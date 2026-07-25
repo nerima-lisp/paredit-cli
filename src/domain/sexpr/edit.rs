@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 
 use super::tree::{Node, NodeKind, Selection, SyntaxTree};
-use super::types::{ByteOffset, ByteSpan, NodeId};
+use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Edit;
@@ -69,12 +69,22 @@ impl Edit {
         Ok(replace_span(input, span, ""))
     }
 
-    pub fn wrap(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn wrap(
+        input: &str,
+        tree: &SyntaxTree,
+        selection: Selection<'_>,
+        delimiter: Delimiter,
+    ) -> Result<String> {
         validate_edit_context(input, tree, selection)?;
         Ok(replace_span(
             input,
             selection.span(),
-            &format!("({})", selection.text()),
+            &format!(
+                "{}{}{}",
+                delimiter.open(),
+                selection.text(),
+                delimiter.close()
+            ),
         ))
     }
 
@@ -223,6 +233,293 @@ impl Edit {
         let insertion = format!("{} ", child_span.slice(input));
         let removal = expand_removal(input, tree, child_span);
         Ok(remove_then_insert(input, removal, open, &insertion))
+    }
+
+    /// Split the enclosing list immediately before the selected expression,
+    /// producing two sibling lists that share the original delimiter. The
+    /// selection becomes the first child of the trailing list.
+    ///
+    /// `(foo bar baz qux)` selecting `baz` yields `(foo bar) (baz qux)`.
+    ///
+    /// The gap between the split point's neighbours is preserved verbatim so
+    /// interleaved comments survive; the caller's trivia normalization then
+    /// trims any whitespace stranded on the changed lines.
+    pub fn split(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
+        let node = selection.node();
+        let parent_id = node
+            .parent
+            .ok_or_else(|| anyhow!("selected expression has no enclosing list to split"))?;
+        let parent = tree.node(parent_id);
+        if parent.kind != NodeKind::List {
+            anyhow::bail!("split requires an expression directly inside a list");
+        }
+        if !parent.reader_prefixes.is_empty() {
+            anyhow::bail!("cannot split a list carrying a reader prefix");
+        }
+        let delimiter = parent
+            .delimiter
+            .ok_or_else(|| anyhow!("enclosing list is missing a delimiter"))?;
+        let previous = previous_sibling(tree, selection.node_id)
+            .ok_or_else(|| anyhow!("cannot split before the first element of a list"))?;
+        let prev_end = tree.node(previous).span.end().get();
+        let selection_start = node.span.start().get();
+
+        let mut output = String::with_capacity(input.len() + 2);
+        output.push_str(&input[..prev_end]);
+        output.push(delimiter.close());
+        output.push_str(&input[prev_end..selection_start]);
+        output.push(delimiter.open());
+        output.push_str(&input[selection_start..]);
+        Ok(output)
+    }
+
+    /// Join the selection with its next sibling. Two lists merge into one list
+    /// concatenating their children; two string literals merge into one string
+    /// concatenating their contents. Adjacent symbols are refused because
+    /// fusing them silently changes tokenization.
+    ///
+    /// `(foo bar) (baz qux)` selecting the first list yields `(foo bar baz qux)`.
+    /// `"foo" "bar"` selecting the first string yields `"foobar"`.
+    pub fn join(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
+        let node = selection.node();
+        let sibling_id = next_sibling(tree, selection.node_id)
+            .ok_or_else(|| anyhow!("selected expression has no next sibling to join"))?;
+        let sibling = tree.node(sibling_id);
+
+        if node.kind == NodeKind::Atom {
+            return join_strings(input, node, sibling);
+        }
+
+        ensure_list(node)?;
+        if !node.reader_prefixes.is_empty() {
+            anyhow::bail!("cannot join a list carrying a reader prefix");
+        }
+        if sibling.kind != NodeKind::List {
+            anyhow::bail!("join requires the next sibling to also be a list");
+        }
+        if !sibling.reader_prefixes.is_empty() {
+            anyhow::bail!("cannot join into a list carrying a reader prefix");
+        }
+        if node.delimiter != sibling.delimiter {
+            anyhow::bail!("cannot join lists that use different delimiters");
+        }
+        let (_, first_close) = list_delimiter_offsets(node)?;
+        let (second_open, _) = list_delimiter_offsets(sibling)?;
+        let gap = &input[first_close + 1..second_open];
+        let separator =
+            if gap.is_empty() && !node.children.is_empty() && !sibling.children.is_empty() {
+                " "
+            } else {
+                gap
+            };
+
+        let mut output = String::with_capacity(input.len());
+        output.push_str(&input[..first_close]);
+        output.push_str(separator);
+        output.push_str(&input[second_open + 1..]);
+        Ok(output)
+    }
+
+    /// Splice the enclosing list, killing every sibling *before* the selection.
+    /// The selection and everything after it survive verbatim; the list's
+    /// delimiters and preceding siblings are removed.
+    ///
+    /// `(let ((x 5)) (foo x) bar)` selecting `(foo x)` yields `(foo x) bar`.
+    pub fn splice_killing_backward(
+        input: &str,
+        tree: &SyntaxTree,
+        selection: Selection<'_>,
+    ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
+        let node = selection.node();
+        let parent = enclosing_list(tree, node)?;
+        let last = *parent
+            .children
+            .last()
+            .ok_or_else(|| anyhow!("enclosing list has no children to keep"))?;
+        let start = node.span.start().get();
+        let end = tree.node(last).span.end().get();
+        Ok(replace_span(input, parent.span, &input[start..end]))
+    }
+
+    /// Splice the enclosing list, killing the selection and every sibling
+    /// *after* it. The siblings before the selection survive verbatim; the
+    /// list's delimiters and the trailing siblings are removed.
+    ///
+    /// `(foo (bar) baz qux)` selecting `baz` yields `foo (bar)`.
+    pub fn splice_killing_forward(
+        input: &str,
+        tree: &SyntaxTree,
+        selection: Selection<'_>,
+    ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
+        let node = selection.node();
+        let parent = enclosing_list(tree, node)?;
+        let previous = previous_sibling(tree, selection.node_id)
+            .ok_or_else(|| anyhow!("nothing precedes the selection to keep"))?;
+        let first = *parent
+            .children
+            .first()
+            .ok_or_else(|| anyhow!("enclosing list has no children to keep"))?;
+        let start = tree.node(first).span.start().get();
+        let end = tree.node(previous).span.end().get();
+        Ok(replace_span(input, parent.span, &input[start..end]))
+    }
+
+    /// Convolute the two lists enclosing the selected list, reversing which one
+    /// nests inside the other. The selected list stays innermost as the anchor.
+    ///
+    /// `(let ((x 1)) (foo (bar baz) quux))` selecting `(bar baz)` yields
+    /// `(foo (let ((x 1)) (bar baz)) quux)`.
+    ///
+    /// Only trivia *between* siblings is normalized to single spaces; comments
+    /// living inside any moved form survive because those forms are sliced
+    /// verbatim. To avoid silently dropping a comment that sits between the
+    /// reshuffled forms, the operation refuses any comment inside the outer
+    /// list that is not inside the selected list.
+    pub fn convolute(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
+        let inner = selection.node();
+        ensure_list(inner)?;
+        let middle_id = inner
+            .parent
+            .ok_or_else(|| anyhow!("selected list has no enclosing list to convolute"))?;
+        let middle = tree.node(middle_id);
+        if middle.kind != NodeKind::List {
+            anyhow::bail!("convolute requires the selected list to be nested inside a list");
+        }
+        let outer_id = middle
+            .parent
+            .ok_or_else(|| anyhow!("convolute requires the selected list to be two lists deep"))?;
+        let outer = tree.node(outer_id);
+        if outer.kind != NodeKind::List {
+            anyhow::bail!("convolute requires the selected list to be two lists deep");
+        }
+        if !middle.reader_prefixes.is_empty() || !outer.reader_prefixes.is_empty() {
+            anyhow::bail!("cannot convolute lists carrying a reader prefix");
+        }
+        let middle_delimiter = middle
+            .delimiter
+            .ok_or_else(|| anyhow!("enclosing list is missing a delimiter"))?;
+        let outer_delimiter = outer
+            .delimiter
+            .ok_or_else(|| anyhow!("outer list is missing a delimiter"))?;
+
+        let inner_span = inner.span;
+        let outer_span = outer.span;
+        if tree.comments.iter().any(|comment| {
+            let within_outer = comment.span.start().get() >= outer_span.start().get()
+                && comment.span.end().get() <= outer_span.end().get();
+            let within_inner = comment.span.start().get() >= inner_span.start().get()
+                && comment.span.end().get() <= inner_span.end().get();
+            within_outer && !within_inner
+        }) {
+            anyhow::bail!("cannot convolute a form with comments outside the selected list");
+        }
+
+        let inner_position = middle
+            .children
+            .iter()
+            .position(|child| *child == selection.node_id)
+            .ok_or_else(|| anyhow!("selected list is not a direct child of its enclosing list"))?;
+        let middle_position = outer
+            .children
+            .iter()
+            .position(|child| *child == middle_id)
+            .ok_or_else(|| anyhow!("enclosing list is not a direct child of the outer list"))?;
+
+        let middle_before = &middle.children[..inner_position];
+        let middle_after = &middle.children[inner_position + 1..];
+        let outer_before = &outer.children[..middle_position];
+        let outer_after = &outer.children[middle_position + 1..];
+
+        let join = |ids: &[NodeId]| {
+            ids.iter()
+                .map(|id| tree.node(*id).span.slice(input))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let middle_before = join(middle_before);
+        let middle_after = join(middle_after);
+        let outer_before = join(outer_before);
+        let outer_after = join(outer_after);
+        let inner_text = inner_span.slice(input);
+
+        let mut relocated_outer = String::new();
+        relocated_outer.push(outer_delimiter.open());
+        push_space_joined(
+            &mut relocated_outer,
+            &[&outer_before, inner_text, &outer_after],
+        );
+        relocated_outer.push(outer_delimiter.close());
+
+        let mut rewritten = String::new();
+        rewritten.push(middle_delimiter.open());
+        push_space_joined(
+            &mut rewritten,
+            &[&middle_before, &relocated_outer, &middle_after],
+        );
+        rewritten.push(middle_delimiter.close());
+
+        Ok(replace_span(input, outer.span, &rewritten))
+    }
+}
+
+/// Merges two adjacent string-literal atoms into one string by concatenating
+/// their contents and dropping the interior delimiters and the gap between
+/// them. Refuses non-string atoms so symbols are never silently fused.
+fn join_strings(input: &str, node: &Node, sibling: &Node) -> Result<String> {
+    if !node.reader_prefixes.is_empty() || !sibling.reader_prefixes.is_empty() {
+        anyhow::bail!("cannot join strings carrying a reader prefix");
+    }
+    let first = node.span.slice(input);
+    let second = sibling.span.slice(input);
+    if !is_string_literal(first) || sibling.kind != NodeKind::Atom || !is_string_literal(second) {
+        anyhow::bail!("join only merges two adjacent lists or two adjacent strings");
+    }
+
+    // Drop the first string's closing quote and the second's opening quote so
+    // their contents abut inside a single pair of quotes: `"foo` + `bar"`.
+    let mut output = String::with_capacity(input.len());
+    output.push_str(&input[..node.span.end().get() - 1]);
+    output.push_str(&second[1..]);
+    output.push_str(&input[sibling.span.end().get()..]);
+    Ok(output)
+}
+
+/// Reports whether `text` is a double-quoted string literal (`"..."`).
+fn is_string_literal(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    bytes.len() >= 2 && bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"'
+}
+
+/// Returns the selected node's enclosing list, or an error when the node is at
+/// the top level or otherwise not directly inside a list.
+fn enclosing_list<'a>(tree: &'a SyntaxTree, node: &Node) -> Result<&'a Node> {
+    let parent_id = node
+        .parent
+        .ok_or_else(|| anyhow!("selected expression has no enclosing list"))?;
+    let parent = tree.node(parent_id);
+    if parent.kind != NodeKind::List {
+        anyhow::bail!("selected expression is not inside a list");
+    }
+    Ok(parent)
+}
+
+/// Appends the non-empty `parts` to `out`, separated by single spaces.
+fn push_space_joined(out: &mut String, parts: &[&str]) {
+    let mut first = true;
+    for part in parts {
+        if part.is_empty() {
+            continue;
+        }
+        if !first {
+            out.push(' ');
+        }
+        out.push_str(part);
+        first = false;
     }
 }
 

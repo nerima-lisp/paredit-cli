@@ -5,7 +5,7 @@ use clap::{Args, ValueEnum};
 use crate::application::usecase::extract_function::ExtractFunctionInsert;
 use crate::application::usecase::function_parameter::FunctionParameterInsert;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::Path;
+use crate::domain::sexpr::{Delimiter, Path};
 
 #[derive(Debug, Args)]
 pub(super) struct AnalyzeArgs {
@@ -108,6 +108,42 @@ pub(super) struct ReplaceArgs {
     /// Print a unified diff against the input instead of the rewritten document.
     #[arg(long)]
     pub(super) diff: bool,
+}
+
+/// Target selection plus in-place write support and a wrapping delimiter.
+/// `wrap` extends [`EditTargetArgs`] with `--delimiter` so callers can wrap in
+/// parentheses, square brackets, or curly braces.
+#[derive(Debug, Args)]
+pub(crate) struct WrapArgs {
+    #[command(flatten)]
+    pub(super) target: TargetArgs,
+    /// Write the rewritten document back to --file instead of stdout.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Print a unified diff against the input instead of the rewritten document.
+    #[arg(long)]
+    pub(super) diff: bool,
+    /// Delimiter to wrap the selected expression in.
+    #[arg(long, value_enum, default_value_t = WrapDelimiter::Paren)]
+    pub(super) delimiter: WrapDelimiter,
+}
+
+/// The list delimiter a `wrap` edit surrounds the selection with.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum WrapDelimiter {
+    Paren,
+    Bracket,
+    Brace,
+}
+
+impl From<WrapDelimiter> for Delimiter {
+    fn from(value: WrapDelimiter) -> Self {
+        match value {
+            WrapDelimiter::Paren => Self::Paren,
+            WrapDelimiter::Bracket => Self::Bracket,
+            WrapDelimiter::Brace => Self::Brace,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

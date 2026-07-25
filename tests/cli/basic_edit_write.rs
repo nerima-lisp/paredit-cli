@@ -230,3 +230,137 @@ fn edit_barf_forward_pushes_last_child_out() {
 fn edit_barf_backward_pushes_first_child_out() {
     assert_edit_output("barf-backward", "0.1", "(a b (c) d e)");
 }
+
+#[test]
+fn edit_wrap_uses_requested_square_bracket_delimiter() {
+    paredit()
+        .args(["edit", "wrap", "--path", "0.1", "--delimiter", "bracket"])
+        .write_stdin("(alpha beta)\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(alpha [beta])"));
+}
+
+#[test]
+fn edit_wrap_write_defaults_to_parentheses() {
+    let dir = fresh_temp_dir("edit-wrap-default-delimiter");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(alpha beta)\n").expect("write source fixture");
+
+    paredit()
+        .args(["edit", "wrap", "--path", "0.1", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(alpha (beta))\n");
+}
+
+#[test]
+fn edit_split_divides_enclosing_list_before_selection() {
+    assert_edit_output("split", "0.2", "(a (b c)) (d e)");
+}
+
+#[test]
+fn edit_join_merges_selected_list_with_next_sibling() {
+    paredit()
+        .args(["edit", "join", "--path", "0"])
+        .write_stdin("(a b) (c d)\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(a b c d)"));
+}
+
+#[test]
+fn edit_split_write_updates_file_in_place() {
+    let dir = fresh_temp_dir("edit-split-write");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(list one two three)\n").expect("write source fixture");
+
+    paredit()
+        .args(["edit", "split", "--path", "0.2", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(list one) (two three)\n");
+}
+
+#[test]
+fn edit_join_write_updates_file_in_place() {
+    let dir = fresh_temp_dir("edit-join-write");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(list one) (two three)\n").expect("write source fixture");
+
+    paredit()
+        .args(["edit", "join", "--path", "0", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(list one two three)\n");
+}
+
+#[test]
+fn edit_join_merges_adjacent_string_literals() {
+    paredit()
+        .args(["edit", "join", "--path", "0.1"])
+        .write_stdin("(concat \"foo\" \"bar\")\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(concat \"foobar\")"));
+}
+
+#[test]
+fn edit_splice_killing_backward_keeps_selection_and_tail() {
+    paredit()
+        .args(["edit", "splice-killing-backward", "--path", "0.2"])
+        .write_stdin("(let ((x 5)) (foo x) bar)\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(foo x) bar"));
+}
+
+#[test]
+fn edit_splice_killing_forward_keeps_preceding_siblings() {
+    paredit()
+        .args(["edit", "splice-killing-forward", "--path", "0.2"])
+        .write_stdin("(foo (bar) baz qux)\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("foo (bar)"));
+}
+
+#[test]
+fn edit_convolute_reverses_two_enclosing_lists() {
+    paredit()
+        .args(["edit", "convolute", "--path", "0.2.1"])
+        .write_stdin("(let ((x 1)) (foo (bar baz) quux))\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(foo (let ((x 1)) (bar baz)) quux)",
+        ));
+}
+
+#[test]
+fn edit_convolute_write_updates_file_in_place() {
+    let dir = fresh_temp_dir("edit-convolute-write");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(let ((x 1)) (foo (bar baz) quux))\n").expect("write source fixture");
+
+    paredit()
+        .args(["edit", "convolute", "--path", "0.2.1", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(foo (let ((x 1)) (bar baz)) quux)\n");
+}

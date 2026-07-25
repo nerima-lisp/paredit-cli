@@ -1,5 +1,7 @@
 use super::{
-    args::{AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs},
+    args::{
+        AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
+    },
     call_graph_report, call_report, capabilities, convert_cond_to_if, convert_flet_to_labels,
     convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
     convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
@@ -83,10 +85,20 @@ pub(super) enum EditCommand {
     Replace(ReplaceArgs),
     /// Remove the selected S-expression.
     Kill(EditTargetArgs),
-    /// Wrap the selected S-expression in a new list.
-    Wrap(EditTargetArgs),
+    /// Wrap the selected S-expression in a new list, optionally choosing the delimiter.
+    Wrap(WrapArgs),
     /// Remove one list pair while keeping its children.
     Splice(EditTargetArgs),
+    /// Split the enclosing list in two immediately before the selected expression.
+    Split(EditTargetArgs),
+    /// Join the selected list with its next sibling list into one list.
+    Join(EditTargetArgs),
+    /// Splice the enclosing list, killing every sibling before the selection.
+    SpliceKillingBackward(EditTargetArgs),
+    /// Splice the enclosing list, killing the selection and every sibling after it.
+    SpliceKillingForward(EditTargetArgs),
+    /// Reverse the nesting of the two lists enclosing the selected list.
+    Convolute(EditTargetArgs),
     /// Replace the selected expression's parent list with the selected expression.
     Raise(EditTargetArgs),
     /// Exchange the selected expression with its next sibling.

@@ -90,12 +90,17 @@ const INTROSPECTION_COMMANDS: [&str; 21] = [
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
 
-const STRUCTURAL_COMMANDS: [&str; 12] = [
+const STRUCTURAL_COMMANDS: [&str; 17] = [
     "edit select",
     "edit replace",
     "edit kill",
     "edit wrap",
     "edit splice",
+    "edit split",
+    "edit join",
+    "edit splice-killing-backward",
+    "edit splice-killing-forward",
+    "edit convolute",
     "edit raise",
     "edit transpose-forward",
     "edit transpose-backward",

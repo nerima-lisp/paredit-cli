@@ -19,7 +19,7 @@ fn edit_rejects_input_that_does_not_match_selection_source() {
     let selection = tree.select_path(&parse_path("0.1")).expect("selection");
 
     assert!(Edit::replace("(alpha zeta)", selection, "delta").is_err());
-    assert!(Edit::wrap("(alpha zeta)", &tree, selection).is_err());
+    assert!(Edit::wrap("(alpha zeta)", &tree, selection, Delimiter::Paren).is_err());
 }
 
 #[test]
@@ -65,8 +65,23 @@ fn wraps_expression() {
     let tree = SyntaxTree::parse(input).expect("valid");
     let selection = tree.select_path(&parse_path("0.1")).expect("selection");
     assert_eq!(
-        Edit::wrap(input, &tree, selection).unwrap(),
+        Edit::wrap(input, &tree, selection, Delimiter::Paren).unwrap(),
         "(alpha (beta))"
+    );
+}
+
+#[test]
+fn wraps_expression_with_square_and_curly_delimiters() {
+    let input = "(alpha beta)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1")).expect("selection");
+    assert_eq!(
+        Edit::wrap(input, &tree, selection, Delimiter::Bracket).unwrap(),
+        "(alpha [beta])"
+    );
+    assert_eq!(
+        Edit::wrap(input, &tree, selection, Delimiter::Brace).unwrap(),
+        "(alpha {beta})"
     );
 }
 
@@ -281,6 +296,160 @@ fn preserves_changed_line_trivia_inside_common_lisp_dispatch() {
         Edit::normalize_changed_line_trivia(input, rewritten.clone(), Dialect::CommonLisp).unwrap(),
         rewritten
     );
+}
+
+#[test]
+fn splits_enclosing_list_before_selection() {
+    let input = "(foo bar baz qux)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.2")).expect("selection");
+    let result = Edit::split(input, &tree, selection).unwrap();
+    assert_eq!(result, "(foo bar) (baz qux)");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn split_preserves_delimiter_and_gap_comment() {
+    let input = "[a b ;; note\n c]";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.2")).expect("selection");
+    let result = Edit::split(input, &tree, selection).unwrap();
+    assert_eq!(result, "[a b] ;; note\n [c]");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn split_rejects_first_element_and_top_level() {
+    let input = "(a b c)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let first = tree.select_path(&parse_path("0.0")).expect("selection");
+    assert!(Edit::split(input, &tree, first).is_err());
+    let top = tree.select_path(&parse_path("0")).expect("selection");
+    assert!(Edit::split(input, &tree, top).is_err());
+}
+
+#[test]
+fn joins_selected_list_with_next_sibling_list() {
+    let input = "(foo bar) (baz qux)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0")).expect("selection");
+    let result = Edit::join(input, &tree, selection).unwrap();
+    assert_eq!(result, "(foo bar baz qux)");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn join_inserts_separator_between_adjacent_lists() {
+    let input = "(a)(b)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0")).expect("selection");
+    assert_eq!(Edit::join(input, &tree, selection).unwrap(), "(a b)");
+}
+
+#[test]
+fn joins_adjacent_string_literals() {
+    let input = "(concat \"foo\" \"bar\")";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1")).expect("selection");
+    let result = Edit::join(input, &tree, selection).unwrap();
+    assert_eq!(result, "(concat \"foobar\")");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn join_preserves_escaped_quotes_when_merging_strings() {
+    let input = "(list \"a\\\"\" \"b\")";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1")).expect("selection");
+    assert_eq!(
+        Edit::join(input, &tree, selection).unwrap(),
+        "(list \"a\\\"b\")"
+    );
+}
+
+#[test]
+fn join_refuses_to_fuse_bare_symbols() {
+    let input = "(foo bar)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.0")).expect("selection");
+    assert!(Edit::join(input, &tree, selection).is_err());
+}
+
+#[test]
+fn join_rejects_mismatched_delimiters_and_non_list_siblings() {
+    let mismatched = "(a) [b]";
+    let tree = SyntaxTree::parse(mismatched).expect("valid");
+    let selection = tree.select_path(&parse_path("0")).expect("selection");
+    assert!(Edit::join(mismatched, &tree, selection).is_err());
+
+    let non_list = "(a) b";
+    let tree = SyntaxTree::parse(non_list).expect("valid");
+    let selection = tree.select_path(&parse_path("0")).expect("selection");
+    assert!(Edit::join(non_list, &tree, selection).is_err());
+}
+
+#[test]
+fn split_then_join_round_trips() {
+    let input = "(foo bar baz qux)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.2")).expect("selection");
+    let split = Edit::split(input, &tree, selection).unwrap();
+    assert_eq!(split, "(foo bar) (baz qux)");
+
+    let split_tree = SyntaxTree::parse(&split).expect("valid");
+    let first = split_tree.select_path(&parse_path("0")).expect("selection");
+    assert_eq!(Edit::join(&split, &split_tree, first).unwrap(), input);
+}
+
+#[test]
+fn splice_killing_backward_keeps_selection_and_following_siblings() {
+    let input = "(let ((x 5)) (foo x) bar)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.2")).expect("selection");
+    let result = Edit::splice_killing_backward(input, &tree, selection).unwrap();
+    assert_eq!(result, "(foo x) bar");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn splice_killing_forward_keeps_preceding_siblings() {
+    let input = "(foo (bar) baz qux)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.2")).expect("selection");
+    let result = Edit::splice_killing_forward(input, &tree, selection).unwrap();
+    assert_eq!(result, "foo (bar)");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn splice_killing_forward_rejects_first_child() {
+    let input = "(foo bar)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.0")).expect("selection");
+    assert!(Edit::splice_killing_forward(input, &tree, selection).is_err());
+}
+
+#[test]
+fn convolutes_two_enclosing_lists() {
+    let input = "(let ((x 1)) (foo (bar baz) quux))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.2.1")).expect("selection");
+    let result = Edit::convolute(input, &tree, selection).unwrap();
+    assert_eq!(result, "(foo (let ((x 1)) (bar baz)) quux)");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn convolute_rejects_shallow_nesting_and_gap_comments() {
+    let shallow = "(foo (bar))";
+    let tree = SyntaxTree::parse(shallow).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1")).expect("selection");
+    assert!(Edit::convolute(shallow, &tree, selection).is_err());
+
+    let commented = "(outer ;; keep me\n (mid (inner)))";
+    let tree = SyntaxTree::parse(commented).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1.1")).expect("selection");
+    assert!(Edit::convolute(commented, &tree, selection).is_err());
 }
 
 #[test]
