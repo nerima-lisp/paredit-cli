@@ -81,6 +81,8 @@ mod definition_movement;
 mod definition_removal;
 #[path = "cli/definition_report.rs"]
 mod definition_report;
+#[path = "cli/defpackage_quoted_report.rs"]
+mod defpackage_quoted_report;
 #[path = "cli/dependency_report.rs"]
 mod dependency_report;
 #[path = "cli/destructive_literal_report.rs"]
@@ -97,6 +99,8 @@ mod duplicate_case_key_report;
 mod duplicate_cond_test_report;
 #[path = "cli/duplicate_export_report.rs"]
 mod duplicate_export_report;
+#[path = "cli/duplicate_keyword_report.rs"]
+mod duplicate_keyword_report;
 #[path = "cli/duplicate_lambda_list_keyword_report.rs"]
 mod duplicate_lambda_list_keyword_report;
 #[path = "cli/duplicate_let_binding_report.rs"]
@@ -379,6 +383,8 @@ mod sort_definitions;
 mod split_file;
 #[path = "cli/split_let_star.rs"]
 mod split_let_star;
+#[path = "cli/step_zero_report.rs"]
+mod step_zero_report;
 #[path = "cli/struct_cycle_report.rs"]
 mod struct_cycle_report;
 #[path = "cli/subseq_zero_report.rs"]
@@ -427,6 +433,8 @@ mod verbose_negation_report;
 mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]
 mod workspace_report;
+#[path = "cli/zero_divisor_report.rs"]
+mod zero_divisor_report;
 
 fn paredit() -> Command {
     Command::cargo_bin("paredit").expect("binary")

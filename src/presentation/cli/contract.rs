@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 154] = [
+const INTROSPECTION_COMMANDS: [&str; 158] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -198,6 +198,10 @@ const INTROSPECTION_COMMANDS: [&str; 154] = [
     "inspect format-to-string",
     "inspect format-newline",
     "inspect literal-place",
+    "inspect zero-divisor",
+    "inspect duplicate-keyword",
+    "inspect defpackage-quoted",
+    "inspect step-zero",
     "inspect eq-char-comparison",
     "inspect redundant-apply",
     "inspect redundant-eql-test",

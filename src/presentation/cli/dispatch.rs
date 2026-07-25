@@ -397,6 +397,18 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::LiteralPlace(args) => {
                 literal_place_report::workflow::literal_place_report(args)?
             }
+            command::InspectCommand::ZeroDivisor(args) => {
+                zero_divisor_report::workflow::zero_divisor_report(args)?
+            }
+            command::InspectCommand::DuplicateKeyword(args) => {
+                duplicate_keyword_report::workflow::duplicate_keyword_report(args)?
+            }
+            command::InspectCommand::DefpackageQuoted(args) => {
+                defpackage_quoted_report::workflow::defpackage_quoted_report(args)?
+            }
+            command::InspectCommand::StepZero(args) => {
+                step_zero_report::workflow::step_zero_report(args)?
+            }
             command::InspectCommand::UnusedParameters(args) => {
                 unused_parameter_report::workflow::unused_parameter_report(args)?
             }

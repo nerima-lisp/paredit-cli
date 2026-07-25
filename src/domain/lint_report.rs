@@ -33,12 +33,14 @@ use crate::domain::constant_if_test_report::collect_constant_if_tests;
 use crate::domain::constant_when_test_report::collect_constant_when_tests;
 use crate::domain::de_morgan_report::collect_de_morgans;
 use crate::domain::dead_boolean_operand_report::collect_dead_boolean_operands;
+use crate::domain::defpackage_quoted_report::collect_defpackage_quoted;
 use crate::domain::destructive_literal_report::collect_destructive_literals;
 use crate::domain::dialect::Dialect;
 use crate::domain::double_reverse_report::collect_double_reverses;
 use crate::domain::duplicate_boolean_operand_report::collect_duplicate_boolean_operands;
 use crate::domain::duplicate_case_key_report::collect_duplicate_case_keys;
 use crate::domain::duplicate_cond_test_report::collect_duplicate_cond_tests;
+use crate::domain::duplicate_keyword_report::collect_duplicate_keywords;
 use crate::domain::duplicate_lambda_list_keyword_report::collect_duplicate_lambda_list_keywords;
 use crate::domain::duplicate_let_binding_report::collect_duplicate_let_bindings;
 use crate::domain::duplicate_parameter_report::collect_duplicate_parameters;
@@ -123,6 +125,7 @@ use crate::domain::single_operand_arithmetic_report::collect_single_operand_arit
 use crate::domain::single_operand_boolean_report::collect_single_operand_booleans;
 use crate::domain::single_operand_list_op_report::collect_single_operand_list_ops;
 use crate::domain::single_value_bind_report::collect_single_value_binds;
+use crate::domain::step_zero_report::collect_step_zeros;
 use crate::domain::subseq_zero_report::collect_subseq_zeros;
 use crate::domain::t_comparison_report::collect_t_comparisons;
 use crate::domain::the_arity_report::collect_the_arity_violations;
@@ -132,9 +135,10 @@ use crate::domain::unreachable_case_clause_report::collect_unreachable_case_clau
 use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clauses;
 use crate::domain::values_list_of_list_report::collect_values_list_of_lists;
 use crate::domain::verbose_negation_report::collect_verbose_negations;
+use crate::domain::zero_divisor_report::collect_zero_divisors;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 110] = [
+pub const RULES: [&str; 114] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -245,6 +249,10 @@ pub const RULES: [&str; 110] = [
     "coerce-to-t",
     "gethash-default",
     "make-hash-table-test",
+    "zero-divisor",
+    "duplicate-keyword",
+    "defpackage-quoted",
+    "step-zero",
 ];
 
 /// The set of rule categories, sorted, for `--category` validation and
@@ -257,7 +265,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 110] = [
+pub const RULE_DOCS: [(&str, &str, &str); 114] = [
     (
         "self-assignment",
         "suspicious",
@@ -808,6 +816,26 @@ pub const RULE_DOCS: [(&str, &str, &str); 110] = [
         "suspicious",
         "a make-hash-table with an explicit :test 'eql, the default ((make-hash-table :test 'eql) is (make-hash-table))",
     ),
+    (
+        "zero-divisor",
+        "suspicious",
+        "a division-family form with a literal 0 divisor, a guaranteed division-by-zero ((/ x 0))",
+    ),
+    (
+        "duplicate-keyword",
+        "duplicate",
+        "a make-* call passing the same keyword argument twice ((make-instance 'c :x 1 :x 2))",
+    ),
+    (
+        "defpackage-quoted",
+        "malformed",
+        "a quoted designator in a defpackage clause, which defpackage does not evaluate ((:export 'foo))",
+    ),
+    (
+        "step-zero",
+        "suspicious",
+        "an incf/decf with an explicit step of 0, a no-op ((incf x 0))",
+    ),
 ];
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
@@ -941,7 +969,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 69] = [
+pub const WARNING_RULES: [&str; 73] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -1011,6 +1039,10 @@ pub const WARNING_RULES: [&str; 69] = [
     "coerce-to-t",
     "gethash-default",
     "make-hash-table-test",
+    "zero-divisor",
+    "duplicate-keyword",
+    "defpackage-quoted",
+    "step-zero",
 ];
 
 /// The severity of a rule's findings (`error` unless it is a [`WARNING_RULES`]
@@ -2390,6 +2422,55 @@ pub fn collect_lint_findings(
             span: item.span,
             message: "the make-hash-table :test defaults to eql; drop the explicit :test 'eql"
                 .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_zero_divisors(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "zero-divisor",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "{} by a literal 0 always signals division-by-zero",
+                item.operator
+            ),
+        });
+    }
+
+    let (_, items) = collect_duplicate_keywords(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "duplicate-keyword",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "keyword {} is passed more than once; the leftmost value wins",
+                item.keyword
+            ),
+        });
+    }
+
+    let (_, items) = collect_defpackage_quoted(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "defpackage-quoted",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "defpackage does not evaluate its options; drop the quote in the {} clause",
+                item.clause
+            ),
+        });
+    }
+
+    let (_, items) = collect_step_zeros(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "step-zero",
+            path: item.path,
+            span: item.span,
+            message: format!("{} by 0 is a no-op that changes nothing", item.operator),
         });
     }
 
