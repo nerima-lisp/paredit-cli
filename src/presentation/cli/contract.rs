@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 97] = [
+const INTROSPECTION_COMMANDS: [&str; 104] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -90,11 +90,15 @@ const INTROSPECTION_COMMANDS: [&str; 97] = [
     "inspect duplicates",
     "inspect similarity",
     "inspect lets",
+    "inspect unused-parameters",
+    "inspect shadowed-bindings",
+    "inspect unused-local-callables",
     "inspect duplicate-setf-places",
     "inspect duplicate-case-keys",
     "inspect self-assignments",
     "inspect identical-if-branches",
     "inspect duplicate-cond-tests",
+    "inspect duplicate-let-bindings",
     "inspect duplicate-boolean-operands",
     "inspect eql-string-comparison",
     "inspect self-comparison",
@@ -102,6 +106,7 @@ const INTROSPECTION_COMMANDS: [&str; 97] = [
     "inspect eq-number-comparison",
     "inspect setf-arity",
     "inspect eql-list-comparison",
+    "inspect duplicate-parameters",
     "inspect redundant-quote",
     "inspect unreachable-cond-clause",
     "inspect malformed-let-binding",
@@ -116,6 +121,7 @@ const INTROSPECTION_COMMANDS: [&str; 97] = [
     "inspect duplicate-lambda-list-keyword",
     "inspect lambda-list-keyword-order",
     "inspect modify-macro-arity",
+    "inspect binds-constant",
     "inspect quoted-case-key",
     "inspect case-nil-key",
     "inspect t-comparison",
@@ -146,6 +152,7 @@ const INTROSPECTION_COMMANDS: [&str; 97] = [
     "inspect single-operand-arithmetic",
     "inspect single-arg-comparison",
     "inspect single-clause-cond",
+    "inspect single-value-bind",
     "inspect sign-comparison",
     "inspect literal-place",
     "inspect eq-char-comparison",

@@ -3,14 +3,15 @@ use super::{
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
-    call_graph_report, call_report, capabilities, case_nil_key_report, char_op_string_report,
-    constant_if_test_report, convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond,
-    convert_if_to_unless, convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let,
-    convert_let_to_let_star, convert_sequential_binding, convert_unless_to_if, convert_when_to_if,
-    de_morgan_report, dead_boolean_operand_report, definition_movement, definition_removal,
-    definition_report, dependency_report, destructive_literal_report,
-    duplicate_boolean_operand_report, duplicate_case_key_report, duplicate_cond_test_report,
-    duplicate_lambda_list_keyword_report, duplicate_report, duplicate_setf_place_report,
+    binds_constant_report, call_graph_report, call_report, capabilities, case_nil_key_report,
+    char_op_string_report, constant_if_test_report, convert_cond_to_if, convert_flet_to_labels,
+    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
+    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
+    convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
+    definition_movement, definition_removal, definition_report, dependency_report,
+    destructive_literal_report, duplicate_boolean_operand_report, duplicate_case_key_report,
+    duplicate_cond_test_report, duplicate_lambda_list_keyword_report, duplicate_let_binding_report,
+    duplicate_parameter_report, duplicate_report, duplicate_setf_place_report,
     eliminate_empty_binding_form, empty_body_report, eq_char_comparison_report,
     eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
     eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
@@ -32,12 +33,13 @@ use super::{
     redundant_let_star_report, redundant_progn_report, redundant_quote_report, refactor,
     remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
     self_assignment_report, self_comparison_report, setf_arity_report, setq_non_variable_report,
-    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
-    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
-    single_operand_boolean_report, split_let, split_let_star, symbol_report, t_comparison_report,
-    the_arity_report, thread_expression, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unthread_expression, unwrap_call, verbose_negation_report,
-    workspace_report,
+    shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
+    similarity_report, single_arg_comparison_report, single_clause_cond_report,
+    single_operand_arithmetic_report, single_operand_boolean_report, single_value_bind_report,
+    split_let, split_let_star, symbol_report, t_comparison_report, the_arity_report,
+    thread_expression, unreachable_case_clause_report, unreachable_cond_clause_report,
+    unthread_expression, unused_local_callable_report, unused_parameter_report, unwrap_call,
+    verbose_negation_report, workspace_report,
 };
 use clap::Subcommand;
 
@@ -87,6 +89,8 @@ pub(super) enum InspectCommand {
     Duplicates(duplicate_report::args::DuplicateReportArgs),
     /// Report a setf/setq/psetf/psetq that assigns the same variable more than once.
     DuplicateSetfPlaces(duplicate_setf_place_report::args::DuplicateSetfPlaceReportArgs),
+    /// Report callable definitions whose lambda list names the same parameter more than once.
+    DuplicateParameters(duplicate_parameter_report::args::DuplicateParameterReportArgs),
     /// Report lambda lists that repeat a lambda-list keyword (&optional, &rest, &key, ...).
     DuplicateLambdaListKeyword(
         duplicate_lambda_list_keyword_report::args::DuplicateLambdaListKeywordReportArgs,
@@ -121,6 +125,8 @@ pub(super) enum InspectCommand {
     UnreachableCondClause(unreachable_cond_clause_report::args::UnreachableCondClauseReportArgs),
     /// Report cond clauses that are not a non-empty list (a bare atom or empty clause).
     MalformedCondClause(malformed_cond_clause_report::args::MalformedCondClauseReportArgs),
+    /// Report parallel let forms that bind the same variable more than once.
+    DuplicateLetBindings(duplicate_let_binding_report::args::DuplicateLetBindingReportArgs),
     /// Report let/let* bindings that are neither a symbol nor a (var value) pair.
     MalformedLetBinding(malformed_let_binding_report::args::MalformedLetBindingReportArgs),
     /// Report a setf/setq that manually increments a variable ((setf x (1+ x)) is (incf x)).
@@ -129,6 +135,8 @@ pub(super) enum InspectCommand {
     ManualPush(manual_push_report::args::ManualPushReportArgs),
     /// Report a setf/setq that manually adjoins onto a variable ((setf x (adjoin e x)) is (pushnew e x)).
     ManualPushnew(manual_pushnew_report::args::ManualPushnewReportArgs),
+    /// Report let/let*/do/do* bindings whose variable is a constant (nil, t, or a keyword).
+    BindsConstant(binds_constant_report::args::BindsConstantReportArgs),
     /// Report dolist/dotimes specs that are not a (var form [result]) list.
     MalformedIterationSpec(malformed_iteration_spec_report::args::MalformedIterationSpecReportArgs),
     /// Report and/or forms that list the same operand more than once.
@@ -249,10 +257,18 @@ pub(super) enum InspectCommand {
     SingleArgComparison(single_arg_comparison_report::args::SingleArgComparisonReportArgs),
     /// Report a cond with a single non-t clause that has a body ((cond (test body)) is (when test body)).
     SingleClauseCond(single_clause_cond_report::args::SingleClauseCondReportArgs),
+    /// Report a multiple-value-bind of one variable, which is just let ((multiple-value-bind (x) f b) is (let ((x f)) b)).
+    SingleValueBind(single_value_bind_report::args::SingleValueBindReportArgs),
     /// Report =/</> comparisons against 0 that have a predicate ((= x 0) is (zerop x)).
     SignComparison(sign_comparison_report::args::SignComparisonReportArgs),
     /// Report incf/decf/push/pop/pushnew whose place is a self-evaluating literal (cannot be modified).
     LiteralPlace(literal_place_report::args::LiteralPlaceReportArgs),
+    /// Report declared function parameters with no unshadowed reference in their body.
+    UnusedParameters(unused_parameter_report::args::UnusedParameterReportArgs),
+    /// Report let-family bindings that shadow an enclosing parameter or let binding.
+    ShadowedBindings(shadowed_binding_report::args::ShadowedBindingReportArgs),
+    /// Report flet/labels local callables never called anywhere in their visible scope.
+    UnusedLocalCallables(unused_local_callable_report::args::UnusedLocalCallableReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

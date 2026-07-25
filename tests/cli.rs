@@ -15,6 +15,8 @@ mod action_contract;
 mod analysis_report;
 #[path = "cli/basic_edit_write.rs"]
 mod basic_edit_write;
+#[path = "cli/binds_constant_report.rs"]
+mod binds_constant_report;
 #[path = "cli/call_graph_report/mod.rs"]
 mod call_graph_report;
 #[path = "cli/call_report.rs"]
@@ -71,6 +73,10 @@ mod duplicate_case_key_report;
 mod duplicate_cond_test_report;
 #[path = "cli/duplicate_lambda_list_keyword_report.rs"]
 mod duplicate_lambda_list_keyword_report;
+#[path = "cli/duplicate_let_binding_report.rs"]
+mod duplicate_let_binding_report;
+#[path = "cli/duplicate_parameter_report.rs"]
+mod duplicate_parameter_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
 #[path = "cli/duplicate_setf_place_report.rs"]
@@ -267,6 +273,8 @@ mod self_comparison_report;
 mod setf_arity_report;
 #[path = "cli/setq_non_variable_report.rs"]
 mod setq_non_variable_report;
+#[path = "cli/shadowed_binding_report.rs"]
+mod shadowed_binding_report;
 #[path = "cli/sharp_quoted_lambda_report.rs"]
 mod sharp_quoted_lambda_report;
 #[path = "cli/sign_comparison_report.rs"]
@@ -283,6 +291,8 @@ mod single_clause_cond_report;
 mod single_operand_arithmetic_report;
 #[path = "cli/single_operand_boolean_report.rs"]
 mod single_operand_boolean_report;
+#[path = "cli/single_value_bind_report.rs"]
+mod single_value_bind_report;
 #[path = "cli/skill_contract.rs"]
 mod skill_contract;
 #[path = "cli/sort_definitions.rs"]
@@ -305,6 +315,10 @@ mod thread_expression;
 mod unreachable_case_clause_report;
 #[path = "cli/unreachable_cond_clause_report.rs"]
 mod unreachable_cond_clause_report;
+#[path = "cli/unused_local_callable_report.rs"]
+mod unused_local_callable_report;
+#[path = "cli/unused_parameter_report.rs"]
+mod unused_parameter_report;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
 #[path = "cli/verbose_negation_report.rs"]

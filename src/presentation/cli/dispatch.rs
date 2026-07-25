@@ -43,6 +43,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::DuplicateSetfPlaces(args) => {
                 duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?
             }
+            command::InspectCommand::DuplicateParameters(args) => {
+                duplicate_parameter_report::workflow::duplicate_parameter_report(args)?
+            }
             command::InspectCommand::DuplicateLambdaListKeyword(args) => {
                 duplicate_lambda_list_keyword_report::workflow::duplicate_lambda_list_keyword_report(
                     args,
@@ -87,6 +90,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::MalformedCondClause(args) => {
                 malformed_cond_clause_report::workflow::malformed_cond_clause_report(args)?
             }
+            command::InspectCommand::DuplicateLetBindings(args) => {
+                duplicate_let_binding_report::workflow::duplicate_let_binding_report(args)?
+            }
             command::InspectCommand::MalformedLetBinding(args) => {
                 malformed_let_binding_report::workflow::malformed_let_binding_report(args)?
             }
@@ -98,6 +104,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::ManualPushnew(args) => {
                 manual_pushnew_report::workflow::manual_pushnew_report(args)?
+            }
+            command::InspectCommand::BindsConstant(args) => {
+                binds_constant_report::workflow::binds_constant_report(args)?
             }
             command::InspectCommand::MalformedIterationSpec(args) => {
                 malformed_iteration_spec_report::workflow::malformed_iteration_spec_report(args)?
@@ -270,11 +279,23 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::SingleClauseCond(args) => {
                 single_clause_cond_report::workflow::single_clause_cond_report(args)?
             }
+            command::InspectCommand::SingleValueBind(args) => {
+                single_value_bind_report::workflow::single_value_bind_report(args)?
+            }
             command::InspectCommand::SignComparison(args) => {
                 sign_comparison_report::workflow::sign_comparison_report(args)?
             }
             command::InspectCommand::LiteralPlace(args) => {
                 literal_place_report::workflow::literal_place_report(args)?
+            }
+            command::InspectCommand::UnusedParameters(args) => {
+                unused_parameter_report::workflow::unused_parameter_report(args)?
+            }
+            command::InspectCommand::ShadowedBindings(args) => {
+                shadowed_binding_report::workflow::shadowed_binding_report(args)?
+            }
+            command::InspectCommand::UnusedLocalCallables(args) => {
+                unused_local_callable_report::workflow::unused_local_callable_report(args)?
             }
         },
         Command::Edit { command } => match command {
