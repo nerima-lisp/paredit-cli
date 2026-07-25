@@ -77,6 +77,8 @@ mod dependency_report;
 mod destructive_literal_report;
 #[path = "cli/dialect_contract.rs"]
 mod dialect_contract;
+#[path = "cli/double_reverse_report.rs"]
+mod double_reverse_report;
 #[path = "cli/duplicate_boolean_operand_report.rs"]
 mod duplicate_boolean_operand_report;
 #[path = "cli/duplicate_case_key_report.rs"]
@@ -223,6 +225,8 @@ mod nested_when_report;
 mod nil_comparison_report;
 #[path = "cli/nth_constant_index_report.rs"]
 mod nth_constant_index_report;
+#[path = "cli/nthcdr_small_index_report.rs"]
+mod nthcdr_small_index_report;
 #[path = "cli/nthcdr_zero_report.rs"]
 mod nthcdr_zero_report;
 #[path = "cli/one_armed_if_report.rs"]

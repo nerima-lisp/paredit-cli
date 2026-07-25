@@ -5,6 +5,7 @@ use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
 use crate::application::usecase::constant_if_test_report::collect_constant_if_tests;
 use crate::application::usecase::constant_when_test_report::collect_constant_when_tests;
 use crate::application::usecase::de_morgan_report::collect_de_morgans;
+use crate::application::usecase::double_reverse_report::collect_double_reverses;
 use crate::application::usecase::empty_let_report::collect_empty_lets;
 use crate::application::usecase::eq_char_comparison_report::collect_eq_char_comparisons;
 use crate::application::usecase::eq_number_comparison_report::collect_eq_number_comparisons;
@@ -32,6 +33,7 @@ use crate::application::usecase::nested_unless_report::collect_nested_unlesses;
 use crate::application::usecase::nested_when_report::collect_nested_whens;
 use crate::application::usecase::nil_comparison_report::collect_nil_comparisons;
 use crate::application::usecase::nth_constant_index_report::collect_nth_constant_indexes;
+use crate::application::usecase::nthcdr_small_index_report::collect_nthcdr_small_indexes;
 use crate::application::usecase::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::application::usecase::one_armed_if_report::collect_one_armed_ifs;
 use crate::application::usecase::one_step_arithmetic_report::collect_one_step_arithmetic;
@@ -220,7 +222,8 @@ fn retain_unbaselined(
 /// `redundant-identity-key` (delete an explicit default `:key #'identity`),
 /// `redundant-identity` (replace
 /// `(identity x)` with `x`), `cons-to-list` (rewrite `(cons a nil)` as
-/// `(list a)`), `verbose-negation` (rewrite `(- 0 x)` / `(* x -1)` as `(- x)`),
+/// `(list a)`), `double-reverse` (rewrite `(reverse (reverse x))` as
+/// `(copy-seq x)`), `verbose-negation` (rewrite `(- 0 x)` / `(* x -1)` as `(- x)`),
 /// `negated-when-unless` (a two-edit fix: flip the
 /// `when`/`unless` head and drop the `(not …)`), `one-armed-if` (swap an
 /// else-less `if` head for `when`), `manual-incf` (rewrite `(setf x (1+ x))` as
@@ -240,7 +243,8 @@ fn retain_unbaselined(
 /// `(unless a (unless b body))` into `(unless (or a b) body)`),
 /// `nested-cxr` (collapse `(car (cdr x))` into `(cadr x)`),
 /// `nth-constant-index` (rewrite `(nth 0 x)` as `(first x)`), `nthcdr-zero`
-/// (replace `(nthcdr 0 x)` with `x`),
+/// (replace `(nthcdr 0 x)` with `x`), `nthcdr-small-index` (rewrite
+/// `(nthcdr 2 x)` as `(cddr x)`),
 /// `redundant-apply` (rewrite `(apply #'f (list a b))` as `(f a b)`),
 /// `sign-comparison` (rewrite `(= x 0)` as `(zerop x)`),
 /// `negated-comparison` (rewrite `(not (= a b))` as `(/= a b)`),
@@ -909,6 +913,24 @@ fn collect_lint_fixes(
         }
     }
 
+    if active.contains(&"double-reverse") {
+        let (_, items) = collect_double_reverses(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (reverse (reverse x)) is (copy-seq x): keep the inner argument.
+            let text = format!("(copy-seq {})", slice(item.inner_span));
+            fixes.insert(
+                ("double-reverse", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (reverse (reverse x)) as (copy-seq x)".to_owned(),
+                ),
+            );
+        }
+    }
+
     if active.contains(&"manual-incf") {
         let (_, items) = collect_manual_incfs(file, dialect, tree)?;
         for item in items {
@@ -1007,6 +1029,24 @@ fn collect_lint_fixes(
                     end,
                     slice(item.list_span),
                     "Drop the no-op (nthcdr 0 …)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"nthcdr-small-index") {
+        let (_, items) = collect_nthcdr_small_indexes(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (nthcdr 2 x) is (cddr x): rewrite to the named cdr accessor.
+            let text = format!("({} {})", item.accessor, slice(item.list_span));
+            fixes.insert(
+                ("nthcdr-small-index", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    format!("Rewrite (nthcdr n …) as ({} …)", item.accessor),
                 ),
             );
         }
@@ -1820,6 +1860,7 @@ mod tests {
             "(mapcar #'(lambda (sq) sq) sqs)\n",      // sharp-quoted-lambda
             "(identity h)\n",                         // redundant-identity
             "(cons e nil)\n",                         // cons-to-list
+            "(reverse (reverse dr))\n",               // double-reverse
             "(- 0 amt)\n",                            // verbose-negation
             "(let* ((a 1)) a)\n",                     // redundant-let-star
             "(cond (ok (run)))\n",                    // single-clause-cond
@@ -1842,6 +1883,7 @@ mod tests {
             "(car (cdr z))\n",                        // nested-cxr
             "(nth 0 zs)\n",                           // nth-constant-index
             "(nthcdr 0 nz)\n",                        // nthcdr-zero
+            "(nthcdr 2 ns)\n",                        // nthcdr-small-index
             "(apply #'g (list m))\n",                 // redundant-apply
             "(find ret lst :test #'eql)\n",           // redundant-eql-test
             "(sort rik #'< :key #'identity)\n",       // redundant-identity-key

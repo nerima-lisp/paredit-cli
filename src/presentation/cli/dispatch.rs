@@ -240,6 +240,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::ConsToList(args) => {
                 cons_to_list_report::workflow::cons_to_list_report(args)?
             }
+            command::InspectCommand::DoubleReverse(args) => {
+                double_reverse_report::workflow::double_reverse_report(args)?
+            }
             command::InspectCommand::VerboseNegation(args) => {
                 verbose_negation_report::workflow::verbose_negation_report(args)?
             }
@@ -251,6 +254,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::NthcdrZero(args) => {
                 nthcdr_zero_report::workflow::nthcdr_zero_report(args)?
+            }
+            command::InspectCommand::NthcdrSmallIndex(args) => {
+                nthcdr_small_index_report::workflow::nthcdr_small_index_report(args)?
             }
             command::InspectCommand::NthConstantIndex(args) => {
                 nth_constant_index_report::workflow::nth_constant_index_report(args)?

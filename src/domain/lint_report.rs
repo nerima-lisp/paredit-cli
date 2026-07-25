@@ -30,6 +30,7 @@ use crate::domain::de_morgan_report::collect_de_morgans;
 use crate::domain::dead_boolean_operand_report::collect_dead_boolean_operands;
 use crate::domain::destructive_literal_report::collect_destructive_literals;
 use crate::domain::dialect::Dialect;
+use crate::domain::double_reverse_report::collect_double_reverses;
 use crate::domain::duplicate_boolean_operand_report::collect_duplicate_boolean_operands;
 use crate::domain::duplicate_case_key_report::collect_duplicate_case_keys;
 use crate::domain::duplicate_cond_test_report::collect_duplicate_cond_tests;
@@ -79,6 +80,7 @@ use crate::domain::nested_unless_report::collect_nested_unlesses;
 use crate::domain::nested_when_report::collect_nested_whens;
 use crate::domain::nil_comparison_report::collect_nil_comparisons;
 use crate::domain::nth_constant_index_report::collect_nth_constant_indexes;
+use crate::domain::nthcdr_small_index_report::collect_nthcdr_small_indexes;
 use crate::domain::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::domain::one_armed_if_report::collect_one_armed_ifs;
 use crate::domain::one_step_arithmetic_report::collect_one_step_arithmetic;
@@ -116,7 +118,7 @@ use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clau
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 92] = [
+pub const RULES: [&str; 94] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -128,6 +130,7 @@ pub const RULES: [&str; 92] = [
     "negated-step-delta",
     "explicit-nil-return",
     "cons-to-list",
+    "double-reverse",
     "modify-macro-arity",
     "duplicate-parameters",
     "duplicate-lambda-list-keyword",
@@ -141,6 +144,7 @@ pub const RULES: [&str; 92] = [
     "nested-cxr",
     "nth-constant-index",
     "nthcdr-zero",
+    "nthcdr-small-index",
     "redundant-body-progn",
     "empty-let",
     "redundant-if-nil",
@@ -221,7 +225,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 92] = [
+pub const RULE_DOCS: [(&str, &str, &str); 94] = [
     (
         "self-assignment",
         "suspicious",
@@ -276,6 +280,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 92] = [
         "cons-to-list",
         "suspicious",
         "a cons onto nil or a list literal ((cons a nil) is (list a); (cons a (list b)) is (list a b))",
+    ),
+    (
+        "double-reverse",
+        "suspicious",
+        "a (reverse (reverse x)), a wasteful obfuscated copy ((reverse (reverse x)) is (copy-seq x))",
     ),
     (
         "modify-macro-arity",
@@ -341,6 +350,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 92] = [
         "nthcdr-zero",
         "suspicious",
         "an nthcdr with a zero count, which returns the list unchanged ((nthcdr 0 x) is x)",
+    ),
+    (
+        "nthcdr-small-index",
+        "suspicious",
+        "an nthcdr with a 1-4 count that has a named cdr accessor ((nthcdr 2 x) is (cddr x))",
     ),
     (
         "redundant-body-progn",
@@ -706,7 +720,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 50] = [
+pub const FIXABLE_RULES: [&str; 52] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -714,6 +728,7 @@ pub const FIXABLE_RULES: [&str; 50] = [
     "negated-step-delta",
     "explicit-nil-return",
     "cons-to-list",
+    "double-reverse",
     "redundant-quote",
     "redundant-progn",
     "nested-progn",
@@ -723,6 +738,7 @@ pub const FIXABLE_RULES: [&str; 50] = [
     "nested-cxr",
     "nth-constant-index",
     "nthcdr-zero",
+    "nthcdr-small-index",
     "redundant-body-progn",
     "empty-let",
     "redundant-if-nil",
@@ -797,7 +813,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 51] = [
+pub const WARNING_RULES: [&str; 53] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -805,6 +821,7 @@ pub const WARNING_RULES: [&str; 51] = [
     "negated-step-delta",
     "explicit-nil-return",
     "cons-to-list",
+    "double-reverse",
     "redundant-quote",
     "redundant-progn",
     "nested-progn",
@@ -814,6 +831,7 @@ pub const WARNING_RULES: [&str; 51] = [
     "nested-cxr",
     "nth-constant-index",
     "nthcdr-zero",
+    "nthcdr-small-index",
     "redundant-body-progn",
     "empty-let",
     "redundant-if-nil",
@@ -1043,6 +1061,16 @@ pub fn collect_lint_findings(
         });
     }
 
+    let (_, items) = collect_double_reverses(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "double-reverse",
+            path: item.path,
+            span: item.span,
+            message: "(reverse (reverse x)) is a wasteful copy; use (copy-seq x)".to_owned(),
+        });
+    }
+
     let (_, items) = collect_modify_macro_arity_violations(path, dialect, tree)?;
     for item in items {
         let expected = expected_arity_phrase(&item);
@@ -1198,6 +1226,19 @@ pub fn collect_lint_findings(
             span: item.span,
             message: "nthcdr with a zero count returns the list unchanged; (nthcdr 0 x) is x"
                 .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_nthcdr_small_indexes(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "nthcdr-small-index",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "nthcdr with a small count has a named cdr accessor; use ({} …)",
+                item.accessor
+            ),
         });
     }
 
