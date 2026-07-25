@@ -206,6 +206,18 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                     args,
                 )?
             }
+            command::InspectCommand::GetfDefaultNil(args) => {
+                getf_default_nil_report::workflow::getf_default_nil_report(args)?
+            }
+            command::InspectCommand::MakeArrayDefaultKeyword(args) => {
+                make_array_default_keyword_report::workflow::make_array_default_keyword_report(args)?
+            }
+            command::InspectCommand::NestedCharCase(args) => {
+                nested_char_case_report::workflow::nested_char_case_report(args)?
+            }
+            command::InspectCommand::ListStarNil(args) => {
+                list_star_nil_report::workflow::list_star_nil_report(args)?
+            }
             command::InspectCommand::EmptyBody(args) => {
                 empty_body_report::workflow::empty_body_report(args)?
             }

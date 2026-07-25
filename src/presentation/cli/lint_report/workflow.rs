@@ -22,6 +22,7 @@ use crate::application::usecase::explicit_step_delta_report::collect_explicit_st
 use crate::application::usecase::format_newline_report::collect_format_newlines;
 use crate::application::usecase::format_to_string_report::collect_format_to_strings;
 use crate::application::usecase::funcall_lambda_report::collect_funcall_lambdas;
+use crate::application::usecase::getf_default_nil_report::collect_getf_default_nils;
 use crate::application::usecase::gethash_default_report::collect_gethash_defaults;
 use crate::application::usecase::handler_case_no_clauses_report::collect_handler_case_no_clauses;
 use crate::application::usecase::if_not_report::collect_if_nots;
@@ -33,7 +34,9 @@ use crate::application::usecase::lint_report::{
     evaluate_lint_policy, resolve_active_rules, rule_category, rule_severity,
     summarize_lint_findings,
 };
+use crate::application::usecase::list_star_nil_report::collect_list_star_nils;
 use crate::application::usecase::list_star_to_cons_report::collect_list_star_to_cons;
+use crate::application::usecase::make_array_default_keyword_report::collect_make_array_default_keywords;
 use crate::application::usecase::make_hash_table_test_report::collect_make_hash_table_tests;
 use crate::application::usecase::make_list_default_element_report::collect_make_list_default_elements;
 use crate::application::usecase::manual_incf_report::collect_manual_incfs;
@@ -45,6 +48,7 @@ use crate::application::usecase::negated_if_report::collect_negated_ifs;
 use crate::application::usecase::negated_step_delta_report::collect_negated_step_deltas;
 use crate::application::usecase::negated_when_unless_report::collect_negated_when_unless;
 use crate::application::usecase::nested_boolean_report::collect_nested_booleans;
+use crate::application::usecase::nested_char_case_report::collect_nested_char_cases;
 use crate::application::usecase::nested_cxr_report::collect_nested_cxrs;
 use crate::application::usecase::nested_progn_report::collect_nested_progns;
 use crate::application::usecase::nested_string_case_report::collect_nested_string_cases;
@@ -260,7 +264,11 @@ fn retain_unbaselined(
 /// `last-default-count` / `butlast-default-count` (drop an explicit trailing
 /// count of `1`), `make-list-default-element` (drop an explicit
 /// `:initial-element nil`), `parse-integer-default-radix` (drop an explicit
-/// `:radix 10`),
+/// `:radix 10`), `getf-default-nil` (drop an explicit `nil` default),
+/// `make-array-default-keyword` (drop an explicit `:adjustable nil` /
+/// `:fill-pointer nil`), `nested-char-case` (collapse
+/// `(char-upcase (char-downcase c))` to `(char-upcase c)`), `list-star-nil`
+/// (rewrite `(list* a b nil)` as `(list a b)`),
 /// `redundant-identity-key` (delete an explicit default `:key #'identity`),
 /// `redundant-identity` (replace
 /// `(identity x)` with `x`), `cons-to-list` (rewrite `(cons a nil)` as
@@ -793,6 +801,91 @@ fn collect_lint_fixes(
                         byte_length: removal_end - removal_start,
                         text: String::new(),
                     }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"getf-default-nil") {
+        let (_, items) = collect_getf_default_nils(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("getf-default-nil", start, end),
+                LintFix {
+                    description: "Drop the redundant nil default".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"make-array-default-keyword") {
+        let (_, items) = collect_make_array_default_keywords(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("make-array-default-keyword", start, end),
+                LintFix {
+                    description: format!("Drop the redundant {} nil", item.keyword),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"nested-char-case") {
+        let (_, items) = collect_nested_char_cases(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (OUTER (INNER c)) is (OUTER c), keeping the outer op.
+            let text = format!("({} {})", slice(item.outer_span), slice(item.char_span));
+            fixes.insert(
+                ("nested-char-case", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Collapse the nested char case op".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"list-star-nil") {
+        let (_, items) = collect_list_star_nils(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // Two disjoint edits: rewrite the head to list and drop the nil tail.
+            let replacements = vec![
+                LintReplacement {
+                    byte_offset: item.head_span.start().get(),
+                    byte_length: item.head_span.end().get() - item.head_span.start().get(),
+                    text: "list".to_owned(),
+                },
+                LintReplacement {
+                    byte_offset: item.removal_span.start().get(),
+                    byte_length: item.removal_span.end().get() - item.removal_span.start().get(),
+                    text: String::new(),
+                },
+            ];
+            fixes.insert(
+                ("list-star-nil", start, end),
+                LintFix {
+                    description: "Rewrite list* with a nil tail as list".to_owned(),
+                    replacements,
                 },
             );
         }
@@ -2588,6 +2681,10 @@ mod tests {
             "(butlast bdc 1)\n",       // butlast-default-count
             "(make-list mde :initial-element nil)\n", // make-list-default-element
             "(parse-integer pir :radix 10)\n", // parse-integer-default-radix
+            "(getf gdn :key nil)\n",   // getf-default-nil
+            "(make-array madk :adjustable nil)\n", // make-array-default-keyword
+            "(char-upcase (char-downcase ncc))\n", // nested-char-case
+            "(list* lsn1 lsn2 nil)\n", // list-star-nil
             "(sort rik #'< :key #'identity)\n", // redundant-identity-key
             "(= tally 0)\n",           // sign-comparison
             "(not (< a b))\n",         // negated-comparison

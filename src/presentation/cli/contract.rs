@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 174] = [
+const INTROSPECTION_COMMANDS: [&str; 178] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -239,6 +239,10 @@ const INTROSPECTION_COMMANDS: [&str; 174] = [
     "inspect butlast-default-count",
     "inspect make-list-default-element",
     "inspect parse-integer-default-radix",
+    "inspect getf-default-nil",
+    "inspect make-array-default-keyword",
+    "inspect nested-char-case",
+    "inspect list-star-nil",
     "inspect empty-body",
     "inspect empty-let",
     "inspect identity-arithmetic",

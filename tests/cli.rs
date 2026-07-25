@@ -171,6 +171,8 @@ mod format_to_string_report;
 mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
+#[path = "cli/getf_default_nil_report.rs"]
+mod getf_default_nil_report;
 #[path = "cli/gethash_default_report.rs"]
 mod gethash_default_report;
 #[path = "cli/handler_case_no_clauses_report.rs"]
@@ -209,10 +211,14 @@ mod last_default_count_report;
 mod let_refactor;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
+#[path = "cli/list_star_nil_report.rs"]
+mod list_star_nil_report;
 #[path = "cli/list_star_to_cons_report.rs"]
 mod list_star_to_cons_report;
 #[path = "cli/literal_place_report.rs"]
 mod literal_place_report;
+#[path = "cli/make_array_default_keyword_report.rs"]
+mod make_array_default_keyword_report;
 #[path = "cli/make_hash_table_test_report.rs"]
 mod make_hash_table_test_report;
 #[path = "cli/make_list_default_element_report.rs"]
@@ -253,6 +259,8 @@ mod negated_step_delta_report;
 mod negated_when_unless_report;
 #[path = "cli/nested_boolean_report.rs"]
 mod nested_boolean_report;
+#[path = "cli/nested_char_case_report.rs"]
+mod nested_char_case_report;
 #[path = "cli/nested_cxr_report.rs"]
 mod nested_cxr_report;
 #[path = "cli/nested_progn_report.rs"]
