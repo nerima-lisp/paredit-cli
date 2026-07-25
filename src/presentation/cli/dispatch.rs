@@ -40,6 +40,24 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?
             }
+            command::InspectCommand::DuplicateCaseKeys(args) => {
+                duplicate_case_key_report::workflow::duplicate_case_key_report(args)?
+            }
+            command::InspectCommand::QuotedCaseKey(args) => {
+                quoted_case_key_report::workflow::quoted_case_key_report(args)?
+            }
+            command::InspectCommand::CaseNilKey(args) => {
+                case_nil_key_report::workflow::case_nil_key_report(args)?
+            }
+            command::InspectCommand::MalformedCaseClause(args) => {
+                malformed_case_clause_report::workflow::malformed_case_clause_report(args)?
+            }
+            command::InspectCommand::UnreachableCaseClause(args) => {
+                unreachable_case_clause_report::workflow::unreachable_case_clause_report(args)?
+            }
+            command::InspectCommand::ExhaustiveCaseOtherwise(args) => {
+                exhaustive_case_otherwise_report::workflow::exhaustive_case_otherwise_report(args)?
+            }
             command::InspectCommand::ExplicitNilReturn(args) => {
                 explicit_nil_return_report::workflow::explicit_nil_return_report(args)?
             }
@@ -48,6 +66,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::UnreachableCondClause(args) => {
                 unreachable_cond_clause_report::workflow::unreachable_cond_clause_report(args)?
+            }
+            command::InspectCommand::MalformedCondClause(args) => {
+                malformed_cond_clause_report::workflow::malformed_cond_clause_report(args)?
             }
             command::InspectCommand::DuplicateBooleanOperands(args) => {
                 duplicate_boolean_operand_report::workflow::duplicate_boolean_operand_report(args)?

@@ -19,6 +19,8 @@ mod call_graph_report;
 mod call_report;
 #[path = "cli/capabilities_contract.rs"]
 mod capabilities_contract;
+#[path = "cli/case_nil_key_report.rs"]
+mod case_nil_key_report;
 #[path = "cli/completions_contract.rs"]
 mod completions_contract;
 #[path = "cli/conditional_conversion.rs"]
@@ -57,6 +59,8 @@ mod dependency_report;
 mod dialect_contract;
 #[path = "cli/duplicate_boolean_operand_report.rs"]
 mod duplicate_boolean_operand_report;
+#[path = "cli/duplicate_case_key_report.rs"]
+mod duplicate_case_key_report;
 #[path = "cli/duplicate_cond_test_report.rs"]
 mod duplicate_cond_test_report;
 #[path = "cli/duplicate_report.rs"]
@@ -65,6 +69,8 @@ mod duplicate_report;
 mod edit_transpose;
 #[path = "cli/eliminate_empty_binding_form.rs"]
 mod eliminate_empty_binding_form;
+#[path = "cli/exhaustive_case_otherwise_report.rs"]
+mod exhaustive_case_otherwise_report;
 #[path = "cli/explicit_nil_return_report.rs"]
 mod explicit_nil_return_report;
 #[path = "cli/extract_constant/mod.rs"]
@@ -103,6 +109,10 @@ mod inline_local_function;
 mod inline_symbol_macro;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/malformed_case_clause_report.rs"]
+mod malformed_case_clause_report;
+#[path = "cli/malformed_cond_clause_report.rs"]
+mod malformed_cond_clause_report;
 #[path = "cli/merge_nested_flet.rs"]
 mod merge_nested_flet;
 #[path = "cli/merge_nested_let_star.rs"]
@@ -135,6 +145,8 @@ mod plan_steps_contract;
 mod public_api_docs_contract;
 #[path = "cli/public_module_docs_contract.rs"]
 mod public_module_docs_contract;
+#[path = "cli/quoted_case_key_report.rs"]
+mod quoted_case_key_report;
 #[path = "cli/readme_api_docs_contract.rs"]
 mod readme_api_docs_contract;
 #[path = "cli/readme_ci_contract.rs"]
@@ -217,6 +229,8 @@ mod symbol_report;
 mod terminal_output_safety;
 #[path = "cli/thread_expression/mod.rs"]
 mod thread_expression;
+#[path = "cli/unreachable_case_clause_report.rs"]
+mod unreachable_case_clause_report;
 #[path = "cli/unreachable_cond_clause_report.rs"]
 mod unreachable_cond_clause_report;
 #[path = "cli/unwrap_call.rs"]

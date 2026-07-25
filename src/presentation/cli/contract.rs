@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 54] = [
+const INTROSPECTION_COMMANDS: [&str; 61] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -90,12 +90,19 @@ const INTROSPECTION_COMMANDS: [&str; 54] = [
     "inspect duplicates",
     "inspect similarity",
     "inspect lets",
+    "inspect duplicate-case-keys",
     "inspect identical-if-branches",
     "inspect duplicate-cond-tests",
     "inspect duplicate-boolean-operands",
     "inspect dead-boolean-operand",
     "inspect redundant-quote",
     "inspect unreachable-cond-clause",
+    "inspect malformed-cond-clause",
+    "inspect malformed-case-clause",
+    "inspect unreachable-case-clause",
+    "inspect quoted-case-key",
+    "inspect case-nil-key",
+    "inspect exhaustive-case-otherwise",
     "inspect explicit-nil-return",
     "inspect redundant-progn",
     "inspect negated-comparison",

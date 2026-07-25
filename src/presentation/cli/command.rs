@@ -2,28 +2,31 @@ use super::{
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
-    call_graph_report, call_report, capabilities, constant_if_test_report, convert_cond_to_if,
-    convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless, convert_if_to_when,
-    convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    call_graph_report, call_report, capabilities, case_nil_key_report, constant_if_test_report,
+    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
+    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
     convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
     dead_boolean_operand_report, definition_movement, definition_removal, definition_report,
-    dependency_report, duplicate_boolean_operand_report, duplicate_cond_test_report,
-    duplicate_report, eliminate_empty_binding_form, explicit_nil_return_report, extract_constant,
+    dependency_report, duplicate_boolean_operand_report, duplicate_case_key_report,
+    duplicate_cond_test_report, duplicate_report, eliminate_empty_binding_form,
+    exhaustive_case_otherwise_report, explicit_nil_return_report, extract_constant,
     extract_function, extract_local_function, flatten_progn, form_report, funcall_lambda_report,
     function_parameter, identical_if_branch_report, if_to_or_report, impact_report,
     inline_function, inline_lambda, inline_let, inline_literal_constant, inline_local_function,
-    inline_symbol_macro, introduce_let, let_report, merge_nested_flet, merge_nested_let,
-    merge_nested_let_star, negated_comparison_report, negated_if_report,
-    negated_when_unless_report, nested_boolean_report, nested_progn_report, nested_unless_report,
-    nested_when_report, one_armed_if_report, package, redundant_apply_report,
+    inline_symbol_macro, introduce_let, let_report, malformed_case_clause_report,
+    malformed_cond_clause_report, merge_nested_flet, merge_nested_let, merge_nested_let_star,
+    negated_comparison_report, negated_if_report, negated_when_unless_report,
+    nested_boolean_report, nested_progn_report, nested_unless_report, nested_when_report,
+    one_armed_if_report, package, quoted_case_key_report, redundant_apply_report,
     redundant_body_progn_report, redundant_boolean_identity_report, redundant_eql_test_report,
     redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
     redundant_if_nil_report, redundant_let_star_report, redundant_progn_report,
     redundant_quote_report, refactor, remove_unused_binding, remove_unused_control, rename,
     rename_control, replace_forms, sharp_quoted_lambda_report, signature_report, similarity_report,
     single_clause_cond_report, single_operand_boolean_report, split_let, split_let_star,
-    symbol_report, thread_expression, unreachable_cond_clause_report, unthread_expression,
-    unwrap_call, verbose_negation_report, workspace_report,
+    symbol_report, thread_expression, unreachable_case_clause_report,
+    unreachable_cond_clause_report, unthread_expression, unwrap_call, verbose_negation_report,
+    workspace_report,
 };
 use clap::Subcommand;
 
@@ -71,12 +74,28 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Report case/ecase/ccase forms with the same key in more than one clause.
+    DuplicateCaseKeys(duplicate_case_key_report::args::DuplicateCaseKeyReportArgs),
+    /// Report case/ecase/ccase clauses with a quoted key ('a matches quote and a, not a).
+    QuotedCaseKey(quoted_case_key_report::args::QuotedCaseKeyReportArgs),
+    /// Report case/ecase/ccase clauses with a bare nil key, which never matches (use ((nil) ...)).
+    CaseNilKey(case_nil_key_report::args::CaseNilKeyReportArgs),
+    /// Report case/typecase-family clauses that are not a non-empty list (a bare atom or empty clause).
+    MalformedCaseClause(malformed_case_clause_report::args::MalformedCaseClauseReportArgs),
+    /// Report case/typecase clauses after a t/otherwise catch-all clause that can never run.
+    UnreachableCaseClause(unreachable_case_clause_report::args::UnreachableCaseClauseReportArgs),
+    /// Report ecase/ccase/etypecase/ctypecase forms with a forbidden t/otherwise clause.
+    ExhaustiveCaseOtherwise(
+        exhaustive_case_otherwise_report::args::ExhaustiveCaseOtherwiseReportArgs,
+    ),
     /// Report a return/return-from with an explicit nil result, the default ((return nil) is (return)).
     ExplicitNilReturn(explicit_nil_return_report::args::ExplicitNilReturnReportArgs),
     /// Report cond forms with the same test expression in more than one clause.
     DuplicateCondTests(duplicate_cond_test_report::args::DuplicateCondTestReportArgs),
     /// Report cond forms with clauses after a t catch-all clause that can never run.
     UnreachableCondClause(unreachable_cond_clause_report::args::UnreachableCondClauseReportArgs),
+    /// Report cond clauses that are not a non-empty list (a bare atom or empty clause).
+    MalformedCondClause(malformed_cond_clause_report::args::MalformedCondClauseReportArgs),
     /// Report and/or forms that list the same operand more than once.
     DuplicateBooleanOperands(
         duplicate_boolean_operand_report::args::DuplicateBooleanOperandReportArgs,
