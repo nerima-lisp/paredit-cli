@@ -56,6 +56,11 @@ something.
   result to `--file` instead and prints nothing (combine with `--diff` to
   write and see the diff at once).
 
+Command paths, flags, exit codes, and documented JSON fields are covered by
+semantic versioning from `1.0.0` onward — see
+[Releases and compatibility](releases.md) for the full list of what a `1.x`
+upgrade may and may not change.
+
 ## Safe editing loop
 
 The recommended loop for one file:

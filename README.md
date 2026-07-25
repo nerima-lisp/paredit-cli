@@ -48,6 +48,15 @@ The current minimum supported Rust version is `1.85`. See the
 [installation guide](https://takeokunn.github.io/paredit-cli/installation/)
 for the Cachix binary cache, flake overlay, and commit-pinning for automation.
 
+## Stability
+
+`paredit-cli` follows Semantic Versioning. From `1.0.0` onward, command paths,
+flags, exit codes, documented JSON fields, the `paredit_cli` crate-root API,
+and the Nix outputs are stable within the `1.x` series; human-readable text
+output is not a machine contract. The
+[compatibility guide](https://takeokunn.github.io/paredit-cli/releases/) lists
+exactly what an upgrade may and may not change.
+
 ## Development
 
 ```sh

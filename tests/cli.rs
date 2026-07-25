@@ -47,6 +47,8 @@ mod class_cycle_report;
 mod code_char_char_code_report;
 #[path = "cli/coerce_to_t_report.rs"]
 mod coerce_to_t_report;
+#[path = "cli/compatibility_contract.rs"]
+mod compatibility_contract;
 #[path = "cli/completions_contract.rs"]
 mod completions_contract;
 #[path = "cli/complexity_report.rs"]
