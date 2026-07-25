@@ -12,6 +12,7 @@ use crate::application::usecase::eq_char_comparison_report::collect_eq_char_comp
 use crate::application::usecase::eq_number_comparison_report::collect_eq_number_comparisons;
 use crate::application::usecase::explicit_nil_return_report::collect_explicit_nil_returns;
 use crate::application::usecase::explicit_step_delta_report::collect_explicit_step_deltas;
+use crate::application::usecase::format_newline_report::collect_format_newlines;
 use crate::application::usecase::format_to_string_report::collect_format_to_strings;
 use crate::application::usecase::funcall_lambda_report::collect_funcall_lambdas;
 use crate::application::usecase::if_not_report::collect_if_nots;
@@ -42,6 +43,7 @@ use crate::application::usecase::one_step_arithmetic_report::collect_one_step_ar
 use crate::application::usecase::redundant_apply_report::collect_redundant_applies;
 use crate::application::usecase::redundant_body_progn_report::collect_redundant_body_progns;
 use crate::application::usecase::redundant_boolean_identity_report::collect_redundant_boolean_identities;
+use crate::application::usecase::redundant_divisor_report::collect_redundant_divisors;
 use crate::application::usecase::redundant_eql_test_report::collect_redundant_eql_tests;
 use crate::application::usecase::redundant_funcall_report::collect_redundant_funcalls;
 use crate::application::usecase::redundant_identity_key_report::collect_redundant_identity_keys;
@@ -228,6 +230,8 @@ fn retain_unbaselined(
 /// `(copy-seq x)`), `append-list-to-cons` (rewrite `(append (list x) rest)` as
 /// `(cons x rest)`), `format-to-string` (rewrite `(format nil "~A" x)` as
 /// `(princ-to-string x)` and `"~S"` as `(prin1-to-string x)`),
+/// `format-newline` (rewrite `(format t "~%")` as `(terpri)`), `redundant-divisor`
+/// (drop the redundant `1` divisor so `(floor x 1)` becomes `(floor x)`),
 /// `verbose-negation` (rewrite `(- 0 x)` / `(* x -1)` as `(- x)`),
 /// `negated-when-unless` (a two-edit fix: flip the
 /// `when`/`unless` head and drop the `(not …)`), `one-armed-if` (swap an
@@ -971,6 +975,45 @@ fn collect_lint_fixes(
                     end,
                     text,
                     format!("Rewrite (format nil … x) as ({} x)", item.replacement),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"format-newline") {
+        let (_, items) = collect_format_newlines(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (format t "~%") is (terpri).
+            fixes.insert(
+                ("format-newline", start, end),
+                one_edit(
+                    start,
+                    end,
+                    "(terpri)".to_owned(),
+                    "Rewrite (format t \"~%\") as (terpri)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"redundant-divisor") {
+        let (_, items) = collect_redundant_divisors(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (floor x 1) is (floor x): drop the redundant unit divisor.
+            let text = format!(
+                "({} {})",
+                slice(item.operator_span),
+                slice(item.number_span)
+            );
+            fixes.insert(
+                ("redundant-divisor", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    format!("Drop the redundant 1 divisor from {}", item.operator),
                 ),
             );
         }
@@ -1908,6 +1951,8 @@ mod tests {
             "(reverse (reverse dr))\n",               // double-reverse
             "(append (list al) ar)\n",                // append-list-to-cons
             "(format nil \"~A\" fs)\n",               // format-to-string
+            "(format t \"~%\")\n",                    // format-newline
+            "(floor fq 1)\n",                         // redundant-divisor
             "(- 0 amt)\n",                            // verbose-negation
             "(let* ((a 1)) a)\n",                     // redundant-let-star
             "(cond (ok (run)))\n",                    // single-clause-cond

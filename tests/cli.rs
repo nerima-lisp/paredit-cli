@@ -145,6 +145,8 @@ mod form_report;
 mod format;
 #[path = "cli/format_missing_destination_report.rs"]
 mod format_missing_destination_report;
+#[path = "cli/format_newline_report.rs"]
+mod format_newline_report;
 #[path = "cli/format_to_string_report.rs"]
 mod format_to_string_report;
 #[path = "cli/funcall_lambda_report.rs"]
@@ -279,6 +281,8 @@ mod redundant_apply_report;
 mod redundant_body_progn_report;
 #[path = "cli/redundant_boolean_identity_report.rs"]
 mod redundant_boolean_identity_report;
+#[path = "cli/redundant_divisor_report.rs"]
+mod redundant_divisor_report;
 #[path = "cli/redundant_eql_test_report.rs"]
 mod redundant_eql_test_report;
 #[path = "cli/redundant_funcall_report.rs"]

@@ -189,6 +189,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::IdentityArithmetic(args) => {
                 identity_arithmetic_report::workflow::identity_arithmetic_report(args)?
             }
+            command::InspectCommand::RedundantDivisor(args) => {
+                redundant_divisor_report::workflow::redundant_divisor_report(args)?
+            }
             command::InspectCommand::EqlListComparison(args) => {
                 eql_list_comparison_report::workflow::eql_list_comparison_report(args)?
             }
@@ -349,6 +352,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::FormatToString(args) => {
                 format_to_string_report::workflow::format_to_string_report(args)?
+            }
+            command::InspectCommand::FormatNewline(args) => {
+                format_newline_report::workflow::format_newline_report(args)?
             }
             command::InspectCommand::LiteralPlace(args) => {
                 literal_place_report::workflow::literal_place_report(args)?

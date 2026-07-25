@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 140] = [
+const INTROSPECTION_COMMANDS: [&str; 142] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -188,6 +188,7 @@ const INTROSPECTION_COMMANDS: [&str; 140] = [
     "inspect sign-comparison",
     "inspect format-missing-destination",
     "inspect format-to-string",
+    "inspect format-newline",
     "inspect literal-place",
     "inspect eq-char-comparison",
     "inspect redundant-apply",
@@ -209,6 +210,7 @@ const INTROSPECTION_COMMANDS: [&str; 140] = [
     "inspect empty-body",
     "inspect empty-let",
     "inspect identity-arithmetic",
+    "inspect redundant-divisor",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];

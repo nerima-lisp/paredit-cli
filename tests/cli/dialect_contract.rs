@@ -76,7 +76,7 @@ fn schema_v2_registry_is_an_exact_bijection_with_clap_leaves() {
     let unique_registry_paths = registry_paths.iter().copied().collect::<BTreeSet<_>>();
 
     assert_eq!(registry_paths.len(), unique_registry_paths.len());
-    assert_eq!(registry_paths.len(), 237);
+    assert_eq!(registry_paths.len(), 239);
     assert_eq!(
         clap_contract_leaf_paths(&v1),
         unique_registry_paths
@@ -92,9 +92,9 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
     assert_eq!(report["schema_version"], 2);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["command_count"], 237);
+    assert_eq!(contract["command_count"], 239);
     assert_eq!(contract["dialect_count"], 10);
-    assert_eq!(contract["cell_count"], 2370);
+    assert_eq!(contract["cell_count"], 2390);
     assert_eq!(
         contract["dialects"],
         serde_json::json!([
@@ -173,12 +173,12 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
         category_counts,
         BTreeMap::from([
             ("format", 2),
-            ("introspection", 140),
+            ("introspection", 142),
             ("semantic", 78),
             ("structural", 17),
         ])
     );
-    assert_eq!(cell_count, 2370);
+    assert_eq!(cell_count, 2390);
     assert_eq!(
         supported_cells,
         [
