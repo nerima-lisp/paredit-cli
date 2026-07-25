@@ -30,6 +30,7 @@ fn cli_reports_workspace_inventory_from_directory_roots() {
         .stdout(predicate::str::contains("\"parsed_count\": 2"))
         .stdout(predicate::str::contains("\"parse_error_count\": 1"))
         .stdout(predicate::str::contains("\"definition_count\": 2"))
+        .stdout(predicate::str::contains("\"max_complexity_score\":"))
         .stdout(predicate::str::contains("\"unknown\": 1"))
         .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
         .stdout(predicate::str::contains("\"dialect\": \"emacs-lisp\""))
@@ -159,4 +160,51 @@ fn cli_reports_workspace_inventory_with_max_depth_limit() {
         .stdout(predicate::str::contains("\"parse_error_count\": 0"))
         .stdout(predicate::str::contains(root_file.display().to_string()))
         .stdout(predicate::str::contains(nested_file.display().to_string()).not());
+}
+
+#[test]
+fn cli_workspace_max_complexity_score_tracks_the_deepest_definition() {
+    let dir = fresh_temp_dir("workspace report-complexity");
+    let shallow_file = dir.join("shallow.lisp");
+    let deep_file = dir.join("deep.lisp");
+    fs::write(&shallow_file, "(defun shallow (x) (+ x 1))\n").expect("write shallow fixture");
+    fs::write(
+        &deep_file,
+        "(defun deep (x)\n\
+           (if x\n\
+             (let ((y (+ x 1)))\n\
+               (if y (+ y 1) y))\n\
+             x))\n",
+    )
+    .expect("write deep fixture");
+
+    let mut cmd = paredit();
+    let output = cmd
+        .args(["inspect", "workspace"])
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid json");
+
+    let files = report["files"].as_array().expect("files array");
+    let shallow_score = files
+        .iter()
+        .find(|file| file["path"] == shallow_file.display().to_string())
+        .expect("shallow file report")["max_complexity_score"]
+        .as_u64()
+        .expect("shallow max_complexity_score");
+    let deep_score = files
+        .iter()
+        .find(|file| file["path"] == deep_file.display().to_string())
+        .expect("deep file report")["max_complexity_score"]
+        .as_u64()
+        .expect("deep max_complexity_score");
+
+    assert!(deep_score > shallow_score);
+    assert_eq!(report["max_complexity_score"], deep_score);
 }

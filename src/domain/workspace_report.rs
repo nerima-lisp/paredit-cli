@@ -30,6 +30,10 @@ pub struct WorkspaceFileMetrics<'a> {
     pub atom_count: usize,
     pub definition_count: usize,
     pub call_count: usize,
+    /// Highest per-definition complexity score in this file, or `0` when the
+    /// file has no definition-like top-level forms. See
+    /// `crate::domain::complexity_report` for the scoring formula.
+    pub max_complexity_score: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +46,8 @@ pub struct WorkspaceReportSummary {
     pub atom_count: usize,
     pub definition_count: usize,
     pub call_count: usize,
+    /// Highest per-definition complexity score across every file.
+    pub max_complexity_score: usize,
     pub dialect_counts: BTreeMap<&'static str, usize>,
     pub status_counts: BTreeMap<&'static str, usize>,
 }
@@ -58,6 +64,7 @@ pub fn summarize_workspace_report<'a>(
         atom_count: 0,
         definition_count: 0,
         call_count: 0,
+        max_complexity_score: 0,
         dialect_counts: BTreeMap::new(),
         status_counts: BTreeMap::new(),
     };
@@ -74,6 +81,7 @@ pub fn summarize_workspace_report<'a>(
         summary.atom_count += file.atom_count;
         summary.definition_count += file.definition_count;
         summary.call_count += file.call_count;
+        summary.max_complexity_score = summary.max_complexity_score.max(file.max_complexity_score);
         *summary
             .dialect_counts
             .entry(file.dialect.label())
@@ -104,6 +112,7 @@ mod tests {
                 atom_count: 3,
                 definition_count: 1,
                 call_count: 2,
+                max_complexity_score: 7,
             },
             WorkspaceFileMetrics {
                 dialect: Dialect::EmacsLisp,
@@ -113,6 +122,7 @@ mod tests {
                 atom_count: 2,
                 definition_count: 0,
                 call_count: 0,
+                max_complexity_score: 0,
             },
         ]);
 
@@ -122,5 +132,35 @@ mod tests {
         assert_eq!(summary.byte_count, 15);
         assert_eq!(summary.dialect_counts.get("common-lisp"), Some(&1));
         assert_eq!(summary.status_counts.get("parse-error"), Some(&1));
+        assert_eq!(summary.max_complexity_score, 7);
+    }
+
+    #[test]
+    fn max_complexity_score_tracks_the_single_highest_file() {
+        let parsed = WorkspaceFileStatus::Parsed;
+        let summary = summarize_workspace_report([
+            WorkspaceFileMetrics {
+                dialect: Dialect::CommonLisp,
+                status: &parsed,
+                byte_count: 1,
+                top_level_form_count: 1,
+                atom_count: 1,
+                definition_count: 1,
+                call_count: 0,
+                max_complexity_score: 12,
+            },
+            WorkspaceFileMetrics {
+                dialect: Dialect::CommonLisp,
+                status: &parsed,
+                byte_count: 1,
+                top_level_form_count: 1,
+                atom_count: 1,
+                definition_count: 1,
+                call_count: 0,
+                max_complexity_score: 4,
+            },
+        ]);
+
+        assert_eq!(summary.max_complexity_score, 12);
     }
 }

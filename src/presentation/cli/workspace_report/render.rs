@@ -38,6 +38,7 @@ fn print_text_workspace_report(plan: &WorkspaceReportPlan) {
     println!("atoms\t{}", summary.atom_count);
     println!("definitions\t{}", summary.definition_count);
     println!("calls\t{}", summary.call_count);
+    println!("max_complexity_score\t{}", summary.max_complexity_score);
     println!("skipped_unknown\t{}", plan.skipped_unknown_count);
     println!("skipped_hidden\t{}", plan.skipped_hidden_count);
     println!("skipped_generated\t{}", plan.skipped_generated_count);
@@ -50,12 +51,13 @@ fn print_text_workspace_report(plan: &WorkspaceReportPlan) {
     }
     for report in &plan.reports {
         println!(
-            "{}\t{}\t{}\tdefinitions={}\tcalls={}",
+            "{}\t{}\t{}\tdefinitions={}\tcalls={}\tmax_complexity_score={}",
             safe_text!(report.path.display()),
             report.dialect.label(),
             report.status.label(),
             report.definition_count,
-            report.call_count
+            report.call_count,
+            report.max_complexity_score
         );
     }
 }
@@ -78,6 +80,7 @@ fn print_json_workspace_report(plan: &WorkspaceReportPlan) -> Result<()> {
             "atom_count": summary.atom_count,
             "definition_count": summary.definition_count,
             "call_count": summary.call_count,
+            "max_complexity_score": summary.max_complexity_score,
             "dialects": summary.dialect_counts
                 .iter()
                 .map(|(dialect, count)| json!({
@@ -113,6 +116,7 @@ fn print_json_workspace_report(plan: &WorkspaceReportPlan) -> Result<()> {
                     "atom_count": report.atom_count,
                     "definition_count": report.definition_count,
                     "call_count": report.call_count,
+                    "max_complexity_score": report.max_complexity_score,
                     "package": report.package.as_deref(),
                 }))
                 .collect::<Vec<_>>(),

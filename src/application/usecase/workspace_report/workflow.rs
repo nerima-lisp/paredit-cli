@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::call_report::build_call_report;
+use crate::application::usecase::complexity_report::build_complexity_report;
 use crate::application::usecase::definition_report::collect_definition_forms;
 use crate::domain::sexpr::SyntaxTree;
 pub use crate::domain::workspace_report::summarize_workspace_report;
@@ -41,6 +42,16 @@ pub fn build_workspace_report(
                     .with_context(|| format!("failed to analyze {}", file.display()))?;
                 let calls = build_call_report(&tree, loaded.dialect, None, false)
                     .with_context(|| format!("failed to collect calls in {}", file.display()))?;
+                // `definitions` is sorted by descending complexity score, so
+                // the first entry (if any) is the file's highest score.
+                let max_complexity_score =
+                    build_complexity_report(file.clone(), loaded.dialect, &tree)
+                        .with_context(|| {
+                            format!("failed to score complexity in {}", file.display())
+                        })?
+                        .definitions
+                        .first()
+                        .map_or(0, |definition| definition.complexity_score);
                 reports.push(WorkspaceFileReport {
                     path: file,
                     dialect: loaded.dialect,
@@ -50,6 +61,7 @@ pub fn build_workspace_report(
                     atom_count: tree.atom_occurrence_count(),
                     definition_count: definitions.len(),
                     call_count: calls.len(),
+                    max_complexity_score,
                     package,
                 });
             }
@@ -67,6 +79,7 @@ pub fn build_workspace_report(
         atom_count: report.atom_count,
         definition_count: report.definition_count,
         call_count: report.call_count,
+        max_complexity_score: report.max_complexity_score,
     }));
 
     Ok(WorkspaceReportPlan {
@@ -95,6 +108,7 @@ fn parse_error_report(
         atom_count: 0,
         definition_count: 0,
         call_count: 0,
+        max_complexity_score: 0,
         package: None,
     }
 }

@@ -46,6 +46,7 @@ fn summary_counts_files_by_status_and_dialect() {
             atom_count: 3,
             definition_count: 1,
             call_count: 2,
+            max_complexity_score: 0,
         },
         WorkspaceFileMetrics {
             dialect: Dialect::EmacsLisp,
@@ -55,6 +56,7 @@ fn summary_counts_files_by_status_and_dialect() {
             atom_count: 0,
             definition_count: 0,
             call_count: 0,
+            max_complexity_score: 0,
         },
     ]);
 

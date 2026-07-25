@@ -45,6 +45,7 @@ pub struct WorkspaceFileReport {
     pub atom_count: usize,
     pub definition_count: usize,
     pub call_count: usize,
+    pub max_complexity_score: usize,
     pub package: Option<String>,
 }
 
