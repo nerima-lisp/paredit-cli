@@ -1,9 +1,0 @@
-[book]
-authors = ["paredit-cli contributors"]
-language = "en"
-src = "src"
-title = "paredit-cli"
-
-[output.html]
-git-repository-url = "https://github.com/takeokunn/paredit-cli"
-edit-url-template = "https://github.com/takeokunn/paredit-cli/edit/main/{path}"

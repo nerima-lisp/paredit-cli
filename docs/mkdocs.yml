@@ -1,0 +1,138 @@
+# paredit-cli documentation — MkDocs + Material configuration.
+#
+# Build:   mkdocs build -f docs/mkdocs.yml --strict
+# Serve:   mkdocs serve  -f docs/mkdocs.yml
+# The Nix flake (`nix build .#docs`) drives the same config offline.
+
+site_name: paredit-cli
+site_description: >-
+  Structure-editing CLI for safe S-expression refactoring, built for both
+  people and AI coding agents.
+site_author: paredit-cli contributors
+site_url: https://takeokunn.github.io/paredit-cli/
+
+repo_name: takeokunn/paredit-cli
+repo_url: https://github.com/takeokunn/paredit-cli
+edit_uri: edit/main/docs/src/
+
+# Content lives in docs/src (kept from the previous mdBook layout).
+docs_dir: src
+site_dir: ../site
+use_directory_urls: true
+
+copyright: Copyright &copy; paredit-cli contributors — MIT License
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/code-parentheses
+  favicon: assets/favicon.svg
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/takeokunn/paredit-cli
+      name: paredit-cli on GitHub
+  generator: false
+
+plugins:
+  - search
+
+markdown_extensions:
+  # Callouts / admonitions.
+  - admonition
+  - pymdownx.details
+  # Code blocks: syntax highlighting, line numbers, inline highlighting.
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  # Content tabs (e.g. the Nix run / profile / local-checkout install paths).
+  - pymdownx.tabbed:
+      alternate_style: true
+  # Task lists, key bindings, smart symbols, emoji.
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.keys
+  - pymdownx.smartsymbols
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+
+nav:
+  - Home: README.md
+  - Getting Started:
+      - Installation: installation.md
+      - Command Model: commands.md
+      - Selecting Forms: selectors.md
+  - Guide:
+      - Refactor Workflow: workflows.md
+      - Safety Reference: safety.md
+      - Agent Interface: agents.md
+  - Reference:
+      - Architecture: architecture.md
+      - Integrations: integrations.md
+      - Releases and Compatibility: releases.md
+  - Contributing:
+      - Development: development.md
+      - Repository Documentation: repository.md

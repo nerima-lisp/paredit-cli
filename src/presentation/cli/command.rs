@@ -39,23 +39,24 @@ use super::{
     package, package_boundary_report, package_conflict_report, package_cycle_report,
     prog2_to_progn_report, quoted_case_key_report, reachability_report, redefinition_report,
     redundant_apply_report, redundant_body_progn_report, redundant_boolean_identity_report,
-    redundant_divisor_report, redundant_eql_test_report, redundant_funcall_report,
+    redundant_count_nil_report, redundant_divisor_report, redundant_end_nil_report,
+    redundant_eql_test_report, redundant_from_end_nil_report, redundant_funcall_report,
     redundant_identity_key_report, redundant_identity_report, redundant_if_nil_report,
     redundant_let_star_report, redundant_prog1_report, redundant_progn_report,
-    redundant_quote_report, redundant_the_report, refactor, remove_unused_binding,
-    remove_unused_control, rename, rename_control, replace_forms, self_assignment_report,
-    self_comparison_report, setf_arity_report, setq_non_variable_report, shadowed_binding_report,
-    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
-    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
-    single_operand_boolean_report, single_operand_list_op_report, single_value_bind_report,
-    split_let, split_let_star, step_zero_report, struct_cycle_report, subseq_zero_report,
-    symbol_report, system_conflict_report, system_cycle_report, t_comparison_report,
-    the_arity_report, thread_expression, typecase_nil_key_report, typep_predicate_report,
-    undefined_package_report, unreachable_case_clause_report, unreachable_cond_clause_report,
-    unthread_expression, unused_export_report, unused_local_callable_report,
-    unused_nickname_report, unused_package_report, unused_parameter_report,
-    unwind_protect_no_cleanup_report, unwrap_call, values_list_of_list_report,
-    verbose_negation_report, workspace_report, zero_divisor_report,
+    redundant_quote_report, redundant_start_zero_report, redundant_the_report, refactor,
+    remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
+    self_assignment_report, self_comparison_report, setf_arity_report, setq_non_variable_report,
+    shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
+    similarity_report, single_arg_comparison_report, single_clause_cond_report,
+    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
+    single_value_bind_report, split_let, split_let_star, step_zero_report, struct_cycle_report,
+    subseq_zero_report, symbol_report, system_conflict_report, system_cycle_report,
+    t_comparison_report, the_arity_report, thread_expression, typecase_nil_key_report,
+    typep_predicate_report, undefined_package_report, unreachable_case_clause_report,
+    unreachable_cond_clause_report, unthread_expression, unused_export_report,
+    unused_local_callable_report, unused_nickname_report, unused_package_report,
+    unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
+    values_list_of_list_report, verbose_negation_report, workspace_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -307,6 +308,14 @@ pub(super) enum InspectCommand {
     RedundantApply(redundant_apply_report::args::RedundantApplyReportArgs),
     /// Report an eql-defaulting call with an explicit :test #'eql ((find x l :test #'eql) is (find x l)).
     RedundantEqlTest(redundant_eql_test_report::args::RedundantEqlTestReportArgs),
+    /// Report a bounded-sequence call with an explicit :start 0, the default ((find x seq :start 0) is (find x seq)).
+    RedundantStartZero(redundant_start_zero_report::args::RedundantStartZeroReportArgs),
+    /// Report a bounded-sequence call with an explicit :end nil, the default ((find x seq :end nil) is (find x seq)).
+    RedundantEndNil(redundant_end_nil_report::args::RedundantEndNilReportArgs),
+    /// Report a sequence call with an explicit :from-end nil, the default ((find x seq :from-end nil) is (find x seq)).
+    RedundantFromEndNil(redundant_from_end_nil_report::args::RedundantFromEndNilReportArgs),
+    /// Report a remove/delete/substitute call with an explicit :count nil, the default ((remove x seq :count nil) is (remove x seq)).
+    RedundantCountNil(redundant_count_nil_report::args::RedundantCountNilReportArgs),
     /// Report a make-hash-table with an explicit :test 'eql, the default ((make-hash-table :test 'eql) is (make-hash-table)).
     MakeHashTableTest(make_hash_table_test_report::args::MakeHashTableTestReportArgs),
     /// Report a gethash with an explicit nil default, the default ((gethash k h nil) is (gethash k h)).

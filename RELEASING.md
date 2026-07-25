@@ -14,8 +14,8 @@ cargo publish --dry-run --locked
 ```
 
 Confirm that `Cargo.toml` contains the intended version, `Cargo.lock` matches,
-the README and mdBook describe the released command surface, and the generated
-package contains the public crate documents.
+the README and the MkDocs site describe the released command surface, and the
+generated package contains the public crate documents.
 
 ## Publish and announce
 

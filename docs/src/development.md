@@ -9,7 +9,7 @@ in.
 ## Environment
 
 ```sh
-nix develop        # rustc, cargo, rust-analyzer, cargo-nextest, clippy, mdbook
+nix develop        # rustc, cargo, rust-analyzer, cargo-nextest, clippy, mkdocs-material
 ```
 
 With [direnv](https://direnv.net/), `direnv allow` activates the same shell
@@ -48,7 +48,7 @@ It builds and runs every check the project defines:
 | `clippy` | No clippy warnings with `-D warnings` |
 | `nextest` | The full test suite under cargo-nextest |
 | `package` | The crate builds and its `cargo test` suite passes |
-| `documentation` | The mdBook site builds to a valid `index.html` |
+| `documentation` | The MkDocs (Material) site builds to a valid `index.html` |
 | `lint-format-integration` | The `paredit-lint` / `paredit-format` gates behave end to end |
 
 ## Documentation is tested
@@ -59,11 +59,11 @@ The repository treats documentation as part of the public contract. Tests in
 statements drift from reality. When you change behaviour, update the
 documentation in the same commit — CI enforces it.
 
-To preview the book locally:
+To preview the site locally:
 
 ```sh
-nix build .#docs   # rendered site in ./result
-mdbook serve docs  # live-reloading preview from the dev shell
+nix build .#docs                   # rendered site in ./result
+mkdocs serve -f docs/mkdocs.yml    # live-reloading preview from the dev shell
 ```
 
 ## MSRV

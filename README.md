@@ -2,15 +2,17 @@
 
 [![CI](https://github.com/takeokunn/paredit-cli/actions/workflows/main.yml/badge.svg)](https://github.com/takeokunn/paredit-cli/actions/workflows/main.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/takeokunn/paredit-cli/blob/main/LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-MkDocs%20Material-3949ab)](https://takeokunn.github.io/paredit-cli/)
 
 `paredit` is a structure-aware CLI for inspecting and safely refactoring Lisp
-S-expressions. Its canonical command layout is designed for both people and AI
-coding agents:
+S-expressions, designed for both people and AI coding agents. It supports
+Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, and
+Fennel.
 
-- `paredit inspect ...` reads source and produces reports.
-- `paredit edit ...` transforms one selected form; stdout by default, `--write`
-  to update the file in place, `--diff` to preview a unified diff.
-- `paredit refactor ...` plans, previews, verifies, and applies semantic changes.
+Full documentation — command reference, safe editing workflows, the agent
+interface, and integration guides — is published at
+<https://takeokunn.github.io/paredit-cli/>. The source for that site lives in
+[docs/src/](docs/src/README.md).
 
 ## Commands
 
@@ -22,25 +24,16 @@ paredit completions <shell>        # shell completion scripts (bash/zsh/fish/...
 ```
 
 Run `paredit --help`, then `paredit <namespace> --help` for the complete
-command list. All source-facing commands live in these three namespaces;
-`completions` is the only meta command. For machine-readable discovery, run:
-
-```sh
-paredit inspect capabilities --output json  # full catalog of commands and flags
-```
+command list. For machine-readable discovery, run
+`paredit inspect capabilities --output json`.
 
 ## Quick Start
 
 ```sh
 paredit inspect check --file src/example.lisp
-paredit inspect outline --file src/example.lisp
 paredit edit wrap --file src/example.lisp --path 0.2 --diff
 paredit refactor plan --symbol old-name src/example.lisp
 ```
-
-Start with the [documentation source](docs/src/README.md) for command selection,
-safe workflows, and integration examples. The published site is available at
-<https://takeokunn.github.io/paredit-cli/>.
 
 ## Install
 
@@ -51,10 +44,9 @@ cargo install --git https://github.com/takeokunn/paredit-cli --locked
 nix develop -c cargo install --path . --locked   # from a local checkout
 ```
 
-Prebuilt binaries are served from the public `takeokunn-paredit-cli` Cachix
-cache. The current minimum supported Rust version is `1.85`. See the
-[installation guide](docs/src/installation.md) for the flake overlay and
-flake-input usage, including commit pinning for automation.
+The current minimum supported Rust version is `1.85`. See the
+[installation guide](https://takeokunn.github.io/paredit-cli/installation/)
+for the Cachix binary cache, flake overlay, and commit-pinning for automation.
 
 ## Development
 
@@ -64,23 +56,17 @@ cargo test
 nix flake check
 ```
 
-Verify the declared MSRV locally before touching parser, refactor, packaging,
-or public API surfaces:
-
-```sh
-cargo +1.85 test --locked
-```
-
-Pull requests run `nix flake check`.
-
-A typed Rust library API behind the CLI is available in the
-[`paredit_cli` documentation](https://docs.rs/paredit-cli) and its
-[source](https://github.com/takeokunn/paredit-cli/blob/main/src/lib.rs).
+Pull requests run `nix flake check`. A typed Rust library API behind the CLI
+is available in the [`paredit_cli` documentation](https://docs.rs/paredit-cli).
 
 ## Community and security
 
-- [Contributing](CONTRIBUTING.md): local setup, verification, and pull request expectations.
-- [Code of Conduct](CODE_OF_CONDUCT.md): standards for project spaces.
-- [Support](SUPPORT.md): where to ask usage questions or report defects.
-- [Security](SECURITY.md): private vulnerability reporting instructions.
-- [Releasing](RELEASING.md): maintainer release verification and publication steps.
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Support](SUPPORT.md)
+- [Security](SECURITY.md)
+- [Releasing](RELEASING.md)
+
+## License
+
+MIT. See [LICENSE](LICENSE).

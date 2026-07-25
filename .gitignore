@@ -4,5 +4,6 @@ result-*
 .DS_Store
 .direnv/
 .serena/
-docs/book/
+# MkDocs local build output (docs/mkdocs.yml sets site_dir: ../site)
+/site/
 .worktrees/

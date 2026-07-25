@@ -326,6 +326,18 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::RedundantEqlTest(args) => {
                 redundant_eql_test_report::workflow::redundant_eql_test_report(args)?
             }
+            command::InspectCommand::RedundantStartZero(args) => {
+                redundant_start_zero_report::workflow::redundant_start_zero_report(args)?
+            }
+            command::InspectCommand::RedundantEndNil(args) => {
+                redundant_end_nil_report::workflow::redundant_end_nil_report(args)?
+            }
+            command::InspectCommand::RedundantFromEndNil(args) => {
+                redundant_from_end_nil_report::workflow::redundant_from_end_nil_report(args)?
+            }
+            command::InspectCommand::RedundantCountNil(args) => {
+                redundant_count_nil_report::workflow::redundant_count_nil_report(args)?
+            }
             command::InspectCommand::MakeHashTableTest(args) => {
                 make_hash_table_test_report::workflow::make_hash_table_test_report(args)?
             }

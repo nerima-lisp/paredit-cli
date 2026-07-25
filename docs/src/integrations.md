@@ -64,7 +64,7 @@ plan/preview/verify sequences are safe to automate.
 
 ## GitHub Pages
 
-This site is built from `docs/src` with mdBook via the Nix flake
+This site is built from `docs/src` with MkDocs (Material) via the Nix flake
 (`nix build .#docs`) and published by the `Publish documentation` workflow.
 The same derivation runs as `checks.documentation` in `nix flake check`, so a
-broken book fails CI before it can reach the site.
+broken site fails CI before it can reach the site.

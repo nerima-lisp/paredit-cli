@@ -104,8 +104,11 @@ use crate::domain::quoted_case_key_report::collect_quoted_case_keys;
 use crate::domain::redundant_apply_report::collect_redundant_applies;
 use crate::domain::redundant_body_progn_report::collect_redundant_body_progns;
 use crate::domain::redundant_boolean_identity_report::collect_redundant_boolean_identities;
+use crate::domain::redundant_count_nil_report::collect_redundant_count_nils;
 use crate::domain::redundant_divisor_report::collect_redundant_divisors;
+use crate::domain::redundant_end_nil_report::collect_redundant_end_nils;
 use crate::domain::redundant_eql_test_report::collect_redundant_eql_tests;
+use crate::domain::redundant_from_end_nil_report::collect_redundant_from_end_nils;
 use crate::domain::redundant_funcall_report::collect_redundant_funcalls;
 use crate::domain::redundant_identity_key_report::collect_redundant_identity_keys;
 use crate::domain::redundant_identity_report::collect_redundant_identities;
@@ -114,6 +117,7 @@ use crate::domain::redundant_let_star_report::collect_redundant_let_stars;
 use crate::domain::redundant_prog1_report::collect_redundant_prog1s;
 use crate::domain::redundant_progn_report::collect_redundant_progns;
 use crate::domain::redundant_quote_report::collect_redundant_quotes;
+use crate::domain::redundant_start_zero_report::collect_redundant_start_zeros;
 use crate::domain::redundant_the_report::collect_redundant_thes;
 use crate::domain::self_assignment_report::collect_self_assignments;
 use crate::domain::self_comparison_report::collect_self_comparisons;
@@ -142,7 +146,7 @@ use crate::domain::verbose_negation_report::collect_verbose_negations;
 use crate::domain::zero_divisor_report::collect_zero_divisors;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 118] = [
+pub const RULES: [&str; 122] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -261,6 +265,10 @@ pub const RULES: [&str; 118] = [
     "prog2-to-progn",
     "handler-case-no-clauses",
     "unwind-protect-no-cleanup",
+    "redundant-start-zero",
+    "redundant-end-nil",
+    "redundant-from-end-nil",
+    "redundant-count-nil",
 ];
 
 /// The set of rule categories, sorted, for `--category` validation and
@@ -273,7 +281,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 118] = [
+pub const RULE_DOCS: [(&str, &str, &str); 122] = [
     (
         "self-assignment",
         "suspicious",
@@ -864,6 +872,26 @@ pub const RULE_DOCS: [(&str, &str, &str); 118] = [
         "suspicious",
         "an unwind-protect with no cleanup forms, which is just its body ((unwind-protect x) is x)",
     ),
+    (
+        "redundant-start-zero",
+        "suspicious",
+        "a bounded-sequence call with an explicit :start 0, the default ((find x seq :start 0) is (find x seq))",
+    ),
+    (
+        "redundant-end-nil",
+        "suspicious",
+        "a bounded-sequence call with an explicit :end nil, the default ((find x seq :end nil) is (find x seq))",
+    ),
+    (
+        "redundant-from-end-nil",
+        "suspicious",
+        "a sequence call with an explicit :from-end nil, the default ((find x seq :from-end nil) is (find x seq))",
+    ),
+    (
+        "redundant-count-nil",
+        "suspicious",
+        "a remove/delete/substitute call with an explicit :count nil, the default ((remove x seq :count nil) is (remove x seq))",
+    ),
 ];
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
@@ -888,7 +916,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 72] = [
+pub const FIXABLE_RULES: [&str; 76] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -961,6 +989,10 @@ pub const FIXABLE_RULES: [&str; 72] = [
     "prog2-to-progn",
     "handler-case-no-clauses",
     "unwind-protect-no-cleanup",
+    "redundant-start-zero",
+    "redundant-end-nil",
+    "redundant-from-end-nil",
+    "redundant-count-nil",
 ];
 
 /// Whether `inspect lint --fix` can automatically repair findings of `name`.
@@ -1001,7 +1033,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 77] = [
+pub const WARNING_RULES: [&str; 81] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -1079,6 +1111,10 @@ pub const WARNING_RULES: [&str; 77] = [
     "prog2-to-progn",
     "handler-case-no-clauses",
     "unwind-protect-no-cleanup",
+    "redundant-start-zero",
+    "redundant-end-nil",
+    "redundant-from-end-nil",
+    "redundant-count-nil",
 ];
 
 /// The severity of a rule's findings (`error` unless it is a [`WARNING_RULES`]
@@ -2550,6 +2586,58 @@ pub fn collect_lint_findings(
             span: item.span,
             message: "an unwind-protect with no cleanup is just its body; (unwind-protect x) is x"
                 .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_redundant_start_zeros(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "redundant-start-zero",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "{} :start defaults to 0; drop the explicit :start 0",
+                item.head
+            ),
+        });
+    }
+
+    let (_, items) = collect_redundant_end_nils(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "redundant-end-nil",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "{} :end defaults to nil; drop the explicit :end nil",
+                item.head
+            ),
+        });
+    }
+
+    let (_, items) = collect_redundant_from_end_nils(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "redundant-from-end-nil",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "{} :from-end defaults to nil; drop the explicit :from-end nil",
+                item.head
+            ),
+        });
+    }
+
+    let (_, items) = collect_redundant_count_nils(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "redundant-count-nil",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "{} :count defaults to nil; drop the explicit :count nil",
+                item.head
+            ),
         });
     }
 

@@ -71,19 +71,22 @@
           src = lib.fileset.toSource {
             root = ./docs;
             fileset = lib.fileset.unions [
-              ./docs/book.toml
+              ./docs/mkdocs.yml
               ./docs/src
             ];
           };
-          nativeBuildInputs = [ pkgs.mdbook ];
+          nativeBuildInputs = [ pkgs.python3Packages.mkdocs-material ];
+          # Build fully offline: Material for MkDocs bundles all of its assets,
+          # so no network access is required inside the Nix sandbox. --strict
+          # promotes broken links and unlisted pages to build failures.
           buildPhase = ''
             runHook preBuild
-            mdbook build --dest-dir "$out" .
+            mkdocs build --strict --config-file mkdocs.yml --site-dir "$out"
             runHook postBuild
           '';
           dontInstall = true;
           meta = {
-            description = "Rendered mdBook documentation for paredit-cli";
+            description = "Rendered MkDocs (Material) documentation for paredit-cli";
             homepage = cargoToml.package.homepage;
             license = lib.licenses.mit;
           };
@@ -297,7 +300,7 @@
             pkgs.cargo-audit
             pkgs.rustfmt
             pkgs.clippy
-            pkgs.mdbook
+            pkgs.python3Packages.mkdocs-material
           ];
           shellHook = ''
             cat <<'USAGE_EOF'
@@ -316,7 +319,7 @@
 
             Build and run:
               nix build .#              # result/bin/paredit
-              nix build .#docs          # result/index.html (mdBook site)
+              nix build .#docs          # result/index.html (MkDocs Material site)
               nix run .# -- inspect check --file source.lisp
               nix run .#lint -- .       # structural lint gate
               nix run .#format -- --check .

@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 162] = [
+const INTROSPECTION_COMMANDS: [&str; 166] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -209,6 +209,10 @@ const INTROSPECTION_COMMANDS: [&str; 162] = [
     "inspect eq-char-comparison",
     "inspect redundant-apply",
     "inspect redundant-eql-test",
+    "inspect redundant-start-zero",
+    "inspect redundant-end-nil",
+    "inspect redundant-from-end-nil",
+    "inspect redundant-count-nil",
     "inspect make-hash-table-test",
     "inspect gethash-default",
     "inspect typep-predicate",

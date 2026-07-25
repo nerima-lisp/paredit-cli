@@ -54,8 +54,11 @@ use crate::application::usecase::prog2_to_progn_report::collect_prog2_to_progn;
 use crate::application::usecase::redundant_apply_report::collect_redundant_applies;
 use crate::application::usecase::redundant_body_progn_report::collect_redundant_body_progns;
 use crate::application::usecase::redundant_boolean_identity_report::collect_redundant_boolean_identities;
+use crate::application::usecase::redundant_count_nil_report::collect_redundant_count_nils;
 use crate::application::usecase::redundant_divisor_report::collect_redundant_divisors;
+use crate::application::usecase::redundant_end_nil_report::collect_redundant_end_nils;
 use crate::application::usecase::redundant_eql_test_report::collect_redundant_eql_tests;
+use crate::application::usecase::redundant_from_end_nil_report::collect_redundant_from_end_nils;
 use crate::application::usecase::redundant_funcall_report::collect_redundant_funcalls;
 use crate::application::usecase::redundant_identity_key_report::collect_redundant_identity_keys;
 use crate::application::usecase::redundant_identity_report::collect_redundant_identities;
@@ -64,6 +67,7 @@ use crate::application::usecase::redundant_let_star_report::collect_redundant_le
 use crate::application::usecase::redundant_prog1_report::collect_redundant_prog1s;
 use crate::application::usecase::redundant_progn_report::collect_redundant_progns;
 use crate::application::usecase::redundant_quote_report::collect_redundant_quotes;
+use crate::application::usecase::redundant_start_zero_report::collect_redundant_start_zeros;
 use crate::application::usecase::redundant_the_report::collect_redundant_thes;
 use crate::application::usecase::sharp_quoted_lambda_report::collect_sharp_quoted_lambdas;
 use crate::application::usecase::sign_comparison_report::collect_sign_comparisons;
@@ -239,6 +243,8 @@ fn retain_unbaselined(
 /// so `(funcall (lambda …) …)` becomes `((lambda …) …)`), `sharp-quoted-lambda`
 /// (strip the redundant `#'` so `#'(lambda …)` becomes `(lambda …)`),
 /// `redundant-eql-test` (delete an explicit default `:test #'eql`),
+/// `redundant-start-zero` / `redundant-end-nil` / `redundant-from-end-nil` /
+/// `redundant-count-nil` (delete an explicit default sequence keyword argument),
 /// `redundant-identity-key` (delete an explicit default `:key #'identity`),
 /// `redundant-identity` (replace
 /// `(identity x)` with `x`), `cons-to-list` (rewrite `(cons a nil)` as
@@ -537,6 +543,86 @@ fn collect_lint_fixes(
                 ("redundant-eql-test", start, end),
                 LintFix {
                     description: "Drop the redundant :test #'eql".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"redundant-start-zero") {
+        let (_, items) = collect_redundant_start_zeros(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("redundant-start-zero", start, end),
+                LintFix {
+                    description: "Drop the redundant :start 0".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"redundant-end-nil") {
+        let (_, items) = collect_redundant_end_nils(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("redundant-end-nil", start, end),
+                LintFix {
+                    description: "Drop the redundant :end nil".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"redundant-from-end-nil") {
+        let (_, items) = collect_redundant_from_end_nils(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("redundant-from-end-nil", start, end),
+                LintFix {
+                    description: "Drop the redundant :from-end nil".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"redundant-count-nil") {
+        let (_, items) = collect_redundant_count_nils(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("redundant-count-nil", start, end),
+                LintFix {
+                    description: "Drop the redundant :count nil".to_owned(),
                     replacements: vec![LintReplacement {
                         byte_offset: removal_start,
                         byte_length: removal_end - removal_start,
@@ -2325,6 +2411,10 @@ mod tests {
             "(nthcdr 2 ns)\n",                          // nthcdr-small-index
             "(apply #'g (list m))\n",                   // redundant-apply
             "(find ret lst :test #'eql)\n",             // redundant-eql-test
+            "(find rsz lst :start 0)\n",                // redundant-start-zero
+            "(find ren lst :end nil)\n",                // redundant-end-nil
+            "(find rfe lst :from-end nil)\n",           // redundant-from-end-nil
+            "(remove rcn lst :count nil)\n",            // redundant-count-nil
             "(sort rik #'< :key #'identity)\n",         // redundant-identity-key
             "(= tally 0)\n",                            // sign-comparison
             "(not (< a b))\n",                          // negated-comparison

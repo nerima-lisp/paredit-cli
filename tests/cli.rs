@@ -307,10 +307,16 @@ mod redundant_apply_report;
 mod redundant_body_progn_report;
 #[path = "cli/redundant_boolean_identity_report.rs"]
 mod redundant_boolean_identity_report;
+#[path = "cli/redundant_count_nil_report.rs"]
+mod redundant_count_nil_report;
 #[path = "cli/redundant_divisor_report.rs"]
 mod redundant_divisor_report;
+#[path = "cli/redundant_end_nil_report.rs"]
+mod redundant_end_nil_report;
 #[path = "cli/redundant_eql_test_report.rs"]
 mod redundant_eql_test_report;
+#[path = "cli/redundant_from_end_nil_report.rs"]
+mod redundant_from_end_nil_report;
 #[path = "cli/redundant_funcall_report.rs"]
 mod redundant_funcall_report;
 #[path = "cli/redundant_identity_key_report.rs"]
@@ -327,6 +333,8 @@ mod redundant_prog1_report;
 mod redundant_progn_report;
 #[path = "cli/redundant_quote_report.rs"]
 mod redundant_quote_report;
+#[path = "cli/redundant_start_zero_report.rs"]
+mod redundant_start_zero_report;
 #[path = "cli/redundant_the_report.rs"]
 mod redundant_the_report;
 #[path = "cli/refactor_entrypoint_contract.rs"]
