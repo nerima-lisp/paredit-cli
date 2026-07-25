@@ -48,6 +48,7 @@ use crate::application::usecase::sign_comparison_report::collect_sign_comparison
 use crate::application::usecase::single_clause_cond_report::collect_single_clause_conds;
 use crate::application::usecase::single_operand_arithmetic_report::collect_single_operand_arithmetic;
 use crate::application::usecase::single_operand_boolean_report::collect_single_operand_booleans;
+use crate::application::usecase::single_operand_list_op_report::collect_single_operand_list_ops;
 use crate::application::usecase::single_value_bind_report::collect_single_value_binds;
 use crate::application::usecase::verbose_negation_report::collect_verbose_negations;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
@@ -197,7 +198,8 @@ fn retain_unbaselined(
 /// `redundant-quote` (drop the quote, keeping the self-evaluating literal),
 /// `redundant-progn` (replace the wrapper with its single body form, or `nil`
 /// when the progn is empty), `single-operand-boolean` (replace `(and X)`/
-/// `(or X)` with `X`), `single-operand-arithmetic` (replace `(+ X)`/`(* X)`
+/// `(or X)` with `X`), `single-operand-list-op` (replace `(append X)` with
+/// `X`), `single-operand-arithmetic` (replace `(+ X)`/`(* X)`
 /// with `X`), `nested-progn` / `redundant-body-progn` (splice a progn's
 /// body into the enclosing progn/implicit-body form), `redundant-if-nil` (drop
 /// the redundant `nil` else), `empty-let` (rewrite `(let () …)` as
@@ -556,6 +558,23 @@ fn collect_lint_fixes(
                     end,
                     slice(item.inner_span),
                     format!("Unwrap the single-operand {}", item.operator),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"single-operand-list-op") {
+        let (_, items) = collect_single_operand_list_ops(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (append x) is x: replace the whole form with the argument source.
+            fixes.insert(
+                ("single-operand-list-op", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.arg_span),
+                    format!("Drop the no-op single-argument {}", item.head),
                 ),
             );
         }
@@ -1720,6 +1739,7 @@ mod tests {
             "(when wa (when wb (wc)))\n",             // nested-when
             "(unless ua (unless ub (uc)))\n",         // nested-unless
             "(and x)\n",                              // single-operand-boolean
+            "(append solo)\n",                        // single-operand-list-op
             "(* x)\n",                                // single-operand-arithmetic
             "(when (not r) y)\n",                     // negated-when-unless
             "(if p q)\n",                             // one-armed-if

@@ -154,6 +154,7 @@ mod single_arg_comparison_report;
 mod single_clause_cond_report;
 mod single_operand_arithmetic_report;
 mod single_operand_boolean_report;
+mod single_operand_list_op_report;
 mod single_value_bind_report;
 mod split_let;
 mod split_let_star;

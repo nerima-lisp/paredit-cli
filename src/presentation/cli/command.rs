@@ -40,13 +40,14 @@ use super::{
     self_assignment_report, self_comparison_report, setf_arity_report, setq_non_variable_report,
     shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
     similarity_report, single_arg_comparison_report, single_clause_cond_report,
-    single_operand_arithmetic_report, single_operand_boolean_report, single_value_bind_report,
-    split_let, split_let_star, struct_cycle_report, symbol_report, system_conflict_report,
-    system_cycle_report, t_comparison_report, the_arity_report, thread_expression,
-    typecase_nil_key_report, undefined_package_report, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unthread_expression, unused_export_report,
-    unused_local_callable_report, unused_nickname_report, unused_package_report,
-    unused_parameter_report, unwrap_call, verbose_negation_report, workspace_report,
+    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
+    single_value_bind_report, split_let, split_let_star, struct_cycle_report, symbol_report,
+    system_conflict_report, system_cycle_report, t_comparison_report, the_arity_report,
+    thread_expression, typecase_nil_key_report, undefined_package_report,
+    unreachable_case_clause_report, unreachable_cond_clause_report, unthread_expression,
+    unused_export_report, unused_local_callable_report, unused_nickname_report,
+    unused_package_report, unused_parameter_report, unwrap_call, verbose_negation_report,
+    workspace_report,
 };
 use clap::Subcommand;
 
@@ -282,6 +283,8 @@ pub(super) enum InspectCommand {
     SharpQuotedLambda(sharp_quoted_lambda_report::args::SharpQuotedLambdaReportArgs),
     /// Report single-operand and/or forms ((and X) and (or X) are just X).
     SingleOperandBoolean(single_operand_boolean_report::args::SingleOperandBooleanReportArgs),
+    /// Report a single-argument append/nconc/list*, which returns its argument ((append x) is x).
+    SingleOperandListOp(single_operand_list_op_report::args::SingleOperandListOpReportArgs),
     /// Report single-operand +/* forms ((+ X) and (* X) are just X).
     SingleOperandArithmetic(
         single_operand_arithmetic_report::args::SingleOperandArithmeticReportArgs,

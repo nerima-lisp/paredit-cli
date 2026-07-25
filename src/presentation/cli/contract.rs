@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 131] = [
+const INTROSPECTION_COMMANDS: [&str; 132] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -174,6 +174,7 @@ const INTROSPECTION_COMMANDS: [&str; 131] = [
     "inspect one-armed-if",
     "inspect one-step-arithmetic",
     "inspect single-operand-boolean",
+    "inspect single-operand-list-op",
     "inspect single-operand-arithmetic",
     "inspect single-arg-comparison",
     "inspect single-clause-cond",

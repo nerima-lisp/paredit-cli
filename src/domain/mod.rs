@@ -154,6 +154,7 @@ pub mod single_arg_comparison_report;
 pub mod single_clause_cond_report;
 pub mod single_operand_arithmetic_report;
 pub mod single_operand_boolean_report;
+pub mod single_operand_list_op_report;
 pub mod single_value_bind_report;
 pub(crate) mod sort_definitions;
 pub(crate) mod split_file;

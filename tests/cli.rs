@@ -329,6 +329,8 @@ mod single_clause_cond_report;
 mod single_operand_arithmetic_report;
 #[path = "cli/single_operand_boolean_report.rs"]
 mod single_operand_boolean_report;
+#[path = "cli/single_operand_list_op_report.rs"]
+mod single_operand_list_op_report;
 #[path = "cli/single_value_bind_report.rs"]
 mod single_value_bind_report;
 #[path = "cli/skill_contract.rs"]

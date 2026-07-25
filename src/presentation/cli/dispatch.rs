@@ -305,6 +305,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::SingleOperandBoolean(args) => {
                 single_operand_boolean_report::workflow::single_operand_boolean_report(args)?
             }
+            command::InspectCommand::SingleOperandListOp(args) => {
+                single_operand_list_op_report::workflow::single_operand_list_op_report(args)?
+            }
             command::InspectCommand::SingleOperandArithmetic(args) => {
                 single_operand_arithmetic_report::workflow::single_operand_arithmetic_report(args)?
             }

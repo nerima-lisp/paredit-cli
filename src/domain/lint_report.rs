@@ -102,6 +102,7 @@ use crate::domain::single_arg_comparison_report::collect_single_arg_comparisons;
 use crate::domain::single_clause_cond_report::collect_single_clause_conds;
 use crate::domain::single_operand_arithmetic_report::collect_single_operand_arithmetic;
 use crate::domain::single_operand_boolean_report::collect_single_operand_booleans;
+use crate::domain::single_operand_list_op_report::collect_single_operand_list_ops;
 use crate::domain::single_value_bind_report::collect_single_value_binds;
 use crate::domain::t_comparison_report::collect_t_comparisons;
 use crate::domain::the_arity_report::collect_the_arity_violations;
@@ -111,7 +112,7 @@ use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clau
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 87] = [
+pub const RULES: [&str; 88] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -182,6 +183,7 @@ pub const RULES: [&str; 87] = [
     "redundant-boolean-identity",
     "de-morgan",
     "single-operand-boolean",
+    "single-operand-list-op",
     "single-operand-arithmetic",
     "eql-string-comparison",
     "eql-list-comparison",
@@ -211,7 +213,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 87] = [
+pub const RULE_DOCS: [(&str, &str, &str); 88] = [
     (
         "self-assignment",
         "suspicious",
@@ -563,6 +565,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 87] = [
         "a single-operand and/or ((and X) and (or X) are just X)",
     ),
     (
+        "single-operand-list-op",
+        "suspicious",
+        "a single-argument append/nconc/list*, which returns its argument unchanged ((append x) is x)",
+    ),
+    (
         "single-operand-arithmetic",
         "suspicious",
         "a single-operand +/* ((+ X) and (* X) are just X)",
@@ -671,7 +678,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 45] = [
+pub const FIXABLE_RULES: [&str; 46] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -702,6 +709,7 @@ pub const FIXABLE_RULES: [&str; 45] = [
     "redundant-boolean-identity",
     "de-morgan",
     "single-operand-boolean",
+    "single-operand-list-op",
     "single-operand-arithmetic",
     "negated-when-unless",
     "negated-comparison",
@@ -757,7 +765,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 46] = [
+pub const WARNING_RULES: [&str; 47] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -788,6 +796,7 @@ pub const WARNING_RULES: [&str; 46] = [
     "redundant-boolean-identity",
     "de-morgan",
     "single-operand-boolean",
+    "single-operand-list-op",
     "single-operand-arithmetic",
     "negated-when-unless",
     "negated-comparison",
@@ -1707,6 +1716,17 @@ pub fn collect_lint_findings(
                 "{} has a single operand; ({} X) is just X",
                 item.operator, item.operator
             ),
+        });
+    }
+
+    let (_, items) = collect_single_operand_list_ops(path, dialect, tree)?;
+    for item in items {
+        let head = item.head;
+        findings.push(LintFinding {
+            rule: "single-operand-list-op",
+            path: item.path,
+            span: item.span,
+            message: format!("{head} of one argument returns it unchanged; ({head} x) is x"),
         });
     }
 
