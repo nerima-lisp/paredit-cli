@@ -22,6 +22,7 @@ use crate::application::usecase::lint_report::{
     evaluate_lint_policy, resolve_active_rules, rule_category, rule_severity,
     summarize_lint_findings,
 };
+use crate::application::usecase::list_star_to_cons_report::collect_list_star_to_cons;
 use crate::application::usecase::manual_incf_report::collect_manual_incfs;
 use crate::application::usecase::manual_push_report::collect_manual_pushes;
 use crate::application::usecase::manual_pushnew_report::collect_manual_pushnews;
@@ -50,6 +51,7 @@ use crate::application::usecase::redundant_identity_key_report::collect_redundan
 use crate::application::usecase::redundant_identity_report::collect_redundant_identities;
 use crate::application::usecase::redundant_if_nil_report::collect_redundant_if_nils;
 use crate::application::usecase::redundant_let_star_report::collect_redundant_let_stars;
+use crate::application::usecase::redundant_prog1_report::collect_redundant_prog1s;
 use crate::application::usecase::redundant_progn_report::collect_redundant_progns;
 use crate::application::usecase::redundant_quote_report::collect_redundant_quotes;
 use crate::application::usecase::redundant_the_report::collect_redundant_thes;
@@ -60,6 +62,8 @@ use crate::application::usecase::single_operand_arithmetic_report::collect_singl
 use crate::application::usecase::single_operand_boolean_report::collect_single_operand_booleans;
 use crate::application::usecase::single_operand_list_op_report::collect_single_operand_list_ops;
 use crate::application::usecase::single_value_bind_report::collect_single_value_binds;
+use crate::application::usecase::subseq_zero_report::collect_subseq_zeros;
+use crate::application::usecase::values_list_of_list_report::collect_values_list_of_lists;
 use crate::application::usecase::verbose_negation_report::collect_verbose_negations;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 use crate::presentation::cli::lint_report::args::LintReportArgs;
@@ -233,6 +237,10 @@ fn retain_unbaselined(
 /// `format-newline` (rewrite `(format t "~%")` as `(terpri)`), `redundant-divisor`
 /// (drop the redundant `1` divisor so `(floor x 1)` becomes `(floor x)`),
 /// `verbose-negation` (rewrite `(- 0 x)` / `(* x -1)` as `(- x)`),
+/// `list-star-to-cons` (rewrite `(list* a b)` as `(cons a b)`),
+/// `values-list-of-list` (rewrite `(values-list (list a b))` as `(values a b)`),
+/// `redundant-prog1` (unwrap `(prog1 x)` to `x`), `subseq-zero` (rewrite
+/// `(subseq seq 0)` as `(copy-seq seq)`),
 /// `negated-when-unless` (a two-edit fix: flip the
 /// `when`/`unless` head and drop the `(not …)`), `one-armed-if` (swap an
 /// else-less `if` head for `when`), `manual-incf` (rewrite `(setf x (1+ x))` as
@@ -699,6 +707,80 @@ fn collect_lint_fixes(
                     end,
                     format!("(- {})", slice(item.operand_span)),
                     "Use unary (- x) for negation".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"list-star-to-cons") {
+        let (_, items) = collect_list_star_to_cons(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (list* a b) is (cons a b).
+            let text = format!("(cons {} {})", slice(item.car_span), slice(item.cdr_span));
+            fixes.insert(
+                ("list-star-to-cons", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (list* a b) as (cons a b)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"values-list-of-list") {
+        let (_, items) = collect_values_list_of_lists(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (values-list (list a b)) is (values a b); an empty list -> (values).
+            let text = match item.elements_span {
+                Some(span) => format!("(values {})", slice(span)),
+                None => "(values)".to_owned(),
+            };
+            fixes.insert(
+                ("values-list-of-list", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (values-list (list …)) as (values …)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"redundant-prog1") {
+        let (_, items) = collect_redundant_prog1s(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (prog1 x) is x: replace the whole form with its single inner form.
+            fixes.insert(
+                ("redundant-prog1", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.form_span),
+                    "Drop the single-form prog1".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"subseq-zero") {
+        let (_, items) = collect_subseq_zeros(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (subseq seq 0) is (copy-seq seq).
+            let text = format!("(copy-seq {})", slice(item.sequence_span));
+            fixes.insert(
+                ("subseq-zero", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (subseq seq 0) as (copy-seq seq)".to_owned(),
                 ),
             );
         }
@@ -1954,6 +2036,10 @@ mod tests {
             "(format t \"~%\")\n",                    // format-newline
             "(floor fq 1)\n",                         // redundant-divisor
             "(- 0 amt)\n",                            // verbose-negation
+            "(list* la lb)\n",                        // list-star-to-cons
+            "(values-list (list va vb))\n",           // values-list-of-list
+            "(prog1 (p1x))\n",                        // redundant-prog1
+            "(subseq sz 0)\n",                        // subseq-zero
             "(let* ((a 1)) a)\n",                     // redundant-let-star
             "(cond (ok (run)))\n",                    // single-clause-cond
             "(cond (t (r1) (r2)))\n",                 // cond-t-clause

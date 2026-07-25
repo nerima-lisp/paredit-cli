@@ -183,6 +183,8 @@ mod lambda_list_keyword_order_report;
 mod let_refactor;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
+#[path = "cli/list_star_to_cons_report.rs"]
+mod list_star_to_cons_report;
 #[path = "cli/literal_place_report.rs"]
 mod literal_place_report;
 #[path = "cli/malformed_case_clause_report.rs"]
@@ -295,6 +297,8 @@ mod redundant_identity_report;
 mod redundant_if_nil_report;
 #[path = "cli/redundant_let_star_report.rs"]
 mod redundant_let_star_report;
+#[path = "cli/redundant_prog1_report.rs"]
+mod redundant_prog1_report;
 #[path = "cli/redundant_progn_report.rs"]
 mod redundant_progn_report;
 #[path = "cli/redundant_quote_report.rs"]
@@ -363,6 +367,8 @@ mod split_file;
 mod split_let_star;
 #[path = "cli/struct_cycle_report.rs"]
 mod struct_cycle_report;
+#[path = "cli/subseq_zero_report.rs"]
+mod subseq_zero_report;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
 #[path = "cli/system_conflict_report.rs"]
@@ -397,6 +403,8 @@ mod unused_package_report;
 mod unused_parameter_report;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
+#[path = "cli/values_list_of_list_report.rs"]
+mod values_list_of_list_report;
 #[path = "cli/verbose_negation_report.rs"]
 mod verbose_negation_report;
 #[path = "cli/workspace_entrypoint_contract.rs"]

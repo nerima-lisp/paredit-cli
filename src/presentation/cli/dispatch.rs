@@ -216,6 +216,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::RedundantProgn(args) => {
                 redundant_progn_report::workflow::redundant_progn_report(args)?
             }
+            command::InspectCommand::RedundantProg1(args) => {
+                redundant_prog1_report::workflow::redundant_prog1_report(args)?
+            }
             command::InspectCommand::NegatedWhenUnless(args) => {
                 negated_when_unless_report::workflow::negated_when_unless_report(args)?
             }
@@ -249,6 +252,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::AppendListToCons(args) => {
                 append_list_to_cons_report::workflow::append_list_to_cons_report(args)?
             }
+            command::InspectCommand::ListStarToCons(args) => {
+                list_star_to_cons_report::workflow::list_star_to_cons_report(args)?
+            }
+            command::InspectCommand::ValuesListOfList(args) => {
+                values_list_of_list_report::workflow::values_list_of_list_report(args)?
+            }
             command::InspectCommand::VerboseNegation(args) => {
                 verbose_negation_report::workflow::verbose_negation_report(args)?
             }
@@ -260,6 +269,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::NthcdrZero(args) => {
                 nthcdr_zero_report::workflow::nthcdr_zero_report(args)?
+            }
+            command::InspectCommand::SubseqZero(args) => {
+                subseq_zero_report::workflow::subseq_zero_report(args)?
             }
             command::InspectCommand::NthcdrSmallIndex(args) => {
                 nthcdr_small_index_report::workflow::nthcdr_small_index_report(args)?
