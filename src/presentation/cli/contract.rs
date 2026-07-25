@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 120] = [
+const INTROSPECTION_COMMANDS: [&str; 127] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -90,6 +90,9 @@ const INTROSPECTION_COMMANDS: [&str; 120] = [
     "inspect duplicates",
     "inspect similarity",
     "inspect lets",
+    "inspect complexity",
+    "inspect naming",
+    "inspect reachability",
     "inspect unused-parameters",
     "inspect shadowed-bindings",
     "inspect unused-local-callables",
@@ -155,9 +158,12 @@ const INTROSPECTION_COMMANDS: [&str; 120] = [
     "inspect negated-step-delta",
     "inspect if-to-or",
     "inspect constant-if-test",
+    "inspect cons-to-list",
     "inspect verbose-negation",
     "inspect negated-when-unless",
     "inspect nested-boolean",
+    "inspect nested-cxr",
+    "inspect nth-constant-index",
     "inspect nested-progn",
     "inspect nested-unless",
     "inspect nested-when",
@@ -170,6 +176,7 @@ const INTROSPECTION_COMMANDS: [&str; 120] = [
     "inspect single-clause-cond",
     "inspect single-value-bind",
     "inspect sign-comparison",
+    "inspect format-missing-destination",
     "inspect literal-place",
     "inspect eq-char-comparison",
     "inspect redundant-apply",

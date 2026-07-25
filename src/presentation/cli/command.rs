@@ -4,32 +4,34 @@ use super::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
     binds_constant_report, call_cycle_report, call_graph_report, call_report, capabilities,
-    case_nil_key_report, char_op_string_report, class_cycle_report, constant_if_test_report,
-    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
-    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
-    convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
-    dead_boolean_operand_report, definition_movement, definition_removal, definition_report,
-    dependency_report, destructive_literal_report, duplicate_boolean_operand_report,
-    duplicate_case_key_report, duplicate_cond_test_report, duplicate_export_report,
-    duplicate_lambda_list_keyword_report, duplicate_let_binding_report, duplicate_method_report,
-    duplicate_parameter_report, duplicate_report, duplicate_setf_place_report,
-    duplicate_slot_report, eliminate_empty_binding_form, empty_body_report,
-    eq_char_comparison_report, eq_number_comparison_report, eql_list_comparison_report,
-    eql_search_literal_report, eql_string_comparison_report, equality_arity_report,
-    eval_when_situation_report, exhaustive_case_otherwise_report, explicit_nil_return_report,
-    explicit_step_delta_report, extract_constant, extract_function, extract_local_function,
-    flatten_progn, form_report, funcall_lambda_report, function_parameter,
+    case_nil_key_report, char_op_string_report, class_cycle_report, complexity_report,
+    cons_to_list_report, constant_if_test_report, convert_cond_to_if, convert_flet_to_labels,
+    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
+    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
+    convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
+    definition_movement, definition_removal, definition_report, dependency_report,
+    destructive_literal_report, duplicate_boolean_operand_report, duplicate_case_key_report,
+    duplicate_cond_test_report, duplicate_export_report, duplicate_lambda_list_keyword_report,
+    duplicate_let_binding_report, duplicate_method_report, duplicate_parameter_report,
+    duplicate_report, duplicate_setf_place_report, duplicate_slot_report,
+    eliminate_empty_binding_form, empty_body_report, eq_char_comparison_report,
+    eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
+    eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
+    exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
+    extract_constant, extract_function, extract_local_function, flatten_progn, form_report,
+    format_missing_destination_report, funcall_lambda_report, function_parameter,
     identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_to_or_report,
     impact_report, inline_function, inline_lambda, inline_let, inline_literal_constant,
     inline_local_function, inline_symbol_macro, introduce_let, lambda_list_keyword_order_report,
     let_report, literal_place_report, malformed_case_clause_report, malformed_cond_clause_report,
     malformed_iteration_spec_report, malformed_let_binding_report, manual_incf_report,
     manual_push_report, manual_pushnew_report, merge_nested_flet, merge_nested_let,
-    merge_nested_let_star, modify_macro_arity_report, negated_comparison_report, negated_if_report,
-    negated_step_delta_report, negated_when_unless_report, nested_boolean_report,
-    nested_progn_report, nested_unless_report, nested_when_report, nil_comparison_report,
-    one_armed_if_report, one_step_arithmetic_report, package, package_boundary_report,
-    package_conflict_report, package_cycle_report, quoted_case_key_report, redefinition_report,
+    merge_nested_let_star, modify_macro_arity_report, naming_report, negated_comparison_report,
+    negated_if_report, negated_step_delta_report, negated_when_unless_report,
+    nested_boolean_report, nested_cxr_report, nested_progn_report, nested_unless_report,
+    nested_when_report, nil_comparison_report, nth_constant_index_report, one_armed_if_report,
+    one_step_arithmetic_report, package, package_boundary_report, package_conflict_report,
+    package_cycle_report, quoted_case_key_report, reachability_report, redefinition_report,
     redundant_apply_report, redundant_body_progn_report, redundant_boolean_identity_report,
     redundant_eql_test_report, redundant_funcall_report, redundant_identity_key_report,
     redundant_identity_report, redundant_if_nil_report, redundant_let_star_report,
@@ -200,6 +202,12 @@ pub(super) enum InspectCommand {
     Similarity(similarity_report::args::SimilarityReportArgs),
     /// Report local let bindings and inline safety for agent refactor planning.
     Lets(let_report::LetReportArgs),
+    /// Report per-definition nesting depth and size metrics for refactor prioritization.
+    Complexity(complexity_report::args::ComplexityReportArgs),
+    /// Report definition names that deviate from idiomatic kebab-case Lisp naming.
+    Naming(naming_report::args::NamingReportArgs),
+    /// Report callable definitions unreachable from any entry point in the internal call graph.
+    Reachability(reachability_report::args::ReachabilityReportArgs),
     /// Report top-level definitions of the same category and name declared more than once.
     Redefinitions(redefinition_report::args::RedefinitionReportArgs),
     /// Report self-evaluating literals (numbers, strings, characters, keywords) that are quoted redundantly.
@@ -214,10 +222,16 @@ pub(super) enum InspectCommand {
     NegatedIf(negated_if_report::args::NegatedIfReportArgs),
     /// Report an if with a literal t/nil test ((if t a b) is a; (if nil a b) is b).
     ConstantIfTest(constant_if_test_report::args::ConstantIfTestReportArgs),
+    /// Report a cons onto nil or a list literal ((cons a nil) is (list a); (cons a (list b)) is (list a b)).
+    ConsToList(cons_to_list_report::args::ConsToListReportArgs),
     /// Report negation written the long way ((- 0 x) and (* x -1) are (- x)).
     VerboseNegation(verbose_negation_report::args::VerboseNegationReportArgs),
     /// Report a same-operator and/or nested in an and/or, which flattens ((or a (or b c)) is (or a b c)).
     NestedBoolean(nested_boolean_report::args::NestedBooleanReportArgs),
+    /// Report nested car/cdr accessors that combine into one ((car (cdr x)) is (cadr x)).
+    NestedCxr(nested_cxr_report::args::NestedCxrReportArgs),
+    /// Report nth with a small constant index that has an ordinal accessor ((nth 0 x) is (first x)).
+    NthConstantIndex(nth_constant_index_report::args::NthConstantIndexReportArgs),
     /// Report progn forms with two or more body forms nested directly inside another progn.
     NestedProgn(nested_progn_report::args::NestedPrognReportArgs),
     /// Report an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c)).
@@ -272,6 +286,10 @@ pub(super) enum InspectCommand {
     SingleValueBind(single_value_bind_report::args::SingleValueBindReportArgs),
     /// Report =/</> comparisons against 0 that have a predicate ((= x 0) is (zerop x)).
     SignComparison(sign_comparison_report::args::SignComparisonReportArgs),
+    /// Report format calls whose first argument is a string literal (the destination is missing).
+    FormatMissingDestination(
+        format_missing_destination_report::args::FormatMissingDestinationReportArgs,
+    ),
     /// Report incf/decf/push/pop/pushnew whose place is a self-evaluating literal (cannot be modified).
     LiteralPlace(literal_place_report::args::LiteralPlaceReportArgs),
     /// Report declared function parameters with no unshadowed reference in their body.

@@ -190,6 +190,13 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 similarity_report::workflow::similarity_report(args)?
             }
             command::InspectCommand::Lets(args) => let_report::let_report(args)?,
+            command::InspectCommand::Complexity(args) => {
+                complexity_report::workflow::complexity_report(args)?
+            }
+            command::InspectCommand::Naming(args) => naming_report::workflow::naming_report(args)?,
+            command::InspectCommand::Reachability(args) => {
+                reachability_report::workflow::reachability_report(args)?
+            }
             command::InspectCommand::Redefinitions(args) => {
                 redefinition_report::workflow::redefinition_report(args)?
             }
@@ -217,11 +224,20 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::ConstantIfTest(args) => {
                 constant_if_test_report::workflow::constant_if_test_report(args)?
             }
+            command::InspectCommand::ConsToList(args) => {
+                cons_to_list_report::workflow::cons_to_list_report(args)?
+            }
             command::InspectCommand::VerboseNegation(args) => {
                 verbose_negation_report::workflow::verbose_negation_report(args)?
             }
             command::InspectCommand::NestedBoolean(args) => {
                 nested_boolean_report::workflow::nested_boolean_report(args)?
+            }
+            command::InspectCommand::NestedCxr(args) => {
+                nested_cxr_report::workflow::nested_cxr_report(args)?
+            }
+            command::InspectCommand::NthConstantIndex(args) => {
+                nth_constant_index_report::workflow::nth_constant_index_report(args)?
             }
             command::InspectCommand::NestedProgn(args) => {
                 nested_progn_report::workflow::nested_progn_report(args)?
@@ -293,6 +309,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::SignComparison(args) => {
                 sign_comparison_report::workflow::sign_comparison_report(args)?
+            }
+            command::InspectCommand::FormatMissingDestination(args) => {
+                format_missing_destination_report::workflow::format_missing_destination_report(args)?
             }
             command::InspectCommand::LiteralPlace(args) => {
                 literal_place_report::workflow::literal_place_report(args)?

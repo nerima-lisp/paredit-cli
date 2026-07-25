@@ -84,6 +84,15 @@ impl FormStats {
     }
 }
 
+/// Returns `(atom_count, list_count, max_depth)` for `view` without
+/// materializing per-symbol occurrence tracking. Callers that only need
+/// structural size and nesting depth (e.g. complexity reports) should use
+/// this instead of [`build_form_report`], which also collects symbols.
+pub fn collect_structural_stats(view: &ExpressionView) -> (usize, usize, usize) {
+    let stats = FormStats::collect(view);
+    (stats.atom_count, stats.list_count, stats.max_depth)
+}
+
 pub fn build_form_report(request: FormReportRequest<'_>) -> FormReport {
     let stats = FormStats::collect(&request.target);
     let head = expression_head(&request.target).map(ToOwned::to_owned);

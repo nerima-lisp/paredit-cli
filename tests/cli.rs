@@ -33,8 +33,12 @@ mod char_op_string_report;
 mod class_cycle_report;
 #[path = "cli/completions_contract.rs"]
 mod completions_contract;
+#[path = "cli/complexity_report.rs"]
+mod complexity_report;
 #[path = "cli/conditional_conversion.rs"]
 mod conditional_conversion;
+#[path = "cli/cons_to_list_report.rs"]
+mod cons_to_list_report;
 #[path = "cli/constant_if_test_report.rs"]
 mod constant_if_test_report;
 #[path = "cli/convert_cond_to_if.rs"]
@@ -129,6 +133,8 @@ mod flatten_progn;
 mod form_report;
 #[path = "cli/format/mod.rs"]
 mod format;
+#[path = "cli/format_missing_destination_report.rs"]
+mod format_missing_destination_report;
 #[path = "cli/funcall_lambda_report.rs"]
 mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]
@@ -183,6 +189,8 @@ mod merge_nested_let_star;
 mod merge_split_let;
 #[path = "cli/modify_macro_arity_report.rs"]
 mod modify_macro_arity_report;
+#[path = "cli/naming_report.rs"]
+mod naming_report;
 #[path = "cli/negated_comparison_report.rs"]
 mod negated_comparison_report;
 #[path = "cli/negated_if_report.rs"]
@@ -193,6 +201,8 @@ mod negated_step_delta_report;
 mod negated_when_unless_report;
 #[path = "cli/nested_boolean_report.rs"]
 mod nested_boolean_report;
+#[path = "cli/nested_cxr_report.rs"]
+mod nested_cxr_report;
 #[path = "cli/nested_progn_report.rs"]
 mod nested_progn_report;
 #[path = "cli/nested_unless_report.rs"]
@@ -201,6 +211,8 @@ mod nested_unless_report;
 mod nested_when_report;
 #[path = "cli/nil_comparison_report.rs"]
 mod nil_comparison_report;
+#[path = "cli/nth_constant_index_report.rs"]
+mod nth_constant_index_report;
 #[path = "cli/one_armed_if_report.rs"]
 mod one_armed_if_report;
 #[path = "cli/one_step_arithmetic_report.rs"]
@@ -223,6 +235,8 @@ mod public_api_docs_contract;
 mod public_module_docs_contract;
 #[path = "cli/quoted_case_key_report.rs"]
 mod quoted_case_key_report;
+#[path = "cli/reachability_report.rs"]
+mod reachability_report;
 #[path = "cli/readme_api_docs_contract.rs"]
 mod readme_api_docs_contract;
 #[path = "cli/readme_ci_contract.rs"]
