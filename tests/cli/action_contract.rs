@@ -41,9 +41,9 @@ fn documentation_covers_lint_and_format_integration_surfaces() {
         "documentation must include integration guidance"
     );
     for needle in [
-        "uses: takeokunn/paredit-cli@",
+        "uses: nerima-lisp/paredit-cli@",
         "mode: lint",
-        "nix run github:takeokunn/paredit-cli -- inspect check",
+        "nix run github:nerima-lisp/paredit-cli -- inspect check",
         "paredit inspect check --file source.lisp",
     ] {
         assert!(

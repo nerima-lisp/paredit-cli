@@ -75,13 +75,22 @@ The MSRV is declared as `rust-version` in `Cargo.toml` and verified in CI.
 Raising it is a minor release, not a major one, so pin a toolchain if you
 build from source in automation.
 
-## Release notes
+## How releases are distributed
 
-Every release is published as an annotated Git tag and a GitHub release.
+A release *is* an annotated Git tag, plus the GitHub release built from it.
+The crate is not published to a package registry, so pin the tag — or a
+reviewed commit — in whichever channel you use:
+
+```sh
+nix run github:nerima-lisp/paredit-cli/v1.0.0 -- --help
+nix profile install github:nerima-lisp/paredit-cli/v1.0.0
+cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.0.0 --locked
+```
+
 Release notes must call out anything that affects automation: new or
 deprecated commands and flags, `schema_version` bumps, exit-code behaviour,
 Nix interface changes, and MSRV increases.
 
 Maintainers follow
-[RELEASING.md](https://github.com/takeokunn/paredit-cli/blob/main/RELEASING.md)
-to verify the package, documentation, and Nix checks before publication.
+[RELEASING.md](https://github.com/nerima-lisp/paredit-cli/blob/main/RELEASING.md)
+to verify the documentation and Nix checks before tagging.

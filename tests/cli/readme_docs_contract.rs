@@ -4,7 +4,7 @@ fn readme_links_to_the_published_documentation() {
 
     for required in [
         "docs/src/README.md",
-        "https://takeokunn.github.io/paredit-cli/",
+        "https://nerima-lisp.github.io/paredit-cli/",
     ] {
         assert!(
             readme.contains(required),

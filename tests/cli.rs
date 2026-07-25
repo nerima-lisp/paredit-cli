@@ -287,8 +287,6 @@ mod one_armed_if_report;
 mod one_step_arithmetic_report;
 #[path = "cli/package/mod.rs"]
 mod package;
-#[path = "cli/package_archive_contract.rs"]
-mod package_archive_contract;
 #[path = "cli/package_boundary_report.rs"]
 mod package_boundary_report;
 #[path = "cli/package_conflict_report.rs"]

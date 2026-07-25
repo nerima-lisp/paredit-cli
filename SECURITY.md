@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Do not open a public issue for a suspected vulnerability. Use the repository's
-[private security advisory form](https://github.com/takeokunn/paredit-cli/security/advisories/new).
+[private security advisory form](https://github.com/nerima-lisp/paredit-cli/security/advisories/new).
 If private reporting is unavailable, contact the maintainer through the
 [repository owner's GitHub profile](https://github.com/takeokunn).
 

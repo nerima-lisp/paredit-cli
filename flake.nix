@@ -312,7 +312,7 @@
               cargo clippy --all-targets --all-features -- -D warnings
               cargo test
               cargo nextest run --locked
-              cargo publish --dry-run --allow-dirty --locked
+              cargo doc --no-deps
 
             Quick verification:
               nix flake check  # treefmt + actionlint + clippy + nextest + package/MSRV build/tests + lint/format integration
@@ -419,12 +419,6 @@
           });
           msrv = mkPareditWithPlatform pkgs msrvRustPlatform;
           package = self.packages.${system}.default;
-          # NOTE: `cargo publish --dry-run` is intentionally NOT a flake check.
-          # It resolves the crates-io registry index over the network, which
-          # the Nix build sandbox blocks on Linux CI (sandbox = true), making
-          # `nix flake check` fail there even though the crate is fine. The
-          # publish dry-run remains a manual local pre-release step, run where
-          # network access is available.
         }
       );
 

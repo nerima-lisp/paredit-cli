@@ -6,7 +6,7 @@ The repository ships a composite action that runs the structural lint and
 canonical-format gates:
 
 ```yaml
-- uses: takeokunn/paredit-cli@main
+- uses: nerima-lisp/paredit-cli@main
   with:
     mode: lint        # lint | format | fix
     paths: src tests  # files or directories, scanned recursively
@@ -23,7 +23,7 @@ For ad-hoc use, invoke the Nix flake directly with canonical command paths:
 
 ```yaml
 - name: Check Lisp source
-  run: nix run github:takeokunn/paredit-cli -- inspect check --file source.lisp
+  run: nix run github:nerima-lisp/paredit-cli -- inspect check --file source.lisp
 ```
 
 ## Nix flake
@@ -31,9 +31,9 @@ For ad-hoc use, invoke the Nix flake directly with canonical command paths:
 The flake exposes packages, apps, and reusable check helpers:
 
 ```sh
-nix run github:takeokunn/paredit-cli -- inspect check --file source.lisp
-nix run github:takeokunn/paredit-cli#lint -- .
-nix run github:takeokunn/paredit-cli#format -- --check .
+nix run github:nerima-lisp/paredit-cli -- inspect check --file source.lisp
+nix run github:nerima-lisp/paredit-cli#lint -- .
+nix run github:nerima-lisp/paredit-cli#format -- --check .
 ```
 
 Downstream flakes can reuse the gates and the formatter:

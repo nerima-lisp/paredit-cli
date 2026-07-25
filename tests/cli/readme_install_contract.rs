@@ -10,7 +10,7 @@ fn readme_installation_and_msrv_match_manifest_contract() {
         "README installation section should use a locked local install command"
     );
     assert!(
-        readme.contains("cargo install --git https://github.com/takeokunn/paredit-cli --locked"),
+        readme.contains("cargo install --git https://github.com/nerima-lisp/paredit-cli --locked"),
         "README installation section should use a locked git install command"
     );
 

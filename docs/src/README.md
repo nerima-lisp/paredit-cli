@@ -36,7 +36,7 @@ surface.
 ## Install
 
 ```sh
-nix run github:takeokunn/paredit-cli -- inspect check --file source.lisp
+nix run github:nerima-lisp/paredit-cli -- inspect check --file source.lisp
 ```
 
 See [Installation](installation.md) for Nix profiles, the flake overlay,

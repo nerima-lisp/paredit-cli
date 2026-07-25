@@ -5,28 +5,12 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 description = "Structure-editing CLI for safe S-expression refactoring by AI coding agents"
-repository = "https://github.com/takeokunn/paredit-cli"
-homepage = "https://github.com/takeokunn/paredit-cli"
-documentation = "https://docs.rs/paredit-cli"
+repository = "https://github.com/nerima-lisp/paredit-cli"
+homepage = "https://github.com/nerima-lisp/paredit-cli"
+documentation = "https://nerima-lisp.github.io/paredit-cli/"
 readme = "README.md"
 keywords = ["lisp", "paredit", "refactoring", "cli", "sexp"]
 categories = ["command-line-utilities", "development-tools"]
-include = [
-    "/.github/workflows/ci.yml",
-    "/Cargo.lock",
-    "/Cargo.toml",
-    "/LICENSE",
-    "/README.md",
-    "/action.yml",
-    "/benches/**/*.rs",
-    "/docs/src/commands.md",
-    "/docs/src/integrations.md",
-    "/flake.nix",
-    "/skills/paredit-cli/SKILL.md",
-    "/src/**/*.rs",
-    "/tests/**/*.rs",
-    "/tests/fixtures/*",
-]
 
 [[bin]]
 name = "paredit"
@@ -58,9 +42,6 @@ proptest = "1.11"
 [[bench]]
 name = "similarity_report"
 harness = false
-
-[package.metadata.docs.rs]
-targets = ["x86_64-unknown-linux-gnu"]
 
 [lints.rust]
 unsafe_code = "deny"

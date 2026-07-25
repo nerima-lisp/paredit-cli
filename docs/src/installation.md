@@ -6,20 +6,20 @@ Cargo works anywhere a Rust toolchain is available.
 ## Run without installing (Nix)
 
 ```sh
-nix run github:takeokunn/paredit-cli -- inspect check --file source.lisp
+nix run github:nerima-lisp/paredit-cli -- inspect check --file source.lisp
 ```
 
 The companion lint and format gates are exposed as flake apps:
 
 ```sh
-nix run github:takeokunn/paredit-cli#lint -- .
-nix run github:takeokunn/paredit-cli#format -- --check .
+nix run github:nerima-lisp/paredit-cli#lint -- .
+nix run github:nerima-lisp/paredit-cli#format -- --check .
 ```
 
 ## Install into a Nix profile
 
 ```sh
-nix profile install github:takeokunn/paredit-cli
+nix profile install github:nerima-lisp/paredit-cli
 ```
 
 Prebuilt binaries are published to the public
@@ -36,7 +36,7 @@ Add the flake and pick the packages or the overlay:
 
 ```nix
 {
-  inputs.paredit-cli.url = "github:takeokunn/paredit-cli";
+  inputs.paredit-cli.url = "github:nerima-lisp/paredit-cli";
 
   outputs = { nixpkgs, paredit-cli, ... }: {
     # Directly as a package:
@@ -55,7 +55,7 @@ The flake also exports `lib.${system}.mkLintCheck`, `mkFormatCheck`, and
 ## Install with Cargo
 
 ```sh
-cargo install --git https://github.com/takeokunn/paredit-cli --locked
+cargo install --git https://github.com/nerima-lisp/paredit-cli --locked
 ```
 
 The minimum supported Rust version is `1.85` (edition 2024).
@@ -63,13 +63,22 @@ The minimum supported Rust version is `1.85` (edition 2024).
 ## Pin automation
 
 The examples above follow the latest default branch. For CI, production
-automation, or a reproducible developer environment, pin an immutable commit
-instead. Replace `<commit>` with a full commit SHA that you have reviewed:
+automation, or a reproducible developer environment, pin a release tag:
 
 ```sh
-nix run github:takeokunn/paredit-cli/<commit> -- --help
-nix profile install github:takeokunn/paredit-cli/<commit>
-cargo install --git https://github.com/takeokunn/paredit-cli --rev <commit> --locked
+nix run github:nerima-lisp/paredit-cli/v1.0.0 -- --help
+nix profile install github:nerima-lisp/paredit-cli/v1.0.0
+cargo install --git https://github.com/nerima-lisp/paredit-cli --tag v1.0.0 --locked
+```
+
+A tag is the release artifact — the crate is not published to a package
+registry. For the strongest guarantee, pin an immutable commit instead and
+replace `<commit>` with a full commit SHA that you have reviewed:
+
+```sh
+nix run github:nerima-lisp/paredit-cli/<commit> -- --help
+nix profile install github:nerima-lisp/paredit-cli/<commit>
+cargo install --git https://github.com/nerima-lisp/paredit-cli --rev <commit> --locked
 ```
 
 When upgrading a pin, inspect the release notes and compare the machine-readable

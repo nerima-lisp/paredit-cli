@@ -9,10 +9,10 @@ site_description: >-
   Structure-editing CLI for safe S-expression refactoring, built for both
   people and AI coding agents.
 site_author: paredit-cli contributors
-site_url: https://takeokunn.github.io/paredit-cli/
+site_url: https://nerima-lisp.github.io/paredit-cli/
 
-repo_name: takeokunn/paredit-cli
-repo_url: https://github.com/takeokunn/paredit-cli
+repo_name: nerima-lisp/paredit-cli
+repo_url: https://github.com/nerima-lisp/paredit-cli
 edit_uri: edit/main/docs/src/
 
 # Content lives in docs/src (kept from the previous mdBook layout).
@@ -76,7 +76,7 @@ extra_css:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/takeokunn/paredit-cli
+      link: https://github.com/nerima-lisp/paredit-cli
       name: paredit-cli on GitHub
   generator: false
 

@@ -40,22 +40,25 @@ diff -u /tmp/prev.json /tmp/next.json
 nix flake check
 cargo +1.85 test --locked
 cargo audit --deny warnings
-cargo package --locked
-cargo publish --dry-run --locked
+nix build .# && ./result/bin/paredit --version
 ```
 
 Confirm that `Cargo.toml` contains the intended version, `Cargo.lock` matches,
-`paredit inspect capabilities --output json` reports that version, the README
-and the MkDocs site describe the released command surface, and the generated
-package contains the public crate documents.
+`paredit inspect capabilities --output json` reports that version, and the
+README and the MkDocs site describe the released command surface.
 
 ## Publish and announce
 
-1. Publish the verified crate with `cargo publish --locked`.
-2. Create the corresponding annotated Git tag and GitHub release from the
-   verified commit.
-3. Confirm the package page on crates.io, the library API on docs.rs, and the
-   GitHub Pages documentation build.
+`paredit-cli` is distributed as a Git tag consumed by Nix and
+`cargo install --git`; it is not published to a package registry, so the tag
+*is* the release artifact.
+
+1. Create the annotated Git tag on the verified commit and push the branch and
+   the tag: `git push origin main && git push origin vX.Y.Z`.
+2. Publish the GitHub release from that tag with the notes below.
+3. Confirm the GitHub Pages documentation build and that
+   `nix run github:nerima-lisp/paredit-cli/vX.Y.Z -- --version` reports the
+   released version.
 4. If the release changes JSON output, command paths, flags, exit codes, the
    MSRV, or Nix interfaces, call out the migration in the release notes.
 

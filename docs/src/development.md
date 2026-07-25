@@ -80,5 +80,5 @@ cargo +1.85 test --locked
 
 The [release and compatibility guide](releases.md) defines the machine-output
 contract and upgrade expectations. Maintainers should use the root
-[release checklist](https://github.com/takeokunn/paredit-cli/blob/main/RELEASING.md)
+[release checklist](https://github.com/nerima-lisp/paredit-cli/blob/main/RELEASING.md)
 before publishing.

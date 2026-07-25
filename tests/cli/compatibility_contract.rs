@@ -115,8 +115,13 @@ fn release_checklist_and_compatibility_guide_reference_each_other() {
         "RELEASING.md must link the release and compatibility guide"
     );
     assert!(
-        checklist.contains("cargo publish --dry-run --locked"),
-        "RELEASING.md must verify the package before publishing"
+        checklist.contains("nix flake check"),
+        "RELEASING.md must run the verification gate before releasing"
+    );
+    assert!(
+        !checklist.contains("cargo publish") && !checklist.contains("crates.io"),
+        "paredit-cli is released as a Git tag, not a registry package; \
+         RELEASING.md must not describe a registry publish"
     );
     assert!(
         releases_guide().contains("RELEASING.md"),

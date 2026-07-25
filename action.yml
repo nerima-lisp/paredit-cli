@@ -23,7 +23,7 @@ inputs:
   version:
     description: >-
       paredit-cli git ref to run. Defaults to the ref this action is pinned
-      to, so `uses: takeokunn/paredit-cli@v1.0.0` runs the v1.0.0 binary.
+      to, so `uses: nerima-lisp/paredit-cli@v1.0.0` runs the v1.0.0 binary.
     required: false
     default: ""
   cachix-name:
@@ -66,4 +66,4 @@ runs:
             ;;
         esac
         # shellcheck disable=SC2086
-        nix run "github:takeokunn/paredit-cli/$ref#$app" -- ${extra[@]+"${extra[@]}"} $PAREDIT_PATHS
+        nix run "github:nerima-lisp/paredit-cli/$ref#$app" -- ${extra[@]+"${extra[@]}"} $PAREDIT_PATHS

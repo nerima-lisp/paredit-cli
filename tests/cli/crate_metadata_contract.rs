@@ -8,9 +8,9 @@ fn cargo_manifest_keeps_public_crate_metadata_explicit() {
         "name = \"paredit-cli\"",
         "license = \"MIT\"",
         "readme = \"README.md\"",
-        "repository = \"https://github.com/takeokunn/paredit-cli\"",
-        "homepage = \"https://github.com/takeokunn/paredit-cli\"",
-        "documentation = \"https://docs.rs/paredit-cli\"",
+        "repository = \"https://github.com/nerima-lisp/paredit-cli\"",
+        "homepage = \"https://github.com/nerima-lisp/paredit-cli\"",
+        "documentation = \"https://nerima-lisp.github.io/paredit-cli/\"",
         "rust-version = \"1.85\"",
     ] {
         assert!(
@@ -21,7 +21,7 @@ fn cargo_manifest_keeps_public_crate_metadata_explicit() {
 }
 
 #[test]
-fn docs_rs_entrypoint_stays_aligned_with_readme_and_public_library_surface() {
+fn rustdoc_entrypoint_stays_aligned_with_readme_and_public_library_surface() {
     let lib_rs = fs::read_to_string("src/lib.rs").expect("read src/lib.rs");
     let readme = fs::read_to_string("README.md").expect("read README.md");
 

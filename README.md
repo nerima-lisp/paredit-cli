@@ -1,8 +1,8 @@
 # paredit-cli
 
-[![CI](https://github.com/takeokunn/paredit-cli/actions/workflows/main.yml/badge.svg)](https://github.com/takeokunn/paredit-cli/actions/workflows/main.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/takeokunn/paredit-cli/blob/main/LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-MkDocs%20Material-3949ab)](https://takeokunn.github.io/paredit-cli/)
+[![CI](https://github.com/nerima-lisp/paredit-cli/actions/workflows/main.yml/badge.svg)](https://github.com/nerima-lisp/paredit-cli/actions/workflows/main.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/nerima-lisp/paredit-cli/blob/main/LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-MkDocs%20Material-3949ab)](https://nerima-lisp.github.io/paredit-cli/)
 
 `paredit` is a structure-aware CLI for inspecting and safely refactoring Lisp
 S-expressions, designed for both people and AI coding agents. It supports
@@ -11,7 +11,7 @@ Fennel.
 
 Full documentation — command reference, safe editing workflows, the agent
 interface, and integration guides — is published at
-<https://takeokunn.github.io/paredit-cli/>. The source for that site lives in
+<https://nerima-lisp.github.io/paredit-cli/>. The source for that site lives in
 [docs/src/](docs/src/README.md).
 
 ## Commands
@@ -38,14 +38,14 @@ paredit refactor plan --symbol old-name src/example.lisp
 ## Install
 
 ```sh
-nix run github:takeokunn/paredit-cli -- --help    # run without installing
-nix profile install github:takeokunn/paredit-cli # install via Nix
-cargo install --git https://github.com/takeokunn/paredit-cli --locked
+nix run github:nerima-lisp/paredit-cli -- --help    # run without installing
+nix profile install github:nerima-lisp/paredit-cli # install via Nix
+cargo install --git https://github.com/nerima-lisp/paredit-cli --locked
 nix develop -c cargo install --path . --locked   # from a local checkout
 ```
 
 The current minimum supported Rust version is `1.85`. See the
-[installation guide](https://takeokunn.github.io/paredit-cli/installation/)
+[installation guide](https://nerima-lisp.github.io/paredit-cli/installation/)
 for the Cachix binary cache, flake overlay, and commit-pinning for automation.
 
 ## Stability
@@ -54,7 +54,7 @@ for the Cachix binary cache, flake overlay, and commit-pinning for automation.
 flags, exit codes, documented JSON fields, the `paredit_cli` crate-root API,
 and the Nix outputs are stable within the `1.x` series; human-readable text
 output is not a machine contract. The
-[compatibility guide](https://takeokunn.github.io/paredit-cli/releases/) lists
+[compatibility guide](https://nerima-lisp.github.io/paredit-cli/releases/) lists
 exactly what an upgrade may and may not change.
 
 ## Development
@@ -66,7 +66,9 @@ nix flake check
 ```
 
 Pull requests run `nix flake check`. A typed Rust library API behind the CLI
-is available in the [`paredit_cli` documentation](https://docs.rs/paredit-cli).
+is documented in [`src/lib.rs`](src/lib.rs); build it locally with
+`cargo doc --no-deps --open`. The rendered command reference and guides live
+at the [documentation site](https://nerima-lisp.github.io/paredit-cli/).
 
 ## Community and security
 
