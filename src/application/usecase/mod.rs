@@ -5,10 +5,13 @@
 
 pub mod accessor_arity_report;
 pub mod append_list_to_cons_report;
+pub mod append_nil_report;
 pub mod binds_constant_report;
 pub mod call_cycle_report;
 pub mod call_graph_report;
 pub mod call_report;
+pub mod car_nthcdr_report;
+pub mod car_reverse_report;
 pub mod case_nil_key_report;
 pub mod char_op_string_report;
 pub mod class_cycle_report;
@@ -100,6 +103,7 @@ pub mod merge_nested_flet;
 pub mod merge_nested_let;
 pub mod merge_nested_let_star;
 pub mod modify_macro_arity_report;
+pub mod multiple_value_list_of_values_report;
 pub(crate) mod mutation_safety;
 pub mod naming_report;
 pub mod negated_comparison_report;

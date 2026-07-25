@@ -20,7 +20,10 @@ use crate::domain::accessor_arity_report::{
     collect_accessor_arity_violations, expected_arity_phrase as accessor_arity_phrase,
 };
 use crate::domain::append_list_to_cons_report::collect_append_list_to_cons;
+use crate::domain::append_nil_report::collect_append_nils;
 use crate::domain::binds_constant_report::collect_binds_constant;
+use crate::domain::car_nthcdr_report::collect_car_nthcdrs;
+use crate::domain::car_reverse_report::collect_car_reverses;
 use crate::domain::case_nil_key_report::collect_case_nil_keys;
 use crate::domain::char_op_string_report::collect_char_op_strings;
 use crate::domain::cond_t_clause_report::collect_cond_t_clauses;
@@ -73,6 +76,7 @@ use crate::domain::manual_pushnew_report::collect_manual_pushnews;
 use crate::domain::modify_macro_arity_report::{
     collect_modify_macro_arity_violations, expected_arity_phrase,
 };
+use crate::domain::multiple_value_list_of_values_report::collect_multiple_value_list_of_values;
 use crate::domain::negated_comparison_report::collect_negated_comparisons;
 use crate::domain::negated_if_report::collect_negated_ifs;
 use crate::domain::negated_step_delta_report::collect_negated_step_deltas;
@@ -126,7 +130,7 @@ use crate::domain::values_list_of_list_report::collect_values_list_of_lists;
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 102] = [
+pub const RULES: [&str; 106] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -229,6 +233,10 @@ pub const RULES: [&str; 102] = [
     "values-list-of-list",
     "redundant-prog1",
     "subseq-zero",
+    "car-nthcdr",
+    "car-reverse",
+    "append-nil",
+    "multiple-value-list-of-values",
 ];
 
 /// The set of rule categories, sorted, for `--category` validation and
@@ -241,7 +249,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 102] = [
+pub const RULE_DOCS: [(&str, &str, &str); 106] = [
     (
         "self-assignment",
         "suspicious",
@@ -752,6 +760,26 @@ pub const RULE_DOCS: [(&str, &str, &str); 102] = [
         "suspicious",
         "a subseq from index 0, a whole-sequence copy ((subseq seq 0) is (copy-seq seq))",
     ),
+    (
+        "car-nthcdr",
+        "suspicious",
+        "a car of an nthcdr, which is nth ((car (nthcdr n x)) is (nth n x))",
+    ),
+    (
+        "car-reverse",
+        "suspicious",
+        "a car of a reverse, a wasteful full copy ((car (reverse x)) is (car (last x)))",
+    ),
+    (
+        "append-nil",
+        "suspicious",
+        "a two-argument append with a nil tail, a fresh copy ((append x nil) is (copy-list x))",
+    ),
+    (
+        "multiple-value-list-of-values",
+        "suspicious",
+        "a multiple-value-list of a values form ((multiple-value-list (values a b)) is (list a b))",
+    ),
 ];
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
@@ -776,7 +804,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 60] = [
+pub const FIXABLE_RULES: [&str; 64] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -837,6 +865,10 @@ pub const FIXABLE_RULES: [&str; 60] = [
     "values-list-of-list",
     "redundant-prog1",
     "subseq-zero",
+    "car-nthcdr",
+    "car-reverse",
+    "append-nil",
+    "multiple-value-list-of-values",
 ];
 
 /// Whether `inspect lint --fix` can automatically repair findings of `name`.
@@ -877,7 +909,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 61] = [
+pub const WARNING_RULES: [&str; 65] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -939,6 +971,10 @@ pub const WARNING_RULES: [&str; 61] = [
     "values-list-of-list",
     "redundant-prog1",
     "subseq-zero",
+    "car-nthcdr",
+    "car-reverse",
+    "append-nil",
+    "multiple-value-list-of-values",
 ];
 
 /// The severity of a rule's findings (`error` unless it is a [`WARNING_RULES`]
@@ -2230,6 +2266,50 @@ pub fn collect_lint_findings(
             message:
                 "a subseq from index 0 copies the whole sequence; (subseq seq 0) is (copy-seq seq)"
                     .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_car_nthcdrs(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "car-nthcdr",
+            path: item.path,
+            span: item.span,
+            message: "car of an nthcdr is nth; (car (nthcdr n x)) is (nth n x)".to_owned(),
+        });
+    }
+
+    let (_, items) = collect_car_reverses(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "car-reverse",
+            path: item.path,
+            span: item.span,
+            message:
+                "car of a reverse copies the whole list to read one element; use (car (last x))"
+                    .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_append_nils(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "append-nil",
+            path: item.path,
+            span: item.span,
+            message: "append with a nil tail is a fresh copy; (append x nil) is (copy-list x)"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_multiple_value_list_of_values(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "multiple-value-list-of-values",
+            path: item.path,
+            span: item.span,
+            message: "multiple-value-list of a values form is just list; (multiple-value-list (values a b)) is (list a b)"
+                .to_owned(),
         });
     }
 

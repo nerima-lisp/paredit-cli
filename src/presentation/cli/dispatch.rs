@@ -258,6 +258,14 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::ValuesListOfList(args) => {
                 values_list_of_list_report::workflow::values_list_of_list_report(args)?
             }
+            command::InspectCommand::MultipleValueListOfValues(args) => {
+                multiple_value_list_of_values_report::workflow::multiple_value_list_of_values_report(
+                    args,
+                )?
+            }
+            command::InspectCommand::AppendNil(args) => {
+                append_nil_report::workflow::append_nil_report(args)?
+            }
             command::InspectCommand::VerboseNegation(args) => {
                 verbose_negation_report::workflow::verbose_negation_report(args)?
             }
@@ -272,6 +280,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::SubseqZero(args) => {
                 subseq_zero_report::workflow::subseq_zero_report(args)?
+            }
+            command::InspectCommand::CarNthcdr(args) => {
+                car_nthcdr_report::workflow::car_nthcdr_report(args)?
+            }
+            command::InspectCommand::CarReverse(args) => {
+                car_reverse_report::workflow::car_reverse_report(args)?
             }
             command::InspectCommand::NthcdrSmallIndex(args) => {
                 nthcdr_small_index_report::workflow::nthcdr_small_index_report(args)?

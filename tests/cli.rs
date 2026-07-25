@@ -15,6 +15,8 @@ mod action_contract;
 mod analysis_report;
 #[path = "cli/append_list_to_cons_report.rs"]
 mod append_list_to_cons_report;
+#[path = "cli/append_nil_report.rs"]
+mod append_nil_report;
 #[path = "cli/basic_edit_write.rs"]
 mod basic_edit_write;
 #[path = "cli/binds_constant_report.rs"]
@@ -27,6 +29,10 @@ mod call_graph_report;
 mod call_report;
 #[path = "cli/capabilities_contract.rs"]
 mod capabilities_contract;
+#[path = "cli/car_nthcdr_report.rs"]
+mod car_nthcdr_report;
+#[path = "cli/car_reverse_report.rs"]
+mod car_reverse_report;
 #[path = "cli/case_nil_key_report.rs"]
 mod case_nil_key_report;
 #[path = "cli/char_op_string_report.rs"]
@@ -209,6 +215,8 @@ mod merge_nested_let_star;
 mod merge_split_let;
 #[path = "cli/modify_macro_arity_report.rs"]
 mod modify_macro_arity_report;
+#[path = "cli/multiple_value_list_of_values_report.rs"]
+mod multiple_value_list_of_values_report;
 #[path = "cli/naming_report.rs"]
 mod naming_report;
 #[path = "cli/negated_comparison_report.rs"]

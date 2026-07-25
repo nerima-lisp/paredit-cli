@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::append_list_to_cons_report::collect_append_list_to_cons;
+use crate::application::usecase::append_nil_report::collect_append_nils;
+use crate::application::usecase::car_nthcdr_report::collect_car_nthcdrs;
+use crate::application::usecase::car_reverse_report::collect_car_reverses;
 use crate::application::usecase::cond_t_clause_report::collect_cond_t_clauses;
 use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
 use crate::application::usecase::constant_if_test_report::collect_constant_if_tests;
@@ -26,6 +29,7 @@ use crate::application::usecase::list_star_to_cons_report::collect_list_star_to_
 use crate::application::usecase::manual_incf_report::collect_manual_incfs;
 use crate::application::usecase::manual_push_report::collect_manual_pushes;
 use crate::application::usecase::manual_pushnew_report::collect_manual_pushnews;
+use crate::application::usecase::multiple_value_list_of_values_report::collect_multiple_value_list_of_values;
 use crate::application::usecase::negated_comparison_report::collect_negated_comparisons;
 use crate::application::usecase::negated_if_report::collect_negated_ifs;
 use crate::application::usecase::negated_step_delta_report::collect_negated_step_deltas;
@@ -240,7 +244,11 @@ fn retain_unbaselined(
 /// `list-star-to-cons` (rewrite `(list* a b)` as `(cons a b)`),
 /// `values-list-of-list` (rewrite `(values-list (list a b))` as `(values a b)`),
 /// `redundant-prog1` (unwrap `(prog1 x)` to `x`), `subseq-zero` (rewrite
-/// `(subseq seq 0)` as `(copy-seq seq)`),
+/// `(subseq seq 0)` as `(copy-seq seq)`), `car-nthcdr` (rewrite
+/// `(car (nthcdr n x))` as `(nth n x)`), `car-reverse` (rewrite
+/// `(car (reverse x))` as `(car (last x))`), `append-nil` (rewrite
+/// `(append x nil)` as `(copy-list x)`), `multiple-value-list-of-values`
+/// (rewrite `(multiple-value-list (values a b))` as `(list a b)`),
 /// `negated-when-unless` (a two-edit fix: flip the
 /// `when`/`unless` head and drop the `(not …)`), `one-armed-if` (swap an
 /// else-less `if` head for `when`), `manual-incf` (rewrite `(setf x (1+ x))` as
@@ -781,6 +789,85 @@ fn collect_lint_fixes(
                     end,
                     text,
                     "Rewrite (subseq seq 0) as (copy-seq seq)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"car-nthcdr") {
+        let (_, items) = collect_car_nthcdrs(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (car (nthcdr n x)) is (nth n x).
+            let text = format!("(nth {} {})", slice(item.count_span), slice(item.list_span));
+            fixes.insert(
+                ("car-nthcdr", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (car (nthcdr n x)) as (nth n x)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"car-reverse") {
+        let (_, items) = collect_car_reverses(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (car (reverse x)) is (car (last x)), keeping the outer accessor.
+            let text = format!(
+                "({} (last {}))",
+                slice(item.accessor_span),
+                slice(item.list_span)
+            );
+            fixes.insert(
+                ("car-reverse", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (car (reverse x)) as (car (last x))".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"append-nil") {
+        let (_, items) = collect_append_nils(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (append x nil) is (copy-list x).
+            let text = format!("(copy-list {})", slice(item.list_span));
+            fixes.insert(
+                ("append-nil", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (append x nil) as (copy-list x)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"multiple-value-list-of-values") {
+        let (_, items) = collect_multiple_value_list_of_values(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (multiple-value-list (values a b)) is (list a b); empty -> (list).
+            let text = match item.elements_span {
+                Some(span) => format!("(list {})", slice(span)),
+                None => "(list)".to_owned(),
+            };
+            fixes.insert(
+                ("multiple-value-list-of-values", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (multiple-value-list (values …)) as (list …)".to_owned(),
                 ),
             );
         }
@@ -2018,67 +2105,71 @@ mod tests {
     #[test]
     fn fixable_rules_match_the_fix_engine() {
         let source = concat!(
-            "(list '5)\n",                            // redundant-quote
-            "(progn only)\n",                         // redundant-progn
-            "(progn a (progn b c))\n",                // nested-progn (the inner progn)
-            "(when q (progn s t))\n",                 // redundant-body-progn
-            "(let () (ela) (elb))\n",                 // empty-let
-            "(if c d nil)\n",                         // redundant-if-nil
-            "(funcall #'g m)\n",                      // redundant-funcall
-            "(the t whatever)\n",                     // redundant-the
-            "(funcall (lambda (fx) fx) 9)\n",         // funcall-lambda
-            "(mapcar #'(lambda (sq) sq) sqs)\n",      // sharp-quoted-lambda
-            "(identity h)\n",                         // redundant-identity
-            "(cons e nil)\n",                         // cons-to-list
-            "(reverse (reverse dr))\n",               // double-reverse
-            "(append (list al) ar)\n",                // append-list-to-cons
-            "(format nil \"~A\" fs)\n",               // format-to-string
-            "(format t \"~%\")\n",                    // format-newline
-            "(floor fq 1)\n",                         // redundant-divisor
-            "(- 0 amt)\n",                            // verbose-negation
-            "(list* la lb)\n",                        // list-star-to-cons
-            "(values-list (list va vb))\n",           // values-list-of-list
-            "(prog1 (p1x))\n",                        // redundant-prog1
-            "(subseq sz 0)\n",                        // subseq-zero
-            "(let* ((a 1)) a)\n",                     // redundant-let-star
-            "(cond (ok (run)))\n",                    // single-clause-cond
-            "(cond (t (r1) (r2)))\n",                 // cond-t-clause
-            "(incf tally 1)\n",                       // explicit-step-delta
-            "(incf nsd -3)\n",                        // negated-step-delta
-            "(return-from blk nil)\n",                // explicit-nil-return
-            "(multiple-value-bind (mv) (vals) mv)\n", // single-value-bind
-            "(or za (or pb qc))\n",                   // nested-boolean
-            "(when wa (when wb (wc)))\n",             // nested-when
-            "(unless ua (unless ub (uc)))\n",         // nested-unless
-            "(and x)\n",                              // single-operand-boolean
-            "(append solo)\n",                        // single-operand-list-op
-            "(* x)\n",                                // single-operand-arithmetic
-            "(when (not r) y)\n",                     // negated-when-unless
-            "(if p q)\n",                             // one-armed-if
-            "(setf ctr (1+ ctr))\n",                  // manual-incf
-            "(setf lst (cons e lst))\n",              // manual-push
-            "(setf st (adjoin e st))\n",              // manual-pushnew
-            "(car (cdr z))\n",                        // nested-cxr
-            "(nth 0 zs)\n",                           // nth-constant-index
-            "(nthcdr 0 nz)\n",                        // nthcdr-zero
-            "(nthcdr 2 ns)\n",                        // nthcdr-small-index
-            "(apply #'g (list m))\n",                 // redundant-apply
-            "(find ret lst :test #'eql)\n",           // redundant-eql-test
-            "(sort rik #'< :key #'identity)\n",       // redundant-identity-key
-            "(= tally 0)\n",                          // sign-comparison
-            "(not (< a b))\n",                        // negated-comparison
-            "(if (not c) a b)\n",                     // negated-if
-            "(if iv iv jv)\n",                        // if-to-or
-            "(if iw nil t)\n",                        // if-not
-            "(+ osa 1)\n",                            // one-step-arithmetic
-            "(if t on off)\n",                        // constant-if-test
-            "(when t (bd))\n",                        // constant-when-test
-            "(and p t q)\n",                          // redundant-boolean-identity
-            "(and (not p) (not q))\n",                // de-morgan
-            "(equal w nil)\n",                        // nil-comparison
-            "(eq n 7)\n",                             // eq-number-comparison
-            "(eq c #\\a)\n",                          // eq-char-comparison
-            "(if a b c d)\n",                         // if-arity — NOT fixable
+            "(list '5)\n",                              // redundant-quote
+            "(progn only)\n",                           // redundant-progn
+            "(progn a (progn b c))\n",                  // nested-progn (the inner progn)
+            "(when q (progn s t))\n",                   // redundant-body-progn
+            "(let () (ela) (elb))\n",                   // empty-let
+            "(if c d nil)\n",                           // redundant-if-nil
+            "(funcall #'g m)\n",                        // redundant-funcall
+            "(the t whatever)\n",                       // redundant-the
+            "(funcall (lambda (fx) fx) 9)\n",           // funcall-lambda
+            "(mapcar #'(lambda (sq) sq) sqs)\n",        // sharp-quoted-lambda
+            "(identity h)\n",                           // redundant-identity
+            "(cons e nil)\n",                           // cons-to-list
+            "(reverse (reverse dr))\n",                 // double-reverse
+            "(append (list al) ar)\n",                  // append-list-to-cons
+            "(format nil \"~A\" fs)\n",                 // format-to-string
+            "(format t \"~%\")\n",                      // format-newline
+            "(floor fq 1)\n",                           // redundant-divisor
+            "(- 0 amt)\n",                              // verbose-negation
+            "(list* la lb)\n",                          // list-star-to-cons
+            "(values-list (list va vb))\n",             // values-list-of-list
+            "(prog1 (p1x))\n",                          // redundant-prog1
+            "(subseq sz 0)\n",                          // subseq-zero
+            "(car (nthcdr cn cx))\n",                   // car-nthcdr
+            "(car (reverse crx))\n",                    // car-reverse
+            "(append anx nil)\n",                       // append-nil
+            "(multiple-value-list (values mva mvb))\n", // multiple-value-list-of-values
+            "(let* ((a 1)) a)\n",                       // redundant-let-star
+            "(cond (ok (run)))\n",                      // single-clause-cond
+            "(cond (t (r1) (r2)))\n",                   // cond-t-clause
+            "(incf tally 1)\n",                         // explicit-step-delta
+            "(incf nsd -3)\n",                          // negated-step-delta
+            "(return-from blk nil)\n",                  // explicit-nil-return
+            "(multiple-value-bind (mv) (vals) mv)\n",   // single-value-bind
+            "(or za (or pb qc))\n",                     // nested-boolean
+            "(when wa (when wb (wc)))\n",               // nested-when
+            "(unless ua (unless ub (uc)))\n",           // nested-unless
+            "(and x)\n",                                // single-operand-boolean
+            "(append solo)\n",                          // single-operand-list-op
+            "(* x)\n",                                  // single-operand-arithmetic
+            "(when (not r) y)\n",                       // negated-when-unless
+            "(if p q)\n",                               // one-armed-if
+            "(setf ctr (1+ ctr))\n",                    // manual-incf
+            "(setf lst (cons e lst))\n",                // manual-push
+            "(setf st (adjoin e st))\n",                // manual-pushnew
+            "(car (cdr z))\n",                          // nested-cxr
+            "(nth 0 zs)\n",                             // nth-constant-index
+            "(nthcdr 0 nz)\n",                          // nthcdr-zero
+            "(nthcdr 2 ns)\n",                          // nthcdr-small-index
+            "(apply #'g (list m))\n",                   // redundant-apply
+            "(find ret lst :test #'eql)\n",             // redundant-eql-test
+            "(sort rik #'< :key #'identity)\n",         // redundant-identity-key
+            "(= tally 0)\n",                            // sign-comparison
+            "(not (< a b))\n",                          // negated-comparison
+            "(if (not c) a b)\n",                       // negated-if
+            "(if iv iv jv)\n",                          // if-to-or
+            "(if iw nil t)\n",                          // if-not
+            "(+ osa 1)\n",                              // one-step-arithmetic
+            "(if t on off)\n",                          // constant-if-test
+            "(when t (bd))\n",                          // constant-when-test
+            "(and p t q)\n",                            // redundant-boolean-identity
+            "(and (not p) (not q))\n",                  // de-morgan
+            "(equal w nil)\n",                          // nil-comparison
+            "(eq n 7)\n",                               // eq-number-comparison
+            "(eq c #\\a)\n",                            // eq-char-comparison
+            "(if a b c d)\n",                           // if-arity — NOT fixable
         );
         let tree =
             crate::domain::sexpr::SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)

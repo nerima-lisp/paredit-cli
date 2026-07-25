@@ -3,12 +3,15 @@
 
 pub mod accessor_arity_report;
 pub mod append_list_to_cons_report;
+pub mod append_nil_report;
 pub(crate) mod binding_index;
 pub mod binds_constant_report;
 pub mod call_cycle_report;
 pub mod call_graph_report;
 pub mod call_report;
 pub(crate) mod callable_scope;
+pub mod car_nthcdr_report;
+pub mod car_reverse_report;
 pub mod case_nil_key_report;
 pub mod char_op_string_report;
 pub mod class_cycle_report;
@@ -101,6 +104,7 @@ pub mod manual_incf_report;
 pub mod manual_push_report;
 pub mod manual_pushnew_report;
 pub mod modify_macro_arity_report;
+pub mod multiple_value_list_of_values_report;
 pub(crate) mod mutation_safety;
 pub mod naming_report;
 pub mod negated_comparison_report;
