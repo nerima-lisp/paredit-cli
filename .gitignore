@@ -6,4 +6,6 @@ result-*
 .serena/
 # MkDocs local build output (docs/mkdocs.yml sets site_dir: ../site)
 /site/
+# Stale mdBook output from the pre-MkDocs layout; never a build input.
+/docs/book/
 .worktrees/
