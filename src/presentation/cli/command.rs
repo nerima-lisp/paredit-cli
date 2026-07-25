@@ -8,28 +8,32 @@ use super::{
     convert_if_to_unless, convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let,
     convert_let_to_let_star, convert_sequential_binding, convert_unless_to_if, convert_when_to_if,
     de_morgan_report, dead_boolean_operand_report, definition_movement, definition_removal,
-    definition_report, dependency_report, duplicate_boolean_operand_report,
-    duplicate_case_key_report, duplicate_cond_test_report, duplicate_lambda_list_keyword_report,
-    duplicate_report, eliminate_empty_binding_form, empty_body_report, eq_char_comparison_report,
+    definition_report, dependency_report, destructive_literal_report,
+    duplicate_boolean_operand_report, duplicate_case_key_report, duplicate_cond_test_report,
+    duplicate_lambda_list_keyword_report, duplicate_report, duplicate_setf_place_report,
+    eliminate_empty_binding_form, empty_body_report, eq_char_comparison_report,
     eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
     eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
-    exhaustive_case_otherwise_report, explicit_nil_return_report, extract_constant,
-    extract_function, extract_local_function, flatten_progn, form_report, funcall_lambda_report,
-    function_parameter, identical_if_branch_report, if_arity_report, if_to_or_report,
-    impact_report, inline_function, inline_lambda, inline_let, inline_literal_constant,
-    inline_local_function, inline_symbol_macro, introduce_let, lambda_list_keyword_order_report,
-    let_report, malformed_case_clause_report, malformed_cond_clause_report,
-    malformed_iteration_spec_report, malformed_let_binding_report, merge_nested_flet,
-    merge_nested_let, merge_nested_let_star, modify_macro_arity_report, negated_comparison_report,
-    negated_if_report, negated_when_unless_report, nested_boolean_report, nested_progn_report,
-    nested_unless_report, nested_when_report, nil_comparison_report, one_armed_if_report, package,
-    quoted_case_key_report, redundant_apply_report, redundant_body_progn_report,
+    exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
+    extract_constant, extract_function, extract_local_function, flatten_progn, form_report,
+    funcall_lambda_report, function_parameter, identical_if_branch_report,
+    identity_arithmetic_report, if_arity_report, if_to_or_report, impact_report, inline_function,
+    inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
+    introduce_let, lambda_list_keyword_order_report, let_report, literal_place_report,
+    malformed_case_clause_report, malformed_cond_clause_report, malformed_iteration_spec_report,
+    malformed_let_binding_report, manual_incf_report, manual_push_report, manual_pushnew_report,
+    merge_nested_flet, merge_nested_let, merge_nested_let_star, modify_macro_arity_report,
+    negated_comparison_report, negated_if_report, negated_step_delta_report,
+    negated_when_unless_report, nested_boolean_report, nested_progn_report, nested_unless_report,
+    nested_when_report, nil_comparison_report, one_armed_if_report, one_step_arithmetic_report,
+    package, quoted_case_key_report, redundant_apply_report, redundant_body_progn_report,
     redundant_boolean_identity_report, redundant_eql_test_report, redundant_funcall_report,
     redundant_identity_key_report, redundant_identity_report, redundant_if_nil_report,
     redundant_let_star_report, redundant_progn_report, redundant_quote_report, refactor,
     remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
-    self_comparison_report, setf_arity_report, sharp_quoted_lambda_report, sign_comparison_report,
-    signature_report, similarity_report, single_arg_comparison_report, single_clause_cond_report,
+    self_assignment_report, self_comparison_report, setf_arity_report, setq_non_variable_report,
+    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
+    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
     single_operand_boolean_report, split_let, split_let_star, symbol_report, t_comparison_report,
     the_arity_report, thread_expression, unreachable_case_clause_report,
     unreachable_cond_clause_report, unthread_expression, unwrap_call, verbose_negation_report,
@@ -81,6 +85,8 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Report a setf/setq/psetf/psetq that assigns the same variable more than once.
+    DuplicateSetfPlaces(duplicate_setf_place_report::args::DuplicateSetfPlaceReportArgs),
     /// Report lambda lists that repeat a lambda-list keyword (&optional, &rest, &key, ...).
     DuplicateLambdaListKeyword(
         duplicate_lambda_list_keyword_report::args::DuplicateLambdaListKeywordReportArgs,
@@ -103,6 +109,10 @@ pub(super) enum InspectCommand {
     ExhaustiveCaseOtherwise(
         exhaustive_case_otherwise_report::args::ExhaustiveCaseOtherwiseReportArgs,
     ),
+    /// Report an incf/decf with an explicit delta of 1, the default ((incf x 1) is (incf x)).
+    ExplicitStepDelta(explicit_step_delta_report::args::ExplicitStepDeltaReportArgs),
+    /// Report an incf/decf with a negative literal delta, which flips the operator ((incf x -1) is (decf x)).
+    NegatedStepDelta(negated_step_delta_report::args::NegatedStepDeltaReportArgs),
     /// Report a return/return-from with an explicit nil result, the default ((return nil) is (return)).
     ExplicitNilReturn(explicit_nil_return_report::args::ExplicitNilReturnReportArgs),
     /// Report cond forms with the same test expression in more than one clause.
@@ -113,6 +123,12 @@ pub(super) enum InspectCommand {
     MalformedCondClause(malformed_cond_clause_report::args::MalformedCondClauseReportArgs),
     /// Report let/let* bindings that are neither a symbol nor a (var value) pair.
     MalformedLetBinding(malformed_let_binding_report::args::MalformedLetBindingReportArgs),
+    /// Report a setf/setq that manually increments a variable ((setf x (1+ x)) is (incf x)).
+    ManualIncf(manual_incf_report::args::ManualIncfReportArgs),
+    /// Report a setf/setq that manually conses onto a variable ((setf x (cons e x)) is (push e x)).
+    ManualPush(manual_push_report::args::ManualPushReportArgs),
+    /// Report a setf/setq that manually adjoins onto a variable ((setf x (adjoin e x)) is (pushnew e x)).
+    ManualPushnew(manual_pushnew_report::args::ManualPushnewReportArgs),
     /// Report dolist/dotimes specs that are not a (var form [result]) list.
     MalformedIterationSpec(malformed_iteration_spec_report::args::MalformedIterationSpecReportArgs),
     /// Report and/or forms that list the same operand more than once.
@@ -121,8 +137,12 @@ pub(super) enum InspectCommand {
     ),
     /// Report and/or forms whose non-final constant operand makes later operands dead.
     DeadBooleanOperand(dead_boolean_operand_report::args::DeadBooleanOperandReportArgs),
+    /// Report setq/setf/psetq/psetf pairs that assign a place to itself.
+    SelfAssignments(self_assignment_report::args::SelfAssignmentReportArgs),
     /// Report setq/setf/psetq/psetf forms with an odd argument count (missing a value).
     SetfArity(setf_arity_report::args::SetfArityReportArgs),
+    /// Report setq/psetq places that are not variables (a list, literal, or constant).
+    SetqNonVariable(setq_non_variable_report::args::SetqNonVariableReportArgs),
     /// Report incf/decf/push/pop calls with the wrong number of arguments.
     ModifyMacroArity(modify_macro_arity_report::args::ModifyMacroArityReportArgs),
     /// Report comparison calls whose two operands are structurally identical.
@@ -149,12 +169,16 @@ pub(super) enum InspectCommand {
     EqNumberComparison(eq_number_comparison_report::args::EqNumberComparisonReportArgs),
     /// Report eq calls that compare against a character literal (eq on characters is unreliable).
     EqCharComparison(eq_char_comparison_report::args::EqCharComparisonReportArgs),
+    /// Report destructive sequence calls (nreverse/sort/...) on a quoted list literal (undefined behavior).
+    DestructiveLiteral(destructive_literal_report::args::DestructiveLiteralReportArgs),
     /// Report member/assoc/find/... searching for a string/list literal without :test (default eql won't match).
     EqlSearchLiteral(eql_search_literal_report::args::EqlSearchLiteralReportArgs),
     /// Report character functions (char=/char-code/...) applied to a string literal (type error).
     CharOpString(char_op_string_report::args::CharOpStringReportArgs),
     /// Report when/unless/dolist/dotimes forms that have no body (the test/spec runs, then nothing).
     EmptyBody(empty_body_report::args::EmptyBodyReportArgs),
+    /// Report arithmetic forms with a redundant identity operand ((+ x 0), (* x 1), (- x 0), (/ x 1)).
+    IdentityArithmetic(identity_arithmetic_report::args::IdentityArithmeticReportArgs),
     /// Report structurally similar S-expression forms across explicit files.
     Similarity(similarity_report::args::SimilarityReportArgs),
     /// Report local let bindings and inline safety for agent refactor planning.
@@ -187,6 +211,8 @@ pub(super) enum InspectCommand {
     OneArmedIf(one_armed_if_report::args::OneArmedIfReportArgs),
     /// Report an if whose test and then are the same atom ((if x x y) is (or x y)).
     IfToOr(if_to_or_report::args::IfToOrReportArgs),
+    /// Report a +/- of a literal 1 with a shorthand ((+ x 1) is (1+ x); (- x 1) is (1- x)).
+    OneStepArithmetic(one_step_arithmetic_report::args::OneStepArithmeticReportArgs),
     /// Report (apply #'f (list ...)) forms that are just (f ...) (a direct call).
     RedundantApply(redundant_apply_report::args::RedundantApplyReportArgs),
     /// Report an eql-defaulting call with an explicit :test #'eql ((find x l :test #'eql) is (find x l)).
@@ -215,12 +241,18 @@ pub(super) enum InspectCommand {
     SharpQuotedLambda(sharp_quoted_lambda_report::args::SharpQuotedLambdaReportArgs),
     /// Report single-operand and/or forms ((and X) and (or X) are just X).
     SingleOperandBoolean(single_operand_boolean_report::args::SingleOperandBooleanReportArgs),
+    /// Report single-operand +/* forms ((+ X) and (* X) are just X).
+    SingleOperandArithmetic(
+        single_operand_arithmetic_report::args::SingleOperandArithmeticReportArgs,
+    ),
     /// Report numeric comparisons (< > <= >= = /=) with a single argument (always true).
     SingleArgComparison(single_arg_comparison_report::args::SingleArgComparisonReportArgs),
     /// Report a cond with a single non-t clause that has a body ((cond (test body)) is (when test body)).
     SingleClauseCond(single_clause_cond_report::args::SingleClauseCondReportArgs),
     /// Report =/</> comparisons against 0 that have a predicate ((= x 0) is (zerop x)).
     SignComparison(sign_comparison_report::args::SignComparisonReportArgs),
+    /// Report incf/decf/push/pop/pushnew whose place is a self-evaluating literal (cannot be modified).
+    LiteralPlace(literal_place_report::args::LiteralPlaceReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

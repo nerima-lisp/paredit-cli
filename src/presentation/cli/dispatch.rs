@@ -40,6 +40,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?
             }
+            command::InspectCommand::DuplicateSetfPlaces(args) => {
+                duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?
+            }
             command::InspectCommand::DuplicateLambdaListKeyword(args) => {
                 duplicate_lambda_list_keyword_report::workflow::duplicate_lambda_list_keyword_report(
                     args,
@@ -66,6 +69,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::ExhaustiveCaseOtherwise(args) => {
                 exhaustive_case_otherwise_report::workflow::exhaustive_case_otherwise_report(args)?
             }
+            command::InspectCommand::ExplicitStepDelta(args) => {
+                explicit_step_delta_report::workflow::explicit_step_delta_report(args)?
+            }
+            command::InspectCommand::NegatedStepDelta(args) => {
+                negated_step_delta_report::workflow::negated_step_delta_report(args)?
+            }
             command::InspectCommand::ExplicitNilReturn(args) => {
                 explicit_nil_return_report::workflow::explicit_nil_return_report(args)?
             }
@@ -81,6 +90,15 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::MalformedLetBinding(args) => {
                 malformed_let_binding_report::workflow::malformed_let_binding_report(args)?
             }
+            command::InspectCommand::ManualIncf(args) => {
+                manual_incf_report::workflow::manual_incf_report(args)?
+            }
+            command::InspectCommand::ManualPush(args) => {
+                manual_push_report::workflow::manual_push_report(args)?
+            }
+            command::InspectCommand::ManualPushnew(args) => {
+                manual_pushnew_report::workflow::manual_pushnew_report(args)?
+            }
             command::InspectCommand::MalformedIterationSpec(args) => {
                 malformed_iteration_spec_report::workflow::malformed_iteration_spec_report(args)?
             }
@@ -90,8 +108,14 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::DeadBooleanOperand(args) => {
                 dead_boolean_operand_report::workflow::dead_boolean_operand_report(args)?
             }
+            command::InspectCommand::SelfAssignments(args) => {
+                self_assignment_report::workflow::self_assignment_report(args)?
+            }
             command::InspectCommand::SetfArity(args) => {
                 setf_arity_report::workflow::setf_arity_report(args)?
+            }
+            command::InspectCommand::SetqNonVariable(args) => {
+                setq_non_variable_report::workflow::setq_non_variable_report(args)?
             }
             command::InspectCommand::ModifyMacroArity(args) => {
                 modify_macro_arity_report::workflow::modify_macro_arity_report(args)?
@@ -129,6 +153,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::EqCharComparison(args) => {
                 eq_char_comparison_report::workflow::eq_char_comparison_report(args)?
             }
+            command::InspectCommand::DestructiveLiteral(args) => {
+                destructive_literal_report::workflow::destructive_literal_report(args)?
+            }
             command::InspectCommand::EqlSearchLiteral(args) => {
                 eql_search_literal_report::workflow::eql_search_literal_report(args)?
             }
@@ -137,6 +164,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::EmptyBody(args) => {
                 empty_body_report::workflow::empty_body_report(args)?
+            }
+            command::InspectCommand::IdentityArithmetic(args) => {
+                identity_arithmetic_report::workflow::identity_arithmetic_report(args)?
             }
             command::InspectCommand::EqlListComparison(args) => {
                 eql_list_comparison_report::workflow::eql_list_comparison_report(args)?
@@ -162,6 +192,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::IfToOr(args) => {
                 if_to_or_report::workflow::if_to_or_report(args)?
+            }
+            command::InspectCommand::OneStepArithmetic(args) => {
+                one_step_arithmetic_report::workflow::one_step_arithmetic_report(args)?
             }
             command::InspectCommand::ConstantIfTest(args) => {
                 constant_if_test_report::workflow::constant_if_test_report(args)?
@@ -228,6 +261,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::SingleOperandBoolean(args) => {
                 single_operand_boolean_report::workflow::single_operand_boolean_report(args)?
             }
+            command::InspectCommand::SingleOperandArithmetic(args) => {
+                single_operand_arithmetic_report::workflow::single_operand_arithmetic_report(args)?
+            }
             command::InspectCommand::SingleArgComparison(args) => {
                 single_arg_comparison_report::workflow::single_arg_comparison_report(args)?
             }
@@ -236,6 +272,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::SignComparison(args) => {
                 sign_comparison_report::workflow::sign_comparison_report(args)?
+            }
+            command::InspectCommand::LiteralPlace(args) => {
+                literal_place_report::workflow::literal_place_report(args)?
             }
         },
         Command::Edit { command } => match command {

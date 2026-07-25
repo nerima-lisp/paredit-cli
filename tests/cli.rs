@@ -59,6 +59,8 @@ mod definition_removal;
 mod definition_report;
 #[path = "cli/dependency_report.rs"]
 mod dependency_report;
+#[path = "cli/destructive_literal_report.rs"]
+mod destructive_literal_report;
 #[path = "cli/dialect_contract.rs"]
 mod dialect_contract;
 #[path = "cli/duplicate_boolean_operand_report.rs"]
@@ -71,6 +73,8 @@ mod duplicate_cond_test_report;
 mod duplicate_lambda_list_keyword_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
+#[path = "cli/duplicate_setf_place_report.rs"]
+mod duplicate_setf_place_report;
 #[path = "cli/edit_transpose.rs"]
 mod edit_transpose;
 #[path = "cli/eliminate_empty_binding_form.rs"]
@@ -95,6 +99,8 @@ mod eval_when_situation_report;
 mod exhaustive_case_otherwise_report;
 #[path = "cli/explicit_nil_return_report.rs"]
 mod explicit_nil_return_report;
+#[path = "cli/explicit_step_delta_report.rs"]
+mod explicit_step_delta_report;
 #[path = "cli/extract_constant/mod.rs"]
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]
@@ -115,6 +121,8 @@ mod function_parameter;
 mod help_contract;
 #[path = "cli/identical_if_branch_report.rs"]
 mod identical_if_branch_report;
+#[path = "cli/identity_arithmetic_report.rs"]
+mod identity_arithmetic_report;
 #[path = "cli/if_arity_report.rs"]
 mod if_arity_report;
 #[path = "cli/if_to_or_report.rs"]
@@ -135,6 +143,8 @@ mod inline_symbol_macro;
 mod lambda_list_keyword_order_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/literal_place_report.rs"]
+mod literal_place_report;
 #[path = "cli/malformed_case_clause_report.rs"]
 mod malformed_case_clause_report;
 #[path = "cli/malformed_cond_clause_report.rs"]
@@ -143,6 +153,12 @@ mod malformed_cond_clause_report;
 mod malformed_iteration_spec_report;
 #[path = "cli/malformed_let_binding_report.rs"]
 mod malformed_let_binding_report;
+#[path = "cli/manual_incf_report.rs"]
+mod manual_incf_report;
+#[path = "cli/manual_push_report.rs"]
+mod manual_push_report;
+#[path = "cli/manual_pushnew_report.rs"]
+mod manual_pushnew_report;
 #[path = "cli/merge_nested_flet.rs"]
 mod merge_nested_flet;
 #[path = "cli/merge_nested_let_star.rs"]
@@ -155,6 +171,8 @@ mod modify_macro_arity_report;
 mod negated_comparison_report;
 #[path = "cli/negated_if_report.rs"]
 mod negated_if_report;
+#[path = "cli/negated_step_delta_report.rs"]
+mod negated_step_delta_report;
 #[path = "cli/negated_when_unless_report.rs"]
 mod negated_when_unless_report;
 #[path = "cli/nested_boolean_report.rs"]
@@ -169,6 +187,8 @@ mod nested_when_report;
 mod nil_comparison_report;
 #[path = "cli/one_armed_if_report.rs"]
 mod one_armed_if_report;
+#[path = "cli/one_step_arithmetic_report.rs"]
+mod one_step_arithmetic_report;
 #[path = "cli/package/mod.rs"]
 mod package;
 #[path = "cli/package_archive_contract.rs"]
@@ -239,10 +259,14 @@ mod rename_control;
 mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
+#[path = "cli/self_assignment_report.rs"]
+mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]
 mod self_comparison_report;
 #[path = "cli/setf_arity_report.rs"]
 mod setf_arity_report;
+#[path = "cli/setq_non_variable_report.rs"]
+mod setq_non_variable_report;
 #[path = "cli/sharp_quoted_lambda_report.rs"]
 mod sharp_quoted_lambda_report;
 #[path = "cli/sign_comparison_report.rs"]
@@ -255,6 +279,8 @@ mod similarity_report;
 mod single_arg_comparison_report;
 #[path = "cli/single_clause_cond_report.rs"]
 mod single_clause_cond_report;
+#[path = "cli/single_operand_arithmetic_report.rs"]
+mod single_operand_arithmetic_report;
 #[path = "cli/single_operand_boolean_report.rs"]
 mod single_operand_boolean_report;
 #[path = "cli/skill_contract.rs"]

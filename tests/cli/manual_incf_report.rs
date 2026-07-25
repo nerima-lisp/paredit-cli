@@ -1,0 +1,102 @@
+use super::*;
+
+#[test]
+fn cli_flags_manual_increment() {
+    let dir = fresh_temp_dir("manual-incf-report");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun step () (setf counter (1+ counter)))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("manual-incf")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"suggested\": \"incf\""));
+}
+
+#[test]
+fn cli_flags_manual_decrement_with_delta() {
+    let dir = fresh_temp_dir("manual-incf-report-decf");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(setq i (- i step))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("manual-incf")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"suggested\": \"decf\""));
+}
+
+#[test]
+fn cli_does_not_flag_compound_place_or_other_variable() {
+    let dir = fresh_temp_dir("manual-incf-report-clean");
+    let file = dir.join("a.lisp");
+    // Compound place, a different variable, a non-commuting minus, and a multi-pair setf.
+    fs::write(
+        &file,
+        "(setf (aref a i) (1+ (aref a i)))\n(setf x (1+ y))\n(setf i (- step i))\n(setf x (1+ x) y (1+ y))\n",
+    )
+    .expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("manual-incf")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 0"));
+}
+
+#[test]
+fn cli_manual_incf_fail_on_violation_trips_gate() {
+    let dir = fresh_temp_dir("manual-incf-report-gate");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(setf total (+ total 1))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("manual-incf")
+        .arg("--fail-on-violation")
+        .arg(&file)
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("manual-incf-report policy failed"));
+}
+
+#[test]
+fn cli_lint_fix_rewrites_manual_incf_forms() {
+    let dir = fresh_temp_dir("manual-incf-report-fix");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        "(setf a (1+ a))\n(setf b (+ b 3))\n(setf c (+ 2 c))\n(setf d (- d 1))\n(setq e (1- e))\n",
+    )
+    .expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg("--rule")
+        .arg("manual-incf")
+        .arg("--fix")
+        .arg(&file)
+        .assert()
+        .success();
+
+    let fixed = fs::read_to_string(&file).expect("read fixed file");
+    assert_eq!(
+        fixed,
+        "(incf a)\n(incf b 3)\n(incf c 2)\n(decf d 1)\n(decf e)\n"
+    );
+}

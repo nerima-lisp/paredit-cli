@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 84] = [
+const INTROSPECTION_COMMANDS: [&str; 97] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -90,7 +90,9 @@ const INTROSPECTION_COMMANDS: [&str; 84] = [
     "inspect duplicates",
     "inspect similarity",
     "inspect lets",
+    "inspect duplicate-setf-places",
     "inspect duplicate-case-keys",
+    "inspect self-assignments",
     "inspect identical-if-branches",
     "inspect duplicate-cond-tests",
     "inspect duplicate-boolean-operands",
@@ -103,6 +105,9 @@ const INTROSPECTION_COMMANDS: [&str; 84] = [
     "inspect redundant-quote",
     "inspect unreachable-cond-clause",
     "inspect malformed-let-binding",
+    "inspect manual-incf",
+    "inspect manual-push",
+    "inspect manual-pushnew",
     "inspect if-arity",
     "inspect malformed-cond-clause",
     "inspect malformed-case-clause",
@@ -117,12 +122,15 @@ const INTROSPECTION_COMMANDS: [&str; 84] = [
     "inspect the-arity",
     "inspect equality-arity",
     "inspect accessor-arity",
+    "inspect setq-non-variable",
     "inspect eval-when-situation",
     "inspect exhaustive-case-otherwise",
+    "inspect explicit-step-delta",
     "inspect explicit-nil-return",
     "inspect redundant-progn",
     "inspect negated-comparison",
     "inspect negated-if",
+    "inspect negated-step-delta",
     "inspect if-to-or",
     "inspect constant-if-test",
     "inspect verbose-negation",
@@ -133,10 +141,13 @@ const INTROSPECTION_COMMANDS: [&str; 84] = [
     "inspect nested-when",
     "inspect nil-comparison",
     "inspect one-armed-if",
+    "inspect one-step-arithmetic",
     "inspect single-operand-boolean",
+    "inspect single-operand-arithmetic",
     "inspect single-arg-comparison",
     "inspect single-clause-cond",
     "inspect sign-comparison",
+    "inspect literal-place",
     "inspect eq-char-comparison",
     "inspect redundant-apply",
     "inspect redundant-eql-test",
@@ -144,6 +155,7 @@ const INTROSPECTION_COMMANDS: [&str; 84] = [
     "inspect redundant-body-progn",
     "inspect redundant-boolean-identity",
     "inspect de-morgan",
+    "inspect destructive-literal",
     "inspect eql-search-literal",
     "inspect redundant-identity",
     "inspect redundant-if-nil",
@@ -153,6 +165,7 @@ const INTROSPECTION_COMMANDS: [&str; 84] = [
     "inspect sharp-quoted-lambda",
     "inspect char-op-string",
     "inspect empty-body",
+    "inspect identity-arithmetic",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
