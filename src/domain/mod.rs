@@ -129,6 +129,7 @@ pub mod redundant_if_nil_report;
 pub mod redundant_let_star_report;
 pub mod redundant_progn_report;
 pub mod redundant_quote_report;
+pub mod redundant_the_report;
 pub mod refactor_execute;
 pub mod refactor_plan;
 pub mod refactor_preview;

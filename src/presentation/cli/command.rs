@@ -35,19 +35,19 @@ use super::{
     reachability_report, redefinition_report, redundant_apply_report, redundant_body_progn_report,
     redundant_boolean_identity_report, redundant_eql_test_report, redundant_funcall_report,
     redundant_identity_key_report, redundant_identity_report, redundant_if_nil_report,
-    redundant_let_star_report, redundant_progn_report, redundant_quote_report, refactor,
-    remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
-    self_assignment_report, self_comparison_report, setf_arity_report, setq_non_variable_report,
-    shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
-    similarity_report, single_arg_comparison_report, single_clause_cond_report,
-    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
-    single_value_bind_report, split_let, split_let_star, struct_cycle_report, symbol_report,
-    system_conflict_report, system_cycle_report, t_comparison_report, the_arity_report,
-    thread_expression, typecase_nil_key_report, undefined_package_report,
-    unreachable_case_clause_report, unreachable_cond_clause_report, unthread_expression,
-    unused_export_report, unused_local_callable_report, unused_nickname_report,
-    unused_package_report, unused_parameter_report, unwrap_call, verbose_negation_report,
-    workspace_report,
+    redundant_let_star_report, redundant_progn_report, redundant_quote_report,
+    redundant_the_report, refactor, remove_unused_binding, remove_unused_control, rename,
+    rename_control, replace_forms, self_assignment_report, self_comparison_report,
+    setf_arity_report, setq_non_variable_report, shadowed_binding_report,
+    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
+    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
+    single_operand_boolean_report, single_operand_list_op_report, single_value_bind_report,
+    split_let, split_let_star, struct_cycle_report, symbol_report, system_conflict_report,
+    system_cycle_report, t_comparison_report, the_arity_report, thread_expression,
+    typecase_nil_key_report, undefined_package_report, unreachable_case_clause_report,
+    unreachable_cond_clause_report, unthread_expression, unused_export_report,
+    unused_local_callable_report, unused_nickname_report, unused_package_report,
+    unused_parameter_report, unwrap_call, verbose_negation_report, workspace_report,
 };
 use clap::Subcommand;
 
@@ -277,6 +277,8 @@ pub(super) enum InspectCommand {
     RedundantLetStar(redundant_let_star_report::args::RedundantLetStarReportArgs),
     /// Report (funcall #'foo ...) forms that are just (foo ...) (a direct call).
     RedundantFuncall(redundant_funcall_report::args::RedundantFuncallReportArgs),
+    /// Report (the t form), a vacuous type declaration that is just form (t matches every object).
+    RedundantThe(redundant_the_report::args::RedundantTheReportArgs),
     /// Report (funcall (lambda ...) ...) forms that apply the lambda directly (((lambda ...) ...)).
     FuncallLambda(funcall_lambda_report::args::FuncallLambdaReportArgs),
     /// Report #'(lambda ...) forms with a redundant #' prefix (#'(lambda ...) is (lambda ...)).

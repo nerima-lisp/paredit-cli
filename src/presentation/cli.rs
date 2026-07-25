@@ -134,6 +134,7 @@ mod redundant_if_nil_report;
 mod redundant_let_star_report;
 mod redundant_progn_report;
 mod redundant_quote_report;
+mod redundant_the_report;
 mod refactor;
 mod remove_unused_binding;
 mod remove_unused_control;

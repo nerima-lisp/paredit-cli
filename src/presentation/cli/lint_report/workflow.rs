@@ -43,6 +43,7 @@ use crate::application::usecase::redundant_if_nil_report::collect_redundant_if_n
 use crate::application::usecase::redundant_let_star_report::collect_redundant_let_stars;
 use crate::application::usecase::redundant_progn_report::collect_redundant_progns;
 use crate::application::usecase::redundant_quote_report::collect_redundant_quotes;
+use crate::application::usecase::redundant_the_report::collect_redundant_thes;
 use crate::application::usecase::sharp_quoted_lambda_report::collect_sharp_quoted_lambdas;
 use crate::application::usecase::sign_comparison_report::collect_sign_comparisons;
 use crate::application::usecase::single_clause_cond_report::collect_single_clause_conds;
@@ -207,7 +208,8 @@ fn retain_unbaselined(
 /// `let*` head to `let`), `single-clause-cond` (rewrite a one-clause
 /// `(cond (test body…))` as `(when test body…)`), `redundant-funcall`
 /// (delete `funcall #'` so
-/// `(funcall #'foo …)` becomes `(foo …)`), `funcall-lambda` (drop `funcall`
+/// `(funcall #'foo …)` becomes `(foo …)`), `redundant-the` (drop a vacuous
+/// `(the t form)` down to `form`), `funcall-lambda` (drop `funcall`
 /// so `(funcall (lambda …) …)` becomes `((lambda …) …)`), `sharp-quoted-lambda`
 /// (strip the redundant `#'` so `#'(lambda …)` becomes `(lambda …)`),
 /// `redundant-eql-test` (delete an explicit default `:test #'eql`),
@@ -408,6 +410,23 @@ fn collect_lint_fixes(
                         text: String::new(),
                     }],
                 },
+            );
+        }
+    }
+
+    if active.contains(&"redundant-the") {
+        let (_, items) = collect_redundant_thes(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (the t form) is form: replace the whole declaration with the inner form.
+            fixes.insert(
+                ("redundant-the", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.form_span),
+                    "Drop the vacuous (the t …) declaration".to_string(),
+                ),
             );
         }
     }
@@ -1724,6 +1743,7 @@ mod tests {
             "(let () (ela) (elb))\n",                 // empty-let
             "(if c d nil)\n",                         // redundant-if-nil
             "(funcall #'g m)\n",                      // redundant-funcall
+            "(the t whatever)\n",                     // redundant-the
             "(funcall (lambda (fx) fx) 9)\n",         // funcall-lambda
             "(mapcar #'(lambda (sq) sq) sqs)\n",      // sharp-quoted-lambda
             "(identity h)\n",                         // redundant-identity

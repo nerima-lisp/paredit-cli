@@ -281,6 +281,8 @@ mod redundant_let_star_report;
 mod redundant_progn_report;
 #[path = "cli/redundant_quote_report.rs"]
 mod redundant_quote_report;
+#[path = "cli/redundant_the_report.rs"]
+mod redundant_the_report;
 #[path = "cli/refactor_entrypoint_contract.rs"]
 mod refactor_entrypoint_contract;
 #[path = "cli/refactor_manifest/mod.rs"]

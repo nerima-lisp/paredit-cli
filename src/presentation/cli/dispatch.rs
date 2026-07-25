@@ -296,6 +296,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::RedundantFuncall(args) => {
                 redundant_funcall_report::workflow::redundant_funcall_report(args)?
             }
+            command::InspectCommand::RedundantThe(args) => {
+                redundant_the_report::workflow::redundant_the_report(args)?
+            }
             command::InspectCommand::FuncallLambda(args) => {
                 funcall_lambda_report::workflow::funcall_lambda_report(args)?
             }

@@ -91,6 +91,7 @@ use crate::domain::redundant_if_nil_report::collect_redundant_if_nils;
 use crate::domain::redundant_let_star_report::collect_redundant_let_stars;
 use crate::domain::redundant_progn_report::collect_redundant_progns;
 use crate::domain::redundant_quote_report::collect_redundant_quotes;
+use crate::domain::redundant_the_report::collect_redundant_thes;
 use crate::domain::self_assignment_report::collect_self_assignments;
 use crate::domain::self_comparison_report::collect_self_comparisons;
 use crate::domain::setf_arity_report::collect_setf_arity_violations;
@@ -112,7 +113,7 @@ use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clau
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 88] = [
+pub const RULES: [&str; 89] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -142,6 +143,7 @@ pub const RULES: [&str; 88] = [
     "redundant-if-nil",
     "redundant-let-star",
     "redundant-funcall",
+    "redundant-the",
     "funcall-lambda",
     "sharp-quoted-lambda",
     "redundant-identity",
@@ -213,7 +215,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 88] = [
+pub const RULE_DOCS: [(&str, &str, &str); 89] = [
     (
         "self-assignment",
         "suspicious",
@@ -358,6 +360,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 88] = [
         "redundant-funcall",
         "suspicious",
         "a funcall of a sharp-quoted symbol ((funcall #'foo a b) is just (foo a b))",
+    ),
+    (
+        "redundant-the",
+        "suspicious",
+        "a (the t form) type declaration, which is vacuous and is just form (t matches every object)",
     ),
     (
         "funcall-lambda",
@@ -678,7 +685,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 46] = [
+pub const FIXABLE_RULES: [&str; 47] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -700,6 +707,7 @@ pub const FIXABLE_RULES: [&str; 46] = [
     "redundant-if-nil",
     "redundant-let-star",
     "redundant-funcall",
+    "redundant-the",
     "funcall-lambda",
     "sharp-quoted-lambda",
     "redundant-identity",
@@ -765,7 +773,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 47] = [
+pub const WARNING_RULES: [&str; 48] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -787,6 +795,7 @@ pub const WARNING_RULES: [&str; 47] = [
     "redundant-if-nil",
     "redundant-let-star",
     "redundant-funcall",
+    "redundant-the",
     "funcall-lambda",
     "sharp-quoted-lambda",
     "redundant-identity",
@@ -1222,6 +1231,16 @@ pub fn collect_lint_findings(
                 "funcall of #'{} is a direct call; (funcall #'{} …) is ({} …)",
                 item.callee, item.callee, item.callee
             ),
+        });
+    }
+
+    let (_, items) = collect_redundant_thes(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "redundant-the",
+            path: item.path,
+            span: item.span,
+            message: "(the t form) is a vacuous type declaration; it is just form".to_string(),
         });
     }
 

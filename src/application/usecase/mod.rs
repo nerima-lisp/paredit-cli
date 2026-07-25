@@ -127,6 +127,7 @@ pub mod redundant_if_nil_report;
 pub mod redundant_let_star_report;
 pub mod redundant_progn_report;
 pub mod redundant_quote_report;
+pub mod redundant_the_report;
 pub mod remove_definition;
 pub mod remove_unused_binding;
 pub mod remove_unused_control;
