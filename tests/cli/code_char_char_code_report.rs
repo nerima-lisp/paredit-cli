@@ -1,0 +1,73 @@
+use super::*;
+
+#[test]
+fn cli_flags_roundtrip() {
+    let dir = fresh_temp_dir("code-char-char-code-report");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(code-char (char-code c))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("code-char-char-code")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"));
+}
+
+#[test]
+fn cli_does_not_flag_reverse() {
+    let dir = fresh_temp_dir("code-char-char-code-report-reverse");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(char-code (code-char n))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("code-char-char-code")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 0"));
+}
+
+#[test]
+fn cli_fail_on_violation_trips_gate() {
+    let dir = fresh_temp_dir("code-char-char-code-report-gate");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(code-char (char-code c))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("code-char-char-code")
+        .arg("--fail-on-violation")
+        .arg(&file)
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "code-char-char-code-report policy failed",
+        ));
+}
+
+#[test]
+fn cli_lint_fix_unwraps() {
+    let dir = fresh_temp_dir("code-char-char-code-report-fix");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(code-char (char-code (elt s i)))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg("--rule")
+        .arg("code-char-char-code")
+        .arg("--fix")
+        .arg(&file)
+        .assert()
+        .success();
+
+    let fixed = fs::read_to_string(&file).expect("read fixed file");
+    assert_eq!(fixed, "(elt s i)\n");
+}

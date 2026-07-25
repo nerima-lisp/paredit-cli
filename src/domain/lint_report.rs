@@ -25,7 +25,9 @@ use crate::domain::binds_constant_report::collect_binds_constant;
 use crate::domain::car_nthcdr_report::collect_car_nthcdrs;
 use crate::domain::car_reverse_report::collect_car_reverses;
 use crate::domain::case_nil_key_report::collect_case_nil_keys;
+use crate::domain::char_case_fold_report::collect_char_case_folds;
 use crate::domain::char_op_string_report::collect_char_op_strings;
+use crate::domain::code_char_char_code_report::collect_code_char_char_codes;
 use crate::domain::coerce_to_t_report::collect_coerce_to_ts;
 use crate::domain::cond_t_clause_report::collect_cond_t_clauses;
 use crate::domain::cons_to_list_report::collect_cons_to_lists;
@@ -91,6 +93,7 @@ use crate::domain::negated_when_unless_report::collect_negated_when_unless;
 use crate::domain::nested_boolean_report::collect_nested_booleans;
 use crate::domain::nested_cxr_report::collect_nested_cxrs;
 use crate::domain::nested_progn_report::collect_nested_progns;
+use crate::domain::nested_string_case_report::collect_nested_string_cases;
 use crate::domain::nested_unless_report::collect_nested_unlesses;
 use crate::domain::nested_when_report::collect_nested_whens;
 use crate::domain::nil_comparison_report::collect_nil_comparisons;
@@ -133,6 +136,7 @@ use crate::domain::single_operand_boolean_report::collect_single_operand_boolean
 use crate::domain::single_operand_list_op_report::collect_single_operand_list_ops;
 use crate::domain::single_value_bind_report::collect_single_value_binds;
 use crate::domain::step_zero_report::collect_step_zeros;
+use crate::domain::string_case_fold_report::collect_string_case_folds;
 use crate::domain::subseq_zero_report::collect_subseq_zeros;
 use crate::domain::t_comparison_report::collect_t_comparisons;
 use crate::domain::the_arity_report::collect_the_arity_violations;
@@ -146,7 +150,7 @@ use crate::domain::verbose_negation_report::collect_verbose_negations;
 use crate::domain::zero_divisor_report::collect_zero_divisors;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 122] = [
+pub const RULES: [&str; 126] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -269,6 +273,10 @@ pub const RULES: [&str; 122] = [
     "redundant-end-nil",
     "redundant-from-end-nil",
     "redundant-count-nil",
+    "string-case-fold",
+    "char-case-fold",
+    "nested-string-case",
+    "code-char-char-code",
 ];
 
 /// The set of rule categories, sorted, for `--category` validation and
@@ -281,7 +289,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 122] = [
+pub const RULE_DOCS: [(&str, &str, &str); 126] = [
     (
         "self-assignment",
         "suspicious",
@@ -892,6 +900,26 @@ pub const RULE_DOCS: [(&str, &str, &str); 122] = [
         "suspicious",
         "a remove/delete/substitute call with an explicit :count nil, the default ((remove x seq :count nil) is (remove x seq))",
     ),
+    (
+        "string-case-fold",
+        "suspicious",
+        "a string= of two same-case-folded operands ((string= (string-downcase a) (string-downcase b)) is (string-equal a b))",
+    ),
+    (
+        "char-case-fold",
+        "suspicious",
+        "a char= of two same-case-folded operands ((char= (char-downcase a) (char-downcase b)) is (char-equal a b))",
+    ),
+    (
+        "nested-string-case",
+        "suspicious",
+        "nested string case ops where the outer dominates ((string-upcase (string-downcase s)) is (string-upcase s))",
+    ),
+    (
+        "code-char-char-code",
+        "suspicious",
+        "a code-char of a char-code, a round-trip that is just the character ((code-char (char-code c)) is c)",
+    ),
 ];
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
@@ -916,7 +944,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 76] = [
+pub const FIXABLE_RULES: [&str; 80] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -993,6 +1021,10 @@ pub const FIXABLE_RULES: [&str; 76] = [
     "redundant-end-nil",
     "redundant-from-end-nil",
     "redundant-count-nil",
+    "string-case-fold",
+    "char-case-fold",
+    "nested-string-case",
+    "code-char-char-code",
 ];
 
 /// Whether `inspect lint --fix` can automatically repair findings of `name`.
@@ -1033,7 +1065,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 81] = [
+pub const WARNING_RULES: [&str; 85] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -1115,6 +1147,10 @@ pub const WARNING_RULES: [&str; 81] = [
     "redundant-end-nil",
     "redundant-from-end-nil",
     "redundant-count-nil",
+    "string-case-fold",
+    "char-case-fold",
+    "nested-string-case",
+    "code-char-char-code",
 ];
 
 /// The severity of a rule's findings (`error` unless it is a [`WARNING_RULES`]
@@ -2638,6 +2674,49 @@ pub fn collect_lint_findings(
                 "{} :count defaults to nil; drop the explicit :count nil",
                 item.head
             ),
+        });
+    }
+
+    let (_, items) = collect_string_case_folds(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "string-case-fold",
+            path: item.path,
+            span: item.span,
+            message: "case-folding both sides of string= is case-insensitive; use string-equal"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_char_case_folds(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "char-case-fold",
+            path: item.path,
+            span: item.span,
+            message: "case-folding both sides of char= is case-insensitive; use char-equal"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_nested_string_cases(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "nested-string-case",
+            path: item.path,
+            span: item.span,
+            message: "the outer string case op dominates; the inner one is dead work".to_owned(),
+        });
+    }
+
+    let (_, items) = collect_code_char_char_codes(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "code-char-char-code",
+            path: item.path,
+            span: item.span,
+            message: "code-char of char-code is a round-trip; (code-char (char-code c)) is c"
+                .to_owned(),
         });
     }
 

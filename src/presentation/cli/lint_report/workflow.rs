@@ -4,6 +4,8 @@ use crate::application::usecase::append_list_to_cons_report::collect_append_list
 use crate::application::usecase::append_nil_report::collect_append_nils;
 use crate::application::usecase::car_nthcdr_report::collect_car_nthcdrs;
 use crate::application::usecase::car_reverse_report::collect_car_reverses;
+use crate::application::usecase::char_case_fold_report::collect_char_case_folds;
+use crate::application::usecase::code_char_char_code_report::collect_code_char_char_codes;
 use crate::application::usecase::coerce_to_t_report::collect_coerce_to_ts;
 use crate::application::usecase::cond_t_clause_report::collect_cond_t_clauses;
 use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
@@ -42,6 +44,7 @@ use crate::application::usecase::negated_when_unless_report::collect_negated_whe
 use crate::application::usecase::nested_boolean_report::collect_nested_booleans;
 use crate::application::usecase::nested_cxr_report::collect_nested_cxrs;
 use crate::application::usecase::nested_progn_report::collect_nested_progns;
+use crate::application::usecase::nested_string_case_report::collect_nested_string_cases;
 use crate::application::usecase::nested_unless_report::collect_nested_unlesses;
 use crate::application::usecase::nested_when_report::collect_nested_whens;
 use crate::application::usecase::nil_comparison_report::collect_nil_comparisons;
@@ -76,6 +79,7 @@ use crate::application::usecase::single_operand_arithmetic_report::collect_singl
 use crate::application::usecase::single_operand_boolean_report::collect_single_operand_booleans;
 use crate::application::usecase::single_operand_list_op_report::collect_single_operand_list_ops;
 use crate::application::usecase::single_value_bind_report::collect_single_value_binds;
+use crate::application::usecase::string_case_fold_report::collect_string_case_folds;
 use crate::application::usecase::subseq_zero_report::collect_subseq_zeros;
 use crate::application::usecase::typep_predicate_report::collect_typep_predicates;
 use crate::application::usecase::unwind_protect_no_cleanup_report::collect_unwind_protect_no_cleanup;
@@ -245,6 +249,10 @@ fn retain_unbaselined(
 /// `redundant-eql-test` (delete an explicit default `:test #'eql`),
 /// `redundant-start-zero` / `redundant-end-nil` / `redundant-from-end-nil` /
 /// `redundant-count-nil` (delete an explicit default sequence keyword argument),
+/// `string-case-fold` / `char-case-fold` (rewrite a same-case-folded `string=`/
+/// `char=` as `string-equal`/`char-equal`), `nested-string-case` (collapse
+/// `(string-upcase (string-downcase s))` to `(string-upcase s)`),
+/// `code-char-char-code` (drop the `(code-char (char-code c))` round-trip to `c`),
 /// `redundant-identity-key` (delete an explicit default `:key #'identity`),
 /// `redundant-identity` (replace
 /// `(identity x)` with `x`), `cons-to-list` (rewrite `(cons a nil)` as
@@ -629,6 +637,75 @@ fn collect_lint_fixes(
                         text: String::new(),
                     }],
                 },
+            );
+        }
+    }
+
+    if active.contains(&"string-case-fold") {
+        let (_, items) = collect_string_case_folds(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (string= (string-downcase a) (string-downcase b)) is (string-equal a b).
+            let text = format!(
+                "(string-equal {} {})",
+                slice(item.left_span),
+                slice(item.right_span)
+            );
+            fixes.insert(
+                ("string-case-fold", start, end),
+                one_edit(start, end, text, "Rewrite as (string-equal a b)".to_owned()),
+            );
+        }
+    }
+
+    if active.contains(&"char-case-fold") {
+        let (_, items) = collect_char_case_folds(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (char= (char-downcase a) (char-downcase b)) is (char-equal a b).
+            let text = format!(
+                "(char-equal {} {})",
+                slice(item.left_span),
+                slice(item.right_span)
+            );
+            fixes.insert(
+                ("char-case-fold", start, end),
+                one_edit(start, end, text, "Rewrite as (char-equal a b)".to_owned()),
+            );
+        }
+    }
+
+    if active.contains(&"nested-string-case") {
+        let (_, items) = collect_nested_string_cases(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (OUTER (INNER s)) is (OUTER s), keeping the outer op.
+            let text = format!("({} {})", slice(item.outer_span), slice(item.string_span));
+            fixes.insert(
+                ("nested-string-case", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Collapse the nested string case op".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"code-char-char-code") {
+        let (_, items) = collect_code_char_char_codes(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (code-char (char-code c)) is c.
+            fixes.insert(
+                ("code-char-char-code", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.char_span),
+                    "Drop the code-char/char-code round-trip".to_owned(),
+                ),
             );
         }
     }
@@ -2357,83 +2434,87 @@ mod tests {
     #[test]
     fn fixable_rules_match_the_fix_engine() {
         let source = concat!(
-            "(list '5)\n",                              // redundant-quote
-            "(progn only)\n",                           // redundant-progn
-            "(progn a (progn b c))\n",                  // nested-progn (the inner progn)
-            "(when q (progn s t))\n",                   // redundant-body-progn
-            "(let () (ela) (elb))\n",                   // empty-let
-            "(if c d nil)\n",                           // redundant-if-nil
-            "(funcall #'g m)\n",                        // redundant-funcall
-            "(the t whatever)\n",                       // redundant-the
-            "(funcall (lambda (fx) fx) 9)\n",           // funcall-lambda
-            "(mapcar #'(lambda (sq) sq) sqs)\n",        // sharp-quoted-lambda
-            "(identity h)\n",                           // redundant-identity
-            "(cons e nil)\n",                           // cons-to-list
-            "(reverse (reverse dr))\n",                 // double-reverse
-            "(append (list al) ar)\n",                  // append-list-to-cons
-            "(format nil \"~A\" fs)\n",                 // format-to-string
-            "(format t \"~%\")\n",                      // format-newline
-            "(floor fq 1)\n",                           // redundant-divisor
-            "(- 0 amt)\n",                              // verbose-negation
-            "(list* la lb)\n",                          // list-star-to-cons
-            "(values-list (list va vb))\n",             // values-list-of-list
-            "(prog1 (p1x))\n",                          // redundant-prog1
-            "(subseq sz 0)\n",                          // subseq-zero
-            "(car (nthcdr cn cx))\n",                   // car-nthcdr
-            "(car (reverse crx))\n",                    // car-reverse
-            "(append anx nil)\n",                       // append-nil
+            "(list '5)\n",                                           // redundant-quote
+            "(progn only)\n",                                        // redundant-progn
+            "(progn a (progn b c))\n", // nested-progn (the inner progn)
+            "(when q (progn s t))\n",  // redundant-body-progn
+            "(let () (ela) (elb))\n",  // empty-let
+            "(if c d nil)\n",          // redundant-if-nil
+            "(funcall #'g m)\n",       // redundant-funcall
+            "(the t whatever)\n",      // redundant-the
+            "(funcall (lambda (fx) fx) 9)\n", // funcall-lambda
+            "(mapcar #'(lambda (sq) sq) sqs)\n", // sharp-quoted-lambda
+            "(identity h)\n",          // redundant-identity
+            "(cons e nil)\n",          // cons-to-list
+            "(reverse (reverse dr))\n", // double-reverse
+            "(append (list al) ar)\n", // append-list-to-cons
+            "(format nil \"~A\" fs)\n", // format-to-string
+            "(format t \"~%\")\n",     // format-newline
+            "(floor fq 1)\n",          // redundant-divisor
+            "(- 0 amt)\n",             // verbose-negation
+            "(list* la lb)\n",         // list-star-to-cons
+            "(values-list (list va vb))\n", // values-list-of-list
+            "(prog1 (p1x))\n",         // redundant-prog1
+            "(subseq sz 0)\n",         // subseq-zero
+            "(car (nthcdr cn cx))\n",  // car-nthcdr
+            "(car (reverse crx))\n",   // car-reverse
+            "(append anx nil)\n",      // append-nil
             "(multiple-value-list (values mva mvb))\n", // multiple-value-list-of-values
-            "(typep tpx 'string)\n",                    // typep-predicate
-            "(coerce ctx t)\n",                         // coerce-to-t
-            "(gethash gdk gdh nil)\n",                  // gethash-default
-            "(make-hash-table :test 'eql)\n",           // make-hash-table-test
-            "(let* ((a 1)) a)\n",                       // redundant-let-star
-            "(cond (ok (run)))\n",                      // single-clause-cond
-            "(cond (t (r1) (r2)))\n",                   // cond-t-clause
-            "(incf tally 1)\n",                         // explicit-step-delta
-            "(incf nsd -3)\n",                          // negated-step-delta
-            "(return-from blk nil)\n",                  // explicit-nil-return
-            "(multiple-value-bind (mv) (vals) mv)\n",   // single-value-bind
-            "(or za (or pb qc))\n",                     // nested-boolean
-            "(when wa (when wb (wc)))\n",               // nested-when
-            "(unless ua (unless ub (uc)))\n",           // nested-unless
-            "(and x)\n",                                // single-operand-boolean
-            "(append solo)\n",                          // single-operand-list-op
-            "(* x)\n",                                  // single-operand-arithmetic
-            "(when (not r) y)\n",                       // negated-when-unless
-            "(if p q)\n",                               // one-armed-if
-            "(setf ctr (1+ ctr))\n",                    // manual-incf
-            "(setf lst (cons e lst))\n",                // manual-push
-            "(setf st (adjoin e st))\n",                // manual-pushnew
-            "(car (cdr z))\n",                          // nested-cxr
-            "(nth 0 zs)\n",                             // nth-constant-index
-            "(nthcdr 0 nz)\n",                          // nthcdr-zero
-            "(nthcdr 2 ns)\n",                          // nthcdr-small-index
-            "(apply #'g (list m))\n",                   // redundant-apply
-            "(find ret lst :test #'eql)\n",             // redundant-eql-test
-            "(find rsz lst :start 0)\n",                // redundant-start-zero
-            "(find ren lst :end nil)\n",                // redundant-end-nil
-            "(find rfe lst :from-end nil)\n",           // redundant-from-end-nil
-            "(remove rcn lst :count nil)\n",            // redundant-count-nil
-            "(sort rik #'< :key #'identity)\n",         // redundant-identity-key
-            "(= tally 0)\n",                            // sign-comparison
-            "(not (< a b))\n",                          // negated-comparison
-            "(if (not c) a b)\n",                       // negated-if
-            "(if iv iv jv)\n",                          // if-to-or
-            "(if iw nil t)\n",                          // if-not
-            "(if iu nil (iue))\n",                      // if-to-unless
-            "(prog2 (p2a) (p2b))\n",                    // prog2-to-progn
-            "(handler-case (hcx))\n",                   // handler-case-no-clauses
-            "(unwind-protect (upx))\n",                 // unwind-protect-no-cleanup
-            "(+ osa 1)\n",                              // one-step-arithmetic
-            "(if t on off)\n",                          // constant-if-test
-            "(when t (bd))\n",                          // constant-when-test
-            "(and p t q)\n",                            // redundant-boolean-identity
-            "(and (not p) (not q))\n",                  // de-morgan
-            "(equal w nil)\n",                          // nil-comparison
-            "(eq n 7)\n",                               // eq-number-comparison
-            "(eq c #\\a)\n",                            // eq-char-comparison
-            "(if a b c d)\n",                           // if-arity — NOT fixable
+            "(typep tpx 'string)\n",   // typep-predicate
+            "(coerce ctx t)\n",        // coerce-to-t
+            "(gethash gdk gdh nil)\n", // gethash-default
+            "(make-hash-table :test 'eql)\n", // make-hash-table-test
+            "(let* ((a 1)) a)\n",      // redundant-let-star
+            "(cond (ok (run)))\n",     // single-clause-cond
+            "(cond (t (r1) (r2)))\n",  // cond-t-clause
+            "(incf tally 1)\n",        // explicit-step-delta
+            "(incf nsd -3)\n",         // negated-step-delta
+            "(return-from blk nil)\n", // explicit-nil-return
+            "(multiple-value-bind (mv) (vals) mv)\n", // single-value-bind
+            "(or za (or pb qc))\n",    // nested-boolean
+            "(when wa (when wb (wc)))\n", // nested-when
+            "(unless ua (unless ub (uc)))\n", // nested-unless
+            "(and x)\n",               // single-operand-boolean
+            "(append solo)\n",         // single-operand-list-op
+            "(* x)\n",                 // single-operand-arithmetic
+            "(when (not r) y)\n",      // negated-when-unless
+            "(if p q)\n",              // one-armed-if
+            "(setf ctr (1+ ctr))\n",   // manual-incf
+            "(setf lst (cons e lst))\n", // manual-push
+            "(setf st (adjoin e st))\n", // manual-pushnew
+            "(car (cdr z))\n",         // nested-cxr
+            "(nth 0 zs)\n",            // nth-constant-index
+            "(nthcdr 0 nz)\n",         // nthcdr-zero
+            "(nthcdr 2 ns)\n",         // nthcdr-small-index
+            "(apply #'g (list m))\n",  // redundant-apply
+            "(find ret lst :test #'eql)\n", // redundant-eql-test
+            "(find rsz lst :start 0)\n", // redundant-start-zero
+            "(find ren lst :end nil)\n", // redundant-end-nil
+            "(find rfe lst :from-end nil)\n", // redundant-from-end-nil
+            "(remove rcn lst :count nil)\n", // redundant-count-nil
+            "(string= (string-downcase sa) (string-downcase sb))\n", // string-case-fold
+            "(char= (char-downcase ca) (char-downcase cb))\n", // char-case-fold
+            "(string-upcase (string-downcase nsc))\n", // nested-string-case
+            "(code-char (char-code ccc))\n", // code-char-char-code
+            "(sort rik #'< :key #'identity)\n", // redundant-identity-key
+            "(= tally 0)\n",           // sign-comparison
+            "(not (< a b))\n",         // negated-comparison
+            "(if (not c) a b)\n",      // negated-if
+            "(if iv iv jv)\n",         // if-to-or
+            "(if iw nil t)\n",         // if-not
+            "(if iu nil (iue))\n",     // if-to-unless
+            "(prog2 (p2a) (p2b))\n",   // prog2-to-progn
+            "(handler-case (hcx))\n",  // handler-case-no-clauses
+            "(unwind-protect (upx))\n", // unwind-protect-no-cleanup
+            "(+ osa 1)\n",             // one-step-arithmetic
+            "(if t on off)\n",         // constant-if-test
+            "(when t (bd))\n",         // constant-when-test
+            "(and p t q)\n",           // redundant-boolean-identity
+            "(and (not p) (not q))\n", // de-morgan
+            "(equal w nil)\n",         // nil-comparison
+            "(eq n 7)\n",              // eq-number-comparison
+            "(eq c #\\a)\n",           // eq-char-comparison
+            "(if a b c d)\n",          // if-arity — NOT fixable
         );
         let tree =
             crate::domain::sexpr::SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)

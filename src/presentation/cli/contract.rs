@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 166] = [
+const INTROSPECTION_COMMANDS: [&str; 170] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -231,6 +231,10 @@ const INTROSPECTION_COMMANDS: [&str; 166] = [
     "inspect funcall-lambda",
     "inspect sharp-quoted-lambda",
     "inspect char-op-string",
+    "inspect string-case-fold",
+    "inspect char-case-fold",
+    "inspect nested-string-case",
+    "inspect code-char-char-code",
     "inspect empty-body",
     "inspect empty-let",
     "inspect identity-arithmetic",

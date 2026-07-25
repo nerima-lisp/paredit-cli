@@ -180,6 +180,18 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::CharOpString(args) => {
                 char_op_string_report::workflow::char_op_string_report(args)?
             }
+            command::InspectCommand::StringCaseFold(args) => {
+                string_case_fold_report::workflow::string_case_fold_report(args)?
+            }
+            command::InspectCommand::CharCaseFold(args) => {
+                char_case_fold_report::workflow::char_case_fold_report(args)?
+            }
+            command::InspectCommand::NestedStringCase(args) => {
+                nested_string_case_report::workflow::nested_string_case_report(args)?
+            }
+            command::InspectCommand::CodeCharCharCode(args) => {
+                code_char_char_code_report::workflow::code_char_char_code_report(args)?
+            }
             command::InspectCommand::EmptyBody(args) => {
                 empty_body_report::workflow::empty_body_report(args)?
             }

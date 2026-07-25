@@ -35,10 +35,14 @@ mod car_nthcdr_report;
 mod car_reverse_report;
 #[path = "cli/case_nil_key_report.rs"]
 mod case_nil_key_report;
+#[path = "cli/char_case_fold_report.rs"]
+mod char_case_fold_report;
 #[path = "cli/char_op_string_report.rs"]
 mod char_op_string_report;
 #[path = "cli/class_cycle_report.rs"]
 mod class_cycle_report;
+#[path = "cli/code_char_char_code_report.rs"]
+mod code_char_char_code_report;
 #[path = "cli/coerce_to_t_report.rs"]
 mod coerce_to_t_report;
 #[path = "cli/completions_contract.rs"]
@@ -247,6 +251,8 @@ mod nested_boolean_report;
 mod nested_cxr_report;
 #[path = "cli/nested_progn_report.rs"]
 mod nested_progn_report;
+#[path = "cli/nested_string_case_report.rs"]
+mod nested_string_case_report;
 #[path = "cli/nested_unless_report.rs"]
 mod nested_unless_report;
 #[path = "cli/nested_when_report.rs"]
@@ -399,6 +405,8 @@ mod split_file;
 mod split_let_star;
 #[path = "cli/step_zero_report.rs"]
 mod step_zero_report;
+#[path = "cli/string_case_fold_report.rs"]
+mod string_case_fold_report;
 #[path = "cli/struct_cycle_report.rs"]
 mod struct_cycle_report;
 #[path = "cli/subseq_zero_report.rs"]
