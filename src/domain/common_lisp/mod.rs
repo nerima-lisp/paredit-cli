@@ -20,7 +20,7 @@ pub(crate) use operator::{
     common_lisp_symbol_identity_eq, common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq,
     common_lisp_symbol_reference_needle, has_common_lisp_package_qualifier,
     is_common_lisp_declaration_form, is_common_lisp_earmuffed_special_variable_name,
-    normalize_common_lisp_operator_head,
+    normalize_common_lisp_operator_head, normalize_common_lisp_package_designator,
 };
 #[cfg(test)]
 pub(crate) use reader_condition::common_lisp_reader_conditional_dispatches;

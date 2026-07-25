@@ -168,6 +168,23 @@ pub(crate) fn common_lisp_symbol_reference_needle(symbol: &str) -> String {
     canonical_common_lisp_symbol_name(strip_common_lisp_symbol_qualifiers(symbol))
 }
 
+/// Strips the reader-syntax wrapper from a package or ASDF system
+/// designator — a leading `:` (keyword, `:app`), a leading `#:` (uninterned
+/// symbol, `#:app`, common in `.asd` files), or surrounding `"..."` (string,
+/// `"app"`) — so the result compares equal regardless of which spelling a
+/// particular form used. A designator already written as a plain symbol is
+/// returned as-is.
+pub(crate) fn normalize_common_lisp_package_designator(designator: &str) -> &str {
+    let unprefixed = designator
+        .strip_prefix("#:")
+        .or_else(|| designator.strip_prefix(':'))
+        .unwrap_or(designator);
+    unprefixed
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+        .unwrap_or(unprefixed)
+}
+
 pub(crate) fn is_common_lisp_declaration_form(head: &str) -> bool {
     common_lisp_operator_head_eq(head, "declare")
         || common_lisp_operator_head_eq(head, "declaim")

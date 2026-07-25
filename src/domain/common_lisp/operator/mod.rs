@@ -14,6 +14,7 @@ pub(crate) use normalize::{
     common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
     has_common_lisp_package_qualifier, is_common_lisp_declaration_form,
     is_common_lisp_earmuffed_special_variable_name, normalize_common_lisp_operator_head,
+    normalize_common_lisp_package_designator,
 };
 
 impl CommonLispOperator {

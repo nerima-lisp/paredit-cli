@@ -15,7 +15,7 @@ mod types;
 
 pub use types::{DependencyKind, DependencyReport, DependencyReportItem};
 
-use collect::collect_dependency_items;
+use collect::{collect_dependency_items, collect_system_dependency_edges};
 use defpackage::defpackage_dependency_items;
 
 pub fn build_dependency_report(tree: &SyntaxTree, dialect: Dialect) -> Result<DependencyReport> {
@@ -25,4 +25,14 @@ pub fn build_dependency_report(tree: &SyntaxTree, dialect: Dialect) -> Result<De
     dependencies.sort_by(DependencyReportItem::cmp_position);
 
     Ok(DependencyReport::new(dependencies))
+}
+
+/// Collects `(declaring_system, depended_on_system)` edges from every
+/// top-level ASDF `defsystem` form in `tree`, for cross-file system
+/// dependency-cycle analysis.
+pub fn build_system_dependency_edges(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+) -> Result<Vec<(String, String)>> {
+    collect_system_dependency_edges(tree, dialect)
 }

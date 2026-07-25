@@ -29,6 +29,25 @@ pub(super) fn collect_dependency_items(
     Ok(dependencies)
 }
 
+/// Collects `(declaring_system, depended_on_system)` edges from every
+/// top-level `defsystem` form. Unlike [`collect_dependency_items`], this
+/// only looks at top-level forms — real `.asd` files always declare
+/// `defsystem` there — so it does not need the full quasiquote/local-binding
+/// aware recursive walk that general dependency collection requires.
+pub(super) fn collect_system_dependency_edges(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+) -> Result<Vec<(String, String)>> {
+    let mut edges = Vec::new();
+
+    for index in 0..tree.root_children().len() {
+        let view = tree.select_path(&Path::root_child(index))?.view();
+        asdf::collect_system_definition_edges(&view, dialect, &mut edges);
+    }
+
+    Ok(edges)
+}
+
 fn collect_dependency_items_from_view(
     view: &ExpressionView,
     dialect: Dialect,

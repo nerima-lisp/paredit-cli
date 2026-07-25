@@ -17,6 +17,36 @@ fn contains_dependency(report: &DependencyReport, kind: DependencyKind, target: 
         .any(|dependency| dependency.kind == kind && dependency.target == target)
 }
 
+fn system_edges(input: &str) -> Vec<(String, String)> {
+    let tree = SyntaxTree::parse(input).expect("parse fixture");
+    build_system_dependency_edges(&tree, Dialect::CommonLisp).expect("build system edges")
+}
+
+#[test]
+fn collects_defsystem_depends_on_edges_with_the_declaring_system_as_source() {
+    let edges =
+        system_edges(r#"(asdf:defsystem "my-system" :depends-on ("alexandria" "cl-ppcre"))"#);
+    assert_eq!(
+        edges,
+        vec![
+            ("my-system".to_owned(), "alexandria".to_owned()),
+            ("my-system".to_owned(), "cl-ppcre".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn ignores_forms_that_are_not_defsystem() {
+    let edges = system_edges("(defun f (x) x)");
+    assert!(edges.is_empty());
+}
+
+#[test]
+fn returns_empty_when_defsystem_has_no_depends_on() {
+    let edges = system_edges(r#"(asdf:defsystem "my-system" :version "1.0")"#);
+    assert!(edges.is_empty());
+}
+
 #[test]
 fn orders_dependency_items_by_span_kind_and_target() {
     let earlier = DependencyReportItem::new(
