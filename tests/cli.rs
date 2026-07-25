@@ -23,6 +23,8 @@ mod capabilities_contract;
 mod completions_contract;
 #[path = "cli/conditional_conversion.rs"]
 mod conditional_conversion;
+#[path = "cli/constant_if_test_report.rs"]
+mod constant_if_test_report;
 #[path = "cli/convert_cond_to_if.rs"]
 mod convert_cond_to_if;
 #[path = "cli/convert_flet_to_labels.rs"]
@@ -39,6 +41,10 @@ mod convert_let_to_let_star;
 mod convert_sequential_binding;
 #[path = "cli/crate_metadata_contract.rs"]
 mod crate_metadata_contract;
+#[path = "cli/de_morgan_report.rs"]
+mod de_morgan_report;
+#[path = "cli/dead_boolean_operand_report.rs"]
+mod dead_boolean_operand_report;
 #[path = "cli/definition_movement.rs"]
 mod definition_movement;
 #[path = "cli/definition_removal.rs"]
@@ -49,6 +55,10 @@ mod definition_report;
 mod dependency_report;
 #[path = "cli/dialect_contract.rs"]
 mod dialect_contract;
+#[path = "cli/duplicate_boolean_operand_report.rs"]
+mod duplicate_boolean_operand_report;
+#[path = "cli/duplicate_cond_test_report.rs"]
+mod duplicate_cond_test_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
 #[path = "cli/edit_transpose.rs"]
@@ -75,6 +85,10 @@ mod funcall_lambda_report;
 mod function_parameter;
 #[path = "cli/help_contract.rs"]
 mod help_contract;
+#[path = "cli/identical_if_branch_report.rs"]
+mod identical_if_branch_report;
+#[path = "cli/if_to_or_report.rs"]
+mod if_to_or_report;
 #[path = "cli/impact_report.rs"]
 mod impact_report;
 #[path = "cli/inline_function/mod.rs"]
@@ -95,8 +109,22 @@ mod merge_nested_flet;
 mod merge_nested_let_star;
 #[path = "cli/merge_split_let.rs"]
 mod merge_split_let;
+#[path = "cli/negated_comparison_report.rs"]
+mod negated_comparison_report;
+#[path = "cli/negated_if_report.rs"]
+mod negated_if_report;
+#[path = "cli/negated_when_unless_report.rs"]
+mod negated_when_unless_report;
+#[path = "cli/nested_boolean_report.rs"]
+mod nested_boolean_report;
 #[path = "cli/nested_progn_report.rs"]
 mod nested_progn_report;
+#[path = "cli/nested_unless_report.rs"]
+mod nested_unless_report;
+#[path = "cli/nested_when_report.rs"]
+mod nested_when_report;
+#[path = "cli/one_armed_if_report.rs"]
+mod one_armed_if_report;
 #[path = "cli/package/mod.rs"]
 mod package;
 #[path = "cli/package_archive_contract.rs"]
@@ -171,6 +199,10 @@ mod sharp_quoted_lambda_report;
 mod signature_report;
 #[path = "cli/similarity_report.rs"]
 mod similarity_report;
+#[path = "cli/single_clause_cond_report.rs"]
+mod single_clause_cond_report;
+#[path = "cli/single_operand_boolean_report.rs"]
+mod single_operand_boolean_report;
 #[path = "cli/skill_contract.rs"]
 mod skill_contract;
 #[path = "cli/sort_definitions.rs"]
@@ -185,8 +217,12 @@ mod symbol_report;
 mod terminal_output_safety;
 #[path = "cli/thread_expression/mod.rs"]
 mod thread_expression;
+#[path = "cli/unreachable_cond_clause_report.rs"]
+mod unreachable_cond_clause_report;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
+#[path = "cli/verbose_negation_report.rs"]
+mod verbose_negation_report;
 #[path = "cli/workspace_entrypoint_contract.rs"]
 mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]

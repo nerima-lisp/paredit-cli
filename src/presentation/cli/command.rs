@@ -2,23 +2,28 @@ use super::{
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
-    call_graph_report, call_report, capabilities, convert_cond_to_if, convert_flet_to_labels,
-    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
-    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
-    convert_unless_to_if, convert_when_to_if, definition_movement, definition_removal,
-    definition_report, dependency_report, duplicate_report, eliminate_empty_binding_form,
-    explicit_nil_return_report, extract_constant, extract_function, extract_local_function,
-    flatten_progn, form_report, funcall_lambda_report, function_parameter, impact_report,
+    call_graph_report, call_report, capabilities, constant_if_test_report, convert_cond_to_if,
+    convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless, convert_if_to_when,
+    convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
+    dead_boolean_operand_report, definition_movement, definition_removal, definition_report,
+    dependency_report, duplicate_boolean_operand_report, duplicate_cond_test_report,
+    duplicate_report, eliminate_empty_binding_form, explicit_nil_return_report, extract_constant,
+    extract_function, extract_local_function, flatten_progn, form_report, funcall_lambda_report,
+    function_parameter, identical_if_branch_report, if_to_or_report, impact_report,
     inline_function, inline_lambda, inline_let, inline_literal_constant, inline_local_function,
     inline_symbol_macro, introduce_let, let_report, merge_nested_flet, merge_nested_let,
-    merge_nested_let_star, nested_progn_report, package, redundant_apply_report,
+    merge_nested_let_star, negated_comparison_report, negated_if_report,
+    negated_when_unless_report, nested_boolean_report, nested_progn_report, nested_unless_report,
+    nested_when_report, one_armed_if_report, package, redundant_apply_report,
     redundant_body_progn_report, redundant_boolean_identity_report, redundant_eql_test_report,
     redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
     redundant_if_nil_report, redundant_let_star_report, redundant_progn_report,
     redundant_quote_report, refactor, remove_unused_binding, remove_unused_control, rename,
     rename_control, replace_forms, sharp_quoted_lambda_report, signature_report, similarity_report,
-    split_let, split_let_star, symbol_report, thread_expression, unthread_expression, unwrap_call,
-    workspace_report,
+    single_clause_cond_report, single_operand_boolean_report, split_let, split_let_star,
+    symbol_report, thread_expression, unreachable_cond_clause_report, unthread_expression,
+    unwrap_call, verbose_negation_report, workspace_report,
 };
 use clap::Subcommand;
 
@@ -68,6 +73,18 @@ pub(super) enum InspectCommand {
     Duplicates(duplicate_report::args::DuplicateReportArgs),
     /// Report a return/return-from with an explicit nil result, the default ((return nil) is (return)).
     ExplicitNilReturn(explicit_nil_return_report::args::ExplicitNilReturnReportArgs),
+    /// Report cond forms with the same test expression in more than one clause.
+    DuplicateCondTests(duplicate_cond_test_report::args::DuplicateCondTestReportArgs),
+    /// Report cond forms with clauses after a t catch-all clause that can never run.
+    UnreachableCondClause(unreachable_cond_clause_report::args::UnreachableCondClauseReportArgs),
+    /// Report and/or forms that list the same operand more than once.
+    DuplicateBooleanOperands(
+        duplicate_boolean_operand_report::args::DuplicateBooleanOperandReportArgs,
+    ),
+    /// Report and/or forms whose non-final constant operand makes later operands dead.
+    DeadBooleanOperand(dead_boolean_operand_report::args::DeadBooleanOperandReportArgs),
+    /// Report if forms whose then and else branches are structurally identical.
+    IdenticalIfBranches(identical_if_branch_report::args::IdenticalIfBranchReportArgs),
     /// Report structurally similar S-expression forms across explicit files.
     Similarity(similarity_report::args::SimilarityReportArgs),
     /// Report local let bindings and inline safety for agent refactor planning.
@@ -76,8 +93,28 @@ pub(super) enum InspectCommand {
     RedundantQuote(redundant_quote_report::args::RedundantQuoteReportArgs),
     /// Report progn forms that are redundant (empty, or wrapping a single form).
     RedundantProgn(redundant_progn_report::args::RedundantPrognReportArgs),
+    /// Report when/unless forms whose test is a (not X)/(null X) negation (flip the macro instead).
+    NegatedWhenUnless(negated_when_unless_report::args::NegatedWhenUnlessReportArgs),
+    /// Report negated two-arg numeric comparisons ((not (= a b)) is (/= a b)).
+    NegatedComparison(negated_comparison_report::args::NegatedComparisonReportArgs),
+    /// Report three-arg if with a negated test ((if (not c) a b) is (if c b a)).
+    NegatedIf(negated_if_report::args::NegatedIfReportArgs),
+    /// Report an if with a literal t/nil test ((if t a b) is a; (if nil a b) is b).
+    ConstantIfTest(constant_if_test_report::args::ConstantIfTestReportArgs),
+    /// Report negation written the long way ((- 0 x) and (* x -1) are (- x)).
+    VerboseNegation(verbose_negation_report::args::VerboseNegationReportArgs),
+    /// Report a same-operator and/or nested in an and/or, which flattens ((or a (or b c)) is (or a b c)).
+    NestedBoolean(nested_boolean_report::args::NestedBooleanReportArgs),
     /// Report progn forms with two or more body forms nested directly inside another progn.
     NestedProgn(nested_progn_report::args::NestedPrognReportArgs),
+    /// Report an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c)).
+    NestedUnless(nested_unless_report::args::NestedUnlessReportArgs),
+    /// Report a when whose only body is a when, mergeable by and ((when a (when b c)) is (when (and a b) c)).
+    NestedWhen(nested_when_report::args::NestedWhenReportArgs),
+    /// Report one-armed if forms with no else branch ((if test then) is (when test then)).
+    OneArmedIf(one_armed_if_report::args::OneArmedIfReportArgs),
+    /// Report an if whose test and then are the same atom ((if x x y) is (or x y)).
+    IfToOr(if_to_or_report::args::IfToOrReportArgs),
     /// Report (apply #'f (list ...)) forms that are just (f ...) (a direct call).
     RedundantApply(redundant_apply_report::args::RedundantApplyReportArgs),
     /// Report an eql-defaulting call with an explicit :test #'eql ((find x l :test #'eql) is (find x l)).
@@ -90,6 +127,8 @@ pub(super) enum InspectCommand {
     RedundantBooleanIdentity(
         redundant_boolean_identity_report::args::RedundantBooleanIdentityReportArgs,
     ),
+    /// Report an and/or of all negations, collapsible by De Morgan ((and (not a) (not b)) is (not (or a b))).
+    DeMorgan(de_morgan_report::args::DeMorganReportArgs),
     /// Report an (identity x) call, which is just x.
     RedundantIdentity(redundant_identity_report::args::RedundantIdentityReportArgs),
     /// Report three-argument if forms whose else branch is a redundant literal nil.
@@ -102,6 +141,10 @@ pub(super) enum InspectCommand {
     FuncallLambda(funcall_lambda_report::args::FuncallLambdaReportArgs),
     /// Report #'(lambda ...) forms with a redundant #' prefix (#'(lambda ...) is (lambda ...)).
     SharpQuotedLambda(sharp_quoted_lambda_report::args::SharpQuotedLambdaReportArgs),
+    /// Report single-operand and/or forms ((and X) and (or X) are just X).
+    SingleOperandBoolean(single_operand_boolean_report::args::SingleOperandBooleanReportArgs),
+    /// Report a cond with a single non-t clause that has a body ((cond (test body)) is (when test body)).
+    SingleClauseCond(single_clause_cond_report::args::SingleClauseCondReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

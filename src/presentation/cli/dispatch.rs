@@ -43,6 +43,21 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::ExplicitNilReturn(args) => {
                 explicit_nil_return_report::workflow::explicit_nil_return_report(args)?
             }
+            command::InspectCommand::DuplicateCondTests(args) => {
+                duplicate_cond_test_report::workflow::duplicate_cond_test_report(args)?
+            }
+            command::InspectCommand::UnreachableCondClause(args) => {
+                unreachable_cond_clause_report::workflow::unreachable_cond_clause_report(args)?
+            }
+            command::InspectCommand::DuplicateBooleanOperands(args) => {
+                duplicate_boolean_operand_report::workflow::duplicate_boolean_operand_report(args)?
+            }
+            command::InspectCommand::DeadBooleanOperand(args) => {
+                dead_boolean_operand_report::workflow::dead_boolean_operand_report(args)?
+            }
+            command::InspectCommand::IdenticalIfBranches(args) => {
+                identical_if_branch_report::workflow::identical_if_branch_report(args)?
+            }
             command::InspectCommand::Similarity(args) => {
                 similarity_report::workflow::similarity_report(args)?
             }
@@ -53,8 +68,38 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::RedundantProgn(args) => {
                 redundant_progn_report::workflow::redundant_progn_report(args)?
             }
+            command::InspectCommand::NegatedWhenUnless(args) => {
+                negated_when_unless_report::workflow::negated_when_unless_report(args)?
+            }
+            command::InspectCommand::NegatedComparison(args) => {
+                negated_comparison_report::workflow::negated_comparison_report(args)?
+            }
+            command::InspectCommand::NegatedIf(args) => {
+                negated_if_report::workflow::negated_if_report(args)?
+            }
+            command::InspectCommand::IfToOr(args) => {
+                if_to_or_report::workflow::if_to_or_report(args)?
+            }
+            command::InspectCommand::ConstantIfTest(args) => {
+                constant_if_test_report::workflow::constant_if_test_report(args)?
+            }
+            command::InspectCommand::VerboseNegation(args) => {
+                verbose_negation_report::workflow::verbose_negation_report(args)?
+            }
+            command::InspectCommand::NestedBoolean(args) => {
+                nested_boolean_report::workflow::nested_boolean_report(args)?
+            }
             command::InspectCommand::NestedProgn(args) => {
                 nested_progn_report::workflow::nested_progn_report(args)?
+            }
+            command::InspectCommand::NestedUnless(args) => {
+                nested_unless_report::workflow::nested_unless_report(args)?
+            }
+            command::InspectCommand::NestedWhen(args) => {
+                nested_when_report::workflow::nested_when_report(args)?
+            }
+            command::InspectCommand::OneArmedIf(args) => {
+                one_armed_if_report::workflow::one_armed_if_report(args)?
             }
             command::InspectCommand::RedundantApply(args) => {
                 redundant_apply_report::workflow::redundant_apply_report(args)?
@@ -73,6 +118,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                     args,
                 )?
             }
+            command::InspectCommand::DeMorgan(args) => {
+                de_morgan_report::workflow::de_morgan_report(args)?
+            }
             command::InspectCommand::RedundantIdentity(args) => {
                 redundant_identity_report::workflow::redundant_identity_report(args)?
             }
@@ -90,6 +138,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::SharpQuotedLambda(args) => {
                 sharp_quoted_lambda_report::workflow::sharp_quoted_lambda_report(args)?
+            }
+            command::InspectCommand::SingleOperandBoolean(args) => {
+                single_operand_boolean_report::workflow::single_operand_boolean_report(args)?
+            }
+            command::InspectCommand::SingleClauseCond(args) => {
+                single_clause_cond_report::workflow::single_clause_cond_report(args)?
             }
         },
         Command::Edit { command } => match command {

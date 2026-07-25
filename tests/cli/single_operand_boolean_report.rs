@@ -1,0 +1,108 @@
+use super::*;
+
+#[test]
+fn cli_flags_single_operand_and() {
+    let dir = fresh_temp_dir("single-operand-boolean-report");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun f (x) (and x))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("single-operand-boolean")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"operator\": \"and\""));
+}
+
+#[test]
+fn cli_flags_single_operand_or() {
+    let dir = fresh_temp_dir("single-operand-boolean-report-or");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(or (compute))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("single-operand-boolean")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"operator\": \"or\""));
+}
+
+#[test]
+fn cli_does_not_flag_multi_operand_or_empty() {
+    let dir = fresh_temp_dir("single-operand-boolean-report-clean");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(and x y)\n(or)\n(and)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("single-operand-boolean")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 0"));
+}
+
+#[test]
+fn cli_does_not_flag_a_lone_reader_conditional() {
+    let dir = fresh_temp_dir("single-operand-boolean-report-feature");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(and #+sbcl (sb-only))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("single-operand-boolean")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 0"));
+}
+
+#[test]
+fn cli_single_operand_boolean_fail_on_violation_trips_gate() {
+    let dir = fresh_temp_dir("single-operand-boolean-report-gate");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(or x)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("single-operand-boolean")
+        .arg("--fail-on-violation")
+        .arg(&file)
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "single-operand-boolean-report policy failed",
+        ));
+}
+
+#[test]
+fn cli_single_operand_boolean_expands_directory_inputs() {
+    let dir = fresh_temp_dir("single-operand-boolean-report-dir");
+    let file = dir.join("nested.lisp");
+    fs::write(&file, "(defun f (y) (or y))\n").expect("write nested.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("single-operand-boolean")
+        .arg("--dialect")
+        .arg("common-lisp")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"));
+}

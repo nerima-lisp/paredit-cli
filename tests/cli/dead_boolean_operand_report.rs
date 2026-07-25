@@ -1,0 +1,91 @@
+use super::*;
+
+#[test]
+fn cli_reports_a_non_final_nil_in_and() {
+    let dir = fresh_temp_dir("dead-boolean-operand-report");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(and (ready a) nil (finalize b))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("dead-boolean-operand")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"head\": \"and\""))
+        .stdout(predicate::str::contains("\"constant\": \"nil\""));
+}
+
+#[test]
+fn cli_reports_a_non_final_t_in_or() {
+    let dir = fresh_temp_dir("dead-boolean-operand-report-or");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(or (cached x) t (compute x))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("dead-boolean-operand")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"head\": \"or\""));
+}
+
+#[test]
+fn cli_does_not_flag_the_trailing_default_idiom() {
+    let dir = fresh_temp_dir("dead-boolean-operand-report-clean");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(or x y t)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("dead-boolean-operand")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 0"));
+}
+
+#[test]
+fn cli_dead_boolean_operand_fail_on_violation_trips_gate() {
+    let dir = fresh_temp_dir("dead-boolean-operand-report-gate");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(and a nil b)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("dead-boolean-operand")
+        .arg("--fail-on-violation")
+        .arg(&file)
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "dead-boolean-operand-report policy failed",
+        ));
+}
+
+#[test]
+fn cli_dead_boolean_operand_passes_gate_when_clean() {
+    let dir = fresh_temp_dir("dead-boolean-operand-report-gate-clean");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(and a b c)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("dead-boolean-operand")
+        .arg("--fail-on-violation")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 0"));
+}

@@ -1,0 +1,42 @@
+use anyhow::Result;
+
+use crate::application::usecase::duplicate_boolean_operand_report::{
+    DuplicateBooleanOperandPolicyOptions, collect_duplicate_boolean_operands,
+    evaluate_duplicate_boolean_operand_policy, summarize_duplicate_boolean_operands,
+};
+use crate::presentation::cli::duplicate_boolean_operand_report::args::DuplicateBooleanOperandReportArgs;
+use crate::presentation::cli::duplicate_boolean_operand_report::render::print_duplicate_boolean_operand_report;
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
+
+pub(in crate::presentation::cli) fn duplicate_boolean_operand_report(
+    args: DuplicateBooleanOperandReportArgs,
+) -> Result<()> {
+    let mut boolean_form_count = 0;
+    let mut duplicates = Vec::new();
+
+    for file in &args.files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let (file_boolean_form_count, file_duplicates) =
+            collect_duplicate_boolean_operands(file, dialect, &tree)?;
+        boolean_form_count += file_boolean_form_count;
+        duplicates.extend(file_duplicates);
+    }
+
+    let summary = summarize_duplicate_boolean_operands(boolean_form_count, duplicates);
+    let policy = evaluate_duplicate_boolean_operand_policy(
+        DuplicateBooleanOperandPolicyOptions::new(args.fail_on_duplicate),
+        &summary,
+    );
+    let policy_passed = policy.passed;
+    let policy_message = policy.violations.join("; ");
+
+    print_duplicate_boolean_operand_report(&summary, &policy, args.output)?;
+
+    if !policy_passed {
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
+            "duplicate-boolean-operand-report policy failed: {policy_message}"
+        )));
+    }
+
+    Ok(())
+}
