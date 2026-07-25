@@ -1,0 +1,96 @@
+use super::*;
+
+#[test]
+fn cli_flags_explicit_identity_key() {
+    let dir = fresh_temp_dir("redundant-identity-key-report");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(sort xs #'< :key #'identity)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-identity-key")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"head\": \"sort\""));
+}
+
+#[test]
+fn cli_flags_nil_key() {
+    let dir = fresh_temp_dir("redundant-identity-key-report-nil");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(find x list :key nil)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-identity-key")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 1"));
+}
+
+#[test]
+fn cli_does_not_flag_custom_key_or_non_key_head() {
+    let dir = fresh_temp_dir("redundant-identity-key-report-clean");
+    let file = dir.join("a.lisp");
+    // A custom key, and tree-equal (which takes :test but no :key), are left alone.
+    fs::write(
+        &file,
+        "(sort xs #'< :key #'car)\n(tree-equal a b :key #'identity)\n",
+    )
+    .expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-identity-key")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"violation_count\": 0"));
+}
+
+#[test]
+fn cli_redundant_identity_key_fail_on_violation_trips_gate() {
+    let dir = fresh_temp_dir("redundant-identity-key-report-gate");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(remove x seq :key #'identity)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-identity-key")
+        .arg("--fail-on-violation")
+        .arg(&file)
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "redundant-identity-key-report policy failed",
+        ));
+}
+
+#[test]
+fn cli_lint_fix_deletes_the_key_pair() {
+    let dir = fresh_temp_dir("redundant-identity-key-report-fix");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(remove x seq :key #'identity :from-end t)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg("--rule")
+        .arg("redundant-identity-key")
+        .arg("--fix")
+        .arg(&file)
+        .assert()
+        .success();
+
+    let fixed = fs::read_to_string(&file).expect("read fixed file");
+    assert_eq!(fixed, "(remove x seq :from-end t)\n");
+}

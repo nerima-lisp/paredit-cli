@@ -7,13 +7,18 @@ use super::{
     convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
     convert_unless_to_if, convert_when_to_if, definition_movement, definition_removal,
     definition_report, dependency_report, duplicate_report, eliminate_empty_binding_form,
-    extract_constant, extract_function, extract_local_function, flatten_progn, form_report,
-    function_parameter, impact_report, inline_function, inline_lambda, inline_let,
-    inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let, let_report,
-    merge_nested_flet, merge_nested_let, merge_nested_let_star, package, refactor,
-    remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
-    signature_report, similarity_report, split_let, split_let_star, symbol_report,
-    thread_expression, unthread_expression, unwrap_call, workspace_report,
+    explicit_nil_return_report, extract_constant, extract_function, extract_local_function,
+    flatten_progn, form_report, funcall_lambda_report, function_parameter, impact_report,
+    inline_function, inline_lambda, inline_let, inline_literal_constant, inline_local_function,
+    inline_symbol_macro, introduce_let, let_report, merge_nested_flet, merge_nested_let,
+    merge_nested_let_star, nested_progn_report, package, redundant_apply_report,
+    redundant_body_progn_report, redundant_boolean_identity_report, redundant_eql_test_report,
+    redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
+    redundant_if_nil_report, redundant_let_star_report, redundant_progn_report,
+    redundant_quote_report, refactor, remove_unused_binding, remove_unused_control, rename,
+    rename_control, replace_forms, sharp_quoted_lambda_report, signature_report, similarity_report,
+    split_let, split_let_star, symbol_report, thread_expression, unthread_expression, unwrap_call,
+    workspace_report,
 };
 use clap::Subcommand;
 
@@ -61,10 +66,42 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Report a return/return-from with an explicit nil result, the default ((return nil) is (return)).
+    ExplicitNilReturn(explicit_nil_return_report::args::ExplicitNilReturnReportArgs),
     /// Report structurally similar S-expression forms across explicit files.
     Similarity(similarity_report::args::SimilarityReportArgs),
     /// Report local let bindings and inline safety for agent refactor planning.
     Lets(let_report::LetReportArgs),
+    /// Report self-evaluating literals (numbers, strings, characters, keywords) that are quoted redundantly.
+    RedundantQuote(redundant_quote_report::args::RedundantQuoteReportArgs),
+    /// Report progn forms that are redundant (empty, or wrapping a single form).
+    RedundantProgn(redundant_progn_report::args::RedundantPrognReportArgs),
+    /// Report progn forms with two or more body forms nested directly inside another progn.
+    NestedProgn(nested_progn_report::args::NestedPrognReportArgs),
+    /// Report (apply #'f (list ...)) forms that are just (f ...) (a direct call).
+    RedundantApply(redundant_apply_report::args::RedundantApplyReportArgs),
+    /// Report an eql-defaulting call with an explicit :test #'eql ((find x l :test #'eql) is (find x l)).
+    RedundantEqlTest(redundant_eql_test_report::args::RedundantEqlTestReportArgs),
+    /// Report a :key-taking call with an explicit :key #'identity or :key nil ((sort xs #'< :key #'identity) is (sort xs #'<)).
+    RedundantIdentityKey(redundant_identity_key_report::args::RedundantIdentityKeyReportArgs),
+    /// Report multi-form progn forms used as a body of when/unless/let/defun/... (its forms splice in).
+    RedundantBodyProgn(redundant_body_progn_report::args::RedundantBodyPrognReportArgs),
+    /// Report an and/or with a redundant identity operand (t in and, nil in or).
+    RedundantBooleanIdentity(
+        redundant_boolean_identity_report::args::RedundantBooleanIdentityReportArgs,
+    ),
+    /// Report an (identity x) call, which is just x.
+    RedundantIdentity(redundant_identity_report::args::RedundantIdentityReportArgs),
+    /// Report three-argument if forms whose else branch is a redundant literal nil.
+    RedundantIfNil(redundant_if_nil_report::args::RedundantIfNilReportArgs),
+    /// Report a let* with zero or one binding, which is just let (no sequential scope in play).
+    RedundantLetStar(redundant_let_star_report::args::RedundantLetStarReportArgs),
+    /// Report (funcall #'foo ...) forms that are just (foo ...) (a direct call).
+    RedundantFuncall(redundant_funcall_report::args::RedundantFuncallReportArgs),
+    /// Report (funcall (lambda ...) ...) forms that apply the lambda directly (((lambda ...) ...)).
+    FuncallLambda(funcall_lambda_report::args::FuncallLambdaReportArgs),
+    /// Report #'(lambda ...) forms with a redundant #' prefix (#'(lambda ...) is (lambda ...)).
+    SharpQuotedLambda(sharp_quoted_lambda_report::args::SharpQuotedLambdaReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

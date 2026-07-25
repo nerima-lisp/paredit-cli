@@ -40,10 +40,57 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?
             }
+            command::InspectCommand::ExplicitNilReturn(args) => {
+                explicit_nil_return_report::workflow::explicit_nil_return_report(args)?
+            }
             command::InspectCommand::Similarity(args) => {
                 similarity_report::workflow::similarity_report(args)?
             }
             command::InspectCommand::Lets(args) => let_report::let_report(args)?,
+            command::InspectCommand::RedundantQuote(args) => {
+                redundant_quote_report::workflow::redundant_quote_report(args)?
+            }
+            command::InspectCommand::RedundantProgn(args) => {
+                redundant_progn_report::workflow::redundant_progn_report(args)?
+            }
+            command::InspectCommand::NestedProgn(args) => {
+                nested_progn_report::workflow::nested_progn_report(args)?
+            }
+            command::InspectCommand::RedundantApply(args) => {
+                redundant_apply_report::workflow::redundant_apply_report(args)?
+            }
+            command::InspectCommand::RedundantEqlTest(args) => {
+                redundant_eql_test_report::workflow::redundant_eql_test_report(args)?
+            }
+            command::InspectCommand::RedundantIdentityKey(args) => {
+                redundant_identity_key_report::workflow::redundant_identity_key_report(args)?
+            }
+            command::InspectCommand::RedundantBodyProgn(args) => {
+                redundant_body_progn_report::workflow::redundant_body_progn_report(args)?
+            }
+            command::InspectCommand::RedundantBooleanIdentity(args) => {
+                redundant_boolean_identity_report::workflow::redundant_boolean_identity_report(
+                    args,
+                )?
+            }
+            command::InspectCommand::RedundantIdentity(args) => {
+                redundant_identity_report::workflow::redundant_identity_report(args)?
+            }
+            command::InspectCommand::RedundantIfNil(args) => {
+                redundant_if_nil_report::workflow::redundant_if_nil_report(args)?
+            }
+            command::InspectCommand::RedundantLetStar(args) => {
+                redundant_let_star_report::workflow::redundant_let_star_report(args)?
+            }
+            command::InspectCommand::RedundantFuncall(args) => {
+                redundant_funcall_report::workflow::redundant_funcall_report(args)?
+            }
+            command::InspectCommand::FuncallLambda(args) => {
+                funcall_lambda_report::workflow::funcall_lambda_report(args)?
+            }
+            command::InspectCommand::SharpQuotedLambda(args) => {
+                sharp_quoted_lambda_report::workflow::sharp_quoted_lambda_report(args)?
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

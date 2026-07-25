@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::collections::BTreeSet;
 use std::fmt::{self, Display, Write};
 use std::path::PathBuf;
 
@@ -9,6 +10,7 @@ use crate::domain::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SymbolName, SyntaxTree,
 };
+use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 #[path = "diff.rs"]
 mod diff;
@@ -251,6 +253,47 @@ pub(crate) fn detect_dialect(input: &SourceInput, explicit: Option<DialectArg>) 
 
 pub(crate) fn require_output_file(file: Option<&PathBuf>) -> Result<&PathBuf> {
     file.context("--write requires --file")
+}
+
+/// Expands file/directory arguments into a deduplicated list of files: a
+/// directory is walked for Lisp sources via workspace discovery, a file is
+/// kept as-is. Argument order is preserved and duplicates (by canonical
+/// path) are dropped. When `dialect` is set, unknown-extension files under a
+/// directory are included, since the caller will parse them with that
+/// dialect regardless of extension.
+pub(crate) fn expand_input_files(
+    inputs: &[PathBuf],
+    dialect: Option<DialectArg>,
+) -> Result<Vec<PathBuf>> {
+    let mut expanded = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for input in inputs {
+        if input.is_dir() {
+            let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+                roots: vec![input.clone()],
+                include_unknown: dialect.is_some(),
+                include_hidden: false,
+                include_generated: false,
+                max_depth: None,
+                exclude: Vec::new(),
+            })?;
+            for discovered in discovery.into_files() {
+                push_unique_path(&mut expanded, &mut seen, discovered);
+            }
+        } else {
+            push_unique_path(&mut expanded, &mut seen, input.clone());
+        }
+    }
+
+    Ok(expanded)
+}
+
+fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: PathBuf) {
+    let canonical = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+    if seen.insert(canonical) {
+        expanded.push(path);
+    }
 }
 
 #[cfg(test)]

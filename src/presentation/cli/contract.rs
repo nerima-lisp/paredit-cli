@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 21] = [
+const INTROSPECTION_COMMANDS: [&str; 36] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -90,6 +90,21 @@ const INTROSPECTION_COMMANDS: [&str; 21] = [
     "inspect duplicates",
     "inspect similarity",
     "inspect lets",
+    "inspect redundant-quote",
+    "inspect explicit-nil-return",
+    "inspect redundant-progn",
+    "inspect nested-progn",
+    "inspect redundant-apply",
+    "inspect redundant-eql-test",
+    "inspect redundant-identity-key",
+    "inspect redundant-body-progn",
+    "inspect redundant-boolean-identity",
+    "inspect redundant-identity",
+    "inspect redundant-if-nil",
+    "inspect redundant-let-star",
+    "inspect redundant-funcall",
+    "inspect funcall-lambda",
+    "inspect sharp-quoted-lambda",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];

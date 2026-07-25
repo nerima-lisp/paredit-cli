@@ -55,6 +55,8 @@ mod duplicate_report;
 mod edit_transpose;
 #[path = "cli/eliminate_empty_binding_form.rs"]
 mod eliminate_empty_binding_form;
+#[path = "cli/explicit_nil_return_report.rs"]
+mod explicit_nil_return_report;
 #[path = "cli/extract_constant/mod.rs"]
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]
@@ -67,6 +69,8 @@ mod flatten_progn;
 mod form_report;
 #[path = "cli/format/mod.rs"]
 mod format;
+#[path = "cli/funcall_lambda_report.rs"]
+mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
 #[path = "cli/help_contract.rs"]
@@ -91,6 +95,8 @@ mod merge_nested_flet;
 mod merge_nested_let_star;
 #[path = "cli/merge_split_let.rs"]
 mod merge_split_let;
+#[path = "cli/nested_progn_report.rs"]
+mod nested_progn_report;
 #[path = "cli/package/mod.rs"]
 mod package;
 #[path = "cli/package_archive_contract.rs"]
@@ -115,6 +121,28 @@ mod readme_install_contract;
 mod readme_smoke;
 #[path = "cli/readme_workspace_smoke.rs"]
 mod readme_workspace_smoke;
+#[path = "cli/redundant_apply_report.rs"]
+mod redundant_apply_report;
+#[path = "cli/redundant_body_progn_report.rs"]
+mod redundant_body_progn_report;
+#[path = "cli/redundant_boolean_identity_report.rs"]
+mod redundant_boolean_identity_report;
+#[path = "cli/redundant_eql_test_report.rs"]
+mod redundant_eql_test_report;
+#[path = "cli/redundant_funcall_report.rs"]
+mod redundant_funcall_report;
+#[path = "cli/redundant_identity_key_report.rs"]
+mod redundant_identity_key_report;
+#[path = "cli/redundant_identity_report.rs"]
+mod redundant_identity_report;
+#[path = "cli/redundant_if_nil_report.rs"]
+mod redundant_if_nil_report;
+#[path = "cli/redundant_let_star_report.rs"]
+mod redundant_let_star_report;
+#[path = "cli/redundant_progn_report.rs"]
+mod redundant_progn_report;
+#[path = "cli/redundant_quote_report.rs"]
+mod redundant_quote_report;
 #[path = "cli/refactor_entrypoint_contract.rs"]
 mod refactor_entrypoint_contract;
 #[path = "cli/refactor_manifest/mod.rs"]
@@ -137,6 +165,8 @@ mod rename_control;
 mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
+#[path = "cli/sharp_quoted_lambda_report.rs"]
+mod sharp_quoted_lambda_report;
 #[path = "cli/signature_report.rs"]
 mod signature_report;
 #[path = "cli/similarity_report.rs"]
