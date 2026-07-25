@@ -54,6 +54,7 @@ mod duplicate_setf_place_report;
 mod duplicate_slot_report;
 mod eliminate_empty_binding_form;
 mod empty_body_report;
+mod empty_let_report;
 mod eq_char_comparison_report;
 mod eq_number_comparison_report;
 mod eql_list_comparison_report;

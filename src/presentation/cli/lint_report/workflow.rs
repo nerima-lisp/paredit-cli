@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
 use crate::application::usecase::constant_if_test_report::collect_constant_if_tests;
 use crate::application::usecase::de_morgan_report::collect_de_morgans;
+use crate::application::usecase::empty_let_report::collect_empty_lets;
 use crate::application::usecase::eq_char_comparison_report::collect_eq_char_comparisons;
 use crate::application::usecase::eq_number_comparison_report::collect_eq_number_comparisons;
 use crate::application::usecase::explicit_nil_return_report::collect_explicit_nil_returns;
@@ -198,7 +199,8 @@ fn retain_unbaselined(
 /// `(or X)` with `X`), `single-operand-arithmetic` (replace `(+ X)`/`(* X)`
 /// with `X`), `nested-progn` / `redundant-body-progn` (splice a progn's
 /// body into the enclosing progn/implicit-body form), `redundant-if-nil` (drop
-/// the redundant `nil` else), `redundant-let-star` (rewrite a ≤1-binding
+/// the redundant `nil` else), `empty-let` (rewrite `(let () …)` as
+/// `(progn …)`), `redundant-let-star` (rewrite a ≤1-binding
 /// `let*` head to `let`), `single-clause-cond` (rewrite a one-clause
 /// `(cond (test body…))` as `(when test body…)`), `redundant-funcall`
 /// (delete `funcall #'` so
@@ -321,6 +323,27 @@ fn collect_lint_fixes(
                     slice(item.body_span),
                     format!("Splice the progn into the enclosing {}", item.parent),
                 ),
+            );
+        }
+    }
+
+    if active.contains(&"empty-let") {
+        let (_, items) = collect_empty_lets(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // Replace the `(let ()` prefix with `(progn`, leaving the body intact.
+            let prefix_start = item.prefix_span.start().get();
+            let prefix_end = item.prefix_span.end().get();
+            fixes.insert(
+                ("empty-let", start, end),
+                LintFix {
+                    description: "Rewrite the empty let as progn".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: prefix_start,
+                        byte_length: prefix_end - prefix_start,
+                        text: "(progn".to_owned(),
+                    }],
+                },
             );
         }
     }
@@ -1660,6 +1683,7 @@ mod tests {
             "(progn only)\n",                         // redundant-progn
             "(progn a (progn b c))\n",                // nested-progn (the inner progn)
             "(when q (progn s t))\n",                 // redundant-body-progn
+            "(let () (ela) (elb))\n",                 // empty-let
             "(if c d nil)\n",                         // redundant-if-nil
             "(funcall #'g m)\n",                      // redundant-funcall
             "(funcall (lambda (fx) fx) 9)\n",         // funcall-lambda

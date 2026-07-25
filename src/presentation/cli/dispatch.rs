@@ -180,6 +180,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::EmptyBody(args) => {
                 empty_body_report::workflow::empty_body_report(args)?
             }
+            command::InspectCommand::EmptyLet(args) => {
+                empty_let_report::workflow::empty_let_report(args)?
+            }
             command::InspectCommand::IdentityArithmetic(args) => {
                 identity_arithmetic_report::workflow::identity_arithmetic_report(args)?
             }

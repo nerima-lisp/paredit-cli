@@ -36,6 +36,7 @@ use crate::domain::duplicate_let_binding_report::collect_duplicate_let_bindings;
 use crate::domain::duplicate_parameter_report::collect_duplicate_parameters;
 use crate::domain::duplicate_setf_place_report::collect_duplicate_setf_places;
 use crate::domain::empty_body_report::collect_empty_bodies;
+use crate::domain::empty_let_report::collect_empty_lets;
 use crate::domain::eq_char_comparison_report::collect_eq_char_comparisons;
 use crate::domain::eq_number_comparison_report::collect_eq_number_comparisons;
 use crate::domain::eql_list_comparison_report::collect_eql_list_comparisons;
@@ -108,7 +109,7 @@ use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clau
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 84] = [
+pub const RULES: [&str; 85] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -133,6 +134,7 @@ pub const RULES: [&str; 84] = [
     "nested-cxr",
     "nth-constant-index",
     "redundant-body-progn",
+    "empty-let",
     "redundant-if-nil",
     "redundant-let-star",
     "redundant-funcall",
@@ -205,7 +207,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 84] = [
+pub const RULE_DOCS: [(&str, &str, &str); 85] = [
     (
         "self-assignment",
         "suspicious",
@@ -325,6 +327,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 84] = [
         "redundant-body-progn",
         "suspicious",
         "a multi-form progn used as a when/unless/let/defun/... body (its forms splice in)",
+    ),
+    (
+        "empty-let",
+        "suspicious",
+        "a let with an empty binding list, which is just progn ((let () body) is (progn body))",
     ),
     (
         "redundant-if-nil",
@@ -650,7 +657,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 43] = [
+pub const FIXABLE_RULES: [&str; 44] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -667,6 +674,7 @@ pub const FIXABLE_RULES: [&str; 43] = [
     "nested-cxr",
     "nth-constant-index",
     "redundant-body-progn",
+    "empty-let",
     "redundant-if-nil",
     "redundant-let-star",
     "redundant-funcall",
@@ -734,7 +742,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 44] = [
+pub const WARNING_RULES: [&str; 45] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -751,6 +759,7 @@ pub const WARNING_RULES: [&str; 44] = [
     "nested-cxr",
     "nth-constant-index",
     "redundant-body-progn",
+    "empty-let",
     "redundant-if-nil",
     "redundant-let-star",
     "redundant-funcall",
@@ -1130,6 +1139,16 @@ pub fn collect_lint_findings(
                 "progn with {} forms is a {} body; splice its forms in",
                 item.body_form_count, item.parent
             ),
+        });
+    }
+
+    let (_, items) = collect_empty_lets(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "empty-let",
+            path: item.path,
+            span: item.span,
+            message: "let with no bindings is just progn; (let () body) is (progn body)".to_owned(),
         });
     }
 

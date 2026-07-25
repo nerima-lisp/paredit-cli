@@ -101,6 +101,8 @@ mod edit_transpose;
 mod eliminate_empty_binding_form;
 #[path = "cli/empty_body_report.rs"]
 mod empty_body_report;
+#[path = "cli/empty_let_report.rs"]
+mod empty_let_report;
 #[path = "cli/eq_char_comparison_report.rs"]
 mod eq_char_comparison_report;
 #[path = "cli/eq_number_comparison_report.rs"]

@@ -44,6 +44,7 @@ pub mod duplicate_setf_place_report;
 pub mod duplicate_slot_report;
 pub mod eliminate_empty_binding_form;
 pub mod empty_body_report;
+pub mod empty_let_report;
 pub mod eq_char_comparison_report;
 pub mod eq_number_comparison_report;
 pub mod eql_list_comparison_report;

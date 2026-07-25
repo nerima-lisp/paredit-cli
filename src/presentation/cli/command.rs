@@ -14,7 +14,7 @@ use super::{
     duplicate_cond_test_report, duplicate_export_report, duplicate_lambda_list_keyword_report,
     duplicate_let_binding_report, duplicate_method_report, duplicate_parameter_report,
     duplicate_report, duplicate_setf_place_report, duplicate_slot_report,
-    eliminate_empty_binding_form, empty_body_report, eq_char_comparison_report,
+    eliminate_empty_binding_form, empty_body_report, empty_let_report, eq_char_comparison_report,
     eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
     eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
     exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
@@ -196,6 +196,8 @@ pub(super) enum InspectCommand {
     CharOpString(char_op_string_report::args::CharOpStringReportArgs),
     /// Report when/unless/dolist/dotimes forms that have no body (the test/spec runs, then nothing).
     EmptyBody(empty_body_report::args::EmptyBodyReportArgs),
+    /// Report a let with an empty binding list, which is just progn ((let () body) is (progn body)).
+    EmptyLet(empty_let_report::args::EmptyLetReportArgs),
     /// Report arithmetic forms with a redundant identity operand ((+ x 0), (* x 1), (- x 0), (/ x 1)).
     IdentityArithmetic(identity_arithmetic_report::args::IdentityArithmeticReportArgs),
     /// Run every within-file logic-bug lint at once and report all findings.
