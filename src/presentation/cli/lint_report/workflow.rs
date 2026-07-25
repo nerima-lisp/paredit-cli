@@ -29,6 +29,7 @@ use crate::application::usecase::nested_unless_report::collect_nested_unlesses;
 use crate::application::usecase::nested_when_report::collect_nested_whens;
 use crate::application::usecase::nil_comparison_report::collect_nil_comparisons;
 use crate::application::usecase::nth_constant_index_report::collect_nth_constant_indexes;
+use crate::application::usecase::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::application::usecase::one_armed_if_report::collect_one_armed_ifs;
 use crate::application::usecase::one_step_arithmetic_report::collect_one_step_arithmetic;
 use crate::application::usecase::redundant_apply_report::collect_redundant_applies;
@@ -229,7 +230,8 @@ fn retain_unbaselined(
 /// `(when (and a b) body)`), `nested-unless` (merge
 /// `(unless a (unless b body))` into `(unless (or a b) body)`),
 /// `nested-cxr` (collapse `(car (cdr x))` into `(cadr x)`),
-/// `nth-constant-index` (rewrite `(nth 0 x)` as `(first x)`),
+/// `nth-constant-index` (rewrite `(nth 0 x)` as `(first x)`), `nthcdr-zero`
+/// (replace `(nthcdr 0 x)` with `x`),
 /// `redundant-apply` (rewrite `(apply #'f (list a b))` as `(f a b)`),
 /// `sign-comparison` (rewrite `(= x 0)` as `(zerop x)`),
 /// `negated-comparison` (rewrite `(not (= a b))` as `(/= a b)`),
@@ -926,6 +928,23 @@ fn collect_lint_fixes(
                         "Use ({} …) instead of nth with a constant index",
                         item.ordinal
                     ),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"nthcdr-zero") {
+        let (_, items) = collect_nthcdr_zeros(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (nthcdr 0 x) is x: replace the whole form with the list source.
+            fixes.insert(
+                ("nthcdr-zero", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.list_span),
+                    "Drop the no-op (nthcdr 0 …)".to_owned(),
                 ),
             );
         }
@@ -1709,6 +1728,7 @@ mod tests {
             "(setf st (adjoin e st))\n",              // manual-pushnew
             "(car (cdr z))\n",                        // nested-cxr
             "(nth 0 zs)\n",                           // nth-constant-index
+            "(nthcdr 0 nz)\n",                        // nthcdr-zero
             "(apply #'g (list m))\n",                 // redundant-apply
             "(find ret lst :test #'eql)\n",           // redundant-eql-test
             "(sort rik #'< :key #'identity)\n",       // redundant-identity-key

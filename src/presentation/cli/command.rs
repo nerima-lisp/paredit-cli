@@ -30,9 +30,9 @@ use super::{
     negated_comparison_report, negated_if_report, negated_step_delta_report,
     negated_when_unless_report, nested_boolean_report, nested_cxr_report, nested_progn_report,
     nested_unless_report, nested_when_report, nil_comparison_report, nth_constant_index_report,
-    one_armed_if_report, one_step_arithmetic_report, package, package_boundary_report,
-    package_conflict_report, package_cycle_report, quoted_case_key_report, reachability_report,
-    redefinition_report, redundant_apply_report, redundant_body_progn_report,
+    nthcdr_zero_report, one_armed_if_report, one_step_arithmetic_report, package,
+    package_boundary_report, package_conflict_report, package_cycle_report, quoted_case_key_report,
+    reachability_report, redefinition_report, redundant_apply_report, redundant_body_progn_report,
     redundant_boolean_identity_report, redundant_eql_test_report, redundant_funcall_report,
     redundant_identity_key_report, redundant_identity_report, redundant_if_nil_report,
     redundant_let_star_report, redundant_progn_report, redundant_quote_report, refactor,
@@ -43,10 +43,10 @@ use super::{
     single_operand_arithmetic_report, single_operand_boolean_report, single_value_bind_report,
     split_let, split_let_star, struct_cycle_report, symbol_report, system_conflict_report,
     system_cycle_report, t_comparison_report, the_arity_report, thread_expression,
-    undefined_package_report, unreachable_case_clause_report, unreachable_cond_clause_report,
-    unthread_expression, unused_export_report, unused_local_callable_report,
-    unused_nickname_report, unused_package_report, unused_parameter_report, unwrap_call,
-    verbose_negation_report, workspace_report,
+    typecase_nil_key_report, undefined_package_report, unreachable_case_clause_report,
+    unreachable_cond_clause_report, unthread_expression, unused_export_report,
+    unused_local_callable_report, unused_nickname_report, unused_package_report,
+    unused_parameter_report, unwrap_call, verbose_negation_report, workspace_report,
 };
 use clap::Subcommand;
 
@@ -116,6 +116,8 @@ pub(super) enum InspectCommand {
     QuotedCaseKey(quoted_case_key_report::args::QuotedCaseKeyReportArgs),
     /// Report case/ecase/ccase clauses with a bare nil key, which never matches (use ((nil) ...)).
     CaseNilKey(case_nil_key_report::args::CaseNilKeyReportArgs),
+    /// Report typecase/etypecase/ctypecase clauses with a bare nil type, which never matches (use null).
+    TypecaseNilKey(typecase_nil_key_report::args::TypecaseNilKeyReportArgs),
     /// Report case/typecase-family clauses that are not a non-empty list (a bare atom or empty clause).
     MalformedCaseClause(malformed_case_clause_report::args::MalformedCaseClauseReportArgs),
     /// Report case/typecase clauses after a t/otherwise catch-all clause that can never run.
@@ -236,6 +238,8 @@ pub(super) enum InspectCommand {
     NestedCxr(nested_cxr_report::args::NestedCxrReportArgs),
     /// Report nth with a small constant index that has an ordinal accessor ((nth 0 x) is (first x)).
     NthConstantIndex(nth_constant_index_report::args::NthConstantIndexReportArgs),
+    /// Report (nthcdr 0 list), which is just list (nthcdr with a zero count returns the list).
+    NthcdrZero(nthcdr_zero_report::args::NthcdrZeroReportArgs),
     /// Report progn forms with two or more body forms nested directly inside another progn.
     NestedProgn(nested_progn_report::args::NestedPrognReportArgs),
     /// Report an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c)).

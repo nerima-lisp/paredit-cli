@@ -76,6 +76,7 @@ use crate::domain::nested_unless_report::collect_nested_unlesses;
 use crate::domain::nested_when_report::collect_nested_whens;
 use crate::domain::nil_comparison_report::collect_nil_comparisons;
 use crate::domain::nth_constant_index_report::collect_nth_constant_indexes;
+use crate::domain::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::domain::one_armed_if_report::collect_one_armed_ifs;
 use crate::domain::one_step_arithmetic_report::collect_one_step_arithmetic;
 use crate::domain::quoted_case_key_report::collect_quoted_case_keys;
@@ -104,12 +105,13 @@ use crate::domain::single_operand_boolean_report::collect_single_operand_boolean
 use crate::domain::single_value_bind_report::collect_single_value_binds;
 use crate::domain::t_comparison_report::collect_t_comparisons;
 use crate::domain::the_arity_report::collect_the_arity_violations;
+use crate::domain::typecase_nil_key_report::collect_typecase_nil_keys;
 use crate::domain::unreachable_case_clause_report::collect_unreachable_case_clauses;
 use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clauses;
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 85] = [
+pub const RULES: [&str; 87] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -133,6 +135,7 @@ pub const RULES: [&str; 85] = [
     "nested-boolean",
     "nested-cxr",
     "nth-constant-index",
+    "nthcdr-zero",
     "redundant-body-progn",
     "empty-let",
     "redundant-if-nil",
@@ -162,6 +165,7 @@ pub const RULES: [&str; 85] = [
     "duplicate-case-keys",
     "quoted-case-key",
     "case-nil-key",
+    "typecase-nil-key",
     "malformed-case-clause",
     "unreachable-case-clause",
     "exhaustive-case-otherwise",
@@ -207,7 +211,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 85] = [
+pub const RULE_DOCS: [(&str, &str, &str); 87] = [
     (
         "self-assignment",
         "suspicious",
@@ -322,6 +326,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 85] = [
         "nth-constant-index",
         "suspicious",
         "an nth with a small constant index that has an ordinal accessor ((nth 0 x) is (first x))",
+    ),
+    (
+        "nthcdr-zero",
+        "suspicious",
+        "an nthcdr with a zero count, which returns the list unchanged ((nthcdr 0 x) is x)",
     ),
     (
         "redundant-body-progn",
@@ -467,6 +476,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 85] = [
         "case-nil-key",
         "dead-code",
         "a case/ecase/ccase clause with a bare nil key, which is the empty key list and never matches (use ((nil) …))",
+    ),
+    (
+        "typecase-nil-key",
+        "dead-code",
+        "a typecase/etypecase/ctypecase clause with a bare nil type, which is the empty type and never matches (use null)",
     ),
     (
         "malformed-case-clause",
@@ -657,7 +671,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 44] = [
+pub const FIXABLE_RULES: [&str; 45] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -673,6 +687,7 @@ pub const FIXABLE_RULES: [&str; 44] = [
     "nested-boolean",
     "nested-cxr",
     "nth-constant-index",
+    "nthcdr-zero",
     "redundant-body-progn",
     "empty-let",
     "redundant-if-nil",
@@ -742,7 +757,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 45] = [
+pub const WARNING_RULES: [&str; 46] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -758,6 +773,7 @@ pub const WARNING_RULES: [&str; 45] = [
     "nested-boolean",
     "nested-cxr",
     "nth-constant-index",
+    "nthcdr-zero",
     "redundant-body-progn",
     "empty-let",
     "redundant-if-nil",
@@ -1129,6 +1145,17 @@ pub fn collect_lint_findings(
         });
     }
 
+    let (_, items) = collect_nthcdr_zeros(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "nthcdr-zero",
+            path: item.path,
+            span: item.span,
+            message: "nthcdr with a zero count returns the list unchanged; (nthcdr 0 x) is x"
+                .to_owned(),
+        });
+    }
+
     let (_, items) = collect_redundant_body_progns(path, dialect, tree)?;
     for item in items {
         findings.push(LintFinding {
@@ -1466,6 +1493,19 @@ pub fn collect_lint_findings(
             span: item.span,
             message: format!(
                 "{} clause key nil is the empty key list and never matches; use ((nil) …)",
+                item.head
+            ),
+        });
+    }
+
+    let (_, items) = collect_typecase_nil_keys(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "typecase-nil-key",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "{} clause type nil is the empty type and never matches; use null",
                 item.head
             ),
         });

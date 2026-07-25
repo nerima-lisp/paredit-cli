@@ -217,6 +217,8 @@ mod nested_when_report;
 mod nil_comparison_report;
 #[path = "cli/nth_constant_index_report.rs"]
 mod nth_constant_index_report;
+#[path = "cli/nthcdr_zero_report.rs"]
+mod nthcdr_zero_report;
 #[path = "cli/one_armed_if_report.rs"]
 mod one_armed_if_report;
 #[path = "cli/one_step_arithmetic_report.rs"]
@@ -353,6 +355,8 @@ mod terminal_output_safety;
 mod the_arity_report;
 #[path = "cli/thread_expression/mod.rs"]
 mod thread_expression;
+#[path = "cli/typecase_nil_key_report.rs"]
+mod typecase_nil_key_report;
 #[path = "cli/undefined_package_report.rs"]
 mod undefined_package_report;
 #[path = "cli/unreachable_case_clause_report.rs"]

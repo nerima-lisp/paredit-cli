@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 129] = [
+const INTROSPECTION_COMMANDS: [&str; 131] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -144,6 +144,7 @@ const INTROSPECTION_COMMANDS: [&str; 129] = [
     "inspect binds-constant",
     "inspect quoted-case-key",
     "inspect case-nil-key",
+    "inspect typecase-nil-key",
     "inspect t-comparison",
     "inspect the-arity",
     "inspect equality-arity",
@@ -164,6 +165,7 @@ const INTROSPECTION_COMMANDS: [&str; 129] = [
     "inspect negated-when-unless",
     "inspect nested-boolean",
     "inspect nested-cxr",
+    "inspect nthcdr-zero",
     "inspect nth-constant-index",
     "inspect nested-progn",
     "inspect nested-unless",

@@ -69,6 +69,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::CaseNilKey(args) => {
                 case_nil_key_report::workflow::case_nil_key_report(args)?
             }
+            command::InspectCommand::TypecaseNilKey(args) => {
+                typecase_nil_key_report::workflow::typecase_nil_key_report(args)?
+            }
             command::InspectCommand::MalformedCaseClause(args) => {
                 malformed_case_clause_report::workflow::malformed_case_clause_report(args)?
             }
@@ -239,6 +242,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::NestedCxr(args) => {
                 nested_cxr_report::workflow::nested_cxr_report(args)?
+            }
+            command::InspectCommand::NthcdrZero(args) => {
+                nthcdr_zero_report::workflow::nthcdr_zero_report(args)?
             }
             command::InspectCommand::NthConstantIndex(args) => {
                 nth_constant_index_report::workflow::nth_constant_index_report(args)?
