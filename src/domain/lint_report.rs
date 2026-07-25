@@ -24,6 +24,7 @@ use crate::domain::case_nil_key_report::collect_case_nil_keys;
 use crate::domain::char_op_string_report::collect_char_op_strings;
 use crate::domain::cons_to_list_report::collect_cons_to_lists;
 use crate::domain::constant_if_test_report::collect_constant_if_tests;
+use crate::domain::constant_when_test_report::collect_constant_when_tests;
 use crate::domain::de_morgan_report::collect_de_morgans;
 use crate::domain::dead_boolean_operand_report::collect_dead_boolean_operands;
 use crate::domain::destructive_literal_report::collect_destructive_literals;
@@ -113,7 +114,7 @@ use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clau
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 89] = [
+pub const RULES: [&str; 90] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -161,6 +162,7 @@ pub const RULES: [&str; 89] = [
     "t-comparison",
     "identical-if-branches",
     "constant-if-test",
+    "constant-when-test",
     "if-arity",
     "the-arity",
     "equality-arity",
@@ -215,7 +217,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 89] = [
+pub const RULE_DOCS: [(&str, &str, &str); 90] = [
     (
         "self-assignment",
         "suspicious",
@@ -452,6 +454,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 89] = [
         "an if whose test is the literal t or nil ((if t a b) is a; (if nil a b) is b)",
     ),
     (
+        "constant-when-test",
+        "dead-code",
+        "a when/unless with a literal t/nil test ((when t b) is (progn b); (when nil b) is nil)",
+    ),
+    (
         "if-arity",
         "arity",
         "an if with the wrong number of arguments (Common Lisp if takes 2 or 3)",
@@ -685,7 +692,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 47] = [
+pub const FIXABLE_RULES: [&str; 48] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -726,6 +733,7 @@ pub const FIXABLE_RULES: [&str; 47] = [
     "one-step-arithmetic",
     "one-armed-if",
     "constant-if-test",
+    "constant-when-test",
     "nil-comparison",
     "sign-comparison",
     "single-clause-cond",
@@ -773,7 +781,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 48] = [
+pub const WARNING_RULES: [&str; 49] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -814,6 +822,7 @@ pub const WARNING_RULES: [&str; 48] = [
     "one-step-arithmetic",
     "one-armed-if",
     "constant-if-test",
+    "constant-when-test",
     "nil-comparison",
     "t-comparison",
     "sign-comparison",
@@ -1434,6 +1443,27 @@ pub fn collect_lint_findings(
             path: item.path,
             span: item.span,
             message: format!("if test is the constant {}; one branch is dead", item.test),
+        });
+    }
+
+    let (_, items) = collect_constant_when_tests(path, dialect, tree)?;
+    for item in items {
+        let message = if item.always_runs {
+            format!(
+                "{} test is the constant {}; the body always runs, so this is a progn",
+                item.head, item.test
+            )
+        } else {
+            format!(
+                "{} test is the constant {}; the body never runs, so this is nil",
+                item.head, item.test
+            )
+        };
+        findings.push(LintFinding {
+            rule: "constant-when-test",
+            path: item.path,
+            span: item.span,
+            message,
         });
     }
 

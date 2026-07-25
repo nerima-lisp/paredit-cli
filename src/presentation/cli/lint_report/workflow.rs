@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 
 use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
 use crate::application::usecase::constant_if_test_report::collect_constant_if_tests;
+use crate::application::usecase::constant_when_test_report::collect_constant_when_tests;
 use crate::application::usecase::de_morgan_report::collect_de_morgans;
 use crate::application::usecase::empty_let_report::collect_empty_lets;
 use crate::application::usecase::eq_char_comparison_report::collect_eq_char_comparisons;
@@ -241,6 +242,8 @@ fn retain_unbaselined(
 /// `negated-comparison` (rewrite `(not (= a b))` as `(/= a b)`),
 /// `negated-if` (rewrite `(if (not c) a b)` as `(if c b a)`),
 /// `constant-if-test` (drop the dead branch of `(if t a b)` / `(if nil a b)`),
+/// `constant-when-test` (rewrite `(when t …)` / `(unless nil …)` as `(progn …)`
+/// and collapse the dead `(when nil …)` / `(unless t …)` to `nil`),
 /// `redundant-boolean-identity` (drop `t` from `and` / `nil` from `or`),
 /// `de-morgan` (collapse `(and (not a) (not b))` into `(not (or a b))`),
 /// `nil-comparison` (rewrite
@@ -1041,6 +1044,36 @@ fn collect_lint_fixes(
         }
     }
 
+    if active.contains(&"constant-when-test") {
+        let (_, items) = collect_constant_when_tests(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let fix = if item.always_runs {
+                // The body always runs: splice `(when t` / `(unless nil` down to
+                // `(progn`, keeping the body forms verbatim.
+                let splice_end = item.splice_span.end().get();
+                one_edit(
+                    start,
+                    splice_end,
+                    "(progn".to_owned(),
+                    format!(
+                        "Rewrite the always-true ({} {} …) as progn",
+                        item.head, item.test
+                    ),
+                )
+            } else {
+                // The body never runs: the whole form is just nil.
+                one_edit(
+                    start,
+                    end,
+                    "nil".to_owned(),
+                    format!("Collapse the dead ({} {} …) to nil", item.head, item.test),
+                )
+            };
+            fixes.insert(("constant-when-test", start, end), fix);
+        }
+    }
+
     if active.contains(&"negated-if") {
         let (_, items) = collect_negated_ifs(file, dialect, tree)?;
         for item in items {
@@ -1778,6 +1811,7 @@ mod tests {
             "(if iv iv jv)\n",                        // if-to-or
             "(+ osa 1)\n",                            // one-step-arithmetic
             "(if t on off)\n",                        // constant-if-test
+            "(when t (bd))\n",                        // constant-when-test
             "(and p t q)\n",                          // redundant-boolean-identity
             "(and (not p) (not q))\n",                // de-morgan
             "(equal w nil)\n",                        // nil-comparison

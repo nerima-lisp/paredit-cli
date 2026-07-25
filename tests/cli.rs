@@ -41,6 +41,8 @@ mod conditional_conversion;
 mod cons_to_list_report;
 #[path = "cli/constant_if_test_report.rs"]
 mod constant_if_test_report;
+#[path = "cli/constant_when_test_report.rs"]
+mod constant_when_test_report;
 #[path = "cli/convert_cond_to_if.rs"]
 mod convert_cond_to_if;
 #[path = "cli/convert_flet_to_labels.rs"]

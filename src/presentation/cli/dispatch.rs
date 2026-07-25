@@ -231,6 +231,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::ConstantIfTest(args) => {
                 constant_if_test_report::workflow::constant_if_test_report(args)?
             }
+            command::InspectCommand::ConstantWhenTest(args) => {
+                constant_when_test_report::workflow::constant_when_test_report(args)?
+            }
             command::InspectCommand::ConsToList(args) => {
                 cons_to_list_report::workflow::cons_to_list_report(args)?
             }
