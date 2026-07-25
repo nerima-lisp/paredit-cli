@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 61] = [
+const INTROSPECTION_COMMANDS: [&str; 72] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -94,7 +94,11 @@ const INTROSPECTION_COMMANDS: [&str; 61] = [
     "inspect identical-if-branches",
     "inspect duplicate-cond-tests",
     "inspect duplicate-boolean-operands",
+    "inspect eql-string-comparison",
+    "inspect self-comparison",
     "inspect dead-boolean-operand",
+    "inspect eq-number-comparison",
+    "inspect eql-list-comparison",
     "inspect redundant-quote",
     "inspect unreachable-cond-clause",
     "inspect malformed-cond-clause",
@@ -102,6 +106,7 @@ const INTROSPECTION_COMMANDS: [&str; 61] = [
     "inspect unreachable-case-clause",
     "inspect quoted-case-key",
     "inspect case-nil-key",
+    "inspect t-comparison",
     "inspect exhaustive-case-otherwise",
     "inspect explicit-nil-return",
     "inspect redundant-progn",
@@ -115,21 +120,27 @@ const INTROSPECTION_COMMANDS: [&str; 61] = [
     "inspect nested-progn",
     "inspect nested-unless",
     "inspect nested-when",
+    "inspect nil-comparison",
     "inspect one-armed-if",
     "inspect single-operand-boolean",
+    "inspect single-arg-comparison",
     "inspect single-clause-cond",
+    "inspect sign-comparison",
+    "inspect eq-char-comparison",
     "inspect redundant-apply",
     "inspect redundant-eql-test",
     "inspect redundant-identity-key",
     "inspect redundant-body-progn",
     "inspect redundant-boolean-identity",
     "inspect de-morgan",
+    "inspect eql-search-literal",
     "inspect redundant-identity",
     "inspect redundant-if-nil",
     "inspect redundant-let-star",
     "inspect redundant-funcall",
     "inspect funcall-lambda",
     "inspect sharp-quoted-lambda",
+    "inspect char-op-string",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];

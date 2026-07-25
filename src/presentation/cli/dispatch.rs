@@ -76,8 +76,32 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::DeadBooleanOperand(args) => {
                 dead_boolean_operand_report::workflow::dead_boolean_operand_report(args)?
             }
+            command::InspectCommand::SelfComparison(args) => {
+                self_comparison_report::workflow::self_comparison_report(args)?
+            }
             command::InspectCommand::IdenticalIfBranches(args) => {
                 identical_if_branch_report::workflow::identical_if_branch_report(args)?
+            }
+            command::InspectCommand::TComparison(args) => {
+                t_comparison_report::workflow::t_comparison_report(args)?
+            }
+            command::InspectCommand::EqlStringComparison(args) => {
+                eql_string_comparison_report::workflow::eql_string_comparison_report(args)?
+            }
+            command::InspectCommand::EqNumberComparison(args) => {
+                eq_number_comparison_report::workflow::eq_number_comparison_report(args)?
+            }
+            command::InspectCommand::EqCharComparison(args) => {
+                eq_char_comparison_report::workflow::eq_char_comparison_report(args)?
+            }
+            command::InspectCommand::EqlSearchLiteral(args) => {
+                eql_search_literal_report::workflow::eql_search_literal_report(args)?
+            }
+            command::InspectCommand::CharOpString(args) => {
+                char_op_string_report::workflow::char_op_string_report(args)?
+            }
+            command::InspectCommand::EqlListComparison(args) => {
+                eql_list_comparison_report::workflow::eql_list_comparison_report(args)?
             }
             command::InspectCommand::Similarity(args) => {
                 similarity_report::workflow::similarity_report(args)?
@@ -118,6 +142,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::NestedWhen(args) => {
                 nested_when_report::workflow::nested_when_report(args)?
+            }
+            command::InspectCommand::NilComparison(args) => {
+                nil_comparison_report::workflow::nil_comparison_report(args)?
             }
             command::InspectCommand::OneArmedIf(args) => {
                 one_armed_if_report::workflow::one_armed_if_report(args)?
@@ -163,8 +190,14 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::SingleOperandBoolean(args) => {
                 single_operand_boolean_report::workflow::single_operand_boolean_report(args)?
             }
+            command::InspectCommand::SingleArgComparison(args) => {
+                single_arg_comparison_report::workflow::single_arg_comparison_report(args)?
+            }
             command::InspectCommand::SingleClauseCond(args) => {
                 single_clause_cond_report::workflow::single_clause_cond_report(args)?
+            }
+            command::InspectCommand::SignComparison(args) => {
+                sign_comparison_report::workflow::sign_comparison_report(args)?
             }
         },
         Command::Edit { command } => match command {

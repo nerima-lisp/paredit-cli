@@ -2,13 +2,15 @@ use super::{
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
-    call_graph_report, call_report, capabilities, case_nil_key_report, constant_if_test_report,
-    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
-    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
-    convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
-    dead_boolean_operand_report, definition_movement, definition_removal, definition_report,
-    dependency_report, duplicate_boolean_operand_report, duplicate_case_key_report,
-    duplicate_cond_test_report, duplicate_report, eliminate_empty_binding_form,
+    call_graph_report, call_report, capabilities, case_nil_key_report, char_op_string_report,
+    constant_if_test_report, convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond,
+    convert_if_to_unless, convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let,
+    convert_let_to_let_star, convert_sequential_binding, convert_unless_to_if, convert_when_to_if,
+    de_morgan_report, dead_boolean_operand_report, definition_movement, definition_removal,
+    definition_report, dependency_report, duplicate_boolean_operand_report,
+    duplicate_case_key_report, duplicate_cond_test_report, duplicate_report,
+    eliminate_empty_binding_form, eq_char_comparison_report, eq_number_comparison_report,
+    eql_list_comparison_report, eql_search_literal_report, eql_string_comparison_report,
     exhaustive_case_otherwise_report, explicit_nil_return_report, extract_constant,
     extract_function, extract_local_function, flatten_progn, form_report, funcall_lambda_report,
     function_parameter, identical_if_branch_report, if_to_or_report, impact_report,
@@ -17,16 +19,17 @@ use super::{
     malformed_cond_clause_report, merge_nested_flet, merge_nested_let, merge_nested_let_star,
     negated_comparison_report, negated_if_report, negated_when_unless_report,
     nested_boolean_report, nested_progn_report, nested_unless_report, nested_when_report,
-    one_armed_if_report, package, quoted_case_key_report, redundant_apply_report,
-    redundant_body_progn_report, redundant_boolean_identity_report, redundant_eql_test_report,
-    redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
-    redundant_if_nil_report, redundant_let_star_report, redundant_progn_report,
-    redundant_quote_report, refactor, remove_unused_binding, remove_unused_control, rename,
-    rename_control, replace_forms, sharp_quoted_lambda_report, signature_report, similarity_report,
-    single_clause_cond_report, single_operand_boolean_report, split_let, split_let_star,
-    symbol_report, thread_expression, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unthread_expression, unwrap_call, verbose_negation_report,
-    workspace_report,
+    nil_comparison_report, one_armed_if_report, package, quoted_case_key_report,
+    redundant_apply_report, redundant_body_progn_report, redundant_boolean_identity_report,
+    redundant_eql_test_report, redundant_funcall_report, redundant_identity_key_report,
+    redundant_identity_report, redundant_if_nil_report, redundant_let_star_report,
+    redundant_progn_report, redundant_quote_report, refactor, remove_unused_binding,
+    remove_unused_control, rename, rename_control, replace_forms, self_comparison_report,
+    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
+    single_arg_comparison_report, single_clause_cond_report, single_operand_boolean_report,
+    split_let, split_let_star, symbol_report, t_comparison_report, thread_expression,
+    unreachable_case_clause_report, unreachable_cond_clause_report, unthread_expression,
+    unwrap_call, verbose_negation_report, workspace_report,
 };
 use clap::Subcommand;
 
@@ -102,8 +105,24 @@ pub(super) enum InspectCommand {
     ),
     /// Report and/or forms whose non-final constant operand makes later operands dead.
     DeadBooleanOperand(dead_boolean_operand_report::args::DeadBooleanOperandReportArgs),
+    /// Report comparison calls whose two operands are structurally identical.
+    SelfComparison(self_comparison_report::args::SelfComparisonReportArgs),
     /// Report if forms whose then and else branches are structurally identical.
     IdenticalIfBranches(identical_if_branch_report::args::IdenticalIfBranchReportArgs),
+    /// Report eq/eql/equal/equalp comparisons against t ((eq x t) only matches the symbol T).
+    TComparison(t_comparison_report::args::TComparisonReportArgs),
+    /// Report eq/eql calls that compare against a string literal (never reliably eql).
+    EqlStringComparison(eql_string_comparison_report::args::EqlStringComparisonReportArgs),
+    /// Report eq/eql calls that compare against a quoted list literal (never reliably eql).
+    EqlListComparison(eql_list_comparison_report::args::EqlListComparisonReportArgs),
+    /// Report eq calls that compare against a number literal (eq on numbers is unreliable).
+    EqNumberComparison(eq_number_comparison_report::args::EqNumberComparisonReportArgs),
+    /// Report eq calls that compare against a character literal (eq on characters is unreliable).
+    EqCharComparison(eq_char_comparison_report::args::EqCharComparisonReportArgs),
+    /// Report member/assoc/find/... searching for a string/list literal without :test (default eql won't match).
+    EqlSearchLiteral(eql_search_literal_report::args::EqlSearchLiteralReportArgs),
+    /// Report character functions (char=/char-code/...) applied to a string literal (type error).
+    CharOpString(char_op_string_report::args::CharOpStringReportArgs),
     /// Report structurally similar S-expression forms across explicit files.
     Similarity(similarity_report::args::SimilarityReportArgs),
     /// Report local let bindings and inline safety for agent refactor planning.
@@ -130,6 +149,8 @@ pub(super) enum InspectCommand {
     NestedUnless(nested_unless_report::args::NestedUnlessReportArgs),
     /// Report a when whose only body is a when, mergeable by and ((when a (when b c)) is (when (and a b) c)).
     NestedWhen(nested_when_report::args::NestedWhenReportArgs),
+    /// Report eq/eql/equal/equalp comparisons against nil ((eq x nil) is just (null x)).
+    NilComparison(nil_comparison_report::args::NilComparisonReportArgs),
     /// Report one-armed if forms with no else branch ((if test then) is (when test then)).
     OneArmedIf(one_armed_if_report::args::OneArmedIfReportArgs),
     /// Report an if whose test and then are the same atom ((if x x y) is (or x y)).
@@ -162,8 +183,12 @@ pub(super) enum InspectCommand {
     SharpQuotedLambda(sharp_quoted_lambda_report::args::SharpQuotedLambdaReportArgs),
     /// Report single-operand and/or forms ((and X) and (or X) are just X).
     SingleOperandBoolean(single_operand_boolean_report::args::SingleOperandBooleanReportArgs),
+    /// Report numeric comparisons (< > <= >= = /=) with a single argument (always true).
+    SingleArgComparison(single_arg_comparison_report::args::SingleArgComparisonReportArgs),
     /// Report a cond with a single non-t clause that has a body ((cond (test body)) is (when test body)).
     SingleClauseCond(single_clause_cond_report::args::SingleClauseCondReportArgs),
+    /// Report =/</> comparisons against 0 that have a predicate ((= x 0) is (zerop x)).
+    SignComparison(sign_comparison_report::args::SignComparisonReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

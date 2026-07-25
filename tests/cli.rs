@@ -21,6 +21,8 @@ mod call_report;
 mod capabilities_contract;
 #[path = "cli/case_nil_key_report.rs"]
 mod case_nil_key_report;
+#[path = "cli/char_op_string_report.rs"]
+mod char_op_string_report;
 #[path = "cli/completions_contract.rs"]
 mod completions_contract;
 #[path = "cli/conditional_conversion.rs"]
@@ -69,6 +71,16 @@ mod duplicate_report;
 mod edit_transpose;
 #[path = "cli/eliminate_empty_binding_form.rs"]
 mod eliminate_empty_binding_form;
+#[path = "cli/eq_char_comparison_report.rs"]
+mod eq_char_comparison_report;
+#[path = "cli/eq_number_comparison_report.rs"]
+mod eq_number_comparison_report;
+#[path = "cli/eql_list_comparison_report.rs"]
+mod eql_list_comparison_report;
+#[path = "cli/eql_search_literal_report.rs"]
+mod eql_search_literal_report;
+#[path = "cli/eql_string_comparison_report.rs"]
+mod eql_string_comparison_report;
 #[path = "cli/exhaustive_case_otherwise_report.rs"]
 mod exhaustive_case_otherwise_report;
 #[path = "cli/explicit_nil_return_report.rs"]
@@ -133,6 +145,8 @@ mod nested_progn_report;
 mod nested_unless_report;
 #[path = "cli/nested_when_report.rs"]
 mod nested_when_report;
+#[path = "cli/nil_comparison_report.rs"]
+mod nil_comparison_report;
 #[path = "cli/one_armed_if_report.rs"]
 mod one_armed_if_report;
 #[path = "cli/package/mod.rs"]
@@ -205,12 +219,18 @@ mod rename_control;
 mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
+#[path = "cli/self_comparison_report.rs"]
+mod self_comparison_report;
 #[path = "cli/sharp_quoted_lambda_report.rs"]
 mod sharp_quoted_lambda_report;
+#[path = "cli/sign_comparison_report.rs"]
+mod sign_comparison_report;
 #[path = "cli/signature_report.rs"]
 mod signature_report;
 #[path = "cli/similarity_report.rs"]
 mod similarity_report;
+#[path = "cli/single_arg_comparison_report.rs"]
+mod single_arg_comparison_report;
 #[path = "cli/single_clause_cond_report.rs"]
 mod single_clause_cond_report;
 #[path = "cli/single_operand_boolean_report.rs"]
@@ -225,6 +245,8 @@ mod split_file;
 mod split_let_star;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
+#[path = "cli/t_comparison_report.rs"]
+mod t_comparison_report;
 #[path = "cli/terminal_output_safety.rs"]
 mod terminal_output_safety;
 #[path = "cli/thread_expression/mod.rs"]
