@@ -364,3 +364,73 @@ fn edit_convolute_write_updates_file_in_place() {
     let rewritten = fs::read_to_string(&file).expect("read rewritten source");
     assert_eq!(rewritten, "(foo (let ((x 1)) (bar baz)) quux)\n");
 }
+
+/// `FsPath::parent` returns `Some("")` for a bare relative file name, so the
+/// staged-write anchor used to try to open the empty path and fail with
+/// "failed to open parent directory". Every other write test passes an
+/// absolute path, which hides the case an agent hits most: editing a file in
+/// the working directory by name.
+#[test]
+fn edit_wrap_write_accepts_a_bare_relative_file_name() {
+    let dir = fresh_temp_dir("edit-wrap-write-bare-relative");
+    fs::write(dir.join("source.lisp"), "(defun foo (x) (+ x 1))\n").expect("write source fixture");
+
+    paredit()
+        .current_dir(&dir)
+        .args(["edit", "wrap", "--path", "0.2", "--write", "--file"])
+        .arg("source.lisp")
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(dir.join("source.lisp")).expect("read rewritten source");
+    assert_eq!(rewritten, "(defun foo ((x)) (+ x 1))\n");
+}
+
+/// The same anchor backs the multi-file writers, so a bare relative name has
+/// to survive the duplicate-target guard and the rollback staging too.
+#[test]
+fn edit_format_write_accepts_a_bare_relative_file_name() {
+    let dir = fresh_temp_dir("edit-format-write-bare-relative");
+    fs::write(dir.join("source.lisp"), "(defun foo (x)\n(+ x 1))\n").expect("write source fixture");
+
+    paredit()
+        .current_dir(&dir)
+        .args(["edit", "format", "--write", "--file"])
+        .arg("source.lisp")
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(dir.join("source.lisp")).expect("read rewritten source");
+    assert_eq!(rewritten, "(defun foo (x)\n  (+ x 1))\n");
+}
+
+/// Two spellings of one path must not be accepted as two distinct write
+/// targets: `split-file` would otherwise stage two conflicting rewrites of the
+/// same file. Bare and `./`-prefixed relative names are the spellings a
+/// working-directory invocation mixes most easily.
+#[test]
+fn split_file_rejects_bare_and_dotted_spellings_of_one_relative_path() {
+    let dir = fresh_temp_dir("split-file-duplicate-bare-relative");
+    fs::write(dir.join("source.lisp"), "(defun foo (x) (+ x 1))\n").expect("write source fixture");
+
+    paredit()
+        .current_dir(&dir)
+        .args([
+            "edit",
+            "split-file",
+            "--from-file",
+            "source.lisp",
+            "--to-file",
+            "./source.lisp",
+            "--names",
+            "foo",
+            "--write",
+        ])
+        .assert()
+        .failure();
+
+    let unchanged = fs::read_to_string(dir.join("source.lisp")).expect("read source");
+    assert_eq!(unchanged, "(defun foo (x) (+ x 1))\n");
+}

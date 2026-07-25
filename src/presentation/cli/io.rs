@@ -325,7 +325,9 @@ fn open_regular_input_file(path: &FsPath) -> io::Result<fs::File> {
 
         options.custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC | libc::O_NOFOLLOW);
     }
-    let file = options.open(path)?;
+    let file = options
+        .open(path)
+        .map_err(|error| describe_refused_input_link(path, error))?;
     let metadata = file.metadata()?;
     if !metadata.is_file() {
         return Err(io::Error::new(
@@ -334,6 +336,25 @@ fn open_regular_input_file(path: &FsPath) -> io::Result<fs::File> {
         ));
     }
     Ok(file)
+}
+
+/// Restates the `O_NOFOLLOW` refusal in terms of the policy that produced it.
+///
+/// Opening a symlinked path with `O_NOFOLLOW` fails as `ELOOP`, which surfaces
+/// as "too many levels of symbolic links" and reads like a link cycle. The
+/// real reason is that paredit only ever opens the regular file it was pointed
+/// at, so the caller — not the tool — decides which file a link stands for.
+fn describe_refused_input_link(path: &FsPath, error: io::Error) -> io::Error {
+    if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
+        return io::Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "refusing to read symlink {} (pass the path it resolves to)",
+                path.display()
+            ),
+        );
+    }
+    error
 }
 
 pub(crate) fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
@@ -1695,6 +1716,20 @@ fn reject_duplicate_write_targets<'a>(files: impl IntoIterator<Item = &'a PathBu
     Ok(())
 }
 
+/// Returns the directory that contains `path`.
+///
+/// `FsPath::parent` yields `Some("")` — not `None` — for a bare relative file
+/// name such as `source.lisp`, and the empty path cannot be opened or
+/// canonicalized. Both the empty and the absent parent denote the current
+/// directory, so they collapse onto `.` here.
+#[cfg(unix)]
+fn write_target_parent(path: &FsPath) -> &FsPath {
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => FsPath::new("."),
+    }
+}
+
 #[cfg(unix)]
 fn write_target_identity(path: &FsPath) -> PathBuf {
     if let Ok(identity) = fs::canonicalize(path) {
@@ -1704,8 +1739,8 @@ fn write_target_identity(path: &FsPath) -> PathBuf {
     let Some(file_name) = path.file_name() else {
         return path.to_path_buf();
     };
-    path.parent()
-        .and_then(|parent| fs::canonicalize(parent).ok())
+    fs::canonicalize(write_target_parent(path))
+        .ok()
         .map_or_else(|| path.to_path_buf(), |parent| parent.join(file_name))
 }
 
@@ -1726,10 +1761,7 @@ fn open_anchored_parent(path: &FsPath) -> Result<(AnchoredDirectory, OsString)> 
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("write target has no file name: {}", path.display()))?
         .to_os_string();
-    let display_path = path
-        .parent()
-        .unwrap_or_else(|| FsPath::new("."))
-        .to_path_buf();
+    let display_path = write_target_parent(path).to_path_buf();
     let handle = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -1778,10 +1810,7 @@ fn anchored_directory_from_retained(
         "anchored target name does not match display path {}",
         display_path.display()
     );
-    let parent_display_path = display_path
-        .parent()
-        .unwrap_or_else(|| FsPath::new("."))
-        .to_path_buf();
+    let parent_display_path = write_target_parent(display_path).to_path_buf();
     let metadata = parent_dir.dir_metadata().with_context(|| {
         format!(
             "failed to inspect retained parent directory {}",
@@ -3086,7 +3115,13 @@ mod tests {
 
         let error = open_regular_input_file(&link).expect_err("symlink input must be rejected");
 
-        assert_eq!(error.raw_os_error(), Some(libc::ELOOP));
+        // The raw `O_NOFOLLOW` failure is ELOOP, which reads as a link cycle;
+        // the caller must instead see why the link was refused.
+        assert_eq!(error.kind(), ErrorKind::InvalidInput);
+        assert!(
+            error.to_string().contains("refusing to read symlink"),
+            "unexpected error: {error}"
+        );
         assert_eq!(
             fs::read_to_string(&target).expect("read symlink target"),
             "(target)"

@@ -143,3 +143,38 @@ fn cli_writes_function_rename_preserving_unquote_prefixes_inside_quasiquote() {
         expected_call_count: 3,
     });
 }
+
+/// The refactor writers share the staged-write anchor with `paredit edit`, and
+/// that anchor could not resolve the parent of a bare relative file name. This
+/// is the entry point an agent uses when it renames a symbol in a file it just
+/// listed from the working directory.
+#[test]
+fn cli_writes_function_rename_for_a_bare_relative_file_name() {
+    let dir = fresh_temp_dir("rename-function-write-bare-relative");
+    fs::write(
+        dir.join("core.lisp"),
+        "(defun old-name (x) (+ x 1))\n(defun caller (y) (old-name y))\n",
+    )
+    .expect("write source fixture");
+
+    paredit()
+        .current_dir(&dir)
+        .args([
+            "refactor",
+            "rename-function",
+            "--from",
+            "old-name",
+            "--to",
+            "new-name",
+            "--write",
+            "core.lisp",
+        ])
+        .assert()
+        .success();
+
+    let rewritten = fs::read_to_string(dir.join("core.lisp")).expect("read rewritten source");
+    assert_eq!(
+        rewritten,
+        "(defun new-name (x) (+ x 1))\n(defun caller (y) (new-name y))\n"
+    );
+}
