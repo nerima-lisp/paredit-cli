@@ -62,11 +62,13 @@ use crate::domain::format_newline_report::collect_format_newlines;
 use crate::domain::format_to_string_report::collect_format_to_strings;
 use crate::domain::funcall_lambda_report::collect_funcall_lambdas;
 use crate::domain::gethash_default_report::collect_gethash_defaults;
+use crate::domain::handler_case_no_clauses_report::collect_handler_case_no_clauses;
 use crate::domain::identical_if_branch_report::collect_identical_if_branches;
 use crate::domain::identity_arithmetic_report::collect_identity_arithmetic;
 use crate::domain::if_arity_report::collect_if_arity_violations;
 use crate::domain::if_not_report::collect_if_nots;
 use crate::domain::if_to_or_report::collect_if_to_ors;
+use crate::domain::if_to_unless_report::collect_if_to_unless;
 use crate::domain::lambda_list_keyword_order_report::collect_lambda_list_keyword_order;
 use crate::domain::list_star_to_cons_report::collect_list_star_to_cons;
 use crate::domain::literal_place_report::collect_literal_places;
@@ -97,6 +99,7 @@ use crate::domain::nthcdr_small_index_report::collect_nthcdr_small_indexes;
 use crate::domain::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::domain::one_armed_if_report::collect_one_armed_ifs;
 use crate::domain::one_step_arithmetic_report::collect_one_step_arithmetic;
+use crate::domain::prog2_to_progn_report::collect_prog2_to_progn;
 use crate::domain::quoted_case_key_report::collect_quoted_case_keys;
 use crate::domain::redundant_apply_report::collect_redundant_applies;
 use crate::domain::redundant_body_progn_report::collect_redundant_body_progns;
@@ -133,12 +136,13 @@ use crate::domain::typecase_nil_key_report::collect_typecase_nil_keys;
 use crate::domain::typep_predicate_report::collect_typep_predicates;
 use crate::domain::unreachable_case_clause_report::collect_unreachable_case_clauses;
 use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clauses;
+use crate::domain::unwind_protect_no_cleanup_report::collect_unwind_protect_no_cleanup;
 use crate::domain::values_list_of_list_report::collect_values_list_of_lists;
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 use crate::domain::zero_divisor_report::collect_zero_divisors;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 114] = [
+pub const RULES: [&str; 118] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -253,6 +257,10 @@ pub const RULES: [&str; 114] = [
     "duplicate-keyword",
     "defpackage-quoted",
     "step-zero",
+    "if-to-unless",
+    "prog2-to-progn",
+    "handler-case-no-clauses",
+    "unwind-protect-no-cleanup",
 ];
 
 /// The set of rule categories, sorted, for `--category` validation and
@@ -265,7 +273,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 114] = [
+pub const RULE_DOCS: [(&str, &str, &str); 118] = [
     (
         "self-assignment",
         "suspicious",
@@ -836,6 +844,26 @@ pub const RULE_DOCS: [(&str, &str, &str); 114] = [
         "suspicious",
         "an incf/decf with an explicit step of 0, a no-op ((incf x 0))",
     ),
+    (
+        "if-to-unless",
+        "suspicious",
+        "a three-argument if with then=nil ((if c nil e) is (unless c e))",
+    ),
+    (
+        "prog2-to-progn",
+        "suspicious",
+        "a two-form prog2, which is just progn ((prog2 a b) is (progn a b))",
+    ),
+    (
+        "handler-case-no-clauses",
+        "suspicious",
+        "a handler-case with no handler clauses, which is just its body ((handler-case x) is x)",
+    ),
+    (
+        "unwind-protect-no-cleanup",
+        "suspicious",
+        "an unwind-protect with no cleanup forms, which is just its body ((unwind-protect x) is x)",
+    ),
 ];
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
@@ -860,7 +888,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 68] = [
+pub const FIXABLE_RULES: [&str; 72] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -929,6 +957,10 @@ pub const FIXABLE_RULES: [&str; 68] = [
     "coerce-to-t",
     "gethash-default",
     "make-hash-table-test",
+    "if-to-unless",
+    "prog2-to-progn",
+    "handler-case-no-clauses",
+    "unwind-protect-no-cleanup",
 ];
 
 /// Whether `inspect lint --fix` can automatically repair findings of `name`.
@@ -969,7 +1001,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 73] = [
+pub const WARNING_RULES: [&str; 77] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -1043,6 +1075,10 @@ pub const WARNING_RULES: [&str; 73] = [
     "duplicate-keyword",
     "defpackage-quoted",
     "step-zero",
+    "if-to-unless",
+    "prog2-to-progn",
+    "handler-case-no-clauses",
+    "unwind-protect-no-cleanup",
 ];
 
 /// The severity of a rule's findings (`error` unless it is a [`WARNING_RULES`]
@@ -2471,6 +2507,49 @@ pub fn collect_lint_findings(
             path: item.path,
             span: item.span,
             message: format!("{} by 0 is a no-op that changes nothing", item.operator),
+        });
+    }
+
+    let (_, items) = collect_if_to_unless(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "if-to-unless",
+            path: item.path,
+            span: item.span,
+            message: "an if with a nil then-branch is an unless; (if c nil e) is (unless c e)"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_prog2_to_progn(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "prog2-to-progn",
+            path: item.path,
+            span: item.span,
+            message: "a two-form prog2 is just progn; (prog2 a b) is (progn a b)".to_owned(),
+        });
+    }
+
+    let (_, items) = collect_handler_case_no_clauses(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "handler-case-no-clauses",
+            path: item.path,
+            span: item.span,
+            message: "a handler-case with no clauses is just its body; (handler-case x) is x"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_unwind_protect_no_cleanup(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "unwind-protect-no-cleanup",
+            path: item.path,
+            span: item.span,
+            message: "an unwind-protect with no cleanup is just its body; (unwind-protect x) is x"
+                .to_owned(),
         });
     }
 

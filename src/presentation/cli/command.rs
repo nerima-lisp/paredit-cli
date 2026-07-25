@@ -22,8 +22,9 @@ use super::{
     exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
     extract_constant, extract_function, extract_local_function, flatten_progn, form_report,
     format_missing_destination_report, format_newline_report, format_to_string_report,
-    funcall_lambda_report, function_parameter, gethash_default_report, identical_if_branch_report,
-    identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report, impact_report,
+    funcall_lambda_report, function_parameter, gethash_default_report,
+    handler_case_no_clauses_report, identical_if_branch_report, identity_arithmetic_report,
+    if_arity_report, if_not_report, if_to_or_report, if_to_unless_report, impact_report,
     inline_function, inline_lambda, inline_let, inline_literal_constant, inline_local_function,
     inline_symbol_macro, introduce_let, lambda_list_keyword_order_report, let_report, lint_report,
     list_star_to_cons_report, literal_place_report, make_hash_table_test_report,
@@ -36,24 +37,25 @@ use super::{
     nested_when_report, nil_comparison_report, nth_constant_index_report,
     nthcdr_small_index_report, nthcdr_zero_report, one_armed_if_report, one_step_arithmetic_report,
     package, package_boundary_report, package_conflict_report, package_cycle_report,
-    quoted_case_key_report, reachability_report, redefinition_report, redundant_apply_report,
-    redundant_body_progn_report, redundant_boolean_identity_report, redundant_divisor_report,
-    redundant_eql_test_report, redundant_funcall_report, redundant_identity_key_report,
-    redundant_identity_report, redundant_if_nil_report, redundant_let_star_report,
-    redundant_prog1_report, redundant_progn_report, redundant_quote_report, redundant_the_report,
-    refactor, remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
-    self_assignment_report, self_comparison_report, setf_arity_report, setq_non_variable_report,
-    shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
-    similarity_report, single_arg_comparison_report, single_clause_cond_report,
-    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
-    single_value_bind_report, split_let, split_let_star, step_zero_report, struct_cycle_report,
-    subseq_zero_report, symbol_report, system_conflict_report, system_cycle_report,
-    t_comparison_report, the_arity_report, thread_expression, typecase_nil_key_report,
-    typep_predicate_report, undefined_package_report, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unthread_expression, unused_export_report,
-    unused_local_callable_report, unused_nickname_report, unused_package_report,
-    unused_parameter_report, unwrap_call, values_list_of_list_report, verbose_negation_report,
-    workspace_report, zero_divisor_report,
+    prog2_to_progn_report, quoted_case_key_report, reachability_report, redefinition_report,
+    redundant_apply_report, redundant_body_progn_report, redundant_boolean_identity_report,
+    redundant_divisor_report, redundant_eql_test_report, redundant_funcall_report,
+    redundant_identity_key_report, redundant_identity_report, redundant_if_nil_report,
+    redundant_let_star_report, redundant_prog1_report, redundant_progn_report,
+    redundant_quote_report, redundant_the_report, refactor, remove_unused_binding,
+    remove_unused_control, rename, rename_control, replace_forms, self_assignment_report,
+    self_comparison_report, setf_arity_report, setq_non_variable_report, shadowed_binding_report,
+    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
+    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
+    single_operand_boolean_report, single_operand_list_op_report, single_value_bind_report,
+    split_let, split_let_star, step_zero_report, struct_cycle_report, subseq_zero_report,
+    symbol_report, system_conflict_report, system_cycle_report, t_comparison_report,
+    the_arity_report, thread_expression, typecase_nil_key_report, typep_predicate_report,
+    undefined_package_report, unreachable_case_clause_report, unreachable_cond_clause_report,
+    unthread_expression, unused_export_report, unused_local_callable_report,
+    unused_nickname_report, unused_package_report, unused_parameter_report,
+    unwind_protect_no_cleanup_report, unwrap_call, values_list_of_list_report,
+    verbose_negation_report, workspace_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -289,6 +291,16 @@ pub(super) enum InspectCommand {
     IfToOr(if_to_or_report::args::IfToOrReportArgs),
     /// Report a three-argument if with then=nil and else=t ((if test nil t) is (not test)).
     IfNot(if_not_report::args::IfNotReportArgs),
+    /// Report a three-argument if with then=nil ((if c nil e) is (unless c e)).
+    IfToUnless(if_to_unless_report::args::IfToUnlessReportArgs),
+    /// Report a two-form prog2, which is just progn ((prog2 a b) is (progn a b)).
+    Prog2ToProgn(prog2_to_progn_report::args::Prog2ToPrognReportArgs),
+    /// Report a handler-case with no handler clauses, which is just its body ((handler-case x) is x).
+    HandlerCaseNoClauses(handler_case_no_clauses_report::args::HandlerCaseNoClausesReportArgs),
+    /// Report an unwind-protect with no cleanup forms, which is just its body ((unwind-protect x) is x).
+    UnwindProtectNoCleanup(
+        unwind_protect_no_cleanup_report::args::UnwindProtectNoCleanupReportArgs,
+    ),
     /// Report a +/- of a literal 1 with a shorthand ((+ x 1) is (1+ x); (- x 1) is (1- x)).
     OneStepArithmetic(one_step_arithmetic_report::args::OneStepArithmeticReportArgs),
     /// Report (apply #'f (list ...)) forms that are just (f ...) (a direct call).

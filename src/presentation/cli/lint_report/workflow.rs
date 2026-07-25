@@ -20,8 +20,10 @@ use crate::application::usecase::format_newline_report::collect_format_newlines;
 use crate::application::usecase::format_to_string_report::collect_format_to_strings;
 use crate::application::usecase::funcall_lambda_report::collect_funcall_lambdas;
 use crate::application::usecase::gethash_default_report::collect_gethash_defaults;
+use crate::application::usecase::handler_case_no_clauses_report::collect_handler_case_no_clauses;
 use crate::application::usecase::if_not_report::collect_if_nots;
 use crate::application::usecase::if_to_or_report::collect_if_to_ors;
+use crate::application::usecase::if_to_unless_report::collect_if_to_unless;
 use crate::application::usecase::lint_report::{
     CATEGORIES, LintFinding, LintPolicyOptions, LintSuppressions, Severity, collect_lint_findings,
     evaluate_lint_policy, resolve_active_rules, rule_category, rule_severity,
@@ -48,6 +50,7 @@ use crate::application::usecase::nthcdr_small_index_report::collect_nthcdr_small
 use crate::application::usecase::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::application::usecase::one_armed_if_report::collect_one_armed_ifs;
 use crate::application::usecase::one_step_arithmetic_report::collect_one_step_arithmetic;
+use crate::application::usecase::prog2_to_progn_report::collect_prog2_to_progn;
 use crate::application::usecase::redundant_apply_report::collect_redundant_applies;
 use crate::application::usecase::redundant_body_progn_report::collect_redundant_body_progns;
 use crate::application::usecase::redundant_boolean_identity_report::collect_redundant_boolean_identities;
@@ -71,6 +74,7 @@ use crate::application::usecase::single_operand_list_op_report::collect_single_o
 use crate::application::usecase::single_value_bind_report::collect_single_value_binds;
 use crate::application::usecase::subseq_zero_report::collect_subseq_zeros;
 use crate::application::usecase::typep_predicate_report::collect_typep_predicates;
+use crate::application::usecase::unwind_protect_no_cleanup_report::collect_unwind_protect_no_cleanup;
 use crate::application::usecase::values_list_of_list_report::collect_values_list_of_lists;
 use crate::application::usecase::verbose_negation_report::collect_verbose_negations;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
@@ -267,7 +271,10 @@ fn retain_unbaselined(
 /// `(return nil)` becomes `(return)`), `single-value-bind` (rewrite a one-variable
 /// `(multiple-value-bind (x) f body)` as `(let ((x f)) body)`),
 /// `if-to-or` (rewrite `(if x x y)` as `(or x y)`), `if-not` (rewrite
-/// `(if test nil t)` as `(not test)`), `one-step-arithmetic`
+/// `(if test nil t)` as `(not test)`), `if-to-unless` (rewrite `(if c nil e)` as
+/// `(unless c e)`), `prog2-to-progn` (rewrite the `prog2` operator to `progn`),
+/// `handler-case-no-clauses` / `unwind-protect-no-cleanup` (unwrap the empty
+/// wrapper to its body), `one-step-arithmetic`
 /// (rewrite `(+ x 1)` as `(1+ x)` and `(- x 1)` as `(1- x)`),
 /// `nested-boolean` (splice a same-operator `(or …)`/`(and …)` into its
 /// enclosing `or`/`and`), `nested-when` (merge `(when a (when b body))` into
@@ -1554,6 +1561,81 @@ fn collect_lint_fixes(
         }
     }
 
+    if active.contains(&"if-to-unless") {
+        let (_, items) = collect_if_to_unless(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (if c nil e) is (unless c e).
+            let text = format!(
+                "(unless {} {})",
+                slice(item.test_span),
+                slice(item.else_span)
+            );
+            fixes.insert(
+                ("if-to-unless", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (if c nil e) as (unless c e)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"prog2-to-progn") {
+        let (_, items) = collect_prog2_to_progn(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // Rewrite the operator token prog2 -> progn, keeping the two forms.
+            let head_start = item.head_span.start().get();
+            let head_end = item.head_span.end().get();
+            fixes.insert(
+                ("prog2-to-progn", start, end),
+                one_edit(
+                    head_start,
+                    head_end,
+                    "progn".to_owned(),
+                    "Rewrite prog2 as progn".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"handler-case-no-clauses") {
+        let (_, items) = collect_handler_case_no_clauses(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (handler-case x) is x.
+            fixes.insert(
+                ("handler-case-no-clauses", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.form_span),
+                    "Drop the clauseless handler-case".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"unwind-protect-no-cleanup") {
+        let (_, items) = collect_unwind_protect_no_cleanup(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (unwind-protect x) is x.
+            fixes.insert(
+                ("unwind-protect-no-cleanup", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.form_span),
+                    "Drop the cleanupless unwind-protect".to_owned(),
+                ),
+            );
+        }
+    }
+
     if active.contains(&"negated-comparison") {
         let (_, items) = collect_negated_comparisons(file, dialect, tree)?;
         for item in items {
@@ -2249,6 +2331,10 @@ mod tests {
             "(if (not c) a b)\n",                       // negated-if
             "(if iv iv jv)\n",                          // if-to-or
             "(if iw nil t)\n",                          // if-not
+            "(if iu nil (iue))\n",                      // if-to-unless
+            "(prog2 (p2a) (p2b))\n",                    // prog2-to-progn
+            "(handler-case (hcx))\n",                   // handler-case-no-clauses
+            "(unwind-protect (upx))\n",                 // unwind-protect-no-cleanup
             "(+ osa 1)\n",                              // one-step-arithmetic
             "(if t on off)\n",                          // constant-if-test
             "(when t (bd))\n",                          // constant-when-test

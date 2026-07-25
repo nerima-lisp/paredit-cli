@@ -167,6 +167,8 @@ mod funcall_lambda_report;
 mod function_parameter;
 #[path = "cli/gethash_default_report.rs"]
 mod gethash_default_report;
+#[path = "cli/handler_case_no_clauses_report.rs"]
+mod handler_case_no_clauses_report;
 #[path = "cli/help_contract.rs"]
 mod help_contract;
 #[path = "cli/identical_if_branch_report.rs"]
@@ -179,6 +181,8 @@ mod if_arity_report;
 mod if_not_report;
 #[path = "cli/if_to_or_report.rs"]
 mod if_to_or_report;
+#[path = "cli/if_to_unless_report.rs"]
+mod if_to_unless_report;
 #[path = "cli/impact_report.rs"]
 mod impact_report;
 #[path = "cli/inline_function/mod.rs"]
@@ -271,6 +275,8 @@ mod package_conflict_report;
 mod package_cycle_report;
 #[path = "cli/plan_steps_contract.rs"]
 mod plan_steps_contract;
+#[path = "cli/prog2_to_progn_report.rs"]
+mod prog2_to_progn_report;
 #[path = "cli/public_api_docs_contract.rs"]
 mod public_api_docs_contract;
 #[path = "cli/public_module_docs_contract.rs"]
@@ -423,6 +429,8 @@ mod unused_nickname_report;
 mod unused_package_report;
 #[path = "cli/unused_parameter_report.rs"]
 mod unused_parameter_report;
+#[path = "cli/unwind_protect_no_cleanup_report.rs"]
+mod unwind_protect_no_cleanup_report;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
 #[path = "cli/values_list_of_list_report.rs"]

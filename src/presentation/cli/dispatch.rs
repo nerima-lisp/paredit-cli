@@ -234,6 +234,18 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::IfNot(args) => {
                 if_not_report::workflow::if_not_report(args)?
             }
+            command::InspectCommand::IfToUnless(args) => {
+                if_to_unless_report::workflow::if_to_unless_report(args)?
+            }
+            command::InspectCommand::Prog2ToProgn(args) => {
+                prog2_to_progn_report::workflow::prog2_to_progn_report(args)?
+            }
+            command::InspectCommand::HandlerCaseNoClauses(args) => {
+                handler_case_no_clauses_report::workflow::handler_case_no_clauses_report(args)?
+            }
+            command::InspectCommand::UnwindProtectNoCleanup(args) => {
+                unwind_protect_no_cleanup_report::workflow::unwind_protect_no_cleanup_report(args)?
+            }
             command::InspectCommand::OneStepArithmetic(args) => {
                 one_step_arithmetic_report::workflow::one_step_arithmetic_report(args)?
             }
