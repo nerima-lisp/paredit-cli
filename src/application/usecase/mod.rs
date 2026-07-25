@@ -4,6 +4,7 @@
 //! reports, and workspace workflows without coupling to the CLI shell.
 
 pub mod accessor_arity_report;
+pub mod append_list_to_cons_report;
 pub mod binds_constant_report;
 pub mod call_cycle_report;
 pub mod call_graph_report;
@@ -65,6 +66,7 @@ pub(crate) mod extract_shared;
 pub mod flatten_progn;
 pub mod form_report;
 pub mod format_missing_destination_report;
+pub mod format_to_string_report;
 pub mod funcall_lambda_report;
 pub mod function_parameter;
 pub mod identical_if_branch_report;

@@ -13,6 +13,8 @@ mod accessor_arity_report;
 mod action_contract;
 #[path = "cli/analysis_report.rs"]
 mod analysis_report;
+#[path = "cli/append_list_to_cons_report.rs"]
+mod append_list_to_cons_report;
 #[path = "cli/basic_edit_write.rs"]
 mod basic_edit_write;
 #[path = "cli/binds_constant_report.rs"]
@@ -143,6 +145,8 @@ mod form_report;
 mod format;
 #[path = "cli/format_missing_destination_report.rs"]
 mod format_missing_destination_report;
+#[path = "cli/format_to_string_report.rs"]
+mod format_to_string_report;
 #[path = "cli/funcall_lambda_report.rs"]
 mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]

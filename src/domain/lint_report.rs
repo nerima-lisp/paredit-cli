@@ -19,6 +19,7 @@ use anyhow::Result;
 use crate::domain::accessor_arity_report::{
     collect_accessor_arity_violations, expected_arity_phrase as accessor_arity_phrase,
 };
+use crate::domain::append_list_to_cons_report::collect_append_list_to_cons;
 use crate::domain::binds_constant_report::collect_binds_constant;
 use crate::domain::case_nil_key_report::collect_case_nil_keys;
 use crate::domain::char_op_string_report::collect_char_op_strings;
@@ -51,6 +52,7 @@ use crate::domain::exhaustive_case_otherwise_report::collect_exhaustive_case_oth
 use crate::domain::explicit_nil_return_report::collect_explicit_nil_returns;
 use crate::domain::explicit_step_delta_report::collect_explicit_step_deltas;
 use crate::domain::format_missing_destination_report::collect_format_missing_destinations;
+use crate::domain::format_to_string_report::collect_format_to_strings;
 use crate::domain::funcall_lambda_report::collect_funcall_lambdas;
 use crate::domain::identical_if_branch_report::collect_identical_if_branches;
 use crate::domain::identity_arithmetic_report::collect_identity_arithmetic;
@@ -118,7 +120,7 @@ use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clau
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 94] = [
+pub const RULES: [&str; 96] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -174,6 +176,8 @@ pub const RULES: [&str; 94] = [
     "the-arity",
     "equality-arity",
     "accessor-arity",
+    "append-list-to-cons",
+    "format-to-string",
     "duplicate-case-keys",
     "quoted-case-key",
     "case-nil-key",
@@ -225,7 +229,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 94] = [
+pub const RULE_DOCS: [(&str, &str, &str); 96] = [
     (
         "self-assignment",
         "suspicious",
@@ -502,6 +506,16 @@ pub const RULE_DOCS: [(&str, &str, &str); 94] = [
         "an nth/elt/gethash/getf/... accessor with the wrong number of arguments",
     ),
     (
+        "append-list-to-cons",
+        "suspicious",
+        "a one-element append that is just a cons ((append (list x) rest) is (cons x rest))",
+    ),
+    (
+        "format-to-string",
+        "suspicious",
+        "a (format nil \"~A\"/\"~S\" x), which is (princ-to-string x)/(prin1-to-string x)",
+    ),
+    (
         "duplicate-case-keys",
         "duplicate",
         "a case/ecase/ccase key repeated across more than one clause",
@@ -720,7 +734,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 52] = [
+pub const FIXABLE_RULES: [&str; 54] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -729,6 +743,8 @@ pub const FIXABLE_RULES: [&str; 52] = [
     "explicit-nil-return",
     "cons-to-list",
     "double-reverse",
+    "append-list-to-cons",
+    "format-to-string",
     "redundant-quote",
     "redundant-progn",
     "nested-progn",
@@ -813,7 +829,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 53] = [
+pub const WARNING_RULES: [&str; 55] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -822,6 +838,8 @@ pub const WARNING_RULES: [&str; 53] = [
     "explicit-nil-return",
     "cons-to-list",
     "double-reverse",
+    "append-list-to-cons",
+    "format-to-string",
     "redundant-quote",
     "redundant-progn",
     "nested-progn",
@@ -1583,6 +1601,30 @@ pub fn collect_lint_findings(
             message: format!(
                 "{} takes {} argument(s) but has {}",
                 item.operator, expected, item.argument_count
+            ),
+        });
+    }
+
+    let (_, items) = collect_append_list_to_cons(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "append-list-to-cons",
+            path: item.path,
+            span: item.span,
+            message: "a one-element append is just a cons; (append (list x) rest) is (cons x rest)"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_format_to_strings(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "format-to-string",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "format to a string is just {}; use ({} x)",
+                item.replacement, item.replacement
             ),
         });
     }

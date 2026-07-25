@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 138] = [
+const INTROSPECTION_COMMANDS: [&str; 140] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -164,6 +164,7 @@ const INTROSPECTION_COMMANDS: [&str; 138] = [
     "inspect constant-when-test",
     "inspect cons-to-list",
     "inspect double-reverse",
+    "inspect append-list-to-cons",
     "inspect verbose-negation",
     "inspect negated-when-unless",
     "inspect nested-boolean",
@@ -186,6 +187,7 @@ const INTROSPECTION_COMMANDS: [&str; 138] = [
     "inspect single-value-bind",
     "inspect sign-comparison",
     "inspect format-missing-destination",
+    "inspect format-to-string",
     "inspect literal-place",
     "inspect eq-char-comparison",
     "inspect redundant-apply",

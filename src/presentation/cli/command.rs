@@ -1,5 +1,5 @@
 use super::{
-    accessor_arity_report,
+    accessor_arity_report, append_list_to_cons_report,
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
@@ -20,7 +20,7 @@ use super::{
     equality_arity_report, eval_when_situation_report, exhaustive_case_otherwise_report,
     explicit_nil_return_report, explicit_step_delta_report, extract_constant, extract_function,
     extract_local_function, flatten_progn, form_report, format_missing_destination_report,
-    funcall_lambda_report, function_parameter, identical_if_branch_report,
+    format_to_string_report, funcall_lambda_report, function_parameter, identical_if_branch_report,
     identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report, impact_report,
     inline_function, inline_lambda, inline_let, inline_literal_constant, inline_local_function,
     inline_symbol_macro, introduce_let, lambda_list_keyword_order_report, let_report, lint_report,
@@ -236,6 +236,8 @@ pub(super) enum InspectCommand {
     ConsToList(cons_to_list_report::args::ConsToListReportArgs),
     /// Report (reverse (reverse x)), a wasteful obfuscated copy ((reverse (reverse x)) is (copy-seq x)).
     DoubleReverse(double_reverse_report::args::DoubleReverseReportArgs),
+    /// Report (append (list x) rest), a one-element append that is just a cons ((append (list x) r) is (cons x r)).
+    AppendListToCons(append_list_to_cons_report::args::AppendListToConsReportArgs),
     /// Report negation written the long way ((- 0 x) and (* x -1) are (- x)).
     VerboseNegation(verbose_negation_report::args::VerboseNegationReportArgs),
     /// Report a same-operator and/or nested in an and/or, which flattens ((or a (or b c)) is (or a b c)).
@@ -314,6 +316,8 @@ pub(super) enum InspectCommand {
     FormatMissingDestination(
         format_missing_destination_report::args::FormatMissingDestinationReportArgs,
     ),
+    /// Report (format nil "~A"/"~S" x), which is (princ-to-string x)/(prin1-to-string x).
+    FormatToString(format_to_string_report::args::FormatToStringReportArgs),
     /// Report incf/decf/push/pop/pushnew whose place is a self-evaluating literal (cannot be modified).
     LiteralPlace(literal_place_report::args::LiteralPlaceReportArgs),
     /// Report declared function parameters with no unshadowed reference in their body.

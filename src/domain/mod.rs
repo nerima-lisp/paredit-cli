@@ -2,6 +2,7 @@
 //! independent from CLI delivery and filesystem adapters.
 
 pub mod accessor_arity_report;
+pub mod append_list_to_cons_report;
 pub(crate) mod binding_index;
 pub mod binds_constant_report;
 pub mod call_cycle_report;
@@ -62,6 +63,7 @@ pub mod form_report;
 pub mod form_shape;
 pub mod form_similarity;
 pub mod format_missing_destination_report;
+pub mod format_to_string_report;
 pub mod funcall_lambda_report;
 pub(crate) mod function_parameter;
 pub(crate) mod graph;

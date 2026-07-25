@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::append_list_to_cons_report::collect_append_list_to_cons;
 use crate::application::usecase::cond_t_clause_report::collect_cond_t_clauses;
 use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
 use crate::application::usecase::constant_if_test_report::collect_constant_if_tests;
@@ -11,6 +12,7 @@ use crate::application::usecase::eq_char_comparison_report::collect_eq_char_comp
 use crate::application::usecase::eq_number_comparison_report::collect_eq_number_comparisons;
 use crate::application::usecase::explicit_nil_return_report::collect_explicit_nil_returns;
 use crate::application::usecase::explicit_step_delta_report::collect_explicit_step_deltas;
+use crate::application::usecase::format_to_string_report::collect_format_to_strings;
 use crate::application::usecase::funcall_lambda_report::collect_funcall_lambdas;
 use crate::application::usecase::if_not_report::collect_if_nots;
 use crate::application::usecase::if_to_or_report::collect_if_to_ors;
@@ -223,7 +225,10 @@ fn retain_unbaselined(
 /// `redundant-identity` (replace
 /// `(identity x)` with `x`), `cons-to-list` (rewrite `(cons a nil)` as
 /// `(list a)`), `double-reverse` (rewrite `(reverse (reverse x))` as
-/// `(copy-seq x)`), `verbose-negation` (rewrite `(- 0 x)` / `(* x -1)` as `(- x)`),
+/// `(copy-seq x)`), `append-list-to-cons` (rewrite `(append (list x) rest)` as
+/// `(cons x rest)`), `format-to-string` (rewrite `(format nil "~A" x)` as
+/// `(princ-to-string x)` and `"~S"` as `(prin1-to-string x)`),
+/// `verbose-negation` (rewrite `(- 0 x)` / `(* x -1)` as `(- x)`),
 /// `negated-when-unless` (a two-edit fix: flip the
 /// `when`/`unless` head and drop the `(not …)`), `one-armed-if` (swap an
 /// else-less `if` head for `when`), `manual-incf` (rewrite `(setf x (1+ x))` as
@@ -926,6 +931,46 @@ fn collect_lint_fixes(
                     end,
                     text,
                     "Rewrite (reverse (reverse x)) as (copy-seq x)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"append-list-to-cons") {
+        let (_, items) = collect_append_list_to_cons(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (append (list x) rest) is (cons x rest).
+            let text = format!(
+                "(cons {} {})",
+                slice(item.element_span),
+                slice(item.rest_span)
+            );
+            fixes.insert(
+                ("append-list-to-cons", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (append (list x) rest) as (cons x rest)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"format-to-string") {
+        let (_, items) = collect_format_to_strings(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (format nil "~A"/"~S" x) is (princ-to-string x)/(prin1-to-string x).
+            let text = format!("({} {})", item.replacement, slice(item.argument_span));
+            fixes.insert(
+                ("format-to-string", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    format!("Rewrite (format nil … x) as ({} x)", item.replacement),
                 ),
             );
         }
@@ -1861,6 +1906,8 @@ mod tests {
             "(identity h)\n",                         // redundant-identity
             "(cons e nil)\n",                         // cons-to-list
             "(reverse (reverse dr))\n",               // double-reverse
+            "(append (list al) ar)\n",                // append-list-to-cons
+            "(format nil \"~A\" fs)\n",               // format-to-string
             "(- 0 amt)\n",                            // verbose-negation
             "(let* ((a 1)) a)\n",                     // redundant-let-star
             "(cond (ok (run)))\n",                    // single-clause-cond

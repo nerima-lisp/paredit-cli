@@ -243,6 +243,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::DoubleReverse(args) => {
                 double_reverse_report::workflow::double_reverse_report(args)?
             }
+            command::InspectCommand::AppendListToCons(args) => {
+                append_list_to_cons_report::workflow::append_list_to_cons_report(args)?
+            }
             command::InspectCommand::VerboseNegation(args) => {
                 verbose_negation_report::workflow::verbose_negation_report(args)?
             }
@@ -343,6 +346,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::FormatMissingDestination(args) => {
                 format_missing_destination_report::workflow::format_missing_destination_report(args)?
+            }
+            command::InspectCommand::FormatToString(args) => {
+                format_to_string_report::workflow::format_to_string_report(args)?
             }
             command::InspectCommand::LiteralPlace(args) => {
                 literal_place_report::workflow::literal_place_report(args)?

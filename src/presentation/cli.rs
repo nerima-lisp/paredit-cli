@@ -6,6 +6,7 @@ macro_rules! safe_text {
 
 mod accessor_arity_report;
 mod analysis_report;
+mod append_list_to_cons_report;
 mod args;
 mod basic_edit;
 mod binds_constant_report;
@@ -74,6 +75,7 @@ mod extract_local_function;
 mod flatten_progn;
 mod form_report;
 mod format_missing_destination_report;
+mod format_to_string_report;
 mod funcall_lambda_report;
 mod function_parameter;
 mod gate;
