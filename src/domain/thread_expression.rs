@@ -25,7 +25,11 @@ pub fn plan_thread_expression(
     match request.dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => {}
@@ -39,7 +43,11 @@ pub fn plan_thread_expression(
     let already_threaded = list_head(&request.target).is_some_and(|head| match request.dialect {
         Dialect::CommonLisp => common_lisp_symbol_reference_eq(head, request.operator.as_str()),
         Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => head == request.operator.as_str(),

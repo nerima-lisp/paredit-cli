@@ -8,10 +8,15 @@ pub(super) fn introduced_let(
     body: &str,
 ) -> String {
     match dialect {
-        Dialect::Clojure | Dialect::Janet | Dialect::Fennel => {
+        Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel => {
             format!("(let [{} {}] {})", name.as_str(), value, body)
         }
-        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Lfe
+        | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Unknown => {
             format!("(let (({} {})) {})", name.as_str(), value, body)
         }
     }

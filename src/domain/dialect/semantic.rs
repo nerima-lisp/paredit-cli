@@ -289,8 +289,12 @@ impl DialectSemanticPolicy {
             (
                 Dialect::CommonLisp
                     | Dialect::EmacsLisp
+                    | Dialect::Lfe
                     | Dialect::Scheme
+                    | Dialect::Racket
                     | Dialect::Clojure
+                    | Dialect::Hy
+                    | Dialect::Carp
                     | Dialect::Janet
                     | Dialect::Fennel,
                 SemanticOperation::IntroduceLet
@@ -320,8 +324,12 @@ impl DialectSemanticPolicy {
         match self.dialect {
             Dialect::CommonLisp => common_lisp_symbol_identity_eq(candidate, expected),
             Dialect::EmacsLisp
+            | Dialect::Lfe
             | Dialect::Scheme
+            | Dialect::Racket
             | Dialect::Clojure
+            | Dialect::Hy
+            | Dialect::Carp
             | Dialect::Janet
             | Dialect::Fennel
             | Dialect::Unknown => candidate == expected,
@@ -531,15 +539,28 @@ fn definition_shape(
         Dialect::EmacsLisp if matches!(head, "defvar" | "defconst" | "defcustom") => {
             direct_variable_shape(form)
         }
-        Dialect::Scheme if head == "define" => scheme_define_shape(form),
-        Dialect::Scheme if head == "define-syntax" => scheme_define_syntax_shape(form),
-        Dialect::Clojure if head == "defn" => {
+        Dialect::Lfe if head == "defun" => {
+            direct_callable_shape(form, Delimiter::Paren, DIRECT_FUNCTION)
+        }
+        Dialect::Lfe if head == "defmacro" => {
+            direct_callable_shape(form, Delimiter::Paren, DIRECT_MACRO)
+        }
+        Dialect::Scheme | Dialect::Racket if head == "define" => scheme_define_shape(form),
+        Dialect::Scheme | Dialect::Racket if head == "define-syntax" => {
+            scheme_define_syntax_shape(form)
+        }
+        Dialect::Clojure | Dialect::Hy if head == "defn" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
         }
-        Dialect::Clojure if head == "defmacro" => {
+        Dialect::Clojure | Dialect::Hy if head == "defmacro" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_MACRO)
         }
         Dialect::Clojure if head == "def" => direct_variable_shape(form),
+        Dialect::Hy if head == "setv" => direct_variable_shape(form),
+        Dialect::Carp if head == "defn" => {
+            direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
+        }
+        Dialect::Carp if head == "def" => direct_variable_shape(form),
         Dialect::Janet if matches!(head, "defn" | "defn-") => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
         }
@@ -557,8 +578,12 @@ fn definition_shape(
         Dialect::Unknown
         | Dialect::CommonLisp
         | Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
         | Dialect::Clojure
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Janet
         | Dialect::Fennel => None,
     }
@@ -659,15 +684,24 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         Dialect::EmacsLisp if head == "lambda" => {
             parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
         }
-        Dialect::Scheme if head == "let" => scheme_let_scope(form),
-        Dialect::Scheme if head == "let*" => {
+        Dialect::Lfe if head == "let" => list_scope(form, Delimiter::Paren, LIST_LET_SCOPE),
+        Dialect::Lfe if head == "let*" => list_scope(form, Delimiter::Paren, LIST_LET_STAR_SCOPE),
+        Dialect::Lfe if head == "lambda" => {
+            parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
+        }
+        Dialect::Scheme | Dialect::Racket if head == "let" => scheme_let_scope(form),
+        Dialect::Scheme | Dialect::Racket if head == "let*" => {
             list_scope(form, Delimiter::Paren, LIST_LET_STAR_SCOPE)
         }
-        Dialect::Scheme if head == "lambda" => {
+        Dialect::Scheme | Dialect::Racket if head == "lambda" => {
             parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
         }
         Dialect::Clojure if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
         Dialect::Clojure if head == "fn" => clojure_fn_scope(form),
+        Dialect::Hy if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
+        Dialect::Hy if head == "fn" => parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE),
+        Dialect::Carp if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
+        Dialect::Carp if head == "fn" => parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE),
         Dialect::Janet if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
         Dialect::Janet if head == "fn" => {
             parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE)
@@ -679,8 +713,12 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         Dialect::Unknown
         | Dialect::CommonLisp
         | Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
         | Dialect::Clojure
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Janet
         | Dialect::Fennel => None,
     }

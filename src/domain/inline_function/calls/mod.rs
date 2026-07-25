@@ -132,7 +132,11 @@ pub(super) fn inline_function_symbol_reference_eq(
     match dialect {
         Dialect::CommonLisp => common_lisp_symbol_reference_eq(left, right),
         Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => left == right,

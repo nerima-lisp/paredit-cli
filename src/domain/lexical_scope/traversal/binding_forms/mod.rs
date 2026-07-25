@@ -163,7 +163,11 @@ pub(super) fn collect_shadow_aware_special_form(
 fn is_dialect_callable_head(dialect: Dialect, head: &str) -> bool {
     matches!(
         (dialect, head),
-        (Dialect::Scheme, "lambda") | (Dialect::Clojure | Dialect::Janet | Dialect::Fennel, "fn")
+        (Dialect::Scheme | Dialect::Racket | Dialect::Lfe, "lambda")
+            | (
+                Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel,
+                "fn"
+            )
     )
 }
 
@@ -174,7 +178,7 @@ fn collect_dialect_callable_references(
     input: &str,
     output: &mut Vec<ByteSpan>,
 ) -> bool {
-    if dialect == Dialect::Scheme {
+    if matches!(dialect, Dialect::Scheme | Dialect::Racket | Dialect::Lfe) {
         let Some(parameter_form) = view.children.get(1) else {
             return false;
         };

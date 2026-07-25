@@ -29,7 +29,11 @@ impl Dialect {
                     | "provide"
                     | "require"
             ),
-            Self::Scheme => matches!(
+            Self::Lfe => matches!(
+                head,
+                "defun" | "defmacro" | "defrecord" | "defmodule" | "defsyntax"
+            ),
+            Self::Scheme | Self::Racket => matches!(
                 head,
                 "define" | "define-syntax" | "define-library" | "lambda" | "let" | "let*"
             ),
@@ -43,6 +47,11 @@ impl Dialect {
                     | "defprotocol"
                     | "defmulti"
                     | "defmethod"
+            ),
+            Self::Hy => matches!(head, "defn" | "defmacro" | "defclass" | "setv" | "require"),
+            Self::Carp => matches!(
+                head,
+                "defn" | "def" | "deftype" | "definterface" | "defdynamic" | "defmodule"
             ),
             Self::Janet => matches!(head, "def" | "defn" | "defmacro" | "def-" | "defn-"),
             Self::Fennel => matches!(head, "fn" | "lambda" | "macro" | "local" | "global"),
@@ -68,8 +77,9 @@ impl Dialect {
                     | "cl-defgeneric"
                     | "cl-defmethod"
             ),
-            Self::Scheme => matches!(head, "define"),
-            Self::Clojure => matches!(head, "defn" | "defmacro"),
+            Self::Lfe => matches!(head, "defun"),
+            Self::Scheme | Self::Racket => matches!(head, "define"),
+            Self::Clojure | Self::Hy | Self::Carp => matches!(head, "defn" | "defmacro"),
             Self::Janet => matches!(head, "defn" | "defmacro"),
             Self::Fennel => matches!(head, "fn" | "lambda"),
             Self::Unknown => {
@@ -95,8 +105,9 @@ impl Dialect {
             Self::CommonLisp => common_lisp_operator(head)
                 .is_some_and(CommonLispOperator::is_inline_function_definition),
             Self::EmacsLisp => matches!(head, "defun" | "cl-defun" | "defsubst"),
-            Self::Scheme => head == "define",
-            Self::Clojure | Self::Janet => matches!(head, "defn" | "defn-"),
+            Self::Lfe => head == "defun",
+            Self::Scheme | Self::Racket => head == "define",
+            Self::Clojure | Self::Hy | Self::Carp | Self::Janet => matches!(head, "defn" | "defn-"),
             Self::Fennel => head == "fn",
             Self::Unknown => {
                 Self::CommonLisp.supports_inline_function_refactor_head(head)
@@ -117,9 +128,9 @@ impl Dialect {
 
     pub(crate) fn inline_function_sequence_head(self) -> &'static str {
         match self {
-            Self::CommonLisp | Self::EmacsLisp | Self::Unknown => "progn",
-            Self::Scheme => "begin",
-            Self::Clojure | Self::Janet | Self::Fennel => "do",
+            Self::CommonLisp | Self::EmacsLisp | Self::Lfe | Self::Unknown => "progn",
+            Self::Scheme | Self::Racket => "begin",
+            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel => "do",
         }
     }
 
@@ -140,7 +151,12 @@ impl Dialect {
     pub(crate) fn let_binding_form_for_head(self, head: &str) -> Option<CommonLispLetBindingForm> {
         if !matches!(
             self,
-            Self::CommonLisp | Self::EmacsLisp | Self::Scheme | Self::Unknown
+            Self::CommonLisp
+                | Self::EmacsLisp
+                | Self::Lfe
+                | Self::Scheme
+                | Self::Racket
+                | Self::Unknown
         ) {
             return None;
         }
@@ -166,10 +182,15 @@ impl Dialect {
         }
 
         match self {
-            Self::Clojure if head == "let" => Some(CommonLispValueScopeForm::Let(
+            Self::Clojure | Self::Hy | Self::Carp if head == "let" => Some(
+                CommonLispValueScopeForm::Let(CommonLispLetBindingForm::Parallel),
+            ),
+            Self::Clojure | Self::Hy | Self::Carp if head == "fn" => {
+                Some(CommonLispValueScopeForm::FunctionLiteral)
+            }
+            Self::Lfe if head == "let" => Some(CommonLispValueScopeForm::Let(
                 CommonLispLetBindingForm::Parallel,
             )),
-            Self::Clojure if head == "fn" => Some(CommonLispValueScopeForm::FunctionLiteral),
             _ => None,
         }
     }
@@ -183,7 +204,17 @@ impl Dialect {
         }
 
         match self {
-            Self::Scheme => match head {
+            Self::Lfe => match head {
+                "let" => Some(CommonLispBindingRefactorForm::Let(
+                    CommonLispLetBindingForm::Parallel,
+                )),
+                "let*" => Some(CommonLispBindingRefactorForm::Let(
+                    CommonLispLetBindingForm::Sequential,
+                )),
+                "lambda" | "match-lambda" => Some(CommonLispBindingRefactorForm::LambdaLike),
+                _ => None,
+            },
+            Self::Scheme | Self::Racket => match head {
                 "let" => Some(CommonLispBindingRefactorForm::Let(
                     CommonLispLetBindingForm::Parallel,
                 )),
@@ -193,10 +224,12 @@ impl Dialect {
                 "lambda" => Some(CommonLispBindingRefactorForm::LambdaLike),
                 _ => None,
             },
-            Self::Clojure | Self::Janet | Self::Fennel if head == "let" => Some(
-                CommonLispBindingRefactorForm::Let(CommonLispLetBindingForm::Parallel),
-            ),
-            Self::Clojure | Self::Fennel if head == "fn" => {
+            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel if head == "let" => {
+                Some(CommonLispBindingRefactorForm::Let(
+                    CommonLispLetBindingForm::Parallel,
+                ))
+            }
+            Self::Clojure | Self::Hy | Self::Carp | Self::Fennel if head == "fn" => {
                 Some(CommonLispBindingRefactorForm::LambdaLike)
             }
             _ => None,
@@ -255,8 +288,13 @@ impl Dialect {
 
     pub(crate) fn supports_inline_let_refactor_head(self, head: &str) -> bool {
         match self {
-            Self::Clojure | Self::Janet | Self::Fennel => head == "let",
-            Self::CommonLisp | Self::EmacsLisp | Self::Scheme | Self::Unknown => self
+            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel => head == "let",
+            Self::CommonLisp
+            | Self::EmacsLisp
+            | Self::Lfe
+            | Self::Scheme
+            | Self::Racket
+            | Self::Unknown => self
                 .let_binding_form_for_head(head)
                 .is_some_and(CommonLispLetBindingForm::supports_inline_refactor),
         }

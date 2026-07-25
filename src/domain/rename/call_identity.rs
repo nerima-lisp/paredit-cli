@@ -5,7 +5,11 @@ pub(super) fn call_reference_eq(dialect: Dialect, candidate: &str, expected: &st
     match dialect {
         Dialect::CommonLisp => common_lisp_symbol_reference_eq(candidate, expected),
         Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => candidate == expected,

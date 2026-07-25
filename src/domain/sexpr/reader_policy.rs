@@ -66,7 +66,11 @@ impl DialectReaderPolicy {
     pub(super) fn supports_block_comments(self) -> bool {
         matches!(
             self.dialect,
-            Dialect::CommonLisp | Dialect::Scheme | Dialect::Unknown
+            Dialect::CommonLisp
+                | Dialect::Lfe
+                | Dialect::Scheme
+                | Dialect::Racket
+                | Dialect::Unknown
         )
     }
 
@@ -100,7 +104,7 @@ impl DialectReaderPolicy {
         let byte = *bytes.get(pos)?;
         let next = bytes.get(pos + 1).copied();
         match self.dialect {
-            Dialect::Scheme if byte == b'#' && next == Some(b'\\') => Some(2),
+            Dialect::Scheme | Dialect::Racket if byte == b'#' && next == Some(b'\\') => Some(2),
             Dialect::Clojure if byte == b'\\' => Some(1),
             Dialect::EmacsLisp if byte == b'?' && next == Some(b'\\') => Some(2),
             Dialect::EmacsLisp if byte == b'?' => Some(1),
@@ -114,10 +118,12 @@ impl DialectReaderPolicy {
         let third = bytes.get(pos + 2).copied();
 
         match self.dialect {
-            Dialect::Unknown => self.classify_legacy(byte, next, third),
+            Dialect::Unknown | Dialect::Lfe | Dialect::Hy | Dialect::Carp => {
+                self.classify_legacy(byte, next, third)
+            }
             Dialect::CommonLisp => self.classify_common_lisp(bytes, pos),
             Dialect::EmacsLisp => self.classify_emacs_lisp(byte, next),
-            Dialect::Scheme => self.classify_scheme(bytes, pos),
+            Dialect::Scheme | Dialect::Racket => self.classify_scheme(bytes, pos),
             Dialect::Clojure => self.classify_clojure(bytes, pos),
             Dialect::Janet => self.classify_janet(byte, next),
             Dialect::Fennel => self.classify_fennel(byte, next),
@@ -128,7 +134,14 @@ impl DialectReaderPolicy {
         match self.dialect {
             Dialect::CommonLisp | Dialect::Scheme => matches!(delimiter, Delimiter::Paren),
             Dialect::EmacsLisp => matches!(delimiter, Delimiter::Paren | Delimiter::Bracket),
-            Dialect::Clojure | Dialect::Janet | Dialect::Fennel | Dialect::Unknown => true,
+            Dialect::Racket
+            | Dialect::Lfe
+            | Dialect::Clojure
+            | Dialect::Hy
+            | Dialect::Carp
+            | Dialect::Janet
+            | Dialect::Fennel
+            | Dialect::Unknown => true,
         }
     }
 

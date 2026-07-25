@@ -26,7 +26,11 @@ pub fn plan_unthread_expression(
     match request.dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => {}

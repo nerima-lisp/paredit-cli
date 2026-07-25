@@ -28,7 +28,14 @@ pub(super) fn collect_lambda_list_references(
 
     if matches!(
         dialect,
-        Dialect::Scheme | Dialect::Clojure | Dialect::Janet | Dialect::Fennel
+        Dialect::Scheme
+            | Dialect::Racket
+            | Dialect::Lfe
+            | Dialect::Clojure
+            | Dialect::Hy
+            | Dialect::Carp
+            | Dialect::Janet
+            | Dialect::Fennel
     ) {
         return collect_simple_parameter_list_references(
             dialect,

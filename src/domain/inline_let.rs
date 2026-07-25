@@ -36,8 +36,12 @@ pub(crate) const fn supports_inline_let_dialect(dialect: Dialect) -> bool {
         dialect,
         Dialect::CommonLisp
             | Dialect::EmacsLisp
+            | Dialect::Lfe
             | Dialect::Scheme
+            | Dialect::Racket
             | Dialect::Clojure
+            | Dialect::Hy
+            | Dialect::Carp
             | Dialect::Janet
             | Dialect::Fennel
     )
@@ -184,12 +188,15 @@ fn parts(dialect: Dialect, input: &str, target: &ExpressionView) -> Result<Parts
     }
 
     let (binding_name, binding_value_view) = match dialect {
-        Dialect::Clojure | Dialect::Janet | Dialect::Fennel => {
+        Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel => {
             vector_let_binding(&target.children[1])?
         }
-        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
-            list_pair_let_binding(&target.children[1])?
-        }
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Lfe
+        | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Unknown => list_pair_let_binding(&target.children[1])?,
     };
     let binding_name = SymbolName::new(binding_name)?;
     let mut reference_spans = Vec::new();

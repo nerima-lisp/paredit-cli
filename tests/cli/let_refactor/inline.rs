@@ -203,7 +203,20 @@ fn cli_plans_inline_let_for_all_known_stdin_dialects() {
             "(let ((product (* width height))) (+ product margin))",
         ),
         (
+            "lfe",
+            "(let ((product (* width height))) (+ product margin))",
+        ),
+        (
+            "racket",
+            "(let ((product (* width height))) (+ product margin))",
+        ),
+        (
             "clojure",
+            "(let [product (* width height)] (+ product margin))",
+        ),
+        ("hy", "(let [product (* width height)] (+ product margin))"),
+        (
+            "carp",
             "(let [product (* width height)] (+ product margin))",
         ),
         (

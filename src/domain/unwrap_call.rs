@@ -36,7 +36,11 @@ pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
     match dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => Ok(()),
@@ -70,7 +74,11 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
                 common_lisp_symbol_reference_eq(expected.as_str(), function.as_str())
             }
             Dialect::EmacsLisp
+            | Dialect::Lfe
             | Dialect::Scheme
+            | Dialect::Racket
+            | Dialect::Hy
+            | Dialect::Carp
             | Dialect::Clojure
             | Dialect::Janet
             | Dialect::Fennel => expected.as_str() == function.as_str(),

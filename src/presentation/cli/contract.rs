@@ -5,11 +5,15 @@ use crate::domain::inline_function::supports_inline_function_dialect;
 use crate::domain::inline_let::supports_inline_let_dialect;
 use crate::domain::rename::supports_rename_at_dialect;
 
-pub(super) const DIALECTS: [&str; 6] = [
+pub(super) const DIALECTS: [&str; 10] = [
     "common-lisp",
     "emacs-lisp",
+    "lfe",
     "scheme",
+    "racket",
     "clojure",
+    "hy",
+    "carp",
     "janet",
     "fennel",
 ];

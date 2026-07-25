@@ -76,7 +76,7 @@ fn schema_v2_registry_is_an_exact_bijection_with_clap_leaves() {
     let unique_registry_paths = registry_paths.iter().copied().collect::<BTreeSet<_>>();
 
     assert_eq!(registry_paths.len(), unique_registry_paths.len());
-    assert_eq!(registry_paths.len(), 113);
+    assert_eq!(registry_paths.len(), 225);
     assert_eq!(
         clap_contract_leaf_paths(&v1),
         unique_registry_paths
@@ -92,16 +92,20 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
     assert_eq!(report["schema_version"], 2);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["command_count"], 113);
-    assert_eq!(contract["dialect_count"], 6);
-    assert_eq!(contract["cell_count"], 678);
+    assert_eq!(contract["command_count"], 225);
+    assert_eq!(contract["dialect_count"], 10);
+    assert_eq!(contract["cell_count"], 2250);
     assert_eq!(
         contract["dialects"],
         serde_json::json!([
             "common-lisp",
             "emacs-lisp",
+            "lfe",
             "scheme",
+            "racket",
             "clojure",
+            "hy",
+            "carp",
             "janet",
             "fennel"
         ])
@@ -119,8 +123,12 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
     let expected_dialects = [
         "common-lisp",
         "emacs-lisp",
+        "lfe",
         "scheme",
+        "racket",
         "clojure",
+        "hy",
+        "carp",
         "janet",
         "fennel",
     ]
@@ -165,22 +173,26 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
         category_counts,
         BTreeMap::from([
             ("format", 2),
-            ("introspection", 21),
+            ("introspection", 128),
             ("semantic", 78),
-            ("structural", 12),
+            ("structural", 17),
         ])
     );
-    assert_eq!(cell_count, 678);
+    assert_eq!(cell_count, 2250);
     assert_eq!(
         supported_cells,
         [
             "refactor inline-function|common-lisp",
             "refactor inline-function|emacs-lisp",
+            "refactor inline-let|carp",
             "refactor inline-let|clojure",
             "refactor inline-let|common-lisp",
             "refactor inline-let|emacs-lisp",
             "refactor inline-let|fennel",
+            "refactor inline-let|hy",
             "refactor inline-let|janet",
+            "refactor inline-let|lfe",
+            "refactor inline-let|racket",
             "refactor inline-let|scheme",
             "refactor rename-at|common-lisp",
         ]
@@ -191,14 +203,22 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
     assert_eq!(
         unsupported_cells,
         [
+            "refactor inline-function|carp",
             "refactor inline-function|clojure",
             "refactor inline-function|fennel",
+            "refactor inline-function|hy",
             "refactor inline-function|janet",
+            "refactor inline-function|lfe",
+            "refactor inline-function|racket",
             "refactor inline-function|scheme",
+            "refactor rename-at|carp",
             "refactor rename-at|clojure",
             "refactor rename-at|emacs-lisp",
             "refactor rename-at|fennel",
+            "refactor rename-at|hy",
             "refactor rename-at|janet",
+            "refactor rename-at|lfe",
+            "refactor rename-at|racket",
             "refactor rename-at|scheme",
         ]
         .into_iter()

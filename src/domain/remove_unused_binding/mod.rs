@@ -278,7 +278,11 @@ fn binding_name_matches(dialect: Dialect, candidate: &str, expected: &str) -> bo
     match dialect {
         Dialect::CommonLisp => common_lisp_symbol_reference_eq(candidate, expected),
         Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => candidate == expected,

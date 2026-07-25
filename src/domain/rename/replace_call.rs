@@ -43,7 +43,11 @@ pub fn plan_replace_function_calls(
     match request.dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
+        | Dialect::Lfe
         | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Hy
+        | Dialect::Carp
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => {}

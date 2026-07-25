@@ -39,7 +39,30 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
             "provide" | "require" => DefinitionCategory::Package,
             _ => return None,
         },
-        Dialect::Scheme => match normalized_lower.as_str() {
+        Dialect::Lfe => match normalized_lower.as_str() {
+            "defun" => DefinitionCategory::Function,
+            "defmacro" => DefinitionCategory::Macro,
+            "defrecord" => DefinitionCategory::Struct,
+            "defmodule" => DefinitionCategory::Package,
+            "defsyntax" => DefinitionCategory::Macro,
+            _ => return None,
+        },
+        Dialect::Hy => match normalized_lower.as_str() {
+            "defn" => DefinitionCategory::Function,
+            "defmacro" => DefinitionCategory::Macro,
+            "defclass" => DefinitionCategory::Class,
+            "setv" => DefinitionCategory::Variable,
+            _ => return None,
+        },
+        Dialect::Carp => match normalized_lower.as_str() {
+            "defn" => DefinitionCategory::Function,
+            "def" => DefinitionCategory::Variable,
+            "deftype" => DefinitionCategory::Struct,
+            "definterface" => DefinitionCategory::Class,
+            "defmodule" => DefinitionCategory::Package,
+            _ => return None,
+        },
+        Dialect::Scheme | Dialect::Racket => match normalized_lower.as_str() {
             "define" | "lambda" => DefinitionCategory::Function,
             "define-syntax" => DefinitionCategory::Macro,
             "define-library" => DefinitionCategory::Package,
@@ -124,6 +147,13 @@ pub(super) fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool
                 .as_str(),
             "defmacro" | "cl-defmacro"
         ),
-        Dialect::Scheme | Dialect::Clojure | Dialect::Janet | Dialect::Fennel => false,
+        Dialect::Lfe
+        | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Clojure
+        | Dialect::Hy
+        | Dialect::Carp
+        | Dialect::Janet
+        | Dialect::Fennel => false,
     }
 }

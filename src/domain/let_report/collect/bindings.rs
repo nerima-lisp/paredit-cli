@@ -17,12 +17,15 @@ pub(super) fn let_binding_candidates(
     binding_form: &ExpressionView,
 ) -> Result<(&'static str, Vec<LetBindingCandidate>)> {
     match dialect {
-        Dialect::Clojure | Dialect::Janet | Dialect::Fennel => {
+        Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel => {
             vector_let_binding_candidates(binding_form)
         }
-        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
-            list_pair_let_binding_candidates(binding_form)
-        }
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Lfe
+        | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Unknown => list_pair_let_binding_candidates(binding_form),
     }
 }
 

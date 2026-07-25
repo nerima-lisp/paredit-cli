@@ -3,8 +3,12 @@ fn cli_rename_at_rejects_non_common_lisp_dialects_without_writing() {
     let input = "(";
     for (dialect, extension) in [
         ("emacs-lisp", "el"),
+        ("lfe", "lfe"),
         ("scheme", "scm"),
+        ("racket", "rkt"),
         ("clojure", "clj"),
+        ("hy", "hy"),
+        ("carp", "carp"),
         ("janet", "janet"),
         ("fennel", "fnl"),
     ] {

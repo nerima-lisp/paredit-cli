@@ -15,12 +15,15 @@ pub(super) fn binding_groups(
     input: &str,
 ) -> Result<Vec<BindingGroup>> {
     match dialect {
-        Dialect::Clojure | Dialect::Janet | Dialect::Fennel => {
+        Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel => {
             vector_let_binding_groups(binding_form, input)
         }
-        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
-            list_pair_let_binding_groups(binding_form, input)
-        }
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Lfe
+        | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Unknown => list_pair_let_binding_groups(binding_form, input),
     }
 }
 
