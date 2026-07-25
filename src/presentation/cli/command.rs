@@ -5,9 +5,9 @@ use super::{
     },
     binds_constant_report, call_cycle_report, call_graph_report, call_report, capabilities,
     case_nil_key_report, char_op_string_report, class_cycle_report, complexity_report,
-    cons_to_list_report, constant_if_test_report, constant_when_test_report, convert_cond_to_if,
-    convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless, convert_if_to_when,
-    convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    cond_t_clause_report, cons_to_list_report, constant_if_test_report, constant_when_test_report,
+    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
+    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
     convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
     dead_boolean_operand_report, definition_movement, definition_removal, definition_report,
     dependency_report, destructive_literal_report, duplicate_boolean_operand_report,
@@ -21,7 +21,7 @@ use super::{
     explicit_step_delta_report, extract_constant, extract_function, extract_local_function,
     flatten_progn, form_report, format_missing_destination_report, funcall_lambda_report,
     function_parameter, identical_if_branch_report, identity_arithmetic_report, if_arity_report,
-    if_to_or_report, impact_report, inline_function, inline_lambda, inline_let,
+    if_not_report, if_to_or_report, impact_report, inline_function, inline_lambda, inline_let,
     inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let,
     lambda_list_keyword_order_report, let_report, lint_report, literal_place_report,
     malformed_case_clause_report, malformed_cond_clause_report, malformed_iteration_spec_report,
@@ -255,6 +255,8 @@ pub(super) enum InspectCommand {
     OneArmedIf(one_armed_if_report::args::OneArmedIfReportArgs),
     /// Report an if whose test and then are the same atom ((if x x y) is (or x y)).
     IfToOr(if_to_or_report::args::IfToOrReportArgs),
+    /// Report a three-argument if with then=nil and else=t ((if test nil t) is (not test)).
+    IfNot(if_not_report::args::IfNotReportArgs),
     /// Report a +/- of a literal 1 with a shorthand ((+ x 1) is (1+ x); (- x 1) is (1- x)).
     OneStepArithmetic(one_step_arithmetic_report::args::OneStepArithmeticReportArgs),
     /// Report (apply #'f (list ...)) forms that are just (f ...) (a direct call).
@@ -297,6 +299,8 @@ pub(super) enum InspectCommand {
     SingleArgComparison(single_arg_comparison_report::args::SingleArgComparisonReportArgs),
     /// Report a cond with a single non-t clause that has a body ((cond (test body)) is (when test body)).
     SingleClauseCond(single_clause_cond_report::args::SingleClauseCondReportArgs),
+    /// Report a cond with a single t clause that has a body ((cond (t body)) is (progn body)).
+    CondTClause(cond_t_clause_report::args::CondTClauseReportArgs),
     /// Report a multiple-value-bind of one variable, which is just let ((multiple-value-bind (x) f b) is (let ((x f)) b)).
     SingleValueBind(single_value_bind_report::args::SingleValueBindReportArgs),
     /// Report =/</> comparisons against 0 that have a predicate ((= x 0) is (zerop x)).

@@ -35,6 +35,8 @@ mod class_cycle_report;
 mod completions_contract;
 #[path = "cli/complexity_report.rs"]
 mod complexity_report;
+#[path = "cli/cond_t_clause_report.rs"]
+mod cond_t_clause_report;
 #[path = "cli/conditional_conversion.rs"]
 mod conditional_conversion;
 #[path = "cli/cons_to_list_report.rs"]
@@ -151,6 +153,8 @@ mod identical_if_branch_report;
 mod identity_arithmetic_report;
 #[path = "cli/if_arity_report.rs"]
 mod if_arity_report;
+#[path = "cli/if_not_report.rs"]
+mod if_not_report;
 #[path = "cli/if_to_or_report.rs"]
 mod if_to_or_report;
 #[path = "cli/impact_report.rs"]

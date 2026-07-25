@@ -22,6 +22,7 @@ use crate::domain::accessor_arity_report::{
 use crate::domain::binds_constant_report::collect_binds_constant;
 use crate::domain::case_nil_key_report::collect_case_nil_keys;
 use crate::domain::char_op_string_report::collect_char_op_strings;
+use crate::domain::cond_t_clause_report::collect_cond_t_clauses;
 use crate::domain::cons_to_list_report::collect_cons_to_lists;
 use crate::domain::constant_if_test_report::collect_constant_if_tests;
 use crate::domain::constant_when_test_report::collect_constant_when_tests;
@@ -53,6 +54,7 @@ use crate::domain::funcall_lambda_report::collect_funcall_lambdas;
 use crate::domain::identical_if_branch_report::collect_identical_if_branches;
 use crate::domain::identity_arithmetic_report::collect_identity_arithmetic;
 use crate::domain::if_arity_report::collect_if_arity_violations;
+use crate::domain::if_not_report::collect_if_nots;
 use crate::domain::if_to_or_report::collect_if_to_ors;
 use crate::domain::lambda_list_keyword_order_report::collect_lambda_list_keyword_order;
 use crate::domain::literal_place_report::collect_literal_places;
@@ -114,7 +116,7 @@ use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clau
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 90] = [
+pub const RULES: [&str; 92] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -155,6 +157,7 @@ pub const RULES: [&str; 90] = [
     "negated-comparison",
     "negated-if",
     "if-to-or",
+    "if-not",
     "one-step-arithmetic",
     "one-armed-if",
     "self-comparison",
@@ -197,6 +200,7 @@ pub const RULES: [&str; 90] = [
     "single-arg-comparison",
     "sign-comparison",
     "single-clause-cond",
+    "cond-t-clause",
     "single-value-bind",
     "format-missing-destination",
     "literal-place",
@@ -217,7 +221,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 90] = [
+pub const RULE_DOCS: [(&str, &str, &str); 92] = [
     (
         "self-assignment",
         "suspicious",
@@ -417,6 +421,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 90] = [
         "if-to-or",
         "suspicious",
         "an if whose test and then are the same atom ((if x x y) is (or x y))",
+    ),
+    (
+        "if-not",
+        "suspicious",
+        "a three-argument if with then=nil and else=t ((if test nil t) is (not test))",
     ),
     (
         "one-step-arithmetic",
@@ -629,6 +638,11 @@ pub const RULE_DOCS: [(&str, &str, &str); 90] = [
         "a cond with one non-t clause that has a body ((cond (test a b)) is (when test a b))",
     ),
     (
+        "cond-t-clause",
+        "suspicious",
+        "a cond with one t clause that has a body ((cond (t a b)) is (progn a b))",
+    ),
+    (
         "single-value-bind",
         "suspicious",
         "a multiple-value-bind of one variable ((multiple-value-bind (x) f body) is (let ((x f)) body))",
@@ -692,7 +706,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 48] = [
+pub const FIXABLE_RULES: [&str; 50] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -730,6 +744,7 @@ pub const FIXABLE_RULES: [&str; 48] = [
     "negated-comparison",
     "negated-if",
     "if-to-or",
+    "if-not",
     "one-step-arithmetic",
     "one-armed-if",
     "constant-if-test",
@@ -737,6 +752,7 @@ pub const FIXABLE_RULES: [&str; 48] = [
     "nil-comparison",
     "sign-comparison",
     "single-clause-cond",
+    "cond-t-clause",
     "single-value-bind",
     "eq-number-comparison",
     "eq-char-comparison",
@@ -781,7 +797,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 49] = [
+pub const WARNING_RULES: [&str; 51] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -819,6 +835,7 @@ pub const WARNING_RULES: [&str; 49] = [
     "negated-comparison",
     "negated-if",
     "if-to-or",
+    "if-not",
     "one-step-arithmetic",
     "one-armed-if",
     "constant-if-test",
@@ -827,6 +844,7 @@ pub const WARNING_RULES: [&str; 49] = [
     "t-comparison",
     "sign-comparison",
     "single-clause-cond",
+    "cond-t-clause",
     "single-value-bind",
     "empty-body",
     "identity-arithmetic",
@@ -1369,6 +1387,17 @@ pub fn collect_lint_findings(
         });
     }
 
+    let (_, items) = collect_if_nots(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "if-not",
+            path: item.path,
+            span: item.span,
+            message: "if with then=nil and else=t is a negation; (if test nil t) is (not test)"
+                .to_owned(),
+        });
+    }
+
     let (_, items) = collect_one_step_arithmetic(path, dialect, tree)?;
     for item in items {
         let shorthand = item.shorthand;
@@ -1889,6 +1918,16 @@ pub fn collect_lint_findings(
             message:
                 "single-clause cond with a body is just when; (cond (test a b)) is (when test a b)"
                     .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_cond_t_clauses(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "cond-t-clause",
+            path: item.path,
+            span: item.span,
+            message: "single t-clause cond is just progn; (cond (t a b)) is (progn a b)".to_owned(),
         });
     }
 

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::cond_t_clause_report::collect_cond_t_clauses;
 use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
 use crate::application::usecase::constant_if_test_report::collect_constant_if_tests;
 use crate::application::usecase::constant_when_test_report::collect_constant_when_tests;
@@ -10,6 +11,7 @@ use crate::application::usecase::eq_number_comparison_report::collect_eq_number_
 use crate::application::usecase::explicit_nil_return_report::collect_explicit_nil_returns;
 use crate::application::usecase::explicit_step_delta_report::collect_explicit_step_deltas;
 use crate::application::usecase::funcall_lambda_report::collect_funcall_lambdas;
+use crate::application::usecase::if_not_report::collect_if_nots;
 use crate::application::usecase::if_to_or_report::collect_if_to_ors;
 use crate::application::usecase::lint_report::{
     CATEGORIES, LintFinding, LintPolicyOptions, LintSuppressions, Severity, collect_lint_findings,
@@ -207,7 +209,8 @@ fn retain_unbaselined(
 /// the redundant `nil` else), `empty-let` (rewrite `(let () …)` as
 /// `(progn …)`), `redundant-let-star` (rewrite a ≤1-binding
 /// `let*` head to `let`), `single-clause-cond` (rewrite a one-clause
-/// `(cond (test body…))` as `(when test body…)`), `redundant-funcall`
+/// `(cond (test body…))` as `(when test body…)`), `cond-t-clause` (rewrite a
+/// one-`t`-clause `(cond (t body…))` as `(progn body…)`), `redundant-funcall`
 /// (delete `funcall #'` so
 /// `(funcall #'foo …)` becomes `(foo …)`), `redundant-the` (drop a vacuous
 /// `(the t form)` down to `form`), `funcall-lambda` (drop `funcall`
@@ -228,7 +231,8 @@ fn retain_unbaselined(
 /// becomes `(decf x 1)`), `explicit-nil-return` (drop the default `nil` result so
 /// `(return nil)` becomes `(return)`), `single-value-bind` (rewrite a one-variable
 /// `(multiple-value-bind (x) f body)` as `(let ((x f)) body)`),
-/// `if-to-or` (rewrite `(if x x y)` as `(or x y)`), `one-step-arithmetic`
+/// `if-to-or` (rewrite `(if x x y)` as `(or x y)`), `if-not` (rewrite
+/// `(if test nil t)` as `(not test)`), `one-step-arithmetic`
 /// (rewrite `(+ x 1)` as `(1+ x)` and `(- x 1)` as `(1- x)`),
 /// `nested-boolean` (splice a same-operator `(or …)`/`(and …)` into its
 /// enclosing `or`/`and`), `nested-when` (merge `(when a (when b body))` into
@@ -722,6 +726,23 @@ fn collect_lint_fixes(
         }
     }
 
+    if active.contains(&"cond-t-clause") {
+        let (_, items) = collect_cond_t_clauses(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (cond (t body…)) -> (progn body…): splice the body verbatim.
+            fixes.insert(
+                ("cond-t-clause", start, end),
+                one_edit(
+                    start,
+                    end,
+                    format!("(progn {})", slice(item.body_span).trim()),
+                    "Rewrite the single t-clause cond as progn".to_owned(),
+                ),
+            );
+        }
+    }
+
     if active.contains(&"nested-unless") {
         let (_, items) = collect_nested_unlesses(file, dialect, tree)?;
         for item in items {
@@ -1129,6 +1150,24 @@ fn collect_lint_fixes(
                     end,
                     text,
                     "Rewrite (if x x y) as (or x y)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"if-not") {
+        let (_, items) = collect_if_nots(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (if test nil t) is (not test): keep the test verbatim.
+            let text = format!("(not {})", slice(item.test_span));
+            fixes.insert(
+                ("if-not", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    "Rewrite (if test nil t) as (not test)".to_owned(),
                 ),
             );
         }
@@ -1784,6 +1823,7 @@ mod tests {
             "(- 0 amt)\n",                            // verbose-negation
             "(let* ((a 1)) a)\n",                     // redundant-let-star
             "(cond (ok (run)))\n",                    // single-clause-cond
+            "(cond (t (r1) (r2)))\n",                 // cond-t-clause
             "(incf tally 1)\n",                       // explicit-step-delta
             "(incf nsd -3)\n",                        // negated-step-delta
             "(return-from blk nil)\n",                // explicit-nil-return
@@ -1809,6 +1849,7 @@ mod tests {
             "(not (< a b))\n",                        // negated-comparison
             "(if (not c) a b)\n",                     // negated-if
             "(if iv iv jv)\n",                        // if-to-or
+            "(if iw nil t)\n",                        // if-not
             "(+ osa 1)\n",                            // one-step-arithmetic
             "(if t on off)\n",                        // constant-if-test
             "(when t (bd))\n",                        // constant-when-test

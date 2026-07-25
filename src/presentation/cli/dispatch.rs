@@ -225,6 +225,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::IfToOr(args) => {
                 if_to_or_report::workflow::if_to_or_report(args)?
             }
+            command::InspectCommand::IfNot(args) => {
+                if_not_report::workflow::if_not_report(args)?
+            }
             command::InspectCommand::OneStepArithmetic(args) => {
                 one_step_arithmetic_report::workflow::one_step_arithmetic_report(args)?
             }
@@ -322,6 +325,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::SingleClauseCond(args) => {
                 single_clause_cond_report::workflow::single_clause_cond_report(args)?
+            }
+            command::InspectCommand::CondTClause(args) => {
+                cond_t_clause_report::workflow::cond_t_clause_report(args)?
             }
             command::InspectCommand::SingleValueBind(args) => {
                 single_value_bind_report::workflow::single_value_bind_report(args)?
