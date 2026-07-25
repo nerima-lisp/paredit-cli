@@ -178,7 +178,7 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"rule_count\": 126"))
+        .stdout(predicate::str::contains("\"rule_count\": 130"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -206,7 +206,7 @@ fn cli_list_rules_filters_by_category() {
     // Every listed rule is in the requested category, and it's a strict subset.
     assert!(!rules.is_empty());
     assert!(rules.iter().all(|r| r["category"] == "dead-code"));
-    assert!(rules.len() < 126);
+    assert!(rules.len() < 130);
     assert_eq!(value["rule_count"], rules.len());
 }
 
@@ -805,7 +805,7 @@ fn cli_lint_list_rules_marks_severity() {
     assert_eq!(severity_of("literal-place"), "error");
     // Exactly five rules are warnings; the rest are errors.
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
-    assert_eq!(warnings, 85);
+    assert_eq!(warnings, 89);
 }
 
 #[test]
@@ -824,7 +824,7 @@ fn cli_lint_list_rules_marks_fixability() {
 
     let fixable_count = rules.iter().filter(|r| r["fixable"] == true).count();
     assert_eq!(
-        fixable_count, 80,
+        fixable_count, 84,
         "exactly twenty-eight rules are auto-fixable"
     );
 

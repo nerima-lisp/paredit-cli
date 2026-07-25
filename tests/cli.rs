@@ -21,6 +21,8 @@ mod append_nil_report;
 mod basic_edit_write;
 #[path = "cli/binds_constant_report.rs"]
 mod binds_constant_report;
+#[path = "cli/butlast_default_count_report.rs"]
+mod butlast_default_count_report;
 #[path = "cli/call_cycle_report.rs"]
 mod call_cycle_report;
 #[path = "cli/call_graph_report/mod.rs"]
@@ -201,6 +203,8 @@ mod inline_local_function;
 mod inline_symbol_macro;
 #[path = "cli/lambda_list_keyword_order_report.rs"]
 mod lambda_list_keyword_order_report;
+#[path = "cli/last_default_count_report.rs"]
+mod last_default_count_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
 #[path = "cli/lint_report.rs"]
@@ -211,6 +215,8 @@ mod list_star_to_cons_report;
 mod literal_place_report;
 #[path = "cli/make_hash_table_test_report.rs"]
 mod make_hash_table_test_report;
+#[path = "cli/make_list_default_element_report.rs"]
+mod make_list_default_element_report;
 #[path = "cli/malformed_case_clause_report.rs"]
 mod malformed_case_clause_report;
 #[path = "cli/malformed_cond_clause_report.rs"]
@@ -279,6 +285,8 @@ mod package_boundary_report;
 mod package_conflict_report;
 #[path = "cli/package_cycle_report.rs"]
 mod package_cycle_report;
+#[path = "cli/parse_integer_default_radix_report.rs"]
+mod parse_integer_default_radix_report;
 #[path = "cli/plan_steps_contract.rs"]
 mod plan_steps_contract;
 #[path = "cli/prog2_to_progn_report.rs"]

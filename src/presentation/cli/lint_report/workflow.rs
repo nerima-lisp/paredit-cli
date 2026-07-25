@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 
 use crate::application::usecase::append_list_to_cons_report::collect_append_list_to_cons;
 use crate::application::usecase::append_nil_report::collect_append_nils;
+use crate::application::usecase::butlast_default_count_report::collect_butlast_default_counts;
 use crate::application::usecase::car_nthcdr_report::collect_car_nthcdrs;
 use crate::application::usecase::car_reverse_report::collect_car_reverses;
 use crate::application::usecase::char_case_fold_report::collect_char_case_folds;
@@ -26,6 +27,7 @@ use crate::application::usecase::handler_case_no_clauses_report::collect_handler
 use crate::application::usecase::if_not_report::collect_if_nots;
 use crate::application::usecase::if_to_or_report::collect_if_to_ors;
 use crate::application::usecase::if_to_unless_report::collect_if_to_unless;
+use crate::application::usecase::last_default_count_report::collect_last_default_counts;
 use crate::application::usecase::lint_report::{
     CATEGORIES, LintFinding, LintPolicyOptions, LintSuppressions, Severity, collect_lint_findings,
     evaluate_lint_policy, resolve_active_rules, rule_category, rule_severity,
@@ -33,6 +35,7 @@ use crate::application::usecase::lint_report::{
 };
 use crate::application::usecase::list_star_to_cons_report::collect_list_star_to_cons;
 use crate::application::usecase::make_hash_table_test_report::collect_make_hash_table_tests;
+use crate::application::usecase::make_list_default_element_report::collect_make_list_default_elements;
 use crate::application::usecase::manual_incf_report::collect_manual_incfs;
 use crate::application::usecase::manual_push_report::collect_manual_pushes;
 use crate::application::usecase::manual_pushnew_report::collect_manual_pushnews;
@@ -53,6 +56,7 @@ use crate::application::usecase::nthcdr_small_index_report::collect_nthcdr_small
 use crate::application::usecase::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::application::usecase::one_armed_if_report::collect_one_armed_ifs;
 use crate::application::usecase::one_step_arithmetic_report::collect_one_step_arithmetic;
+use crate::application::usecase::parse_integer_default_radix_report::collect_parse_integer_default_radixes;
 use crate::application::usecase::prog2_to_progn_report::collect_prog2_to_progn;
 use crate::application::usecase::redundant_apply_report::collect_redundant_applies;
 use crate::application::usecase::redundant_body_progn_report::collect_redundant_body_progns;
@@ -253,6 +257,10 @@ fn retain_unbaselined(
 /// `char=` as `string-equal`/`char-equal`), `nested-string-case` (collapse
 /// `(string-upcase (string-downcase s))` to `(string-upcase s)`),
 /// `code-char-char-code` (drop the `(code-char (char-code c))` round-trip to `c`),
+/// `last-default-count` / `butlast-default-count` (drop an explicit trailing
+/// count of `1`), `make-list-default-element` (drop an explicit
+/// `:initial-element nil`), `parse-integer-default-radix` (drop an explicit
+/// `:radix 10`),
 /// `redundant-identity-key` (delete an explicit default `:key #'identity`),
 /// `redundant-identity` (replace
 /// `(identity x)` with `x`), `cons-to-list` (rewrite `(cons a nil)` as
@@ -706,6 +714,86 @@ fn collect_lint_fixes(
                     slice(item.char_span),
                     "Drop the code-char/char-code round-trip".to_owned(),
                 ),
+            );
+        }
+    }
+
+    if active.contains(&"last-default-count") {
+        let (_, items) = collect_last_default_counts(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("last-default-count", start, end),
+                LintFix {
+                    description: "Drop the redundant last count of 1".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"butlast-default-count") {
+        let (_, items) = collect_butlast_default_counts(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("butlast-default-count", start, end),
+                LintFix {
+                    description: "Drop the redundant butlast count of 1".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"make-list-default-element") {
+        let (_, items) = collect_make_list_default_elements(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("make-list-default-element", start, end),
+                LintFix {
+                    description: "Drop the redundant :initial-element nil".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"parse-integer-default-radix") {
+        let (_, items) = collect_parse_integer_default_radixes(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("parse-integer-default-radix", start, end),
+                LintFix {
+                    description: "Drop the redundant :radix 10".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
             );
         }
     }
@@ -2496,6 +2584,10 @@ mod tests {
             "(char= (char-downcase ca) (char-downcase cb))\n", // char-case-fold
             "(string-upcase (string-downcase nsc))\n", // nested-string-case
             "(code-char (char-code ccc))\n", // code-char-char-code
+            "(last ldc 1)\n",          // last-default-count
+            "(butlast bdc 1)\n",       // butlast-default-count
+            "(make-list mde :initial-element nil)\n", // make-list-default-element
+            "(parse-integer pir :radix 10)\n", // parse-integer-default-radix
             "(sort rik #'< :key #'identity)\n", // redundant-identity-key
             "(= tally 0)\n",           // sign-comparison
             "(not (< a b))\n",         // negated-comparison

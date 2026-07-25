@@ -192,6 +192,20 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::CodeCharCharCode(args) => {
                 code_char_char_code_report::workflow::code_char_char_code_report(args)?
             }
+            command::InspectCommand::LastDefaultCount(args) => {
+                last_default_count_report::workflow::last_default_count_report(args)?
+            }
+            command::InspectCommand::ButlastDefaultCount(args) => {
+                butlast_default_count_report::workflow::butlast_default_count_report(args)?
+            }
+            command::InspectCommand::MakeListDefaultElement(args) => {
+                make_list_default_element_report::workflow::make_list_default_element_report(args)?
+            }
+            command::InspectCommand::ParseIntegerDefaultRadix(args) => {
+                parse_integer_default_radix_report::workflow::parse_integer_default_radix_report(
+                    args,
+                )?
+            }
             command::InspectCommand::EmptyBody(args) => {
                 empty_body_report::workflow::empty_body_report(args)?
             }

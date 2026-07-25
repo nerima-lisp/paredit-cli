@@ -22,6 +22,7 @@ use crate::domain::accessor_arity_report::{
 use crate::domain::append_list_to_cons_report::collect_append_list_to_cons;
 use crate::domain::append_nil_report::collect_append_nils;
 use crate::domain::binds_constant_report::collect_binds_constant;
+use crate::domain::butlast_default_count_report::collect_butlast_default_counts;
 use crate::domain::car_nthcdr_report::collect_car_nthcdrs;
 use crate::domain::car_reverse_report::collect_car_reverses;
 use crate::domain::case_nil_key_report::collect_case_nil_keys;
@@ -72,9 +73,11 @@ use crate::domain::if_not_report::collect_if_nots;
 use crate::domain::if_to_or_report::collect_if_to_ors;
 use crate::domain::if_to_unless_report::collect_if_to_unless;
 use crate::domain::lambda_list_keyword_order_report::collect_lambda_list_keyword_order;
+use crate::domain::last_default_count_report::collect_last_default_counts;
 use crate::domain::list_star_to_cons_report::collect_list_star_to_cons;
 use crate::domain::literal_place_report::collect_literal_places;
 use crate::domain::make_hash_table_test_report::collect_make_hash_table_tests;
+use crate::domain::make_list_default_element_report::collect_make_list_default_elements;
 use crate::domain::malformed_case_clause_report::collect_malformed_case_clauses;
 use crate::domain::malformed_cond_clause_report::collect_malformed_cond_clauses;
 use crate::domain::malformed_iteration_spec_report::collect_malformed_iteration_specs;
@@ -102,6 +105,7 @@ use crate::domain::nthcdr_small_index_report::collect_nthcdr_small_indexes;
 use crate::domain::nthcdr_zero_report::collect_nthcdr_zeros;
 use crate::domain::one_armed_if_report::collect_one_armed_ifs;
 use crate::domain::one_step_arithmetic_report::collect_one_step_arithmetic;
+use crate::domain::parse_integer_default_radix_report::collect_parse_integer_default_radixes;
 use crate::domain::prog2_to_progn_report::collect_prog2_to_progn;
 use crate::domain::quoted_case_key_report::collect_quoted_case_keys;
 use crate::domain::redundant_apply_report::collect_redundant_applies;
@@ -150,7 +154,7 @@ use crate::domain::verbose_negation_report::collect_verbose_negations;
 use crate::domain::zero_divisor_report::collect_zero_divisors;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 126] = [
+pub const RULES: [&str; 130] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -277,6 +281,10 @@ pub const RULES: [&str; 126] = [
     "char-case-fold",
     "nested-string-case",
     "code-char-char-code",
+    "last-default-count",
+    "butlast-default-count",
+    "make-list-default-element",
+    "parse-integer-default-radix",
 ];
 
 /// The set of rule categories, sorted, for `--category` validation and
@@ -289,7 +297,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 126] = [
+pub const RULE_DOCS: [(&str, &str, &str); 130] = [
     (
         "self-assignment",
         "suspicious",
@@ -920,6 +928,26 @@ pub const RULE_DOCS: [(&str, &str, &str); 126] = [
         "suspicious",
         "a code-char of a char-code, a round-trip that is just the character ((code-char (char-code c)) is c)",
     ),
+    (
+        "last-default-count",
+        "suspicious",
+        "a last call with an explicit count of 1, the default ((last x 1) is (last x))",
+    ),
+    (
+        "butlast-default-count",
+        "suspicious",
+        "a butlast/nbutlast call with an explicit count of 1, the default ((butlast x 1) is (butlast x))",
+    ),
+    (
+        "make-list-default-element",
+        "suspicious",
+        "a make-list call with an explicit :initial-element nil, the default ((make-list n :initial-element nil) is (make-list n))",
+    ),
+    (
+        "parse-integer-default-radix",
+        "suspicious",
+        "a parse-integer call with an explicit :radix 10, the default ((parse-integer s :radix 10) is (parse-integer s))",
+    ),
 ];
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
@@ -944,7 +972,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 80] = [
+pub const FIXABLE_RULES: [&str; 84] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -1025,6 +1053,10 @@ pub const FIXABLE_RULES: [&str; 80] = [
     "char-case-fold",
     "nested-string-case",
     "code-char-char-code",
+    "last-default-count",
+    "butlast-default-count",
+    "make-list-default-element",
+    "parse-integer-default-radix",
 ];
 
 /// Whether `inspect lint --fix` can automatically repair findings of `name`.
@@ -1065,7 +1097,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 85] = [
+pub const WARNING_RULES: [&str; 89] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -1151,6 +1183,10 @@ pub const WARNING_RULES: [&str; 85] = [
     "char-case-fold",
     "nested-string-case",
     "code-char-char-code",
+    "last-default-count",
+    "butlast-default-count",
+    "make-list-default-element",
+    "parse-integer-default-radix",
 ];
 
 /// The severity of a rule's findings (`error` unless it is a [`WARNING_RULES`]
@@ -2717,6 +2753,49 @@ pub fn collect_lint_findings(
             span: item.span,
             message: "code-char of char-code is a round-trip; (code-char (char-code c)) is c"
                 .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_last_default_counts(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "last-default-count",
+            path: item.path,
+            span: item.span,
+            message: "explicit count of 1 restates last's default; (last x 1) is (last x)"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_butlast_default_counts(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "butlast-default-count",
+            path: item.path,
+            span: item.span,
+            message: "explicit count of 1 restates butlast's default; (butlast x 1) is (butlast x)"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_make_list_default_elements(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "make-list-default-element",
+            path: item.path,
+            span: item.span,
+            message: "explicit :initial-element nil restates make-list's default; drop it"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_parse_integer_default_radixes(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "parse-integer-default-radix",
+            path: item.path,
+            span: item.span,
+            message: "explicit :radix 10 restates parse-integer's default; drop it".to_owned(),
         });
     }
 
