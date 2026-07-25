@@ -1,0 +1,143 @@
+;; broad.lisp — one triggering form per `inspect lint` rule (all 134), so the
+;; golden text/json/sarif/fix-plan/fix outputs pin today's behavior for every
+;; rule at once. Each line is independent and self-contained; forms are not
+;; meant to be loaded/evaluated, only parsed and linted.
+
+;; --- fixable rules (mirrors the fixable_rules_match_the_fix_engine guard
+;; --- test in src/presentation/cli/lint_report/workflow.rs) ---
+(list 5)                                           ; redundant-quote
+only                                        ; redundant-progn
+(progn a b c)                               ; nested-progn (the inner progn)
+(when q s t)                                ; redundant-body-progn
+(progn (ela) (elb))                                ; empty-let
+(when c d)                                        ; redundant-if-nil
+(g m)                                     ; redundant-funcall
+whatever                                    ; redundant-the
+((lambda (fx) fx) 9)                        ; funcall-lambda
+(mapcar (lambda (sq) sq) sqs)                     ; sharp-quoted-lambda
+h                                        ; redundant-identity
+(list e)                                        ; cons-to-list
+(copy-seq dr)                              ; double-reverse
+(cons al ar)                               ; append-list-to-cons
+(princ-to-string fs)                                ; format-to-string
+(terpri)                                     ; format-newline
+(floor fq)                                        ; redundant-divisor
+(- amt)                                           ; verbose-negation
+(cons la lb)                                       ; list-star-to-cons
+(values va vb)                          ; values-list-of-list
+(p1x)                                       ; redundant-prog1
+(copy-seq sz)                                       ; subseq-zero
+(nth cn cx)                                ; car-nthcdr
+(car (last crx))                                 ; car-reverse
+(copy-list anx)                                    ; append-nil
+(list mva mvb)              ; multiple-value-list-of-values
+(stringp tpx)                                 ; typep-predicate
+ctx                                      ; coerce-to-t
+(gethash gdk gdh)                               ; gethash-default
+(make-hash-table)                        ; make-hash-table-test
+(let ((a 1)) a)                                    ; redundant-let-star
+(when ok (run))                                   ; single-clause-cond
+(progn (r1) (r2))                                ; cond-t-clause
+(incf tally)                                      ; explicit-step-delta
+(decf nsd 3)                                       ; negated-step-delta
+(return-from blk)                               ; explicit-nil-return
+(let ((mv (vals))) mv)                ; single-value-bind
+(or za pb qc)                                  ; nested-boolean
+(when (and wa wb) (wc))                            ; nested-when
+(unless (or ua ub) (uc))                        ; nested-unless
+x                                             ; single-operand-boolean
+solo                                       ; single-operand-list-op
+x                                               ; single-operand-arithmetic
+(unless r y)                                    ; negated-when-unless
+(when p q)                                            ; one-armed-if
+(incf ctr)                                 ; manual-incf
+(push e lst)                             ; manual-push
+(pushnew e st)                             ; manual-pushnew
+(cadr z)                                       ; nested-cxr
+(first zs)                                          ; nth-constant-index
+nz                                       ; nthcdr-zero
+(cddr ns)                                       ; nthcdr-small-index
+(g m)                                ; redundant-apply
+(find ret lst)                          ; redundant-eql-test
+(find rsz lst)                             ; redundant-start-zero
+(find ren lst)                             ; redundant-end-nil
+(find rfe lst)                        ; redundant-from-end-nil
+(remove rcn lst)                         ; redundant-count-nil
+(string-equal sa sb) ; string-case-fold
+(char-equal ca cb)       ; char-case-fold
+(string-upcase nsc)               ; nested-string-case
+ccc                         ; code-char-char-code
+(last ldc)                                        ; last-default-count
+(butlast bdc)                                     ; butlast-default-count
+(make-list mde)                ; make-list-default-element
+(parse-integer pir)                       ; parse-integer-default-radix
+(getf gdn :key)                                 ; getf-default-nil
+(make-array madk)                   ; make-array-default-keyword
+(char-upcase ncc)                   ; nested-char-case
+(list lsn1 lsn2)                               ; list-star-nil
+(sort rik #'<)                      ; redundant-identity-key
+(zerop tally)                                         ; sign-comparison
+(>= a b)                                       ; negated-comparison
+(if c b a)                                    ; negated-if
+(or iv jv)                                       ; if-to-or
+(not iw)                                       ; if-not
+(unless iu (iue))                                   ; if-to-unless
+(progn (p2a) (p2b))                                 ; prog2-to-progn
+(hcx)                                ; handler-case-no-clauses
+(upx)                              ; unwind-protect-no-cleanup
+(1+ osa)                                           ; one-step-arithmetic
+on                                       ; constant-if-test
+(bd)                                       ; constant-when-test
+(and p q)                                         ; redundant-boolean-identity
+(not (or p q))                               ; de-morgan
+(null w)                                       ; nil-comparison
+(eql n 7)                                            ; eq-number-comparison
+(eql c #\a)                                          ; eq-char-comparison
+(if a b c d)                                        ; if-arity (NOT fixable)
+
+;; --- report-only rules (no auto-fix), one form per rule ---
+(setq x x)                                          ; self-assignment
+(defun reset () (setf total 0 total 1))             ; duplicate-setf-places
+(setf (slot a) 1 (slot b))                          ; setf-arity
+(setq (car x) 5)                                    ; setq-non-variable
+(incf counter 1 2)                                  ; modify-macro-arity
+(defun scale (factor x factor) (* factor x))        ; duplicate-parameters
+(defun dupkw (&optional x &optional y) x)           ; duplicate-lambda-list-keyword
+(defun kworder (&key a &optional b) a)              ; lambda-list-keyword-order
+(when (eq status status) 1)                         ; self-comparison
+(defun ready? (x) (eq (compute x) t))               ; t-comparison
+(if test (foo x) (foo x))                           ; identical-if-branches
+(the fixnum)                                        ; the-arity
+(eq x)                                              ; equality-arity
+(gethash key)                                       ; accessor-arity
+(case x (:a 1) (:b 2) (:a 3))                       ; duplicate-case-keys
+(case sym ('apple :fruit) ('carrot :veg) (t :x))    ; quoted-case-key
+(case x (nil 1) (t 2))                              ; case-nil-key
+(typecase x (nil 1) (t 2))                          ; typecase-nil-key
+(case x (1 :one) 2 :two)                            ; malformed-case-clause
+(case x (1 :one) (t :def) (2 :two))                 ; unreachable-case-clause
+(ecase x (1 :one) (t :default))                     ; exhaustive-case-otherwise
+(cond ((foo) 1) ((bar) 2) ((foo) 3))                ; duplicate-cond-tests
+(cond ((foo) 1) (t 2) ((bar) 3))                    ; unreachable-cond-clause
+(cond ((plusp x) :pos) ((minusp x) :neg) :zero)     ; malformed-cond-clause
+(let ((x 1) (y 2) (x 3)) x)                         ; duplicate-let-bindings
+(let ((x 1 y 2)) (+ x y))                           ; malformed-let-binding
+(let ((nil 1) (:status :ok)) :status)               ; binds-constant
+(dolist (x) (print x))                              ; malformed-iteration-spec
+(eval-when (:compile-toplevel :executee) 1)         ; eval-when-situation
+(or x y x)                                          ; duplicate-boolean-operands
+(and (ready a) nil (finalize b))                    ; dead-boolean-operand
+(when (eql name "root") 1)                          ; eql-string-comparison
+(when (eql p '(:a :b)) 1)                           ; eql-list-comparison
+(defun eqlsearch (items) (member "x" items))        ; eql-search-literal
+(defun singlearg (x) (when (< x) (go)))             ; single-arg-comparison
+(defun missingdest (x) (format "~a~%" x))           ; format-missing-destination
+(defun litplace () (incf 5))                        ; literal-place
+(defun destrlit () (nreverse '(a b c)))              ; destructive-literal
+(defun charopstr (c) (when (char= c "a") :hit))     ; char-op-string
+(defun emptybody (ready) (when ready))              ; empty-body
+(defun identarith (x) (+ x 0))                      ; identity-arithmetic
+(/ x 0)                                             ; zero-divisor
+(make-instance 'c :x 1 :x 2)                        ; duplicate-keyword
+(defpackage :app (:export 'foo))                    ; defpackage-quoted
+(incf counter 0)                                    ; step-zero

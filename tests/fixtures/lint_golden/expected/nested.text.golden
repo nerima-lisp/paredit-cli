@@ -1,0 +1,154 @@
+finding_count	19
+rule	self-assignment	0
+rule	duplicate-setf-places	0
+rule	setf-arity	0
+rule	setq-non-variable	0
+rule	manual-incf	0
+rule	manual-push	0
+rule	manual-pushnew	0
+rule	explicit-step-delta	0
+rule	negated-step-delta	0
+rule	explicit-nil-return	0
+rule	cons-to-list	0
+rule	double-reverse	0
+rule	modify-macro-arity	0
+rule	duplicate-parameters	0
+rule	duplicate-lambda-list-keyword	0
+rule	lambda-list-keyword-order	0
+rule	redundant-quote	1
+rule	redundant-progn	3
+rule	nested-progn	2
+rule	nested-when	2
+rule	nested-unless	2
+rule	nested-boolean	2
+rule	nested-cxr	2
+rule	nth-constant-index	0
+rule	nthcdr-zero	0
+rule	nthcdr-small-index	0
+rule	redundant-body-progn	2
+rule	empty-let	1
+rule	redundant-if-nil	0
+rule	redundant-let-star	1
+rule	redundant-funcall	0
+rule	redundant-the	0
+rule	funcall-lambda	0
+rule	sharp-quoted-lambda	0
+rule	redundant-identity	0
+rule	redundant-apply	0
+rule	redundant-eql-test	0
+rule	redundant-identity-key	0
+rule	negated-when-unless	0
+rule	negated-comparison	0
+rule	negated-if	0
+rule	if-to-or	0
+rule	if-not	0
+rule	one-step-arithmetic	0
+rule	one-armed-if	0
+rule	self-comparison	0
+rule	nil-comparison	0
+rule	t-comparison	0
+rule	identical-if-branches	0
+rule	constant-if-test	0
+rule	constant-when-test	0
+rule	if-arity	0
+rule	the-arity	0
+rule	equality-arity	0
+rule	accessor-arity	0
+rule	append-list-to-cons	0
+rule	format-to-string	0
+rule	format-newline	0
+rule	redundant-divisor	0
+rule	duplicate-case-keys	0
+rule	quoted-case-key	0
+rule	case-nil-key	0
+rule	typecase-nil-key	0
+rule	malformed-case-clause	0
+rule	unreachable-case-clause	0
+rule	exhaustive-case-otherwise	0
+rule	duplicate-cond-tests	0
+rule	unreachable-cond-clause	0
+rule	malformed-cond-clause	0
+rule	duplicate-let-bindings	0
+rule	malformed-let-binding	0
+rule	binds-constant	0
+rule	malformed-iteration-spec	0
+rule	eval-when-situation	0
+rule	duplicate-boolean-operands	0
+rule	dead-boolean-operand	0
+rule	redundant-boolean-identity	0
+rule	de-morgan	0
+rule	single-operand-boolean	1
+rule	single-operand-list-op	0
+rule	single-operand-arithmetic	0
+rule	eql-string-comparison	0
+rule	eql-list-comparison	0
+rule	eql-search-literal	0
+rule	eq-number-comparison	0
+rule	eq-char-comparison	0
+rule	single-arg-comparison	0
+rule	sign-comparison	0
+rule	single-clause-cond	0
+rule	cond-t-clause	0
+rule	single-value-bind	0
+rule	format-missing-destination	0
+rule	literal-place	0
+rule	destructive-literal	0
+rule	char-op-string	0
+rule	empty-body	0
+rule	identity-arithmetic	0
+rule	verbose-negation	0
+rule	list-star-to-cons	0
+rule	values-list-of-list	0
+rule	redundant-prog1	0
+rule	subseq-zero	0
+rule	car-nthcdr	0
+rule	car-reverse	0
+rule	append-nil	0
+rule	multiple-value-list-of-values	0
+rule	typep-predicate	0
+rule	coerce-to-t	0
+rule	gethash-default	0
+rule	make-hash-table-test	0
+rule	zero-divisor	0
+rule	duplicate-keyword	0
+rule	defpackage-quoted	0
+rule	step-zero	0
+rule	if-to-unless	0
+rule	prog2-to-progn	0
+rule	handler-case-no-clauses	0
+rule	unwind-protect-no-cleanup	0
+rule	redundant-start-zero	0
+rule	redundant-end-nil	0
+rule	redundant-from-end-nil	0
+rule	redundant-count-nil	0
+rule	string-case-fold	0
+rule	char-case-fold	0
+rule	nested-string-case	0
+rule	code-char-char-code	0
+rule	last-default-count	0
+rule	butlast-default-count	0
+rule	make-list-default-element	0
+rule	parse-integer-default-radix	0
+rule	getf-default-nil	0
+rule	make-array-default-keyword	0
+rule	nested-char-case	0
+rule	list-star-nil	0
+finding	redundant-quote	warning	suspicious	fixable=true	nested.lisp	840	quoting number 5 is redundant
+finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	268	redundant progn: progn wraps a single form; it is equivalent to that form
+finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	833	redundant progn: progn wraps a single form; it is equivalent to that form
+finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	907	redundant progn: progn wraps a single form; it is equivalent to that form
+finding	nested-progn	warning	suspicious	fixable=true	nested.lisp	520	progn with 2 forms is nested directly in another progn; splice its forms in
+finding	nested-progn	warning	suspicious	fixable=true	nested.lisp	541	progn with 2 forms is nested directly in another progn; splice its forms in
+finding	nested-when	warning	suspicious	fixable=true	nested.lisp	321	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)
+finding	nested-when	warning	suspicious	fixable=true	nested.lisp	333	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)
+finding	nested-unless	warning	suspicious	fixable=true	nested.lisp	412	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)
+finding	nested-unless	warning	suspicious	fixable=true	nested.lisp	426	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)
+finding	nested-boolean	warning	suspicious	fixable=true	nested.lisp	768	and nested in a and flattens; its operands splice in
+finding	nested-boolean	warning	suspicious	fixable=true	nested.lisp	781	or nested in a or flattens; its operands splice in
+finding	nested-cxr	warning	suspicious	fixable=true	nested.lisp	592	nested car/cdr accessors combine into (cadr …)
+finding	nested-cxr	warning	suspicious	fixable=true	nested.lisp	597	nested car/cdr accessors combine into (cddr …)
+finding	redundant-body-progn	warning	suspicious	fixable=true	nested.lisp	503	progn with 3 forms is a defun body; splice its forms in
+finding	redundant-body-progn	warning	suspicious	fixable=true	nested.lisp	678	progn with 2 forms is a when body; splice its forms in
+finding	empty-let	warning	suspicious	fixable=true	nested.lisp	899	let with no bindings is just progn; (let () body) is (progn body)
+finding	redundant-let-star	warning	suspicious	fixable=true	nested.lisp	881	let* with 1 binding is just let; sequential scope is unused
+finding	single-operand-boolean	warning	suspicious	fixable=true	nested.lisp	275	or has a single operand; (or X) is just X

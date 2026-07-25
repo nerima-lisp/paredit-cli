@@ -1,0 +1,310 @@
+{
+  "fix_count": 19,
+  "fixes": [
+    {
+      "description": "Remove the redundant quote",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 2,
+          "byte_offset": 840,
+          "text": "5"
+        }
+      ],
+      "rule": "redundant-quote",
+      "span": {
+        "end": 842,
+        "start": 840
+      }
+    },
+    {
+      "description": "Unwrap the redundant progn",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 14,
+          "byte_offset": 268,
+          "text": "(or x)"
+        }
+      ],
+      "rule": "redundant-progn",
+      "span": {
+        "end": 282,
+        "start": 268
+      }
+    },
+    {
+      "description": "Unwrap the redundant progn",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 10,
+          "byte_offset": 833,
+          "text": "'5"
+        }
+      ],
+      "rule": "redundant-progn",
+      "span": {
+        "end": 843,
+        "start": 833
+      }
+    },
+    {
+      "description": "Unwrap the redundant progn",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 9,
+          "byte_offset": 907,
+          "text": "a"
+        }
+      ],
+      "rule": "redundant-progn",
+      "span": {
+        "end": 916,
+        "start": 907
+      }
+    },
+    {
+      "description": "Splice the nested progn into the enclosing progn",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 33,
+          "byte_offset": 520,
+          "text": "b\n      (progn c d)"
+        }
+      ],
+      "rule": "nested-progn",
+      "span": {
+        "end": 553,
+        "start": 520
+      }
+    },
+    {
+      "description": "Splice the nested progn into the enclosing progn",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 11,
+          "byte_offset": 541,
+          "text": "c d"
+        }
+      ],
+      "rule": "nested-progn",
+      "span": {
+        "end": 552,
+        "start": 541
+      }
+    },
+    {
+      "description": "Merge the nested when tests with and",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 50,
+          "byte_offset": 321,
+          "text": "(when (and a b) (when c\n        (act)))"
+        }
+      ],
+      "rule": "nested-when",
+      "span": {
+        "end": 371,
+        "start": 321
+      }
+    },
+    {
+      "description": "Merge the nested when tests with and",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 37,
+          "byte_offset": 333,
+          "text": "(when (and b c) (act))"
+        }
+      ],
+      "rule": "nested-when",
+      "span": {
+        "end": 370,
+        "start": 333
+      }
+    },
+    {
+      "description": "Merge the nested unless tests with or",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 56,
+          "byte_offset": 412,
+          "text": "(unless (or a b) (unless c\n        (act)))"
+        }
+      ],
+      "rule": "nested-unless",
+      "span": {
+        "end": 468,
+        "start": 412
+      }
+    },
+    {
+      "description": "Merge the nested unless tests with or",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 41,
+          "byte_offset": 426,
+          "text": "(unless (or b c) (act))"
+        }
+      ],
+      "rule": "nested-unless",
+      "span": {
+        "end": 467,
+        "start": 426
+      }
+    },
+    {
+      "description": "Flatten the nested same-operator and/or",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 23,
+          "byte_offset": 768,
+          "text": "q (or r (or p q))"
+        }
+      ],
+      "rule": "nested-boolean",
+      "span": {
+        "end": 791,
+        "start": 768
+      }
+    },
+    {
+      "description": "Flatten the nested same-operator and/or",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 8,
+          "byte_offset": 781,
+          "text": "p q"
+        }
+      ],
+      "rule": "nested-boolean",
+      "span": {
+        "end": 789,
+        "start": 781
+      }
+    },
+    {
+      "description": "Combine the nested accessors into cadr",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 19,
+          "byte_offset": 592,
+          "text": "(cadr (cdr x))"
+        }
+      ],
+      "rule": "nested-cxr",
+      "span": {
+        "end": 611,
+        "start": 592
+      }
+    },
+    {
+      "description": "Combine the nested accessors into cddr",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 13,
+          "byte_offset": 597,
+          "text": "(cddr x)"
+        }
+      ],
+      "rule": "nested-cxr",
+      "span": {
+        "end": 610,
+        "start": 597
+      }
+    },
+    {
+      "description": "Splice the progn into the enclosing defun",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 57,
+          "byte_offset": 503,
+          "text": "a\n    (progn\n      b\n      (progn c d))\n    e"
+        }
+      ],
+      "rule": "redundant-body-progn",
+      "span": {
+        "end": 560,
+        "start": 503
+      }
+    },
+    {
+      "description": "Splice the progn into the enclosing when",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 41,
+          "byte_offset": 678,
+          "text": "(step-one)\n      (step-two)"
+        }
+      ],
+      "rule": "redundant-body-progn",
+      "span": {
+        "end": 719,
+        "start": 678
+      }
+    },
+    {
+      "description": "Rewrite the empty let as progn",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 7,
+          "byte_offset": 899,
+          "text": "(progn"
+        }
+      ],
+      "rule": "empty-let",
+      "span": {
+        "end": 917,
+        "start": 899
+      }
+    },
+    {
+      "description": "Rewrite the redundant let* as let",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 4,
+          "byte_offset": 882,
+          "text": "let"
+        }
+      ],
+      "rule": "redundant-let-star",
+      "span": {
+        "end": 918,
+        "start": 881
+      }
+    },
+    {
+      "description": "Unwrap the single-operand or",
+      "path": "nested.lisp",
+      "replacements": [
+        {
+          "byte_length": 6,
+          "byte_offset": 275,
+          "text": "x"
+        }
+      ],
+      "rule": "single-operand-boolean",
+      "span": {
+        "end": 281,
+        "start": 275
+      }
+    }
+  ],
+  "schema_version": 1
+}

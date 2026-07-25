@@ -1,3 +1,9 @@
+use std::collections::HashSet;
+
+use proptest::prelude::*;
+
+use crate::domain::dialect::Dialect;
+
 use super::*;
 
 #[test]
@@ -73,4 +79,144 @@ fn property_generated_rename_preserves_parse_and_atom_spans() {
         assert!(output.contains(&format!("\"{}\"", from.as_str())));
         assert!(output.contains(&format!("; {} in comment", from.as_str())));
     }
+}
+
+/// Maps `ExpressionKind` to a small discriminant so `(span, kind)` pairs can
+/// be hashed without adding a `Hash` derive to the public type.
+fn expression_kind_discriminant(kind: ExpressionKind) -> u8 {
+    match kind {
+        ExpressionKind::Root => 0,
+        ExpressionKind::List => 1,
+        ExpressionKind::Atom => 2,
+    }
+}
+
+/// Collects the `(span, kind)` identity of every NON-ROOT node reachable
+/// from `view`, i.e. exactly the key shape a side table keyed by
+/// `ExpressionView` identity (which carries no `NodeId`) would use.
+fn collect_non_root_node_keys(view: &ExpressionView, keys: &mut Vec<(usize, usize, u8)>) {
+    if !matches!(view.kind, ExpressionKind::Root) {
+        keys.push((
+            view.span.start().get(),
+            view.span.end().get(),
+            expression_kind_discriminant(view.kind),
+        ));
+    }
+    for child in &view.children {
+        collect_non_root_node_keys(child, keys);
+    }
+}
+
+/// Asserts the node-identity invariant side tables rely on: every non-root
+/// node's `(span, kind)` pair is unique across the whole tree.
+fn assert_node_span_kind_pairs_are_unique(input: &str) {
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)
+        .unwrap_or_else(|error| panic!("{input:?} must parse: {error}"));
+
+    let mut keys = Vec::new();
+    collect_non_root_node_keys(&tree.root_view(), &mut keys);
+
+    let mut seen = HashSet::new();
+    for key in &keys {
+        assert!(
+            seen.insert(*key),
+            "duplicate (span, kind) key {key:?} across the tree for {input:?}"
+        );
+    }
+}
+
+/// Generates balanced S-expression source using only constructs the Common
+/// Lisp reader accepts (see `DialectReaderPolicy::allows_delimiter` and
+/// `classify_common_lisp`): parenthesized lists, `#(...)` vector literals,
+/// and the `'`, `` ` ``, `,`, `,@`, `#'` reader prefixes. Brackets/braces are
+/// deliberately excluded -- CL only allows `Delimiter::Paren`.
+fn sexpr_source_strategy() -> impl Strategy<Value = String> {
+    let leaf = prop_oneof![
+        "[a-zA-Z][a-zA-Z0-9]{0,3}",
+        "[a-z]{0,4}".prop_map(|text| format!("\"{text}\"")),
+    ];
+
+    leaf.prop_recursive(4, 64, 4, |inner| {
+        prop_oneof![
+            prop::collection::vec(inner.clone(), 0..4)
+                .prop_map(|children| format!("({})", children.join(" "))),
+            prop::collection::vec(inner.clone(), 0..4)
+                .prop_map(|children| format!("#({})", children.join(" "))),
+            inner.clone().prop_map(|form| format!("'{form}")),
+            inner.clone().prop_map(|form| format!("`{form}")),
+            inner.clone().prop_map(|form| format!(",{form}")),
+            inner.clone().prop_map(|form| format!(",@{form}")),
+            inner.prop_map(|form| format!("#'{form}")),
+        ]
+    })
+}
+
+/// A whole document: one to four top-level forms separated by whitespace.
+fn sexpr_document_strategy() -> impl Strategy<Value = String> {
+    prop::collection::vec(sexpr_source_strategy(), 1..5).prop_map(|forms| forms.join(" \n "))
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    /// Foundational invariant for span/kind-keyed side tables (see
+    /// `ExpressionView`, which deliberately carries no `NodeId`): in any
+    /// successfully parsed document, every non-root node's `(span, kind)`
+    /// pair is unique across the whole tree.
+    #[test]
+    fn pbt_non_root_node_span_kind_pairs_are_unique(input in sexpr_document_strategy()) {
+        let tree = SyntaxTree::parse_with_dialect(&input, Dialect::CommonLisp)
+            .expect("generated input parses");
+
+        let mut keys = Vec::new();
+        collect_non_root_node_keys(&tree.root_view(), &mut keys);
+
+        let mut seen = HashSet::new();
+        for key in &keys {
+            prop_assert!(
+                seen.insert(*key),
+                "duplicate (span, kind) key {:?} across the tree for {:?}",
+                key,
+                input
+            );
+        }
+    }
+}
+
+// Hand-picked shapes that are easy for a generator to under-sample but
+// exercise the sharpest edges of the invariant above: a document that is a
+// single atom (root and child could plausibly share a span), a minimal
+// list, a reader-prefixed list, a vector literal, an opaque `#.` read-eval
+// form, and an opaque `#+`/`#-` feature-conditional form (the latter two
+// are represented as one verbatim atom node with no exposed children, per
+// `Node::opaque_reader_form`).
+
+#[test]
+fn node_span_kind_pairs_are_unique_for_a_single_atom_document() {
+    assert_node_span_kind_pairs_are_unique("x");
+}
+
+#[test]
+fn node_span_kind_pairs_are_unique_for_a_one_element_list() {
+    assert_node_span_kind_pairs_are_unique("(a)");
+}
+
+#[test]
+fn node_span_kind_pairs_are_unique_for_a_quoted_list() {
+    assert_node_span_kind_pairs_are_unique("'(a)");
+}
+
+#[test]
+fn node_span_kind_pairs_are_unique_for_a_vector_literal() {
+    assert_node_span_kind_pairs_are_unique("#(1 2)");
+}
+
+#[test]
+fn node_span_kind_pairs_are_unique_for_a_read_eval_form() {
+    assert_node_span_kind_pairs_are_unique("#.(f)");
+}
+
+#[test]
+fn node_span_kind_pairs_are_unique_for_a_feature_conditional_form() {
+    assert_node_span_kind_pairs_are_unique("#+sbcl (a)");
 }

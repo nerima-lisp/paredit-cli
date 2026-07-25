@@ -368,6 +368,15 @@ impl SyntaxTree {
         parser.parse()
     }
 
+    /// Returns the exact source text this tree was parsed from.
+    ///
+    /// Analyses that build side tables keyed by node identity (spans, kinds)
+    /// need the original bytes to slice or hash against, but only ever
+    /// receive `&SyntaxTree` -- this is the only way back to them.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
     /// Returns the direct children of the virtual root document node.
     pub fn root_children(&self) -> &[NodeId] {
         &self.node(NodeId::ROOT).children

@@ -1,0 +1,22 @@
+{
+  "fix_count": 1,
+  "fixes": [
+    {
+      "description": "Remove the redundant quote",
+      "path": "suppressed.lisp",
+      "replacements": [
+        {
+          "byte_length": 2,
+          "byte_offset": 338,
+          "text": "6"
+        }
+      ],
+      "rule": "redundant-quote",
+      "span": {
+        "end": 340,
+        "start": 338
+      }
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,6 +1,18 @@
 use super::*;
 
 #[test]
+fn source_round_trips_the_exact_parsed_text() {
+    for input in [
+        "(defun add (x y) (+ x y))",
+        "(message \"foo\") ; trailing comment\n(foo foo)",
+        "'(a b c) #'f #(1 2)",
+    ] {
+        let tree = SyntaxTree::parse(input).expect("valid");
+        assert_eq!(tree.source(), input);
+    }
+}
+
+#[test]
 fn selects_by_path() {
     let input = "(defun add (x y) (+ x y))";
     let tree = SyntaxTree::parse(input).expect("valid");

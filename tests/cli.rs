@@ -213,6 +213,8 @@ mod last_default_count_report;
 mod let_refactor;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
+#[path = "cli/lint_report_golden.rs"]
+mod lint_report_golden;
 #[path = "cli/list_star_nil_report.rs"]
 mod list_star_nil_report;
 #[path = "cli/list_star_to_cons_report.rs"]
