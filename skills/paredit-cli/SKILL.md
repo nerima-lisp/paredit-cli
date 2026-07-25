@@ -1,6 +1,6 @@
 ---
 name: paredit-cli
-description: This skill should be used when refactoring Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming scoped symbols, functions, control targets, or packages; moving definitions; extracting or inlining local code; reshaping bindings, conditionals, calls, or parameters; or removing unused code. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
+description: This skill should be used when refactoring Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming scoped symbols, functions, control targets, or packages; moving definitions; extracting or inlining local code; reshaping bindings, conditionals, calls, or parameters; or removing unused code. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
 version: 1.3.0
 ---
 
@@ -11,7 +11,7 @@ version: 1.3.0
 </purpose>
 
 <overview>
-  paredit detects the Lisp dialect (Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, Fennel)
+  paredit detects the Lisp dialect (Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, Fennel)
   from file extension or an explicit --dialect flag, and exposes every read and write
   operation under `paredit inspect ...`, `paredit edit ...`, or `paredit refactor ...`.
 
@@ -165,6 +165,11 @@ version: 1.3.0
     <command>paredit edit kill --file f.lisp --path 0.3 --write</command>
     <command>paredit edit wrap --file f.lisp --path 0.3 --write</command>
     <command>paredit edit splice --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit split --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit join --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit splice-killing-backward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit splice-killing-forward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit convolute --file f.lisp --path 0.3.1 --write</command>
     <command>paredit edit raise --file f.lisp --path 0.3 --write</command>
     <command>paredit edit slurp-forward --file f.lisp --path 0.3 --write</command>
     <command>paredit edit slurp-backward --file f.lisp --path 0.3 --write</command>

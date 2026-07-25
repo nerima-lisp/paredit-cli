@@ -65,9 +65,12 @@ command.
 ## Files and stdin
 
 Single-document commands read `--file` when given and stdin otherwise.
-Dialect detection uses the file extension (`.lisp`, `.asd`, `.el`, `.scm`,
-`.clj`, `.cljc`, `.cljs`, `.janet`, `.fnl`); pass `--dialect` explicitly for
-stdin input or unusual extensions where the command accepts it.
+Dialect detection uses the file extension: `.lisp`/`.lsp`/`.cl`/`.asd`
+(Common Lisp), `.el` (Emacs Lisp), `.lfe` (LFE), `.scm`/`.ss`/`.sld`/`.sls`/
+`.sps` (Scheme), `.rkt`/`.rktl`/`.rktd` (Racket), `.clj`/`.cljc`/`.cljs`/
+`.cljd`/`.edn`/`.bb` (Clojure), `.hy` (Hy), `.carp` (Carp), `.janet` (Janet),
+and `.fnl` (Fennel). Pass `--dialect` explicitly for stdin input or unusual
+extensions where the command accepts it.
 
 Report commands that take multiple files (`symbols`, `calls`, `signature`,
 …) require explicit file arguments, while `workspace` and the

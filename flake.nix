@@ -171,14 +171,31 @@
           '';
         };
 
+      # Mirrors Dialect::from_extension in src/domain/dialect/mod.rs; keep the
+      # two in sync so the Nix helpers cover every file paredit can parse.
       lispIncludes = [
         "*.lisp"
+        "*.lsp"
+        "*.cl"
         "*.asd"
         "*.el"
+        "*.lfe"
         "*.scm"
+        "*.ss"
+        "*.sld"
+        "*.sls"
+        "*.sps"
+        "*.rkt"
+        "*.rktl"
+        "*.rktd"
         "*.clj"
         "*.cljc"
         "*.cljs"
+        "*.cljd"
+        "*.edn"
+        "*.bb"
+        "*.hy"
+        "*.carp"
         "*.janet"
         "*.fnl"
       ];

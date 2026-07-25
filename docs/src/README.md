@@ -5,7 +5,7 @@ refactoring Lisp source. It parses first, edits only balanced S-expression
 structure or exact atom tokens, and validates the result — so symbol-oriented
 rewrites never touch strings or comments.
 
-It supports Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, and Fennel
+It supports Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, and Fennel
 sources, and is designed for both people and AI coding agents.
 
 ## Quick start

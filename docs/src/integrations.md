@@ -42,9 +42,9 @@ Downstream flakes can reuse the gates and the formatter:
   structural parse errors, suitable for `checks`.
 - `lib.<system>.mkFormatCheck { src = ./.; }` — the canonical-format gate as a
   derivation.
-- `lib.<system>.treefmtFormatter` — a treefmt formatter entry covering
-  `.lisp`, `.asd`, `.el`, `.scm`, `.clj`, `.cljc`, `.cljs`, `.janet`, and
-  `.fnl` sources.
+- `lib.<system>.treefmtFormatter` — a treefmt formatter entry covering every
+  extension paredit detects a dialect for (see
+  [Selectors](./selectors.md#files-and-stdin)).
 - `overlays.default` — adds `paredit-cli`, `paredit-lint`, `paredit-format`,
   and `paredit-format-files` to nixpkgs.
 
