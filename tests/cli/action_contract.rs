@@ -80,6 +80,60 @@ fn flake_exposes_the_documented_integration_surfaces() {
     );
 }
 
+/// `lispIncludes` decides which files `paredit-lint`, `paredit-format`, and the
+/// treefmt formatter ever look at. If it drifts from `Dialect::from_extension`,
+/// a supported dialect is silently skipped by every Nix gate — the failure is
+/// invisible because the tools simply report nothing for those files.
+#[test]
+fn flake_lisp_includes_cover_exactly_the_recognized_dialect_extensions() {
+    use std::collections::BTreeSet;
+
+    let flake = fs::read_to_string("flake.nix").expect("read flake.nix");
+    let marker = "lispIncludes = [";
+    let start = flake.find(marker).expect("flake.nix defines lispIncludes") + marker.len();
+    let end = start
+        + flake[start..]
+            .find(']')
+            .expect("lispIncludes list is closed");
+    let flake_extensions: BTreeSet<&str> = flake[start..end]
+        .lines()
+        .map(str::trim)
+        .filter_map(|line| line.strip_prefix("\"*."))
+        .filter_map(|line| line.strip_suffix('"'))
+        .collect();
+
+    let dialect = fs::read_to_string("src/domain/dialect/mod.rs").expect("read dialect module");
+    let arms_start = dialect
+        .find("pub fn from_extension")
+        .expect("dialect module defines from_extension");
+    let arms_end = arms_start
+        + dialect[arms_start..]
+            .find("_ => Self::Unknown")
+            .expect("from_extension has a fallback arm");
+    let dialect_extensions: BTreeSet<&str> = dialect[arms_start..arms_end]
+        .lines()
+        .filter(|line| line.contains("=> Self::"))
+        .flat_map(|line| {
+            line.split("=>")
+                .next()
+                .expect("match arm has a pattern")
+                .split('|')
+        })
+        .map(|pattern| pattern.trim().trim_matches('"'))
+        .filter(|pattern| !pattern.is_empty())
+        .collect();
+
+    assert!(
+        !dialect_extensions.is_empty(),
+        "failed to extract any extension from Dialect::from_extension"
+    );
+    assert_eq!(
+        flake_extensions, dialect_extensions,
+        "flake.nix lispIncludes must mirror Dialect::from_extension so the Nix \
+         lint, format, and treefmt gates cover every file paredit can parse"
+    );
+}
+
 #[test]
 fn ci_checks_each_host_and_audits_dependencies_on_linux() {
     let workflow = fs::read_to_string(".github/workflows/ci.yml").expect("read CI workflow");

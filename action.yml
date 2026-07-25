@@ -1,8 +1,8 @@
 name: paredit-lint
 description: >-
   Structural S-expression lint and canonical-format checks for Lisp sources
-  (Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, Fennel), powered by
-  paredit-cli.
+  (Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet,
+  Fennel), powered by paredit-cli.
 branding:
   icon: check-circle
   color: purple
@@ -23,7 +23,7 @@ inputs:
   version:
     description: >-
       paredit-cli git ref to run. Defaults to the ref this action is pinned
-      to, so `uses: takeokunn/paredit-cli@v0.1.1` runs the v0.1.1 binary.
+      to, so `uses: takeokunn/paredit-cli@v1.0.0` runs the v1.0.0 binary.
     required: false
     default: ""
   cachix-name:
