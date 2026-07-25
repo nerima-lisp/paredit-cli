@@ -314,6 +314,18 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::RedundantEqlTest(args) => {
                 redundant_eql_test_report::workflow::redundant_eql_test_report(args)?
             }
+            command::InspectCommand::MakeHashTableTest(args) => {
+                make_hash_table_test_report::workflow::make_hash_table_test_report(args)?
+            }
+            command::InspectCommand::GethashDefault(args) => {
+                gethash_default_report::workflow::gethash_default_report(args)?
+            }
+            command::InspectCommand::TypepPredicate(args) => {
+                typep_predicate_report::workflow::typep_predicate_report(args)?
+            }
+            command::InspectCommand::CoerceToT(args) => {
+                coerce_to_t_report::workflow::coerce_to_t_report(args)?
+            }
             command::InspectCommand::RedundantIdentityKey(args) => {
                 redundant_identity_key_report::workflow::redundant_identity_key_report(args)?
             }

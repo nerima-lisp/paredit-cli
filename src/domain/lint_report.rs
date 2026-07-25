@@ -26,6 +26,7 @@ use crate::domain::car_nthcdr_report::collect_car_nthcdrs;
 use crate::domain::car_reverse_report::collect_car_reverses;
 use crate::domain::case_nil_key_report::collect_case_nil_keys;
 use crate::domain::char_op_string_report::collect_char_op_strings;
+use crate::domain::coerce_to_t_report::collect_coerce_to_ts;
 use crate::domain::cond_t_clause_report::collect_cond_t_clauses;
 use crate::domain::cons_to_list_report::collect_cons_to_lists;
 use crate::domain::constant_if_test_report::collect_constant_if_tests;
@@ -58,6 +59,7 @@ use crate::domain::format_missing_destination_report::collect_format_missing_des
 use crate::domain::format_newline_report::collect_format_newlines;
 use crate::domain::format_to_string_report::collect_format_to_strings;
 use crate::domain::funcall_lambda_report::collect_funcall_lambdas;
+use crate::domain::gethash_default_report::collect_gethash_defaults;
 use crate::domain::identical_if_branch_report::collect_identical_if_branches;
 use crate::domain::identity_arithmetic_report::collect_identity_arithmetic;
 use crate::domain::if_arity_report::collect_if_arity_violations;
@@ -66,6 +68,7 @@ use crate::domain::if_to_or_report::collect_if_to_ors;
 use crate::domain::lambda_list_keyword_order_report::collect_lambda_list_keyword_order;
 use crate::domain::list_star_to_cons_report::collect_list_star_to_cons;
 use crate::domain::literal_place_report::collect_literal_places;
+use crate::domain::make_hash_table_test_report::collect_make_hash_table_tests;
 use crate::domain::malformed_case_clause_report::collect_malformed_case_clauses;
 use crate::domain::malformed_cond_clause_report::collect_malformed_cond_clauses;
 use crate::domain::malformed_iteration_spec_report::collect_malformed_iteration_specs;
@@ -124,13 +127,14 @@ use crate::domain::subseq_zero_report::collect_subseq_zeros;
 use crate::domain::t_comparison_report::collect_t_comparisons;
 use crate::domain::the_arity_report::collect_the_arity_violations;
 use crate::domain::typecase_nil_key_report::collect_typecase_nil_keys;
+use crate::domain::typep_predicate_report::collect_typep_predicates;
 use crate::domain::unreachable_case_clause_report::collect_unreachable_case_clauses;
 use crate::domain::unreachable_cond_clause_report::collect_unreachable_cond_clauses;
 use crate::domain::values_list_of_list_report::collect_values_list_of_lists;
 use crate::domain::verbose_negation_report::collect_verbose_negations;
 
 /// Stable rule identifiers, matching each lint's own `inspect` command name.
-pub const RULES: [&str; 106] = [
+pub const RULES: [&str; 110] = [
     "self-assignment",
     "duplicate-setf-places",
     "setf-arity",
@@ -237,6 +241,10 @@ pub const RULES: [&str; 106] = [
     "car-reverse",
     "append-nil",
     "multiple-value-list-of-values",
+    "typep-predicate",
+    "coerce-to-t",
+    "gethash-default",
+    "make-hash-table-test",
 ];
 
 /// The set of rule categories, sorted, for `--category` validation and
@@ -249,7 +257,7 @@ pub const CATEGORIES: [&str; 5] = ["arity", "dead-code", "duplicate", "malformed
 /// its groupings, and its `--rule`/`--exclude`/`--category` names without
 /// consulting the documentation. Kept in lockstep with [`RULES`] and
 /// [`CATEGORIES`] by `rule_docs_cover_every_rule`.
-pub const RULE_DOCS: [(&str, &str, &str); 106] = [
+pub const RULE_DOCS: [(&str, &str, &str); 110] = [
     (
         "self-assignment",
         "suspicious",
@@ -780,6 +788,26 @@ pub const RULE_DOCS: [(&str, &str, &str); 106] = [
         "suspicious",
         "a multiple-value-list of a values form ((multiple-value-list (values a b)) is (list a b))",
     ),
+    (
+        "typep-predicate",
+        "suspicious",
+        "a typep against a type with a dedicated predicate ((typep x 'string) is (stringp x))",
+    ),
+    (
+        "coerce-to-t",
+        "suspicious",
+        "a coerce to type t, which returns the object unchanged ((coerce x t) is x)",
+    ),
+    (
+        "gethash-default",
+        "suspicious",
+        "a gethash with an explicit nil default, the default ((gethash k h nil) is (gethash k h))",
+    ),
+    (
+        "make-hash-table-test",
+        "suspicious",
+        "a make-hash-table with an explicit :test 'eql, the default ((make-hash-table :test 'eql) is (make-hash-table))",
+    ),
 ];
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
@@ -804,7 +832,7 @@ pub fn rule_category(name: &str) -> Option<&'static str> {
 /// and it is asserted to match that engine's actual behavior by a guard test
 /// there. The rest of the rules are diagnostic-only (their repair depends on
 /// intent a machine cannot infer).
-pub const FIXABLE_RULES: [&str; 64] = [
+pub const FIXABLE_RULES: [&str; 68] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -869,6 +897,10 @@ pub const FIXABLE_RULES: [&str; 64] = [
     "car-reverse",
     "append-nil",
     "multiple-value-list-of-values",
+    "typep-predicate",
+    "coerce-to-t",
+    "gethash-default",
+    "make-hash-table-test",
 ];
 
 /// Whether `inspect lint --fix` can automatically repair findings of `name`.
@@ -909,7 +941,7 @@ impl Severity {
 /// the pure-redundancy and readability rules. Every other rule is an `error`
 /// (a likely or certain bug). This is the single source of truth for severity;
 /// a guard test asserts each entry is a real rule.
-pub const WARNING_RULES: [&str; 65] = [
+pub const WARNING_RULES: [&str; 69] = [
     "manual-incf",
     "manual-push",
     "manual-pushnew",
@@ -975,6 +1007,10 @@ pub const WARNING_RULES: [&str; 65] = [
     "car-reverse",
     "append-nil",
     "multiple-value-list-of-values",
+    "typep-predicate",
+    "coerce-to-t",
+    "gethash-default",
+    "make-hash-table-test",
 ];
 
 /// The severity of a rule's findings (`error` unless it is a [`WARNING_RULES`]
@@ -2309,6 +2345,50 @@ pub fn collect_lint_findings(
             path: item.path,
             span: item.span,
             message: "multiple-value-list of a values form is just list; (multiple-value-list (values a b)) is (list a b)"
+                .to_owned(),
+        });
+    }
+
+    let (_, items) = collect_typep_predicates(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "typep-predicate",
+            path: item.path,
+            span: item.span,
+            message: format!(
+                "typep against this type has a dedicated predicate; use ({} x)",
+                item.predicate
+            ),
+        });
+    }
+
+    let (_, items) = collect_coerce_to_ts(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "coerce-to-t",
+            path: item.path,
+            span: item.span,
+            message: "coerce to type t returns the object unchanged; (coerce x t) is x".to_owned(),
+        });
+    }
+
+    let (_, items) = collect_gethash_defaults(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "gethash-default",
+            path: item.path,
+            span: item.span,
+            message: "the gethash default is nil; (gethash k h nil) is (gethash k h)".to_owned(),
+        });
+    }
+
+    let (_, items) = collect_make_hash_table_tests(path, dialect, tree)?;
+    for item in items {
+        findings.push(LintFinding {
+            rule: "make-hash-table-test",
+            path: item.path,
+            span: item.span,
+            message: "the make-hash-table :test defaults to eql; drop the explicit :test 'eql"
                 .to_owned(),
         });
     }

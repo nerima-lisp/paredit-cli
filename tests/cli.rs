@@ -39,6 +39,8 @@ mod case_nil_key_report;
 mod char_op_string_report;
 #[path = "cli/class_cycle_report.rs"]
 mod class_cycle_report;
+#[path = "cli/coerce_to_t_report.rs"]
+mod coerce_to_t_report;
 #[path = "cli/completions_contract.rs"]
 mod completions_contract;
 #[path = "cli/complexity_report.rs"]
@@ -159,6 +161,8 @@ mod format_to_string_report;
 mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
+#[path = "cli/gethash_default_report.rs"]
+mod gethash_default_report;
 #[path = "cli/help_contract.rs"]
 mod help_contract;
 #[path = "cli/identical_if_branch_report.rs"]
@@ -193,6 +197,8 @@ mod lint_report;
 mod list_star_to_cons_report;
 #[path = "cli/literal_place_report.rs"]
 mod literal_place_report;
+#[path = "cli/make_hash_table_test_report.rs"]
+mod make_hash_table_test_report;
 #[path = "cli/malformed_case_clause_report.rs"]
 mod malformed_case_clause_report;
 #[path = "cli/malformed_cond_clause_report.rs"]
@@ -393,6 +399,8 @@ mod the_arity_report;
 mod thread_expression;
 #[path = "cli/typecase_nil_key_report.rs"]
 mod typecase_nil_key_report;
+#[path = "cli/typep_predicate_report.rs"]
+mod typep_predicate_report;
 #[path = "cli/undefined_package_report.rs"]
 mod undefined_package_report;
 #[path = "cli/unreachable_case_clause_report.rs"]

@@ -4,6 +4,7 @@ use crate::application::usecase::append_list_to_cons_report::collect_append_list
 use crate::application::usecase::append_nil_report::collect_append_nils;
 use crate::application::usecase::car_nthcdr_report::collect_car_nthcdrs;
 use crate::application::usecase::car_reverse_report::collect_car_reverses;
+use crate::application::usecase::coerce_to_t_report::collect_coerce_to_ts;
 use crate::application::usecase::cond_t_clause_report::collect_cond_t_clauses;
 use crate::application::usecase::cons_to_list_report::collect_cons_to_lists;
 use crate::application::usecase::constant_if_test_report::collect_constant_if_tests;
@@ -18,6 +19,7 @@ use crate::application::usecase::explicit_step_delta_report::collect_explicit_st
 use crate::application::usecase::format_newline_report::collect_format_newlines;
 use crate::application::usecase::format_to_string_report::collect_format_to_strings;
 use crate::application::usecase::funcall_lambda_report::collect_funcall_lambdas;
+use crate::application::usecase::gethash_default_report::collect_gethash_defaults;
 use crate::application::usecase::if_not_report::collect_if_nots;
 use crate::application::usecase::if_to_or_report::collect_if_to_ors;
 use crate::application::usecase::lint_report::{
@@ -26,6 +28,7 @@ use crate::application::usecase::lint_report::{
     summarize_lint_findings,
 };
 use crate::application::usecase::list_star_to_cons_report::collect_list_star_to_cons;
+use crate::application::usecase::make_hash_table_test_report::collect_make_hash_table_tests;
 use crate::application::usecase::manual_incf_report::collect_manual_incfs;
 use crate::application::usecase::manual_push_report::collect_manual_pushes;
 use crate::application::usecase::manual_pushnew_report::collect_manual_pushnews;
@@ -67,6 +70,7 @@ use crate::application::usecase::single_operand_boolean_report::collect_single_o
 use crate::application::usecase::single_operand_list_op_report::collect_single_operand_list_ops;
 use crate::application::usecase::single_value_bind_report::collect_single_value_binds;
 use crate::application::usecase::subseq_zero_report::collect_subseq_zeros;
+use crate::application::usecase::typep_predicate_report::collect_typep_predicates;
 use crate::application::usecase::values_list_of_list_report::collect_values_list_of_lists;
 use crate::application::usecase::verbose_negation_report::collect_verbose_negations;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
@@ -249,6 +253,9 @@ fn retain_unbaselined(
 /// `(car (reverse x))` as `(car (last x))`), `append-nil` (rewrite
 /// `(append x nil)` as `(copy-list x)`), `multiple-value-list-of-values`
 /// (rewrite `(multiple-value-list (values a b))` as `(list a b)`),
+/// `typep-predicate` (rewrite `(typep x 'string)` as `(stringp x)`), `coerce-to-t`
+/// (unwrap `(coerce x t)` to `x`), `gethash-default` (delete the redundant `nil`
+/// default), `make-hash-table-test` (delete the redundant `:test 'eql`),
 /// `negated-when-unless` (a two-edit fix: flip the
 /// `when`/`unless` head and drop the `(not …)`), `one-armed-if` (swap an
 /// else-less `if` head for `when`), `manual-incf` (rewrite `(setf x (1+ x))` as
@@ -869,6 +876,83 @@ fn collect_lint_fixes(
                     text,
                     "Rewrite (multiple-value-list (values …)) as (list …)".to_owned(),
                 ),
+            );
+        }
+    }
+
+    if active.contains(&"typep-predicate") {
+        let (_, items) = collect_typep_predicates(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (typep x 'TYPE) is (PRED x).
+            let text = format!("({} {})", item.predicate, slice(item.object_span));
+            fixes.insert(
+                ("typep-predicate", start, end),
+                one_edit(
+                    start,
+                    end,
+                    text,
+                    format!("Rewrite typep as ({} x)", item.predicate),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"coerce-to-t") {
+        let (_, items) = collect_coerce_to_ts(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // (coerce x t) is x.
+            fixes.insert(
+                ("coerce-to-t", start, end),
+                one_edit(
+                    start,
+                    end,
+                    slice(item.object_span),
+                    "Drop the no-op (coerce x t)".to_owned(),
+                ),
+            );
+        }
+    }
+
+    if active.contains(&"gethash-default") {
+        let (_, items) = collect_gethash_defaults(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // Delete the redundant ` nil` default.
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("gethash-default", start, end),
+                LintFix {
+                    description: "Drop the redundant nil default".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
+            );
+        }
+    }
+
+    if active.contains(&"make-hash-table-test") {
+        let (_, items) = collect_make_hash_table_tests(file, dialect, tree)?;
+        for item in items {
+            let (start, end) = (item.span.start().get(), item.span.end().get());
+            // Delete the redundant ` :test 'eql` argument pair.
+            let removal_start = item.removal_span.start().get();
+            let removal_end = item.removal_span.end().get();
+            fixes.insert(
+                ("make-hash-table-test", start, end),
+                LintFix {
+                    description: "Drop the redundant :test 'eql".to_owned(),
+                    replacements: vec![LintReplacement {
+                        byte_offset: removal_start,
+                        byte_length: removal_end - removal_start,
+                        text: String::new(),
+                    }],
+                },
             );
         }
     }
@@ -2131,6 +2215,10 @@ mod tests {
             "(car (reverse crx))\n",                    // car-reverse
             "(append anx nil)\n",                       // append-nil
             "(multiple-value-list (values mva mvb))\n", // multiple-value-list-of-values
+            "(typep tpx 'string)\n",                    // typep-predicate
+            "(coerce ctx t)\n",                         // coerce-to-t
+            "(gethash gdk gdh nil)\n",                  // gethash-default
+            "(make-hash-table :test 'eql)\n",           // make-hash-table-test
             "(let* ((a 1)) a)\n",                       // redundant-let-star
             "(cond (ok (run)))\n",                      // single-clause-cond
             "(cond (t (r1) (r2)))\n",                   // cond-t-clause

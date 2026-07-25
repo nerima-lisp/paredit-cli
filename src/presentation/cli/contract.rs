@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 150] = [
+const INTROSPECTION_COMMANDS: [&str; 154] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -201,6 +201,10 @@ const INTROSPECTION_COMMANDS: [&str; 150] = [
     "inspect eq-char-comparison",
     "inspect redundant-apply",
     "inspect redundant-eql-test",
+    "inspect make-hash-table-test",
+    "inspect gethash-default",
+    "inspect typep-predicate",
+    "inspect coerce-to-t",
     "inspect redundant-identity-key",
     "inspect redundant-body-progn",
     "inspect redundant-boolean-identity",
