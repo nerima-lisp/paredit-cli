@@ -10,36 +10,39 @@ use super::{
     convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
     definition_movement, definition_removal, definition_report, dependency_report,
     destructive_literal_report, duplicate_boolean_operand_report, duplicate_case_key_report,
-    duplicate_cond_test_report, duplicate_lambda_list_keyword_report, duplicate_let_binding_report,
-    duplicate_parameter_report, duplicate_report, duplicate_setf_place_report,
-    eliminate_empty_binding_form, empty_body_report, eq_char_comparison_report,
-    eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
-    eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
-    exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
-    extract_constant, extract_function, extract_local_function, flatten_progn, form_report,
-    funcall_lambda_report, function_parameter, identical_if_branch_report,
-    identity_arithmetic_report, if_arity_report, if_to_or_report, impact_report, inline_function,
-    inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
-    introduce_let, lambda_list_keyword_order_report, let_report, literal_place_report,
-    malformed_case_clause_report, malformed_cond_clause_report, malformed_iteration_spec_report,
-    malformed_let_binding_report, manual_incf_report, manual_push_report, manual_pushnew_report,
-    merge_nested_flet, merge_nested_let, merge_nested_let_star, modify_macro_arity_report,
-    negated_comparison_report, negated_if_report, negated_step_delta_report,
-    negated_when_unless_report, nested_boolean_report, nested_progn_report, nested_unless_report,
-    nested_when_report, nil_comparison_report, one_armed_if_report, one_step_arithmetic_report,
-    package, quoted_case_key_report, redundant_apply_report, redundant_body_progn_report,
-    redundant_boolean_identity_report, redundant_eql_test_report, redundant_funcall_report,
-    redundant_identity_key_report, redundant_identity_report, redundant_if_nil_report,
-    redundant_let_star_report, redundant_progn_report, redundant_quote_report, refactor,
-    remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
-    self_assignment_report, self_comparison_report, setf_arity_report, setq_non_variable_report,
-    shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
-    similarity_report, single_arg_comparison_report, single_clause_cond_report,
-    single_operand_arithmetic_report, single_operand_boolean_report, single_value_bind_report,
-    split_let, split_let_star, symbol_report, t_comparison_report, the_arity_report,
-    thread_expression, unreachable_case_clause_report, unreachable_cond_clause_report,
-    unthread_expression, unused_local_callable_report, unused_parameter_report, unwrap_call,
-    verbose_negation_report, workspace_report,
+    duplicate_cond_test_report, duplicate_export_report, duplicate_lambda_list_keyword_report,
+    duplicate_let_binding_report, duplicate_parameter_report, duplicate_report,
+    duplicate_setf_place_report, eliminate_empty_binding_form, empty_body_report,
+    eq_char_comparison_report, eq_number_comparison_report, eql_list_comparison_report,
+    eql_search_literal_report, eql_string_comparison_report, equality_arity_report,
+    eval_when_situation_report, exhaustive_case_otherwise_report, explicit_nil_return_report,
+    explicit_step_delta_report, extract_constant, extract_function, extract_local_function,
+    flatten_progn, form_report, funcall_lambda_report, function_parameter,
+    identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_to_or_report,
+    impact_report, inline_function, inline_lambda, inline_let, inline_literal_constant,
+    inline_local_function, inline_symbol_macro, introduce_let, lambda_list_keyword_order_report,
+    let_report, literal_place_report, malformed_case_clause_report, malformed_cond_clause_report,
+    malformed_iteration_spec_report, malformed_let_binding_report, manual_incf_report,
+    manual_push_report, manual_pushnew_report, merge_nested_flet, merge_nested_let,
+    merge_nested_let_star, modify_macro_arity_report, negated_comparison_report, negated_if_report,
+    negated_step_delta_report, negated_when_unless_report, nested_boolean_report,
+    nested_progn_report, nested_unless_report, nested_when_report, nil_comparison_report,
+    one_armed_if_report, one_step_arithmetic_report, package, package_boundary_report,
+    package_conflict_report, package_cycle_report, quoted_case_key_report, redundant_apply_report,
+    redundant_body_progn_report, redundant_boolean_identity_report, redundant_eql_test_report,
+    redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
+    redundant_if_nil_report, redundant_let_star_report, redundant_progn_report,
+    redundant_quote_report, refactor, remove_unused_binding, remove_unused_control, rename,
+    rename_control, replace_forms, self_assignment_report, self_comparison_report,
+    setf_arity_report, setq_non_variable_report, shadowed_binding_report,
+    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
+    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
+    single_operand_boolean_report, single_value_bind_report, split_let, split_let_star,
+    symbol_report, system_conflict_report, system_cycle_report, t_comparison_report,
+    the_arity_report, thread_expression, undefined_package_report, unreachable_case_clause_report,
+    unreachable_cond_clause_report, unthread_expression, unused_export_report,
+    unused_local_callable_report, unused_nickname_report, unused_package_report,
+    unused_parameter_report, unwrap_call, verbose_negation_report, workspace_report,
 };
 use clap::Subcommand;
 
@@ -269,6 +272,26 @@ pub(super) enum InspectCommand {
     ShadowedBindings(shadowed_binding_report::args::ShadowedBindingReportArgs),
     /// Report flet/labels local callables never called anywhere in their visible scope.
     UnusedLocalCallables(unused_local_callable_report::args::UnusedLocalCallableReportArgs),
+    /// Report package::symbol references that reach into another package's internal symbols.
+    PackageBoundaries(package_boundary_report::args::PackageBoundaryReportArgs),
+    /// Report defpackage :use/:import-from cycles across two or more packages.
+    PackageCycles(package_cycle_report::args::PackageCycleReportArgs),
+    /// Report distinct defpackage forms that claim the same package name or nickname.
+    PackageConflicts(package_conflict_report::args::PackageConflictReportArgs),
+    /// Report distinct asdf:defsystem forms that claim the same system name.
+    SystemConflicts(system_conflict_report::args::SystemConflictReportArgs),
+    /// Report ASDF defsystem :depends-on cycles across two or more systems.
+    SystemCycles(system_cycle_report::args::SystemCycleReportArgs),
+    /// Report defpackage declarations never used, imported-from, or reached by a qualified symbol.
+    UnusedPackages(unused_package_report::args::UnusedPackageReportArgs),
+    /// Report defpackage :export symbols never reached by a qualified symbol reference.
+    UnusedExports(unused_export_report::args::UnusedExportReportArgs),
+    /// Report defpackage forms that export the same symbol more than once.
+    DuplicateExports(duplicate_export_report::args::DuplicateExportReportArgs),
+    /// Report defpackage :nicknames never used as a qualifier anywhere.
+    UnusedNicknames(unused_nickname_report::args::UnusedNicknameReportArgs),
+    /// Report in-package forms naming a package no analyzed defpackage declares.
+    UndefinedPackages(undefined_package_report::args::UndefinedPackageReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

@@ -71,6 +71,8 @@ mod duplicate_boolean_operand_report;
 mod duplicate_case_key_report;
 #[path = "cli/duplicate_cond_test_report.rs"]
 mod duplicate_cond_test_report;
+#[path = "cli/duplicate_export_report.rs"]
+mod duplicate_export_report;
 #[path = "cli/duplicate_lambda_list_keyword_report.rs"]
 mod duplicate_lambda_list_keyword_report;
 #[path = "cli/duplicate_let_binding_report.rs"]
@@ -199,6 +201,12 @@ mod one_step_arithmetic_report;
 mod package;
 #[path = "cli/package_archive_contract.rs"]
 mod package_archive_contract;
+#[path = "cli/package_boundary_report.rs"]
+mod package_boundary_report;
+#[path = "cli/package_conflict_report.rs"]
+mod package_conflict_report;
+#[path = "cli/package_cycle_report.rs"]
+mod package_cycle_report;
 #[path = "cli/plan_steps_contract.rs"]
 mod plan_steps_contract;
 #[path = "cli/public_api_docs_contract.rs"]
@@ -303,6 +311,10 @@ mod split_file;
 mod split_let_star;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
+#[path = "cli/system_conflict_report.rs"]
+mod system_conflict_report;
+#[path = "cli/system_cycle_report.rs"]
+mod system_cycle_report;
 #[path = "cli/t_comparison_report.rs"]
 mod t_comparison_report;
 #[path = "cli/terminal_output_safety.rs"]
@@ -311,12 +323,20 @@ mod terminal_output_safety;
 mod the_arity_report;
 #[path = "cli/thread_expression/mod.rs"]
 mod thread_expression;
+#[path = "cli/undefined_package_report.rs"]
+mod undefined_package_report;
 #[path = "cli/unreachable_case_clause_report.rs"]
 mod unreachable_case_clause_report;
 #[path = "cli/unreachable_cond_clause_report.rs"]
 mod unreachable_cond_clause_report;
+#[path = "cli/unused_export_report.rs"]
+mod unused_export_report;
 #[path = "cli/unused_local_callable_report.rs"]
 mod unused_local_callable_report;
+#[path = "cli/unused_nickname_report.rs"]
+mod unused_nickname_report;
+#[path = "cli/unused_package_report.rs"]
+mod unused_package_report;
 #[path = "cli/unused_parameter_report.rs"]
 mod unused_parameter_report;
 #[path = "cli/unwrap_call.rs"]

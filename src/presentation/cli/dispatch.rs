@@ -297,6 +297,36 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::UnusedLocalCallables(args) => {
                 unused_local_callable_report::workflow::unused_local_callable_report(args)?
             }
+            command::InspectCommand::PackageBoundaries(args) => {
+                package_boundary_report::workflow::package_boundary_report(args)?
+            }
+            command::InspectCommand::PackageCycles(args) => {
+                package_cycle_report::workflow::package_cycle_report(args)?
+            }
+            command::InspectCommand::PackageConflicts(args) => {
+                package_conflict_report::workflow::package_conflict_report(args)?
+            }
+            command::InspectCommand::SystemConflicts(args) => {
+                system_conflict_report::workflow::system_conflict_report(args)?
+            }
+            command::InspectCommand::SystemCycles(args) => {
+                system_cycle_report::workflow::system_cycle_report(args)?
+            }
+            command::InspectCommand::UnusedPackages(args) => {
+                unused_package_report::workflow::unused_package_report(args)?
+            }
+            command::InspectCommand::UnusedExports(args) => {
+                unused_export_report::workflow::unused_export_report(args)?
+            }
+            command::InspectCommand::DuplicateExports(args) => {
+                duplicate_export_report::workflow::duplicate_export_report(args)?
+            }
+            command::InspectCommand::UnusedNicknames(args) => {
+                unused_nickname_report::workflow::unused_nickname_report(args)?
+            }
+            command::InspectCommand::UndefinedPackages(args) => {
+                undefined_package_report::workflow::undefined_package_report(args)?
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
