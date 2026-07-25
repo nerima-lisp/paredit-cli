@@ -17,6 +17,8 @@ mod analysis_report;
 mod basic_edit_write;
 #[path = "cli/binds_constant_report.rs"]
 mod binds_constant_report;
+#[path = "cli/call_cycle_report.rs"]
+mod call_cycle_report;
 #[path = "cli/call_graph_report/mod.rs"]
 mod call_graph_report;
 #[path = "cli/call_report.rs"]
@@ -27,6 +29,8 @@ mod capabilities_contract;
 mod case_nil_key_report;
 #[path = "cli/char_op_string_report.rs"]
 mod char_op_string_report;
+#[path = "cli/class_cycle_report.rs"]
+mod class_cycle_report;
 #[path = "cli/completions_contract.rs"]
 mod completions_contract;
 #[path = "cli/conditional_conversion.rs"]
@@ -77,12 +81,16 @@ mod duplicate_export_report;
 mod duplicate_lambda_list_keyword_report;
 #[path = "cli/duplicate_let_binding_report.rs"]
 mod duplicate_let_binding_report;
+#[path = "cli/duplicate_method_report.rs"]
+mod duplicate_method_report;
 #[path = "cli/duplicate_parameter_report.rs"]
 mod duplicate_parameter_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
 #[path = "cli/duplicate_setf_place_report.rs"]
 mod duplicate_setf_place_report;
+#[path = "cli/duplicate_slot_report.rs"]
+mod duplicate_slot_report;
 #[path = "cli/edit_transpose.rs"]
 mod edit_transpose;
 #[path = "cli/eliminate_empty_binding_form.rs"]
@@ -229,6 +237,8 @@ mod readme_install_contract;
 mod readme_smoke;
 #[path = "cli/readme_workspace_smoke.rs"]
 mod readme_workspace_smoke;
+#[path = "cli/redefinition_report.rs"]
+mod redefinition_report;
 #[path = "cli/redundant_apply_report.rs"]
 mod redundant_apply_report;
 #[path = "cli/redundant_body_progn_report.rs"]
@@ -309,6 +319,8 @@ mod sort_definitions;
 mod split_file;
 #[path = "cli/split_let_star.rs"]
 mod split_let_star;
+#[path = "cli/struct_cycle_report.rs"]
+mod struct_cycle_report;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
 #[path = "cli/system_conflict_report.rs"]

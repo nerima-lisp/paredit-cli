@@ -43,6 +43,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::DuplicateSetfPlaces(args) => {
                 duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?
             }
+            command::InspectCommand::DuplicateSlots(args) => {
+                duplicate_slot_report::workflow::duplicate_slot_report(args)?
+            }
+            command::InspectCommand::DuplicateMethods(args) => {
+                duplicate_method_report::workflow::duplicate_method_report(args)?
+            }
             command::InspectCommand::DuplicateParameters(args) => {
                 duplicate_parameter_report::workflow::duplicate_parameter_report(args)?
             }
@@ -184,6 +190,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 similarity_report::workflow::similarity_report(args)?
             }
             command::InspectCommand::Lets(args) => let_report::let_report(args)?,
+            command::InspectCommand::Redefinitions(args) => {
+                redefinition_report::workflow::redefinition_report(args)?
+            }
             command::InspectCommand::RedundantQuote(args) => {
                 redundant_quote_report::workflow::redundant_quote_report(args)?
             }
@@ -300,6 +309,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::PackageBoundaries(args) => {
                 package_boundary_report::workflow::package_boundary_report(args)?
             }
+            command::InspectCommand::CallCycles(args) => {
+                call_cycle_report::workflow::call_cycle_report(args)?
+            }
             command::InspectCommand::PackageCycles(args) => {
                 package_cycle_report::workflow::package_cycle_report(args)?
             }
@@ -311,6 +323,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::SystemCycles(args) => {
                 system_cycle_report::workflow::system_cycle_report(args)?
+            }
+            command::InspectCommand::ClassCycles(args) => {
+                class_cycle_report::workflow::class_cycle_report(args)?
+            }
+            command::InspectCommand::StructCycles(args) => {
+                struct_cycle_report::workflow::struct_cycle_report(args)?
             }
             command::InspectCommand::UnusedPackages(args) => {
                 unused_package_report::workflow::unused_package_report(args)?

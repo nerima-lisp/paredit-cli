@@ -3,16 +3,17 @@ use super::{
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
-    binds_constant_report, call_graph_report, call_report, capabilities, case_nil_key_report,
-    char_op_string_report, constant_if_test_report, convert_cond_to_if, convert_flet_to_labels,
-    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
-    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
-    convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
-    definition_movement, definition_removal, definition_report, dependency_report,
-    destructive_literal_report, duplicate_boolean_operand_report, duplicate_case_key_report,
-    duplicate_cond_test_report, duplicate_export_report, duplicate_lambda_list_keyword_report,
-    duplicate_let_binding_report, duplicate_parameter_report, duplicate_report,
-    duplicate_setf_place_report, eliminate_empty_binding_form, empty_body_report,
+    binds_constant_report, call_cycle_report, call_graph_report, call_report, capabilities,
+    case_nil_key_report, char_op_string_report, class_cycle_report, constant_if_test_report,
+    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
+    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
+    dead_boolean_operand_report, definition_movement, definition_removal, definition_report,
+    dependency_report, destructive_literal_report, duplicate_boolean_operand_report,
+    duplicate_case_key_report, duplicate_cond_test_report, duplicate_export_report,
+    duplicate_lambda_list_keyword_report, duplicate_let_binding_report, duplicate_method_report,
+    duplicate_parameter_report, duplicate_report, duplicate_setf_place_report,
+    duplicate_slot_report, eliminate_empty_binding_form, empty_body_report,
     eq_char_comparison_report, eq_number_comparison_report, eql_list_comparison_report,
     eql_search_literal_report, eql_string_comparison_report, equality_arity_report,
     eval_when_situation_report, exhaustive_case_otherwise_report, explicit_nil_return_report,
@@ -28,21 +29,22 @@ use super::{
     negated_step_delta_report, negated_when_unless_report, nested_boolean_report,
     nested_progn_report, nested_unless_report, nested_when_report, nil_comparison_report,
     one_armed_if_report, one_step_arithmetic_report, package, package_boundary_report,
-    package_conflict_report, package_cycle_report, quoted_case_key_report, redundant_apply_report,
-    redundant_body_progn_report, redundant_boolean_identity_report, redundant_eql_test_report,
-    redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
-    redundant_if_nil_report, redundant_let_star_report, redundant_progn_report,
-    redundant_quote_report, refactor, remove_unused_binding, remove_unused_control, rename,
-    rename_control, replace_forms, self_assignment_report, self_comparison_report,
-    setf_arity_report, setq_non_variable_report, shadowed_binding_report,
+    package_conflict_report, package_cycle_report, quoted_case_key_report, redefinition_report,
+    redundant_apply_report, redundant_body_progn_report, redundant_boolean_identity_report,
+    redundant_eql_test_report, redundant_funcall_report, redundant_identity_key_report,
+    redundant_identity_report, redundant_if_nil_report, redundant_let_star_report,
+    redundant_progn_report, redundant_quote_report, refactor, remove_unused_binding,
+    remove_unused_control, rename, rename_control, replace_forms, self_assignment_report,
+    self_comparison_report, setf_arity_report, setq_non_variable_report, shadowed_binding_report,
     sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
     single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
     single_operand_boolean_report, single_value_bind_report, split_let, split_let_star,
-    symbol_report, system_conflict_report, system_cycle_report, t_comparison_report,
-    the_arity_report, thread_expression, undefined_package_report, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unthread_expression, unused_export_report,
-    unused_local_callable_report, unused_nickname_report, unused_package_report,
-    unused_parameter_report, unwrap_call, verbose_negation_report, workspace_report,
+    struct_cycle_report, symbol_report, system_conflict_report, system_cycle_report,
+    t_comparison_report, the_arity_report, thread_expression, undefined_package_report,
+    unreachable_case_clause_report, unreachable_cond_clause_report, unthread_expression,
+    unused_export_report, unused_local_callable_report, unused_nickname_report,
+    unused_package_report, unused_parameter_report, unwrap_call, verbose_negation_report,
+    workspace_report,
 };
 use clap::Subcommand;
 
@@ -92,6 +94,10 @@ pub(super) enum InspectCommand {
     Duplicates(duplicate_report::args::DuplicateReportArgs),
     /// Report a setf/setq/psetf/psetq that assigns the same variable more than once.
     DuplicateSetfPlaces(duplicate_setf_place_report::args::DuplicateSetfPlaceReportArgs),
+    /// Report defclass/define-condition/defstruct forms declaring the same slot name more than once.
+    DuplicateSlots(duplicate_slot_report::args::DuplicateSlotReportArgs),
+    /// Report defmethod forms with the same name, qualifier, and specializers declared more than once.
+    DuplicateMethods(duplicate_method_report::args::DuplicateMethodReportArgs),
     /// Report callable definitions whose lambda list names the same parameter more than once.
     DuplicateParameters(duplicate_parameter_report::args::DuplicateParameterReportArgs),
     /// Report lambda lists that repeat a lambda-list keyword (&optional, &rest, &key, ...).
@@ -194,6 +200,8 @@ pub(super) enum InspectCommand {
     Similarity(similarity_report::args::SimilarityReportArgs),
     /// Report local let bindings and inline safety for agent refactor planning.
     Lets(let_report::LetReportArgs),
+    /// Report top-level definitions of the same category and name declared more than once.
+    Redefinitions(redefinition_report::args::RedefinitionReportArgs),
     /// Report self-evaluating literals (numbers, strings, characters, keywords) that are quoted redundantly.
     RedundantQuote(redundant_quote_report::args::RedundantQuoteReportArgs),
     /// Report progn forms that are redundant (empty, or wrapping a single form).
@@ -274,6 +282,8 @@ pub(super) enum InspectCommand {
     UnusedLocalCallables(unused_local_callable_report::args::UnusedLocalCallableReportArgs),
     /// Report package::symbol references that reach into another package's internal symbols.
     PackageBoundaries(package_boundary_report::args::PackageBoundaryReportArgs),
+    /// Report strongly connected cycles of two or more definitions in the internal call graph.
+    CallCycles(call_cycle_report::args::CallCycleReportArgs),
     /// Report defpackage :use/:import-from cycles across two or more packages.
     PackageCycles(package_cycle_report::args::PackageCycleReportArgs),
     /// Report distinct defpackage forms that claim the same package name or nickname.
@@ -282,6 +292,10 @@ pub(super) enum InspectCommand {
     SystemConflicts(system_conflict_report::args::SystemConflictReportArgs),
     /// Report ASDF defsystem :depends-on cycles across two or more systems.
     SystemCycles(system_cycle_report::args::SystemCycleReportArgs),
+    /// Report CLOS defclass/define-condition superclass inheritance cycles across two or more classes.
+    ClassCycles(class_cycle_report::args::ClassCycleReportArgs),
+    /// Report defstruct :include cycles across two or more structs.
+    StructCycles(struct_cycle_report::args::StructCycleReportArgs),
     /// Report defpackage declarations never used, imported-from, or reached by a qualified symbol.
     UnusedPackages(unused_package_report::args::UnusedPackageReportArgs),
     /// Report defpackage :export symbols never reached by a qualified symbol reference.

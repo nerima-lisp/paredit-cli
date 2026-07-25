@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 114] = [
+const INTROSPECTION_COMMANDS: [&str; 120] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -94,15 +94,21 @@ const INTROSPECTION_COMMANDS: [&str; 114] = [
     "inspect shadowed-bindings",
     "inspect unused-local-callables",
     "inspect package-boundaries",
+    "inspect call-cycles",
     "inspect package-cycles",
     "inspect system-cycles",
     "inspect unused-packages",
     "inspect unused-exports",
     "inspect unused-nicknames",
     "inspect package-conflicts",
+    "inspect redefinitions",
     "inspect undefined-packages",
+    "inspect class-cycles",
+    "inspect struct-cycles",
     "inspect system-conflicts",
     "inspect duplicate-setf-places",
+    "inspect duplicate-slots",
+    "inspect duplicate-methods",
     "inspect duplicate-case-keys",
     "inspect self-assignments",
     "inspect identical-if-branches",
