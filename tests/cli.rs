@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[path = "cli/accessor_arity_report.rs"]
+mod accessor_arity_report;
 #[path = "cli/action_contract.rs"]
 mod action_contract;
 #[path = "cli/analysis_report.rs"]
@@ -65,12 +67,16 @@ mod duplicate_boolean_operand_report;
 mod duplicate_case_key_report;
 #[path = "cli/duplicate_cond_test_report.rs"]
 mod duplicate_cond_test_report;
+#[path = "cli/duplicate_lambda_list_keyword_report.rs"]
+mod duplicate_lambda_list_keyword_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
 #[path = "cli/edit_transpose.rs"]
 mod edit_transpose;
 #[path = "cli/eliminate_empty_binding_form.rs"]
 mod eliminate_empty_binding_form;
+#[path = "cli/empty_body_report.rs"]
+mod empty_body_report;
 #[path = "cli/eq_char_comparison_report.rs"]
 mod eq_char_comparison_report;
 #[path = "cli/eq_number_comparison_report.rs"]
@@ -81,6 +87,10 @@ mod eql_list_comparison_report;
 mod eql_search_literal_report;
 #[path = "cli/eql_string_comparison_report.rs"]
 mod eql_string_comparison_report;
+#[path = "cli/equality_arity_report.rs"]
+mod equality_arity_report;
+#[path = "cli/eval_when_situation_report.rs"]
+mod eval_when_situation_report;
 #[path = "cli/exhaustive_case_otherwise_report.rs"]
 mod exhaustive_case_otherwise_report;
 #[path = "cli/explicit_nil_return_report.rs"]
@@ -105,6 +115,8 @@ mod function_parameter;
 mod help_contract;
 #[path = "cli/identical_if_branch_report.rs"]
 mod identical_if_branch_report;
+#[path = "cli/if_arity_report.rs"]
+mod if_arity_report;
 #[path = "cli/if_to_or_report.rs"]
 mod if_to_or_report;
 #[path = "cli/impact_report.rs"]
@@ -119,18 +131,26 @@ mod inline_literal_constant;
 mod inline_local_function;
 #[path = "cli/inline_symbol_macro.rs"]
 mod inline_symbol_macro;
+#[path = "cli/lambda_list_keyword_order_report.rs"]
+mod lambda_list_keyword_order_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
 #[path = "cli/malformed_case_clause_report.rs"]
 mod malformed_case_clause_report;
 #[path = "cli/malformed_cond_clause_report.rs"]
 mod malformed_cond_clause_report;
+#[path = "cli/malformed_iteration_spec_report.rs"]
+mod malformed_iteration_spec_report;
+#[path = "cli/malformed_let_binding_report.rs"]
+mod malformed_let_binding_report;
 #[path = "cli/merge_nested_flet.rs"]
 mod merge_nested_flet;
 #[path = "cli/merge_nested_let_star.rs"]
 mod merge_nested_let_star;
 #[path = "cli/merge_split_let.rs"]
 mod merge_split_let;
+#[path = "cli/modify_macro_arity_report.rs"]
+mod modify_macro_arity_report;
 #[path = "cli/negated_comparison_report.rs"]
 mod negated_comparison_report;
 #[path = "cli/negated_if_report.rs"]
@@ -221,6 +241,8 @@ mod repair_unclosed_lists;
 mod replace_forms;
 #[path = "cli/self_comparison_report.rs"]
 mod self_comparison_report;
+#[path = "cli/setf_arity_report.rs"]
+mod setf_arity_report;
 #[path = "cli/sharp_quoted_lambda_report.rs"]
 mod sharp_quoted_lambda_report;
 #[path = "cli/sign_comparison_report.rs"]
@@ -249,6 +271,8 @@ mod symbol_report;
 mod t_comparison_report;
 #[path = "cli/terminal_output_safety.rs"]
 mod terminal_output_safety;
+#[path = "cli/the_arity_report.rs"]
+mod the_arity_report;
 #[path = "cli/thread_expression/mod.rs"]
 mod thread_expression;
 #[path = "cli/unreachable_case_clause_report.rs"]

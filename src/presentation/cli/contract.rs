@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 72] = [
+const INTROSPECTION_COMMANDS: [&str; 84] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -98,15 +98,26 @@ const INTROSPECTION_COMMANDS: [&str; 72] = [
     "inspect self-comparison",
     "inspect dead-boolean-operand",
     "inspect eq-number-comparison",
+    "inspect setf-arity",
     "inspect eql-list-comparison",
     "inspect redundant-quote",
     "inspect unreachable-cond-clause",
+    "inspect malformed-let-binding",
+    "inspect if-arity",
     "inspect malformed-cond-clause",
     "inspect malformed-case-clause",
     "inspect unreachable-case-clause",
+    "inspect malformed-iteration-spec",
+    "inspect duplicate-lambda-list-keyword",
+    "inspect lambda-list-keyword-order",
+    "inspect modify-macro-arity",
     "inspect quoted-case-key",
     "inspect case-nil-key",
     "inspect t-comparison",
+    "inspect the-arity",
+    "inspect equality-arity",
+    "inspect accessor-arity",
+    "inspect eval-when-situation",
     "inspect exhaustive-case-otherwise",
     "inspect explicit-nil-return",
     "inspect redundant-progn",
@@ -141,6 +152,7 @@ const INTROSPECTION_COMMANDS: [&str; 72] = [
     "inspect funcall-lambda",
     "inspect sharp-quoted-lambda",
     "inspect char-op-string",
+    "inspect empty-body",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];

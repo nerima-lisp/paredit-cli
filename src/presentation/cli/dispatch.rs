@@ -40,6 +40,14 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?
             }
+            command::InspectCommand::DuplicateLambdaListKeyword(args) => {
+                duplicate_lambda_list_keyword_report::workflow::duplicate_lambda_list_keyword_report(
+                    args,
+                )?
+            }
+            command::InspectCommand::LambdaListKeywordOrder(args) => {
+                lambda_list_keyword_order_report::workflow::lambda_list_keyword_order_report(args)?
+            }
             command::InspectCommand::DuplicateCaseKeys(args) => {
                 duplicate_case_key_report::workflow::duplicate_case_key_report(args)?
             }
@@ -70,11 +78,23 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::MalformedCondClause(args) => {
                 malformed_cond_clause_report::workflow::malformed_cond_clause_report(args)?
             }
+            command::InspectCommand::MalformedLetBinding(args) => {
+                malformed_let_binding_report::workflow::malformed_let_binding_report(args)?
+            }
+            command::InspectCommand::MalformedIterationSpec(args) => {
+                malformed_iteration_spec_report::workflow::malformed_iteration_spec_report(args)?
+            }
             command::InspectCommand::DuplicateBooleanOperands(args) => {
                 duplicate_boolean_operand_report::workflow::duplicate_boolean_operand_report(args)?
             }
             command::InspectCommand::DeadBooleanOperand(args) => {
                 dead_boolean_operand_report::workflow::dead_boolean_operand_report(args)?
+            }
+            command::InspectCommand::SetfArity(args) => {
+                setf_arity_report::workflow::setf_arity_report(args)?
+            }
+            command::InspectCommand::ModifyMacroArity(args) => {
+                modify_macro_arity_report::workflow::modify_macro_arity_report(args)?
             }
             command::InspectCommand::SelfComparison(args) => {
                 self_comparison_report::workflow::self_comparison_report(args)?
@@ -82,8 +102,23 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::IdenticalIfBranches(args) => {
                 identical_if_branch_report::workflow::identical_if_branch_report(args)?
             }
+            command::InspectCommand::IfArity(args) => {
+                if_arity_report::workflow::if_arity_report(args)?
+            }
             command::InspectCommand::TComparison(args) => {
                 t_comparison_report::workflow::t_comparison_report(args)?
+            }
+            command::InspectCommand::TheArity(args) => {
+                the_arity_report::workflow::the_arity_report(args)?
+            }
+            command::InspectCommand::EqualityArity(args) => {
+                equality_arity_report::workflow::equality_arity_report(args)?
+            }
+            command::InspectCommand::AccessorArity(args) => {
+                accessor_arity_report::workflow::accessor_arity_report(args)?
+            }
+            command::InspectCommand::EvalWhenSituation(args) => {
+                eval_when_situation_report::workflow::eval_when_situation_report(args)?
             }
             command::InspectCommand::EqlStringComparison(args) => {
                 eql_string_comparison_report::workflow::eql_string_comparison_report(args)?
@@ -99,6 +134,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::CharOpString(args) => {
                 char_op_string_report::workflow::char_op_string_report(args)?
+            }
+            command::InspectCommand::EmptyBody(args) => {
+                empty_body_report::workflow::empty_body_report(args)?
             }
             command::InspectCommand::EqlListComparison(args) => {
                 eql_list_comparison_report::workflow::eql_list_comparison_report(args)?
