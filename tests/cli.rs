@@ -165,6 +165,8 @@ mod inline_symbol_macro;
 mod lambda_list_keyword_order_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/lint_report.rs"]
+mod lint_report;
 #[path = "cli/literal_place_report.rs"]
 mod literal_place_report;
 #[path = "cli/malformed_case_clause_report.rs"]

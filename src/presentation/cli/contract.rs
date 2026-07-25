@@ -68,7 +68,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 127] = [
+const INTROSPECTION_COMMANDS: [&str; 128] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -119,6 +119,7 @@ const INTROSPECTION_COMMANDS: [&str; 127] = [
     "inspect duplicate-let-bindings",
     "inspect duplicate-boolean-operands",
     "inspect eql-string-comparison",
+    "inspect lint",
     "inspect self-comparison",
     "inspect dead-boolean-operand",
     "inspect eq-number-comparison",

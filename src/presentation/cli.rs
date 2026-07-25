@@ -87,6 +87,7 @@ mod inline_symbol_macro;
 mod introduce_let;
 mod lambda_list_keyword_order_report;
 mod let_report;
+mod lint_report;
 mod literal_place_report;
 mod malformed_case_clause_report;
 mod malformed_cond_clause_report;

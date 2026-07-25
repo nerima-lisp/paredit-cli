@@ -78,6 +78,7 @@ pub mod introduce_let;
 pub mod lambda_list_keyword_order_report;
 pub(crate) mod leading_trivia;
 pub mod let_report;
+pub mod lint_report;
 pub mod literal_place_report;
 pub mod malformed_case_clause_report;
 pub mod malformed_cond_clause_report;

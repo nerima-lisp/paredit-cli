@@ -186,6 +186,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::EqlListComparison(args) => {
                 eql_list_comparison_report::workflow::eql_list_comparison_report(args)?
             }
+            command::InspectCommand::Lint(args) => lint_report::workflow::lint_report(args)?,
             command::InspectCommand::Similarity(args) => {
                 similarity_report::workflow::similarity_report(args)?
             }

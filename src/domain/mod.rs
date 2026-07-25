@@ -80,6 +80,8 @@ pub(crate) mod let_composition;
 pub mod let_report;
 pub(crate) mod let_star_composition;
 pub mod lexical_scope;
+pub mod lint_report;
+pub mod lint_suppression;
 pub mod literal_place_report;
 pub(crate) mod local_function_binding;
 pub mod malformed_case_clause_report;
