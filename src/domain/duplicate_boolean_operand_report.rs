@@ -129,7 +129,7 @@ pub fn collect_duplicate_boolean_operands(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, path, &mut boolean_form_count, &mut duplicates)
+            examine_boolean(subview, path, &mut boolean_form_count, &mut duplicates);
         });
     }
     Ok((boolean_form_count, duplicates))

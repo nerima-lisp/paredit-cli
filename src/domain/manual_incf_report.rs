@@ -184,7 +184,7 @@ pub fn collect_manual_incfs(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_assignment(subview, path, &mut assignment_form_count, &mut violations)
+            examine_assignment(subview, path, &mut assignment_form_count, &mut violations);
         });
     }
     Ok((assignment_form_count, violations))

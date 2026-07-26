@@ -106,7 +106,7 @@ pub fn collect_format_missing_destinations(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_format(subview, path, &mut format_call_count, &mut violations)
+            examine_format(subview, path, &mut format_call_count, &mut violations);
         });
     }
     Ok((format_call_count, violations))

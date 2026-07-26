@@ -634,7 +634,7 @@ impl SyntaxTree {
                 match best {
                     None => best = Some(node_id),
                     Some(best_id) if node.span.len() < self.node(best_id).span.len() => {
-                        best = Some(node_id)
+                        best = Some(node_id);
                     }
                     _ => {}
                 }

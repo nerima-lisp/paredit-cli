@@ -3161,7 +3161,7 @@ mod tests {
         let result = completes_within(move || {
             let _guard =
                 install_before_existing_file_open_hook(operation_target.clone(), move || {
-                    replace_regular_file_with_fifo(&hook_target, &hook_preserved)
+                    replace_regular_file_with_fifo(&hook_target, &hook_preserved);
                 });
             stage_write_target(operation_target, "(paredit)".to_owned())
                 .map(|_| ())
@@ -3192,7 +3192,7 @@ mod tests {
         let operation_target = target.clone();
         let result = completes_within(move || {
             let _guard = install_before_existing_file_open_hook(operation_target, move || {
-                replace_regular_file_with_fifo(&hook_target, &hook_preserved)
+                replace_regular_file_with_fifo(&hook_target, &hook_preserved);
             });
             apply_staged_writes(vec![staged]).map_err(|error| format!("{error:#}"))
         });
@@ -3222,7 +3222,7 @@ mod tests {
         let operation_staged = staged_path.clone();
         let errors = completes_within(move || {
             let _guard = install_before_existing_file_open_hook(operation_staged, move || {
-                replace_regular_file_with_fifo(&hook_staged, &hook_preserved)
+                replace_regular_file_with_fifo(&hook_staged, &hook_preserved);
             });
             let mut errors = Vec::new();
             cleanup_unapplied_write(&staged, &mut errors);

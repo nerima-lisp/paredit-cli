@@ -124,7 +124,7 @@ pub fn collect_self_assignments(
                 path,
                 &mut assignment_form_count,
                 &mut self_assignments,
-            )
+            );
         });
     }
     Ok((assignment_form_count, self_assignments))

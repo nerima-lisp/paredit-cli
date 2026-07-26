@@ -174,7 +174,7 @@ pub fn collect_eq_char_comparisons(
                 &never,
                 &mut comparison_form_count,
                 &mut violations,
-            )
+            );
         });
     }
     Ok((comparison_form_count, violations))

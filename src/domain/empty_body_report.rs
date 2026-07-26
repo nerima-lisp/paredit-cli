@@ -120,7 +120,7 @@ pub fn collect_empty_bodies(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(subview, path, &mut body_form_count, &mut violations)
+            examine_form(subview, path, &mut body_form_count, &mut violations);
         });
     }
     Ok((body_form_count, violations))

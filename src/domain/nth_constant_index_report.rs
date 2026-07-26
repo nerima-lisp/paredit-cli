@@ -134,7 +134,7 @@ pub fn collect_nth_constant_indexes(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_nth(subview, path, &mut nth_form_count, &mut violations)
+            examine_nth(subview, path, &mut nth_form_count, &mut violations);
         });
     }
     Ok((nth_form_count, violations))

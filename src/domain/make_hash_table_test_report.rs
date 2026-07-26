@@ -151,7 +151,7 @@ pub fn collect_make_hash_table_tests(
                 path,
                 &mut make_hash_table_form_count,
                 &mut violations,
-            )
+            );
         });
     }
     Ok((make_hash_table_form_count, violations))

@@ -127,7 +127,7 @@ pub fn collect_one_armed_ifs(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, path, &mut if_form_count, &mut violations)
+            examine_if(subview, path, &mut if_form_count, &mut violations);
         });
     }
     Ok((if_form_count, violations))

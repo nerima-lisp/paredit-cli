@@ -147,7 +147,7 @@ pub fn collect_make_array_default_keywords(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut call_form_count, &mut violations)
+            examine(subview, path, &mut call_form_count, &mut violations);
         });
     }
     Ok((call_form_count, violations))

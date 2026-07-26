@@ -115,7 +115,7 @@ pub fn collect_handler_case_no_clauses(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut handler_case_form_count, &mut violations)
+            examine(subview, path, &mut handler_case_form_count, &mut violations);
         });
     }
     Ok((handler_case_form_count, violations))

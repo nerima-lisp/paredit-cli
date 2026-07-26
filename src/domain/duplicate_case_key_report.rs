@@ -163,7 +163,7 @@ pub fn collect_duplicate_case_keys(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, path, &mut case_form_count, &mut duplicates)
+            examine_case(subview, path, &mut case_form_count, &mut duplicates);
         });
     }
     Ok((case_form_count, duplicates))

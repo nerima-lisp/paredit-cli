@@ -122,7 +122,7 @@ pub fn collect_list_star_to_cons(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut list_star_form_count, &mut violations)
+            examine(subview, path, &mut list_star_form_count, &mut violations);
         });
     }
     Ok((list_star_form_count, violations))

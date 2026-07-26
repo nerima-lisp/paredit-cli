@@ -138,7 +138,7 @@ pub fn collect_equality_arity_violations(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &mut call_count, &mut violations)
+            examine_call(subview, path, &mut call_count, &mut violations);
         });
     }
     Ok((call_count, violations))

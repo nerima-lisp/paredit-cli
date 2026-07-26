@@ -139,7 +139,7 @@ pub fn collect_values_list_of_lists(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut values_list_form_count, &mut violations)
+            examine(subview, path, &mut values_list_form_count, &mut violations);
         });
     }
     Ok((values_list_form_count, violations))

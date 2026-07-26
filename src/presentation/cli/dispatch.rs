@@ -7,523 +7,523 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Dialect(args) => analysis_report::workflow::dialect(args)?,
             command::InspectCommand::Stats(args) => analysis_report::workflow::stats(args)?,
             command::InspectCommand::AgentReport(args) => {
-                analysis_report::workflow::agent_report(args)?
+                analysis_report::workflow::agent_report(args)?;
             }
             command::InspectCommand::Capabilities(args) => capabilities::capabilities(args)?,
             command::InspectCommand::Outline(args) => analysis_report::workflow::outline(args)?,
             command::InspectCommand::Form(args) => form_report::workflow::form_report(args)?,
             command::InspectCommand::FindSymbol(args) => {
-                symbol_report::workflow::find_symbol(args)?
+                symbol_report::workflow::find_symbol(args)?;
             }
             command::InspectCommand::Symbols(args) => symbol_report::workflow::symbol_report(args)?,
             command::InspectCommand::Calls(args) => call_report::workflow::call_report(args)?,
             command::InspectCommand::Signature(args) => {
-                signature_report::workflow::signature_report(args)?
+                signature_report::workflow::signature_report(args)?;
             }
             command::InspectCommand::CallGraph(args) => {
-                call_graph_report::workflow::call_graph(args)?
+                call_graph_report::workflow::call_graph(args)?;
             }
             command::InspectCommand::Impact(args) => impact_report::workflow::impact_report(args)?,
             command::InspectCommand::Workspace(args) => {
-                workspace_report::workflow::workspace_report(args)?
+                workspace_report::workflow::workspace_report(args)?;
             }
             command::InspectCommand::Dependencies(args) => {
-                dependency_report::workflow::dependency_report(args)?
+                dependency_report::workflow::dependency_report(args)?;
             }
             command::InspectCommand::Packages(args) => package::report::package_report(args)?,
             command::InspectCommand::Definitions(args) => {
-                definition_report::workflow::definition_report(args)?
+                definition_report::workflow::definition_report(args)?;
             }
             command::InspectCommand::UnusedDefinitions(args) => {
-                definition_report::workflow::unused_definition_report(args)?
+                definition_report::workflow::unused_definition_report(args)?;
             }
             command::InspectCommand::Duplicates(args) => {
-                duplicate_report::workflow::duplicate_report(args)?
+                duplicate_report::workflow::duplicate_report(args)?;
             }
             command::InspectCommand::DuplicateSetfPlaces(args) => {
-                duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?
+                duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?;
             }
             command::InspectCommand::DuplicateSlots(args) => {
-                duplicate_slot_report::workflow::duplicate_slot_report(args)?
+                duplicate_slot_report::workflow::duplicate_slot_report(args)?;
             }
             command::InspectCommand::DuplicateMethods(args) => {
-                duplicate_method_report::workflow::duplicate_method_report(args)?
+                duplicate_method_report::workflow::duplicate_method_report(args)?;
             }
             command::InspectCommand::DuplicateParameters(args) => {
-                duplicate_parameter_report::workflow::duplicate_parameter_report(args)?
+                duplicate_parameter_report::workflow::duplicate_parameter_report(args)?;
             }
             command::InspectCommand::DuplicateLambdaListKeyword(args) => {
                 duplicate_lambda_list_keyword_report::workflow::duplicate_lambda_list_keyword_report(
                     args,
-                )?
+                )?;
             }
             command::InspectCommand::LambdaListKeywordOrder(args) => {
-                lambda_list_keyword_order_report::workflow::lambda_list_keyword_order_report(args)?
+                lambda_list_keyword_order_report::workflow::lambda_list_keyword_order_report(args)?;
             }
             command::InspectCommand::DuplicateCaseKeys(args) => {
-                duplicate_case_key_report::workflow::duplicate_case_key_report(args)?
+                duplicate_case_key_report::workflow::duplicate_case_key_report(args)?;
             }
             command::InspectCommand::QuotedCaseKey(args) => {
-                quoted_case_key_report::workflow::quoted_case_key_report(args)?
+                quoted_case_key_report::workflow::quoted_case_key_report(args)?;
             }
             command::InspectCommand::CaseNilKey(args) => {
-                case_nil_key_report::workflow::case_nil_key_report(args)?
+                case_nil_key_report::workflow::case_nil_key_report(args)?;
             }
             command::InspectCommand::TypecaseNilKey(args) => {
-                typecase_nil_key_report::workflow::typecase_nil_key_report(args)?
+                typecase_nil_key_report::workflow::typecase_nil_key_report(args)?;
             }
             command::InspectCommand::MalformedCaseClause(args) => {
-                malformed_case_clause_report::workflow::malformed_case_clause_report(args)?
+                malformed_case_clause_report::workflow::malformed_case_clause_report(args)?;
             }
             command::InspectCommand::UnreachableCaseClause(args) => {
-                unreachable_case_clause_report::workflow::unreachable_case_clause_report(args)?
+                unreachable_case_clause_report::workflow::unreachable_case_clause_report(args)?;
             }
             command::InspectCommand::ExhaustiveCaseOtherwise(args) => {
-                exhaustive_case_otherwise_report::workflow::exhaustive_case_otherwise_report(args)?
+                exhaustive_case_otherwise_report::workflow::exhaustive_case_otherwise_report(args)?;
             }
             command::InspectCommand::ExplicitStepDelta(args) => {
-                explicit_step_delta_report::workflow::explicit_step_delta_report(args)?
+                explicit_step_delta_report::workflow::explicit_step_delta_report(args)?;
             }
             command::InspectCommand::NegatedStepDelta(args) => {
-                negated_step_delta_report::workflow::negated_step_delta_report(args)?
+                negated_step_delta_report::workflow::negated_step_delta_report(args)?;
             }
             command::InspectCommand::ExplicitNilReturn(args) => {
-                explicit_nil_return_report::workflow::explicit_nil_return_report(args)?
+                explicit_nil_return_report::workflow::explicit_nil_return_report(args)?;
             }
             command::InspectCommand::DuplicateCondTests(args) => {
-                duplicate_cond_test_report::workflow::duplicate_cond_test_report(args)?
+                duplicate_cond_test_report::workflow::duplicate_cond_test_report(args)?;
             }
             command::InspectCommand::UnreachableCondClause(args) => {
-                unreachable_cond_clause_report::workflow::unreachable_cond_clause_report(args)?
+                unreachable_cond_clause_report::workflow::unreachable_cond_clause_report(args)?;
             }
             command::InspectCommand::MalformedCondClause(args) => {
-                malformed_cond_clause_report::workflow::malformed_cond_clause_report(args)?
+                malformed_cond_clause_report::workflow::malformed_cond_clause_report(args)?;
             }
             command::InspectCommand::DuplicateLetBindings(args) => {
-                duplicate_let_binding_report::workflow::duplicate_let_binding_report(args)?
+                duplicate_let_binding_report::workflow::duplicate_let_binding_report(args)?;
             }
             command::InspectCommand::MalformedLetBinding(args) => {
-                malformed_let_binding_report::workflow::malformed_let_binding_report(args)?
+                malformed_let_binding_report::workflow::malformed_let_binding_report(args)?;
             }
             command::InspectCommand::ManualIncf(args) => {
-                manual_incf_report::workflow::manual_incf_report(args)?
+                manual_incf_report::workflow::manual_incf_report(args)?;
             }
             command::InspectCommand::ManualPush(args) => {
-                manual_push_report::workflow::manual_push_report(args)?
+                manual_push_report::workflow::manual_push_report(args)?;
             }
             command::InspectCommand::ManualPushnew(args) => {
-                manual_pushnew_report::workflow::manual_pushnew_report(args)?
+                manual_pushnew_report::workflow::manual_pushnew_report(args)?;
             }
             command::InspectCommand::BindsConstant(args) => {
-                binds_constant_report::workflow::binds_constant_report(args)?
+                binds_constant_report::workflow::binds_constant_report(args)?;
             }
             command::InspectCommand::MalformedIterationSpec(args) => {
-                malformed_iteration_spec_report::workflow::malformed_iteration_spec_report(args)?
+                malformed_iteration_spec_report::workflow::malformed_iteration_spec_report(args)?;
             }
             command::InspectCommand::DuplicateBooleanOperands(args) => {
-                duplicate_boolean_operand_report::workflow::duplicate_boolean_operand_report(args)?
+                duplicate_boolean_operand_report::workflow::duplicate_boolean_operand_report(args)?;
             }
             command::InspectCommand::DeadBooleanOperand(args) => {
-                dead_boolean_operand_report::workflow::dead_boolean_operand_report(args)?
+                dead_boolean_operand_report::workflow::dead_boolean_operand_report(args)?;
             }
             command::InspectCommand::SelfAssignments(args) => {
-                self_assignment_report::workflow::self_assignment_report(args)?
+                self_assignment_report::workflow::self_assignment_report(args)?;
             }
             command::InspectCommand::SetfArity(args) => {
-                setf_arity_report::workflow::setf_arity_report(args)?
+                setf_arity_report::workflow::setf_arity_report(args)?;
             }
             command::InspectCommand::SetqNonVariable(args) => {
-                setq_non_variable_report::workflow::setq_non_variable_report(args)?
+                setq_non_variable_report::workflow::setq_non_variable_report(args)?;
             }
             command::InspectCommand::ModifyMacroArity(args) => {
-                modify_macro_arity_report::workflow::modify_macro_arity_report(args)?
+                modify_macro_arity_report::workflow::modify_macro_arity_report(args)?;
             }
             command::InspectCommand::SelfComparison(args) => {
-                self_comparison_report::workflow::self_comparison_report(args)?
+                self_comparison_report::workflow::self_comparison_report(args)?;
             }
             command::InspectCommand::IdenticalIfBranches(args) => {
-                identical_if_branch_report::workflow::identical_if_branch_report(args)?
+                identical_if_branch_report::workflow::identical_if_branch_report(args)?;
             }
             command::InspectCommand::IfArity(args) => {
-                if_arity_report::workflow::if_arity_report(args)?
+                if_arity_report::workflow::if_arity_report(args)?;
             }
             command::InspectCommand::TComparison(args) => {
-                t_comparison_report::workflow::t_comparison_report(args)?
+                t_comparison_report::workflow::t_comparison_report(args)?;
             }
             command::InspectCommand::TheArity(args) => {
-                the_arity_report::workflow::the_arity_report(args)?
+                the_arity_report::workflow::the_arity_report(args)?;
             }
             command::InspectCommand::EqualityArity(args) => {
-                equality_arity_report::workflow::equality_arity_report(args)?
+                equality_arity_report::workflow::equality_arity_report(args)?;
             }
             command::InspectCommand::AccessorArity(args) => {
-                accessor_arity_report::workflow::accessor_arity_report(args)?
+                accessor_arity_report::workflow::accessor_arity_report(args)?;
             }
             command::InspectCommand::EvalWhenSituation(args) => {
-                eval_when_situation_report::workflow::eval_when_situation_report(args)?
+                eval_when_situation_report::workflow::eval_when_situation_report(args)?;
             }
             command::InspectCommand::EqlStringComparison(args) => {
-                eql_string_comparison_report::workflow::eql_string_comparison_report(args)?
+                eql_string_comparison_report::workflow::eql_string_comparison_report(args)?;
             }
             command::InspectCommand::EqNumberComparison(args) => {
-                eq_number_comparison_report::workflow::eq_number_comparison_report(args)?
+                eq_number_comparison_report::workflow::eq_number_comparison_report(args)?;
             }
             command::InspectCommand::EqCharComparison(args) => {
-                eq_char_comparison_report::workflow::eq_char_comparison_report(args)?
+                eq_char_comparison_report::workflow::eq_char_comparison_report(args)?;
             }
             command::InspectCommand::DestructiveLiteral(args) => {
-                destructive_literal_report::workflow::destructive_literal_report(args)?
+                destructive_literal_report::workflow::destructive_literal_report(args)?;
             }
             command::InspectCommand::EqlSearchLiteral(args) => {
-                eql_search_literal_report::workflow::eql_search_literal_report(args)?
+                eql_search_literal_report::workflow::eql_search_literal_report(args)?;
             }
             command::InspectCommand::CharOpString(args) => {
-                char_op_string_report::workflow::char_op_string_report(args)?
+                char_op_string_report::workflow::char_op_string_report(args)?;
             }
             command::InspectCommand::StringCaseFold(args) => {
-                string_case_fold_report::workflow::string_case_fold_report(args)?
+                string_case_fold_report::workflow::string_case_fold_report(args)?;
             }
             command::InspectCommand::CharCaseFold(args) => {
-                char_case_fold_report::workflow::char_case_fold_report(args)?
+                char_case_fold_report::workflow::char_case_fold_report(args)?;
             }
             command::InspectCommand::NestedStringCase(args) => {
-                nested_string_case_report::workflow::nested_string_case_report(args)?
+                nested_string_case_report::workflow::nested_string_case_report(args)?;
             }
             command::InspectCommand::CodeCharCharCode(args) => {
-                code_char_char_code_report::workflow::code_char_char_code_report(args)?
+                code_char_char_code_report::workflow::code_char_char_code_report(args)?;
             }
             command::InspectCommand::LastDefaultCount(args) => {
-                last_default_count_report::workflow::last_default_count_report(args)?
+                last_default_count_report::workflow::last_default_count_report(args)?;
             }
             command::InspectCommand::ButlastDefaultCount(args) => {
-                butlast_default_count_report::workflow::butlast_default_count_report(args)?
+                butlast_default_count_report::workflow::butlast_default_count_report(args)?;
             }
             command::InspectCommand::MakeListDefaultElement(args) => {
-                make_list_default_element_report::workflow::make_list_default_element_report(args)?
+                make_list_default_element_report::workflow::make_list_default_element_report(args)?;
             }
             command::InspectCommand::ParseIntegerDefaultRadix(args) => {
                 parse_integer_default_radix_report::workflow::parse_integer_default_radix_report(
                     args,
-                )?
+                )?;
             }
             command::InspectCommand::GetfDefaultNil(args) => {
-                getf_default_nil_report::workflow::getf_default_nil_report(args)?
+                getf_default_nil_report::workflow::getf_default_nil_report(args)?;
             }
             command::InspectCommand::MakeArrayDefaultKeyword(args) => {
-                make_array_default_keyword_report::workflow::make_array_default_keyword_report(args)?
+                make_array_default_keyword_report::workflow::make_array_default_keyword_report(args)?;
             }
             command::InspectCommand::NestedCharCase(args) => {
-                nested_char_case_report::workflow::nested_char_case_report(args)?
+                nested_char_case_report::workflow::nested_char_case_report(args)?;
             }
             command::InspectCommand::ListStarNil(args) => {
-                list_star_nil_report::workflow::list_star_nil_report(args)?
+                list_star_nil_report::workflow::list_star_nil_report(args)?;
             }
             command::InspectCommand::EmptyBody(args) => {
-                empty_body_report::workflow::empty_body_report(args)?
+                empty_body_report::workflow::empty_body_report(args)?;
             }
             command::InspectCommand::EmptyLet(args) => {
-                empty_let_report::workflow::empty_let_report(args)?
+                empty_let_report::workflow::empty_let_report(args)?;
             }
             command::InspectCommand::IdentityArithmetic(args) => {
-                identity_arithmetic_report::workflow::identity_arithmetic_report(args)?
+                identity_arithmetic_report::workflow::identity_arithmetic_report(args)?;
             }
             command::InspectCommand::RedundantDivisor(args) => {
-                redundant_divisor_report::workflow::redundant_divisor_report(args)?
+                redundant_divisor_report::workflow::redundant_divisor_report(args)?;
             }
             command::InspectCommand::EqlListComparison(args) => {
-                eql_list_comparison_report::workflow::eql_list_comparison_report(args)?
+                eql_list_comparison_report::workflow::eql_list_comparison_report(args)?;
             }
             command::InspectCommand::Lint(args) => lint_report::workflow::lint_report(args)?,
             command::InspectCommand::Similarity(args) => {
-                similarity_report::workflow::similarity_report(args)?
+                similarity_report::workflow::similarity_report(args)?;
             }
             command::InspectCommand::Lets(args) => let_report::let_report(args)?,
             command::InspectCommand::Complexity(args) => {
-                complexity_report::workflow::complexity_report(args)?
+                complexity_report::workflow::complexity_report(args)?;
             }
             command::InspectCommand::Naming(args) => naming_report::workflow::naming_report(args)?,
             command::InspectCommand::Reachability(args) => {
-                reachability_report::workflow::reachability_report(args)?
+                reachability_report::workflow::reachability_report(args)?;
             }
             command::InspectCommand::Redefinitions(args) => {
-                redefinition_report::workflow::redefinition_report(args)?
+                redefinition_report::workflow::redefinition_report(args)?;
             }
             command::InspectCommand::RedundantQuote(args) => {
-                redundant_quote_report::workflow::redundant_quote_report(args)?
+                redundant_quote_report::workflow::redundant_quote_report(args)?;
             }
             command::InspectCommand::RedundantProgn(args) => {
-                redundant_progn_report::workflow::redundant_progn_report(args)?
+                redundant_progn_report::workflow::redundant_progn_report(args)?;
             }
             command::InspectCommand::RedundantProg1(args) => {
-                redundant_prog1_report::workflow::redundant_prog1_report(args)?
+                redundant_prog1_report::workflow::redundant_prog1_report(args)?;
             }
             command::InspectCommand::NegatedWhenUnless(args) => {
-                negated_when_unless_report::workflow::negated_when_unless_report(args)?
+                negated_when_unless_report::workflow::negated_when_unless_report(args)?;
             }
             command::InspectCommand::NegatedComparison(args) => {
-                negated_comparison_report::workflow::negated_comparison_report(args)?
+                negated_comparison_report::workflow::negated_comparison_report(args)?;
             }
             command::InspectCommand::NegatedIf(args) => {
-                negated_if_report::workflow::negated_if_report(args)?
+                negated_if_report::workflow::negated_if_report(args)?;
             }
             command::InspectCommand::IfToOr(args) => {
-                if_to_or_report::workflow::if_to_or_report(args)?
+                if_to_or_report::workflow::if_to_or_report(args)?;
             }
             command::InspectCommand::IfNot(args) => {
-                if_not_report::workflow::if_not_report(args)?
+                if_not_report::workflow::if_not_report(args)?;
             }
             command::InspectCommand::IfToUnless(args) => {
-                if_to_unless_report::workflow::if_to_unless_report(args)?
+                if_to_unless_report::workflow::if_to_unless_report(args)?;
             }
             command::InspectCommand::Prog2ToProgn(args) => {
-                prog2_to_progn_report::workflow::prog2_to_progn_report(args)?
+                prog2_to_progn_report::workflow::prog2_to_progn_report(args)?;
             }
             command::InspectCommand::HandlerCaseNoClauses(args) => {
-                handler_case_no_clauses_report::workflow::handler_case_no_clauses_report(args)?
+                handler_case_no_clauses_report::workflow::handler_case_no_clauses_report(args)?;
             }
             command::InspectCommand::UnwindProtectNoCleanup(args) => {
-                unwind_protect_no_cleanup_report::workflow::unwind_protect_no_cleanup_report(args)?
+                unwind_protect_no_cleanup_report::workflow::unwind_protect_no_cleanup_report(args)?;
             }
             command::InspectCommand::OneStepArithmetic(args) => {
-                one_step_arithmetic_report::workflow::one_step_arithmetic_report(args)?
+                one_step_arithmetic_report::workflow::one_step_arithmetic_report(args)?;
             }
             command::InspectCommand::ConstantIfTest(args) => {
-                constant_if_test_report::workflow::constant_if_test_report(args)?
+                constant_if_test_report::workflow::constant_if_test_report(args)?;
             }
             command::InspectCommand::ConstantWhenTest(args) => {
-                constant_when_test_report::workflow::constant_when_test_report(args)?
+                constant_when_test_report::workflow::constant_when_test_report(args)?;
             }
             command::InspectCommand::ConsToList(args) => {
-                cons_to_list_report::workflow::cons_to_list_report(args)?
+                cons_to_list_report::workflow::cons_to_list_report(args)?;
             }
             command::InspectCommand::DoubleReverse(args) => {
-                double_reverse_report::workflow::double_reverse_report(args)?
+                double_reverse_report::workflow::double_reverse_report(args)?;
             }
             command::InspectCommand::AppendListToCons(args) => {
-                append_list_to_cons_report::workflow::append_list_to_cons_report(args)?
+                append_list_to_cons_report::workflow::append_list_to_cons_report(args)?;
             }
             command::InspectCommand::ListStarToCons(args) => {
-                list_star_to_cons_report::workflow::list_star_to_cons_report(args)?
+                list_star_to_cons_report::workflow::list_star_to_cons_report(args)?;
             }
             command::InspectCommand::ValuesListOfList(args) => {
-                values_list_of_list_report::workflow::values_list_of_list_report(args)?
+                values_list_of_list_report::workflow::values_list_of_list_report(args)?;
             }
             command::InspectCommand::MultipleValueListOfValues(args) => {
                 multiple_value_list_of_values_report::workflow::multiple_value_list_of_values_report(
                     args,
-                )?
+                )?;
             }
             command::InspectCommand::AppendNil(args) => {
-                append_nil_report::workflow::append_nil_report(args)?
+                append_nil_report::workflow::append_nil_report(args)?;
             }
             command::InspectCommand::VerboseNegation(args) => {
-                verbose_negation_report::workflow::verbose_negation_report(args)?
+                verbose_negation_report::workflow::verbose_negation_report(args)?;
             }
             command::InspectCommand::NestedBoolean(args) => {
-                nested_boolean_report::workflow::nested_boolean_report(args)?
+                nested_boolean_report::workflow::nested_boolean_report(args)?;
             }
             command::InspectCommand::NestedCxr(args) => {
-                nested_cxr_report::workflow::nested_cxr_report(args)?
+                nested_cxr_report::workflow::nested_cxr_report(args)?;
             }
             command::InspectCommand::NthcdrZero(args) => {
-                nthcdr_zero_report::workflow::nthcdr_zero_report(args)?
+                nthcdr_zero_report::workflow::nthcdr_zero_report(args)?;
             }
             command::InspectCommand::SubseqZero(args) => {
-                subseq_zero_report::workflow::subseq_zero_report(args)?
+                subseq_zero_report::workflow::subseq_zero_report(args)?;
             }
             command::InspectCommand::CarNthcdr(args) => {
-                car_nthcdr_report::workflow::car_nthcdr_report(args)?
+                car_nthcdr_report::workflow::car_nthcdr_report(args)?;
             }
             command::InspectCommand::CarReverse(args) => {
-                car_reverse_report::workflow::car_reverse_report(args)?
+                car_reverse_report::workflow::car_reverse_report(args)?;
             }
             command::InspectCommand::NthcdrSmallIndex(args) => {
-                nthcdr_small_index_report::workflow::nthcdr_small_index_report(args)?
+                nthcdr_small_index_report::workflow::nthcdr_small_index_report(args)?;
             }
             command::InspectCommand::NthConstantIndex(args) => {
-                nth_constant_index_report::workflow::nth_constant_index_report(args)?
+                nth_constant_index_report::workflow::nth_constant_index_report(args)?;
             }
             command::InspectCommand::NestedProgn(args) => {
-                nested_progn_report::workflow::nested_progn_report(args)?
+                nested_progn_report::workflow::nested_progn_report(args)?;
             }
             command::InspectCommand::NestedUnless(args) => {
-                nested_unless_report::workflow::nested_unless_report(args)?
+                nested_unless_report::workflow::nested_unless_report(args)?;
             }
             command::InspectCommand::NestedWhen(args) => {
-                nested_when_report::workflow::nested_when_report(args)?
+                nested_when_report::workflow::nested_when_report(args)?;
             }
             command::InspectCommand::NilComparison(args) => {
-                nil_comparison_report::workflow::nil_comparison_report(args)?
+                nil_comparison_report::workflow::nil_comparison_report(args)?;
             }
             command::InspectCommand::OneArmedIf(args) => {
-                one_armed_if_report::workflow::one_armed_if_report(args)?
+                one_armed_if_report::workflow::one_armed_if_report(args)?;
             }
             command::InspectCommand::RedundantApply(args) => {
-                redundant_apply_report::workflow::redundant_apply_report(args)?
+                redundant_apply_report::workflow::redundant_apply_report(args)?;
             }
             command::InspectCommand::RedundantEqlTest(args) => {
-                redundant_eql_test_report::workflow::redundant_eql_test_report(args)?
+                redundant_eql_test_report::workflow::redundant_eql_test_report(args)?;
             }
             command::InspectCommand::RedundantStartZero(args) => {
-                redundant_start_zero_report::workflow::redundant_start_zero_report(args)?
+                redundant_start_zero_report::workflow::redundant_start_zero_report(args)?;
             }
             command::InspectCommand::RedundantEndNil(args) => {
-                redundant_end_nil_report::workflow::redundant_end_nil_report(args)?
+                redundant_end_nil_report::workflow::redundant_end_nil_report(args)?;
             }
             command::InspectCommand::RedundantFromEndNil(args) => {
-                redundant_from_end_nil_report::workflow::redundant_from_end_nil_report(args)?
+                redundant_from_end_nil_report::workflow::redundant_from_end_nil_report(args)?;
             }
             command::InspectCommand::RedundantCountNil(args) => {
-                redundant_count_nil_report::workflow::redundant_count_nil_report(args)?
+                redundant_count_nil_report::workflow::redundant_count_nil_report(args)?;
             }
             command::InspectCommand::MakeHashTableTest(args) => {
-                make_hash_table_test_report::workflow::make_hash_table_test_report(args)?
+                make_hash_table_test_report::workflow::make_hash_table_test_report(args)?;
             }
             command::InspectCommand::GethashDefault(args) => {
-                gethash_default_report::workflow::gethash_default_report(args)?
+                gethash_default_report::workflow::gethash_default_report(args)?;
             }
             command::InspectCommand::TypepPredicate(args) => {
-                typep_predicate_report::workflow::typep_predicate_report(args)?
+                typep_predicate_report::workflow::typep_predicate_report(args)?;
             }
             command::InspectCommand::CoerceToT(args) => {
-                coerce_to_t_report::workflow::coerce_to_t_report(args)?
+                coerce_to_t_report::workflow::coerce_to_t_report(args)?;
             }
             command::InspectCommand::RedundantIdentityKey(args) => {
-                redundant_identity_key_report::workflow::redundant_identity_key_report(args)?
+                redundant_identity_key_report::workflow::redundant_identity_key_report(args)?;
             }
             command::InspectCommand::RedundantBodyProgn(args) => {
-                redundant_body_progn_report::workflow::redundant_body_progn_report(args)?
+                redundant_body_progn_report::workflow::redundant_body_progn_report(args)?;
             }
             command::InspectCommand::RedundantBooleanIdentity(args) => {
                 redundant_boolean_identity_report::workflow::redundant_boolean_identity_report(
                     args,
-                )?
+                )?;
             }
             command::InspectCommand::DeMorgan(args) => {
-                de_morgan_report::workflow::de_morgan_report(args)?
+                de_morgan_report::workflow::de_morgan_report(args)?;
             }
             command::InspectCommand::RedundantIdentity(args) => {
-                redundant_identity_report::workflow::redundant_identity_report(args)?
+                redundant_identity_report::workflow::redundant_identity_report(args)?;
             }
             command::InspectCommand::RedundantIfNil(args) => {
-                redundant_if_nil_report::workflow::redundant_if_nil_report(args)?
+                redundant_if_nil_report::workflow::redundant_if_nil_report(args)?;
             }
             command::InspectCommand::RedundantLetStar(args) => {
-                redundant_let_star_report::workflow::redundant_let_star_report(args)?
+                redundant_let_star_report::workflow::redundant_let_star_report(args)?;
             }
             command::InspectCommand::RedundantFuncall(args) => {
-                redundant_funcall_report::workflow::redundant_funcall_report(args)?
+                redundant_funcall_report::workflow::redundant_funcall_report(args)?;
             }
             command::InspectCommand::RedundantThe(args) => {
-                redundant_the_report::workflow::redundant_the_report(args)?
+                redundant_the_report::workflow::redundant_the_report(args)?;
             }
             command::InspectCommand::FuncallLambda(args) => {
-                funcall_lambda_report::workflow::funcall_lambda_report(args)?
+                funcall_lambda_report::workflow::funcall_lambda_report(args)?;
             }
             command::InspectCommand::SharpQuotedLambda(args) => {
-                sharp_quoted_lambda_report::workflow::sharp_quoted_lambda_report(args)?
+                sharp_quoted_lambda_report::workflow::sharp_quoted_lambda_report(args)?;
             }
             command::InspectCommand::SingleOperandBoolean(args) => {
-                single_operand_boolean_report::workflow::single_operand_boolean_report(args)?
+                single_operand_boolean_report::workflow::single_operand_boolean_report(args)?;
             }
             command::InspectCommand::SingleOperandListOp(args) => {
-                single_operand_list_op_report::workflow::single_operand_list_op_report(args)?
+                single_operand_list_op_report::workflow::single_operand_list_op_report(args)?;
             }
             command::InspectCommand::SingleOperandArithmetic(args) => {
-                single_operand_arithmetic_report::workflow::single_operand_arithmetic_report(args)?
+                single_operand_arithmetic_report::workflow::single_operand_arithmetic_report(args)?;
             }
             command::InspectCommand::SingleArgComparison(args) => {
-                single_arg_comparison_report::workflow::single_arg_comparison_report(args)?
+                single_arg_comparison_report::workflow::single_arg_comparison_report(args)?;
             }
             command::InspectCommand::SingleClauseCond(args) => {
-                single_clause_cond_report::workflow::single_clause_cond_report(args)?
+                single_clause_cond_report::workflow::single_clause_cond_report(args)?;
             }
             command::InspectCommand::CondTClause(args) => {
-                cond_t_clause_report::workflow::cond_t_clause_report(args)?
+                cond_t_clause_report::workflow::cond_t_clause_report(args)?;
             }
             command::InspectCommand::SingleValueBind(args) => {
-                single_value_bind_report::workflow::single_value_bind_report(args)?
+                single_value_bind_report::workflow::single_value_bind_report(args)?;
             }
             command::InspectCommand::SignComparison(args) => {
-                sign_comparison_report::workflow::sign_comparison_report(args)?
+                sign_comparison_report::workflow::sign_comparison_report(args)?;
             }
             command::InspectCommand::FormatMissingDestination(args) => {
-                format_missing_destination_report::workflow::format_missing_destination_report(args)?
+                format_missing_destination_report::workflow::format_missing_destination_report(args)?;
             }
             command::InspectCommand::FormatToString(args) => {
-                format_to_string_report::workflow::format_to_string_report(args)?
+                format_to_string_report::workflow::format_to_string_report(args)?;
             }
             command::InspectCommand::FormatNewline(args) => {
-                format_newline_report::workflow::format_newline_report(args)?
+                format_newline_report::workflow::format_newline_report(args)?;
             }
             command::InspectCommand::LiteralPlace(args) => {
-                literal_place_report::workflow::literal_place_report(args)?
+                literal_place_report::workflow::literal_place_report(args)?;
             }
             command::InspectCommand::ZeroDivisor(args) => {
-                zero_divisor_report::workflow::zero_divisor_report(args)?
+                zero_divisor_report::workflow::zero_divisor_report(args)?;
             }
             command::InspectCommand::DuplicateKeyword(args) => {
-                duplicate_keyword_report::workflow::duplicate_keyword_report(args)?
+                duplicate_keyword_report::workflow::duplicate_keyword_report(args)?;
             }
             command::InspectCommand::DefpackageQuoted(args) => {
-                defpackage_quoted_report::workflow::defpackage_quoted_report(args)?
+                defpackage_quoted_report::workflow::defpackage_quoted_report(args)?;
             }
             command::InspectCommand::StepZero(args) => {
-                step_zero_report::workflow::step_zero_report(args)?
+                step_zero_report::workflow::step_zero_report(args)?;
             }
             command::InspectCommand::UnusedParameters(args) => {
-                unused_parameter_report::workflow::unused_parameter_report(args)?
+                unused_parameter_report::workflow::unused_parameter_report(args)?;
             }
             command::InspectCommand::ShadowedBindings(args) => {
-                shadowed_binding_report::workflow::shadowed_binding_report(args)?
+                shadowed_binding_report::workflow::shadowed_binding_report(args)?;
             }
             command::InspectCommand::UnusedLocalCallables(args) => {
-                unused_local_callable_report::workflow::unused_local_callable_report(args)?
+                unused_local_callable_report::workflow::unused_local_callable_report(args)?;
             }
             command::InspectCommand::PackageBoundaries(args) => {
-                package_boundary_report::workflow::package_boundary_report(args)?
+                package_boundary_report::workflow::package_boundary_report(args)?;
             }
             command::InspectCommand::CallCycles(args) => {
-                call_cycle_report::workflow::call_cycle_report(args)?
+                call_cycle_report::workflow::call_cycle_report(args)?;
             }
             command::InspectCommand::PackageCycles(args) => {
-                package_cycle_report::workflow::package_cycle_report(args)?
+                package_cycle_report::workflow::package_cycle_report(args)?;
             }
             command::InspectCommand::PackageConflicts(args) => {
-                package_conflict_report::workflow::package_conflict_report(args)?
+                package_conflict_report::workflow::package_conflict_report(args)?;
             }
             command::InspectCommand::SystemConflicts(args) => {
-                system_conflict_report::workflow::system_conflict_report(args)?
+                system_conflict_report::workflow::system_conflict_report(args)?;
             }
             command::InspectCommand::SystemCycles(args) => {
-                system_cycle_report::workflow::system_cycle_report(args)?
+                system_cycle_report::workflow::system_cycle_report(args)?;
             }
             command::InspectCommand::ClassCycles(args) => {
-                class_cycle_report::workflow::class_cycle_report(args)?
+                class_cycle_report::workflow::class_cycle_report(args)?;
             }
             command::InspectCommand::StructCycles(args) => {
-                struct_cycle_report::workflow::struct_cycle_report(args)?
+                struct_cycle_report::workflow::struct_cycle_report(args)?;
             }
             command::InspectCommand::UnusedPackages(args) => {
-                unused_package_report::workflow::unused_package_report(args)?
+                unused_package_report::workflow::unused_package_report(args)?;
             }
             command::InspectCommand::UnusedExports(args) => {
-                unused_export_report::workflow::unused_export_report(args)?
+                unused_export_report::workflow::unused_export_report(args)?;
             }
             command::InspectCommand::DuplicateExports(args) => {
-                duplicate_export_report::workflow::duplicate_export_report(args)?
+                duplicate_export_report::workflow::duplicate_export_report(args)?;
             }
             command::InspectCommand::UnusedNicknames(args) => {
-                unused_nickname_report::workflow::unused_nickname_report(args)?
+                unused_nickname_report::workflow::unused_nickname_report(args)?;
             }
             command::InspectCommand::UndefinedPackages(args) => {
-                undefined_package_report::workflow::undefined_package_report(args)?
+                undefined_package_report::workflow::undefined_package_report(args)?;
             }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
             command::EditCommand::RepairUnclosedLists(args) => {
-                basic_edit::workflow::repair_unclosed_lists(args)?
+                basic_edit::workflow::repair_unclosed_lists(args)?;
             }
             command::EditCommand::Select(args) => basic_edit::workflow::select(args)?,
             command::EditCommand::Replace(args) => basic_edit::workflow::replace(args)?,
@@ -533,22 +533,22 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::EditCommand::Split(args) => basic_edit::workflow::split(args)?,
             command::EditCommand::Join(args) => basic_edit::workflow::join(args)?,
             command::EditCommand::SpliceKillingBackward(args) => {
-                basic_edit::workflow::splice_killing_backward(args)?
+                basic_edit::workflow::splice_killing_backward(args)?;
             }
             command::EditCommand::SpliceKillingForward(args) => {
-                basic_edit::workflow::splice_killing_forward(args)?
+                basic_edit::workflow::splice_killing_forward(args)?;
             }
             command::EditCommand::Convolute(args) => basic_edit::workflow::convolute(args)?,
             command::EditCommand::Raise(args) => basic_edit::workflow::raise(args)?,
             command::EditCommand::TransposeForward(args) => {
-                basic_edit::workflow::transpose_forward(args)?
+                basic_edit::workflow::transpose_forward(args)?;
             }
             command::EditCommand::TransposeBackward(args) => {
-                basic_edit::workflow::transpose_backward(args)?
+                basic_edit::workflow::transpose_backward(args)?;
             }
             command::EditCommand::SlurpForward(args) => basic_edit::workflow::slurp_forward(args)?,
             command::EditCommand::SlurpBackward(args) => {
-                basic_edit::workflow::slurp_backward(args)?
+                basic_edit::workflow::slurp_backward(args)?;
             }
             command::EditCommand::BarfForward(args) => basic_edit::workflow::barf_forward(args)?,
             command::EditCommand::BarfBackward(args) => basic_edit::workflow::barf_backward(args)?,
@@ -562,191 +562,191 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::Apply(args) => refactor::workflow::refactor_apply(args)?,
             command::RefactorCommand::Diff(args) => refactor::workflow::refactor_diff(args)?,
             command::RefactorCommand::WorkspacePlan(args) => {
-                refactor::workflow::workspace_refactor_plan(args)?
+                refactor::workflow::workspace_refactor_plan(args)?;
             }
             command::RefactorCommand::WorkspacePreview(args) => {
-                refactor::workflow::workspace_refactor_preview(args)?
+                refactor::workflow::workspace_refactor_preview(args)?;
             }
             command::RefactorCommand::WorkspaceExecute(args) => {
-                refactor::workflow::workspace_refactor_execute(args)?
+                refactor::workflow::workspace_refactor_execute(args)?;
             }
             command::RefactorCommand::RemoveDefinition(args) => {
-                definition_removal::remove_definition::remove_definition(args)?
+                definition_removal::remove_definition::remove_definition(args)?;
             }
             command::RefactorCommand::RemoveUnusedDefinitions(args) => {
-                definition_removal::remove_unused_definitions::remove_unused_definitions(args)?
+                definition_removal::remove_unused_definitions::remove_unused_definitions(args)?;
             }
             command::RefactorCommand::MoveDefinition(args) => {
-                definition_movement::move_definition::move_definition(args)?
+                definition_movement::move_definition::move_definition(args)?;
             }
             command::RefactorCommand::SplitFile(args) => {
-                definition_movement::split_file::split_file(args)?
+                definition_movement::split_file::split_file(args)?;
             }
             command::RefactorCommand::SortDefinitions(args) => {
-                definition_movement::sort_definitions::sort_definitions(args)?
+                definition_movement::sort_definitions::sort_definitions(args)?;
             }
             command::RefactorCommand::MoveForm(args) => {
-                definition_movement::move_form::move_form(args)?
+                definition_movement::move_form::move_form(args)?;
             }
             command::RefactorCommand::InsertTopLevel(args) => {
-                definition_movement::insert_top_level::insert_top_level(args)?
+                definition_movement::insert_top_level::insert_top_level(args)?;
             }
             command::RefactorCommand::ReplacementPlan(args) => {
-                duplicate_report::workflow::replacement_plan(args)?
+                duplicate_report::workflow::replacement_plan(args)?;
             }
             command::RefactorCommand::ReplaceForms(args) => replace_forms::replace_forms(args)?,
             command::RefactorCommand::AddExport(args) => package::add_export::add_export(args)?,
             command::RefactorCommand::SortPackageExports(args) => {
-                package::sort_exports::sort_package_exports(args)?
+                package::sort_exports::sort_package_exports(args)?;
             }
             command::RefactorCommand::SortPackageOptions(args) => {
-                package::sort_options::sort_package_options(args)?
+                package::sort_options::sort_package_options(args)?;
             }
             command::RefactorCommand::MergePackageOptions(args) => {
-                package::merge_options::merge_package_options(args)?
+                package::merge_options::merge_package_options(args)?;
             }
             command::RefactorCommand::RenamePackage(args) => package::rename::rename_package(args)?,
             command::RefactorCommand::RenameAt(args) => rename::rename_at::rename_at(args)?,
             command::RefactorCommand::RenameSymbol(args) => {
-                rename::rename_symbol::rename_symbol(args)?
+                rename::rename_symbol::rename_symbol(args)?;
             }
             command::RefactorCommand::RenameInForm(args) => {
-                rename::rename_in_form::rename_in_form(args)?
+                rename::rename_in_form::rename_in_form(args)?;
             }
             command::RefactorCommand::RenameBinding(args) => {
-                rename::rename_binding::rename_binding(args)?
+                rename::rename_binding::rename_binding(args)?;
             }
             command::RefactorCommand::RenameBlock(args) => rename_control::rename_block(args)?,
             command::RefactorCommand::RenameTag(args) => rename_control::rename_tag(args)?,
             command::RefactorCommand::RemoveUnusedBlock(args) => {
-                remove_unused_control::remove_unused_block(args)?
+                remove_unused_control::remove_unused_block(args)?;
             }
             command::RefactorCommand::RemoveUnusedTag(args) => {
-                remove_unused_control::remove_unused_tag(args)?
+                remove_unused_control::remove_unused_tag(args)?;
             }
             command::RefactorCommand::RenameSymbols(args) => {
-                rename::rename_symbols::rename_symbols(args)?
+                rename::rename_symbols::rename_symbols(args)?;
             }
             command::RefactorCommand::RenameFunction(args) => {
-                rename::rename_function::rename_function(args)?
+                rename::rename_function::rename_function(args)?;
             }
             command::RefactorCommand::RenameMacrolet(args) => {
-                rename::rename_macrolet::rename_macrolet(args)?
+                rename::rename_macrolet::rename_macrolet(args)?;
             }
             command::RefactorCommand::RenameSymbolMacro(args) => {
-                rename::rename_symbol_macro::rename_symbol_macro(args)?
+                rename::rename_symbol_macro::rename_symbol_macro(args)?;
             }
             command::RefactorCommand::RenameLocalFunction(args) => {
-                rename::rename_local_function::rename_local_function(args)?
+                rename::rename_local_function::rename_local_function(args)?;
             }
             command::RefactorCommand::ReplaceFunctionCalls(args) => {
-                rename::replace_function_calls::replace_function_calls(args)?
+                rename::replace_function_calls::replace_function_calls(args)?;
             }
             command::RefactorCommand::WrapFunctionCalls(args) => {
-                rename::wrap_function_calls::wrap_function_calls(args)?
+                rename::wrap_function_calls::wrap_function_calls(args)?;
             }
             command::RefactorCommand::UnwrapFunctionCalls(args) => {
-                rename::unwrap_function_calls::unwrap_function_calls(args)?
+                rename::unwrap_function_calls::unwrap_function_calls(args)?;
             }
             command::RefactorCommand::UnwrapCall(args) => unwrap_call::unwrap_call(args)?,
             command::RefactorCommand::ThreadExpression(args) => {
-                thread_expression::thread_expression(args)?
+                thread_expression::thread_expression(args)?;
             }
             command::RefactorCommand::UnthreadExpression(args) => {
-                unthread_expression::unthread_expression(args)?
+                unthread_expression::unthread_expression(args)?;
             }
             command::RefactorCommand::ExtractFunction(args) => {
-                extract_function::extract_function(args)?
+                extract_function::extract_function(args)?;
             }
             command::RefactorCommand::ExtractLocalFunction(args) => {
-                extract_local_function::extract_local_function(args)?
+                extract_local_function::extract_local_function(args)?;
             }
             command::RefactorCommand::ExtractConstant(args) => {
-                extract_constant::extract_constant(args)?
+                extract_constant::extract_constant(args)?;
             }
             command::RefactorCommand::InlineFunction(args) => {
-                inline_function::inline_function(args)?
+                inline_function::inline_function(args)?;
             }
             command::RefactorCommand::InlineLambda(args) => inline_lambda::inline_lambda(args)?,
             command::RefactorCommand::InlineLocalFunction(args) => {
-                inline_local_function::inline_local_function(args)?
+                inline_local_function::inline_local_function(args)?;
             }
             command::RefactorCommand::InlineSymbolMacro(args) => {
-                inline_symbol_macro::inline_symbol_macro(args)?
+                inline_symbol_macro::inline_symbol_macro(args)?;
             }
             command::RefactorCommand::InlineLiteralConstant(args) => {
-                inline_literal_constant::inline_literal_constant(args)?
+                inline_literal_constant::inline_literal_constant(args)?;
             }
             command::RefactorCommand::AddFunctionParameter(args) => {
-                function_parameter::add::add_function_parameter(args)?
+                function_parameter::add::add_function_parameter(args)?;
             }
             command::RefactorCommand::MoveFunctionParameter(args) => {
-                function_parameter::move_parameter::move_function_parameter(args)?
+                function_parameter::move_parameter::move_function_parameter(args)?;
             }
             command::RefactorCommand::SwapFunctionParameters(args) => {
-                function_parameter::swap::swap_function_parameters(args)?
+                function_parameter::swap::swap_function_parameters(args)?;
             }
             command::RefactorCommand::ReorderFunctionParameters(args) => {
-                function_parameter::reorder::reorder_function_parameters(args)?
+                function_parameter::reorder::reorder_function_parameters(args)?;
             }
             command::RefactorCommand::RemoveFunctionParameter(args) => {
-                function_parameter::remove::remove_function_parameter(args)?
+                function_parameter::remove::remove_function_parameter(args)?;
             }
             command::RefactorCommand::IntroduceLet(args) => introduce_let::introduce_let(args)?,
             command::RefactorCommand::InlineLet(args) => inline_let::inline_let(args)?,
             command::RefactorCommand::ConvertLetToLetStar(args) => {
-                convert_let_to_let_star::convert_let_to_let_star(args)?
+                convert_let_to_let_star::convert_let_to_let_star(args)?;
             }
             command::RefactorCommand::ConvertLetStarToLet(args) => {
-                convert_let_star_to_let::convert_let_star_to_let(args)?
+                convert_let_star_to_let::convert_let_star_to_let(args)?;
             }
             command::RefactorCommand::ConvertDoStarToDo(args) => {
-                convert_sequential_binding::convert_do_star_to_do(args)?
+                convert_sequential_binding::convert_do_star_to_do(args)?;
             }
             command::RefactorCommand::ConvertProgStarToProg(args) => {
-                convert_sequential_binding::convert_prog_star_to_prog(args)?
+                convert_sequential_binding::convert_prog_star_to_prog(args)?;
             }
             command::RefactorCommand::MergeNestedLetStar(args) => {
-                merge_nested_let_star::merge_nested_let_star(args)?
+                merge_nested_let_star::merge_nested_let_star(args)?;
             }
             command::RefactorCommand::MergeNestedLet(args) => {
-                merge_nested_let::merge_nested_let(args)?
+                merge_nested_let::merge_nested_let(args)?;
             }
             command::RefactorCommand::MergeNestedFlet(args) => {
-                merge_nested_flet::merge_nested_flet(args)?
+                merge_nested_flet::merge_nested_flet(args)?;
             }
             command::RefactorCommand::SplitLetStar(args) => split_let_star::split_let_star(args)?,
             command::RefactorCommand::SplitLet(args) => split_let::split_let(args)?,
             command::RefactorCommand::EliminateEmptyBindingForm(args) => {
-                eliminate_empty_binding_form::eliminate_empty_binding_form(args)?
+                eliminate_empty_binding_form::eliminate_empty_binding_form(args)?;
             }
             command::RefactorCommand::FlattenProgn(args) => flatten_progn::flatten_progn(args)?,
             command::RefactorCommand::ConvertIfToCond(args) => {
-                convert_if_to_cond::convert_if_to_cond(args)?
+                convert_if_to_cond::convert_if_to_cond(args)?;
             }
             command::RefactorCommand::ConvertCondToIf(args) => {
-                convert_cond_to_if::convert_cond_to_if(args)?
+                convert_cond_to_if::convert_cond_to_if(args)?;
             }
             command::RefactorCommand::ConvertWhenToIf(args) => {
-                convert_when_to_if::convert_when_to_if(args)?
+                convert_when_to_if::convert_when_to_if(args)?;
             }
             command::RefactorCommand::ConvertUnlessToIf(args) => {
-                convert_unless_to_if::convert_unless_to_if(args)?
+                convert_unless_to_if::convert_unless_to_if(args)?;
             }
             command::RefactorCommand::ConvertIfToWhen(args) => {
-                convert_if_to_when::convert_if_to_when(args)?
+                convert_if_to_when::convert_if_to_when(args)?;
             }
             command::RefactorCommand::ConvertIfToUnless(args) => {
-                convert_if_to_unless::convert_if_to_unless(args)?
+                convert_if_to_unless::convert_if_to_unless(args)?;
             }
             command::RefactorCommand::ConvertLabelsToFlet(args) => {
-                convert_labels_to_flet::convert_labels_to_flet(args)?
+                convert_labels_to_flet::convert_labels_to_flet(args)?;
             }
             command::RefactorCommand::ConvertFletToLabels(args) => {
-                convert_flet_to_labels::convert_flet_to_labels(args)?
+                convert_flet_to_labels::convert_flet_to_labels(args)?;
             }
             command::RefactorCommand::RemoveUnusedBinding(args) => {
-                remove_unused_binding::remove_unused_binding(args)?
+                remove_unused_binding::remove_unused_binding(args)?;
             }
         },
         Command::Completions { shell } => {

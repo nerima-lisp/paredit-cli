@@ -121,7 +121,7 @@ pub fn collect_unwind_protect_no_cleanup(
                 path,
                 &mut unwind_protect_form_count,
                 &mut violations,
-            )
+            );
         });
     }
     Ok((unwind_protect_form_count, violations))

@@ -161,7 +161,7 @@ pub fn collect_redundant_body_progns(
                 path,
                 &mut implicit_progn_form_count,
                 &mut violations,
-            )
+            );
         });
     }
     Ok((implicit_progn_form_count, violations))

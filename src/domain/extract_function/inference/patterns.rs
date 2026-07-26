@@ -122,7 +122,7 @@ fn collect_lambda_list_parameter_spec_names(
             collect_supplied_p_name(semantic, spec, names);
         }
         LambdaListMode::Aux => {
-            collect_extract_function_pattern_names(semantic, &spec.children[0], names)
+            collect_extract_function_pattern_names(semantic, &spec.children[0], names);
         }
     }
 }

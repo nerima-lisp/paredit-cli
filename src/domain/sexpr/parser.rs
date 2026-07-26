@@ -519,7 +519,7 @@ impl<'a> Parser<'a> {
         }
         match self.current_byte() {
             byte if self.policy.delimiter_from_open(byte).is_some() => {
-                self.open_list_with_prefixes(prefixes)
+                self.open_list_with_prefixes(prefixes);
             }
             byte if self.policy.delimiter_from_close(byte).is_some() => self.close_list()?,
             byte if DialectReaderPolicy::is_raw_delimiter(byte) => {

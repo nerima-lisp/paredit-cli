@@ -1589,10 +1589,10 @@ fn compare_group_into<'a>(
             budget,
         ),
         SimilarityComparisonScope::SameFile => {
-            compare_group_same_file_into(output, group, threshold, result_limit, state, budget)
+            compare_group_same_file_into(output, group, threshold, result_limit, state, budget);
         }
         SimilarityComparisonScope::CrossFile => {
-            compare_group_cross_file_into(output, group, threshold, result_limit, state, budget)
+            compare_group_cross_file_into(output, group, threshold, result_limit, state, budget);
         }
     }
 }

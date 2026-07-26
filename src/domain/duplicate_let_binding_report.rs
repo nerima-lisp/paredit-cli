@@ -134,7 +134,7 @@ pub fn collect_duplicate_let_bindings(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let(subview, path, &mut let_form_count, &mut duplicates)
+            examine_let(subview, path, &mut let_form_count, &mut duplicates);
         });
     }
     Ok((let_form_count, duplicates))
