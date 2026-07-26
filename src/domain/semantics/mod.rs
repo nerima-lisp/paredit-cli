@@ -16,13 +16,24 @@
 //! stops at forms whose semantics are not registered for the dialect, because
 //! an unknown macro can do anything to what it encloses.
 
-// What remains unread is the binding table's structural surface — the scope
-// tree (`Scope::parent`, `is_within`) and a binding's provenance
-// (`definition`, `binder_head`, `references`). The consumers wired up so far
-// ask value and type questions, which need neither; a scope-aware rule or an
-// unused-binding report would. Each is exercised by this module's own tests,
-// and deleting them would mean re-deriving the scope tree the builder already
-// has.
+// What remains unread falls into two groups, and neither is an oversight.
+//
+// The binding table's structural surface: the scope tree (`Scope::parent`,
+// `is_within`, `scope_count`) and a binding's provenance (`definition`,
+// `references`). The consumers wired up so far ask value and type questions,
+// which need neither; a scope-aware rule or an unused-binding report would.
+// `binder_head` left this list when the coverage harness began attributing
+// uninitialized bindings to the form that bound them.
+//
+// The system-order resolver (`resolve_system_order`, `system_dependency_edges`,
+// `SystemOrderCycle`). Cross-file constant resolution turned out not to need
+// it: the project table carries a value only for a `defconstant` defined
+// exactly once project-wide, and "exactly once" is the same however the files
+// are visited. An analysis whose answer depends on which file was seen first
+// would need it, and none does yet.
+//
+// Every item here is exercised by this module's own tests, and deleting them
+// would mean re-deriving what the builders already have.
 #![allow(dead_code, unused_imports)]
 
 mod node_key;

@@ -55,6 +55,25 @@ pub enum HeadFilter {
     AllNodes,
     /// The whole document at once, for rules that correlate separate
     /// definitions and cannot be expressed as a per-node predicate.
+    ///
+    /// Three rules use this — `duplicate-parameters`,
+    /// `duplicate-lambda-list-keyword`, and `lambda-list-keyword-order` — and
+    /// all three want the same narrower thing: the *top-level* definitions
+    /// only. `Heads` would be wrong for them, because a `defun` inside an
+    /// `flet` or a `let` is not a top-level definition and picking it up would
+    /// change what they report.
+    ///
+    /// A `TopLevelHeads` variant was considered and declined. It would have to
+    /// carry heads as well as the depth restriction, so it is a whole
+    /// additional dispatch mode; what it would replace is the five lines below
+    /// that hand each such rule the root view once per *file*, not once per
+    /// node. The three rules then walk `root_children` themselves, which is
+    /// explicit about the one thing that matters about them. Adding a mode to
+    /// remove a smaller one is not a simplification.
+    ///
+    /// Revisit if a fourth rule wants top-level definitions, or if one of
+    /// these needs the per-node context (`RuleContext` carries no depth) for
+    /// some other reason.
     WholeTree,
 }
 
