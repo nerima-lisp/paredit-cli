@@ -60,9 +60,7 @@ pub(super) fn removal_edit_for_list_item(
         anyhow::bail!("remove-function-parameter removal target must be a list");
     }
     if item_index >= container.children.len() {
-        anyhow::bail!(
-            "remove-function-parameter removal item index {item_index} is out of bounds"
-        );
+        anyhow::bail!("remove-function-parameter removal item index {item_index} is out of bounds");
     }
 
     let item = &container.children[item_index];

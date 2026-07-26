@@ -52,9 +52,7 @@ pub(in crate::domain::function_parameter) fn build_new_relative_order(
             );
         }
         let index = old_indexes.get(name.as_str()).copied().with_context(|| {
-            format!(
-                "reorder-function-parameters requested unknown parameter '{name}'"
-            )
+            format!("reorder-function-parameters requested unknown parameter '{name}'")
         })?;
         relative_order.push(index);
     }

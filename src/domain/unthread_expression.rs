@@ -74,9 +74,9 @@ pub fn plan_unthread_expression(
     let style = match (request.style, recognized) {
         (Some(style), _) => style,
         (None, Some(style)) => style,
-        (None, None) => anyhow::bail!(
-            "unthread-expression custom operator {operator} requires --style"
-        ),
+        (None, None) => {
+            anyhow::bail!("unthread-expression custom operator {operator} requires --style")
+        }
     };
 
     if request.target.children.len() < 3 {

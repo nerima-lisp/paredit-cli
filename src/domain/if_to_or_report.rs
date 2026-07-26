@@ -159,7 +159,10 @@ pub fn collect_if_to_ors(
 }
 
 #[must_use]
-pub const fn summarize_if_to_ors(if_form_count: usize, violations: Vec<IfToOrItem>) -> IfToOrSummary {
+pub const fn summarize_if_to_ors(
+    if_form_count: usize,
+    violations: Vec<IfToOrItem>,
+) -> IfToOrSummary {
     IfToOrSummary {
         if_form_count,
         violations,

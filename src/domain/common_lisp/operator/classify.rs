@@ -6,7 +6,9 @@ use super::super::{
 };
 use super::CommonLispOperator;
 
-pub(super) const fn definition_category(operator: CommonLispOperator) -> Option<DefinitionCategory> {
+pub(super) const fn definition_category(
+    operator: CommonLispOperator,
+) -> Option<DefinitionCategory> {
     Some(match operator {
         CommonLispOperator::Defun => DefinitionCategory::Function,
         CommonLispOperator::Defmacro

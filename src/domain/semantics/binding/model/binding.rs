@@ -112,7 +112,12 @@ pub struct BindingDraft {
 }
 
 impl BindingDraft {
-    pub const fn new(name: SymbolName, kind: BindingKind, scope: ScopeId, definition: ByteSpan) -> Self {
+    pub const fn new(
+        name: SymbolName,
+        kind: BindingKind,
+        scope: ScopeId,
+        definition: ByteSpan,
+    ) -> Self {
         Self {
             binding: Binding {
                 name,

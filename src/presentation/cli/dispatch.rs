@@ -210,7 +210,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 getf_default_nil_report::workflow::getf_default_nil_report(args)?;
             }
             command::InspectCommand::MakeArrayDefaultKeyword(args) => {
-                make_array_default_keyword_report::workflow::make_array_default_keyword_report(args)?;
+                make_array_default_keyword_report::workflow::make_array_default_keyword_report(
+                    args,
+                )?;
             }
             command::InspectCommand::NestedCharCase(args) => {
                 nested_char_case_report::workflow::nested_char_case_report(args)?;
@@ -448,7 +450,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 sign_comparison_report::workflow::sign_comparison_report(args)?;
             }
             command::InspectCommand::FormatMissingDestination(args) => {
-                format_missing_destination_report::workflow::format_missing_destination_report(args)?;
+                format_missing_destination_report::workflow::format_missing_destination_report(
+                    args,
+                )?;
             }
             command::InspectCommand::FormatToString(args) => {
                 format_to_string_report::workflow::format_to_string_report(args)?;

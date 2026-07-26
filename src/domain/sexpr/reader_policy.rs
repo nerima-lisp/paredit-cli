@@ -145,7 +145,12 @@ impl DialectReaderPolicy {
         }
     }
 
-    const fn classify_legacy(self, byte: u8, next: Option<u8>, third: Option<u8>) -> Option<ReaderMacro> {
+    const fn classify_legacy(
+        self,
+        byte: u8,
+        next: Option<u8>,
+        third: Option<u8>,
+    ) -> Option<ReaderMacro> {
         if byte == b'#' && matches!(next, Some(b';' | b'_')) {
             return Some(ReaderMacro::Discard { width: 2 });
         }
@@ -356,7 +361,11 @@ impl DialectReaderPolicy {
     }
 }
 
-const fn classify_shared_prefix(byte: u8, next: Option<u8>, third: Option<u8>) -> Option<ReaderMacro> {
+const fn classify_shared_prefix(
+    byte: u8,
+    next: Option<u8>,
+    third: Option<u8>,
+) -> Option<ReaderMacro> {
     if let Some(prefix) = classify_quote_prefix(byte, next) {
         return Some(prefix);
     }

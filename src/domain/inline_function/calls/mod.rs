@@ -157,9 +157,7 @@ pub(super) fn validate_or_resolve_function_call_paths(
         let call_paths =
             discovery::discover_function_call_paths(tree, dialect, definition_span, function_name)?;
         if call_paths.is_empty() {
-            anyhow::bail!(
-                "{command} --all-calls found no same-file calls for {function_name}"
-            );
+            anyhow::bail!("{command} --all-calls found no same-file calls for {function_name}");
         }
         return Ok(call_paths);
     }

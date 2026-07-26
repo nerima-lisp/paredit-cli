@@ -172,7 +172,9 @@ pub(super) fn local_callable_binding_body_scope(
     }
 }
 
-const fn shadow_current_target_in_definition_body(scope: MacroletRenameScope) -> MacroletRenameScope {
+const fn shadow_current_target_in_definition_body(
+    scope: MacroletRenameScope,
+) -> MacroletRenameScope {
     if scope.is_target_active() || scope.is_shadowed() {
         scope
     } else {

@@ -15,9 +15,7 @@ pub(crate) fn find_unique_parameter_location<'a>(
         if common_lisp_symbol_reference_eq(&parameter.name, parameter_name.as_str())
             && found.replace(parameter).is_some()
         {
-            anyhow::bail!(
-                "{operation} parameter '{parameter_name}' appears more than once"
-            );
+            anyhow::bail!("{operation} parameter '{parameter_name}' appears more than once");
         }
     }
 
