@@ -14,7 +14,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::domain::dialect::Dialect;
-use crate::domain::lint::model::RuleFix;
+pub use crate::domain::lint::model::RuleFix;
 use crate::domain::lint::policy::RuleSelection;
 use crate::domain::lint::registry::catalog;
 use crate::domain::sexpr::{ByteSpan, SyntaxTree};
@@ -29,6 +29,11 @@ pub use crate::domain::lint::registry::catalog::{
     CATEGORIES, FIXABLE_RULES, RULE_DOCS, RULES, WARNING_RULES, rule_description, rule_is_fixable,
     rule_severity,
 };
+
+/// One rule's rewrite for one finding: the rule that offered it and the span
+/// of the finding it repairs, which together key the fix map its callers
+/// build.
+pub type RuleFixFor = (&'static str, ByteSpan, RuleFix);
 
 /// The category for a rule name, or `None` if the name is unknown.
 pub fn rule_category(name: &str) -> Option<&'static str> {
@@ -69,7 +74,7 @@ pub fn collect_lint_fixes(
     tree: &SyntaxTree,
     source: &str,
     active: &[&str],
-) -> Result<Vec<(&'static str, ByteSpan, RuleFix)>> {
+) -> Result<Vec<RuleFixFor>> {
     Ok(crate::domain::lint::collect_lint_outcomes(
         path,
         dialect,
@@ -83,6 +88,49 @@ pub fn collect_lint_fixes(
         fix.map(|fix| (finding.rule, finding.span, fix))
     })
     .collect())
+}
+
+/// Every finding in a file, together with the fixes the `active` rules offer,
+/// from a single dispatch pass.
+///
+/// `--sarif` and `--fix-plan` need both halves of the same walk: the complete
+/// finding list, so the report covers every rule, and the fixes of the
+/// selected rules only, so an excluded rule never edits a file. Asking
+/// [`collect_lint_findings`] and [`collect_lint_fixes`] for them separately
+/// ran that pass twice over every file — `--fix` has always managed with one.
+///
+/// Filtering after the walk is identical to filtering before it, and that is
+/// not an accident of the current rules:
+/// [`RuleSelection`](crate::domain::lint::policy::RuleSelection) is a per-rule
+/// membership test, rules never observe one another, and a rule left out of
+/// `active` contributes no fix either way. The one thing that must not happen
+/// — a fix from an unselected rule reaching the plan — is exactly what the
+/// `active` check below prevents.
+pub fn collect_lint_findings_and_fixes(
+    path: &Path,
+    dialect: Dialect,
+    tree: &SyntaxTree,
+    source: &str,
+    active: &[&str],
+) -> Result<(Vec<LintFinding>, Vec<RuleFixFor>)> {
+    let outcomes = crate::domain::lint::collect_lint_outcomes(
+        path,
+        dialect,
+        tree,
+        source,
+        RuleSelection::All,
+    )?;
+
+    let mut findings = Vec::with_capacity(outcomes.len());
+    let mut fixes = Vec::new();
+    for outcome in outcomes {
+        let (finding, fix) = outcome.into_parts();
+        if let Some(fix) = fix.filter(|_| active.contains(&finding.rule)) {
+            fixes.push((finding.rule, finding.span, fix));
+        }
+        findings.push(finding);
+    }
+    Ok((findings, fixes))
 }
 
 #[cfg(test)]

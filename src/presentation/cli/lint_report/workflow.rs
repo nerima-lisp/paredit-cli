@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::lint_report::{
-    CATEGORIES, LintFinding, LintPolicyOptions, LintSuppressions, Severity, collect_lint_findings,
-    collect_lint_fixes_for, evaluate_lint_policy, lint_gate_violations, resolve_active_rules,
-    rule_category, rule_severity, summarize_lint_findings,
+    CATEGORIES, LintFinding, LintPolicyOptions, LintSuppressions, RuleFixFor, Severity,
+    collect_lint_findings, collect_lint_findings_and_fixes, collect_lint_fixes_for,
+    evaluate_lint_policy, lint_gate_violations, resolve_active_rules, rule_category, rule_severity,
+    summarize_lint_findings,
 };
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 use crate::presentation::cli::lint_report::args::LintReportArgs;
@@ -146,11 +147,39 @@ fn collect_lint_fixes(
     tree: &crate::domain::sexpr::SyntaxTree,
     text: &str,
     active: &[&str],
-) -> Result<std::collections::HashMap<(&'static str, usize, usize), LintFix>> {
-    let mut fixes = std::collections::HashMap::new();
-    for (rule, span, fix) in collect_lint_fixes_for(file, dialect, tree, text, active)? {
+) -> Result<FixMap> {
+    Ok(fix_map(collect_lint_fixes_for(
+        file, dialect, tree, text, active,
+    )?))
+}
+
+/// The findings and the fix map for one file, from a single dispatch pass.
+///
+/// `--sarif` and `--fix-plan` want both, and used to ask for them separately —
+/// two walks of every file where `--fix` has always needed one. The domain
+/// answers both from the same walk; this only reshapes its fix list into the
+/// map both paths index by.
+fn collect_lint_findings_and_fix_map(
+    file: &std::path::Path,
+    dialect: crate::domain::dialect::Dialect,
+    tree: &crate::domain::sexpr::SyntaxTree,
+    text: &str,
+    active: &[&str],
+) -> Result<(Vec<LintFinding>, FixMap)> {
+    let (findings, fixes) = collect_lint_findings_and_fixes(file, dialect, tree, text, active)?;
+    Ok((findings, fix_map(fixes)))
+}
+
+/// Fixes keyed by `(rule, finding start, finding end)`, which is how the
+/// fixpoint loop, the SARIF writer, and the fix plan all pair a finding with
+/// its rewrite.
+type FixMap = std::collections::HashMap<(&'static str, usize, usize), LintFix>;
+
+fn fix_map(fixes: Vec<RuleFixFor>) -> FixMap {
+    let mut map = std::collections::HashMap::new();
+    for (rule, span, fix) in fixes {
         let (start, end) = (span.start().get(), span.end().get());
-        fixes.insert(
+        map.insert(
             (rule, start, end),
             LintFix {
                 description: fix.description().to_owned(),
@@ -165,7 +194,7 @@ fn collect_lint_fixes(
             },
         );
     }
-    Ok(fixes)
+    map
 }
 
 pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<()> {
@@ -255,9 +284,9 @@ fn lint_report_sarif(
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let fixes = collect_lint_fixes(file, dialect, &tree, &input.text, active)?;
-        let findings =
-            retain_unsuppressed(collect_lint_findings(file, dialect, &tree)?, &input.text);
+        let (findings, fixes) =
+            collect_lint_findings_and_fix_map(file, dialect, &tree, &input.text, active)?;
+        let findings = retain_unsuppressed(findings, &input.text);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         for finding in findings {
             if !active.contains(&finding.rule) {
@@ -311,10 +340,10 @@ fn lint_report_fix_plan(
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let fixes = collect_lint_fixes(file, dialect, &tree, &input.text, active)?;
+        let (findings, fixes) =
+            collect_lint_findings_and_fix_map(file, dialect, &tree, &input.text, active)?;
         let suppressions = LintSuppressions::parse(&input.text);
-        let findings =
-            retain_unsuppressed(collect_lint_findings(file, dialect, &tree)?, &input.text);
+        let findings = retain_unsuppressed(findings, &input.text);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         for finding in findings {
             if !active.contains(&finding.rule) {
