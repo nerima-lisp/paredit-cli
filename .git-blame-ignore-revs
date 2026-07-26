@@ -1,0 +1,16 @@
+# Revisions to skip when running `git blame`.
+#
+# Only bulk revisions with no behavioural change belong here: mechanical
+# Clippy fixes (`#[must_use]`, `const fn`, trailing-semicolon and `format!`
+# consistency) and the pure `git mv` commits of the package-by-feature
+# migration, which move files without touching a single byte of content.
+# See SPEC-package-by-feature.md sections 9.5 and 13.1.
+#
+# Never add a revision that changes behaviour: doing so hides the real author
+# of that behaviour from `git blame` permanently.
+#
+# GitHub honours this file automatically. Locally, enable it once with:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Entries are full 40-character SHAs, one per line, newest last.

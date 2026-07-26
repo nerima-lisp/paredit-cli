@@ -21,6 +21,17 @@ cargo test --locked
 nix flake check
 ```
 
+Enable the shared blame-ignore list once per clone, so bulk mechanical
+revisions do not mask the real author of a line:
+
+```sh
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+`.git-blame-ignore-revs` lists only revisions with no behavioural change —
+mechanical Clippy fixes and the pure file-move commits of the package
+migration. GitHub applies it to its blame view automatically.
+
 `nix flake check` is the required verification gate. It checks formatting,
 GitHub Actions syntax, Clippy, the test suite, package construction, rendered
 documentation, the exact MSRV build/test, and the lint/format integration
