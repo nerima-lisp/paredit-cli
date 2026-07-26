@@ -48,11 +48,56 @@ harness = false
 name = "lint_report"
 harness = false
 
-[lints.rust]
+# Inherited from [workspace.lints] below, so the root package and every
+# packages/*/* member are governed by one definition. A member that omits
+# `[lints] workspace = true` silently loses `unsafe_code = "deny"` without any
+# error, which is why a contract test checks every member for it.
+[lints]
+workspace = true
+
+# The workspace sections are deliberately placed after [package].
+# .github/workflows/release.yml reads the crate version with
+#   sed -n 's/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -n1
+# which takes the first column-0 `version =` line in the file. Keeping
+# [package] first means that line stays the package version even though
+# [workspace.package] declares one too. A contract test asserts the two agree,
+# so a one-sided bump cannot ship a mismatched tag.
+[workspace]
+# `members` is intentionally absent until the first packages/*/* member exists:
+# Cargo does not accept a glob that matches nothing - it falls back to reading
+# the literal path `packages/*/*/Cargo.toml` and fails. The root package is the
+# sole member until then.
+#
+# When the first member lands it must be declared as a wildcard,
+#   members = ["packages/*/*"]
+# and must stay one: crane cannot resolve sources for an omitted member, and an
+# explicit list silently drops any package added without editing this line.
+
+[workspace.package]
+version = "1.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/nerima-lisp/paredit-cli"
+
+# Single source of truth for dependency versions, so 26 members cannot drift
+# apart. Verify with `cargo tree --duplicates` when adding one.
+[workspace.dependencies]
+anyhow = "1.0"
+blake3 = "1.8"
+cap-std = "4.0"
+clap = { version = "4.6", features = ["derive"] }
+clap_complete = "4.5"
+libc = "0.2"
+serde_json = "1.0"
+thiserror = "2.0"
+xattr = "1.6"
+
+[workspace.lints.rust]
 unsafe_code = "deny"
 missing_debug_implementations = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 all = "warn"
 # Individually promoted after Phase -1 cleared every existing occurrence.
 # `clippy::pedantic` is deliberately NOT enabled wholesale: it also carries
@@ -60,6 +105,6 @@ all = "warn"
 must_use_candidate = "warn"
 semicolon_if_nothing_returned = "warn"
 uninlined_format_args = "warn"
-# Nursery lint, kept because it guards the 574 `const fn` signatures added in
-# Phase -1. Its two known false positives carry a local `expect` with a reason.
+# Nursery lint, kept because it guards the `const fn` signatures added in
+# Phase -1. Its two cfg-dependent false positives carry a local `allow`.
 missing_const_for_fn = "warn"

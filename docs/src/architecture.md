@@ -5,6 +5,30 @@ dependency rule. The layers are the top-level modules of the crate
 (`src/lib.rs`): `domain`, `application`, `infrastructure`, and `presentation`.
 Understanding this shape is the fastest way to know where a change belongs.
 
+> **Migration in progress.** The crate is being split into a Cargo workspace of
+> `packages/core/<name>` and `packages/feature/<name>` members. This document
+> still describes the single-crate shape, which remains accurate for everything
+> not yet extracted, and will be rewritten once the split lands. Three points of
+> direction are already settled and worth knowing before adding code:
+>
+> - **The four layers stop being the top-level unit.** `packages/{core,feature}`
+>   becomes the outermost division, and a feature owns its whole vertical slice.
+> - **Layers survive as file names, not directories.** Inside a package a slice
+>   is one directory holding `domain.rs`, `usecase.rs`, `rule.rs` and `cli/`.
+>   Do not recreate `domain/`, `application/` or `presentation/` directories
+>   inside a package: that reproduces, one level down, the very problem the
+>   split exists to fix — a single feature change spread across three trees.
+> - **The dependency rule moves from directory layout into the crate graph.**
+>   `[dependencies]` in each member's `Cargo.toml` becomes the only place a
+>   cross-feature dependency can be declared, and the compiler enforces it. The
+>   one-directional rule below is not being relaxed; it is being made
+>   mechanical. Its real intent — domain logic knows nothing about CLI delivery
+>   — is checked by asserting `clap` appears only under a `cli/` path.
+>
+> The root `src/` keeps its four layer modules as a re-export façade, so every
+> existing `crate::domain::…` path and the public `paredit_cli::domain::…` API
+> continue to work unchanged throughout. See `SPEC-package-by-feature.md`.
+
 ## Layers and dependency direction
 
 | Layer | Module | Responsibility |
