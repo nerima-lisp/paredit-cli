@@ -9,6 +9,7 @@
 //! makes the value layer confidently wrong.
 
 use crate::domain::dialect::Dialect;
+use crate::domain::sexpr::ExpressionView;
 
 /// Where the places sit among a form's arguments.
 ///
@@ -25,11 +26,22 @@ pub enum PlacePositions {
     EveryArgument,
     /// `(shiftf a b new)` — every argument but the last, which is a value.
     EveryArgumentButLast,
+    /// The places are the *children* of the argument at this index, not
+    /// arguments themselves: `(multiple-value-setq (a b) form)` writes both
+    /// names inside its first argument, and `(assert test (a b) datum)` both
+    /// inside its second.
+    ///
+    /// A variant of its own rather than an index list, because no index into
+    /// the form's own children names a place one level further down.
+    NestedInArgument(usize),
 }
 
 impl PlacePositions {
     /// The child indices that hold places for a form with `child_count`
     /// children (including the operator at index 0).
+    ///
+    /// [`Self::NestedInArgument`] has none: its places are one level further
+    /// down, which is what [`Self::places_in`] exists to reach.
     pub fn indices(self, child_count: usize) -> Vec<usize> {
         match self {
             Self::Pairs => (1..child_count).step_by(2).collect(),
@@ -37,7 +49,26 @@ impl PlacePositions {
             Self::SecondArgument => (2..child_count.min(3)).collect(),
             Self::EveryArgument => (1..child_count).collect(),
             Self::EveryArgumentButLast => (1..child_count.saturating_sub(1)).collect(),
+            Self::NestedInArgument(_) => Vec::new(),
         }
+    }
+
+    /// The subviews of `view` that hold places.
+    ///
+    /// The single entry point for callers, so a nested shape cannot be missed
+    /// by one that only remembered to consult [`Self::indices`].
+    pub fn places_in(self, view: &ExpressionView) -> Vec<&ExpressionView> {
+        if let Self::NestedInArgument(index) = self {
+            return view
+                .children
+                .get(index)
+                .map(|list| list.children.iter().collect())
+                .unwrap_or_default();
+        }
+        self.indices(view.children.len())
+            .into_iter()
+            .filter_map(|index| view.children.get(index))
+            .collect()
     }
 }
 
@@ -62,7 +93,18 @@ impl AssignmentForm {
     }
 }
 
-const COMMON_LISP: [AssignmentForm; 11] = [
+/// The `COMMON-LISP` forms that write to a place.
+///
+/// `assert` and `check-type` are here for a reason worth spelling out: neither
+/// looks like an assignment, and both are. `(check-type x integer)` offers a
+/// `store-value` restart that writes a new value into `x`, and
+/// `(assert (> x 0) (x))` offers the same for each place it lists. A reader
+/// who takes them for pure tests would let the value layer propagate a value
+/// the program can legally replace.
+///
+/// `remf` is the quieter case: it reads as a removal, and `(remf plist :key)`
+/// writes the whole modified list back into `plist`.
+const COMMON_LISP: [AssignmentForm; 15] = [
     AssignmentForm::new("setq", PlacePositions::Pairs),
     AssignmentForm::new("psetq", PlacePositions::Pairs),
     AssignmentForm::new("setf", PlacePositions::Pairs),
@@ -74,6 +116,10 @@ const COMMON_LISP: [AssignmentForm; 11] = [
     AssignmentForm::new("pushnew", PlacePositions::SecondArgument),
     AssignmentForm::new("rotatef", PlacePositions::EveryArgument),
     AssignmentForm::new("shiftf", PlacePositions::EveryArgumentButLast),
+    AssignmentForm::new("check-type", PlacePositions::FirstArgument),
+    AssignmentForm::new("remf", PlacePositions::FirstArgument),
+    AssignmentForm::new("assert", PlacePositions::NestedInArgument(2)),
+    AssignmentForm::new("multiple-value-setq", PlacePositions::NestedInArgument(1)),
 ];
 
 const EMACS_LISP: [AssignmentForm; 12] = [

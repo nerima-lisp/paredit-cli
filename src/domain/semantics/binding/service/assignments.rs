@@ -22,10 +22,7 @@ impl Walk<'_> {
             return;
         };
 
-        for index in form.places().indices(view.children.len()) {
-            let Some(place) = view.children.get(index) else {
-                continue;
-            };
+        for place in form.places().places_in(view) {
             // `atom_symbol_text` already refuses lists, which is the whole
             // bare-variable test.
             let (Some(text), Some(span)) = (atom_symbol_text(place), atom_symbol_span(place))
