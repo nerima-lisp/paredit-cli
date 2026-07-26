@@ -16,13 +16,13 @@
 //! stops at forms whose semantics are not registered for the dialect, because
 //! an unknown macro can do anything to what it encloses.
 
-// The layer is deliberately wider than its current callers. Three lint rules
-// read the value table today; the type context's consumers (`eq-number-
-// comparison` and friends) and the project context's (the impact and
-// undefined-package reports) still match names and spellings by hand and have
-// not been converted. Deleting the API they will need — `NodeKey::of`,
-// `Binding::name`, the project tables — would leave modules that cannot be
-// wired up, and each is covered by its own tests.
+// What remains unread is the binding table's structural surface — the scope
+// tree (`Scope::parent`, `is_within`) and a binding's provenance
+// (`definition`, `binder_head`, `references`). The consumers wired up so far
+// ask value and type questions, which need neither; a scope-aware rule or an
+// unused-binding report would. Each is exercised by this module's own tests,
+// and deleting them would mean re-deriving the scope tree the builder already
+// has.
 #![allow(dead_code, unused_imports)]
 
 mod node_key;
