@@ -19,4 +19,6 @@ pub mod policy;
 pub mod service;
 
 pub use model::{LiteralValue, PropagatableValue, Value, ValueTable};
-pub use service::{build_value_table, evaluate_constant};
+pub use service::{
+    ProjectConstants, build_value_table, build_value_table_in_project, evaluate_constant,
+};
