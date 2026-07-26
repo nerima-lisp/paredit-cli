@@ -17,9 +17,16 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::dialect::Dialect;
 use crate::domain::semantics::binding::{
-    Binding, BindingKind, OpacityCauseKind, build_binding_table,
+    Binding, BindingKind, BindingTable, OpacityCauseKind, build_binding_table,
 };
-use crate::domain::semantics::value::{build_value_table, evaluate_constant};
+use crate::domain::semantics::project::GlobalTable;
+use crate::domain::semantics::project::service::{
+    FilePackages, ProjectFile, build_global_table, resolve_file_packages,
+};
+use crate::domain::semantics::value::{
+    ProjectConstants, ValueTable, build_value_table, build_value_table_in_project,
+    evaluate_constant,
+};
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, SyntaxTree};
 use crate::domain::view_query::for_each_subview;
 
@@ -399,22 +406,50 @@ pub fn build_semantic_coverage_report(
         .discover(&request)
         .map_err(SemanticCoverageWorkflowError::Source)?;
 
-    let mut files = Vec::with_capacity(inventory.files.len());
+    let mut loaded = Vec::with_capacity(inventory.files.len());
     let mut errors = Vec::new();
     for file in &inventory.files {
-        match measure_file(source, file) {
-            Ok(report) => files.push(report),
+        match load_file(source, file) {
+            Ok(file) => loaded.push(file),
             Err(error) => errors.push(error),
         }
     }
 
+    // The project table is what makes a `defconstant` visible to a file that
+    // does not define it, and building it needs every file analysed first —
+    // which is the whole reason discovery and measurement are separate passes
+    // here. Analysis *order* does not matter: the table carries a value only
+    // for a constant defined exactly once project-wide, and "exactly once" is
+    // the same however the files are visited.
+    let project_files: Vec<ProjectFile<'_>> = loaded
+        .iter()
+        .map(|file| ProjectFile::new(&file.tree, &file.packages, &file.values))
+        .collect();
+    let globals = build_global_table(Dialect::CommonLisp, &project_files);
+
+    let files = loaded
+        .iter()
+        .map(|file| measure_file(file, &globals))
+        .collect();
+
     Ok(SemanticCoverageReport { files, errors })
 }
 
-fn measure_file(
+/// One file, parsed and analysed on its own, before any project context
+/// exists to widen it.
+struct LoadedFile {
+    path: PathBuf,
+    text: String,
+    tree: SyntaxTree,
+    bindings: BindingTable,
+    packages: FilePackages,
+    values: ValueTable,
+}
+
+fn load_file(
     source: &impl SemanticCoverageSourcePort,
     file: &DiscoveredSemanticCoverageFile,
-) -> Result<SemanticCoverageFileReport, SemanticCoverageFileError> {
+) -> Result<LoadedFile, SemanticCoverageFileError> {
     let bytes = source.load(file).map_err(|message| {
         file_error(&file.path, SemanticCoverageProcessingStage::Read, message)
     })?;
@@ -435,6 +470,35 @@ fn measure_file(
 
     let bindings = build_binding_table(Dialect::CommonLisp, &tree, &text);
     let values = build_value_table(Dialect::CommonLisp, &tree, &bindings);
+    let packages = resolve_file_packages(Dialect::CommonLisp, &tree);
+
+    Ok(LoadedFile {
+        path: file.path.clone(),
+        text,
+        tree,
+        bindings,
+        packages,
+        values,
+    })
+}
+
+/// Measures one already-loaded file, this time with the project's constants
+/// available to it.
+///
+/// The value table is rebuilt rather than reused: the one computed during
+/// loading exists only to tell the project table what this file *defines*, and
+/// measuring what the file can *see* is a different question. A development
+/// harness can afford the second pass; nothing on the lint path does this.
+fn measure_file(file: &LoadedFile, globals: &GlobalTable) -> SemanticCoverageFileReport {
+    let LoadedFile {
+        text,
+        tree,
+        bindings,
+        packages,
+        ..
+    } = file;
+    let project = ProjectConstants::new(globals, packages);
+    let values = build_value_table_in_project(Dialect::CommonLisp, tree, bindings, Some(&project));
 
     let mut report = SemanticCoverageFileReport {
         path: file.path.clone(),
@@ -464,7 +528,7 @@ fn measure_file(
                     .record(BindingNonResolutionReason::OpaqueScope);
                 report
                     .non_resolution
-                    .record_opacity_cause(opacity_cause_label(binding, &text));
+                    .record_opacity_cause(opacity_cause_label(binding, text));
             }
             BindingNonResolutionReason::NoInitialForm => {
                 report
@@ -489,7 +553,7 @@ fn measure_file(
     let mut folded_initial_forms: HashSet<ByteSpan> = HashSet::new();
     for_each_subview(&document, |view| {
         if pending_initial_forms.contains_key(&view.span)
-            && evaluate_constant(Dialect::CommonLisp, view, &bindings, &values).is_known()
+            && evaluate_constant(Dialect::CommonLisp, view, bindings, &values).is_known()
         {
             folded_initial_forms.insert(view.span);
         }
@@ -498,7 +562,7 @@ fn measure_file(
             return;
         }
         report.list_expression_count += 1;
-        if evaluate_constant(Dialect::CommonLisp, view, &bindings, &values).is_known() {
+        if evaluate_constant(Dialect::CommonLisp, view, bindings, &values).is_known() {
             report.known_list_expression_count += 1;
         }
     });
@@ -516,7 +580,7 @@ fn measure_file(
         }
     }
 
-    Ok(report)
+    report
 }
 
 /// Classifies an unresolved `Variable` binding by the first disqualifying
