@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 use std::thread;
 
-use crate::domain::form_similarity::{
+use crate::form_similarity::{
     MAX_REPORT_TREE_EDIT_OPERATIONS, MAX_TREE_SIMILARITY_WORKSPACES, StructuralTree,
     TreeSimilarityError, TreeSimilarityOperationBudget, TreeSimilarityWorkspace,
     reserve_tree_similarity_workspaces, similarity_upper_bound,
@@ -123,8 +123,8 @@ impl ResultBudget {
 
     fn tree_similarity(
         &self,
-        left: &crate::domain::form_similarity::StructuralTree,
-        right: &crate::domain::form_similarity::StructuralTree,
+        left: &crate::form_similarity::StructuralTree,
+        right: &crate::form_similarity::StructuralTree,
         workspace: &mut TreeSimilarityWorkspace,
     ) -> std::result::Result<f64, TreeSimilarityError> {
         #[cfg(test)]
@@ -350,7 +350,7 @@ struct ComparisonCounts {
     matched_pairs: usize,
 }
 
-pub(super) trait PairLike {
+pub trait PairLike {
     fn left_form(&self) -> &SimilarityFormReport;
     fn right_form(&self) -> &SimilarityFormReport;
 }
@@ -844,7 +844,7 @@ fn validate_comparison_budget(possible_pairs: usize, max_comparisons: Option<usi
 }
 
 #[cfg(test)]
-pub(super) fn validate_resource_budgets_for_test(
+pub fn validate_resource_budgets_for_test(
     candidate_count: usize,
     possible_pairs: usize,
     max_comparisons: Option<usize>,
@@ -879,7 +879,7 @@ const fn should_spawn_worker_threads(worker_item_count: usize) -> bool {
 }
 
 #[cfg(test)]
-pub(super) fn scheduling_policy_for_test(
+pub fn scheduling_policy_for_test(
     available_workers: usize,
     possible_pairs: usize,
     worker_item_count: usize,
@@ -891,7 +891,7 @@ pub(super) fn scheduling_policy_for_test(
 }
 
 #[cfg(test)]
-pub(super) const fn result_bounded_worker_count_for_test(
+pub const fn result_bounded_worker_count_for_test(
     requested_workers: usize,
     limit: Option<usize>,
 ) -> usize {
@@ -951,7 +951,7 @@ fn build_work_items<'a>(
 }
 
 #[cfg(test)]
-pub(super) fn work_item_costs_for_test(
+pub fn work_item_costs_for_test(
     groups: &[&[SimilarityCandidate]],
     scope: SimilarityComparisonScope,
     worker_count: usize,
@@ -963,7 +963,7 @@ pub(super) fn work_item_costs_for_test(
 }
 
 #[cfg(test)]
-pub(super) fn tree_edit_operation_budget_execution_for_test(
+pub fn tree_edit_operation_budget_execution_for_test(
     candidates: &[SimilarityCandidate],
     operation_limit: usize,
     worker_count: usize,
@@ -1018,7 +1018,7 @@ pub(super) fn tree_edit_operation_budget_execution_for_test(
 }
 
 #[cfg(test)]
-pub(super) fn pruning_execution_for_test(
+pub fn pruning_execution_for_test(
     candidates: &[SimilarityCandidate],
     threshold: f64,
 ) -> (usize, usize, usize) {
@@ -1169,13 +1169,13 @@ const fn pair_count(count: usize) -> usize {
     }
 }
 
-pub(crate) struct GroupComparisonOutput<'a> {
+pub struct GroupComparisonOutput<'a> {
     pairs: RetainedPairs<'a>,
     matched_pairs: usize,
     result_budget_exceeded: bool,
-    pub(crate) evaluated_pairs: usize,
-    pub(crate) pruned_by_size: usize,
-    pub(crate) resource_skipped_pairs: usize,
+    pub evaluated_pairs: usize,
+    pub pruned_by_size: usize,
+    pub resource_skipped_pairs: usize,
 }
 
 impl<'a> GroupComparisonOutput<'a> {
@@ -1209,7 +1209,7 @@ impl<'a> GroupComparisonOutput<'a> {
 
 impl<'a> GroupComparisonOutput<'a> {
     #[cfg(test)]
-    pub(crate) fn pair_count(&self) -> usize {
+    pub fn pair_count(&self) -> usize {
         self.pairs.len()
     }
 }
@@ -1251,7 +1251,7 @@ fn push_pair<'a>(
 }
 
 #[cfg(test)]
-pub(super) fn bounded_result_scores_for_test(
+pub fn bounded_result_scores_for_test(
     candidates: &[SimilarityCandidate],
     scores: &[f64],
     limit: usize,
@@ -1287,7 +1287,7 @@ pub(super) fn bounded_result_scores_for_test(
 }
 
 #[cfg(test)]
-pub(super) fn bounded_result_retention_for_test(
+pub fn bounded_result_retention_for_test(
     candidates: &[SimilarityCandidate],
     scores: &[f64],
     limit: usize,
@@ -1323,7 +1323,7 @@ pub(super) fn bounded_result_retention_for_test(
 }
 
 #[cfg(test)]
-pub(super) fn bounded_result_paths_for_test(
+pub fn bounded_result_paths_for_test(
     candidates: &[SimilarityCandidate],
     candidate_pairs: &[(usize, usize)],
     limit: usize,
@@ -1361,7 +1361,7 @@ pub(super) fn bounded_result_paths_for_test(
 }
 
 #[cfg(test)]
-pub(super) fn bounded_parallel_result_paths_for_test(
+pub fn bounded_parallel_result_paths_for_test(
     candidates: &[SimilarityCandidate],
     worker_pairs: &[&[(usize, usize)]],
     merge_order: &[usize],
@@ -1892,7 +1892,7 @@ fn compare_cross_file_group_pair_into<'a>(
 }
 
 #[cfg(test)]
-pub(super) fn compare_cross_file_group_pair<'a>(
+pub fn compare_cross_file_group_pair<'a>(
     left_group: &[&'a SimilarityCandidate],
     right_group: &[&'a SimilarityCandidate],
     threshold: f64,
@@ -2017,7 +2017,7 @@ fn pair_total_span_len<P: PairLike>(pair: &P) -> usize {
 }
 
 #[cfg(test)]
-pub(super) fn retain_maximal_frontier_for_test<P: PairLike>(pairs: &mut Vec<P>) -> usize {
+pub fn retain_maximal_frontier_for_test<P: PairLike>(pairs: &mut Vec<P>) -> usize {
     let original_len = pairs.len();
     let mut frontier = Vec::with_capacity(original_len);
     let mut min_total_span_len = None::<usize>;
@@ -2046,7 +2046,7 @@ pub(super) fn retain_maximal_frontier_for_test<P: PairLike>(pairs: &mut Vec<P>) 
     original_len.saturating_sub(pairs.len())
 }
 
-pub(super) fn suppress_contained_pairs<P: PairLike>(pairs: &mut Vec<P>) -> usize {
+pub fn suppress_contained_pairs<P: PairLike>(pairs: &mut Vec<P>) -> usize {
     let mut suppressed = vec![false; pairs.len()];
     {
         let mut groups: HashMap<(&Path, &Path), Vec<(usize, bool)>> = HashMap::new();

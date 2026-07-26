@@ -1,15 +1,16 @@
+use paredit_core_cli::safe_text;
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::usecase::similarity_report::{
+use crate::similarity_report::usecase::{
     SimilarityFormReport, SimilarityProcessingStage, SimilarityReportPlan,
 };
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
-use super::super::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 use super::args::SimilarityReportArgs;
 
-pub(super) fn print_similarity_report(
+pub fn print_similarity_report(
     plan: &SimilarityReportPlan,
     args: &SimilarityReportArgs,
 ) -> Result<()> {

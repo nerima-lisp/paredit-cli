@@ -1,9 +1,10 @@
+use anyhow::Result;
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::similarity_report::{
+use paredit_core_syntax::dialect::Dialect;
+use crate::similarity_report::domain::{
     PairProcessingCounts, PairResultCounts, ReportLimit, SimilarityReport, SimilarityReportSummary,
 };
 

@@ -1,5 +1,5 @@
 //! Backwards-compatible application facade for similarity analysis.
-pub use crate::domain::similarity_report::*;
+pub use crate::similarity_report::domain::*;
 
 pub mod types;
 pub mod workflow;

@@ -2,8 +2,8 @@ use std::num::NonZeroUsize;
 use std::path::Path as FsPath;
 use std::path::PathBuf;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path as SExprPath, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path as SExprPath, SyntaxTree};
 
 use super::*;
 
@@ -228,9 +228,9 @@ fn similarity_candidate(file: &str, node_count: usize) -> SimilarityCandidate {
             Some("foo".into()),
             input,
         ),
-        crate::domain::form_similarity::StructuralTree::from_view(
+        crate::form_similarity::StructuralTree::from_view(
             &tree
-                .select_path(&crate::domain::sexpr::Path::root_child(0))
+                .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))
                 .unwrap()
                 .view(),
         ),
@@ -240,9 +240,9 @@ fn similarity_candidate(file: &str, node_count: usize) -> SimilarityCandidate {
 
 fn structural_similarity_candidate(file: &str, input: &str, index: usize) -> SimilarityCandidate {
     let syntax_tree = SyntaxTree::parse(input).unwrap();
-    let structural_tree = crate::domain::form_similarity::StructuralTree::from_view(
+    let structural_tree = crate::form_similarity::StructuralTree::from_view(
         &syntax_tree
-            .select_path(&crate::domain::sexpr::Path::root_child(0))
+            .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))
             .unwrap()
             .view(),
     );
@@ -634,7 +634,7 @@ fn split_scoped_comparisons_match_the_sequential_path() {
 fn threshold_is_inclusive() {
     let values = candidates("a.lisp", "(foo a b) (foo x y)", 2);
     let similarity =
-        crate::domain::form_similarity::tree_similarity(values[0].tree(), values[1].tree())
+        crate::form_similarity::tree_similarity(values[0].tree(), values[1].tree())
             .unwrap();
     let report = build_similarity_pairs(values, similarity, SimilarityOverlapPolicy::All, None);
     assert_eq!(report.pairs.len(), 1);
@@ -736,7 +736,7 @@ fn cross_file_size_pruning_keeps_later_valid_pairs() {
     ];
     let left_refs: Vec<_> = left_group.iter().collect();
     let right_refs: Vec<_> = right_group.iter().collect();
-    let mut workspace = crate::domain::form_similarity::TreeSimilarityWorkspace::default();
+    let mut workspace = crate::form_similarity::TreeSimilarityWorkspace::default();
     let mut evaluated_pairs = 0;
 
     let (output, limit_reached) = super::reports::compare_cross_file_group_pair(

@@ -1,7 +1,8 @@
+use anyhow::Result;
 use std::path::Path;
 
-use crate::domain::sexpr::SyntaxTree;
-use crate::domain::similarity_report::{
+use paredit_core_syntax::sexpr::SyntaxTree;
+use crate::similarity_report::domain::{
     SimilarityCandidate, build_similarity_pairs_with_omissions, collect_similarity_candidates,
 };
 
@@ -90,7 +91,7 @@ fn process_files(
 fn process_file(
     source: &impl SimilarityReportSourcePort,
     file: &DiscoveredSimilarityFile,
-    options: &crate::domain::similarity_report::SimilarityReportOptions,
+    options: &crate::similarity_report::domain::SimilarityReportOptions,
 ) -> Result<FileProcessingOutput, SimilarityFileError> {
     let bytes = source
         .load(file)

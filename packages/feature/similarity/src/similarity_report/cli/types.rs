@@ -1,15 +1,16 @@
+use anyhow::Result;
 use std::str::FromStr;
 
-use crate::application::usecase::similarity_report::SimilarityErrorPolicy;
+use crate::similarity_report::usecase::SimilarityErrorPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ErrorPolicy {
+pub enum ErrorPolicy {
     Fail,
     Skip,
 }
 
 impl ErrorPolicy {
-    pub(super) const fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Fail => "fail",
             Self::Skip => "skip",

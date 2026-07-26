@@ -656,6 +656,7 @@ dependencies = [
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",
+ "paredit-feature-similarity",
  "predicates",
  "proptest",
  "serde_json",
@@ -734,6 +735,20 @@ dependencies = [
  "libc",
  "paredit-core-syntax",
  "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-similarity"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "paredit-core-workspace",
+ "proptest",
+ "serde_json",
  "thiserror",
 ]
 

@@ -1,8 +1,8 @@
 use anyhow::Result;
 
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-pub(super) fn discover_duplicate_report_files(
+pub fn discover_duplicate_report_files(
     roots: &[std::path::PathBuf],
 ) -> Result<Vec<std::path::PathBuf>> {
     let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {

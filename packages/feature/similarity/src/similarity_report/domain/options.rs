@@ -1,8 +1,9 @@
+use anyhow::Result;
 use std::str::FromStr;
 
 use thiserror::Error;
 
-pub(crate) const MAX_STORED_RESULTS: usize = 1_000_000;
+pub const MAX_STORED_RESULTS: usize = 1_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SimilarityOverlapPolicy {
@@ -245,10 +246,12 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
 
-    use super::super::{SimilarityCandidateCollectionError, collect_similarity_candidates};
+    use crate::similarity_report::domain::{
+        SimilarityCandidateCollectionError, collect_similarity_candidates,
+    };
 
     #[test]
     fn default_options_validate() {

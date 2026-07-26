@@ -6,9 +6,9 @@ use std::path::{Path as FsPath, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::form_shape::{FormShape, duplicate_shape};
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::form_shape::{FormShape, duplicate_shape};
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateFormReport {
@@ -557,7 +557,7 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::domain::sexpr::{ByteOffset, Path as ExpressionPath};
+    use paredit_core_syntax::sexpr::{ByteOffset, Path as ExpressionPath};
 
     #[test]
     fn groups_duplicate_forms_by_shape() {

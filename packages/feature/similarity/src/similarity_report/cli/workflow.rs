@@ -1,12 +1,12 @@
 use anyhow::{Result, bail};
 
-use crate::application::usecase::similarity_report::{
+use crate::similarity_report::usecase::{
     DiscoveredSimilarityFile, SimilarityDuplicatePolicy, SimilarityGateDecision,
     SimilarityIndeterminateReason, SimilarityInventory, SimilarityReportOptions,
     SimilarityReportRequest, SimilarityReportSourcePort, build_similarity_report,
 };
-use crate::domain::dialect::Dialect;
-use crate::infrastructure::workspace::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_workspace::workspace::{
     WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
 };
 
@@ -49,7 +49,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
     match plan.gate() {
         SimilarityGateDecision::NotRequested | SimilarityGateDecision::Passed => Ok(()),
         SimilarityGateDecision::DuplicateFound { matched_pairs } => {
-            Err(crate::presentation::cli::gate::gate_failure(format!(
+            Err(paredit_core_cli::gate::gate_failure(format!(
                 "similarity-report policy failed: {matched_pairs} duplicate pair(s) found"
             )))
         }

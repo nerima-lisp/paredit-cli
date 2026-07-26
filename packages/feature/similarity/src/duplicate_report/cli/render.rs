@@ -1,9 +1,12 @@
-use super::super::*;
-use crate::application::usecase::duplicate_report::{
+use anyhow::Result;
+use serde_json::json;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use crate::duplicate_report::usecase::{
     DuplicateFormReport, DuplicateShapeReport, ReplacementPlanBatch,
 };
 
-pub(in crate::presentation::cli) fn print_duplicate_report(
+pub fn print_duplicate_report(
     reports: &[DuplicateShapeReport],
     output: OutputFormat,
 ) -> Result<()> {
@@ -72,7 +75,7 @@ pub(in crate::presentation::cli) fn print_duplicate_report(
     Ok(())
 }
 
-pub(in crate::presentation::cli) fn print_replacement_plan(
+pub fn print_replacement_plan(
     batches: &[ReplacementPlanBatch],
     output: OutputFormat,
 ) -> Result<()> {

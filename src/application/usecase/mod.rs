@@ -52,7 +52,6 @@ pub mod duplicate_lambda_list_keyword_report;
 pub mod duplicate_let_binding_report;
 pub mod duplicate_method_report;
 pub mod duplicate_parameter_report;
-pub mod duplicate_report;
 pub mod duplicate_setf_place_report;
 pub mod duplicate_slot_report;
 pub mod eliminate_empty_binding_form;
@@ -182,7 +181,6 @@ pub mod shadowed_binding_report;
 pub mod sharp_quoted_lambda_report;
 pub mod sign_comparison_report;
 pub mod signature_report;
-pub mod similarity_report;
 pub mod single_arg_comparison_report;
 pub mod single_clause_cond_report;
 pub mod single_operand_arithmetic_report;
@@ -219,3 +217,8 @@ pub mod values_list_of_list_report;
 pub mod verbose_negation_report;
 pub mod workspace_report;
 pub mod zero_divisor_report;
+
+// Phase 3 facade (section 4.1). benches/similarity_report.rs uses
+// `paredit_cli::application::usecase::similarity_report`, so this path stays.
+pub use paredit_feature_similarity::similarity_report::usecase as similarity_report;
+pub use paredit_feature_similarity::duplicate_report::usecase as duplicate_report;

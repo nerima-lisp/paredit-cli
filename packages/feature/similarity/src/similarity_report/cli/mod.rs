@@ -1,4 +1,9 @@
-pub(super) mod args;
-pub(super) mod render;
+pub mod args;
+pub mod render;
 mod types;
-pub(super) mod workflow;
+pub mod workflow;
+
+// The contract with the composition root (section 4.2): the `clap` argument
+// type and the function that runs it.
+pub use args::SimilarityReportArgs;
+pub use workflow::similarity_report;

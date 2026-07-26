@@ -1,10 +1,11 @@
+use anyhow::Result;
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering};
 use std::sync::{Condvar, Mutex};
 
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, ReaderPrefix};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, ReaderPrefix};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuralTree {
@@ -37,11 +38,12 @@ const ATOM_RENAME_COST: usize = 3;
 const MAX_DISTANCE_MATRIX_CELLS: usize = 4 * 1024 * 1024;
 const MAX_TREE_SIMILARITY_WORKSPACE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_TOTAL_TREE_SIMILARITY_WORKSPACE_BYTES: usize = 256 * 1024 * 1024;
-pub(crate) const MAX_TREE_SIMILARITY_WORKSPACES: usize =
+pub const MAX_TREE_SIMILARITY_WORKSPACES: usize =
     MAX_TOTAL_TREE_SIMILARITY_WORKSPACE_BYTES / MAX_TREE_SIMILARITY_WORKSPACE_BYTES;
 const MAX_TREE_EDIT_OPERATIONS: usize = 64 * 1024 * 1024;
-pub(crate) const MAX_REPORT_TREE_EDIT_OPERATIONS: usize = MAX_TREE_EDIT_OPERATIONS;
+pub const MAX_REPORT_TREE_EDIT_OPERATIONS: usize = MAX_TREE_EDIT_OPERATIONS;
 
+#[derive(Debug)]
 struct TreeSimilarityWorkspaceLimiter {
     active: Mutex<usize>,
     available: Condvar,
@@ -78,13 +80,17 @@ impl TreeSimilarityWorkspaceLimiter {
     }
 }
 
-pub(crate) struct TreeSimilarityWorkspaceReservation<'a> {
+// Public since the extraction: it was crate-internal, a visibility that
+// cannot cross a crate boundary, so the lint applies for the first time.
+#[derive(Debug)]
+pub struct TreeSimilarityWorkspaceReservation<'a> {
     limiter: &'a TreeSimilarityWorkspaceLimiter,
     count: usize,
 }
 
 impl TreeSimilarityWorkspaceReservation<'_> {
-    pub(crate) const fn count(&self) -> usize {
+    #[must_use]
+    pub const fn count(&self) -> usize {
         self.count
     }
 }
@@ -104,7 +110,7 @@ impl Drop for TreeSimilarityWorkspaceReservation<'_> {
 static TREE_SIMILARITY_WORKSPACE_LIMITER: TreeSimilarityWorkspaceLimiter =
     TreeSimilarityWorkspaceLimiter::new(MAX_TREE_SIMILARITY_WORKSPACES);
 
-pub(crate) fn reserve_tree_similarity_workspaces(
+pub fn reserve_tree_similarity_workspaces(
     requested: usize,
 ) -> TreeSimilarityWorkspaceReservation<'static> {
     TREE_SIMILARITY_WORKSPACE_LIMITER.acquire(requested)
@@ -139,20 +145,21 @@ impl fmt::Display for TreeSimilarityError {
 impl Error for TreeSimilarityError {}
 
 #[derive(Debug, Default)]
-pub(crate) struct TreeSimilarityWorkspace {
+pub struct TreeSimilarityWorkspace {
     tree_distances: Vec<usize>,
     forest_distances: Vec<usize>,
 }
 
 #[derive(Debug)]
-pub(crate) struct TreeSimilarityOperationBudget {
+pub struct TreeSimilarityOperationBudget {
     operations: AtomicUsize,
     exhausted: AtomicBool,
     limit: usize,
 }
 
 impl TreeSimilarityOperationBudget {
-    pub(crate) const fn new(limit: usize) -> Self {
+    #[must_use]
+    pub const fn new(limit: usize) -> Self {
         Self {
             operations: AtomicUsize::new(0),
             exhausted: AtomicBool::new(false),
@@ -197,15 +204,15 @@ impl TreeSimilarityOperationBudget {
         }
     }
 
-    pub(crate) fn exhausted(&self) -> bool {
+    pub fn exhausted(&self) -> bool {
         self.exhausted.load(AtomicOrdering::Acquire)
     }
 
-    pub(crate) fn operations(&self) -> usize {
+    pub fn operations(&self) -> usize {
         self.operations.load(AtomicOrdering::Acquire)
     }
 
-    pub(crate) const fn limit(&self) -> usize {
+    pub const fn limit(&self) -> usize {
         self.limit
     }
 }
@@ -244,7 +251,7 @@ impl StructuralTree {
         Self::from_view_with_count(view).0
     }
 
-    pub(crate) fn from_view_with_count(view: &ExpressionView) -> (Self, usize) {
+    pub fn from_view_with_count(view: &ExpressionView) -> (Self, usize) {
         fn label(view: &ExpressionView) -> NodeLabel {
             match view.kind {
                 ExpressionKind::Root => NodeLabel::Root(view.reader_prefixes.clone()),
@@ -425,7 +432,8 @@ fn sorted_intersection_count(left: &[u64], right: &[u64]) -> usize {
 /// insertion or deletion changes it by at most one. Taking the maximum of these
 /// independent distance lower bounds keeps the resulting similarity bound sound.
 /// Label hash collisions can only loosen the label bound.
-pub(crate) fn similarity_upper_bound(left: &StructuralTree, right: &StructuralTree) -> f64 {
+#[must_use]
+pub fn similarity_upper_bound(left: &StructuralTree, right: &StructuralTree) -> f64 {
     let left_count = left.labels.len();
     let right_count = right.labels.len();
     let matched = left_count.min(right_count);
@@ -447,7 +455,7 @@ pub fn tree_similarity(
     tree_similarity_with_workspace(left, right, &mut workspace)
 }
 
-pub(crate) fn tree_similarity_with_workspace(
+pub fn tree_similarity_with_workspace(
     left: &StructuralTree,
     right: &StructuralTree,
     workspace: &mut TreeSimilarityWorkspace,
@@ -455,7 +463,7 @@ pub(crate) fn tree_similarity_with_workspace(
     tree_similarity_with_workspace_and_budget(left, right, workspace, None)
 }
 
-pub(crate) fn tree_similarity_with_workspace_and_budget(
+pub fn tree_similarity_with_workspace_and_budget(
     left: &StructuralTree,
     right: &StructuralTree,
     workspace: &mut TreeSimilarityWorkspace,
@@ -704,7 +712,7 @@ fn rename_cost_scaled(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
+    use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
     fn form(input: &str) -> StructuralTree {
         let tree = SyntaxTree::parse(input).unwrap();

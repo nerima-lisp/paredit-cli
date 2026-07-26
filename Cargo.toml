@@ -28,6 +28,7 @@ paredit-core-semantics = { path = "packages/core/semantics" }
 paredit-core-edit = { path = "packages/core/edit" }
 paredit-core-lint-engine = { path = "packages/core/lint-engine" }
 paredit-core-cli = { path = "packages/core/cli" }
+paredit-feature-similarity = { path = "packages/feature/similarity" }
 paredit-core-workspace = { path = "packages/core/workspace" }
 
 anyhow = "1.0"

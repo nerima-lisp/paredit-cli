@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
@@ -5,12 +6,12 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::form_similarity::StructuralTree;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path};
+use paredit_core_syntax::dialect::Dialect;
+use crate::form_similarity::StructuralTree;
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path};
 
 #[allow(unused_imports)]
-pub use crate::domain::similarity_report::{
+pub use crate::similarity_report::domain::{
     SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,
     SimilarityReportOptions, SimilarityReportOptionsError,
 };
@@ -30,20 +31,24 @@ impl SharedFormText {
         }
     }
 
-    pub(crate) const fn from_source(source: Arc<str>, span: ByteSpan) -> Self {
+    #[must_use]
+    pub const fn from_source(source: Arc<str>, span: ByteSpan) -> Self {
         Self { source, span }
     }
 
-    pub(crate) fn source_identity(&self) -> *const str {
+    #[must_use]
+    pub fn source_identity(&self) -> *const str {
         Arc::as_ptr(&self.source)
     }
 
-    pub(crate) fn source_len(&self) -> usize {
+    #[must_use]
+    pub fn source_len(&self) -> usize {
         self.source.len()
     }
 
     #[cfg(test)]
-    pub(crate) fn shares_source(&self, other: &Self) -> bool {
+    #[must_use]
+    pub fn shares_source(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.source, &other.source)
     }
 }
@@ -106,7 +111,8 @@ impl SimilarityFormReport {
         }
     }
 
-    pub(crate) const fn new_shared(
+    #[must_use]
+    pub const fn new_shared(
         path: PathBuf,
         dialect: Dialect,
         form_path: Path,
@@ -310,7 +316,8 @@ impl SimilarityPairReport {
         }
     }
 
-    pub(crate) const fn from_shared(
+    #[must_use]
+    pub const fn from_shared(
         similarity: SimilarityRatio,
         score: SimilarityScore,
         left: Arc<SimilarityFormReport>,
@@ -350,7 +357,7 @@ impl SimilarityPairReport {
     }
 }
 
-pub(super) fn strictly_contains_pair_forms(
+pub fn strictly_contains_pair_forms(
     left_outer: &SimilarityFormReport,
     right_outer: &SimilarityFormReport,
     left_inner: &SimilarityFormReport,
@@ -698,8 +705,8 @@ impl SimilarityReportSummary {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimilarityReport {
-    pub(crate) summary: SimilarityReportSummary,
-    pub(crate) pairs: Vec<SimilarityPairReport>,
+    pub summary: SimilarityReportSummary,
+    pub pairs: Vec<SimilarityPairReport>,
 }
 
 impl SimilarityReport {

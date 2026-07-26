@@ -1,14 +1,14 @@
-use super::super::*;
+use anyhow::Result;
 use super::args::{DuplicateReportArgs, ReplacementPlanArgs};
 use super::render::{print_duplicate_report, print_replacement_plan};
 use super::workspace::discover_duplicate_report_files;
-use crate::application::usecase::duplicate_report::{
+use crate::duplicate_report::usecase::{
     DuplicateCandidateAccumulator, DuplicateCandidateGroups, build_duplicate_shape_reports,
     collect_replacement_plan_batches,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {
+pub fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {
     ensure_thresholds(args.min_group_size, args.min_node_count)?;
     let grouped = collect_duplicate_candidate_groups(
         &args.files,
@@ -21,7 +21,7 @@ pub(in crate::presentation::cli) fn duplicate_report(args: DuplicateReportArgs) 
     print_duplicate_report(&reports, args.output)
 }
 
-pub(in crate::presentation::cli) fn replacement_plan(args: ReplacementPlanArgs) -> Result<()> {
+pub fn replacement_plan(args: ReplacementPlanArgs) -> Result<()> {
     ensure_thresholds(args.min_group_size, args.min_node_count)?;
     let grouped = collect_duplicate_candidate_groups(
         &args.files,
@@ -49,7 +49,7 @@ pub(in crate::presentation::cli) fn replacement_plan(args: ReplacementPlanArgs) 
 
 fn collect_duplicate_candidate_groups(
     roots: &[std::path::PathBuf],
-    dialect: Option<super::super::DialectArg>,
+    dialect: Option<paredit_core_cli::args::DialectArg>,
     min_node_count: usize,
     min_group_size: usize,
 ) -> Result<DuplicateCandidateGroups> {

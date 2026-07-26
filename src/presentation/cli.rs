@@ -37,6 +37,9 @@ mod contract;
 // it enumerates three features' capabilities, which makes it composition root
 // (section 11.5.1).
 use paredit_core_cli::{args, gate, shared};
+// Phase 3 facade: the composition root sees each slice's Args type and run fn.
+use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
+use paredit_feature_similarity::similarity_report::cli as similarity_report;
 mod convert_cond_to_if;
 mod convert_flet_to_labels;
 mod convert_if_to_cond;
@@ -67,7 +70,6 @@ mod duplicate_lambda_list_keyword_report;
 mod duplicate_let_binding_report;
 mod duplicate_method_report;
 mod duplicate_parameter_report;
-mod duplicate_report;
 mod duplicate_setf_place_report;
 mod duplicate_slot_report;
 mod eliminate_empty_binding_form;
@@ -191,7 +193,6 @@ mod shadowed_binding_report;
 mod sharp_quoted_lambda_report;
 mod sign_comparison_report;
 mod signature_report;
-mod similarity_report;
 mod single_arg_comparison_report;
 mod single_clause_cond_report;
 mod single_operand_arithmetic_report;

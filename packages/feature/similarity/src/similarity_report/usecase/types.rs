@@ -1,9 +1,10 @@
+use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::similarity_report::{SimilarityReport, SimilarityReportOptions};
+use paredit_core_syntax::dialect::Dialect;
+use crate::similarity_report::domain::{SimilarityReport, SimilarityReportOptions};
 
 #[derive(Debug, Clone)]
 pub struct SimilarityReportRequest {

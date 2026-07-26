@@ -1,4 +1,9 @@
-pub(in crate::presentation::cli) mod args;
-pub(in crate::presentation::cli) mod render;
-pub(in crate::presentation::cli) mod workflow;
-pub(in crate::presentation::cli) mod workspace;
+pub mod args;
+pub mod render;
+pub mod workflow;
+pub mod workspace;
+
+// The contract with the composition root (section 4.2): the `clap` argument
+// type and the function that runs it.
+pub use args::DuplicateReportArgs;
+pub use workflow::duplicate_report;

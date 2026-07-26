@@ -5,10 +5,10 @@ use std::sync::Arc;
 use anyhow::Error as AnyhowError;
 use thiserror::Error;
 
-use crate::domain::common_lisp::normalize_common_lisp_operator_head;
-use crate::domain::dialect::Dialect;
-use crate::domain::form_similarity::StructuralTree;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::common_lisp::normalize_common_lisp_operator_head;
+use paredit_core_syntax::dialect::Dialect;
+use crate::form_similarity::StructuralTree;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::SimilarityReportOptionsError;
 use super::types::{
@@ -225,7 +225,7 @@ impl CandidateCollection<'_> {
 
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
-pub(super) fn collect_similarity_candidates_with_budgets_for_test(
+pub fn collect_similarity_candidates_with_budgets_for_test(
     tree: &SyntaxTree,
     input: &str,
     file: &FsPath,
@@ -250,7 +250,7 @@ pub(super) fn collect_similarity_candidates_with_budgets_for_test(
 
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
-pub(super) fn collect_similarity_candidates_materialization_for_test(
+pub fn collect_similarity_candidates_materialization_for_test(
     tree: &SyntaxTree,
     input: &str,
     file: &FsPath,

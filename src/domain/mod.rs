@@ -9,6 +9,10 @@
 // Visibility mirrors the original `mod` declarations exactly - promoting a
 // `pub(crate)` module to `pub` here would silently widen the public API.
 pub use paredit_core_syntax::{common_lisp, definition, dialect, form_shape, sexpr};
+// Phase 3 facade: benches/similarity_report.rs uses the public library API.
+pub use paredit_feature_similarity::similarity_report::domain as similarity_report;
+pub use paredit_feature_similarity::duplicate_report::domain as duplicate_report;
+pub use paredit_feature_similarity::form_similarity;
 pub(crate) use paredit_core_syntax::{expression_equality, graph, leading_trivia, view_query};
 
 // Phase 2 facade (section 4.1), visibility mirroring the original `mod` lines.
@@ -61,7 +65,6 @@ pub mod duplicate_lambda_list_keyword_report;
 pub mod duplicate_let_binding_report;
 pub mod duplicate_method_report;
 pub mod duplicate_parameter_report;
-pub mod duplicate_report;
 pub mod duplicate_setf_place_report;
 pub mod duplicate_slot_report;
 pub mod empty_body_report;
@@ -80,7 +83,6 @@ pub(crate) mod extract_constant;
 pub(crate) mod extract_function;
 pub(crate) mod extract_local_function;
 pub mod form_report;
-pub mod form_similarity;
 pub mod format_missing_destination_report;
 pub mod format_newline_report;
 pub mod format_to_string_report;
@@ -186,7 +188,6 @@ pub mod shadowed_binding_report;
 pub mod sharp_quoted_lambda_report;
 pub mod sign_comparison_report;
 pub mod signature_report;
-pub mod similarity_report;
 pub mod single_arg_comparison_report;
 pub mod single_clause_cond_report;
 pub mod single_operand_arithmetic_report;
