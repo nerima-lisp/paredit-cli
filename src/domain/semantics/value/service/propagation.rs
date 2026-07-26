@@ -1,9 +1,12 @@
 //! Deciding which bindings carry a constant value.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::domain::common_lisp::common_lisp_operator_head_eq;
 use crate::domain::dialect::Dialect;
+use crate::domain::semantics::project::model::PackageId;
+use crate::domain::semantics::project::service::{FilePackages, PackageRegion};
+use crate::domain::semantics::project::{GlobalTable, QualifiedSymbol};
 use crate::domain::sexpr::reader::atom_symbol_text;
 use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SymbolName, SyntaxTree};
 use crate::domain::view_query::list_head;
@@ -34,6 +37,25 @@ pub fn build_value_table(
     tree: &SyntaxTree,
     bindings: &BindingTable,
 ) -> ValueTable {
+    build_value_table_in_project(dialect, tree, bindings, None)
+}
+
+/// The same, with a project context to fall back on for constants this file
+/// does not define.
+///
+/// A `defconstant` is the only definition whose value provably cannot differ
+/// between where it is written and where it is read, which is what lets it
+/// cross a file boundary at all. `project` supplies the ones the file's own
+/// package makes visible; everything else about the file is unchanged.
+///
+/// `None` reproduces [`build_value_table`] exactly, which is what every
+/// single-file caller passes.
+pub fn build_value_table_in_project(
+    dialect: Dialect,
+    tree: &SyntaxTree,
+    bindings: &BindingTable,
+    project: Option<&ProjectConstants<'_>>,
+) -> ValueTable {
     let mut builder = ValueTableBuilder::new();
     if dialect != Dialect::CommonLisp {
         return builder.finish();
@@ -42,6 +64,14 @@ pub fn build_value_table(
     let roots = root_forms(tree);
     // File-level constants first: a binding's initial form may reference one.
     collect_constants(dialect, &roots, bindings, &mut builder);
+
+    // Then the project's, and only into the gaps. The file's own answer is
+    // the more local and more certain one, and a project constant that
+    // overwrote it — or that arrived first and made the file's own
+    // `defconstant` look like a duplicate — would be strictly worse.
+    if let Some(project) = project {
+        project.fill(&mut builder);
+    }
 
     // A `let*` initial form can reference a binding resolved in an earlier
     // round, so keep re-scanning until a round proves nothing new.
@@ -70,6 +100,48 @@ pub fn build_value_table(
     }
 
     builder.finish()
+}
+
+/// The project's constants, seen from inside one file.
+///
+/// Visibility is deliberately the narrowest rule that is provable: a constant
+/// is filled in only when its home package is one this file is *in*. A file
+/// with no `in-package` is in no package this layer can name and receives
+/// nothing, which is exactly the behaviour it had before the project layer
+/// existed.
+///
+/// `use-package` inheritance is not modelled. A name inherited from another
+/// package is genuinely visible unqualified, but proving that needs the
+/// `defpackage` graph, and a constant this misses stays `Unknown` — a lost
+/// deduction rather than a wrong one.
+#[derive(Debug, Clone, Copy)]
+pub struct ProjectConstants<'a> {
+    globals: &'a GlobalTable,
+    packages: &'a FilePackages,
+}
+
+impl<'a> ProjectConstants<'a> {
+    pub const fn new(globals: &'a GlobalTable, packages: &'a FilePackages) -> Self {
+        Self { globals, packages }
+    }
+
+    fn fill(&self, builder: &mut ValueTableBuilder) {
+        let visible: HashSet<&PackageId> = self
+            .packages
+            .regions()
+            .iter()
+            .map(PackageRegion::package)
+            .collect();
+        if visible.is_empty() {
+            return;
+        }
+
+        for (symbol, value) in self.globals.constants() {
+            if visible.contains(symbol.package()) {
+                builder.fill_missing_constant(symbol.name().clone(), value.clone());
+            }
+        }
+    }
 }
 
 /// The top-level forms, as owned views.
@@ -157,7 +229,7 @@ fn collect_constants(
             .children
             .get(1)
             .and_then(atom_symbol_text)
-            .and_then(|text| SymbolName::new(text).ok())
+            .and_then(super::folding::constant_key)
         else {
             continue;
         };
@@ -299,8 +371,19 @@ mod tests {
         assert_eq!(
             analysis
                 .values
-                .constant_value(&SymbolName::new("+limit+").expect("symbol")),
+                .constant_value(&SymbolName::new("+LIMIT+").expect("symbol")),
             Some(&PropagatableValue::Integer(10))
+        );
+    }
+
+    #[test]
+    fn a_constant_referenced_in_another_case_is_the_same_constant() {
+        // The reader folds a symbol's case, so these name one constant.
+        // Keying the table on the raw spelling made the reference miss.
+        let analysis = analyze("(defconstant +limit+ 10)(let ((n +LIMIT+)) (list n))");
+        assert_eq!(
+            value_at_last_use(&analysis, "n"),
+            Value::Known(LiteralValue::Integer(10))
         );
     }
 
@@ -310,7 +393,7 @@ mod tests {
         assert_eq!(
             analysis
                 .values
-                .constant_value(&SymbolName::new("+limit+").expect("symbol")),
+                .constant_value(&SymbolName::new("+LIMIT+").expect("symbol")),
             None
         );
     }
@@ -321,8 +404,126 @@ mod tests {
         assert_eq!(
             analysis
                 .values
-                .constant_value(&SymbolName::new("+limit+").expect("symbol")),
+                .constant_value(&SymbolName::new("+LIMIT+").expect("symbol")),
             None
+        );
+    }
+
+    /// Builds a project table from `sources`, then the value table of the
+    /// file at `index` with that project behind it.
+    fn analyze_in_project(sources: &[&str], index: usize) -> Analysis {
+        use crate::domain::semantics::binding::build_binding_table;
+        use crate::domain::semantics::project::service::{
+            ProjectFile, build_global_table, resolve_file_packages,
+        };
+
+        let trees: Vec<SyntaxTree> = sources
+            .iter()
+            .map(|text| SyntaxTree::parse_with_dialect(text, Dialect::CommonLisp).expect("parse"))
+            .collect();
+        let bindings: Vec<_> = trees
+            .iter()
+            .zip(sources)
+            .map(|(tree, text)| build_binding_table(Dialect::CommonLisp, tree, text))
+            .collect();
+        let packages: Vec<_> = trees
+            .iter()
+            .map(|tree| resolve_file_packages(Dialect::CommonLisp, tree))
+            .collect();
+        let values: Vec<_> = trees
+            .iter()
+            .zip(&bindings)
+            .map(|(tree, binding)| build_value_table(Dialect::CommonLisp, tree, binding))
+            .collect();
+
+        let files: Vec<ProjectFile<'_>> = (0..trees.len())
+            .map(|i| ProjectFile::new(&trees[i], &packages[i], &values[i]))
+            .collect();
+        let globals = build_global_table(Dialect::CommonLisp, &files);
+
+        let project = ProjectConstants::new(&globals, &packages[index]);
+        let table = build_value_table_in_project(
+            Dialect::CommonLisp,
+            &trees[index],
+            &bindings[index],
+            Some(&project),
+        );
+
+        Analysis {
+            tree: SyntaxTree::parse_with_dialect(sources[index], Dialect::CommonLisp)
+                .expect("parse"),
+            bindings: build_binding_table(Dialect::CommonLisp, &trees[index], sources[index]),
+            values: table,
+            source: sources[index].to_owned(),
+        }
+    }
+
+    const DEFINES_LIMIT: &str = "(in-package :app)\n(defconstant +limit+ 10)\n";
+
+    #[test]
+    fn a_constant_defined_in_another_file_of_the_same_package_resolves() {
+        let analysis = analyze_in_project(
+            &[
+                DEFINES_LIMIT,
+                "(in-package :app)\n(let ((n +limit+)) (list n))\n",
+            ],
+            1,
+        );
+        assert_eq!(
+            value_at_last_use(&analysis, "n"),
+            Value::Known(LiteralValue::Integer(10))
+        );
+    }
+
+    #[test]
+    fn a_constant_two_files_define_resolves_to_nothing() {
+        // The project table only carries a constant defined exactly once
+        // project-wide, so two files disagreeing leaves nothing to fill in.
+        let analysis = analyze_in_project(
+            &[
+                DEFINES_LIMIT,
+                "(in-package :app)\n(defconstant +limit+ 20)\n",
+                "(in-package :app)\n(let ((n +limit+)) (list n))\n",
+            ],
+            2,
+        );
+        assert_eq!(value_at_last_use(&analysis, "n"), Value::Unknown);
+    }
+
+    #[test]
+    fn a_constant_from_another_package_is_not_visible_unqualified() {
+        // `use-package` inheritance is not modelled, so an unqualified name
+        // reaches only its own package. A lost deduction, never a wrong one.
+        let analysis = analyze_in_project(
+            &[
+                DEFINES_LIMIT,
+                "(in-package :other)\n(let ((n +limit+)) (list n))\n",
+            ],
+            1,
+        );
+        assert_eq!(value_at_last_use(&analysis, "n"), Value::Unknown);
+    }
+
+    #[test]
+    fn a_file_with_no_in_package_receives_nothing_from_the_project() {
+        // It is in no package this layer can name, so filling it in would be
+        // a guess. This is exactly its behaviour before the project layer.
+        let analysis = analyze_in_project(&[DEFINES_LIMIT, "(let ((n +limit+)) (list n))\n"], 1);
+        assert_eq!(value_at_last_use(&analysis, "n"), Value::Unknown);
+    }
+
+    #[test]
+    fn a_file_that_defines_the_constant_itself_keeps_its_own_answer() {
+        // Filling must never overwrite or poison what the file settled. The
+        // project's copy of `+limit+` *is* this file's definition, so filling
+        // first would have made it look like a second definition of the same
+        // name and retracted both.
+        let analysis = analyze_in_project(&[DEFINES_LIMIT], 0);
+        assert_eq!(
+            analysis
+                .values
+                .constant_value(&SymbolName::new("+LIMIT+").expect("symbol")),
+            Some(&PropagatableValue::Integer(10))
         );
     }
 

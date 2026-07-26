@@ -73,6 +73,16 @@ impl GlobalTable {
     pub fn definition_count(&self) -> usize {
         self.definitions.values().map(Vec::len).sum()
     }
+
+    /// Every project-wide constant, for a caller that needs to find the ones
+    /// visible to a file rather than ask about a name it already has.
+    ///
+    /// A file's own value table is keyed by bare name, so filling it from here
+    /// means walking these and keeping the ones whose package the file is in —
+    /// there is no other direction to ask the question from.
+    pub fn constants(&self) -> impl Iterator<Item = (&QualifiedSymbol, &PropagatableValue)> {
+        self.constants.iter()
+    }
 }
 
 /// A global table under construction.
