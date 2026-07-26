@@ -1,6 +1,6 @@
-use crate::domain::sexpr::ByteSpan;
+use crate::sexpr::ByteSpan;
 #[cfg(test)]
-use crate::domain::sexpr::ExpressionPath;
+use crate::sexpr::ExpressionPath;
 
 /// The kind of a Common Lisp reader-label dispatch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

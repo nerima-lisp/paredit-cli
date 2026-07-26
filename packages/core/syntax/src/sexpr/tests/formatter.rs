@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::dialect::Dialect;
+use crate::dialect::Dialect;
 
 #[test]
 fn formats_short_atom_lists_inline() {

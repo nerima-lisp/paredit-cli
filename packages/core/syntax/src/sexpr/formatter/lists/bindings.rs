@@ -1,9 +1,9 @@
-use crate::domain::sexpr::formatter::Formatter;
-use crate::domain::sexpr::tree::{NodeKind, SyntaxTree};
-use crate::domain::sexpr::types::NodeId;
+use crate::sexpr::formatter::Formatter;
+use crate::sexpr::tree::{NodeKind, SyntaxTree};
+use crate::sexpr::types::NodeId;
 
 impl Formatter {
-    pub(in crate::domain::sexpr::formatter) fn format_binding_form(
+    pub(in crate::sexpr::formatter) fn format_binding_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -42,7 +42,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_local_callable_form(
+    pub(in crate::sexpr::formatter) fn format_local_callable_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -78,7 +78,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_local_callable_bindings(
+    pub(in crate::sexpr::formatter) fn format_local_callable_bindings(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -110,7 +110,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_local_callable_binding(
+    pub(in crate::sexpr::formatter) fn format_local_callable_binding(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -143,7 +143,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_declaration_form(
+    pub(in crate::sexpr::formatter) fn format_declaration_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -174,7 +174,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_pair_assignment_form(
+    pub(in crate::sexpr::formatter) fn format_pair_assignment_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,

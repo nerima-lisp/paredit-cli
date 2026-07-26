@@ -2,8 +2,8 @@ use std::fmt;
 
 use anyhow::{Result, anyhow};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
+use crate::common_lisp::common_lisp_symbol_reference_eq;
+use crate::dialect::Dialect;
 
 use super::parser::{ParseError, Parser};
 use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, SymbolName};
@@ -13,7 +13,7 @@ use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, Symb
 /// # Examples
 ///
 /// ```
-/// use paredit_cli::sexpr::{ExpressionPath, SyntaxTree};
+/// use paredit_core_syntax::sexpr::{ExpressionPath, SyntaxTree};
 ///
 /// let input = "(let ((value 1)) (+ value 2))";
 /// let tree = SyntaxTree::parse(input).unwrap();
@@ -25,43 +25,43 @@ use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, Symb
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyntaxTree {
-    pub(in crate::domain::sexpr) nodes: Vec<Node>,
+    pub(in crate::sexpr) nodes: Vec<Node>,
     /// Comments discovered during parsing, in source order. They are kept
     /// outside the node tree so structural refactors that walk `children` never
     /// have to reason about them; only the canonical formatter re-emits them.
-    pub(in crate::domain::sexpr) comments: Vec<Comment>,
+    pub(in crate::sexpr) comments: Vec<Comment>,
     /// The exact source text the tree was parsed from, used by the formatter to
     /// slice comment-bearing forms verbatim and to measure line breaks.
-    pub(in crate::domain::sexpr) source: String,
+    pub(in crate::sexpr) source: String,
 }
 
 /// A comment captured verbatim during parsing together with the placement
 /// metadata the formatter needs to re-emit it without losing information.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::domain::sexpr) struct Comment {
+pub(in crate::sexpr) struct Comment {
     /// Byte range of the comment in the original source.
-    pub(in crate::domain::sexpr) span: ByteSpan,
+    pub(in crate::sexpr) span: ByteSpan,
     /// Exact comment text (`; ...`, `#| ... |#`, `#; <form>`, or `#_<form>`),
     /// trailing whitespace preserved as parsed.
-    pub(in crate::domain::sexpr) text: String,
+    pub(in crate::sexpr) text: String,
     /// `true` when only whitespace precedes the comment on its source line, i.e.
     /// it stands on its own line rather than trailing code.
-    pub(in crate::domain::sexpr) own_line: bool,
+    pub(in crate::sexpr) own_line: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::domain::sexpr) struct Node {
-    pub(in crate::domain::sexpr) kind: NodeKind,
-    pub(in crate::domain::sexpr) delimiter: Option<Delimiter>,
-    pub(in crate::domain::sexpr) reader_prefixes: Vec<ReaderPrefix>,
+pub(in crate::sexpr) struct Node {
+    pub(in crate::sexpr) kind: NodeKind,
+    pub(in crate::sexpr) delimiter: Option<Delimiter>,
+    pub(in crate::sexpr) reader_prefixes: Vec<ReaderPrefix>,
     /// Exact source ranges for `reader_prefixes`, kept separately from their
     /// normalized semantics so dialect-specific spellings round-trip.
-    pub(in crate::domain::sexpr) reader_prefix_spans: Vec<ByteSpan>,
-    pub(in crate::domain::sexpr) parent: Option<NodeId>,
-    pub(in crate::domain::sexpr) children: Vec<NodeId>,
-    pub(in crate::domain::sexpr) span: ByteSpan,
-    pub(in crate::domain::sexpr) open: Option<ByteOffset>,
-    pub(in crate::domain::sexpr) close: Option<ByteOffset>,
+    pub(in crate::sexpr) reader_prefix_spans: Vec<ByteSpan>,
+    pub(in crate::sexpr) parent: Option<NodeId>,
+    pub(in crate::sexpr) children: Vec<NodeId>,
+    pub(in crate::sexpr) span: ByteSpan,
+    pub(in crate::sexpr) open: Option<ByteOffset>,
+    pub(in crate::sexpr) close: Option<ByteOffset>,
     /// Byte offset from `span.start()` to where an atom's own symbol content
     /// begins, i.e. past its reader prefixes *and* any trivia (whitespace or
     /// comments) between the last prefix and the symbol. Reader prefixes are
@@ -69,14 +69,14 @@ pub(in crate::domain::sexpr) struct Node {
     /// unusual, syntax), so this cannot be recovered later by summing each
     /// prefix's fixed source length — it must be recorded while parsing.
     /// Meaningless (`0`) for non-atom nodes.
-    pub(in crate::domain::sexpr) symbol_offset: usize,
+    pub(in crate::sexpr) symbol_offset: usize,
     /// Reader forms that consume multiple datums are represented by one
     /// verbatim atom node so their payload cannot become editable siblings.
-    pub(in crate::domain::sexpr) opaque_reader_form: bool,
+    pub(in crate::sexpr) opaque_reader_form: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::domain::sexpr) enum NodeKind {
+pub(in crate::sexpr) enum NodeKind {
     Root,
     List,
     Atom,
@@ -149,20 +149,25 @@ pub struct AtomOccurrence {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(in crate::domain) struct BorrowedAtomOccurrence<'a> {
+pub struct BorrowedAtomOccurrence<'a> {
     node_id: NodeId,
-    pub(in crate::domain) span: ByteSpan,
-    pub(in crate::domain) text: &'a str,
+    pub span: ByteSpan,
+    pub text: &'a str,
 }
 
-pub(in crate::domain) struct AtomOccurrenceIndex<'a> {
+// Public since the extraction: it was `pub(in crate::domain)`, a visibility
+// that cannot cross a crate boundary, so `missing_debug_implementations`
+// applies to it for the first time.
+#[derive(Debug)]
+pub struct AtomOccurrenceIndex<'a> {
     parent_steps: Vec<Option<(NodeId, usize)>>,
     occurrences: Vec<BorrowedAtomOccurrence<'a>>,
     quoted_designators: Vec<BorrowedAtomOccurrence<'a>>,
 }
 
 impl AtomOccurrenceIndex<'_> {
-    pub(in crate::domain) fn occurrences(&self) -> &[BorrowedAtomOccurrence<'_>] {
+    #[must_use]
+    pub fn occurrences(&self) -> &[BorrowedAtomOccurrence<'_>] {
         &self.occurrences
     }
 
@@ -170,12 +175,14 @@ impl AtomOccurrenceIndex<'_> {
         self.occurrences.iter().chain(&self.quoted_designators)
     }
 
-    pub(in crate::domain) fn path_for_span(&self, span: ByteSpan) -> Option<ExpressionPath> {
+    #[must_use]
+    pub fn path_for_span(&self, span: ByteSpan) -> Option<ExpressionPath> {
         let occurrence = self.find_by_span(span)?;
         Some(self.path_for_node(occurrence.node_id))
     }
 
-    pub(in crate::domain) fn last_index_for_span(&self, span: ByteSpan) -> Option<usize> {
+    #[must_use]
+    pub fn last_index_for_span(&self, span: ByteSpan) -> Option<usize> {
         let occurrence = self.find_by_span(span)?;
         self.parent_steps[occurrence.node_id.get()].map(|(_, index)| index)
     }
@@ -341,8 +348,8 @@ impl Drop for ExpressionView {
 /// A validated selection of one non-root expression inside a syntax tree.
 #[derive(Debug, Clone, Copy)]
 pub struct Selection<'a> {
-    pub(in crate::domain::sexpr) tree: &'a SyntaxTree,
-    pub(in crate::domain::sexpr) node_id: NodeId,
+    pub(in crate::sexpr) tree: &'a SyntaxTree,
+    pub(in crate::sexpr) node_id: NodeId,
 }
 
 impl SyntaxTree {
@@ -471,7 +478,8 @@ impl SyntaxTree {
         count
     }
 
-    pub(in crate::domain) fn atom_occurrence_index(&self) -> AtomOccurrenceIndex<'_> {
+    #[must_use]
+    pub fn atom_occurrence_index(&self) -> AtomOccurrenceIndex<'_> {
         let mut parent_steps = vec![None; self.nodes.len()];
         let mut occurrences = Vec::new();
         let mut quoted_designators = Vec::new();
@@ -563,7 +571,7 @@ impl SyntaxTree {
     /// # Examples
     ///
     /// ```
-    /// use paredit_cli::sexpr::{SymbolName, SyntaxTree};
+    /// use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
     ///
     /// let input = "(let ((value 1)) (+ value value))";
     /// let tree = SyntaxTree::parse(input).unwrap();
@@ -736,7 +744,7 @@ impl SyntaxTree {
         Some(node.span.slice(&self.source))
     }
 
-    pub(in crate::domain::sexpr) fn expression_view(&self, node_id: NodeId) -> ExpressionView {
+    pub(in crate::sexpr) fn expression_view(&self, node_id: NodeId) -> ExpressionView {
         let mut frames = vec![(node_id, false)];
         let mut views = Vec::new();
 
@@ -784,13 +792,13 @@ impl SyntaxTree {
             .expect("expression view root is always constructed")
     }
 
-    pub(in crate::domain::sexpr) fn node(&self, node_id: NodeId) -> &Node {
+    pub(in crate::sexpr) fn node(&self, node_id: NodeId) -> &Node {
         &self.nodes[node_id.get()]
     }
 }
 
 impl<'a> Selection<'a> {
-    pub(crate) fn validate_source(self, input: &str) -> Result<()> {
+    pub fn validate_source(self, input: &str) -> Result<()> {
         if self.tree.source != input {
             anyhow::bail!("input does not match the source used to build the selection");
         }
@@ -799,12 +807,12 @@ impl<'a> Selection<'a> {
             .map_err(|error| anyhow!("selected span is invalid: {error}"))
     }
 
-    pub(crate) fn validate_context(self, input: &str, tree: &SyntaxTree) -> Result<()> {
+    pub fn validate_context(self, input: &str, tree: &SyntaxTree) -> Result<()> {
         self.validate_tree(tree)?;
         self.validate_source(input)
     }
 
-    pub(crate) fn validate_tree(self, tree: &SyntaxTree) -> Result<()> {
+    pub fn validate_tree(self, tree: &SyntaxTree) -> Result<()> {
         if !std::ptr::eq(tree, self.tree) {
             anyhow::bail!("selection belongs to a different syntax tree");
         }
@@ -817,7 +825,7 @@ impl<'a> Selection<'a> {
         self.span().slice(&self.tree.source)
     }
 
-    pub(in crate::domain::sexpr) fn node(self) -> &'a Node {
+    pub(in crate::sexpr) fn node(self) -> &'a Node {
         self.tree.node(self.node_id)
     }
 

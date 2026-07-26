@@ -1,9 +1,10 @@
-use crate::domain::common_lisp::CommonLispOperator;
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
+use crate::common_lisp::CommonLispOperator;
+use crate::common_lisp::common_lisp_operator_head_eq;
 
 use super::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix};
 
-pub(crate) fn apply_reader_prefix_context(
+#[must_use]
+pub fn apply_reader_prefix_context(
     view: &ExpressionView,
     mut quasiquote_depth: usize,
 ) -> Option<usize> {
@@ -62,17 +63,20 @@ pub(crate) fn apply_reader_prefix_context(
     Some(quasiquote_depth)
 }
 
-pub(crate) fn atom_text(view: &ExpressionView) -> Option<&str> {
+#[must_use]
+pub fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
         .then_some(view.text.as_deref())
         .flatten()
 }
 
-pub(crate) fn atom_symbol_text(view: &ExpressionView) -> Option<&str> {
+#[must_use]
+pub fn atom_symbol_text(view: &ExpressionView) -> Option<&str> {
     atom_text(view).and_then(|text| text.get(view.symbol_offset..))
 }
 
-pub(crate) fn atom_symbol_span(view: &ExpressionView) -> Option<ByteSpan> {
+#[must_use]
+pub fn atom_symbol_span(view: &ExpressionView) -> Option<ByteSpan> {
     (view.kind == ExpressionKind::Atom).then(|| {
         let start = view.span.start().get() + view.symbol_offset;
         ByteSpan::new(ByteOffset::new(start), view.span.end())

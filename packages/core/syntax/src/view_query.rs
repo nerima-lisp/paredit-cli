@@ -6,36 +6,39 @@
 //! of child N" — plus the same pre-order recursion. Keeping one copy here
 //! means a report body is just its own analysis, not re-derived boilerplate.
 
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use crate::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 /// The atom's text, or `None` for a non-atom (or a text-less atom).
-pub(crate) fn atom_text(view: &ExpressionView) -> Option<&str> {
+#[must_use]
+pub fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
         .then_some(view.text.as_deref())
         .flatten()
 }
 
 /// The atom text of the child at `index`, if that child exists and is an atom.
-pub(crate) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
 /// Whether `view` is a `(...)` list (as opposed to an atom, a `[...]`
 /// bracket, or a `{...}` brace form).
-pub(crate) fn is_paren_list(view: &ExpressionView) -> bool {
+#[must_use]
+pub fn is_paren_list(view: &ExpressionView) -> bool {
     view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren)
 }
 
 /// The head symbol of a `(...)` list — its first child's atom text — or
 /// `None` if `view` is not a paren list or its head is not a bare symbol.
-pub(crate) fn list_head(view: &ExpressionView) -> Option<&str> {
+#[must_use]
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
     is_paren_list(view).then(|| atom_child(view, 0)).flatten()
 }
 
 /// Calls `visit` on `root` and every descendant view, in pre-order (a view
 /// before its children). The single place the whole-tree recursion that
 /// body-form lints share is written.
-pub(crate) fn for_each_subview(root: &ExpressionView, mut visit: impl FnMut(&ExpressionView)) {
+pub fn for_each_subview(root: &ExpressionView, mut visit: impl FnMut(&ExpressionView)) {
     fn recurse(view: &ExpressionView, visit: &mut impl FnMut(&ExpressionView)) {
         visit(view);
         for child in &view.children {
@@ -48,7 +51,7 @@ pub(crate) fn for_each_subview(root: &ExpressionView, mut visit: impl FnMut(&Exp
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::{Path, SyntaxTree};
+    use crate::sexpr::{Path, SyntaxTree};
 
     fn root(input: &str) -> ExpressionView {
         let tree = SyntaxTree::parse(input).expect("parse input");

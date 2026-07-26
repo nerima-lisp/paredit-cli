@@ -13,4 +13,4 @@ pub use dispatch::{CommonLispReaderLabelForm, CommonLispReaderLabelKind};
 #[cfg(test)]
 pub use query::common_lisp_reader_label_dispatches;
 pub use query::common_lisp_reader_label_forms;
-pub(crate) use query::reader_label_kind;
+pub use query::reader_label_kind;

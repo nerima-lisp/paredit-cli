@@ -21,7 +21,7 @@ use std::path::Path;
 /// # Examples
 ///
 /// ```
-/// use paredit_cli::dialect::Dialect;
+/// use paredit_core_syntax::dialect::Dialect;
 ///
 /// assert_eq!(Dialect::from_extension("el"), Dialect::EmacsLisp);
 /// assert_eq!(

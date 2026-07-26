@@ -1,6 +1,6 @@
-use crate::domain::sexpr::ByteSpan;
+use crate::sexpr::ByteSpan;
 #[cfg(test)]
-use crate::domain::sexpr::ExpressionPath;
+use crate::sexpr::ExpressionPath;
 
 /// The polarity of a Common Lisp reader-conditional dispatch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

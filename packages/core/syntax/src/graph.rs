@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 /// report (`inspect package-cycles`, `system-cycles`, `class-cycles`,
 /// `struct-cycles`); each one only wraps the returned names in its own item
 /// type.
-pub(crate) fn string_edge_cycles(
+pub fn string_edge_cycles(
     edges: &[(String, String)],
     needle: impl Fn(&str) -> String,
 ) -> (usize, Vec<Vec<String>>) {
@@ -75,7 +75,8 @@ pub(crate) fn string_edge_cycles(
 /// Getting that ordering right is the entire correctness argument: an SCC
 /// root check that runs even one child's `Propagate` too early would use a
 /// stale `low_link` and could split or merge components incorrectly.
-pub(crate) fn tarjan_scc(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
+#[must_use]
+pub fn tarjan_scc(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
     let node_count = adjacency.len();
     let mut index: Vec<Option<usize>> = vec![None; node_count];
     let mut low_link = vec![0usize; node_count];

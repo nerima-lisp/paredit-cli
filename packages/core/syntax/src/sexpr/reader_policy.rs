@@ -1,4 +1,4 @@
-use crate::domain::dialect::Dialect;
+use crate::dialect::Dialect;
 
 use super::tree::ReaderPrefix;
 use super::types::Delimiter;

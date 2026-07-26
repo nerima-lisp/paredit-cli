@@ -1,4 +1,4 @@
-use crate::domain::definition::DefinitionCategory;
+use crate::definition::DefinitionCategory;
 
 use super::super::{
     CommonLispLambdaListShape, CommonLispLocalCallableForm, CommonLispPackageDeclarationForm,

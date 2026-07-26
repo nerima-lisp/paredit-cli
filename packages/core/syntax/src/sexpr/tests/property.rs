@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use proptest::prelude::*;
 
-use crate::domain::dialect::Dialect;
+use crate::dialect::Dialect;
 
 use super::*;
 

@@ -1,8 +1,8 @@
 use super::*;
 
-pub(super) use crate::domain::definition::DefinitionCategory;
-pub(super) use crate::domain::dialect::Dialect;
-pub(super) use crate::domain::sexpr::SyntaxTree;
+pub(super) use crate::definition::DefinitionCategory;
+pub(super) use crate::dialect::Dialect;
+pub(super) use crate::sexpr::SyntaxTree;
 
 mod definition;
 mod operator;

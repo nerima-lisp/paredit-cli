@@ -1,6 +1,6 @@
-use crate::domain::sexpr::formatter::{Formatter, MAX_INLINE_WIDTH};
-use crate::domain::sexpr::tree::{NodeKind, SyntaxTree};
-use crate::domain::sexpr::types::NodeId;
+use crate::sexpr::formatter::{Formatter, MAX_INLINE_WIDTH};
+use crate::sexpr::tree::{NodeKind, SyntaxTree};
+use crate::sexpr::types::NodeId;
 
 #[derive(Clone, Copy)]
 struct LastInlineChildPosition(Option<usize>);
@@ -12,7 +12,7 @@ impl Formatter {
     /// Unlike [`Formatter::format_definition`], the whole form is kept on one
     /// line when it fits the width budget, and when it must break each
     /// keyword/value pair stays together on its own line.
-    pub(in crate::domain::sexpr::formatter) fn format_system_definition(
+    pub(in crate::sexpr::formatter) fn format_system_definition(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -73,7 +73,7 @@ impl Formatter {
         (output.len().saturating_add(reader_prefix_len) <= MAX_INLINE_WIDTH).then_some(output)
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_definition(
+    pub(in crate::sexpr::formatter) fn format_definition(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -89,7 +89,7 @@ impl Formatter {
         );
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_defmethod(
+    pub(in crate::sexpr::formatter) fn format_defmethod(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -146,7 +146,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_prefix_body(
+    pub(in crate::sexpr::formatter) fn format_prefix_body(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -174,7 +174,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_head_body(
+    pub(in crate::sexpr::formatter) fn format_head_body(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,

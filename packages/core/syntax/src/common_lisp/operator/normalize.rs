@@ -4,7 +4,8 @@ fn strip_common_lisp_package_prefix<'a>(head: &'a str, prefix: &str) -> Option<&
     Some(&head[prefix.len()..])
 }
 
-pub(crate) fn normalize_common_lisp_operator_head(head: &str) -> &str {
+#[must_use]
+pub fn normalize_common_lisp_operator_head(head: &str) -> &str {
     strip_common_lisp_package_prefix(head, "cl:")
         .or_else(|| strip_common_lisp_package_prefix(head, "cl-user:"))
         .or_else(|| strip_common_lisp_package_prefix(head, "common-lisp:"))
@@ -12,11 +13,13 @@ pub(crate) fn normalize_common_lisp_operator_head(head: &str) -> &str {
         .unwrap_or(head)
 }
 
-pub(crate) fn common_lisp_operator_head_eq(head: &str, expected: &str) -> bool {
+#[must_use]
+pub fn common_lisp_operator_head_eq(head: &str, expected: &str) -> bool {
     common_lisp_symbol_name_eq(head, expected)
 }
 
-pub(crate) fn common_lisp_symbol_name_eq(head: &str, expected: &str) -> bool {
+#[must_use]
+pub fn common_lisp_symbol_name_eq(head: &str, expected: &str) -> bool {
     canonical_common_lisp_symbol_name(normalize_common_lisp_operator_head(head))
         == canonical_common_lisp_symbol_name(normalize_common_lisp_operator_head(expected))
 }
@@ -85,7 +88,8 @@ fn strip_common_lisp_symbol_qualifiers(head: &str) -> &str {
     }
 }
 
-pub(crate) fn has_common_lisp_package_qualifier(symbol: &str) -> bool {
+#[must_use]
+pub fn has_common_lisp_package_qualifier(symbol: &str) -> bool {
     let symbol = symbol.strip_prefix("#:").unwrap_or(symbol);
     last_common_lisp_package_marker(symbol)
         .is_some_and(|index| index > 0 && index + 1 < symbol.len())
@@ -101,7 +105,8 @@ pub(crate) fn has_common_lisp_package_qualifier(symbol: &str) -> bool {
 /// `#:execute-command-line` both denote the same symbol as bare
 /// `execute-command-line` for the purpose of asking "is this symbol
 /// referenced anywhere?" Comparison is case-insensitive per the CLHS reader.
-pub(crate) fn common_lisp_symbol_reference_eq(candidate: &str, expected: &str) -> bool {
+#[must_use]
+pub fn common_lisp_symbol_reference_eq(candidate: &str, expected: &str) -> bool {
     canonical_common_lisp_symbol_name(strip_common_lisp_symbol_qualifiers(candidate))
         == canonical_common_lisp_symbol_name(strip_common_lisp_symbol_qualifiers(expected))
 }
@@ -134,7 +139,8 @@ fn canonical_common_lisp_package_identity(package: &str) -> String {
 /// An unqualified symbol can only match another unqualified symbol. Explicitly
 /// qualified symbols must name the same package, while uninterned symbols are
 /// conservatively treated as distinct.
-pub(crate) fn common_lisp_symbol_identity_eq(candidate: &str, expected: &str) -> bool {
+#[must_use]
+pub fn common_lisp_symbol_identity_eq(candidate: &str, expected: &str) -> bool {
     if candidate.starts_with("#:") || expected.starts_with("#:") {
         return false;
     }
@@ -164,7 +170,8 @@ pub(crate) fn common_lisp_symbol_identity_eq(candidate: &str, expected: &str) ->
 /// symbol, while `foo` and `|foo|` do not. Removing the reader escapes and
 /// folding only unescaped characters therefore produces a stable key without
 /// collapsing distinct escaped names.
-pub(crate) fn common_lisp_symbol_reference_needle(symbol: &str) -> String {
+#[must_use]
+pub fn common_lisp_symbol_reference_needle(symbol: &str) -> String {
     canonical_common_lisp_symbol_name(strip_common_lisp_symbol_qualifiers(symbol))
 }
 
@@ -174,7 +181,8 @@ pub(crate) fn common_lisp_symbol_reference_needle(symbol: &str) -> String {
 /// `"app"`) — so the result compares equal regardless of which spelling a
 /// particular form used. A designator already written as a plain symbol is
 /// returned as-is.
-pub(crate) fn normalize_common_lisp_package_designator(designator: &str) -> &str {
+#[must_use]
+pub fn normalize_common_lisp_package_designator(designator: &str) -> &str {
     let unprefixed = designator
         .strip_prefix("#:")
         .or_else(|| designator.strip_prefix(':'))
@@ -185,7 +193,8 @@ pub(crate) fn normalize_common_lisp_package_designator(designator: &str) -> &str
         .unwrap_or(unprefixed)
 }
 
-pub(crate) fn is_common_lisp_declaration_form(head: &str) -> bool {
+#[must_use]
+pub fn is_common_lisp_declaration_form(head: &str) -> bool {
     common_lisp_operator_head_eq(head, "declare")
         || common_lisp_operator_head_eq(head, "declaim")
         || common_lisp_operator_head_eq(head, "proclaim")
@@ -204,7 +213,8 @@ pub(crate) fn is_common_lisp_declaration_form(head: &str) -> bool {
 /// lexical body. A lexical-scope-only "is this name referenced in the body"
 /// check is the wrong question for such a binding and must not flag it as
 /// dead.
-pub(crate) fn is_common_lisp_earmuffed_special_variable_name(name: &str) -> bool {
+#[must_use]
+pub fn is_common_lisp_earmuffed_special_variable_name(name: &str) -> bool {
     let name = strip_common_lisp_symbol_qualifiers(name);
     let bytes = name.as_bytes();
     bytes.len() > 2 && bytes[0] == b'*' && bytes[bytes.len() - 1] == b'*'

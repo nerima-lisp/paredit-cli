@@ -1,9 +1,9 @@
-use crate::domain::sexpr::formatter::Formatter;
-use crate::domain::sexpr::tree::{NodeKind, SyntaxTree};
-use crate::domain::sexpr::types::NodeId;
+use crate::sexpr::formatter::Formatter;
+use crate::sexpr::tree::{NodeKind, SyntaxTree};
+use crate::sexpr::types::NodeId;
 
 impl Formatter {
-    pub(in crate::domain::sexpr::formatter) fn format_loop_form(
+    pub(in crate::sexpr::formatter) fn format_loop_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -63,7 +63,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_loop_clause(
+    pub(in crate::sexpr::formatter) fn format_loop_clause(
         &self,
         tree: &SyntaxTree,
         children: &[NodeId],
@@ -78,7 +78,7 @@ impl Formatter {
         }
     }
 
-    pub(in crate::domain::sexpr::formatter) fn is_loop_clause_start(
+    pub(in crate::sexpr::formatter) fn is_loop_clause_start(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -87,7 +87,7 @@ impl Formatter {
             .is_some_and(Self::is_loop_clause_keyword)
     }
 
-    pub(in crate::domain::sexpr::formatter) fn atom_text<'a>(
+    pub(in crate::sexpr::formatter) fn atom_text<'a>(
         &self,
         tree: &'a SyntaxTree,
         node_id: NodeId,
@@ -96,7 +96,7 @@ impl Formatter {
         (node.kind == NodeKind::Atom).then(|| node.span.slice(&tree.source))
     }
 
-    pub(in crate::domain::sexpr::formatter) fn is_loop_clause_keyword(keyword: &str) -> bool {
+    pub(in crate::sexpr::formatter) fn is_loop_clause_keyword(keyword: &str) -> bool {
         let keyword = keyword.to_ascii_lowercase();
         matches!(
             keyword.as_str(),
@@ -120,9 +120,7 @@ impl Formatter {
         ) || Self::is_loop_conditional_action_keyword(&keyword)
     }
 
-    pub(in crate::domain::sexpr::formatter) fn is_loop_conditional_action_keyword(
-        keyword: &str,
-    ) -> bool {
+    pub(in crate::sexpr::formatter) fn is_loop_conditional_action_keyword(keyword: &str) -> bool {
         matches!(
             keyword.to_ascii_lowercase().as_str(),
             "do" | "doing"

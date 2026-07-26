@@ -1,6 +1,16 @@
 //! Core Lisp parsing, dialect, and semantic refactoring rules that stay
 //! independent from CLI delivery and filesystem adapters.
 
+// Phase 1 facade (section 4.1). These modules now live in
+// `paredit-core-syntax`; re-exporting them here keeps every existing
+// `crate::domain::<module>` path and the public `paredit_cli::domain::…`
+// API working unchanged, so the split can proceed one package at a time.
+//
+// Visibility mirrors the original `mod` declarations exactly - promoting a
+// `pub(crate)` module to `pub` here would silently widen the public API.
+pub use paredit_core_syntax::{common_lisp, definition, dialect, form_shape, sexpr};
+pub(crate) use paredit_core_syntax::{expression_equality, graph, leading_trivia, view_query};
+
 pub mod accessor_arity_report;
 pub mod append_list_to_cons_report;
 pub mod append_nil_report;
@@ -19,7 +29,6 @@ pub mod char_op_string_report;
 pub mod class_cycle_report;
 pub mod code_char_char_code_report;
 pub mod coerce_to_t_report;
-pub mod common_lisp;
 pub mod complexity_report;
 pub mod cond_t_clause_report;
 pub(crate) mod conditional_sugar;
@@ -30,13 +39,11 @@ pub(crate) mod convert_control;
 pub(crate) mod convert_sequential_binding;
 pub mod de_morgan_report;
 pub mod dead_boolean_operand_report;
-pub mod definition;
 pub(crate) mod definition_reference;
 pub mod definition_report;
 pub mod defpackage_quoted_report;
 pub mod dependency_report;
 pub mod destructive_literal_report;
-pub mod dialect;
 pub mod double_reverse_report;
 pub mod duplicate_boolean_operand_report;
 pub mod duplicate_case_key_report;
@@ -62,14 +69,12 @@ pub mod eval_when_situation_report;
 pub mod exhaustive_case_otherwise_report;
 pub mod explicit_nil_return_report;
 pub mod explicit_step_delta_report;
-pub(crate) mod expression_equality;
 pub(crate) mod extract_constant;
 pub(crate) mod extract_function;
 pub(crate) mod extract_local_function;
 pub(crate) mod extract_shared;
 pub(crate) mod flet_composition;
 pub mod form_report;
-pub mod form_shape;
 pub mod form_similarity;
 pub mod format_missing_destination_report;
 pub mod format_newline_report;
@@ -78,7 +83,6 @@ pub mod funcall_lambda_report;
 pub(crate) mod function_parameter;
 pub mod getf_default_nil_report;
 pub mod gethash_default_report;
-pub(crate) mod graph;
 pub mod handler_case_no_clauses_report;
 pub mod identical_if_branch_report;
 pub mod identity_arithmetic_report;
@@ -96,7 +100,6 @@ pub(crate) mod inline_symbol_macro;
 pub(crate) mod introduce_let;
 pub mod lambda_list_keyword_order_report;
 pub mod last_default_count_report;
-pub(crate) mod leading_trivia;
 pub(crate) mod let_binding;
 pub(crate) mod let_composition;
 pub mod let_report;
@@ -185,7 +188,6 @@ pub mod self_comparison_report;
 pub(crate) mod semantics;
 pub mod setf_arity_report;
 pub mod setq_non_variable_report;
-pub mod sexpr;
 pub mod shadowed_binding_report;
 pub mod sharp_quoted_lambda_report;
 pub mod sign_comparison_report;
@@ -223,6 +225,5 @@ pub mod unwind_protect_no_cleanup_report;
 pub(crate) mod unwrap_call;
 pub mod values_list_of_list_report;
 pub mod verbose_negation_report;
-pub(crate) mod view_query;
 pub mod workspace_report;
 pub mod zero_divisor_report;

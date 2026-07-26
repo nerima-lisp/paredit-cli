@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispOperator {
+pub enum CommonLispOperator {
     Let,
     LetStar,
     SymbolMacrolet,

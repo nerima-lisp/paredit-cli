@@ -12,7 +12,8 @@
 /// begins: the newline that ends the *previous* sibling's line, so anything
 /// after it (blank lines, then an own-line comment) belongs to the sibling
 /// that follows.
-pub(crate) fn first_newline_or(input: &str, start: usize, end: usize) -> usize {
+#[must_use]
+pub fn first_newline_or(input: &str, start: usize, end: usize) -> usize {
     input.as_bytes()[start..end]
         .iter()
         .position(|&byte| byte == b'\n')
@@ -28,7 +29,8 @@ pub(crate) fn first_newline_or(input: &str, start: usize, end: usize) -> usize {
 /// there is no blank line at all (just `"\n"` before the sibling), that
 /// single newline must be kept — dropping it unconditionally would glue a
 /// relocated sibling onto whatever text now precedes it.
-pub(crate) fn strip_leading_blank_lines(text: &str) -> String {
+#[must_use]
+pub fn strip_leading_blank_lines(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut cursor = 0;
     while bytes.get(cursor) == Some(&b'\n') && bytes.get(cursor + 1) == Some(&b'\n') {

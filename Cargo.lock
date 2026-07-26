@@ -650,11 +650,21 @@ dependencies = [
  "clap_complete",
  "criterion",
  "libc",
+ "paredit-core-syntax",
  "predicates",
  "proptest",
  "serde_json",
  "thiserror",
  "xattr",
+]
+
+[[package]]
+name = "paredit-core-syntax"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "proptest",
+ "thiserror",
 ]
 
 [[package]]

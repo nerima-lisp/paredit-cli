@@ -1,6 +1,6 @@
-use crate::domain::sexpr::formatter::Formatter;
-use crate::domain::sexpr::tree::{NodeKind, SyntaxTree};
-use crate::domain::sexpr::types::NodeId;
+use crate::sexpr::formatter::Formatter;
+use crate::sexpr::tree::{NodeKind, SyntaxTree};
+use crate::sexpr::types::NodeId;
 
 #[derive(Clone, Copy)]
 enum ClauseFormKind {
@@ -9,7 +9,7 @@ enum ClauseFormKind {
 }
 
 impl Formatter {
-    pub(in crate::domain::sexpr::formatter) fn format_clause_form(
+    pub(in crate::sexpr::formatter) fn format_clause_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -38,7 +38,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_clause(
+    pub(in crate::sexpr::formatter) fn format_clause(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -70,7 +70,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_cond_clauses(
+    pub(in crate::sexpr::formatter) fn format_cond_clauses(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -94,7 +94,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_case_clauses(
+    pub(in crate::sexpr::formatter) fn format_case_clauses(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -123,7 +123,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_body_clause(
+    pub(in crate::sexpr::formatter) fn format_body_clause(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -151,7 +151,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_do_form(
+    pub(in crate::sexpr::formatter) fn format_do_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -162,7 +162,7 @@ impl Formatter {
         self.format_clause_sequence_form(tree, node_id, depth, head, ClauseFormKind::Do, output);
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_prog_form(
+    pub(in crate::sexpr::formatter) fn format_prog_form(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,

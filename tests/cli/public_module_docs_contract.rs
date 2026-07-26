@@ -26,11 +26,11 @@ fn top_level_public_modules_keep_docs_rs_responsibility_docs() {
             "//! CLI presentation adapters that map commands, flags, and output modes onto",
         ),
         (
-            "src/domain/sexpr.rs",
+            "packages/core/syntax/src/sexpr.rs",
             "//! Typed S-expression parsing, tree navigation, spans, and balanced edit",
         ),
         (
-            "src/domain/dialect/mod.rs",
+            "packages/core/syntax/src/dialect/mod.rs",
             "//! Dialect detection and capability helpers for Lisp-family files, including",
         ),
     ] {

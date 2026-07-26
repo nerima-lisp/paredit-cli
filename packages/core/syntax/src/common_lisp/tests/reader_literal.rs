@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::common_lisp::{CommonLispReaderLiteralKind, common_lisp_reader_literals};
+use crate::common_lisp::{CommonLispReaderLiteralKind, common_lisp_reader_literals};
 
 #[test]
 fn detects_common_lisp_vector_literals_in_source_order() {

@@ -102,7 +102,8 @@ fn flake_lisp_includes_cover_exactly_the_recognized_dialect_extensions() {
         .filter_map(|line| line.strip_suffix('"'))
         .collect();
 
-    let dialect = fs::read_to_string("src/domain/dialect/mod.rs").expect("read dialect module");
+    let dialect =
+        fs::read_to_string("packages/core/syntax/src/dialect/mod.rs").expect("read dialect module");
     let arms_start = dialect
         .find("pub fn from_extension")
         .expect("dialect module defines from_extension");

@@ -14,4 +14,4 @@ pub use dispatch::{CommonLispReaderConditionalForm, CommonLispReaderConditionalK
 #[cfg(test)]
 pub use query::common_lisp_reader_conditional_dispatches;
 pub use query::common_lisp_reader_conditional_forms;
-pub(crate) use query::reader_conditional_kind;
+pub use query::reader_conditional_kind;

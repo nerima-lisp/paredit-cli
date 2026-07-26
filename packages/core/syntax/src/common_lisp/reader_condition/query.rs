@@ -1,6 +1,6 @@
 #[cfg(test)]
-use crate::domain::sexpr::ExpressionPath;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
+use crate::sexpr::ExpressionPath;
+use crate::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
 
 #[cfg(test)]
 use super::CommonLispReaderConditionalDispatch;
@@ -13,6 +13,7 @@ use super::{CommonLispReaderConditionalForm, CommonLispReaderConditionalKind};
 /// one opaque atom. A bare legacy dispatch is still reported so callers can
 /// reject incomplete input safely before attempting a structural refactor.
 #[cfg(test)]
+#[must_use]
 pub fn common_lisp_reader_conditional_dispatches(
     tree: &SyntaxTree,
 ) -> Vec<CommonLispReaderConditionalDispatch> {
@@ -30,6 +31,7 @@ pub fn common_lisp_reader_conditional_dispatches(
 /// This supports both legacy trees, where the dispatch, feature expression,
 /// and guarded datum are siblings, and dialect-aware Common Lisp trees, where
 /// the complete conditional is one opaque atom.
+#[must_use]
 pub fn common_lisp_reader_conditional_forms(
     tree: &SyntaxTree,
 ) -> Vec<CommonLispReaderConditionalForm> {
@@ -87,9 +89,8 @@ fn collect_forms(view: &ExpressionView, forms: &mut Vec<CommonLispReaderConditio
     }
 }
 
-pub(crate) fn reader_conditional_kind(
-    view: &ExpressionView,
-) -> Option<CommonLispReaderConditionalKind> {
+#[must_use]
+pub fn reader_conditional_kind(view: &ExpressionView) -> Option<CommonLispReaderConditionalKind> {
     reader_conditional(view).map(|(kind, _, _)| kind)
 }
 

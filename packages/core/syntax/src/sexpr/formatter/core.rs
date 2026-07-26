@@ -1,8 +1,8 @@
 use super::styles::ListStyle;
 use super::{Formatter, MAX_INLINE_WIDTH};
-use crate::domain::sexpr::tree::{Node, NodeKind, SyntaxTree};
-use crate::domain::sexpr::types::Delimiter;
-use crate::domain::sexpr::types::NodeId;
+use crate::sexpr::tree::{Node, NodeKind, SyntaxTree};
+use crate::sexpr::types::Delimiter;
+use crate::sexpr::types::NodeId;
 
 const MAX_RECURSIVE_FORMAT_DEPTH: usize = 256;
 
@@ -77,7 +77,7 @@ impl Formatter {
                 .node(end_node_id)
                 .reader_prefixes
                 .iter()
-                .any(|prefix| matches!(prefix, crate::domain::sexpr::tree::ReaderPrefix::Metadata))
+                .any(|prefix| matches!(prefix, crate::sexpr::tree::ReaderPrefix::Metadata))
                 && node_index + 1 < root_children.len()
             {
                 node_index += 1;

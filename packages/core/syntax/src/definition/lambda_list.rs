@@ -1,7 +1,7 @@
-use crate::domain::common_lisp::{
+use crate::common_lisp::{
     CommonLispLambdaListShape, CommonLispOperator, normalize_common_lisp_operator_head,
 };
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use crate::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::DefinitionCategory;
 

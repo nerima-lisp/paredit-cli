@@ -1,6 +1,6 @@
 use super::*;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::parser::MAX_DISCARDED_FORM_STACK_FRAMES;
+use crate::dialect::Dialect;
+use crate::sexpr::parser::MAX_DISCARDED_FORM_STACK_FRAMES;
 
 #[test]
 fn parses_balanced_document() {

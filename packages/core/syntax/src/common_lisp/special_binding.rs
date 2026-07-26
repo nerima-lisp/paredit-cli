@@ -1,4 +1,4 @@
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
+use crate::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
 
 use super::{
     CommonLispDeclarationScope, common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
@@ -6,7 +6,8 @@ use super::{
 
 /// Returns the first body child covered by a leading `(declare (special ...))`
 /// declaration for `name`.
-pub(crate) fn common_lisp_special_declaration_body_start(
+#[must_use]
+pub fn common_lisp_special_declaration_body_start(
     view: &ExpressionView,
     scope: CommonLispDeclarationScope,
     name: &str,
@@ -28,7 +29,8 @@ pub(crate) fn common_lisp_special_declaration_body_start(
 /// `declaim`, `proclaim`, `defvar`, `defparameter`, or an enclosing lexical
 /// `declare (special ...)` declaration, including one at the start of the
 /// binding form's own body.
-pub(crate) fn common_lisp_dynamic_binding_is_declared(
+#[must_use]
+pub fn common_lisp_dynamic_binding_is_declared(
     document: &ExpressionView,
     target: &ExpressionView,
     symbol: &SymbolName,

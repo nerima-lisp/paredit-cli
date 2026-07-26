@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::{
+use crate::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispLetBindingForm, CommonLispLocalCallableForm,
     CommonLispOperator, CommonLispPackageDeclarationForm, CommonLispRuntimeDependencyForm,
     CommonLispValueScopeForm, CommonLispVariableBindingForm,
@@ -64,7 +64,7 @@ impl Dialect {
         }
     }
 
-    pub(crate) fn supports_function_parameter_refactor_head(self, head: &str) -> bool {
+    pub fn supports_function_parameter_refactor_head(self, head: &str) -> bool {
         match self {
             Self::CommonLisp => common_lisp_operator(head)
                 .is_some_and(CommonLispOperator::supports_function_parameter_refactor),
@@ -101,7 +101,7 @@ impl Dialect {
         }
     }
 
-    pub(crate) fn supports_inline_function_refactor_head(self, head: &str) -> bool {
+    pub fn supports_inline_function_refactor_head(self, head: &str) -> bool {
         match self {
             Self::CommonLisp => common_lisp_operator(head)
                 .is_some_and(CommonLispOperator::is_inline_function_definition),
@@ -127,7 +127,8 @@ impl Dialect {
         }
     }
 
-    pub(crate) const fn inline_function_sequence_head(self) -> &'static str {
+    #[must_use]
+    pub const fn inline_function_sequence_head(self) -> &'static str {
         match self {
             Self::CommonLisp | Self::EmacsLisp | Self::Lfe | Self::Unknown => "progn",
             Self::Scheme | Self::Racket => "begin",
@@ -135,11 +136,13 @@ impl Dialect {
         }
     }
 
-    pub(crate) const fn supports_common_lisp_lambda_list_refactor_model(self) -> bool {
+    #[must_use]
+    pub const fn supports_common_lisp_lambda_list_refactor_model(self) -> bool {
         matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown)
     }
 
-    pub(crate) fn common_lisp_local_callable_form_for_head(
+    #[must_use]
+    pub fn common_lisp_local_callable_form_for_head(
         self,
         head: &str,
     ) -> Option<CommonLispLocalCallableForm> {
@@ -149,7 +152,8 @@ impl Dialect {
         common_lisp_operator(head)?.local_callable_form()
     }
 
-    pub(crate) fn let_binding_form_for_head(self, head: &str) -> Option<CommonLispLetBindingForm> {
+    #[must_use]
+    pub fn let_binding_form_for_head(self, head: &str) -> Option<CommonLispLetBindingForm> {
         if !matches!(
             self,
             Self::CommonLisp
@@ -164,7 +168,8 @@ impl Dialect {
         common_lisp_operator(head)?.let_binding_form()
     }
 
-    pub(crate) fn variable_binding_form_for_head(
+    #[must_use]
+    pub fn variable_binding_form_for_head(
         self,
         head: &str,
     ) -> Option<CommonLispVariableBindingForm> {
@@ -174,7 +179,8 @@ impl Dialect {
         common_lisp_operator(head)?.variable_binding_form()
     }
 
-    pub(crate) fn common_lisp_value_scope_form_for_head(
+    #[must_use]
+    pub fn common_lisp_value_scope_form_for_head(
         self,
         head: &str,
     ) -> Option<CommonLispValueScopeForm> {
@@ -196,7 +202,8 @@ impl Dialect {
         }
     }
 
-    pub(crate) fn common_lisp_binding_refactor_form_for_head(
+    #[must_use]
+    pub fn common_lisp_binding_refactor_form_for_head(
         self,
         head: &str,
     ) -> Option<CommonLispBindingRefactorForm> {
@@ -237,12 +244,13 @@ impl Dialect {
         }
     }
 
-    pub(crate) fn common_lisp_variable_binding_has_step_forms_for_head(self, head: &str) -> bool {
+    pub fn common_lisp_variable_binding_has_step_forms_for_head(self, head: &str) -> bool {
         matches!(self, Self::CommonLisp | Self::Unknown)
             && common_lisp_operator(head).is_some_and(CommonLispOperator::has_variable_step_forms)
     }
 
-    pub(crate) fn common_lisp_runtime_dependency_form_for_head(
+    #[must_use]
+    pub fn common_lisp_runtime_dependency_form_for_head(
         self,
         head: &str,
     ) -> Option<CommonLispRuntimeDependencyForm> {
@@ -272,7 +280,8 @@ impl Dialect {
         Some(form)
     }
 
-    pub(crate) fn common_lisp_package_declaration_form_for_head(
+    #[must_use]
+    pub fn common_lisp_package_declaration_form_for_head(
         self,
         head: &str,
     ) -> Option<CommonLispPackageDeclarationForm> {
@@ -282,12 +291,12 @@ impl Dialect {
         common_lisp_operator(head)?.package_declaration_form()
     }
 
-    pub(crate) fn is_common_lisp_asdf_system_definition_head(self, head: &str) -> bool {
+    pub fn is_common_lisp_asdf_system_definition_head(self, head: &str) -> bool {
         matches!(self, Self::CommonLisp | Self::Unknown)
             && common_lisp_operator(head).is_some_and(CommonLispOperator::is_asdf_system_definition)
     }
 
-    pub(crate) fn supports_inline_let_refactor_head(self, head: &str) -> bool {
+    pub fn supports_inline_let_refactor_head(self, head: &str) -> bool {
         match self {
             Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel => head == "let",
             Self::CommonLisp

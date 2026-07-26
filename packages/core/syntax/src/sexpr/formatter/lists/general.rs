@@ -1,9 +1,9 @@
-use crate::domain::sexpr::formatter::Formatter;
-use crate::domain::sexpr::tree::{NodeKind, SyntaxTree};
-use crate::domain::sexpr::types::{Delimiter, NodeId};
+use crate::sexpr::formatter::Formatter;
+use crate::sexpr::tree::{NodeKind, SyntaxTree};
+use crate::sexpr::types::{Delimiter, NodeId};
 
 impl Formatter {
-    pub(in crate::domain::sexpr::formatter) fn format_general_list(
+    pub(in crate::sexpr::formatter) fn format_general_list(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
@@ -25,7 +25,7 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
-    pub(in crate::domain::sexpr::formatter) fn format_sequence_list(
+    pub(in crate::sexpr::formatter) fn format_sequence_list(
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,

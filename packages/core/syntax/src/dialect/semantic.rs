@@ -1,8 +1,8 @@
 use std::{fmt, marker::PhantomData};
 
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_identity_eq};
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use crate::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_identity_eq};
+use crate::definition::DefinitionCategory;
+use crate::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::Dialect;
 
@@ -32,7 +32,7 @@ impl SemanticOperation {
 mod sealed {
     use super::SemanticOperation;
 
-    pub(crate) trait SemanticOperationMarker {
+    pub trait SemanticOperationMarker {
         const OPERATION: SemanticOperation;
     }
 }
@@ -281,20 +281,20 @@ impl ScopeShape {
 
 /// Semantic metadata and verification rules used inside the domain layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct DialectSemanticPolicy {
+pub struct DialectSemanticPolicy {
     dialect: Dialect,
 }
 
 impl DialectSemanticPolicy {
-    pub(crate) const fn new(dialect: Dialect) -> Self {
+    pub const fn new(dialect: Dialect) -> Self {
         Self { dialect }
     }
 
-    pub(crate) const fn dialect(self) -> Dialect {
+    pub const fn dialect(self) -> Dialect {
         self.dialect
     }
 
-    pub(crate) const fn supports(self, operation: SemanticOperation) -> bool {
+    pub const fn supports(self, operation: SemanticOperation) -> bool {
         matches!(
             (self.dialect, operation),
             (
@@ -331,7 +331,7 @@ impl DialectSemanticPolicy {
         }
     }
 
-    pub(crate) fn identifiers_equal(self, candidate: &str, expected: &str) -> bool {
+    pub fn identifiers_equal(self, candidate: &str, expected: &str) -> bool {
         match self.dialect {
             Dialect::CommonLisp => common_lisp_symbol_identity_eq(candidate, expected),
             Dialect::EmacsLisp
@@ -347,11 +347,11 @@ impl DialectSemanticPolicy {
         }
     }
 
-    pub(crate) fn definition_shape(self, form: &ExpressionView) -> Option<DefinitionShape> {
+    pub fn definition_shape(self, form: &ExpressionView) -> Option<DefinitionShape> {
         definition_shape(self, form)
     }
 
-    pub(crate) fn scope_shape(self, form: &ExpressionView) -> Option<ScopeShape> {
+    pub fn scope_shape(self, form: &ExpressionView) -> Option<ScopeShape> {
         scope_shape(self, form)
     }
 }
@@ -387,11 +387,11 @@ impl Dialect {
 /// Raw policy construction is intentionally unavailable outside the crate.
 ///
 /// ```compile_fail
-/// use paredit_cli::dialect::DialectSemanticPolicy;
+/// use paredit_core_syntax::dialect::DialectSemanticPolicy;
 /// ```
 ///
 /// ```compile_fail
-/// use paredit_cli::dialect::{
+/// use paredit_core_syntax::dialect::{
 ///     IntroduceLetOperation, RenameBindingOperation, VerifiedSemanticPolicy,
 /// };
 ///
@@ -403,7 +403,7 @@ impl Dialect {
 /// Its private fields also prevent safe callers from forging a proof.
 ///
 /// ```compile_fail
-/// use paredit_cli::dialect::{RenameBindingOperation, VerifiedSemanticPolicy};
+/// use paredit_core_syntax::dialect::{RenameBindingOperation, VerifiedSemanticPolicy};
 ///
 /// let _forged = VerifiedSemanticPolicy::<RenameBindingOperation> {};
 /// ```
@@ -861,7 +861,7 @@ fn is_plain_list(view: &ExpressionView, delimiter: Delimiter) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::sexpr::SyntaxTree;
+    use crate::sexpr::SyntaxTree;
 
     use super::*;
 

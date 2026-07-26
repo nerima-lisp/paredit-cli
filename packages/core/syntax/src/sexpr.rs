@@ -15,12 +15,12 @@ mod types;
 pub use edit::Edit;
 pub use formatter::Formatter;
 pub use parser::ParseError;
-pub(in crate::domain) use tree::AtomOccurrenceIndex;
+pub use tree::AtomOccurrenceIndex;
 pub use tree::{
     AtomOccurrence, ExpressionKind, ExpressionView, OutlineEntry, ReaderPrefix, Selection,
     SyntaxTree,
 };
-pub(in crate::domain) use types::NonEmptyExpressionPath;
+pub use types::NonEmptyExpressionPath;
 pub use types::{
     ByteOffset, ByteSpan, ChildIndex, Delimiter, ExpressionPath, NodeId, Path, SymbolName,
 };

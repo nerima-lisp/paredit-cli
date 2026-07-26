@@ -198,7 +198,7 @@ impl ChildIndex {
 /// ```
 /// use std::str::FromStr;
 ///
-/// use paredit_cli::sexpr::ExpressionPath;
+/// use paredit_core_syntax::sexpr::ExpressionPath;
 ///
 /// let path = ExpressionPath::from_str("0.2")?;
 /// assert_eq!(path.to_raw_indexes(), vec![0, 2]);
@@ -209,7 +209,7 @@ impl ChildIndex {
 pub struct ExpressionPath(Vec<ChildIndex>);
 
 #[derive(Debug, Clone, Copy)]
-pub(in crate::domain) struct NonEmptyExpressionPath<'a>(&'a [ChildIndex]);
+pub struct NonEmptyExpressionPath<'a>(&'a [ChildIndex]);
 
 impl<'a> TryFrom<&'a ExpressionPath> for NonEmptyExpressionPath<'a> {
     type Error = ();
@@ -224,7 +224,8 @@ impl<'a> TryFrom<&'a ExpressionPath> for NonEmptyExpressionPath<'a> {
 }
 
 impl NonEmptyExpressionPath<'_> {
-    pub(crate) fn indexes(&self) -> impl ExactSizeIterator<Item = usize> + '_ {
+    #[must_use]
+    pub fn indexes(&self) -> impl ExactSizeIterator<Item = usize> + '_ {
         self.0.iter().map(|index| index.get())
     }
 }
@@ -355,13 +356,13 @@ impl fmt::Display for SymbolName {
 pub struct NodeId(usize);
 
 impl NodeId {
-    pub(in crate::domain::sexpr) const ROOT: Self = Self(0);
+    pub(in crate::sexpr) const ROOT: Self = Self(0);
 
-    pub(in crate::domain::sexpr) const fn new(value: usize) -> Self {
+    pub(in crate::sexpr) const fn new(value: usize) -> Self {
         Self(value)
     }
 
-    pub(in crate::domain::sexpr) const fn get(self) -> usize {
+    pub(in crate::sexpr) const fn get(self) -> usize {
         self.0
     }
 }
@@ -375,7 +376,7 @@ pub enum Delimiter {
 }
 
 impl Delimiter {
-    pub(in crate::domain::sexpr) const fn from_open(byte: u8) -> Option<Self> {
+    pub(in crate::sexpr) const fn from_open(byte: u8) -> Option<Self> {
         match byte {
             b'(' => Some(Self::Paren),
             b'[' => Some(Self::Bracket),
@@ -384,7 +385,7 @@ impl Delimiter {
         }
     }
 
-    pub(in crate::domain::sexpr) const fn from_close(byte: u8) -> Option<Self> {
+    pub(in crate::sexpr) const fn from_close(byte: u8) -> Option<Self> {
         match byte {
             b')' => Some(Self::Paren),
             b']' => Some(Self::Bracket),
@@ -393,7 +394,7 @@ impl Delimiter {
         }
     }
 
-    pub(in crate::domain::sexpr) const fn open(self) -> char {
+    pub(in crate::sexpr) const fn open(self) -> char {
         match self {
             Self::Paren => '(',
             Self::Bracket => '[',
@@ -401,7 +402,7 @@ impl Delimiter {
         }
     }
 
-    pub(in crate::domain::sexpr) const fn close(self) -> char {
+    pub(in crate::sexpr) const fn close(self) -> char {
         match self {
             Self::Paren => ')',
             Self::Bracket => ']',
@@ -410,6 +411,6 @@ impl Delimiter {
     }
 }
 
-pub(in crate::domain::sexpr) const fn is_symbol_boundary(byte: u8) -> bool {
+pub(in crate::sexpr) const fn is_symbol_boundary(byte: u8) -> bool {
     byte.is_ascii_whitespace() || matches!(byte, b'(' | b')' | b'[' | b']' | b'{' | b'}' | b';')
 }

@@ -1,5 +1,5 @@
 use super::Formatter;
-use crate::domain::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
+use crate::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ListStyle {

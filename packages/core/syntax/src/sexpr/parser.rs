@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::domain::dialect::Dialect;
+use crate::dialect::Dialect;
 
 use super::reader_policy::{DialectReaderPolicy, ReaderMacro};
 use super::tree::{Comment, Node, NodeKind, ReaderPrefix, SyntaxTree};
@@ -38,7 +38,7 @@ pub enum ParseError {
 
 pub(super) const MAX_DISCARDED_FORM_STACK_FRAMES: usize = 65_536;
 
-pub(in crate::domain::sexpr) struct Parser<'a> {
+pub(in crate::sexpr) struct Parser<'a> {
     input: &'a str,
     bytes: &'a [u8],
     pos: ByteOffset,
@@ -70,11 +70,11 @@ enum SkipFrame {
 }
 
 impl<'a> Parser<'a> {
-    pub(in crate::domain::sexpr) fn new(input: &'a str) -> Self {
+    pub(in crate::sexpr) fn new(input: &'a str) -> Self {
         Self::with_dialect(input, Dialect::Unknown)
     }
 
-    pub(in crate::domain::sexpr) fn with_dialect(input: &'a str, dialect: Dialect) -> Self {
+    pub(in crate::sexpr) fn with_dialect(input: &'a str, dialect: Dialect) -> Self {
         let root = Node {
             kind: NodeKind::Root,
             delimiter: None,
@@ -100,9 +100,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(in crate::domain::sexpr) fn parse(
-        &mut self,
-    ) -> std::result::Result<SyntaxTree, ParseError> {
+    pub(in crate::sexpr) fn parse(&mut self) -> std::result::Result<SyntaxTree, ParseError> {
         while self.pos.get() < self.bytes.len() {
             self.skip_trivia()?;
             if self.pos.get() >= self.bytes.len() {
@@ -128,7 +126,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub(in crate::domain::sexpr) fn repair_unclosed_lists(
+    pub(in crate::sexpr) fn repair_unclosed_lists(
         &mut self,
     ) -> std::result::Result<String, ParseError> {
         match self.parse() {

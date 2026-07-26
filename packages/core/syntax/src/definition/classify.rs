@@ -1,5 +1,5 @@
-use crate::domain::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
-use crate::domain::dialect::Dialect;
+use crate::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
+use crate::dialect::Dialect;
 
 use super::DefinitionCategory;
 

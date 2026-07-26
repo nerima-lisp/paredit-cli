@@ -4,8 +4,8 @@ mod classify;
 mod lambda_list;
 mod name;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path};
+use crate::dialect::Dialect;
+use crate::sexpr::{ByteSpan, ExpressionView, Path};
 
 use classify::classify_definition_head;
 use lambda_list::{
@@ -295,7 +295,7 @@ pub fn macro_expander_body_range(
 mod tests {
     use super::*;
 
-    use crate::domain::sexpr::{Path, SyntaxTree};
+    use crate::sexpr::{Path, SyntaxTree};
 
     #[test]
     fn labels_round_trip_to_categories() {

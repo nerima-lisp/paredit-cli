@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::{
+use crate::common_lisp::{
     CommonLispLetBindingForm, CommonLispLocalCallableForm, CommonLispPackageDeclarationForm,
     CommonLispRuntimeDependencyForm, CommonLispValueScopeForm, CommonLispVariableBindingForm,
 };

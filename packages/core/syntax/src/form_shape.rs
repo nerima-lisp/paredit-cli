@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use crate::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FormShape(String);
@@ -110,7 +110,7 @@ fn atom_text(view: &ExpressionView) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::{ExpressionPath, SyntaxTree};
+    use crate::sexpr::{ExpressionPath, SyntaxTree};
 
     fn shape(input: &str, path: &str, preserve_list_head: bool) -> FormShape {
         let tree = SyntaxTree::parse(input).expect("parse");

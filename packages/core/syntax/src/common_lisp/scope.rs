@@ -1,14 +1,15 @@
 use anyhow::{Result, anyhow};
 
-use crate::domain::definition::macro_expander_body_range;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
+use crate::definition::macro_expander_body_range;
+use crate::dialect::Dialect;
+use crate::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::CommonLispLocalCallableForm;
 use super::common_lisp_operator_head_eq;
 use super::common_lisp_symbol_reference_eq;
 
-pub(crate) fn common_lisp_local_callable_form(
+#[must_use]
+pub fn common_lisp_local_callable_form(
     dialect: Dialect,
     head: &str,
 ) -> Option<CommonLispLocalCallableForm> {
@@ -18,7 +19,7 @@ pub(crate) fn common_lisp_local_callable_form(
 /// Macro expander templates are syntax templates for executable output, so
 /// quasiquoted forms in global and local macro expander bodies remain eligible
 /// for refactoring.
-pub(crate) fn common_lisp_macro_expander_path(
+pub fn common_lisp_macro_expander_path(
     tree: &SyntaxTree,
     dialect: Dialect,
     path: &Path,
@@ -52,11 +53,12 @@ pub(crate) fn common_lisp_macro_expander_path(
     Ok(false)
 }
 
-pub(crate) const fn is_macro_callable_form(form: CommonLispLocalCallableForm) -> bool {
+#[must_use]
+pub const fn is_macro_callable_form(form: CommonLispLocalCallableForm) -> bool {
     form.is_macro()
 }
 
-pub(crate) fn local_callable_names(view: &ExpressionView) -> Vec<String> {
+pub fn local_callable_names(view: &ExpressionView) -> Vec<String> {
     view.children
         .get(1)
         .into_iter()
@@ -66,22 +68,22 @@ pub(crate) fn local_callable_names(view: &ExpressionView) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn is_local_callable_bound(scope: &[String], head: &str) -> bool {
+#[must_use]
+pub fn is_local_callable_bound(scope: &[String], head: &str) -> bool {
     scope
         .iter()
         .any(|name| common_lisp_symbol_reference_eq(name, head))
 }
 
-pub(crate) fn local_callable_body_scope(
-    local_callables: &[String],
-    view: &ExpressionView,
-) -> Vec<String> {
+#[must_use]
+pub fn local_callable_body_scope(local_callables: &[String], view: &ExpressionView) -> Vec<String> {
     let mut body_scope = local_callables.to_vec();
     body_scope.extend(local_callable_names(view));
     body_scope
 }
 
-pub(crate) const fn local_callable_binding_body_scope<'a>(
+#[must_use]
+pub const fn local_callable_binding_body_scope<'a>(
     form: CommonLispLocalCallableForm,
     local_callables: &'a [String],
     body_scope: &'a [String],
@@ -94,7 +96,8 @@ pub(crate) const fn local_callable_binding_body_scope<'a>(
     }
 }
 
-pub(crate) const fn local_callable_definition_reference_scope<'a>(
+#[must_use]
+pub const fn local_callable_definition_reference_scope<'a>(
     form: CommonLispLocalCallableForm,
     local_callables: &'a [String],
     body_scope: &'a [String],
@@ -107,7 +110,7 @@ pub(crate) const fn local_callable_definition_reference_scope<'a>(
     }
 }
 
-pub(crate) fn local_callable_scope_at_path(
+pub fn local_callable_scope_at_path(
     tree: &SyntaxTree,
     dialect: Dialect,
     path: &Path,

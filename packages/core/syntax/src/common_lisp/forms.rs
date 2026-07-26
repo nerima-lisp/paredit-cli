@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispLocalCallableForm {
+pub enum CommonLispLocalCallableForm {
     Flet,
     Labels,
     Macrolet,
@@ -7,26 +7,26 @@ pub(crate) enum CommonLispLocalCallableForm {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispLetBindingForm {
+pub enum CommonLispLetBindingForm {
     Parallel,
     Sequential,
     SymbolMacro,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispVariableBindingForm {
+pub enum CommonLispVariableBindingForm {
     Parallel,
     Sequential,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispHandlerBindingForm {
+pub enum CommonLispHandlerBindingForm {
     Handler,
     Restart,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispRuntimeDependencyForm {
+pub enum CommonLispRuntimeDependencyForm {
     Require,
     Provide,
     Load,
@@ -37,13 +37,13 @@ pub(crate) enum CommonLispRuntimeDependencyForm {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispPackageDeclarationForm {
+pub enum CommonLispPackageDeclarationForm {
     Defpackage,
     InPackage,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispValueScopeForm {
+pub enum CommonLispValueScopeForm {
     Let(CommonLispLetBindingForm),
     Lambda,
     FunctionLiteral,
@@ -59,7 +59,7 @@ pub(crate) enum CommonLispValueScopeForm {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispResourceBindingForm {
+pub enum CommonLispResourceBindingForm {
     OpenFile,
     OpenStream,
     InputFromString,
@@ -67,37 +67,40 @@ pub(crate) enum CommonLispResourceBindingForm {
 }
 
 impl CommonLispResourceBindingForm {
-    pub(crate) const fn body_start_index(self) -> usize {
+    #[must_use]
+    pub const fn body_start_index(self) -> usize {
         2
     }
 }
 
 /// A form body whose leading declarations apply to every following body form.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct CommonLispDeclarationScope {
+pub struct CommonLispDeclarationScope {
     declaration_start_index: usize,
 }
 
 impl CommonLispDeclarationScope {
-    pub(crate) const fn new(declaration_start_index: usize) -> Self {
+    #[must_use]
+    pub const fn new(declaration_start_index: usize) -> Self {
         Self {
             declaration_start_index,
         }
     }
 
-    pub(crate) const fn declaration_start_index(self) -> usize {
+    #[must_use]
+    pub const fn declaration_start_index(self) -> usize {
         self.declaration_start_index
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispSlotBindingForm {
+pub enum CommonLispSlotBindingForm {
     WithSlots,
     WithAccessors,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispBindingRefactorForm {
+pub enum CommonLispBindingRefactorForm {
     Let(CommonLispLetBindingForm),
     Value,
     LambdaLike,
@@ -114,7 +117,7 @@ pub(crate) enum CommonLispBindingRefactorForm {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispBindingListShape {
+pub enum CommonLispBindingListShape {
     NameValuePairs,
     LocalCallableDefinitions(CommonLispLocalCallableForm),
     VariableSpecs(CommonLispVariableSpecForm),
@@ -122,7 +125,7 @@ pub(crate) enum CommonLispBindingListShape {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispBindingReferenceScope {
+pub enum CommonLispBindingReferenceScope {
     NameValuePairs(CommonLispLetBindingForm),
     LocalCallableDefinitions(CommonLispLocalCallableForm),
     VariableSpecs(CommonLispVariableSpecForm, CommonLispVariableBindingForm),
@@ -130,23 +133,25 @@ pub(crate) enum CommonLispBindingReferenceScope {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispVariableSpecForm {
+pub enum CommonLispVariableSpecForm {
     Do,
     Prog,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CommonLispLambdaListShape {
+pub enum CommonLispLambdaListShape {
     ChildAt(usize),
     FirstListAtOrAfter(usize),
 }
 
 impl CommonLispLocalCallableForm {
-    pub(crate) const fn is_macro(self) -> bool {
+    #[must_use]
+    pub const fn is_macro(self) -> bool {
         matches!(self, Self::Macrolet | Self::CompilerMacrolet)
     }
 
-    pub(crate) const fn operator_name(self) -> &'static str {
+    #[must_use]
+    pub const fn operator_name(self) -> &'static str {
         match self {
             Self::Flet => "flet",
             Self::Labels => "labels",
@@ -157,23 +162,27 @@ impl CommonLispLocalCallableForm {
 }
 
 impl CommonLispLetBindingForm {
-    pub(crate) const fn is_sequential(self) -> bool {
+    #[must_use]
+    pub const fn is_sequential(self) -> bool {
         matches!(self, Self::Sequential)
     }
 
-    pub(crate) const fn supports_inline_refactor(self) -> bool {
+    #[must_use]
+    pub const fn supports_inline_refactor(self) -> bool {
         matches!(self, Self::Parallel | Self::Sequential | Self::SymbolMacro)
     }
 }
 
 impl CommonLispVariableBindingForm {
-    pub(crate) const fn is_sequential(self) -> bool {
+    #[must_use]
+    pub const fn is_sequential(self) -> bool {
         matches!(self, Self::Sequential)
     }
 }
 
 impl CommonLispHandlerBindingForm {
-    pub(crate) const fn includes_restart_options(self) -> bool {
+    #[must_use]
+    pub const fn includes_restart_options(self) -> bool {
         matches!(self, Self::Restart)
     }
 }
@@ -182,7 +191,8 @@ impl CommonLispValueScopeForm {
     /// Returns the first child that may be a body declaration when its index
     /// is fixed by the form syntax. Method definitions are handled by their
     /// parsed lambda-list position instead.
-    pub(crate) const fn declaration_scope(self) -> Option<CommonLispDeclarationScope> {
+    #[must_use]
+    pub const fn declaration_scope(self) -> Option<CommonLispDeclarationScope> {
         match self {
             Self::Let(_) | Self::Lambda | Self::LocalCallable(_) | Self::Resource(_) => {
                 Some(CommonLispDeclarationScope::new(2))
@@ -200,7 +210,8 @@ impl CommonLispValueScopeForm {
 impl CommonLispBindingRefactorForm {
     /// Whether this form introduces value bindings that can dynamically bind
     /// a variable declared special.
-    pub(crate) const fn supports_dynamic_special_binding(self) -> bool {
+    #[must_use]
+    pub const fn supports_dynamic_special_binding(self) -> bool {
         matches!(
             self,
             Self::Let(CommonLispLetBindingForm::Parallel | CommonLispLetBindingForm::Sequential)
@@ -209,25 +220,29 @@ impl CommonLispBindingRefactorForm {
         )
     }
 
-    pub(crate) const fn supports_remove_unused_binding(self) -> bool {
+    #[must_use]
+    pub const fn supports_remove_unused_binding(self) -> bool {
         matches!(
             self,
             Self::Let(_) | Self::LocalCallable(_) | Self::Do(_) | Self::Prog(_) | Self::Slot(_)
         )
     }
 
-    pub(crate) const fn remove_unused_body_start_index(self) -> usize {
+    #[must_use]
+    pub const fn remove_unused_body_start_index(self) -> usize {
         match self {
             Self::Slot(_) | Self::Do(_) => 3,
             _ => 2,
         }
     }
 
-    pub(crate) const fn preserves_binding_form_when_empty(self) -> bool {
+    #[must_use]
+    pub const fn preserves_binding_form_when_empty(self) -> bool {
         matches!(self, Self::Do(_) | Self::Prog(_))
     }
 
-    pub(crate) const fn binding_list_shape(self) -> Option<CommonLispBindingListShape> {
+    #[must_use]
+    pub const fn binding_list_shape(self) -> Option<CommonLispBindingListShape> {
         match self {
             Self::Let(_) => Some(CommonLispBindingListShape::NameValuePairs),
             Self::LocalCallable(form) => {
@@ -244,7 +259,8 @@ impl CommonLispBindingRefactorForm {
         }
     }
 
-    pub(crate) const fn reference_scope(self) -> Option<CommonLispBindingReferenceScope> {
+    #[must_use]
+    pub const fn reference_scope(self) -> Option<CommonLispBindingReferenceScope> {
         match self {
             Self::Let(form) => Some(CommonLispBindingReferenceScope::NameValuePairs(form)),
             Self::LocalCallable(form) => Some(
@@ -265,32 +281,37 @@ impl CommonLispBindingRefactorForm {
 }
 
 impl CommonLispVariableSpecForm {
-    pub(crate) const fn form_name(self) -> &'static str {
+    #[must_use]
+    pub const fn form_name(self) -> &'static str {
         match self {
             Self::Do => "do",
             Self::Prog => "prog",
         }
     }
 
-    pub(crate) const fn max_children(self) -> usize {
+    #[must_use]
+    pub const fn max_children(self) -> usize {
         match self {
             Self::Do => 3,
             Self::Prog => 2,
         }
     }
 
-    pub(crate) const fn has_step_forms(self) -> bool {
+    #[must_use]
+    pub const fn has_step_forms(self) -> bool {
         matches!(self, Self::Do)
     }
 
-    pub(crate) const fn end_clause_index(self) -> Option<usize> {
+    #[must_use]
+    pub const fn end_clause_index(self) -> Option<usize> {
         match self {
             Self::Do => Some(2),
             Self::Prog => None,
         }
     }
 
-    pub(crate) const fn body_start_index(self) -> usize {
+    #[must_use]
+    pub const fn body_start_index(self) -> usize {
         match self {
             Self::Do => 3,
             Self::Prog => 2,

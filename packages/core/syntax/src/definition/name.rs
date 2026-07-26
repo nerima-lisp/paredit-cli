@@ -1,5 +1,5 @@
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path};
+use crate::common_lisp::common_lisp_operator_head_eq;
+use crate::sexpr::{ExpressionKind, ExpressionView, Path};
 
 use super::DefinitionNameTarget;
 

@@ -1,6 +1,6 @@
 #[cfg(test)]
-use crate::domain::sexpr::ExpressionPath;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
+use crate::sexpr::ExpressionPath;
+use crate::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
 
 #[cfg(test)]
 use super::CommonLispReaderLabelDispatch;
@@ -8,6 +8,7 @@ use super::{CommonLispReaderLabelForm, CommonLispReaderLabelKind};
 
 /// Returns every Common Lisp `#n=` or `#n#` dispatch atom in source order.
 #[cfg(test)]
+#[must_use]
 pub fn common_lisp_reader_label_dispatches(
     tree: &SyntaxTree,
 ) -> Vec<CommonLispReaderLabelDispatch> {
@@ -21,6 +22,7 @@ pub fn common_lisp_reader_label_dispatches(
 }
 
 /// Returns the complete source region consumed by every reader-label form.
+#[must_use]
 pub fn common_lisp_reader_label_forms(tree: &SyntaxTree) -> Vec<CommonLispReaderLabelForm> {
     let mut forms = Vec::new();
     collect_forms(&tree.root_view(), &mut forms);
@@ -73,7 +75,8 @@ fn collect_forms(view: &ExpressionView, forms: &mut Vec<CommonLispReaderLabelFor
     }
 }
 
-pub(crate) fn reader_label_kind(view: &ExpressionView) -> Option<CommonLispReaderLabelKind> {
+#[must_use]
+pub fn reader_label_kind(view: &ExpressionView) -> Option<CommonLispReaderLabelKind> {
     if view.kind != ExpressionKind::Atom {
         return None;
     }

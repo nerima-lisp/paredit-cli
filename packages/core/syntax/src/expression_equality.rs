@@ -1,7 +1,7 @@
 //! Structural comparison and display of parsed expressions, shared by the
 //! reports that need to ask "are these two subtrees the same code?" —
-//! [`crate::domain::self_assignment_report`] (`(setq x x)`) and
-//! [`crate::domain::identical_if_branch_report`] (`(if c a a)`).
+//! `self_assignment_report` (`(setq x x)`) and
+//! `identical_if_branch_report` (`(if c a a)`).
 //!
 //! Equality follows Common Lisp reader semantics: two symbols are equal when
 //! their spellings match after folding ASCII case (the reader upcases
@@ -12,7 +12,7 @@
 //! `,`) are not compared here — the callers work over places and branch
 //! bodies where those do not appear at the top level.
 
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use crate::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
@@ -35,10 +35,8 @@ fn atoms_equal(left: &str, right: &str) -> bool {
 /// Structural equality of two expression views: same kind and delimiter, and
 /// recursively equal children, with atoms compared by reader-aware
 /// [`atoms_equal`].
-pub(crate) fn expressions_structurally_equal(
-    left: &ExpressionView,
-    right: &ExpressionView,
-) -> bool {
+#[must_use]
+pub fn expressions_structurally_equal(left: &ExpressionView, right: &ExpressionView) -> bool {
     if left.kind != right.kind || left.delimiter != right.delimiter {
         return false;
     }
@@ -63,7 +61,7 @@ pub(crate) fn expressions_structurally_equal(
 /// Renders a view back to an approximate S-expression string for display in
 /// a report (not a round-trippable serialization — reader prefixes and exact
 /// whitespace are not preserved).
-pub(crate) fn render_expression(view: &ExpressionView) -> String {
+pub fn render_expression(view: &ExpressionView) -> String {
     match view.kind {
         ExpressionKind::Atom => view.text.clone().unwrap_or_default(),
         _ => {
@@ -86,12 +84,12 @@ pub(crate) fn render_expression(view: &ExpressionView) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::SyntaxTree;
+    use crate::sexpr::SyntaxTree;
 
     fn first_two_children(input: &str) -> (ExpressionView, ExpressionView) {
         let tree = SyntaxTree::parse(input).expect("parse input");
         let root = tree
-            .select_path(&crate::domain::sexpr::Path::root_child(0))
+            .select_path(&crate::sexpr::Path::root_child(0))
             .expect("root form")
             .view();
         (root.children[1].clone(), root.children[2].clone())

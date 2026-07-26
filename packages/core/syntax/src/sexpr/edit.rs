@@ -10,7 +10,7 @@ impl Edit {
     pub fn normalize_changed_line_trivia(
         input: &str,
         rewritten: String,
-        dialect: crate::domain::dialect::Dialect,
+        dialect: crate::dialect::Dialect,
     ) -> Result<String> {
         if input == rewritten {
             return Ok(rewritten);
