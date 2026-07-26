@@ -64,6 +64,7 @@ pub enum MissingArgumentPolicy {
 }
 
 impl MissingArgumentPolicy {
+    #[must_use]
     pub fn allows_missing_argument(self) -> bool {
         matches!(self, Self::Ignore)
     }
@@ -76,6 +77,7 @@ pub enum FunctionParameterInsert {
 }
 
 impl FunctionParameterInsert {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Start => "start",
@@ -93,6 +95,7 @@ pub enum FunctionParameterSection {
 }
 
 impl FunctionParameterSection {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Auto => "auto",

@@ -75,10 +75,12 @@ pub struct NegatedComparisonPolicyOptions {
 }
 
 impl NegatedComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -162,6 +164,7 @@ pub fn collect_negated_comparisons(
     Ok((negation_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_negated_comparisons(
     negation_form_count: usize,
     violations: Vec<NegatedComparisonItem>,
@@ -172,6 +175,7 @@ pub fn summarize_negated_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_negated_comparison_policy(
     options: NegatedComparisonPolicyOptions,
     summary: &NegatedComparisonSummary,

@@ -11,6 +11,7 @@ pub enum SortDefinitionsStrategy {
 }
 
 impl SortDefinitionsStrategy {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Name => "name",

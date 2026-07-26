@@ -127,10 +127,12 @@ pub struct RedundantQuotePolicyOptions {
 }
 
 impl RedundantQuotePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -200,6 +202,7 @@ pub fn collect_redundant_quotes(
     Ok((quoted_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_quotes(
     quoted_form_count: usize,
     violations: Vec<RedundantQuoteItem>,
@@ -210,6 +213,7 @@ pub fn summarize_redundant_quotes(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_quote_policy(
     options: RedundantQuotePolicyOptions,
     summary: &RedundantQuoteSummary,

@@ -20,6 +20,7 @@ use super::traversal::{collect_unshadowed_symbol_references, symbol_name_matches
 ///
 /// `scope_span` must cover the whole let form and `reference_spans` must be the
 /// substitution sites within it (both anchored in `input`).
+#[must_use]
 pub fn value_capture(
     dialect: Dialect,
     input: &str,

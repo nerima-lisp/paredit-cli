@@ -85,10 +85,12 @@ pub struct UndefinedPackagePolicyOptions {
 }
 
 impl UndefinedPackagePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_undefined: bool) -> Self {
         Self { fail_on_undefined }
     }
 
+    #[must_use]
     pub const fn fail_on_undefined(self) -> bool {
         self.fail_on_undefined
     }
@@ -165,6 +167,7 @@ fn package_identity(designator: &str) -> String {
     canonical_package_id(designator).as_str().to_owned()
 }
 
+#[must_use]
 pub fn analyze_undefined_packages(
     declared: &[String],
     referenced: &[InPackageReference],
@@ -192,6 +195,7 @@ pub fn analyze_undefined_packages(
     }
 }
 
+#[must_use]
 pub fn evaluate_undefined_package_policy(
     options: UndefinedPackagePolicyOptions,
     summary: &UndefinedPackageSummary,

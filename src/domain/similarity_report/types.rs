@@ -126,38 +126,47 @@ impl SimilarityFormReport {
         }
     }
 
+    #[must_use]
     pub fn path(&self) -> &std::path::Path {
         self.path.as_path()
     }
 
+    #[must_use]
     pub const fn dialect(&self) -> Dialect {
         self.dialect
     }
 
+    #[must_use]
     pub const fn form_path(&self) -> &Path {
         &self.form_path
     }
 
+    #[must_use]
     pub const fn span(&self) -> ByteSpan {
         self.span
     }
 
+    #[must_use]
     pub const fn node_count(&self) -> usize {
         self.node_count
     }
 
+    #[must_use]
     pub fn head(&self) -> Option<&FormHead> {
         self.head.as_ref()
     }
 
+    #[must_use]
     pub const fn text(&self) -> &SharedFormText {
         &self.text
     }
 
+    #[must_use]
     pub fn contains_span(&self, other: &Self) -> bool {
         self.span.contains_span(other.span)
     }
 
+    #[must_use]
     pub fn strictly_contains_span(&self, other: &Self) -> bool {
         self.contains_span(other) && self.span != other.span
     }
@@ -183,22 +192,27 @@ impl SimilarityCandidate {
         }
     }
 
+    #[must_use]
     pub fn form(&self) -> &Arc<SimilarityFormReport> {
         &self.form
     }
 
+    #[must_use]
     pub const fn tree(&self) -> &StructuralTree {
         &self.tree
     }
 
+    #[must_use]
     pub fn comparison_head(&self) -> Option<&ComparisonHead> {
         self.comparison_head.as_ref()
     }
 
+    #[must_use]
     pub fn same_comparison_bucket(&self, other: &Self) -> bool {
         self.comparison_head == other.comparison_head
     }
 
+    #[must_use]
     pub fn cmp_comparison_bucket(&self, other: &Self) -> Ordering {
         self.comparison_head.cmp(&other.comparison_head)
     }
@@ -208,10 +222,12 @@ impl SimilarityCandidate {
 pub struct SimilarityRatio(f64);
 
 impl SimilarityRatio {
+    #[must_use]
     pub fn new(value: f64) -> Option<Self> {
         (value.is_finite() && (0.0..=1.0).contains(&value)).then_some(Self(value))
     }
 
+    #[must_use]
     pub const fn as_f64(self) -> f64 {
         self.0
     }
@@ -240,10 +256,12 @@ impl std::error::Error for InvalidSimilarityRatio {}
 pub struct SimilarityScore(f64);
 
 impl SimilarityScore {
+    #[must_use]
     pub fn new(value: f64) -> Option<Self> {
         (value.is_finite() && value >= 0.0).then_some(Self(value))
     }
 
+    #[must_use]
     pub const fn as_f64(self) -> f64 {
         self.0
     }
@@ -277,6 +295,7 @@ pub struct SimilarityPairReport {
 }
 
 impl SimilarityPairReport {
+    #[must_use]
     pub fn new(
         similarity: SimilarityRatio,
         score: SimilarityScore,
@@ -305,22 +324,27 @@ impl SimilarityPairReport {
         }
     }
 
+    #[must_use]
     pub const fn similarity(&self) -> SimilarityRatio {
         self.similarity
     }
 
+    #[must_use]
     pub const fn score(&self) -> SimilarityScore {
         self.score
     }
 
+    #[must_use]
     pub fn left(&self) -> &SimilarityFormReport {
         &self.left
     }
 
+    #[must_use]
     pub fn right(&self) -> &SimilarityFormReport {
         &self.right
     }
 
+    #[must_use]
     pub fn strictly_contains_pair(&self, other: &Self) -> bool {
         strictly_contains_pair_forms(&self.left, &self.right, &other.left, &other.right)
     }
@@ -435,10 +459,12 @@ impl ReportLimit {
         NonZeroUsize::new(count).map_or(Self::Complete, Self::Limited)
     }
 
+    #[must_use]
     pub fn reached(self) -> bool {
         matches!(self, Self::Limited(_))
     }
 
+    #[must_use]
     pub fn omitted(self) -> usize {
         match self {
             Self::Complete => 0,
@@ -609,50 +635,62 @@ impl SimilarityReportSummary {
         })
     }
 
+    #[must_use]
     pub fn candidate_limit_reached(&self) -> bool {
         self.candidate_limit.reached()
     }
 
+    #[must_use]
     pub fn omitted_candidates(&self) -> usize {
         self.candidate_limit.omitted()
     }
 
+    #[must_use]
     pub fn possible_pairs(&self) -> usize {
         self.pair_processing.possible
     }
 
+    #[must_use]
     pub fn evaluated_pairs(&self) -> usize {
         self.pair_processing.evaluated
     }
 
+    #[must_use]
     pub fn pruned_by_size(&self) -> usize {
         self.pair_processing.pruned_by_size
     }
 
+    #[must_use]
     pub fn resource_skipped_pairs(&self) -> usize {
         self.pair_processing.resource_skipped
     }
 
+    #[must_use]
     pub fn comparison_limit_reached(&self) -> bool {
         self.comparison_limit.reached()
     }
 
+    #[must_use]
     pub fn unprocessed_pairs(&self) -> usize {
         self.comparison_limit.omitted()
     }
 
+    #[must_use]
     pub fn matched_pairs(&self) -> usize {
         self.pair_results.matched
     }
 
+    #[must_use]
     pub fn suppressed_pairs(&self) -> usize {
         self.pair_results.suppressed
     }
 
+    #[must_use]
     pub fn reported_pairs(&self) -> usize {
         self.pair_results.reported
     }
 
+    #[must_use]
     pub fn truncated(&self) -> bool {
         self.reported_pairs() < self.matched_pairs().saturating_sub(self.suppressed_pairs())
     }
@@ -678,10 +716,12 @@ impl SimilarityReport {
         Ok(Self { summary, pairs })
     }
 
+    #[must_use]
     pub const fn summary(&self) -> &SimilarityReportSummary {
         &self.summary
     }
 
+    #[must_use]
     pub fn pairs(&self) -> &[SimilarityPairReport] {
         &self.pairs
     }

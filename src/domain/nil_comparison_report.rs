@@ -78,10 +78,12 @@ pub struct NilComparisonPolicyOptions {
 }
 
 impl NilComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -156,6 +158,7 @@ pub fn collect_nil_comparisons(
     Ok((comparison_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_nil_comparisons(
     comparison_form_count: usize,
     violations: Vec<NilComparisonItem>,
@@ -166,6 +169,7 @@ pub fn summarize_nil_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_nil_comparison_policy(
     options: NilComparisonPolicyOptions,
     summary: &NilComparisonSummary,

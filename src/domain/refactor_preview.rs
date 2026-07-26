@@ -18,6 +18,7 @@ pub enum RefactorPreviewParseStatus {
 }
 
 impl RefactorPreviewSummary {
+    #[must_use]
     pub fn new(
         changed_files: Vec<String>,
         unchanged_file_count: usize,
@@ -44,22 +45,27 @@ impl RefactorPreviewSummary {
         }
     }
 
+    #[must_use]
     pub fn file_count(&self) -> usize {
         self.changed_file_count() + self.unchanged_file_count
     }
 
+    #[must_use]
     pub fn changed_file_count(&self) -> usize {
         self.changed_files.len()
     }
 
+    #[must_use]
     pub fn changed_files(&self) -> &[String] {
         &self.changed_files
     }
 
+    #[must_use]
     pub const fn unchanged_file_count(&self) -> usize {
         self.unchanged_file_count
     }
 
+    #[must_use]
     pub const fn written_file_count(&self) -> usize {
         self.written_file_count
     }
@@ -75,18 +81,22 @@ impl RefactorPreviewSummary {
         Ok(())
     }
 
+    #[must_use]
     pub const fn definition_count(&self) -> usize {
         self.definition_count
     }
 
+    #[must_use]
     pub const fn target_occurrence_count(&self) -> usize {
         self.target_occurrence_count
     }
 
+    #[must_use]
     pub const fn edit_count(&self) -> usize {
         self.edit_count
     }
 
+    #[must_use]
     pub const fn parse_error_count(&self) -> usize {
         match self.parse_status {
             RefactorPreviewParseStatus::AllOutputsParse => 0,
@@ -94,6 +104,7 @@ impl RefactorPreviewSummary {
         }
     }
 
+    #[must_use]
     pub const fn all_outputs_parse(&self) -> bool {
         matches!(
             self.parse_status,
@@ -115,30 +126,37 @@ pub enum RefactorPreviewPolicyStatus {
 }
 
 impl RefactorPreviewPolicy {
+    #[must_use]
     pub const fn fail_on_no_change(&self) -> bool {
         self.options.fail_on_no_change()
     }
 
+    #[must_use]
     pub const fn fail_on_parse_error(&self) -> bool {
         self.options.fail_on_parse_error()
     }
 
+    #[must_use]
     pub const fn fail_on_target_conflict(&self) -> bool {
         self.options.fail_on_target_conflict()
     }
 
+    #[must_use]
     pub const fn require_changed_files(&self) -> Option<usize> {
         self.options.require_changed_files()
     }
 
+    #[must_use]
     pub const fn require_definitions(&self) -> Option<usize> {
         self.options.require_definitions()
     }
 
+    #[must_use]
     pub const fn require_edits(&self) -> Option<usize> {
         self.options.require_edits()
     }
 
+    #[must_use]
     pub fn status(&self) -> RefactorPreviewPolicyStatus {
         if self.violations.is_empty() {
             RefactorPreviewPolicyStatus::Passed
@@ -147,14 +165,17 @@ impl RefactorPreviewPolicy {
         }
     }
 
+    #[must_use]
     pub fn passed(&self) -> bool {
         self.status() == RefactorPreviewPolicyStatus::Passed
     }
 
+    #[must_use]
     pub fn violations(&self) -> &[String] {
         &self.violations
     }
 
+    #[must_use]
     pub fn summary(&self) -> RefactorPreviewPolicySummary {
         let violation_count = self.violations.len();
 
@@ -216,31 +237,38 @@ impl RefactorPreviewPolicyOptions {
         })
     }
 
+    #[must_use]
     pub const fn fail_on_no_change(self) -> bool {
         self.fail_on_no_change
     }
 
+    #[must_use]
     pub const fn fail_on_parse_error(self) -> bool {
         self.fail_on_parse_error
     }
 
+    #[must_use]
     pub const fn fail_on_target_conflict(self) -> bool {
         self.fail_on_target_conflict
     }
 
+    #[must_use]
     pub const fn require_changed_files(self) -> Option<usize> {
         self.require_changed_files
     }
 
+    #[must_use]
     pub const fn require_definitions(self) -> Option<usize> {
         self.require_definitions
     }
 
+    #[must_use]
     pub const fn require_edits(self) -> Option<usize> {
         self.require_edits
     }
 }
 
+#[must_use]
 pub fn evaluate_refactor_preview_policy(
     options: RefactorPreviewPolicyOptions,
     summary: &RefactorPreviewSummary,
@@ -357,6 +385,7 @@ pub enum RefactorPreviewDecisionStatus {
 }
 
 impl RefactorPreviewDecisionStatus {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "blocked-by-policy",
@@ -366,6 +395,7 @@ impl RefactorPreviewDecisionStatus {
         }
     }
 
+    #[must_use]
     pub const fn reason(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "preview-policy-failed",
@@ -375,6 +405,7 @@ impl RefactorPreviewDecisionStatus {
         }
     }
 
+    #[must_use]
     pub const fn next_action(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "review-policy-violations",
@@ -385,6 +416,7 @@ impl RefactorPreviewDecisionStatus {
     }
 }
 
+#[must_use]
 pub const fn decide_refactor_preview(
     write_requested: bool,
     policy_passed: bool,

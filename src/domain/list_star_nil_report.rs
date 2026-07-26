@@ -56,10 +56,12 @@ pub struct ListStarNilPolicyOptions {
 }
 
 impl ListStarNilPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -130,6 +132,7 @@ pub fn collect_list_star_nils(
     Ok((call_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_list_star_nils(
     call_form_count: usize,
     violations: Vec<ListStarNilItem>,
@@ -140,6 +143,7 @@ pub fn summarize_list_star_nils(
     }
 }
 
+#[must_use]
 pub fn evaluate_list_star_nil_policy(
     options: ListStarNilPolicyOptions,
     summary: &ListStarNilSummary,

@@ -44,10 +44,12 @@ pub struct PackageCyclePolicyOptions {
 }
 
 impl PackageCyclePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_cycle: bool) -> Self {
         Self { fail_on_cycle }
     }
 
+    #[must_use]
     pub const fn fail_on_cycle(self) -> bool {
         self.fail_on_cycle
     }
@@ -106,6 +108,7 @@ pub fn analyze_package_cycles(edges: &[(String, String)]) -> PackageCycleSummary
     }
 }
 
+#[must_use]
 pub fn evaluate_package_cycle_policy(
     options: PackageCyclePolicyOptions,
     summary: &PackageCycleSummary,

@@ -56,10 +56,12 @@ pub struct CoerceToTPolicyOptions {
 }
 
 impl CoerceToTPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -132,6 +134,7 @@ pub fn collect_coerce_to_ts(
     Ok((coerce_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_coerce_to_ts(
     coerce_form_count: usize,
     violations: Vec<CoerceToTItem>,
@@ -142,6 +145,7 @@ pub fn summarize_coerce_to_ts(
     }
 }
 
+#[must_use]
 pub fn evaluate_coerce_to_t_policy(
     options: CoerceToTPolicyOptions,
     summary: &CoerceToTSummary,

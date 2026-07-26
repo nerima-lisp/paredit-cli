@@ -16,6 +16,7 @@ pub use types::{
     RefactorPlanAutomationStepStatus, RefactorPlanDecision, RefactorPlanRequest, RefactorPlanStep,
 };
 
+#[must_use]
 pub fn build_refactor_plan_decision(request: RefactorPlanRequest<'_>) -> RefactorPlanDecision {
     let gates = refactor_plan_gates(
         request.operation,
@@ -43,6 +44,7 @@ pub fn build_refactor_plan_decision(request: RefactorPlanRequest<'_>) -> Refacto
     }
 }
 
+#[must_use]
 pub fn refactor_plan_automation_decision(
     policy: &RefactorPlanPolicy,
     steps: &[RefactorPlanStep],

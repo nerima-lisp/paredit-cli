@@ -43,10 +43,12 @@ pub struct IdenticalIfBranchPolicyOptions {
 }
 
 impl IdenticalIfBranchPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_identical: bool) -> Self {
         Self { fail_on_identical }
     }
 
+    #[must_use]
     pub const fn fail_on_identical(self) -> bool {
         self.fail_on_identical
     }
@@ -110,6 +112,7 @@ pub fn collect_identical_if_branches(
     Ok((if_form_count, identical))
 }
 
+#[must_use]
 pub fn summarize_identical_if_branches(
     if_form_count: usize,
     identical: Vec<IdenticalIfBranchItem>,
@@ -120,6 +123,7 @@ pub fn summarize_identical_if_branches(
     }
 }
 
+#[must_use]
 pub fn evaluate_identical_if_branch_policy(
     options: IdenticalIfBranchPolicyOptions,
     summary: &IdenticalIfBranchSummary,

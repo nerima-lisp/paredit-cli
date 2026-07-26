@@ -46,10 +46,12 @@ pub struct CallCyclePolicyOptions {
 }
 
 impl CallCyclePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_cycle: bool) -> Self {
         Self { fail_on_cycle }
     }
 
+    #[must_use]
     pub const fn fail_on_cycle(self) -> bool {
         self.fail_on_cycle
     }
@@ -64,6 +66,7 @@ pub struct CallCyclePolicy {
     pub violations: Vec<String>,
 }
 
+#[must_use]
 pub fn analyze_call_cycles(files: &[CallGraphFile]) -> CallCycleSummary {
     // needle -> display name, first-seen order preserved via a Vec index.
     let mut names = Vec::new();
@@ -123,6 +126,7 @@ pub fn analyze_call_cycles(files: &[CallGraphFile]) -> CallCycleSummary {
     }
 }
 
+#[must_use]
 pub fn evaluate_call_cycle_policy(
     options: CallCyclePolicyOptions,
     summary: &CallCycleSummary,

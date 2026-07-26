@@ -128,10 +128,12 @@ pub struct RedundantIdentityKeyPolicyOptions {
 }
 
 impl RedundantIdentityKeyPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -205,6 +207,7 @@ pub fn collect_redundant_identity_keys(
     Ok((call_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_identity_keys(
     call_form_count: usize,
     violations: Vec<RedundantIdentityKeyItem>,
@@ -215,6 +218,7 @@ pub fn summarize_redundant_identity_keys(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_identity_key_policy(
     options: RedundantIdentityKeyPolicyOptions,
     summary: &RedundantIdentityKeySummary,

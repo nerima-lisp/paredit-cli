@@ -8,6 +8,7 @@ pub struct DependencyReport {
 }
 
 impl DependencyReport {
+    #[must_use]
     pub fn new(dependencies: Vec<DependencyReportItem>) -> Self {
         Self { dependencies }
     }
@@ -39,6 +40,7 @@ impl DependencyReportItem {
         }
     }
 
+    #[must_use]
     pub fn cmp_position(&self, other: &Self) -> Ordering {
         self.span
             .start()
@@ -65,6 +67,7 @@ pub enum DependencyKind {
 }
 
 impl DependencyKind {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::AsdfDependsOn => "asdf-depends-on",

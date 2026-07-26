@@ -108,6 +108,7 @@ pub enum ReaderPrefix {
 
 impl ReaderPrefix {
     /// Returns the exact source spelling for this reader prefix.
+    #[must_use]
     pub fn as_source(self) -> &'static str {
         match self {
             Self::Quote => "'",
@@ -124,6 +125,7 @@ impl ReaderPrefix {
     }
 
     /// Returns true when this prefix makes the following form opaque to structural refactors.
+    #[must_use]
     pub fn is_opaque_reader_form(self) -> bool {
         matches!(self, Self::ReadEval)
     }
@@ -373,16 +375,19 @@ impl SyntaxTree {
     /// Analyses that build side tables keyed by node identity (spans, kinds)
     /// need the original bytes to slice or hash against, but only ever
     /// receive `&SyntaxTree` -- this is the only way back to them.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
 
     /// Returns the direct children of the virtual root document node.
+    #[must_use]
     pub fn root_children(&self) -> &[NodeId] {
         &self.node(NodeId::ROOT).children
     }
 
     /// Returns an immutable tree view rooted at the virtual document node.
+    #[must_use]
     pub fn root_view(&self) -> ExpressionView {
         self.expression_view(NodeId::ROOT)
     }
@@ -419,6 +424,7 @@ impl SyntaxTree {
     /// than slicing it verbatim) can use this to detect when doing so would
     /// silently discard a comment, since comments live outside the node tree
     /// and are otherwise invisible to such callers.
+    #[must_use]
     pub fn has_comment_in(&self, span: ByteSpan) -> bool {
         self.comments
             .iter()
@@ -426,6 +432,7 @@ impl SyntaxTree {
     }
 
     /// Collects every atom in the tree together with its path and byte span.
+    #[must_use]
     pub fn atom_occurrences(&self) -> Vec<AtomOccurrence> {
         self.collect_atom_occurrences(false)
     }
@@ -433,6 +440,7 @@ impl SyntaxTree {
     /// Counts the atoms `atom_occurrences` would report without materializing
     /// their paths and text. Callers that only need the total (e.g. workspace
     /// inventory reports) avoid one `String` and one path `Vec` per atom.
+    #[must_use]
     pub fn atom_occurrence_count(&self) -> usize {
         let mut count: usize = 0;
         let mut pending = self.node(NodeId::ROOT).children.clone();
@@ -545,6 +553,7 @@ impl SyntaxTree {
     /// keeps its reader prefix on the list node, not on `foo`/`bar`, so those
     /// remain ordinary atoms already covered by `atom_occurrences` and are
     /// left untouched here.
+    #[must_use]
     pub fn quoted_symbol_designator_occurrences(&self) -> Vec<AtomOccurrence> {
         self.collect_atom_occurrences(true)
     }
@@ -565,6 +574,7 @@ impl SyntaxTree {
     ///
     /// assert_eq!(output, "(let ((count 1)) (+ count count))");
     /// ```
+    #[must_use]
     pub fn rename_symbol(&self, from: &SymbolName, to: &SymbolName) -> String {
         let input = self.source.as_str();
         let index = self.atom_occurrence_index();
@@ -802,6 +812,7 @@ impl<'a> Selection<'a> {
     }
 
     /// Returns the original source text covered by this selection.
+    #[must_use]
     pub fn text(self) -> &'a str {
         self.span().slice(&self.tree.source)
     }
@@ -811,11 +822,13 @@ impl<'a> Selection<'a> {
     }
 
     /// Returns the byte span of the selected expression.
+    #[must_use]
     pub fn span(self) -> ByteSpan {
         self.node().span
     }
 
     /// Returns an immutable view of the selected expression subtree.
+    #[must_use]
     pub fn view(self) -> ExpressionView {
         self.tree.expression_view(self.node_id)
     }

@@ -49,10 +49,12 @@ pub struct RedundantIfNilPolicyOptions {
 }
 
 impl RedundantIfNilPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -118,6 +120,7 @@ pub fn collect_redundant_if_nils(
     Ok((if_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_if_nils(
     if_form_count: usize,
     violations: Vec<RedundantIfNilItem>,
@@ -128,6 +131,7 @@ pub fn summarize_redundant_if_nils(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_if_nil_policy(
     options: RedundantIfNilPolicyOptions,
     summary: &RedundantIfNilSummary,

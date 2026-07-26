@@ -52,10 +52,12 @@ pub struct ClassCyclePolicyOptions {
 }
 
 impl ClassCyclePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_cycle: bool) -> Self {
         Self { fail_on_cycle }
     }
 
+    #[must_use]
     pub const fn fail_on_cycle(self) -> bool {
         self.fail_on_cycle
     }
@@ -123,6 +125,7 @@ pub fn analyze_class_cycles(edges: &[(String, String)]) -> ClassCycleSummary {
     }
 }
 
+#[must_use]
 pub fn evaluate_class_cycle_policy(
     options: ClassCyclePolicyOptions,
     summary: &ClassCycleSummary,

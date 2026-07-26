@@ -45,10 +45,12 @@ pub struct SetfArityPolicyOptions {
 }
 
 impl SetfArityPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -115,6 +117,7 @@ pub fn collect_setf_arity_violations(
     Ok((assignment_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_setf_arity_violations(
     assignment_form_count: usize,
     violations: Vec<SetfArityItem>,
@@ -125,6 +128,7 @@ pub fn summarize_setf_arity_violations(
     }
 }
 
+#[must_use]
 pub fn evaluate_setf_arity_policy(
     options: SetfArityPolicyOptions,
     summary: &SetfAritySummary,

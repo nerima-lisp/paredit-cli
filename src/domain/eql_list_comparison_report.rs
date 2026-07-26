@@ -70,10 +70,12 @@ pub struct EqlListComparisonPolicyOptions {
 }
 
 impl EqlListComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -144,6 +146,7 @@ pub fn collect_eql_list_comparisons(
     Ok((comparison_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_eql_list_comparisons(
     comparison_form_count: usize,
     violations: Vec<EqlListComparisonItem>,
@@ -154,6 +157,7 @@ pub fn summarize_eql_list_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_eql_list_comparison_policy(
     options: EqlListComparisonPolicyOptions,
     summary: &EqlListComparisonSummary,

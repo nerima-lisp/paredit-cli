@@ -239,6 +239,7 @@ impl TreeSimilarityWorkspace {
 }
 
 impl StructuralTree {
+    #[must_use]
     pub fn from_view(view: &ExpressionView) -> Self {
         Self::from_view_with_count(view).0
     }
@@ -325,6 +326,7 @@ impl StructuralTree {
         )
     }
 
+    #[must_use]
     pub fn node_count(&self) -> usize {
         self.labels.len()
     }

@@ -46,10 +46,12 @@ pub struct DuplicateBooleanOperandPolicyOptions {
 }
 
 impl DuplicateBooleanOperandPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
+    #[must_use]
     pub const fn fail_on_duplicate(self) -> bool {
         self.fail_on_duplicate
     }
@@ -135,6 +137,7 @@ pub fn collect_duplicate_boolean_operands(
     Ok((boolean_form_count, duplicates))
 }
 
+#[must_use]
 pub fn summarize_duplicate_boolean_operands(
     boolean_form_count: usize,
     duplicates: Vec<DuplicateBooleanOperandItem>,
@@ -145,6 +148,7 @@ pub fn summarize_duplicate_boolean_operands(
     }
 }
 
+#[must_use]
 pub fn evaluate_duplicate_boolean_operand_policy(
     options: DuplicateBooleanOperandPolicyOptions,
     summary: &DuplicateBooleanOperandSummary,

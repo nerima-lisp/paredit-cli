@@ -14,6 +14,7 @@ pub struct ImpactReportSource {
 }
 
 impl ImpactReportSource {
+    #[must_use]
     pub fn new(path: PathBuf, dialect: Dialect, tree: SyntaxTree) -> Self {
         Self {
             path,
@@ -38,6 +39,7 @@ pub struct ImpactReportFile {
 
 impl ImpactReportFile {
     #[allow(clippy::too_many_arguments)]
+    #[must_use]
     pub fn new(
         path: PathBuf,
         dialect: Dialect,

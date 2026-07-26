@@ -49,10 +49,12 @@ pub struct HandlerCaseNoClausesPolicyOptions {
 }
 
 impl HandlerCaseNoClausesPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -121,6 +123,7 @@ pub fn collect_handler_case_no_clauses(
     Ok((handler_case_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_handler_case_no_clauses(
     handler_case_form_count: usize,
     violations: Vec<HandlerCaseNoClausesItem>,
@@ -131,6 +134,7 @@ pub fn summarize_handler_case_no_clauses(
     }
 }
 
+#[must_use]
 pub fn evaluate_handler_case_no_clauses_policy(
     options: HandlerCaseNoClausesPolicyOptions,
     summary: &HandlerCaseNoClausesSummary,

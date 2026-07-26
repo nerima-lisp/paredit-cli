@@ -62,10 +62,12 @@ pub struct MalformedCondClausePolicyOptions {
 }
 
 impl MalformedCondClausePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -134,6 +136,7 @@ pub fn collect_malformed_cond_clauses(
     Ok((cond_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_malformed_cond_clauses(
     cond_form_count: usize,
     violations: Vec<MalformedCondClauseItem>,
@@ -144,6 +147,7 @@ pub fn summarize_malformed_cond_clauses(
     }
 }
 
+#[must_use]
 pub fn evaluate_malformed_cond_clause_policy(
     options: MalformedCondClausePolicyOptions,
     summary: &MalformedCondClauseSummary,

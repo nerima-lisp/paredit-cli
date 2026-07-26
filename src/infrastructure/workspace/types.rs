@@ -79,30 +79,37 @@ impl Default for WorkspaceDiscovery {
 }
 
 impl WorkspaceDiscovery {
+    #[must_use]
     pub fn files(&self) -> &[PathBuf] {
         &self.files
     }
 
+    #[must_use]
     pub fn into_files(self) -> Vec<PathBuf> {
         self.files
     }
 
+    #[must_use]
     pub fn skipped_unknown_count(&self) -> usize {
         self.skipped_unknown_count
     }
 
+    #[must_use]
     pub fn skipped_hidden_count(&self) -> usize {
         self.skipped_hidden_count
     }
 
+    #[must_use]
     pub fn skipped_generated_count(&self) -> usize {
         self.skipped_generated_count
     }
 
+    #[must_use]
     pub fn skipped_symlink_count(&self) -> usize {
         self.skipped_symlink_count
     }
 
+    #[must_use]
     pub fn skipped_excluded_count(&self) -> usize {
         self.skipped_excluded_count
     }

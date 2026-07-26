@@ -69,10 +69,12 @@ pub struct UnusedLocalCallablePolicyOptions {
 }
 
 impl UnusedLocalCallablePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_unused: bool) -> Self {
         Self { fail_on_unused }
     }
 
+    #[must_use]
     pub const fn fail_on_unused(self) -> bool {
         self.fail_on_unused
     }
@@ -200,6 +202,7 @@ fn analyze_local_callable_form(
     }
 }
 
+#[must_use]
 pub fn evaluate_unused_local_callable_policy(
     options: UnusedLocalCallablePolicyOptions,
     reports: &[UnusedLocalCallableReportFile],

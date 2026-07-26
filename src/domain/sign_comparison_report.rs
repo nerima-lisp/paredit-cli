@@ -77,10 +77,12 @@ pub struct SignComparisonPolicyOptions {
 }
 
 impl SignComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -160,6 +162,7 @@ pub fn collect_sign_comparisons(
     Ok((comparison_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_sign_comparisons(
     comparison_form_count: usize,
     violations: Vec<SignComparisonItem>,
@@ -170,6 +173,7 @@ pub fn summarize_sign_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_sign_comparison_policy(
     options: SignComparisonPolicyOptions,
     summary: &SignComparisonSummary,

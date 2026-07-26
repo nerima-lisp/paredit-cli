@@ -58,10 +58,12 @@ pub struct EmptyBodyPolicyOptions {
 }
 
 impl EmptyBodyPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -126,6 +128,7 @@ pub fn collect_empty_bodies(
     Ok((body_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_empty_bodies(
     body_form_count: usize,
     violations: Vec<EmptyBodyItem>,
@@ -136,6 +139,7 @@ pub fn summarize_empty_bodies(
     }
 }
 
+#[must_use]
 pub fn evaluate_empty_body_policy(
     options: EmptyBodyPolicyOptions,
     summary: &EmptyBodySummary,

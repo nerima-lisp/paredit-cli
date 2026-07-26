@@ -19,6 +19,7 @@ pub enum SemanticOperation {
 
 impl SemanticOperation {
     /// Returns the stable CLI-facing operation name.
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::IntroduceLet => "introduce-let",
@@ -76,6 +77,7 @@ pub enum RelativeNodePath {
 
 impl RelativeNodePath {
     /// Returns the first child index in the path.
+    #[must_use]
     pub const fn child(self) -> usize {
         match self {
             Self::Child(child) | Self::Grandchild { child, .. } => child,
@@ -83,6 +85,7 @@ impl RelativeNodePath {
     }
 
     /// Returns the nested child index when this is a two-level path.
+    #[must_use]
     pub const fn grandchild(self) -> Option<usize> {
         match self {
             Self::Child(_) => None,
@@ -107,11 +110,13 @@ impl ParameterShape {
     }
 
     /// Returns the path to the parameter container.
+    #[must_use]
     pub const fn container(self) -> RelativeNodePath {
         self.container
     }
 
     /// Returns the first child in the container that denotes a parameter.
+    #[must_use]
     pub const fn first_parameter_index(self) -> usize {
         self.first_parameter_index
     }
@@ -158,21 +163,25 @@ impl DefinitionShape {
     }
 
     /// Returns the semantic category of this definition.
+    #[must_use]
     pub const fn category(self) -> DefinitionCategory {
         self.category
     }
 
     /// Returns the definition name path, if the form has a name.
+    #[must_use]
     pub const fn name(self) -> Option<RelativeNodePath> {
         self.name
     }
 
     /// Returns the callable parameter layout, if present.
+    #[must_use]
     pub const fn parameters(self) -> Option<ParameterShape> {
         self.parameters
     }
 
     /// Returns the body layout.
+    #[must_use]
     pub const fn body(self) -> BodyShape {
         self.body
     }
@@ -258,11 +267,13 @@ impl ScopeShape {
     }
 
     /// Returns the lexical binder layout.
+    #[must_use]
     pub const fn binders(self) -> BinderShape {
         self.binders
     }
 
     /// Returns the executable body layout.
+    #[must_use]
     pub const fn body(self) -> BodyShape {
         self.body
     }
@@ -404,21 +415,25 @@ pub struct VerifiedSemanticPolicy<O> {
 
 impl<O> VerifiedSemanticPolicy<O> {
     /// Returns the verified dialect.
+    #[must_use]
     pub const fn dialect(self) -> Dialect {
         self.policy.dialect()
     }
 
     /// Compares identifiers using the verified dialect's identity rules.
+    #[must_use]
     pub fn identifiers_equal(self, candidate: &str, expected: &str) -> bool {
         self.policy.identifiers_equal(candidate, expected)
     }
 
     /// Resolves a definition layout after validating the actual form.
+    #[must_use]
     pub fn definition_shape(self, form: &ExpressionView) -> Option<DefinitionShape> {
         self.policy.definition_shape(form)
     }
 
     /// Resolves a lexical scope layout after validating the actual form.
+    #[must_use]
     pub fn scope_shape(self, form: &ExpressionView) -> Option<ScopeShape> {
         self.policy.scope_shape(form)
     }
@@ -426,6 +441,7 @@ impl<O> VerifiedSemanticPolicy<O> {
 
 impl VerifiedSemanticPolicy<IntroduceLetOperation> {
     /// Returns the operation verified by this token type.
+    #[must_use]
     pub const fn operation(self) -> SemanticOperation {
         SemanticOperation::IntroduceLet
     }
@@ -433,6 +449,7 @@ impl VerifiedSemanticPolicy<IntroduceLetOperation> {
 
 impl VerifiedSemanticPolicy<RenameBindingOperation> {
     /// Returns the operation verified by this token type.
+    #[must_use]
     pub const fn operation(self) -> SemanticOperation {
         SemanticOperation::RenameBinding
     }
@@ -440,6 +457,7 @@ impl VerifiedSemanticPolicy<RenameBindingOperation> {
 
 impl VerifiedSemanticPolicy<ExtractFunctionOperation> {
     /// Returns the operation verified by this token type.
+    #[must_use]
     pub const fn operation(self) -> SemanticOperation {
         SemanticOperation::ExtractFunction
     }
@@ -454,11 +472,13 @@ pub struct UnsupportedSemanticOperation {
 
 impl UnsupportedSemanticOperation {
     /// Returns the unsupported dialect.
+    #[must_use]
     pub const fn dialect(self) -> Dialect {
         self.dialect
     }
 
     /// Returns the unverified operation.
+    #[must_use]
     pub const fn operation(self) -> SemanticOperation {
         self.operation
     }

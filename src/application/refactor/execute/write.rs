@@ -1,5 +1,6 @@
 use super::types::{RefactorWriteCandidate, RefactorWritePlan, RefactorWriteRefusal};
 
+#[must_use]
 pub fn build_refactor_write_plan(
     write_requested: bool,
     candidates: &[RefactorWriteCandidate],

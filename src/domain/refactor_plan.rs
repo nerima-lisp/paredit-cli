@@ -9,6 +9,7 @@ pub enum RefactorOperation {
 }
 
 impl RefactorOperation {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Rename => "rename",
@@ -30,6 +31,7 @@ pub enum RefactorPlanTargetKind {
 }
 
 impl RefactorPlanTargetKind {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Callable => "callable",
@@ -41,6 +43,7 @@ impl RefactorPlanTargetKind {
         }
     }
 
+    #[must_use]
     pub fn is_macro_like(self) -> bool {
         matches!(
             self,
@@ -48,10 +51,12 @@ impl RefactorPlanTargetKind {
         )
     }
 
+    #[must_use]
     pub fn skips_signature_compatibility(self) -> bool {
         self.is_macro_like()
     }
 
+    #[must_use]
     pub fn requires_call_coverage(self, operation: RefactorOperation) -> bool {
         match operation {
             RefactorOperation::Rename | RefactorOperation::Move => {
@@ -70,6 +75,7 @@ pub enum VerificationPhase {
 }
 
 impl VerificationPhase {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Pre => "pre",
@@ -86,6 +92,7 @@ pub enum RefactorRiskLevel {
 }
 
 impl RefactorRiskLevel {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Info => "info",
@@ -138,6 +145,7 @@ pub struct RefactorPlanRiskSummary {
 }
 
 impl RefactorPlanRiskSummary {
+    #[must_use]
     pub fn from_gates(gates: &[RefactorPlanGate]) -> Self {
         let mut summary = Self {
             highest_level: None,
@@ -196,12 +204,15 @@ impl RefactorPlanPolicyOptions {
         })
     }
 
+    #[must_use]
     pub const fn fail_on_blocking_gate(self) -> bool {
         self.fail_on_blocking_gate
     }
+    #[must_use]
     pub const fn require_definitions(self) -> Option<usize> {
         self.require_definitions
     }
+    #[must_use]
     pub const fn require_references(self) -> Option<usize> {
         self.require_references
     }
@@ -247,6 +258,7 @@ pub struct RawRefactorRisk {
     pub count: usize,
 }
 
+#[must_use]
 pub fn refactor_plan_gates(
     operation: RefactorOperation,
     target_kind: RefactorPlanTargetKind,
@@ -300,6 +312,7 @@ pub fn refactor_plan_gates(
     gates
 }
 
+#[must_use]
 pub fn evaluate_refactor_plan_policy(
     options: RefactorPlanPolicyOptions,
     summary: &RefactorPlanSummary,
@@ -340,6 +353,7 @@ pub fn evaluate_refactor_plan_policy(
     }
 }
 
+#[must_use]
 pub fn refactor_verification_checks(
     request: RefactorVerificationRequest<'_>,
     gates: &[RefactorPlanGate],

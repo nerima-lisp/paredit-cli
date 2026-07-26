@@ -159,6 +159,7 @@ pub fn insert_call_graph_node(
     }
 }
 
+#[must_use]
 pub fn build_call_graph_edge(
     call: CallReportItem,
     nodes_by_name: &BTreeMap<String, CallGraphNode>,
@@ -180,6 +181,7 @@ pub fn build_call_graph_edge(
     }
 }
 
+#[must_use]
 pub fn call_graph_edge_matches(edge: &CallGraphEdge, symbol: Option<&SymbolName>) -> bool {
     symbol
         .map(|symbol| {
@@ -347,19 +349,23 @@ impl CallGraphPolicyOptions {
         Ok(())
     }
 
+    #[must_use]
     pub const fn fail_on_inbound_callers(self) -> bool {
         self.fail_on_inbound_callers
     }
 
+    #[must_use]
     pub const fn require_edges(self) -> Option<usize> {
         self.require_edges
     }
 
+    #[must_use]
     pub const fn require_internal_edges(self) -> Option<usize> {
         self.require_internal_edges
     }
 }
 
+#[must_use]
 pub fn evaluate_call_graph_policy(
     reports: &[CallGraphFile],
     symbol: Option<&SymbolName>,

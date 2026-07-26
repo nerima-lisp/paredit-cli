@@ -55,10 +55,12 @@ pub struct CarNthcdrPolicyOptions {
 }
 
 impl CarNthcdrPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -143,6 +145,7 @@ pub fn collect_car_nthcdrs(
     Ok((car_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_car_nthcdrs(
     car_form_count: usize,
     violations: Vec<CarNthcdrItem>,
@@ -153,6 +156,7 @@ pub fn summarize_car_nthcdrs(
     }
 }
 
+#[must_use]
 pub fn evaluate_car_nthcdr_policy(
     options: CarNthcdrPolicyOptions,
     summary: &CarNthcdrSummary,

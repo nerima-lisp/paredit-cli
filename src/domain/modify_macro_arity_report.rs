@@ -84,10 +84,12 @@ pub struct ModifyMacroArityPolicyOptions {
 }
 
 impl ModifyMacroArityPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -161,6 +163,7 @@ pub fn collect_modify_macro_arity_violations(
     Ok((call_count, violations))
 }
 
+#[must_use]
 pub fn summarize_modify_macro_arity(
     call_count: usize,
     violations: Vec<ModifyMacroArityItem>,
@@ -171,6 +174,7 @@ pub fn summarize_modify_macro_arity(
     }
 }
 
+#[must_use]
 pub fn evaluate_modify_macro_arity_policy(
     options: ModifyMacroArityPolicyOptions,
     summary: &ModifyMacroAritySummary,
@@ -191,6 +195,7 @@ pub fn evaluate_modify_macro_arity_policy(
 }
 
 /// A human phrase for the expected arity of one violation, e.g. `exactly 2`.
+#[must_use]
 pub fn expected_arity_phrase(item: &ModifyMacroArityItem) -> String {
     arity_phrase(item.min_arity, item.max_arity)
 }

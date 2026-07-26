@@ -73,10 +73,12 @@ pub struct NthcdrSmallIndexPolicyOptions {
 }
 
 impl NthcdrSmallIndexPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -150,6 +152,7 @@ pub fn collect_nthcdr_small_indexes(
     Ok((nthcdr_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_nthcdr_small_indexes(
     nthcdr_form_count: usize,
     violations: Vec<NthcdrSmallIndexItem>,
@@ -160,6 +163,7 @@ pub fn summarize_nthcdr_small_indexes(
     }
 }
 
+#[must_use]
 pub fn evaluate_nthcdr_small_index_policy(
     options: NthcdrSmallIndexPolicyOptions,
     summary: &NthcdrSmallIndexSummary,

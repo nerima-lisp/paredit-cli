@@ -73,6 +73,7 @@ impl EqNumberComparisonItem {
     /// Empty for a type-derived detection, which the standalone `inspect`
     /// command never produces — it passes [`never`], so every item it renders
     /// carries a spelling.
+    #[must_use]
     pub fn literal(&self) -> &str {
         match &self.evidence {
             NumberEvidence::Literal(text) => text,
@@ -93,10 +94,12 @@ pub struct EqNumberComparisonPolicyOptions {
 }
 
 impl EqNumberComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -189,6 +192,7 @@ pub fn collect_eq_number_comparisons(
     Ok((comparison_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_eq_number_comparisons(
     comparison_form_count: usize,
     violations: Vec<EqNumberComparisonItem>,
@@ -199,6 +203,7 @@ pub fn summarize_eq_number_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_eq_number_comparison_policy(
     options: EqNumberComparisonPolicyOptions,
     summary: &EqNumberComparisonSummary,

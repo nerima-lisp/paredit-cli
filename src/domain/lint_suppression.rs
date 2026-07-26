@@ -62,6 +62,7 @@ pub struct LintSuppressions {
 
 impl LintSuppressions {
     /// Parses every `paredit:ignore` directive in `text`.
+    #[must_use]
     pub fn parse(text: &str) -> Self {
         let mut by_line = HashMap::new();
         let mut directives = Vec::new();
@@ -97,6 +98,7 @@ impl LintSuppressions {
     }
 
     /// Whether `rule` is suppressed on 1-based `line`.
+    #[must_use]
     pub fn is_suppressed(&self, rule: &str, line: usize) -> bool {
         match self.by_line.get(&line) {
             None => false,
@@ -106,6 +108,7 @@ impl LintSuppressions {
     }
 
     /// Whether any directive was parsed (for reporting/telemetry).
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.by_line.is_empty()
     }
@@ -115,6 +118,7 @@ impl LintSuppressions {
     /// actually reported a finding there. A bare `paredit:ignore` is unused
     /// when its target line has no finding at all; a named directive is unused
     /// for each listed rule absent from its target line.
+    #[must_use]
     pub fn unused_directives(
         &self,
         present: &HashMap<usize, HashSet<&'static str>>,

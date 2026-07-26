@@ -68,10 +68,12 @@ pub struct SystemConflictPolicyOptions {
 }
 
 impl SystemConflictPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_conflict: bool) -> Self {
         Self { fail_on_conflict }
     }
 
+    #[must_use]
     pub const fn fail_on_conflict(self) -> bool {
         self.fail_on_conflict
     }
@@ -121,6 +123,7 @@ pub fn collect_declared_systems(
     Ok(declared)
 }
 
+#[must_use]
 pub fn analyze_system_conflicts(declared: &[DeclaredSystem]) -> SystemConflictSummary {
     let mut groups: BTreeMap<String, Vec<&DeclaredSystem>> = BTreeMap::new();
     for system in declared {
@@ -154,6 +157,7 @@ pub fn analyze_system_conflicts(declared: &[DeclaredSystem]) -> SystemConflictSu
     }
 }
 
+#[must_use]
 pub fn evaluate_system_conflict_policy(
     options: SystemConflictPolicyOptions,
     summary: &SystemConflictSummary,

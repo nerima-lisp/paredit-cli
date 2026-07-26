@@ -43,6 +43,7 @@ pub enum ImpactRiskLevel {
 }
 
 impl ImpactRiskLevel {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Info => "info",
@@ -99,18 +100,22 @@ impl ImpactReportPolicyOptions {
         Ok(())
     }
 
+    #[must_use]
     pub const fn fail_on_risk_level(self) -> Option<ImpactRiskLevel> {
         self.fail_on_risk_level
     }
 
+    #[must_use]
     pub const fn require_definitions(self) -> Option<usize> {
         self.require_definitions
     }
 
+    #[must_use]
     pub const fn require_references(self) -> Option<usize> {
         self.require_references
     }
 
+    #[must_use]
     pub const fn require_calls(self) -> Option<usize> {
         self.require_calls
     }
@@ -141,6 +146,7 @@ pub struct ImpactReportPolicy {
     pub violations: Vec<String>,
 }
 
+#[must_use]
 pub fn evaluate_impact_report_policy(
     options: ImpactReportPolicyOptions,
     summary: &RefactorPlanSummary,

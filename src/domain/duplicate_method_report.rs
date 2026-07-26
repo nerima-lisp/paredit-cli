@@ -113,10 +113,12 @@ pub struct DuplicateMethodPolicyOptions {
 }
 
 impl DuplicateMethodPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
+    #[must_use]
     pub const fn fail_on_duplicate(self) -> bool {
         self.fail_on_duplicate
     }
@@ -194,6 +196,7 @@ pub fn collect_declared_methods(
 /// overloads.
 type MethodIdentity = (String, Option<String>, Vec<String>);
 
+#[must_use]
 pub fn analyze_duplicate_methods(declared: &[DeclaredMethod]) -> DuplicateMethodSummary {
     let mut groups: BTreeMap<MethodIdentity, Vec<&DeclaredMethod>> = BTreeMap::new();
     for method in declared {
@@ -230,6 +233,7 @@ pub fn analyze_duplicate_methods(declared: &[DeclaredMethod]) -> DuplicateMethod
     }
 }
 
+#[must_use]
 pub fn evaluate_duplicate_method_policy(
     options: DuplicateMethodPolicyOptions,
     summary: &DuplicateMethodSummary,

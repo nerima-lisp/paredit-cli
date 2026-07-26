@@ -57,10 +57,12 @@ pub struct ParseIntegerDefaultRadixPolicyOptions {
 }
 
 impl ParseIntegerDefaultRadixPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -149,6 +151,7 @@ pub fn collect_parse_integer_default_radixes(
     Ok((call_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_parse_integer_default_radixes(
     call_form_count: usize,
     violations: Vec<ParseIntegerDefaultRadixItem>,
@@ -159,6 +162,7 @@ pub fn summarize_parse_integer_default_radixes(
     }
 }
 
+#[must_use]
 pub fn evaluate_parse_integer_default_radix_policy(
     options: ParseIntegerDefaultRadixPolicyOptions,
     summary: &ParseIntegerDefaultRadixSummary,

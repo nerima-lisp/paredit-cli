@@ -8,6 +8,7 @@ use crate::domain::lint::registry::catalog::{RULES, rule_severity};
 /// Summarizes findings, keeping only those from `active` rules; `per_rule`
 /// lists exactly the active rules (in [`RULES`] order) so the checklist
 /// reflects what actually ran.
+#[must_use]
 pub fn summarize_lint_findings(findings: Vec<LintFinding>, active: &[&str]) -> LintSummary {
     let findings: Vec<LintFinding> = findings
         .into_iter()
@@ -39,6 +40,7 @@ pub fn summarize_lint_findings(findings: Vec<LintFinding>, active: &[&str]) -> L
 /// findings out as they are produced and never build one. Both readings go
 /// through this function so the gate has a single implementation — two would
 /// drift the moment a third condition is added.
+#[must_use]
 pub fn lint_gate_violations(options: LintPolicyOptions, finding_rules: &[&str]) -> Vec<String> {
     let mut violations = Vec::new();
     if options.fail_on_finding() && !finding_rules.is_empty() {
@@ -61,6 +63,7 @@ pub fn lint_gate_violations(options: LintPolicyOptions, finding_rules: &[&str]) 
 
 /// Judges a summary against the requested gate, listing each violated
 /// condition so the caller can report why the run failed.
+#[must_use]
 pub fn evaluate_lint_policy(options: LintPolicyOptions, summary: &LintSummary) -> LintPolicy {
     let finding_rules: Vec<&str> = summary
         .findings

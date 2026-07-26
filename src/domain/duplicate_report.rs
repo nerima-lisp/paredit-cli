@@ -63,6 +63,7 @@ struct CandidateLocator {
 }
 
 impl DuplicateCandidateAccumulator {
+    #[must_use]
     pub fn new(min_node_count: usize) -> Self {
         Self {
             min_node_count,
@@ -381,6 +382,7 @@ fn same_duplicate_shape(left: &ExpressionView, right: &ExpressionView) -> bool {
     true
 }
 
+#[must_use]
 pub fn collect_replacement_plan_batches(
     grouped: DuplicateCandidateGroups,
     min_group_size: usize,
@@ -419,6 +421,7 @@ pub fn collect_replacement_plan_batches(
     batches
 }
 
+#[must_use]
 pub fn build_duplicate_shape_reports(
     grouped: DuplicateCandidateGroups,
     min_group_size: usize,

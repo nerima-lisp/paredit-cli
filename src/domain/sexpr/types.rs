@@ -10,11 +10,13 @@ pub struct ByteOffset(usize);
 
 impl ByteOffset {
     /// Creates an offset from a raw byte index.
+    #[must_use]
     pub const fn new(value: usize) -> Self {
         Self(value)
     }
 
     /// Returns the raw byte index.
+    #[must_use]
     pub const fn get(self) -> usize {
         self.0
     }
@@ -32,11 +34,13 @@ impl ByteSpan {
     ///
     /// This constructor preserves the historical unchecked behavior. Use
     /// [`Self::try_new`] when input ordering is not trusted.
+    #[must_use]
     pub const fn new(start: ByteOffset, end: ByteOffset) -> Self {
         Self { start, end }
     }
 
     /// Attempts to create a span from byte offsets.
+    #[must_use]
     pub const fn try_new(start: ByteOffset, end: ByteOffset) -> Option<Self> {
         if start.get() <= end.get() {
             Some(Self { start, end })
@@ -46,36 +50,43 @@ impl ByteSpan {
     }
 
     /// Returns the inclusive start boundary as a byte offset.
+    #[must_use]
     pub const fn start(&self) -> ByteOffset {
         self.start
     }
 
     /// Returns the exclusive end boundary as a byte offset.
+    #[must_use]
     pub const fn end(&self) -> ByteOffset {
         self.end
     }
 
     /// Returns the span length in bytes, saturating at zero for invalid order.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.end.get().saturating_sub(self.start.get())
     }
 
     /// Returns `true` when the span covers no bytes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.start == self.end
     }
 
     /// Returns `true` when `offset` lies inside the half-open range.
+    #[must_use]
     pub fn contains(&self, offset: ByteOffset) -> bool {
         self.start.get() <= offset.get() && offset.get() < self.end.get()
     }
 
     /// Returns `true` when `inner` lies entirely inside this span.
+    #[must_use]
     pub fn contains_span(&self, inner: ByteSpan) -> bool {
         self.start.get() <= inner.start.get() && inner.end.get() <= self.end.get()
     }
 
     /// Exposes the span as a Rust range over byte indexes.
+    #[must_use]
     pub fn as_range(&self) -> Range<usize> {
         self.start.get()..self.end.get()
     }
@@ -100,6 +111,7 @@ impl ByteSpan {
     }
 
     /// Borrows the substring covered by this byte span.
+    #[must_use]
     pub fn slice<'a>(&self, input: &'a str) -> &'a str {
         &input[self.as_range()]
     }
@@ -167,11 +179,13 @@ pub struct ChildIndex(usize);
 
 impl ChildIndex {
     /// Creates a child index from its zero-based position.
+    #[must_use]
     pub const fn new(value: usize) -> Self {
         Self(value)
     }
 
     /// Returns the zero-based child position.
+    #[must_use]
     pub const fn get(self) -> usize {
         self.0
     }
@@ -220,6 +234,7 @@ pub type Path = ExpressionPath;
 
 impl ExpressionPath {
     /// Builds a path that points to one root-level child expression.
+    #[must_use]
     pub fn root_child(index: usize) -> Self {
         Self::from_indexes(vec![index])
     }
@@ -230,16 +245,19 @@ impl ExpressionPath {
     }
 
     /// Returns the typed child indexes that form this path.
+    #[must_use]
     pub fn indexes(&self) -> &[ChildIndex] {
         &self.0
     }
 
     /// Clones this path into raw zero-based indexes.
+    #[must_use]
     pub fn to_raw_indexes(&self) -> Vec<usize> {
         self.0.iter().map(|index| index.get()).collect()
     }
 
     /// Returns a new path extended by one child position.
+    #[must_use]
     pub fn child(&self, index: usize) -> Self {
         let mut indexes = self.0.clone();
         indexes.push(ChildIndex::new(index));
@@ -247,6 +265,7 @@ impl ExpressionPath {
     }
 
     /// Returns the parent path, or `None` for the virtual root.
+    #[must_use]
     pub fn parent(&self) -> Option<Self> {
         let mut indexes = self.0.clone();
         indexes.pop()?;
@@ -254,6 +273,7 @@ impl ExpressionPath {
     }
 
     /// Returns a new path extended by a fixed list of child positions.
+    #[must_use]
     pub fn descendant<const N: usize>(&self, indexes: [usize; N]) -> Self {
         let mut path = self.clone();
         for index in indexes {
@@ -311,6 +331,7 @@ impl SymbolName {
     }
 
     /// Returns the original symbol text.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }

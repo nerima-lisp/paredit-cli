@@ -67,17 +67,20 @@ impl DefinitionShape {
             .and_then(definition_name_text)
     }
 
+    #[must_use]
     pub fn body_form_count(self, view: &ExpressionView) -> usize {
         view.children
             .len()
             .saturating_sub(self.body_start_child_index)
     }
 
+    #[must_use]
     pub fn body_forms(self, view: &ExpressionView) -> &[ExpressionView] {
         let start = self.body_start_child_index.min(view.children.len());
         &view.children[start..]
     }
 
+    #[must_use]
     pub fn lambda_list(self, view: &ExpressionView) -> Option<&ExpressionView> {
         self.lambda_list_child_index
             .and_then(|index| view.children.get(index))
@@ -97,6 +100,7 @@ impl DefinitionShape {
             .map(definition_lambda_parameter_arity)
     }
 
+    #[must_use]
     pub fn name_target<'a>(
         self,
         view: &'a ExpressionView,
@@ -107,6 +111,7 @@ impl DefinitionShape {
         definition_name_target(name, &parent_path.child(index))
     }
 
+    #[must_use]
     pub fn body_range(self) -> DefinitionBodyRange {
         DefinitionBodyRange {
             start_child_index: self.body_start_child_index,
@@ -115,6 +120,7 @@ impl DefinitionShape {
     }
 
     /// Returns a body range bounded by the children present in `view`.
+    #[must_use]
     pub fn body_range_in(self, view: &ExpressionView) -> DefinitionBodyRange {
         DefinitionBodyRange {
             start_child_index: self.body_start_child_index,
@@ -124,11 +130,13 @@ impl DefinitionShape {
 }
 
 impl DefinitionBodyRange {
+    #[must_use]
     pub fn contains_child(self, child_index: usize) -> bool {
         child_index >= self.start_child_index
             && self.end_child_index.is_none_or(|end| child_index < end)
     }
 
+    #[must_use]
     pub fn child_path(self, parent_path: &Path, child_index: usize) -> Option<Path> {
         self.contains_child(child_index)
             .then(|| parent_path.child(child_index))
@@ -136,6 +144,7 @@ impl DefinitionBodyRange {
 }
 
 impl DefinitionCategory {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Function => "function",
@@ -158,6 +167,7 @@ impl DefinitionCategory {
         }
     }
 
+    #[must_use]
     pub fn from_label(label: &str) -> Option<Self> {
         match label {
             "function" => Some(Self::Function),
@@ -181,6 +191,7 @@ impl DefinitionCategory {
         }
     }
 
+    #[must_use]
     pub fn is_callable(self) -> bool {
         matches!(
             self,
@@ -220,6 +231,7 @@ impl DefinitionCategory {
     /// definitions are conventionally discovered by a human through `M-x`
     /// or a customize buffer rather than called by name from other Lisp
     /// forms, so the same reasoning applies to them.
+    #[must_use]
     pub fn is_bulk_removable(self) -> bool {
         matches!(
             self,
@@ -241,6 +253,7 @@ fn definition_name_child_index(_head: &str) -> Option<usize> {
     Some(1)
 }
 
+#[must_use]
 pub fn definition_shape(
     dialect: Dialect,
     view: &ExpressionView,
@@ -260,6 +273,7 @@ pub fn definition_shape(
 }
 
 /// Whether the definition body returns code to be evaluated by a Lisp macro expander.
+#[must_use]
 pub fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool {
     classify::is_macro_expander_definition(dialect, head)
 }

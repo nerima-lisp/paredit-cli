@@ -63,10 +63,12 @@ pub struct ExplicitStepDeltaPolicyOptions {
 }
 
 impl ExplicitStepDeltaPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -145,6 +147,7 @@ pub fn collect_explicit_step_deltas(
     Ok((step_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_explicit_step_deltas(
     step_form_count: usize,
     violations: Vec<ExplicitStepDeltaItem>,
@@ -155,6 +158,7 @@ pub fn summarize_explicit_step_deltas(
     }
 }
 
+#[must_use]
 pub fn evaluate_explicit_step_delta_policy(
     options: ExplicitStepDeltaPolicyOptions,
     summary: &ExplicitStepDeltaSummary,

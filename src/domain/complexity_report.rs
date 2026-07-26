@@ -71,10 +71,12 @@ pub struct ComplexityReportPolicyOptions {
 }
 
 impl ComplexityReportPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_max_depth: Option<usize>) -> Self {
         Self { fail_on_max_depth }
     }
 
+    #[must_use]
     pub const fn fail_on_max_depth(self) -> Option<usize> {
         self.fail_on_max_depth
     }
@@ -140,6 +142,7 @@ pub fn build_complexity_report(
     })
 }
 
+#[must_use]
 pub fn evaluate_complexity_report_policy(
     options: ComplexityReportPolicyOptions,
     reports: &[ComplexityReportFile],

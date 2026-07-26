@@ -2,6 +2,7 @@ use crate::domain::sexpr::ByteSpan;
 
 use super::types::RefactorPreviewEdit;
 
+#[must_use]
 pub fn refactor_preview_edits(edits: &[(ByteSpan, String)]) -> Vec<RefactorPreviewEdit> {
     let mut preview_edits = edits
         .iter()

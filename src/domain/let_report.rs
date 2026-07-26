@@ -44,14 +44,17 @@ impl LetReportPolicyOptions {
         })
     }
 
+    #[must_use]
     pub const fn fail_on_duplicate_evaluation(self) -> bool {
         self.fail_on_duplicate_evaluation
     }
 
+    #[must_use]
     pub const fn fail_on_unused_binding(self) -> bool {
         self.fail_on_unused_binding
     }
 
+    #[must_use]
     pub const fn require_inlineable_bindings(self) -> Option<usize> {
         self.require_inlineable_bindings
     }
@@ -91,6 +94,7 @@ pub struct LetReportPolicy {
     pub violations: Vec<String>,
 }
 
+#[must_use]
 pub fn evaluate_let_report_policy(
     reports: &[LetFormReport],
     options: &LetReportPolicyOptions,

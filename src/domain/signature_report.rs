@@ -22,6 +22,7 @@ pub struct SignatureReportSource {
 }
 
 impl SignatureReportSource {
+    #[must_use]
     pub const fn new(path: PathBuf, dialect: Dialect, tree: SyntaxTree) -> Self {
         Self {
             path,
@@ -40,6 +41,7 @@ pub struct SignatureReportFile {
 }
 
 impl SignatureReportFile {
+    #[must_use]
     pub const fn new(
         path: PathBuf,
         dialect: Dialect,
@@ -76,6 +78,7 @@ pub struct SignatureCallItem {
 }
 
 impl SignatureCallItem {
+    #[must_use]
     pub const fn new(
         call: CallReportItem,
         expected_parameter_arity: Option<(usize, Option<usize>)>,
@@ -88,6 +91,7 @@ impl SignatureCallItem {
         }
     }
 
+    #[must_use]
     pub const fn is_mismatch(&self) -> bool {
         matches!(
             self.status,
@@ -106,6 +110,7 @@ pub enum SignatureCallStatus {
 }
 
 impl SignatureCallStatus {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Exact => "exact",
@@ -116,6 +121,7 @@ impl SignatureCallStatus {
         }
     }
 
+    #[must_use]
     pub const fn is_mismatch(self) -> bool {
         matches!(self, Self::MissingArguments | Self::ExtraArguments)
     }
@@ -133,6 +139,7 @@ pub struct SignatureReportPolicy {
     pub violations: Vec<String>,
 }
 
+#[must_use]
 pub fn evaluate_signature_report_policy(
     definition_count: usize,
     statuses: &[SignatureCallStatus],

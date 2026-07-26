@@ -54,10 +54,12 @@ impl UnusedDefinitionPolicyOptions {
         })
     }
 
+    #[must_use]
     pub const fn fail_on_unused(self) -> bool {
         self.fail_on_unused
     }
 
+    #[must_use]
     pub const fn require_unused_definitions(self) -> Option<usize> {
         self.require_unused_definitions
     }
@@ -357,6 +359,7 @@ pub fn collect_definition_forms(
     Ok((current_package, definitions))
 }
 
+#[must_use]
 pub fn unused_definition_candidate_count(reports: &[UnusedDefinitionFile]) -> usize {
     reports
         .iter()
@@ -365,6 +368,7 @@ pub fn unused_definition_candidate_count(reports: &[UnusedDefinitionFile]) -> us
         .count()
 }
 
+#[must_use]
 pub fn unused_definition_actionable_candidate_count(reports: &[UnusedDefinitionFile]) -> usize {
     reports
         .iter()
@@ -373,6 +377,7 @@ pub fn unused_definition_actionable_candidate_count(reports: &[UnusedDefinitionF
         .count()
 }
 
+#[must_use]
 pub fn evaluate_unused_definition_policy(
     options: UnusedDefinitionPolicyOptions,
     reports: &[UnusedDefinitionFile],

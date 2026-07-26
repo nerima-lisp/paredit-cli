@@ -71,10 +71,12 @@ pub struct CharCaseFoldPolicyOptions {
 }
 
 impl CharCaseFoldPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -152,6 +154,7 @@ pub fn collect_char_case_folds(
     Ok((compare_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_char_case_folds(
     compare_form_count: usize,
     violations: Vec<CharCaseFoldItem>,
@@ -162,6 +165,7 @@ pub fn summarize_char_case_folds(
     }
 }
 
+#[must_use]
 pub fn evaluate_char_case_fold_policy(
     options: CharCaseFoldPolicyOptions,
     summary: &CharCaseFoldSummary,

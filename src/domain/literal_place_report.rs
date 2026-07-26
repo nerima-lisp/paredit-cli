@@ -98,10 +98,12 @@ pub struct LiteralPlacePolicyOptions {
 }
 
 impl LiteralPlacePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -172,6 +174,7 @@ pub fn collect_literal_places(
     Ok((modify_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_literal_places(
     modify_form_count: usize,
     violations: Vec<LiteralPlaceItem>,
@@ -182,6 +185,7 @@ pub fn summarize_literal_places(
     }
 }
 
+#[must_use]
 pub fn evaluate_literal_place_policy(
     options: LiteralPlacePolicyOptions,
     summary: &LiteralPlaceSummary,

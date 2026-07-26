@@ -70,10 +70,12 @@ pub struct NegatedIfPolicyOptions {
 }
 
 impl NegatedIfPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -149,6 +151,7 @@ pub fn collect_negated_ifs(
     Ok((if_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_negated_ifs(
     if_form_count: usize,
     violations: Vec<NegatedIfItem>,
@@ -159,6 +162,7 @@ pub fn summarize_negated_ifs(
     }
 }
 
+#[must_use]
 pub fn evaluate_negated_if_policy(
     options: NegatedIfPolicyOptions,
     summary: &NegatedIfSummary,

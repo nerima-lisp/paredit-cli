@@ -71,10 +71,12 @@ pub struct ExplicitNilReturnPolicyOptions {
 }
 
 impl ExplicitNilReturnPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -168,6 +170,7 @@ pub fn collect_explicit_nil_returns(
     Ok((return_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_explicit_nil_returns(
     return_form_count: usize,
     violations: Vec<ExplicitNilReturnItem>,
@@ -178,6 +181,7 @@ pub fn summarize_explicit_nil_returns(
     }
 }
 
+#[must_use]
 pub fn evaluate_explicit_nil_return_policy(
     options: ExplicitNilReturnPolicyOptions,
     summary: &ExplicitNilReturnSummary,

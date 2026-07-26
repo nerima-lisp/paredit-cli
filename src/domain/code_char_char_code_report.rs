@@ -55,10 +55,12 @@ pub struct CodeCharCharCodePolicyOptions {
 }
 
 impl CodeCharCharCodePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -141,6 +143,7 @@ pub fn collect_code_char_char_codes(
     Ok((code_char_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_code_char_char_codes(
     code_char_form_count: usize,
     violations: Vec<CodeCharCharCodeItem>,
@@ -151,6 +154,7 @@ pub fn summarize_code_char_char_codes(
     }
 }
 
+#[must_use]
 pub fn evaluate_code_char_char_code_policy(
     options: CodeCharCharCodePolicyOptions,
     summary: &CodeCharCharCodeSummary,

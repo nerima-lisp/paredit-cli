@@ -72,10 +72,12 @@ pub struct DuplicateSlotPolicyOptions {
 }
 
 impl DuplicateSlotPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
+    #[must_use]
     pub const fn fail_on_duplicate(self) -> bool {
         self.fail_on_duplicate
     }
@@ -159,6 +161,7 @@ pub fn collect_duplicate_slots(
     Ok((definition_count, duplicates))
 }
 
+#[must_use]
 pub fn summarize_duplicate_slots(
     definition_count: usize,
     duplicates: Vec<DuplicateSlotItem>,
@@ -169,6 +172,7 @@ pub fn summarize_duplicate_slots(
     }
 }
 
+#[must_use]
 pub fn evaluate_duplicate_slot_policy(
     options: DuplicateSlotPolicyOptions,
     summary: &DuplicateSlotSummary,

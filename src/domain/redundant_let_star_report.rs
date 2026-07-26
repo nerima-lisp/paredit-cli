@@ -58,10 +58,12 @@ pub struct RedundantLetStarPolicyOptions {
 }
 
 impl RedundantLetStarPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -141,6 +143,7 @@ pub fn collect_redundant_let_stars(
     Ok((let_star_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_let_stars(
     let_star_form_count: usize,
     violations: Vec<RedundantLetStarItem>,
@@ -151,6 +154,7 @@ pub fn summarize_redundant_let_stars(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_let_star_policy(
     options: RedundantLetStarPolicyOptions,
     summary: &RedundantLetStarSummary,

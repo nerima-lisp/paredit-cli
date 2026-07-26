@@ -8,6 +8,7 @@ pub enum UnthreadStyle {
 }
 
 impl UnthreadStyle {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::First => "first",

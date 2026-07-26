@@ -8,6 +8,7 @@ pub enum ThreadStyle {
 }
 
 impl ThreadStyle {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::First => "first",
@@ -15,6 +16,7 @@ impl ThreadStyle {
         }
     }
 
+    #[must_use]
     pub fn default_operator(self) -> &'static str {
         match self {
             Self::First => "->",

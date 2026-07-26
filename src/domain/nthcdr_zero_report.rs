@@ -58,10 +58,12 @@ pub struct NthcdrZeroPolicyOptions {
 }
 
 impl NthcdrZeroPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -134,6 +136,7 @@ pub fn collect_nthcdr_zeros(
     Ok((nthcdr_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_nthcdr_zeros(
     nthcdr_form_count: usize,
     violations: Vec<NthcdrZeroItem>,
@@ -144,6 +147,7 @@ pub fn summarize_nthcdr_zeros(
     }
 }
 
+#[must_use]
 pub fn evaluate_nthcdr_zero_policy(
     options: NthcdrZeroPolicyOptions,
     summary: &NthcdrZeroSummary,

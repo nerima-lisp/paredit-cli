@@ -44,12 +44,14 @@ pub struct ReachabilityReportPolicyOptions {
 }
 
 impl ReachabilityReportPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_unreachable: bool) -> Self {
         Self {
             fail_on_unreachable,
         }
     }
 
+    #[must_use]
     pub const fn fail_on_unreachable(self) -> bool {
         self.fail_on_unreachable
     }
@@ -70,6 +72,7 @@ pub struct ReachabilityReportPolicy {
 /// [`crate::domain::call_graph_report::build_call_graph_report`] with
 /// `include_external: false`, so every edge in the input already targets a
 /// definition known within the scanned file set.
+#[must_use]
 pub fn analyze_reachability(files: &[CallGraphFile]) -> ReachabilityReportSummary {
     // needle -> (file_index, item) for every callable definition, keeping the
     // first-seen location when a name is (re)defined more than once.
@@ -174,6 +177,7 @@ pub fn analyze_reachability(files: &[CallGraphFile]) -> ReachabilityReportSummar
     }
 }
 
+#[must_use]
 pub fn evaluate_reachability_policy(
     options: ReachabilityReportPolicyOptions,
     summary: &ReachabilityReportSummary,

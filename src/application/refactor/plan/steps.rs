@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use super::types::RefactorPlanStep;
 use crate::domain::refactor_plan::{RefactorOperation, RefactorPlanGate, RefactorPlanTargetKind};
 
+#[must_use]
 pub fn refactor_plan_steps(
     operation: RefactorOperation,
     symbol: &str,

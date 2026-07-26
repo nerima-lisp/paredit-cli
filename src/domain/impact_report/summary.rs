@@ -5,6 +5,7 @@ use crate::domain::signature_report::SignatureCallStatus;
 
 use super::{ImpactReportFile, ImpactRisk, ImpactRiskLevel};
 
+#[must_use]
 pub fn impact_status_counts(reports: &[ImpactReportFile]) -> BTreeMap<SignatureCallStatus, usize> {
     let mut by_status = BTreeMap::new();
     for report in reports {
@@ -15,6 +16,7 @@ pub fn impact_status_counts(reports: &[ImpactReportFile]) -> BTreeMap<SignatureC
     by_status
 }
 
+#[must_use]
 pub fn summarize_impact_reports(files: &[ImpactReportFile]) -> RefactorPlanSummary {
     RefactorPlanSummary {
         file_count: files.len(),
@@ -48,6 +50,7 @@ pub fn summarize_impact_reports(files: &[ImpactReportFile]) -> RefactorPlanSumma
     }
 }
 
+#[must_use]
 pub fn raw_refactor_risks(summary: &RefactorPlanSummary) -> Vec<RawRefactorRisk> {
     let mut by_status = BTreeMap::new();
     if summary.signature_mismatch_count > 0 {
@@ -73,6 +76,7 @@ pub fn raw_refactor_risks(summary: &RefactorPlanSummary) -> Vec<RawRefactorRisk>
     .collect()
 }
 
+#[must_use]
 pub fn impact_risks(
     definition_count: usize,
     inbound_edge_count: usize,

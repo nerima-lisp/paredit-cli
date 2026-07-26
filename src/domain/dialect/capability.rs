@@ -7,6 +7,7 @@ use crate::domain::common_lisp::{
 use super::Dialect;
 
 impl Dialect {
+    #[must_use]
     pub fn is_definition_head(self, head: &str) -> bool {
         match self {
             Self::CommonLisp => common_lisp_operator(head)

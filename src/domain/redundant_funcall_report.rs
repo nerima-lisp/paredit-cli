@@ -78,10 +78,12 @@ pub struct RedundantFuncallPolicyOptions {
 }
 
 impl RedundantFuncallPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -155,6 +157,7 @@ pub fn collect_redundant_funcalls(
     Ok((funcall_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_funcalls(
     funcall_form_count: usize,
     violations: Vec<RedundantFuncallItem>,
@@ -165,6 +168,7 @@ pub fn summarize_redundant_funcalls(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_funcall_policy(
     options: RedundantFuncallPolicyOptions,
     summary: &RedundantFuncallSummary,

@@ -67,10 +67,12 @@ pub struct UnreachableCaseClausePolicyOptions {
 }
 
 impl UnreachableCaseClausePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -158,6 +160,7 @@ pub fn collect_unreachable_case_clauses(
     Ok((case_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_unreachable_case_clauses(
     case_form_count: usize,
     violations: Vec<UnreachableCaseClauseItem>,
@@ -168,6 +171,7 @@ pub fn summarize_unreachable_case_clauses(
     }
 }
 
+#[must_use]
 pub fn evaluate_unreachable_case_clause_policy(
     options: UnreachableCaseClausePolicyOptions,
     summary: &UnreachableCaseClauseSummary,

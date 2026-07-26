@@ -59,10 +59,12 @@ pub struct DuplicateSetfPlacePolicyOptions {
 }
 
 impl DuplicateSetfPlacePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -139,6 +141,7 @@ pub fn collect_duplicate_setf_places(
     Ok((assignment_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_duplicate_setf_places(
     assignment_form_count: usize,
     violations: Vec<DuplicateSetfPlaceItem>,
@@ -149,6 +152,7 @@ pub fn summarize_duplicate_setf_places(
     }
 }
 
+#[must_use]
 pub fn evaluate_duplicate_setf_place_policy(
     options: DuplicateSetfPlacePolicyOptions,
     summary: &DuplicateSetfPlaceSummary,

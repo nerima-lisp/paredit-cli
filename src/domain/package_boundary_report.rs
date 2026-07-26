@@ -76,10 +76,12 @@ pub struct PackageBoundaryPolicyOptions {
 }
 
 impl PackageBoundaryPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -181,6 +183,7 @@ pub fn build_package_boundary_report(
     })
 }
 
+#[must_use]
 pub fn evaluate_package_boundary_policy(
     options: PackageBoundaryPolicyOptions,
     reports: &[PackageBoundaryReportFile],

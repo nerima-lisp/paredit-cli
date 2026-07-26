@@ -50,10 +50,12 @@ pub struct LastDefaultCountPolicyOptions {
 }
 
 impl LastDefaultCountPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -121,6 +123,7 @@ pub fn collect_last_default_counts(
     Ok((call_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_last_default_counts(
     call_form_count: usize,
     violations: Vec<LastDefaultCountItem>,
@@ -131,6 +134,7 @@ pub fn summarize_last_default_counts(
     }
 }
 
+#[must_use]
 pub fn evaluate_last_default_count_policy(
     options: LastDefaultCountPolicyOptions,
     summary: &LastDefaultCountSummary,

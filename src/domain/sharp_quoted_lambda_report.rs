@@ -47,10 +47,12 @@ pub struct SharpQuotedLambdaPolicyOptions {
 }
 
 impl SharpQuotedLambdaPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -109,6 +111,7 @@ pub fn collect_sharp_quoted_lambdas(
     Ok((lambda_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_sharp_quoted_lambdas(
     lambda_form_count: usize,
     violations: Vec<SharpQuotedLambdaItem>,
@@ -119,6 +122,7 @@ pub fn summarize_sharp_quoted_lambdas(
     }
 }
 
+#[must_use]
 pub fn evaluate_sharp_quoted_lambda_policy(
     options: SharpQuotedLambdaPolicyOptions,
     summary: &SharpQuotedLambdaSummary,

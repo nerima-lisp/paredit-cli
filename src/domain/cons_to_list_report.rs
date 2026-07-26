@@ -69,10 +69,12 @@ pub struct ConsToListPolicyOptions {
 }
 
 impl ConsToListPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -161,6 +163,7 @@ pub fn collect_cons_to_lists(
     Ok((cons_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_cons_to_lists(
     cons_form_count: usize,
     violations: Vec<ConsToListItem>,
@@ -171,6 +174,7 @@ pub fn summarize_cons_to_lists(
     }
 }
 
+#[must_use]
 pub fn evaluate_cons_to_list_policy(
     options: ConsToListPolicyOptions,
     summary: &ConsToListSummary,

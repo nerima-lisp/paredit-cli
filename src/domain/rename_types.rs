@@ -7,18 +7,22 @@ pub enum FunctionCallScope {
 }
 
 impl FunctionCallScope {
+    #[must_use]
     pub const fn all() -> Self {
         Self::AllCalls
     }
 
+    #[must_use]
     pub fn explicit(paths: Vec<Path>) -> Self {
         Self::ExplicitPaths(paths)
     }
 
+    #[must_use]
     pub const fn is_all_calls(&self) -> bool {
         matches!(self, Self::AllCalls)
     }
 
+    #[must_use]
     pub fn explicit_paths(&self) -> Option<&[Path]> {
         match self {
             Self::AllCalls => None,

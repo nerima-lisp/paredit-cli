@@ -22,6 +22,7 @@ pub enum RefactorPlanAutomationStatus {
 }
 
 impl RefactorPlanAutomationStatus {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Ready => "ready",
@@ -40,6 +41,7 @@ pub enum RefactorPlanAutomationStepStatus {
 }
 
 impl RefactorPlanAutomationStepStatus {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Passed => "passed",
@@ -107,6 +109,7 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
+    #[must_use]
     pub fn status(&self) -> RefactorPlanAutomationStatus {
         match self.state {
             RefactorPlanAutomationState::PolicyFailed { .. } => {
@@ -119,6 +122,7 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
+    #[must_use]
     pub fn reason(&self) -> &str {
         match &self.state {
             RefactorPlanAutomationState::PolicyFailed { reason, .. }
@@ -129,6 +133,7 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
+    #[must_use]
     pub fn next_action(&self) -> &'static str {
         match self.state {
             RefactorPlanAutomationState::PolicyFailed { .. } => "resolve-policy-violations",
@@ -137,14 +142,17 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
+    #[must_use]
     pub fn safe_to_automate(&self) -> bool {
         matches!(self.state, RefactorPlanAutomationState::Ready { .. })
     }
 
+    #[must_use]
     pub fn policy_passed(&self) -> bool {
         !matches!(self.state, RefactorPlanAutomationState::PolicyFailed { .. })
     }
 
+    #[must_use]
     pub fn blocking_gate_count(&self) -> usize {
         match self.state {
             RefactorPlanAutomationState::PolicyFailed {
@@ -159,6 +167,7 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
+    #[must_use]
     pub fn steps(&self) -> [RefactorPlanAutomationStep; 3] {
         let policy_status = if self.policy_passed() {
             RefactorPlanAutomationStepStatus::Passed

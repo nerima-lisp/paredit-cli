@@ -67,10 +67,12 @@ pub struct SingleValueBindPolicyOptions {
 }
 
 impl SingleValueBindPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -167,6 +169,7 @@ pub fn collect_single_value_binds(
     Ok((bind_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_single_value_binds(
     bind_form_count: usize,
     violations: Vec<SingleValueBindItem>,
@@ -177,6 +180,7 @@ pub fn summarize_single_value_binds(
     }
 }
 
+#[must_use]
 pub fn evaluate_single_value_bind_policy(
     options: SingleValueBindPolicyOptions,
     summary: &SingleValueBindSummary,

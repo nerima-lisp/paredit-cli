@@ -68,10 +68,12 @@ pub struct EmptyLetPolicyOptions {
 }
 
 impl EmptyLetPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -145,6 +147,7 @@ pub fn collect_empty_lets(
     Ok((let_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_empty_lets(
     let_form_count: usize,
     violations: Vec<EmptyLetItem>,
@@ -155,6 +158,7 @@ pub fn summarize_empty_lets(
     }
 }
 
+#[must_use]
 pub fn evaluate_empty_let_policy(
     options: EmptyLetPolicyOptions,
     summary: &EmptyLetSummary,

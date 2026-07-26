@@ -72,10 +72,12 @@ pub struct MakeArrayDefaultKeywordPolicyOptions {
 }
 
 impl MakeArrayDefaultKeywordPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -153,6 +155,7 @@ pub fn collect_make_array_default_keywords(
     Ok((call_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_make_array_default_keywords(
     call_form_count: usize,
     violations: Vec<MakeArrayDefaultKeywordItem>,
@@ -163,6 +166,7 @@ pub fn summarize_make_array_default_keywords(
     }
 }
 
+#[must_use]
 pub fn evaluate_make_array_default_keyword_policy(
     options: MakeArrayDefaultKeywordPolicyOptions,
     summary: &MakeArrayDefaultKeywordSummary,

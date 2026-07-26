@@ -83,10 +83,12 @@ pub struct AccessorArityPolicyOptions {
 }
 
 impl AccessorArityPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -160,6 +162,7 @@ pub fn collect_accessor_arity_violations(
     Ok((call_count, violations))
 }
 
+#[must_use]
 pub fn summarize_accessor_arity(
     call_count: usize,
     violations: Vec<AccessorArityItem>,
@@ -170,6 +173,7 @@ pub fn summarize_accessor_arity(
     }
 }
 
+#[must_use]
 pub fn evaluate_accessor_arity_policy(
     options: AccessorArityPolicyOptions,
     summary: &AccessorAritySummary,
@@ -190,6 +194,7 @@ pub fn evaluate_accessor_arity_policy(
 }
 
 /// A human phrase for the expected arity of one violation, e.g. `exactly 2`.
+#[must_use]
 pub fn expected_arity_phrase(item: &AccessorArityItem) -> String {
     arity_phrase(item.min_arity, item.max_arity)
 }

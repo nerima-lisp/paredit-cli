@@ -89,10 +89,12 @@ pub struct UnusedExportPolicyOptions {
 }
 
 impl UnusedExportPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_unused: bool) -> Self {
         Self { fail_on_unused }
     }
 
+    #[must_use]
     pub const fn fail_on_unused(self) -> bool {
         self.fail_on_unused
     }
@@ -173,6 +175,7 @@ pub fn collect_referenced_symbols(
         .collect())
 }
 
+#[must_use]
 pub fn analyze_unused_exports(
     declared: &[DeclaredExport],
     referenced: &[ReferencedSymbol],
@@ -210,6 +213,7 @@ pub fn analyze_unused_exports(
     }
 }
 
+#[must_use]
 pub fn evaluate_unused_export_policy(
     options: UnusedExportPolicyOptions,
     summary: &UnusedExportSummary,

@@ -36,6 +36,7 @@ pub enum FormKind {
 }
 
 impl FormKind {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Atom => "atom",
@@ -88,6 +89,7 @@ impl FormStats {
 /// materializing per-symbol occurrence tracking. Callers that only need
 /// structural size and nesting depth (e.g. complexity reports) should use
 /// this instead of [`build_form_report`], which also collects symbols.
+#[must_use]
 pub fn collect_structural_stats(view: &ExpressionView) -> (usize, usize, usize) {
     let stats = FormStats::collect(view);
     (stats.atom_count, stats.list_count, stats.max_depth)

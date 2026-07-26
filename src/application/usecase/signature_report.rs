@@ -8,6 +8,7 @@ pub use crate::domain::signature_report::{
     SignatureReportPolicy, SignatureReportSource, build_signature_reports, classify_signature_call,
 };
 
+#[must_use]
 pub fn evaluate_signature_report_policy(
     reports: &[SignatureReportFile],
     fail_on_mismatch: bool,

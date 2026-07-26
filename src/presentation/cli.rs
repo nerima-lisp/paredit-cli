@@ -284,6 +284,7 @@ struct Cli {
     command: Command,
 }
 
+#[must_use]
 pub fn run() -> ExitCode {
     let cli = Cli::parse();
     match dispatch::dispatch(cli.command) {

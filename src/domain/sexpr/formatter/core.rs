@@ -26,12 +26,14 @@ enum TopLevelItem {
 }
 
 impl Formatter {
+    #[must_use]
     pub fn new(indent: usize) -> Self {
         Self {
             indent: indent.min(MAX_INLINE_WIDTH),
         }
     }
 
+    #[must_use]
     pub fn format(&self, tree: &SyntaxTree) -> String {
         let items = self.plan_top_level(tree);
         if items.is_empty() {

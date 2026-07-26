@@ -74,10 +74,12 @@ pub struct StringCaseFoldPolicyOptions {
 }
 
 impl StringCaseFoldPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -156,6 +158,7 @@ pub fn collect_string_case_folds(
     Ok((compare_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_string_case_folds(
     compare_form_count: usize,
     violations: Vec<StringCaseFoldItem>,
@@ -166,6 +169,7 @@ pub fn summarize_string_case_folds(
     }
 }
 
+#[must_use]
 pub fn evaluate_string_case_fold_policy(
     options: StringCaseFoldPolicyOptions,
     summary: &StringCaseFoldSummary,

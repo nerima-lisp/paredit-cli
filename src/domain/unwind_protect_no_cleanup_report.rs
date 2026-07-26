@@ -50,10 +50,12 @@ pub struct UnwindProtectNoCleanupPolicyOptions {
 }
 
 impl UnwindProtectNoCleanupPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -127,6 +129,7 @@ pub fn collect_unwind_protect_no_cleanup(
     Ok((unwind_protect_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_unwind_protect_no_cleanup(
     unwind_protect_form_count: usize,
     violations: Vec<UnwindProtectNoCleanupItem>,
@@ -137,6 +140,7 @@ pub fn summarize_unwind_protect_no_cleanup(
     }
 }
 
+#[must_use]
 pub fn evaluate_unwind_protect_no_cleanup_policy(
     options: UnwindProtectNoCleanupPolicyOptions,
     summary: &UnwindProtectNoCleanupSummary,

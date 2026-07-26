@@ -58,10 +58,12 @@ pub struct IdentityArithmeticPolicyOptions {
 }
 
 impl IdentityArithmeticPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -132,6 +134,7 @@ pub fn collect_identity_arithmetic(
     Ok((arithmetic_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_identity_arithmetic(
     arithmetic_form_count: usize,
     violations: Vec<IdentityArithmeticItem>,
@@ -142,6 +145,7 @@ pub fn summarize_identity_arithmetic(
     }
 }
 
+#[must_use]
 pub fn evaluate_identity_arithmetic_policy(
     options: IdentityArithmeticPolicyOptions,
     summary: &IdentityArithmeticSummary,

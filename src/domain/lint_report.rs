@@ -36,6 +36,7 @@ pub use crate::domain::lint::registry::catalog::{
 pub type RuleFixFor = (&'static str, ByteSpan, RuleFix);
 
 /// The category for a rule name, or `None` if the name is unknown.
+#[must_use]
 pub fn rule_category(name: &str) -> Option<&'static str> {
     catalog::rule_category(name).map(|category| category.as_str())
 }

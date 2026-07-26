@@ -11,6 +11,7 @@ pub enum SimilarityOverlapPolicy {
 }
 
 impl SimilarityOverlapPolicy {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Maximal => "maximal",
@@ -39,6 +40,7 @@ pub enum SimilarityComparisonScope {
 }
 
 impl SimilarityComparisonScope {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::All => "all",
@@ -68,6 +70,7 @@ pub enum SimilarityFormScope {
 }
 
 impl SimilarityFormScope {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::All => "all",
@@ -163,38 +166,47 @@ impl SimilarityReportOptions {
         Ok(options)
     }
 
+    #[must_use]
     pub const fn threshold(&self) -> f64 {
         self.threshold
     }
 
+    #[must_use]
     pub const fn min_node_count(&self) -> usize {
         self.min_node_count
     }
 
+    #[must_use]
     pub const fn min_line_span(&self) -> usize {
         self.min_line_span
     }
 
+    #[must_use]
     pub const fn comparison_scope(&self) -> SimilarityComparisonScope {
         self.comparison_scope
     }
 
+    #[must_use]
     pub const fn form_scope(&self) -> SimilarityFormScope {
         self.form_scope
     }
 
+    #[must_use]
     pub const fn overlap_policy(&self) -> SimilarityOverlapPolicy {
         self.overlap_policy
     }
 
+    #[must_use]
     pub const fn max_candidates(&self) -> Option<usize> {
         self.max_candidates
     }
 
+    #[must_use]
     pub const fn max_comparisons(&self) -> Option<usize> {
         self.max_comparisons
     }
 
+    #[must_use]
     pub const fn max_results(&self) -> Option<usize> {
         self.max_results
     }

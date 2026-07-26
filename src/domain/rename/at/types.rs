@@ -12,6 +12,7 @@ pub enum RenameAtNamespace {
 }
 
 impl RenameAtNamespace {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Value => "value",

@@ -69,6 +69,7 @@ pub enum SimilarityProcessingStage {
 }
 
 impl SimilarityProcessingStage {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Read => "read",
@@ -209,18 +210,22 @@ impl SimilarityReportPlan {
         })
     }
 
+    #[must_use]
     pub const fn report(&self) -> &SimilarityReport {
         &self.report
     }
 
+    #[must_use]
     pub const fn inventory(&self) -> &SimilarityInventory {
         &self.inventory
     }
 
+    #[must_use]
     pub fn errors(&self) -> &[SimilarityFileError] {
         &self.errors
     }
 
+    #[must_use]
     pub const fn gate(&self) -> &SimilarityGateDecision {
         &self.gate
     }

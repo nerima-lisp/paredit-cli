@@ -117,10 +117,12 @@ pub struct RedundantEqlTestPolicyOptions {
 }
 
 impl RedundantEqlTestPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -199,6 +201,7 @@ pub fn collect_redundant_eql_tests(
     Ok((call_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_eql_tests(
     call_form_count: usize,
     violations: Vec<RedundantEqlTestItem>,
@@ -209,6 +212,7 @@ pub fn summarize_redundant_eql_tests(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_eql_test_policy(
     options: RedundantEqlTestPolicyOptions,
     summary: &RedundantEqlTestSummary,

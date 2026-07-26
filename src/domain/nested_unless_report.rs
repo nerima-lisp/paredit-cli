@@ -71,10 +71,12 @@ pub struct NestedUnlessPolicyOptions {
 }
 
 impl NestedUnlessPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -162,6 +164,7 @@ pub fn collect_nested_unlesses(
     Ok((unless_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_nested_unlesses(
     unless_form_count: usize,
     violations: Vec<NestedUnlessItem>,
@@ -172,6 +175,7 @@ pub fn summarize_nested_unlesses(
     }
 }
 
+#[must_use]
 pub fn evaluate_nested_unless_policy(
     options: NestedUnlessPolicyOptions,
     summary: &NestedUnlessSummary,

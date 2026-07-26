@@ -116,10 +116,12 @@ pub struct DestructiveLiteralPolicyOptions {
 }
 
 impl DestructiveLiteralPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -189,6 +191,7 @@ pub fn collect_destructive_literals(
     Ok((destructive_call_count, violations))
 }
 
+#[must_use]
 pub fn summarize_destructive_literals(
     destructive_call_count: usize,
     violations: Vec<DestructiveLiteralItem>,
@@ -199,6 +202,7 @@ pub fn summarize_destructive_literals(
     }
 }
 
+#[must_use]
 pub fn evaluate_destructive_literal_policy(
     options: DestructiveLiteralPolicyOptions,
     summary: &DestructiveLiteralSummary,

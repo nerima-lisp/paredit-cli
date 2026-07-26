@@ -121,6 +121,7 @@ impl CharOpStringItem {
     /// Empty for a type-derived detection, which the standalone `inspect`
     /// command never produces — it passes [`never`], so every item it renders
     /// carries a spelling.
+    #[must_use]
     pub fn literal(&self) -> &str {
         match &self.mismatch {
             CharacterMismatch::StringLiteral(text) => text,
@@ -141,10 +142,12 @@ pub struct CharOpStringPolicyOptions {
 }
 
 impl CharOpStringPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -227,6 +230,7 @@ pub fn collect_char_op_strings(
     Ok((char_call_count, violations))
 }
 
+#[must_use]
 pub fn summarize_char_op_strings(
     char_call_count: usize,
     violations: Vec<CharOpStringItem>,
@@ -237,6 +241,7 @@ pub fn summarize_char_op_strings(
     }
 }
 
+#[must_use]
 pub fn evaluate_char_op_string_policy(
     options: CharOpStringPolicyOptions,
     summary: &CharOpStringSummary,

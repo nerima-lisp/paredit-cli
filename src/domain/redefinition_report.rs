@@ -83,12 +83,14 @@ pub struct RedefinitionPolicyOptions {
 }
 
 impl RedefinitionPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_redefinition: bool) -> Self {
         Self {
             fail_on_redefinition,
         }
     }
 
+    #[must_use]
     pub const fn fail_on_redefinition(self) -> bool {
         self.fail_on_redefinition
     }
@@ -178,6 +180,7 @@ pub fn analyze_redefinitions(declared: &[DeclaredDefinition]) -> RedefinitionSum
     }
 }
 
+#[must_use]
 pub fn evaluate_redefinition_policy(
     options: RedefinitionPolicyOptions,
     summary: &RedefinitionSummary,

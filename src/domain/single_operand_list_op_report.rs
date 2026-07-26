@@ -63,10 +63,12 @@ pub struct SingleOperandListOpPolicyOptions {
 }
 
 impl SingleOperandListOpPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -139,6 +141,7 @@ pub fn collect_single_operand_list_ops(
     Ok((list_op_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_single_operand_list_ops(
     list_op_form_count: usize,
     violations: Vec<SingleOperandListOpItem>,
@@ -149,6 +152,7 @@ pub fn summarize_single_operand_list_ops(
     }
 }
 
+#[must_use]
 pub fn evaluate_single_operand_list_op_policy(
     options: SingleOperandListOpPolicyOptions,
     summary: &SingleOperandListOpSummary,

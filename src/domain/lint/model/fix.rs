@@ -68,11 +68,13 @@ impl RuleFix {
         }
     }
 
+    #[must_use]
     pub fn description(&self) -> &str {
         &self.description
     }
 
     /// How many regions this fix edits. Always at least one.
+    #[must_use]
     pub fn replacement_count(&self) -> usize {
         1 + self.rest.len()
     }

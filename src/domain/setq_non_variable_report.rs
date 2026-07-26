@@ -91,10 +91,12 @@ pub struct SetqNonVariablePolicyOptions {
 }
 
 impl SetqNonVariablePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -171,6 +173,7 @@ pub fn collect_setq_non_variables(
     Ok((assignment_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_setq_non_variables(
     assignment_form_count: usize,
     violations: Vec<SetqNonVariableItem>,
@@ -181,6 +184,7 @@ pub fn summarize_setq_non_variables(
     }
 }
 
+#[must_use]
 pub fn evaluate_setq_non_variable_policy(
     options: SetqNonVariablePolicyOptions,
     summary: &SetqNonVariableSummary,

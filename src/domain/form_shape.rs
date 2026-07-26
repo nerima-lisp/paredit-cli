@@ -6,10 +6,12 @@ use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 pub struct FormShape(String);
 
 impl FormShape {
+    #[must_use]
     pub fn new(shape: String) -> Self {
         Self(shape)
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -45,6 +47,7 @@ impl Display for FormShape {
     }
 }
 
+#[must_use]
 pub fn duplicate_shape(view: &ExpressionView, preserve_list_head: bool) -> FormShape {
     let mut output = String::new();
     write_duplicate_shape(view, preserve_list_head, &mut output);

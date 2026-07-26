@@ -87,10 +87,12 @@ pub struct RedundantThePolicyOptions {
 }
 
 impl RedundantThePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -190,6 +192,7 @@ pub fn collect_redundant_thes(
     Ok((the_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_thes(
     the_form_count: usize,
     violations: Vec<RedundantTheItem>,
@@ -200,6 +203,7 @@ pub fn summarize_redundant_thes(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_the_policy(
     options: RedundantThePolicyOptions,
     summary: &RedundantTheSummary,

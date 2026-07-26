@@ -70,10 +70,12 @@ pub struct ConstantIfTestPolicyOptions {
 }
 
 impl ConstantIfTestPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -175,6 +177,7 @@ pub fn collect_constant_if_tests(
     Ok((if_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_constant_if_tests(
     if_form_count: usize,
     violations: Vec<ConstantIfTestItem>,
@@ -185,6 +188,7 @@ pub fn summarize_constant_if_tests(
     }
 }
 
+#[must_use]
 pub fn evaluate_constant_if_test_policy(
     options: ConstantIfTestPolicyOptions,
     summary: &ConstantIfTestSummary,

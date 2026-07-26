@@ -46,10 +46,12 @@ pub struct SystemCyclePolicyOptions {
 }
 
 impl SystemCyclePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_cycle: bool) -> Self {
         Self { fail_on_cycle }
     }
 
+    #[must_use]
     pub const fn fail_on_cycle(self) -> bool {
         self.fail_on_cycle
     }
@@ -75,6 +77,7 @@ pub fn analyze_system_cycles(edges: &[(String, String)]) -> SystemCycleSummary {
     }
 }
 
+#[must_use]
 pub fn evaluate_system_cycle_policy(
     options: SystemCyclePolicyOptions,
     summary: &SystemCycleSummary,

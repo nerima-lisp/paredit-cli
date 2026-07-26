@@ -58,10 +58,12 @@ pub struct NestedPrognPolicyOptions {
 }
 
 impl NestedPrognPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -135,6 +137,7 @@ pub fn collect_nested_progns(
     Ok((progn_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_nested_progns(
     progn_form_count: usize,
     violations: Vec<NestedPrognItem>,
@@ -145,6 +148,7 @@ pub fn summarize_nested_progns(
     }
 }
 
+#[must_use]
 pub fn evaluate_nested_progn_policy(
     options: NestedPrognPolicyOptions,
     summary: &NestedPrognSummary,

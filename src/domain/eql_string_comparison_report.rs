@@ -49,10 +49,12 @@ pub struct EqlStringComparisonPolicyOptions {
 }
 
 impl EqlStringComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -123,6 +125,7 @@ pub fn collect_eql_string_comparisons(
     Ok((comparison_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_eql_string_comparisons(
     comparison_form_count: usize,
     violations: Vec<EqlStringComparisonItem>,
@@ -133,6 +136,7 @@ pub fn summarize_eql_string_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_eql_string_comparison_policy(
     options: EqlStringComparisonPolicyOptions,
     summary: &EqlStringComparisonSummary,

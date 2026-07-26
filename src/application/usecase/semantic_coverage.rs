@@ -71,6 +71,7 @@ pub enum SemanticCoverageProcessingStage {
 }
 
 impl SemanticCoverageProcessingStage {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Read => "read",
@@ -157,6 +158,7 @@ pub enum OpacityCauseLabel {
 }
 
 impl OpacityCauseLabel {
+    #[must_use]
     pub fn display(&self) -> String {
         match self {
             Self::UnknownHead(head) => head.clone(),
@@ -180,26 +182,32 @@ pub struct BindingNonResolutionBreakdown {
 }
 
 impl BindingNonResolutionBreakdown {
+    #[must_use]
     pub const fn reassigned(&self) -> usize {
         self.reassigned
     }
 
+    #[must_use]
     pub const fn opaque_scope(&self) -> usize {
         self.opaque_scope
     }
 
+    #[must_use]
     pub const fn special(&self) -> usize {
         self.special
     }
 
+    #[must_use]
     pub const fn no_initial_form(&self) -> usize {
         self.no_initial_form
     }
 
+    #[must_use]
     pub const fn initial_form_not_constant(&self) -> usize {
         self.initial_form_not_constant
     }
 
+    #[must_use]
     pub const fn initial_form_not_propagatable(&self) -> usize {
         self.initial_form_not_propagatable
     }
@@ -209,6 +217,7 @@ impl BindingNonResolutionBreakdown {
     /// The counts sum to [`Self::opaque_scope`]: every binding contributes the
     /// first cause recorded for it and no more, so a head's count reads as
     /// "bindings this form alone is blocking", not "times the form appears".
+    #[must_use]
     pub const fn opacity_causes(&self) -> &BTreeMap<OpacityCauseLabel, usize> {
         &self.opacity_causes
     }
@@ -223,6 +232,7 @@ impl BindingNonResolutionBreakdown {
     /// `None` keys a binding with no binding operator at all — a definition's
     /// own name — rather than a made-up head, so "recognized with no binder"
     /// stays distinguishable from "bound by a form literally named that".
+    #[must_use]
     pub const fn uninitialized_binders(&self) -> &BTreeMap<Option<String>, usize> {
         &self.uninitialized_binders
     }
@@ -232,15 +242,18 @@ impl BindingNonResolutionBreakdown {
     /// Ties break on the label so two runs over the same corpus print the same
     /// ranking: a measurement whose output reorders between runs cannot be
     /// diffed, which is most of what this harness is for.
+    #[must_use]
     pub fn ranked_opacity_causes(&self) -> Vec<(&OpacityCauseLabel, usize)> {
         rank(&self.opacity_causes)
     }
 
     /// [`Self::uninitialized_binders`] with the largest counts first.
+    #[must_use]
     pub fn ranked_uninitialized_binders(&self) -> Vec<(&Option<String>, usize)> {
         rank(&self.uninitialized_binders)
     }
 
+    #[must_use]
     pub const fn total(&self) -> usize {
         self.reassigned
             + self.opaque_scope
@@ -311,6 +324,7 @@ pub struct SemanticCoverageFileReport {
 }
 
 impl SemanticCoverageFileReport {
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -318,25 +332,30 @@ impl SemanticCoverageFileReport {
     /// Every `Variable`-kind binding the binding table recorded. Function,
     /// macro, symbol-macro, and slot bindings are out of scope: only a
     /// variable's *value* is something the value table resolves.
+    #[must_use]
     pub const fn variable_binding_count(&self) -> usize {
         self.variable_binding_count
     }
 
     /// How many of those the value table gave a constant value.
+    #[must_use]
     pub const fn resolved_binding_count(&self) -> usize {
         self.resolved_binding_count
     }
 
     /// Every `(...)` list expression in the file, at any nesting depth.
+    #[must_use]
     pub const fn list_expression_count(&self) -> usize {
         self.list_expression_count
     }
 
     /// How many of those `evaluate_constant` folded to `Known`.
+    #[must_use]
     pub const fn known_list_expression_count(&self) -> usize {
         self.known_list_expression_count
     }
 
+    #[must_use]
     pub const fn non_resolution(&self) -> &BindingNonResolutionBreakdown {
         &self.non_resolution
     }
@@ -350,6 +369,7 @@ pub struct SemanticCoverageReport {
 }
 
 impl SemanticCoverageReport {
+    #[must_use]
     pub fn files(&self) -> &[SemanticCoverageFileReport] {
         &self.files
     }
@@ -357,6 +377,7 @@ impl SemanticCoverageReport {
     /// Files the source discovered but could not be read, decoded, or
     /// parsed. Measurement continues over the rest: a corpus with a handful
     /// of unreadable files should not lose every other file's numbers.
+    #[must_use]
     pub fn errors(&self) -> &[SemanticCoverageFileError] {
         &self.errors
     }
@@ -389,6 +410,7 @@ impl SemanticCoverageReport {
             .sum()
     }
 
+    #[must_use]
     pub fn total_non_resolution(&self) -> BindingNonResolutionBreakdown {
         let mut total = BindingNonResolutionBreakdown::default();
         for file in &self.files {

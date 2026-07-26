@@ -46,10 +46,12 @@ pub struct FormatMissingDestinationPolicyOptions {
 }
 
 impl FormatMissingDestinationPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -112,6 +114,7 @@ pub fn collect_format_missing_destinations(
     Ok((format_call_count, violations))
 }
 
+#[must_use]
 pub fn summarize_format_missing_destinations(
     format_call_count: usize,
     violations: Vec<FormatMissingDestinationItem>,
@@ -122,6 +125,7 @@ pub fn summarize_format_missing_destinations(
     }
 }
 
+#[must_use]
 pub fn evaluate_format_missing_destination_policy(
     options: FormatMissingDestinationPolicyOptions,
     summary: &FormatMissingDestinationSummary,

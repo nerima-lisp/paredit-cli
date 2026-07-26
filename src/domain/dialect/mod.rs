@@ -55,6 +55,7 @@ impl Dialect {
     }
 
     /// Maps a lowercase file extension onto the closest supported dialect.
+    #[must_use]
     pub fn from_extension(extension: &str) -> Self {
         match extension {
             "lisp" | "lsp" | "cl" | "asd" => Self::CommonLisp,
@@ -72,6 +73,7 @@ impl Dialect {
     }
 
     /// Returns the stable CLI and JSON identifier for this dialect.
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::CommonLisp => "common-lisp",
@@ -89,6 +91,7 @@ impl Dialect {
     }
 
     /// Returns a human-facing family label for diagnostics and reports.
+    #[must_use]
     pub fn family(self) -> &'static str {
         match self {
             Self::CommonLisp => "Common Lisp",

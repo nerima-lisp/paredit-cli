@@ -69,10 +69,12 @@ pub struct CondTClausePolicyOptions {
 }
 
 impl CondTClausePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -156,6 +158,7 @@ pub fn collect_cond_t_clauses(
     Ok((cond_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_cond_t_clauses(
     cond_form_count: usize,
     violations: Vec<CondTClauseItem>,
@@ -166,6 +169,7 @@ pub fn summarize_cond_t_clauses(
     }
 }
 
+#[must_use]
 pub fn evaluate_cond_t_clause_policy(
     options: CondTClausePolicyOptions,
     summary: &CondTClauseSummary,

@@ -70,10 +70,12 @@ pub struct UnusedPackagePolicyOptions {
 }
 
 impl UnusedPackagePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_unused: bool) -> Self {
         Self { fail_on_unused }
     }
 
+    #[must_use]
     pub const fn fail_on_unused(self) -> bool {
         self.fail_on_unused
     }
@@ -141,6 +143,7 @@ pub fn collect_referenced_package_names(
         .collect())
 }
 
+#[must_use]
 pub fn analyze_unused_packages(
     declared: &[DeclaredPackage],
     referenced: &[String],
@@ -168,6 +171,7 @@ pub fn analyze_unused_packages(
     }
 }
 
+#[must_use]
 pub fn evaluate_unused_package_policy(
     options: UnusedPackagePolicyOptions,
     summary: &UnusedPackageSummary,

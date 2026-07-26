@@ -65,10 +65,12 @@ pub struct LambdaListKeywordOrderPolicyOptions {
 }
 
 impl LambdaListKeywordOrderPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -164,6 +166,7 @@ pub fn collect_lambda_list_keyword_order(
     Ok((definition_count, violations))
 }
 
+#[must_use]
 pub fn summarize_lambda_list_keyword_order(
     definition_count: usize,
     violations: Vec<LambdaListKeywordOrderItem>,
@@ -174,6 +177,7 @@ pub fn summarize_lambda_list_keyword_order(
     }
 }
 
+#[must_use]
 pub fn evaluate_lambda_list_keyword_order_policy(
     options: LambdaListKeywordOrderPolicyOptions,
     summary: &LambdaListKeywordOrderSummary,

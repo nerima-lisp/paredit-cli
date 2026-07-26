@@ -9,6 +9,7 @@ pub enum Severity {
 }
 
 impl Severity {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Error => "error",
@@ -18,6 +19,7 @@ impl Severity {
 
     /// Whether this is the style-only level. `const` so the catalogue can
     /// derive its warning list at compile time.
+    #[must_use]
     pub const fn is_warning(self) -> bool {
         matches!(self, Self::Warning)
     }
@@ -30,6 +32,7 @@ impl Severity {
     }
 
     /// Whether this severity is at least as serious as `threshold`.
+    #[must_use]
     pub fn at_least(self, threshold: Severity) -> bool {
         self.rank() >= threshold.rank()
     }

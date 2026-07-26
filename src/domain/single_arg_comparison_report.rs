@@ -56,10 +56,12 @@ pub struct SingleArgComparisonPolicyOptions {
 }
 
 impl SingleArgComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -121,6 +123,7 @@ pub fn collect_single_arg_comparisons(
     Ok((comparison_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_single_arg_comparisons(
     comparison_form_count: usize,
     violations: Vec<SingleArgComparisonItem>,
@@ -131,6 +134,7 @@ pub fn summarize_single_arg_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_single_arg_comparison_policy(
     options: SingleArgComparisonPolicyOptions,
     summary: &SingleArgComparisonSummary,

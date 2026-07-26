@@ -9,6 +9,7 @@ pub enum WorkspaceFileStatus {
 }
 
 impl WorkspaceFileStatus {
+    #[must_use]
     pub fn label(&self) -> &'static str {
         match self {
             Self::Parsed => "parsed",
@@ -16,6 +17,7 @@ impl WorkspaceFileStatus {
         }
     }
 
+    #[must_use]
     pub fn is_parsed(&self) -> bool {
         matches!(self, Self::Parsed)
     }

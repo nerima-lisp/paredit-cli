@@ -10,6 +10,7 @@ pub struct LintPolicyOptions {
 }
 
 impl LintPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_finding: bool, fail_on_severity: Option<Severity>) -> Self {
         Self {
             fail_on_finding,
@@ -17,10 +18,12 @@ impl LintPolicyOptions {
         }
     }
 
+    #[must_use]
     pub const fn fail_on_finding(self) -> bool {
         self.fail_on_finding
     }
 
+    #[must_use]
     pub const fn fail_on_severity(self) -> Option<Severity> {
         self.fail_on_severity
     }

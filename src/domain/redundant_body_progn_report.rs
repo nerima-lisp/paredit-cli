@@ -86,10 +86,12 @@ pub struct RedundantBodyPrognPolicyOptions {
 }
 
 impl RedundantBodyPrognPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -167,6 +169,7 @@ pub fn collect_redundant_body_progns(
     Ok((implicit_progn_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_redundant_body_progns(
     implicit_progn_form_count: usize,
     violations: Vec<RedundantBodyPrognItem>,
@@ -177,6 +180,7 @@ pub fn summarize_redundant_body_progns(
     }
 }
 
+#[must_use]
 pub fn evaluate_redundant_body_progn_policy(
     options: RedundantBodyPrognPolicyOptions,
     summary: &RedundantBodyPrognSummary,

@@ -79,6 +79,7 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
     })
 }
 
+#[must_use]
 pub fn infer_extract_function_params(
     dialect: crate::domain::dialect::Dialect,
     selection: &ExpressionView,

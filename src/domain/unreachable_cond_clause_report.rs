@@ -53,10 +53,12 @@ pub struct UnreachableCondClausePolicyOptions {
 }
 
 impl UnreachableCondClausePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -131,6 +133,7 @@ pub fn collect_unreachable_cond_clauses(
     Ok((cond_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_unreachable_cond_clauses(
     cond_form_count: usize,
     violations: Vec<UnreachableCondClauseItem>,
@@ -141,6 +144,7 @@ pub fn summarize_unreachable_cond_clauses(
     }
 }
 
+#[must_use]
 pub fn evaluate_unreachable_cond_clause_policy(
     options: UnreachableCondClausePolicyOptions,
     summary: &UnreachableCondClauseSummary,

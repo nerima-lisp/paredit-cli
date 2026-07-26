@@ -53,10 +53,12 @@ pub struct GetfDefaultNilPolicyOptions {
 }
 
 impl GetfDefaultNilPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -124,6 +126,7 @@ pub fn collect_getf_default_nils(
     Ok((call_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_getf_default_nils(
     call_form_count: usize,
     violations: Vec<GetfDefaultNilItem>,
@@ -134,6 +137,7 @@ pub fn summarize_getf_default_nils(
     }
 }
 
+#[must_use]
 pub fn evaluate_getf_default_nil_policy(
     options: GetfDefaultNilPolicyOptions,
     summary: &GetfDefaultNilSummary,

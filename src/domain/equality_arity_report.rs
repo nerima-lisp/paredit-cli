@@ -68,10 +68,12 @@ pub struct EqualityArityPolicyOptions {
 }
 
 impl EqualityArityPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -144,6 +146,7 @@ pub fn collect_equality_arity_violations(
     Ok((call_count, violations))
 }
 
+#[must_use]
 pub fn summarize_equality_arity(
     call_count: usize,
     violations: Vec<EqualityArityItem>,
@@ -154,6 +157,7 @@ pub fn summarize_equality_arity(
     }
 }
 
+#[must_use]
 pub fn evaluate_equality_arity_policy(
     options: EqualityArityPolicyOptions,
     summary: &EqualityAritySummary,

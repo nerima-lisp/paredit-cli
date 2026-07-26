@@ -68,10 +68,12 @@ pub struct FormatNewlinePolicyOptions {
 }
 
 impl FormatNewlinePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -143,6 +145,7 @@ pub fn collect_format_newlines(
     Ok((format_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_format_newlines(
     format_form_count: usize,
     violations: Vec<FormatNewlineItem>,
@@ -153,6 +156,7 @@ pub fn summarize_format_newlines(
     }
 }
 
+#[must_use]
 pub fn evaluate_format_newline_policy(
     options: FormatNewlinePolicyOptions,
     summary: &FormatNewlineSummary,

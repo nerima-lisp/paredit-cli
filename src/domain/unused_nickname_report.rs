@@ -72,10 +72,12 @@ pub struct UnusedNicknamePolicyOptions {
 }
 
 impl UnusedNicknamePolicyOptions {
+    #[must_use]
     pub fn new(fail_on_unused: bool) -> Self {
         Self { fail_on_unused }
     }
 
+    #[must_use]
     pub const fn fail_on_unused(self) -> bool {
         self.fail_on_unused
     }
@@ -121,6 +123,7 @@ pub fn collect_declared_nicknames(
         .collect())
 }
 
+#[must_use]
 pub fn analyze_unused_nicknames(
     declared: &[DeclaredNickname],
     referenced: &[String],
@@ -149,6 +152,7 @@ pub fn analyze_unused_nicknames(
     }
 }
 
+#[must_use]
 pub fn evaluate_unused_nickname_policy(
     options: UnusedNicknamePolicyOptions,
     summary: &UnusedNicknameSummary,

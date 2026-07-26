@@ -18,18 +18,21 @@ pub enum RefactorWriteRefusal {
 }
 
 impl RefactorWriteRefusal {
+    #[must_use]
     pub fn label(&self) -> &'static str {
         match self {
             Self::UnparsableOutputs { .. } => "unparsable-outputs",
         }
     }
 
+    #[must_use]
     pub fn reason(&self) -> &'static str {
         match self {
             Self::UnparsableOutputs { .. } => "rewritten-output-did-not-parse",
         }
     }
 
+    #[must_use]
     pub fn next_action(&self) -> &'static str {
         match self {
             Self::UnparsableOutputs { .. } => "inspect-preview-parse-errors",
@@ -68,14 +71,17 @@ impl RefactorWritePlan {
         }
     }
 
+    #[must_use]
     pub fn write_requested(&self) -> bool {
         !matches!(self.state, RefactorWritePlanState::NotRequested)
     }
 
+    #[must_use]
     pub fn write_allowed(&self) -> bool {
         matches!(self.state, RefactorWritePlanState::Allowed { .. })
     }
 
+    #[must_use]
     pub fn writable_indexes(&self) -> &[usize] {
         match &self.state {
             RefactorWritePlanState::Allowed { writable_indexes } => writable_indexes,
@@ -83,6 +89,7 @@ impl RefactorWritePlan {
         }
     }
 
+    #[must_use]
     pub fn refusal(&self) -> Option<&RefactorWriteRefusal> {
         match &self.state {
             RefactorWritePlanState::Refused(refusal) => Some(refusal),

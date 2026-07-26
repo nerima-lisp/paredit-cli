@@ -127,6 +127,7 @@ fn meta_of(name: &str) -> Option<&'static crate::domain::lint::model::RuleMeta> 
 }
 
 /// The one-line description for a rule name, or `None` if the name is unknown.
+#[must_use]
 pub fn rule_description(name: &str) -> Option<&'static str> {
     meta_of(name).map(|meta| meta.description())
 }
@@ -137,6 +138,7 @@ pub fn rule_category(name: &str) -> Option<RuleCategory> {
 }
 
 /// Whether `inspect lint --fix` can repair this rule's findings.
+#[must_use]
 pub fn rule_is_fixable(name: &str) -> bool {
     meta_of(name).is_some_and(|meta| meta.fixability().is_fixable())
 }
@@ -145,6 +147,7 @@ pub fn rule_is_fixable(name: &str) -> bool {
 ///
 /// An unknown name reports `Error`, matching the historical `contains`-based
 /// lookup that treated anything not listed as a warning as an error.
+#[must_use]
 pub fn rule_severity(name: &str) -> Severity {
     meta_of(name).map_or(Severity::Error, |meta| meta.severity())
 }

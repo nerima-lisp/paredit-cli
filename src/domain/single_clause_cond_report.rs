@@ -69,10 +69,12 @@ pub struct SingleClauseCondPolicyOptions {
 }
 
 impl SingleClauseCondPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -161,6 +163,7 @@ pub fn collect_single_clause_conds(
     Ok((cond_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_single_clause_conds(
     cond_form_count: usize,
     violations: Vec<SingleClauseCondItem>,
@@ -171,6 +174,7 @@ pub fn summarize_single_clause_conds(
     }
 }
 
+#[must_use]
 pub fn evaluate_single_clause_cond_policy(
     options: SingleClauseCondPolicyOptions,
     summary: &SingleClauseCondSummary,

@@ -75,6 +75,7 @@ pub enum SkippedDefinitionRemovalReason {
 }
 
 impl SkippedDefinitionRemovalReason {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::ExportedDefinition => "exported-definition",

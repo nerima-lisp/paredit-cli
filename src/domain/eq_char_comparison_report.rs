@@ -64,6 +64,7 @@ impl EqCharComparisonItem {
     /// Empty for a type-derived detection, which the standalone `inspect`
     /// command never produces — it passes [`never`], so every item it renders
     /// carries a spelling.
+    #[must_use]
     pub fn literal(&self) -> &str {
         match &self.evidence {
             CharacterEvidence::Literal(text) => text,
@@ -84,10 +85,12 @@ pub struct EqCharComparisonPolicyOptions {
 }
 
 impl EqCharComparisonPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
+    #[must_use]
     pub const fn fail_on_violation(self) -> bool {
         self.fail_on_violation
     }
@@ -180,6 +183,7 @@ pub fn collect_eq_char_comparisons(
     Ok((comparison_form_count, violations))
 }
 
+#[must_use]
 pub fn summarize_eq_char_comparisons(
     comparison_form_count: usize,
     violations: Vec<EqCharComparisonItem>,
@@ -190,6 +194,7 @@ pub fn summarize_eq_char_comparisons(
     }
 }
 
+#[must_use]
 pub fn evaluate_eq_char_comparison_policy(
     options: EqCharComparisonPolicyOptions,
     summary: &EqCharComparisonSummary,

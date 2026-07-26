@@ -36,6 +36,7 @@ pub struct RefactorExecutePreflightInputs {
 }
 
 impl RefactorExecutePreflightInputs {
+    #[must_use]
     pub const fn new(
         mode: RefactorExecuteMode,
         policy: RefactorExecutePolicyResult,
@@ -58,6 +59,7 @@ pub struct RefactorExecuteGateInputs {
 }
 
 impl RefactorExecuteGateInputs {
+    #[must_use]
     pub const fn new(
         mode: RefactorExecuteMode,
         policy: RefactorExecutePolicyResult,
@@ -121,10 +123,12 @@ impl RefactorExecuteOutcome {
         }
     }
 
+    #[must_use]
     pub const fn write_applied(self) -> bool {
         matches!(self, Self::WriteApplied | Self::PostVerificationFailed)
     }
 
+    #[must_use]
     pub const fn post_verification_passed(self) -> Option<bool> {
         match self {
             Self::WriteApplied => Some(true),
@@ -133,6 +137,7 @@ impl RefactorExecuteOutcome {
         }
     }
 
+    #[must_use]
     pub fn steps(self) -> [RefactorExecuteStep; 5] {
         use RefactorExecuteStepStatus::{Failed, Passed, Scheduled, Skipped};
         let preview_policy = if matches!(self, Self::BlockedByPolicy) {
@@ -188,6 +193,7 @@ impl RefactorExecuteOutcome {
 }
 
 impl RefactorExecuteDecisionStatus {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "blocked-by-policy",
@@ -198,6 +204,7 @@ impl RefactorExecuteDecisionStatus {
         }
     }
 
+    #[must_use]
     pub fn reason(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "preview-policy-failed",
@@ -208,6 +215,7 @@ impl RefactorExecuteDecisionStatus {
         }
     }
 
+    #[must_use]
     pub fn next_action(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "review-policy-violations",
@@ -228,6 +236,7 @@ pub enum RefactorExecuteStepStatus {
 }
 
 impl RefactorExecuteStepStatus {
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Passed => "passed",
@@ -257,27 +266,35 @@ pub struct RefactorExecuteDecisionSummary {
 }
 
 impl RefactorExecuteDecisionSummary {
+    #[must_use]
     pub const fn passed_step_count(self) -> usize {
         self.passed_step_count
     }
+    #[must_use]
     pub const fn failed_step_count(self) -> usize {
         self.failed_step_count
     }
+    #[must_use]
     pub const fn skipped_step_count(self) -> usize {
         self.skipped_step_count
     }
+    #[must_use]
     pub const fn scheduled_step_count(self) -> usize {
         self.scheduled_step_count
     }
+    #[must_use]
     pub const fn write_parse_refused(self) -> bool {
         self.write_parse_refused
     }
+    #[must_use]
     pub const fn run_pre_verification(self) -> bool {
         self.run_pre_verification
     }
+    #[must_use]
     pub const fn apply_preview(self) -> bool {
         self.apply_preview
     }
+    #[must_use]
     pub const fn run_post_verification(self) -> bool {
         self.run_post_verification
     }
@@ -289,10 +306,12 @@ pub struct RefactorExecuteDecision {
 }
 
 impl RefactorExecuteDecision {
+    #[must_use]
     pub const fn status(self) -> RefactorExecuteDecisionStatus {
         self.status
     }
 
+    #[must_use]
     pub const fn write_parse_refused(self) -> bool {
         matches!(
             self.status,
@@ -300,6 +319,7 @@ impl RefactorExecuteDecision {
         )
     }
 
+    #[must_use]
     pub const fn run_pre_verification(self) -> bool {
         matches!(
             self.status,
@@ -309,6 +329,7 @@ impl RefactorExecuteDecision {
         )
     }
 
+    #[must_use]
     pub const fn apply_preview(self) -> bool {
         matches!(
             self.status,
@@ -317,10 +338,12 @@ impl RefactorExecuteDecision {
         )
     }
 
+    #[must_use]
     pub const fn run_post_verification(self) -> bool {
         matches!(self.status, RefactorExecuteDecisionStatus::ReadyToWrite)
     }
 
+    #[must_use]
     pub fn summary(self) -> RefactorExecuteDecisionSummary {
         let mut summary = RefactorExecuteDecisionSummary {
             passed_step_count: 0,
@@ -345,6 +368,7 @@ impl RefactorExecuteDecision {
         summary
     }
 
+    #[must_use]
     pub fn steps(self) -> [RefactorExecuteStep; 5] {
         [
             RefactorExecuteStep {
@@ -395,6 +419,7 @@ impl RefactorExecuteDecision {
     }
 }
 
+#[must_use]
 pub fn build_refactor_execute_decision(
     inputs: RefactorExecuteGateInputs,
 ) -> RefactorExecuteDecision {
@@ -436,6 +461,7 @@ pub fn build_refactor_execute_decision(
     RefactorExecuteDecision { status }
 }
 
+#[must_use]
 pub fn build_refactor_execute_preflight_decision(
     inputs: RefactorExecutePreflightInputs,
 ) -> RefactorExecuteDecision {

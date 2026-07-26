@@ -48,6 +48,7 @@ pub enum NamingStyle {
 }
 
 impl NamingStyle {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::KebabCase => "kebab-case",
@@ -58,6 +59,7 @@ impl NamingStyle {
     }
 
     /// Whether this style matches the shared cross-dialect Lisp convention.
+    #[must_use]
     pub const fn is_idiomatic(self) -> bool {
         matches!(self, Self::KebabCase)
     }
@@ -71,6 +73,7 @@ fn core_name(name: &str) -> &str {
     trimmed.strip_suffix("-p").unwrap_or(trimmed)
 }
 
+#[must_use]
 pub fn naming_style(name: &str) -> NamingStyle {
     let core = core_name(name);
     if core.is_empty() || core.chars().all(|c| !c.is_ascii_alphabetic()) {
@@ -129,12 +132,14 @@ pub struct NamingReportPolicyOptions {
 }
 
 impl NamingReportPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_non_idiomatic: bool) -> Self {
         Self {
             fail_on_non_idiomatic,
         }
     }
 
+    #[must_use]
     pub const fn fail_on_non_idiomatic(self) -> bool {
         self.fail_on_non_idiomatic
     }
@@ -191,6 +196,7 @@ pub fn build_naming_report(
     })
 }
 
+#[must_use]
 pub fn evaluate_naming_report_policy(
     options: NamingReportPolicyOptions,
     reports: &[NamingReportFile],

@@ -85,10 +85,12 @@ pub struct PackageConflictPolicyOptions {
 }
 
 impl PackageConflictPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_conflict: bool) -> Self {
         Self { fail_on_conflict }
     }
 
+    #[must_use]
     pub const fn fail_on_conflict(self) -> bool {
         self.fail_on_conflict
     }
@@ -141,6 +143,7 @@ pub fn collect_declared_package_identifiers(
     Ok(identifiers)
 }
 
+#[must_use]
 pub fn analyze_package_conflicts(declared: &[DeclaredPackageIdentifier]) -> PackageConflictSummary {
     let mut groups: BTreeMap<String, Vec<&DeclaredPackageIdentifier>> = BTreeMap::new();
     for identifier in declared {
@@ -183,6 +186,7 @@ pub fn analyze_package_conflicts(declared: &[DeclaredPackageIdentifier]) -> Pack
     }
 }
 
+#[must_use]
 pub fn evaluate_package_conflict_policy(
     options: PackageConflictPolicyOptions,
     summary: &PackageConflictSummary,

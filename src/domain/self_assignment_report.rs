@@ -49,12 +49,14 @@ pub struct SelfAssignmentPolicyOptions {
 }
 
 impl SelfAssignmentPolicyOptions {
+    #[must_use]
     pub fn new(fail_on_self_assignment: bool) -> Self {
         Self {
             fail_on_self_assignment,
         }
     }
 
+    #[must_use]
     pub const fn fail_on_self_assignment(self) -> bool {
         self.fail_on_self_assignment
     }
@@ -130,6 +132,7 @@ pub fn collect_self_assignments(
     Ok((assignment_form_count, self_assignments))
 }
 
+#[must_use]
 pub fn summarize_self_assignments(
     assignment_form_count: usize,
     self_assignments: Vec<SelfAssignmentItem>,
@@ -140,6 +143,7 @@ pub fn summarize_self_assignments(
     }
 }
 
+#[must_use]
 pub fn evaluate_self_assignment_policy(
     options: SelfAssignmentPolicyOptions,
     summary: &SelfAssignmentSummary,
