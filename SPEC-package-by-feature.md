@@ -1647,6 +1647,45 @@ Phase 2 以降の各移送で必ず実施すること。
 | 4 | **可視性の拡大が昇格済み lint を再発火させる** | `pub(crate)` → `pub` により `must_use_candidate` 等が新たに公開された項目に適用される（Phase 1 で 104 件）。`missing_debug_implementations` も同様 | 移送直後に `cargo clippy --fix -p <pkg>` を回す。**`--fix` はワークスペース全体指定だとメンバーを処理しないことがあるので `-p` を明示する** |
 | 5 | **`cargo clippy --fix` はフォーマットしない** | `const ` 挿入で幅超過、`format!` 引数インライン化で行が詰まる。**`treefmt-check` でしか検出できず、判明まで約 15 分かかる** | `clippy --fix` の直後に必ず `nix fmt` |
 
+### 11.6.1 【実装時の追記】feature 移送は core 移送より高くつく
+
+Phase 3〜4 で判明。core パッケージはほぼ自己完結していたが、**feature の
+`cli` 側は `src/presentation/cli.rs` の「暗黙のスコープ」に依存している。**
+
+`cli.rs` は次を提供しており、各 feature の `cli` ファイルは**一切 import せずに**
+使っていた:
+
+| 提供元 | 内容 | 個数 |
+| --- | --- | ---: |
+| `use args::*;` | `DialectArg`, `OutputFormat`, `MoveInsert` 等の値 enum | 12 |
+| `pub(crate) use shared::{...}` | `read_input_and_dialect`, `write_file_with_rollback` 等 | 17 |
+| `macro_rules! safe_text`（テキストスコープ） | 端末安全レンダリング | 1 |
+| `cli.rs` 自身の `use` | `Result`, `Args`, `json!`, `PathBuf`, `SyntaxTree`, `Dialect` 等 | 19 |
+
+**合計 49 個。** クレート境界を越えると全て明示が必要になる
+（F6 で 16 箇所、F8 で 47 箇所）。`scripts/rewrite-feature-package.py` が
+この 49 名を把握し、**実際に使われているファイルにだけ** import を追加する。
+残り 10 feature を手作業でやると事故る。
+
+**併せて 2 つの落とし穴**:
+
+1. **`X.rs` と `X/` が両方存在する**（Rust 2018 スタイル。ファイルがモジュール
+   ルート、ディレクトリが子）。**ディレクトリだけ `git mv` するとルートが残り、
+   パッケージが解決できない。** 実測で **18 モジュール**が該当
+   （domain 12 / application::usecase 6）。
+2. **移送によりルート側の再エクスポートが孤立する。**
+   `application::usecase::extract_shared` は 1 行の `pub(crate) use` で、
+   利用者が extract feature と共に去った瞬間 `unused_imports` で
+   `--deny warnings` に落ちた。
+
+### 11.6.2 【実装時の追記】ゲート実行中にツリーを編集しない
+
+`nix flake check` は**追跡ファイルのワーキングツリーを読む**（§11.6 の
+`git add -N` の裏返し）。Phase 3 のゲートをバックグラウンドで回したまま
+Phase 4 の編集を始めた結果、**ゲートが Phase 3 ではなく「Phase 3 + 作りかけの
+Phase 4」を検証して落ちた**。1 回 40 分（実測 35〜40 分）
+を無駄にする。**ゲート中は待つか、別 worktree で回すこと。**
+
 補足: `pub(crate)` の一括 `pub` 化は**必須**である。移送後は `crate` が
 パッケージを指すため、ルートが使っている項目が**パッケージ内から見ると
 dead_code になる**（Phase 1 では 101 件）。個別に絞るのではなく一括で広げ、
