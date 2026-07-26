@@ -13,6 +13,8 @@
 //! the catalogue, and [`rules`] for the rules themselves.
 
 pub mod engine;
+#[cfg(test)]
+mod engine_dispatch_tests;
 pub mod model;
 pub mod policy;
 pub mod registry;
