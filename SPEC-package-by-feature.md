@@ -568,6 +568,52 @@ lint の `REGISTRY`（`const` 配列）も同じ扱いで、**ルート側に移
 `core/sexpr` が全依存の起点（882 箇所から参照）。`core/cli` の実体は
 `io.rs` 4,782 行 + `diff.rs` 797 行で、CLI の I/O 規約そのもの。
 
+> **【実装時の訂正 — 上表の「依存先」列は誤り】**
+>
+> Phase 1 の着手時に、上表の core モジュール全件について
+> `crate::domain::<module>` 参照（コメント除去済み）を抽出し Tarjan で
+> 強連結成分を求めたところ、**C1 は葉ではなかった**。
+>
+> ```
+> sexpr       -> dialect       8   (parser / tree / edit / reader_policy が Dialect)
+> sexpr       -> common_lisp   4   (CommonLispOperator と各種 eq ヘルパ)
+> common_lisp -> sexpr        13   (ByteSpan / ExpressionView / SyntaxTree)
+> dialect     -> sexpr         2
+> common_lisp -> definition    4   (DefinitionCategory)
+> dialect     -> definition    1
+> definition  -> sexpr / dialect / common_lisp
+> ```
+>
+> すべて本番コードであり、doc リンクではない。結果:
+>
+> | SCC | 行数 | 判定 |
+> | --- | ---: | --- |
+> | `{sexpr, dialect, common_lisp, definition}` | 12,936 | **1 パッケージにするしかない** |
+> | 他の core モジュール全て | — | 単独ノード（非循環） |
+>
+> **C1 → C2 → C3 という依存順は Cargo で表現できない。**
+> §1.2 の「相互循環は 1 組のみ」は feature スライスに対する実測であり、
+> core は対象外だった。
+>
+> したがって Phase 1 で切り出したのは上表の C1 ではなく:
+>
+> | 実装 | 内容 | 行数 |
+> | --- | --- | ---: |
+> | `packages/core/syntax`<br>(`paredit-core-syntax`) | 上記 SCC + `leading_trivia`, `expression_equality`, `form_shape`, `graph`, `view_query` | **13,603**（62 ファイル） |
+>
+> 外向きコード依存ゼロ・`application`/`presentation`/`infrastructure` 参照ゼロを
+> 実測で確認済み。`sexpr` ではなく `syntax` と命名したのは dialect と
+> Common Lisp 知識を持つため。
+>
+> **上表への影響**: C1 と C2 は消滅し `core/syntax` に統合。C3 は
+> `definition` を失い `semantics, lexical_scope, binding_index,
+> callable_scope, definition_reference` になる。
+> **C4・C5・C6・C7 は上表のまま有効**（実測でいずれも非循環）。
+> core パッケージ数は 7 → 6。
+>
+> なお `benches/` だけでなく **`examples/semantic_coverage.rs` も façade 経由の
+> 利用者**である（§11.3 の「参照ゼロ」も参照）。
+
 ### 5.2 feature パッケージ（約 153,900 行）
 
 #### 5.2.1 確度の高い分割（実測の連結成分に基づく）
@@ -1503,6 +1549,30 @@ cargo nextest list                      > /tmp/tests-before.txt   # 全テスト
 CLI サブコマンドも、テストからの利用も、bench からの利用もない
 （ファイル内の `#[cfg(test)]` テストのみが実行経路）。
 
+> **【実装時の訂正 — 「参照ゼロ」は誤り】**
+>
+> `examples/semantic_coverage.rs`（コミット `a335358` で追加済み・追跡下）が
+> **公開 API 経由でこのモジュールを使っている**:
+>
+> ```rust
+> use paredit_cli::application::usecase::semantic_coverage::{
+>     SemanticCoverageRequest, SemanticCoverageSourcePort, build_semantic_coverage_report,
+> };
+> ```
+>
+> `cargo metadata` にも `example` ターゲットとして現れる。したがって:
+>
+> - **削除は選択肢から外れる**（§8-8 の 3 択のうち 1 つが消える）
+> - 「`benches/` に移す」案は **`examples/` の開発ハーネスとして既に実現済み**
+> - 帰属は「計測対象と同居」＝ `core/semantics` でよい。
+>   ただし**移送後もルート façade が
+>   `application::usecase::semantic_coverage` を再エクスポートし続けること**が
+>   この example のコンパイル条件になる
+>
+> **併せて §2.6・§11.5 への補足**: façade の利用者として本書は `benches/` しか
+> 挙げていないが、**`examples/` も同格の利用者**である。各 Phase の完了確認では
+> `cargo build --examples` も対象に含めること。
+
 doc コメントによれば、`domain::semantics` が実コードのどれだけを解決できるかを
 **計測するための内部ツール**である。移行時に 3 つの選択肢がある:
 
@@ -1542,6 +1612,26 @@ scripts/extract-package.sh <kind> <name> <module...>
 | `rustfmt.toml` | 現在存在せず、treefmt が `edition = "2024"` で rustfmt をかけている。26 パッケージでも設定は 1 箇所のままでよい |
 | 未使用依存の検出 | 分割後、各パッケージが実際には使っていない依存を持つ可能性がある。`cargo-machete` または `cargo-udeps` を Phase 6 で 1 回流す |
 | `benches/` の帰属 | `benches/{similarity_report,lint_report}.rs` は `paredit_cli::domain::...` を使う。façade が維持されるため**無改修で動く**が、Phase 6 で対応パッケージへ移すかを判断する |
+
+### 11.6 Phase 1 で判明した手順上の追加事項
+
+以下はいずれも**本書に記載がなく、ゲートに落ちて初めて判明した**もの。
+Phase 2 以降の各移送で必ず実施すること。
+
+| # | 事項 | 症状 | 対処 |
+| --- | --- | --- | --- |
+| 1 | **`[workspace] default-members` が必須** | ルートパッケージを持つ workspace では素の `cargo nextest run` が**ルートしかビルドしない**。Phase 1 では新パッケージの 272 テストが**警告もなく消え、結果は緑のまま**だった。`flake.nix` は `--workspace` を付けないので **CI が黙ってテストを回さなくなる** | `default-members = [".", "packages/*/*"]` を宣言。各 Phase で `cargo nextest list` の**総数**を必ず確認する |
+| 2 | **doctest はルートクレートを参照できない** | 移送ファイル内の `/// use paredit_cli::…` は移送先クレートからは解決不能。さらに **`compile_fail` doctest は「別の理由でコンパイルに失敗する」ため通り続け、何も検証しなくなる**（Phase 1 で 3 本該当） | 移送時に `paredit_cli::` → `<移送先クレート>::` へ一括置換し、`cargo test --doc -p <pkg>` で**実行本数**を確認する |
+| 3 | **契約テストが移送対象ソースをフィクスチャとして読む** | §2.6 は `public_module_docs_contract.rs` が無改修で通るとするが、それは `src/domain/mod.rs`（façade）についてのみ正しい。**個別モジュールのパスは移送で壊れる**（Phase 1 で 3 テスト / 18 パスリテラル） | 移送前に `grep -rn '"src/domain/' tests/` でパスリテラルを洗い出す |
+| 4 | **可視性の拡大が昇格済み lint を再発火させる** | `pub(crate)` → `pub` により `must_use_candidate` 等が新たに公開された項目に適用される（Phase 1 で 104 件）。`missing_debug_implementations` も同様 | 移送直後に `cargo clippy --fix -p <pkg>` を回す。**`--fix` はワークスペース全体指定だとメンバーを処理しないことがあるので `-p` を明示する** |
+| 5 | **`cargo clippy --fix` はフォーマットしない** | `const ` 挿入で幅超過、`format!` 引数インライン化で行が詰まる。**`treefmt-check` でしか検出できず、判明まで約 15 分かかる** | `clippy --fix` の直後に必ず `nix fmt` |
+
+補足: `pub(crate)` の一括 `pub` 化は**必須**である。移送後は `crate` が
+パッケージを指すため、ルートが使っている項目が**パッケージ内から見ると
+dead_code になる**（Phase 1 では 101 件）。個別に絞るのではなく一括で広げ、
+公開範囲の制御は **façade 側の再エクスポートの可視性**で行う
+（Phase 1 では 5 モジュールを `pub`、4 モジュールを `pub(crate)` で再エクスポートし、
+ルートクレートの公開 API を維持した）。
 
 ---
 
