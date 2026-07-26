@@ -1,6 +1,6 @@
 use super::types::BlockReplacement;
 
-pub(super) fn apply_replacements(input: &str, replacements: &[BlockReplacement]) -> String {
+pub fn apply_replacements(input: &str, replacements: &[BlockReplacement]) -> String {
     let mut output = String::with_capacity(input.len());
     let mut cursor = 0;
     for replacement in replacements {

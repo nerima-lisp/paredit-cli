@@ -1,15 +1,15 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::leading_trivia::first_newline_or;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
+use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::leading_trivia::first_newline_or;
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use super::syntax::{atom_child, list_head};
 use super::{SplitFileDefinition, SplitFileItem};
 
-pub(super) fn build_split_file_item(
+pub fn build_split_file_item(
     from_tree: &SyntaxTree,
     from_input: &str,
     from_dialect: Dialect,
@@ -75,7 +75,7 @@ pub(super) fn build_split_file_item(
     })
 }
 
-pub(super) fn package_context_before_top_level(
+pub fn package_context_before_top_level(
     tree: &SyntaxTree,
     dialect: Dialect,
     target_index: usize,

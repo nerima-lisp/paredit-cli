@@ -1,9 +1,9 @@
 use super::syntax::{expression_source, is_threadable_call, list_head};
 use super::types::{ThreadExpressionParts, ThreadExpressionStep, ThreadStyle};
-use crate::domain::sexpr::ExpressionView;
 use anyhow::{Context, Result};
+use paredit_core_syntax::sexpr::ExpressionView;
 
-pub(super) fn thread_expression_parts(
+pub fn thread_expression_parts(
     input: &str,
     view: &ExpressionView,
     style: ThreadStyle,

@@ -2,14 +2,14 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct Request<'a> {
+pub struct Request<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Option<Path>,
@@ -19,7 +19,7 @@ pub(crate) struct Request<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Plan {
+pub struct Plan {
     pub dialect: Dialect,
     pub path: Option<Path>,
     pub function: SymbolName,
@@ -32,7 +32,7 @@ pub(crate) struct Plan {
     pub changed: bool,
 }
 
-pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> Result<()> {
     match dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -48,7 +48,7 @@ pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
     }
 }
 
-pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> Result<Plan> {
     validate_dialect(request.dialect)?;
 
     SyntaxTree::parse_with_dialect(request.input, request.dialect)

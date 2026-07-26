@@ -1,6 +1,7 @@
 use super::*;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SymbolName};
 use proptest::prelude::*;
 
 fn parsed(input: &str, dialect: Dialect) -> (SyntaxTree, ExpressionView) {

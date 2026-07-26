@@ -1,5 +1,5 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnthreadStyle {
@@ -16,7 +16,8 @@ impl UnthreadStyle {
         }
     }
 
-    pub(super) fn from_operator(operator: &str) -> Option<Self> {
+    #[must_use]
+    pub fn from_operator(operator: &str) -> Option<Self> {
         match operator {
             "->" => Some(Self::First),
             "->>" => Some(Self::Last),
@@ -60,9 +61,9 @@ pub struct UnthreadExpressionStep {
 }
 
 #[derive(Debug)]
-pub(super) struct PipelineStep {
-    pub(super) head: String,
-    pub(super) arguments: Vec<String>,
-    pub(super) span: ByteSpan,
-    pub(super) form: String,
+pub struct PipelineStep {
+    pub head: String,
+    pub arguments: Vec<String>,
+    pub span: ByteSpan,
+    pub form: String,
 }

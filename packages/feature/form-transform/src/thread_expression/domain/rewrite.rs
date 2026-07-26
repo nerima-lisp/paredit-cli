@@ -1,7 +1,7 @@
 use super::types::ThreadExpressionStep;
-use crate::domain::sexpr::{ByteSpan, SymbolName};
+use paredit_core_syntax::sexpr::{ByteSpan, SymbolName};
 
-pub(super) fn thread_expression_replacement(
+pub fn thread_expression_replacement(
     operator: &SymbolName,
     base: &str,
     steps: &[ThreadExpressionStep],
@@ -13,7 +13,7 @@ pub(super) fn thread_expression_replacement(
     format!("({})", forms.join(" "))
 }
 
-pub(super) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut output = String::with_capacity(input.len() - span.len() + replacement.len());
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);

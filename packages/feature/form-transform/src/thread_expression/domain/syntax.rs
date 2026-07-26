@@ -1,16 +1,16 @@
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub(super) fn atom_text(view: &ExpressionView) -> Option<&str> {
+pub fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
         .then_some(view.text.as_deref())
         .flatten()
 }
 
-pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
-pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return None;
     }
@@ -18,11 +18,11 @@ pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
     atom_child(view, 0)
 }
 
-pub(super) fn expression_source(input: &str, view: &ExpressionView) -> String {
+pub fn expression_source(input: &str, view: &ExpressionView) -> String {
     view.span.slice(input).to_owned()
 }
 
-pub(super) fn is_threadable_call(view: &ExpressionView) -> bool {
+pub fn is_threadable_call(view: &ExpressionView) -> bool {
     view.kind == ExpressionKind::List
         && view.delimiter == Some(Delimiter::Paren)
         && view.children.len() >= 2

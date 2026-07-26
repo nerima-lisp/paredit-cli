@@ -1,12 +1,20 @@
-use super::*;
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
-use crate::application::usecase::replace_forms::{
-    ReplaceFormsPlan, ReplaceFormsRequest, plan_replace_forms,
-};
-use crate::domain::form_shape::FormShape;
+use crate::replace_forms::usecase::{ReplaceFormsPlan, ReplaceFormsRequest, plan_replace_forms};
+use paredit_core_syntax::form_shape::FormShape;
 
 #[derive(Debug, Args)]
-pub(super) struct ReplaceFormsArgs {
+pub struct ReplaceFormsArgs {
     /// Input file. Required when --write is used; reads stdin otherwise.
     #[arg(short, long)]
     file: Option<PathBuf>,
@@ -30,7 +38,7 @@ pub(super) struct ReplaceFormsArgs {
     output: OutputFormat,
 }
 
-pub(super) fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
+pub fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
     let ReplaceFormsArgs {
         file,
         dialect,

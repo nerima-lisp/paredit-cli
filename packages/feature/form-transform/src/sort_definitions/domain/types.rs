@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path};
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortDefinitionsStrategy {
@@ -52,10 +52,10 @@ pub struct SortDefinitionsItem {
     pub target_index: usize,
 }
 
-pub(super) struct DefinitionBlock {
-    pub(super) start: usize,
-    pub(super) end: usize,
-    pub(super) entries: Vec<DefinitionEntry>,
+pub struct DefinitionBlock {
+    pub start: usize,
+    pub end: usize,
+    pub entries: Vec<DefinitionEntry>,
 }
 
 /// `form_text` spans from the newline that ends the previous entry's line up
@@ -63,23 +63,23 @@ pub(super) struct DefinitionBlock {
 /// with the definition below it when entries are reordered. The first entry
 /// in the block has no previous entry to inherit trivia from, so its
 /// `form_text` is just its own span and `has_leading_trivia` is `false`.
-pub(super) struct DefinitionEntry {
-    pub(super) item: SortDefinitionsItem,
-    pub(super) form_text: String,
-    pub(super) has_leading_trivia: bool,
+pub struct DefinitionEntry {
+    pub item: SortDefinitionsItem,
+    pub form_text: String,
+    pub has_leading_trivia: bool,
 }
 
-pub(super) struct RawDefinition {
-    pub(super) path: Path,
-    pub(super) span: ByteSpan,
-    pub(super) head: String,
-    pub(super) name: Option<String>,
-    pub(super) category: DefinitionCategory,
-    pub(super) source_index: usize,
+pub struct RawDefinition {
+    pub path: Path,
+    pub span: ByteSpan,
+    pub head: String,
+    pub name: Option<String>,
+    pub category: DefinitionCategory,
+    pub source_index: usize,
 }
 
-pub(super) struct BlockReplacement {
-    pub(super) start: usize,
-    pub(super) end: usize,
-    pub(super) text: String,
+pub struct BlockReplacement {
+    pub start: usize,
+    pub end: usize,
+    pub text: String,
 }

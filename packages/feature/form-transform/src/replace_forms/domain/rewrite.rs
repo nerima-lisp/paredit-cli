@@ -1,7 +1,7 @@
 use super::ReplaceFormsTarget;
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
-pub(super) fn rewrite_replace_targets(
+pub fn rewrite_replace_targets(
     input: &str,
     targets: &[ReplaceFormsTarget],
     replacement: &str,

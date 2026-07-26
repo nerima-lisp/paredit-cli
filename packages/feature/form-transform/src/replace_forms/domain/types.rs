@@ -1,6 +1,6 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::form_shape::FormShape;
-use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::form_shape::FormShape;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug)]
 pub struct ReplaceFormsRequest<'a> {

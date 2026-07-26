@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path};
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path};
 
 #[derive(Debug)]
 pub struct SplitFileRequest<'a> {

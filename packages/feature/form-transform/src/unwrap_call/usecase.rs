@@ -2,9 +2,9 @@
 
 use anyhow::Result;
 
-use crate::application::usecase::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
+use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct UnwrapCallRequest<'a> {
@@ -31,14 +31,14 @@ pub struct UnwrapCallPlan {
 }
 
 pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> Result<UnwrapCallPlan> {
-    crate::domain::unwrap_call::validate_dialect(request.dialect)?;
+    crate::unwrap_call::domain::validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_overlapping_common_lisp_reader_time_forms(
         &tree,
         request.dialect,
         [request.target.span],
     )?;
-    let plan = crate::domain::unwrap_call::plan(crate::domain::unwrap_call::Request {
+    let plan = crate::unwrap_call::domain::plan(crate::unwrap_call::domain::Request {
         input: request.input,
         dialect: request.dialect,
         path: request.path,
@@ -63,7 +63,7 @@ pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> Result<UnwrapCallPlan
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::Path;
+    use paredit_core_syntax::sexpr::Path;
     use proptest::prelude::*;
 
     fn target(input: &str, dialect: Dialect) -> ExpressionView {

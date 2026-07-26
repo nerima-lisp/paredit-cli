@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
-use super::super::leading_trivia::first_newline_or;
 use super::syntax::list_head;
 use super::types::{DefinitionBlock, DefinitionEntry, RawDefinition, SortDefinitionsItem};
+use paredit_core_syntax::leading_trivia::first_newline_or;
 
-pub(super) fn collect_sortable_blocks(
+pub fn collect_sortable_blocks(
     input: &str,
     tree: &SyntaxTree,
     dialect: Dialect,

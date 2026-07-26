@@ -1,11 +1,11 @@
 use anyhow::{Context, Result, bail};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::form_shape::duplicate_shape;
-use crate::domain::mutation_safety::{
+use paredit_core_edit::mutation_safety::{
     reject_common_lisp_reader_conditionals, reject_overlapping_common_lisp_reader_time_forms,
 };
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::form_shape::duplicate_shape;
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
 mod rewrite;
 #[cfg(test)]

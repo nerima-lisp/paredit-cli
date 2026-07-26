@@ -1,12 +1,23 @@
-use super::*;
-use crate::application::usecase::thread_expression::{
+use crate::thread_expression::usecase::{
     ThreadExpressionPlan, ThreadExpressionRequest, ThreadStyle as ApplicationThreadStyle,
     plan_thread_expression,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use anyhow::{Context, Result};
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::args::ThreadStyleArg;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct ThreadExpressionArgs {
+pub struct ThreadExpressionArgs {
     /// Input file. Required when --write is used; reads stdin otherwise.
     #[arg(short, long)]
     file: Option<PathBuf>,
@@ -46,7 +57,7 @@ const fn application_style(style: ThreadStyleArg) -> ApplicationThreadStyle {
     }
 }
 
-pub(super) fn thread_expression(args: ThreadExpressionArgs) -> Result<()> {
+pub fn thread_expression(args: ThreadExpressionArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let selected = selection.view();

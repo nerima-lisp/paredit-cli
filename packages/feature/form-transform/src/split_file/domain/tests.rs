@@ -4,9 +4,9 @@ use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::rewrite::append_top_level_definitions;
 use super::*;
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
 fn split_request<'a>(from_input: &'a str, to_input: &'a str) -> SplitFileRequest<'a> {
     SplitFileRequest {

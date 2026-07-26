@@ -1,7 +1,7 @@
 use super::types::{PipelineStep, UnthreadExpressionStep, UnthreadStyle};
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
-pub(super) fn unthread_replacement(
+pub fn unthread_replacement(
     style: UnthreadStyle,
     base: &str,
     pipeline_steps: Vec<PipelineStep>,
@@ -30,7 +30,7 @@ pub(super) fn unthread_replacement(
     (current, steps)
 }
 
-pub(super) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut output = String::with_capacity(input.len() - span.len() + replacement.len());
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);

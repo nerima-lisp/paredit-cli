@@ -1,11 +1,19 @@
-use super::*;
-use crate::application::usecase::unwrap_call::{
-    UnwrapCallPlan, UnwrapCallRequest, plan_unwrap_call,
-};
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use crate::unwrap_call::usecase::{UnwrapCallPlan, UnwrapCallRequest, plan_unwrap_call};
+use anyhow::{Context, Result};
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct UnwrapCallArgs {
+pub struct UnwrapCallArgs {
     /// Input file. Required when --write is used; reads stdin otherwise.
     #[arg(short, long)]
     file: Option<PathBuf>,
@@ -32,7 +40,7 @@ pub(super) struct UnwrapCallArgs {
     output: OutputFormat,
 }
 
-pub(super) fn unwrap_call(args: UnwrapCallArgs) -> Result<()> {
+pub fn unwrap_call(args: UnwrapCallArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let selected = selection.view();

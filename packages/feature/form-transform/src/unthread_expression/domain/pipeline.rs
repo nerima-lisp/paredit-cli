@@ -1,9 +1,9 @@
 use super::syntax::{atom_child, atom_text, expression_source};
 use super::types::PipelineStep;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 use anyhow::{Context, Result};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub(super) fn pipeline_step(input: &str, view: &ExpressionView) -> Result<PipelineStep> {
+pub fn pipeline_step(input: &str, view: &ExpressionView) -> Result<PipelineStep> {
     match view.kind {
         ExpressionKind::Atom => {
             let head =

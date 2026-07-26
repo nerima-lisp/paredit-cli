@@ -10,12 +10,12 @@ mod types;
 
 use anyhow::Result;
 
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
-use super::leading_trivia::strip_leading_blank_lines;
 use collect::collect_sortable_blocks;
 use ordering::sorted_entry_positions;
+use paredit_core_syntax::leading_trivia::strip_leading_blank_lines;
 use rewrite::apply_replacements;
 use types::BlockReplacement;
 
@@ -28,7 +28,7 @@ pub use types::{
 const DEFAULT_ENTRY_SEPARATOR: &str = "\n\n";
 
 pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<SortDefinitionsPlan> {
-    if request.dialect == crate::domain::dialect::Dialect::Unknown {
+    if request.dialect == paredit_core_syntax::dialect::Dialect::Unknown {
         anyhow::bail!("sort-definitions does not support the unknown dialect");
     }
 

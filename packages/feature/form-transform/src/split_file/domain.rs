@@ -2,9 +2,9 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::definition::definition_shape;
-use crate::domain::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
 mod item;
 mod rewrite;
@@ -127,7 +127,7 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
     )?;
 
     let destination_is_common_lisp =
-        request.to_dialect == crate::domain::dialect::Dialect::CommonLisp;
+        request.to_dialect == paredit_core_syntax::dialect::Dialect::CommonLisp;
     let mut running_package = if destination_is_common_lisp {
         package_context_before_top_level(
             &to_tree,

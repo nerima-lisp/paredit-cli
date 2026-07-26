@@ -1,9 +1,10 @@
+use anyhow::Result;
 use std::path::PathBuf;
 
 use proptest::{prelude::*, test_runner::TestCaseError};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 use super::*;
 

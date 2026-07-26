@@ -1,8 +1,10 @@
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SyntaxTree;
 use proptest::prelude::*;
 
 use super::*;
-use crate::domain::dialect::Dialect;
-use crate::domain::form_shape::FormShape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::form_shape::FormShape;
 
 #[test]
 fn plans_multiple_replacements_in_reverse_span_order() {

@@ -1,5 +1,5 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThreadStyle {
@@ -24,7 +24,8 @@ impl ThreadStyle {
         }
     }
 
-    pub(super) const fn threaded_child_index(self, child_count: usize) -> usize {
+    #[must_use]
+    pub const fn threaded_child_index(self, child_count: usize) -> usize {
         match self {
             Self::First => 1,
             Self::Last => child_count.saturating_sub(1),
@@ -67,7 +68,7 @@ pub struct ThreadExpressionStep {
 }
 
 #[derive(Debug)]
-pub(super) struct ThreadExpressionParts {
-    pub(super) base: String,
-    pub(super) steps: Vec<ThreadExpressionStep>,
+pub struct ThreadExpressionParts {
+    pub base: String,
+    pub steps: Vec<ThreadExpressionStep>,
 }

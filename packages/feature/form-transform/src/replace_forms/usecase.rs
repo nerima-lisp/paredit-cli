@@ -1,3 +1,3 @@
-pub use crate::domain::replace_forms::{
+pub use crate::replace_forms::domain::{
     ReplaceFormsPlan, ReplaceFormsRequest, ReplaceFormsTarget, plan_replace_forms,
 };

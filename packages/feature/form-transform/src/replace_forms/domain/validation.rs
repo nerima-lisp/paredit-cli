@@ -3,10 +3,10 @@ use std::collections::HashSet;
 use anyhow::{Context, Result};
 
 use super::ReplaceFormsTarget;
-use crate::domain::form_shape::{FormShape, duplicate_shape};
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_syntax::form_shape::{FormShape, duplicate_shape};
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
-pub(super) fn collect_replace_targets(
+pub fn collect_replace_targets(
     tree: &SyntaxTree,
     paths: &[Path],
 ) -> Result<Vec<ReplaceFormsTarget>> {
@@ -34,11 +34,11 @@ pub(super) fn collect_replace_targets(
     Ok(targets)
 }
 
-pub(super) fn original_shape_for_targets(targets: &[ReplaceFormsTarget]) -> Option<FormShape> {
+pub fn original_shape_for_targets(targets: &[ReplaceFormsTarget]) -> Option<FormShape> {
     targets.first().map(|target| target.shape.clone())
 }
 
-pub(super) fn ensure_same_shape_when_required(
+pub fn ensure_same_shape_when_required(
     targets: &[ReplaceFormsTarget],
     original_shape: Option<&FormShape>,
     require_same_shape: bool,

@@ -12,10 +12,10 @@ pub use types::{
     UnthreadExpressionPlan, UnthreadExpressionRequest, UnthreadExpressionStep, UnthreadStyle,
 };
 
-use crate::domain::dialect::Dialect;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, SymbolName, SyntaxTree};
 use anyhow::{Context, Result};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, SymbolName, SyntaxTree};
 use pipeline::pipeline_step;
 use rewrite::{replace_span, unthread_replacement};
 use syntax::{atom_child, expression_source};

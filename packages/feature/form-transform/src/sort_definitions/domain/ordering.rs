@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use super::types::{DefinitionEntry, SortDefinitionsStrategy};
 
-pub(super) fn sorted_entry_positions(
+pub fn sorted_entry_positions(
     entries: &[DefinitionEntry],
     strategy: SortDefinitionsStrategy,
 ) -> Vec<usize> {
