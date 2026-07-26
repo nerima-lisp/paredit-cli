@@ -19,6 +19,10 @@ use super::folding::evaluate_constant;
 /// in as many rounds as the longest `let*` chain is deep. The cap is a
 /// backstop against a pathological file, not an expected limit; stopping early
 /// only loses deductions, it never produces a wrong one.
+///
+/// It is only a backstop: the loop already stops when a round learns nothing
+/// or when every target is resolved, and a file needs a second round at all
+/// only if one initial form depends on another.
 const MAX_ROUNDS: usize = 8;
 
 /// Builds the value table for one file, on top of its binding table.
@@ -41,16 +45,28 @@ pub fn build_value_table(
 
     // A `let*` initial form can reference a binding resolved in an earlier
     // round, so keep re-scanning until a round proves nothing new.
+    //
+    // Two exits, and the cheap one matters most. A round costs a full walk of
+    // every root plus a clone of the table so far, so the loop stops the
+    // moment there is nothing left to learn *about* — not one round later,
+    // once a walk has confirmed it. Most files leave the loop before the
+    // first walk (no propagatable binding at all) or after it (every target
+    // resolved at once); only a genuine `let*` chain needs a second.
     let targets = propagation_targets(bindings);
+    let mut resolved = 0;
     for _ in 0..MAX_ROUNDS {
-        let before = builder.snapshot();
-        let mut learned = false;
-        for root in &roots {
-            learned |= propagate_in(dialect, root, &targets, bindings, &before, &mut builder);
-        }
-        if !learned {
+        if resolved == targets.len() {
             break;
         }
+        let before = builder.snapshot();
+        let mut learned = 0;
+        for root in &roots {
+            learned += propagate_in(dialect, root, &targets, bindings, &before, &mut builder);
+        }
+        if learned == 0 {
+            break;
+        }
+        resolved += learned;
     }
 
     builder.finish()
@@ -83,7 +99,11 @@ fn propagation_targets(bindings: &BindingTable) -> HashMap<ByteSpan, BindingId> 
 }
 
 /// Records the value of every initial form in `view`'s subtree that resolves
-/// to a target, returning whether anything new was learned.
+/// to a target, returning how many bindings were newly resolved.
+///
+/// A count rather than a flag so the caller can tell "this round learned
+/// something" from "there is nothing left to learn", which is what lets it
+/// skip the confirming round entirely.
 fn propagate_in(
     dialect: Dialect,
     view: &ExpressionView,
@@ -91,8 +111,8 @@ fn propagate_in(
     bindings: &BindingTable,
     known: &ValueTable,
     builder: &mut ValueTableBuilder,
-) -> bool {
-    let mut learned = false;
+) -> usize {
+    let mut learned = 0;
     let mut stack = vec![view];
 
     while let Some(node) = stack.pop() {
@@ -105,7 +125,7 @@ fn propagate_in(
                 .and_then(super::super::model::LiteralValue::propagatable);
             if let Some(value) = value {
                 builder.set_binding_value(*binding, value);
-                learned = true;
+                learned += 1;
             }
         }
         stack.extend(node.children.iter().rev());
