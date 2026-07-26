@@ -1,14 +1,14 @@
 use std::iter;
 
-use crate::domain::common_lisp::CommonLispResourceBindingForm;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::common_lisp::CommonLispResourceBindingForm;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::super::syntax::atom_text;
 use super::super::bindings::extract_function_binding_entries;
 use super::super::patterns::parameter_names;
 use super::{ExtractFunctionSemantic, extend_extract_function_bound_params, slot_spec_bound_name};
 
-pub(super) fn collect_inferred_extract_function_let(
+pub fn collect_inferred_extract_function_let(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -61,7 +61,7 @@ pub(super) fn collect_inferred_extract_function_let(
     true
 }
 
-pub(super) fn collect_inferred_extract_function_let_star(
+pub fn collect_inferred_extract_function_let_star(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -102,7 +102,7 @@ pub(super) fn collect_inferred_extract_function_let_star(
     true
 }
 
-pub(super) fn collect_inferred_extract_function_value_binding(
+pub fn collect_inferred_extract_function_value_binding(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -141,7 +141,7 @@ pub(super) fn collect_inferred_extract_function_value_binding(
     true
 }
 
-pub(super) fn collect_inferred_extract_function_clause_form(
+pub fn collect_inferred_extract_function_clause_form(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -194,7 +194,7 @@ pub(super) fn collect_inferred_extract_function_clause_form(
     true
 }
 
-pub(super) fn collect_inferred_extract_function_handler_bind(
+pub fn collect_inferred_extract_function_handler_bind(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -264,7 +264,7 @@ fn collect_inferred_extract_function_restart_option_values(
     }
 }
 
-pub(super) fn collect_inferred_extract_function_iteration_binding(
+pub fn collect_inferred_extract_function_iteration_binding(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -317,7 +317,7 @@ pub(super) fn collect_inferred_extract_function_iteration_binding(
     true
 }
 
-pub(super) fn collect_inferred_extract_function_slot_binding(
+pub fn collect_inferred_extract_function_slot_binding(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -374,7 +374,7 @@ fn collect_bodies(
     }
 }
 
-pub(super) fn collect_inferred_extract_function_resource_binding(
+pub fn collect_inferred_extract_function_resource_binding(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],

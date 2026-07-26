@@ -2,12 +2,12 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::extract_shared::{insert_top_level_form, replace_span_checked};
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::{ExpressionView, SyntaxTree};
+use paredit_core_edit::extract_shared::{insert_top_level_form, replace_span_checked};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::sexpr::{ExpressionView, SyntaxTree};
 
 mod inference;
-pub(crate) mod rewrite;
+pub mod rewrite;
 mod syntax;
 #[cfg(test)]
 mod tests;
@@ -81,7 +81,7 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
 
 #[must_use]
 pub fn infer_extract_function_params(
-    dialect: crate::domain::dialect::Dialect,
+    dialect: paredit_core_syntax::dialect::Dialect,
     selection: &ExpressionView,
     explicit_params: &[String],
 ) -> Vec<String> {

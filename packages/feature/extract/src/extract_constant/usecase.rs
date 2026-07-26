@@ -2,10 +2,10 @@
 
 use anyhow::Result;
 
-use crate::application::usecase::extract_shared::TopLevelInsert;
-use crate::application::usecase::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path, Selection, SymbolName, SyntaxTree};
+use paredit_core_edit::extract_shared::TopLevelInsert;
+use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, Selection, SymbolName, SyntaxTree};
 
 pub type ExtractConstantInsert = TopLevelInsert;
 
@@ -38,7 +38,7 @@ pub struct ExtractConstantPlan {
 }
 
 pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
-    crate::domain::extract_constant::path_for_selection(tree, selection)
+    crate::extract_constant::domain::path_for_selection(tree, selection)
 }
 
 pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<ExtractConstantPlan> {
@@ -52,7 +52,7 @@ pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<Extr
             [request.selection.span()],
         )?;
     }
-    let plan = crate::domain::extract_constant::plan(crate::domain::extract_constant::Request {
+    let plan = crate::extract_constant::domain::plan(crate::extract_constant::domain::Request {
         input: request.input,
         tree: request.tree,
         selection: request.selection,

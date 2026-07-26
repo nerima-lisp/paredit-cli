@@ -1,11 +1,11 @@
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::{
     ExtractFunctionSemantic, extend_extract_function_bound_params, iteration_spec_bound_name,
     iteration_spec_init_form, iteration_spec_step_form, push_extract_function_bound_param,
 };
 
-pub(super) fn collect_inferred_extract_function_do(
+pub fn collect_inferred_extract_function_do(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -61,7 +61,7 @@ pub(super) fn collect_inferred_extract_function_do(
     true
 }
 
-pub(super) fn collect_inferred_extract_function_prog(
+pub fn collect_inferred_extract_function_prog(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],

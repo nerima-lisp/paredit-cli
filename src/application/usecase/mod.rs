@@ -67,10 +67,6 @@ pub mod eval_when_situation_report;
 pub mod exhaustive_case_otherwise_report;
 pub mod explicit_nil_return_report;
 pub mod explicit_step_delta_report;
-pub mod extract_constant;
-pub mod extract_function;
-pub mod extract_local_function;
-pub(crate) mod extract_shared;
 pub mod flatten_progn;
 pub mod form_report;
 pub mod format_missing_destination_report;
@@ -222,3 +218,7 @@ pub mod zero_divisor_report;
 // `paredit_cli::application::usecase::similarity_report`, so this path stays.
 pub use paredit_feature_similarity::similarity_report::usecase as similarity_report;
 pub use paredit_feature_similarity::duplicate_report::usecase as duplicate_report;
+
+pub use paredit_feature_extract::extract_function::usecase as extract_function;
+pub use paredit_feature_extract::extract_local_function::usecase as extract_local_function;
+pub use paredit_feature_extract::extract_constant::usecase as extract_constant;

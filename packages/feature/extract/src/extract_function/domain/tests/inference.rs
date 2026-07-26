@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn infers_free_variables_from_selected_expression() {

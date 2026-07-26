@@ -1,7 +1,7 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path, Selection, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, Selection, SymbolName};
 
-pub type ExtractFunctionInsert = crate::domain::extract_shared::TopLevelInsert;
+pub type ExtractFunctionInsert = paredit_core_edit::extract_shared::TopLevelInsert;
 
 #[derive(Debug, Clone)]
 pub struct ExtractFunctionRequest<'a> {

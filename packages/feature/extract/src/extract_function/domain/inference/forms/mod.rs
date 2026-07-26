@@ -2,13 +2,13 @@ mod bindings;
 mod callable;
 mod control;
 
-use crate::domain::common_lisp::{CommonLispLetBindingForm, CommonLispValueScopeForm};
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::common_lisp::{CommonLispLetBindingForm, CommonLispValueScopeForm};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::syntax::{atom_text, list_head};
 use super::ExtractFunctionSemantic;
 
-pub(super) fn collect_inferred_extract_function_special_form(
+pub fn collect_inferred_extract_function_special_form(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
@@ -154,7 +154,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
     }
 }
 
-pub(super) fn extend_extract_function_bound_params<'a>(
+pub fn extend_extract_function_bound_params<'a>(
     semantic: ExtractFunctionSemantic,
     bound_params: &[String],
     names: impl Iterator<Item = &'a str>,
@@ -166,7 +166,7 @@ pub(super) fn extend_extract_function_bound_params<'a>(
     extended
 }
 
-pub(super) fn push_extract_function_bound_param(
+pub fn push_extract_function_bound_param(
     semantic: ExtractFunctionSemantic,
     bound_params: &mut Vec<String>,
     name: &str,
@@ -180,21 +180,21 @@ pub(super) fn push_extract_function_bound_param(
     }
 }
 
-pub(super) fn slot_spec_bound_name(slot_spec: &ExpressionView) -> Option<&str> {
+pub fn slot_spec_bound_name(slot_spec: &ExpressionView) -> Option<&str> {
     atom_text(slot_spec).or_else(|| slot_spec.children.first().and_then(atom_text))
 }
 
-pub(super) fn iteration_spec_bound_name(spec: &ExpressionView) -> Option<&str> {
+pub fn iteration_spec_bound_name(spec: &ExpressionView) -> Option<&str> {
     atom_text(spec).or_else(|| spec.children.first().and_then(atom_text))
 }
 
-pub(super) fn iteration_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+pub fn iteration_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {
     (spec.kind == ExpressionKind::List)
         .then(|| spec.children.get(1))
         .flatten()
 }
 
-pub(super) fn iteration_spec_step_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+pub fn iteration_spec_step_form(spec: &ExpressionView) -> Option<&ExpressionView> {
     (spec.kind == ExpressionKind::List)
         .then(|| spec.children.get(2))
         .flatten()

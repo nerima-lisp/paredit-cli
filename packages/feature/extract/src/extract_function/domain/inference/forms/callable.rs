@@ -1,9 +1,9 @@
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::patterns::parameter_names;
 use super::{ExtractFunctionSemantic, extend_extract_function_bound_params};
 
-pub(super) fn collect_inferred_extract_function_lambda(
+pub fn collect_inferred_extract_function_lambda(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     parameter_index: usize,
@@ -33,7 +33,7 @@ pub(super) fn collect_inferred_extract_function_lambda(
     true
 }
 
-pub(super) fn collect_inferred_extract_function_local_callable_form(
+pub fn collect_inferred_extract_function_local_callable_form(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],

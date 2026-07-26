@@ -1,15 +1,15 @@
-use crate::domain::dialect::{
+use paredit_core_syntax::dialect::{
     BinderShape, BindingVisibility, BodyShape, DefinitionShape, Dialect, ParameterShape,
     RelativeNodePath, ScopeShape,
 };
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::bindings::{ExtractFunctionBindingEntry, extract_function_binding_entries};
 use super::forms::{extend_extract_function_bound_params, push_extract_function_bound_param};
 use super::patterns::{extract_function_pattern_names, parameter_names};
 use super::{ExtractFunctionSemantic, collect_inferred_extract_function_params};
 
-pub(super) fn collect_inferred_extract_function_semantic_form(
+pub fn collect_inferred_extract_function_semantic_form(
     semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],

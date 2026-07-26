@@ -2,17 +2,17 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispLocalCallableForm, CommonLispOperator, common_lisp_local_callable_form,
     common_lisp_operator_head_eq, common_lisp_symbol_identity_eq, common_lisp_symbol_reference_eq,
     local_callable_names,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::extract_function::{infer_extract_function_params, rewrite::extracted_call};
-use crate::domain::extract_shared::replace_span;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::reader::{apply_reader_prefix_context, atom_symbol_text};
-use crate::domain::sexpr::{
+use paredit_core_syntax::dialect::Dialect;
+use crate::extract_function::domain::{infer_extract_function_params, rewrite::extracted_call};
+use paredit_core_edit::extract_shared::replace_span;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::sexpr::reader::{apply_reader_prefix_context, atom_symbol_text};
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, ReaderPrefix, Selection, SymbolName, SyntaxTree,
 };
 

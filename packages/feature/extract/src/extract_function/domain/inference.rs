@@ -4,19 +4,19 @@ mod patterns;
 mod semantic;
 mod symbols;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_eq, is_common_lisp_declaration_form,
 };
-use crate::domain::dialect::{Dialect, ExtractFunctionOperation, VerifiedSemanticPolicy};
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, ReaderPrefix};
+use paredit_core_syntax::dialect::{Dialect, ExtractFunctionOperation, VerifiedSemanticPolicy};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::syntax::{atom_text, list_head};
 use forms::collect_inferred_extract_function_special_form;
 use symbols::is_extract_function_param_candidate;
 
-pub(super) type ExtractFunctionSemantic = VerifiedSemanticPolicy<ExtractFunctionOperation>;
+pub type ExtractFunctionSemantic = VerifiedSemanticPolicy<ExtractFunctionOperation>;
 
-pub(super) fn infer_extract_function_params(
+pub fn infer_extract_function_params(
     semantic: ExtractFunctionSemantic,
     selection: &ExpressionView,
     explicit_params: &[String],
@@ -33,7 +33,7 @@ pub(super) fn infer_extract_function_params(
     params
 }
 
-pub(super) fn extract_function_param_name_eq(
+pub fn extract_function_param_name_eq(
     semantic: ExtractFunctionSemantic,
     left: &str,
     right: &str,

@@ -1,6 +1,6 @@
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
-pub(super) fn is_extract_function_param_candidate(text: &str) -> bool {
+pub fn is_extract_function_param_candidate(text: &str) -> bool {
     if text.is_empty()
         || text.starts_with(':')
         || text.starts_with('"')

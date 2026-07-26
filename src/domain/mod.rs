@@ -13,6 +13,9 @@ pub use paredit_core_syntax::{common_lisp, definition, dialect, form_shape, sexp
 pub use paredit_feature_similarity::similarity_report::domain as similarity_report;
 pub use paredit_feature_similarity::duplicate_report::domain as duplicate_report;
 pub use paredit_feature_similarity::form_similarity;
+pub use paredit_feature_extract::extract_function::domain as extract_function;
+pub use paredit_feature_extract::extract_local_function::domain as extract_local_function;
+pub use paredit_feature_extract::extract_constant::domain as extract_constant;
 pub(crate) use paredit_core_syntax::{expression_equality, graph, leading_trivia, view_query};
 
 // Phase 2 facade (section 4.1), visibility mirroring the original `mod` lines.
@@ -79,9 +82,6 @@ pub mod eval_when_situation_report;
 pub mod exhaustive_case_otherwise_report;
 pub mod explicit_nil_return_report;
 pub mod explicit_step_delta_report;
-pub(crate) mod extract_constant;
-pub(crate) mod extract_function;
-pub(crate) mod extract_local_function;
 pub mod form_report;
 pub mod format_missing_destination_report;
 pub mod format_newline_report;

@@ -1,10 +1,10 @@
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::super::syntax::atom_text;
 use super::ExtractFunctionSemantic;
 use super::symbols::is_extract_function_param_candidate;
 
-pub(super) fn parameter_names(
+pub fn parameter_names(
     semantic: ExtractFunctionSemantic,
     parameter_form: &ExpressionView,
 ) -> Vec<String> {
@@ -13,7 +13,7 @@ pub(super) fn parameter_names(
     names
 }
 
-pub(super) fn extract_function_pattern_names(
+pub fn extract_function_pattern_names(
     semantic: ExtractFunctionSemantic,
     pattern: &ExpressionView,
 ) -> Vec<String> {

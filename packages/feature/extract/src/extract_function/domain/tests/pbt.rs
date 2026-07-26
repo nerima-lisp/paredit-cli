@@ -1,3 +1,7 @@
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_core_syntax::dialect::Dialect;
 use proptest::prelude::*;
 
 use super::*;

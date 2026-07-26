@@ -1,13 +1,13 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::extract_shared::{TopLevelInsert, insert_top_level_form, replace_span_checked};
-use crate::domain::sexpr::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_edit::extract_shared::{TopLevelInsert, insert_top_level_form, replace_span_checked};
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, ReaderPrefix, Selection, SymbolName, SyntaxTree,
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct Request<'a> {
+pub struct Request<'a> {
     pub input: &'a str,
     pub tree: &'a SyntaxTree,
     pub selection: Selection<'a>,
@@ -19,7 +19,7 @@ pub(crate) struct Request<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Plan {
+pub struct Plan {
     pub dialect: Dialect,
     pub path: Path,
     pub span_start: usize,
@@ -33,7 +33,7 @@ pub(crate) struct Plan {
     pub changed: bool,
 }
 
-pub(crate) fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
+pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
     selection.validate_tree(tree)?;
     let target = selection.span();
     find_path(&tree.root_view(), target, &mut Vec::new())
@@ -41,7 +41,7 @@ pub(crate) fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) ->
         .ok_or_else(|| anyhow::anyhow!("selected expression path could not be resolved"))
 }
 
-pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> Result<Plan> {
     request
         .selection
         .validate_context(request.input, request.tree)?;

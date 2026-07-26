@@ -1,11 +1,21 @@
-use super::*;
-use crate::application::usecase::extract_local_function::{
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use anyhow::Result;
+use clap::Args;
+use serde_json::json;
+use std::path::PathBuf;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use crate::extract_local_function::usecase::{
     ExtractLocalFunctionPlan, ExtractLocalFunctionRequest, plan_extract_local_function,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
-pub(super) struct ExtractLocalFunctionArgs {
+pub struct ExtractLocalFunctionArgs {
     /// Input file. Required when --write is used; reads stdin otherwise.
     #[arg(short, long)]
     file: Option<PathBuf>,
@@ -38,7 +48,7 @@ pub(super) struct ExtractLocalFunctionArgs {
     output: OutputFormat,
 }
 
-pub(super) fn extract_local_function(args: ExtractLocalFunctionArgs) -> Result<()> {
+pub fn extract_local_function(args: ExtractLocalFunctionArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

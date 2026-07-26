@@ -1,14 +1,14 @@
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::patterns::extract_function_pattern_names;
 
 #[derive(Debug)]
-pub(super) struct ExtractFunctionBindingEntry {
-    pub(super) names: Vec<String>,
-    pub(super) value: Option<ExpressionView>,
+pub struct ExtractFunctionBindingEntry {
+    pub names: Vec<String>,
+    pub value: Option<ExpressionView>,
 }
 
-pub(super) fn extract_function_binding_entries(
+pub fn extract_function_binding_entries(
     semantic: super::ExtractFunctionSemantic,
     binding_form: &ExpressionView,
 ) -> Option<Vec<ExtractFunctionBindingEntry>> {

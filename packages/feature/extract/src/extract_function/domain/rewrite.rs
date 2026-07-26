@@ -1,7 +1,8 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
-pub(crate) fn extracted_call(name: &SymbolName, params: &[String]) -> String {
+#[must_use]
+pub fn extracted_call(name: &SymbolName, params: &[String]) -> String {
     if params.is_empty() {
         format!("({})", name.as_str())
     } else {
@@ -9,7 +10,8 @@ pub(crate) fn extracted_call(name: &SymbolName, params: &[String]) -> String {
     }
 }
 
-pub(super) fn extracted_definition(
+#[must_use]
+pub fn extracted_definition(
     dialect: Dialect,
     name: &SymbolName,
     params: &[String],

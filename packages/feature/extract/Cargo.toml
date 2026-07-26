@@ -1,0 +1,28 @@
+[package]
+name = "paredit-feature-extract"
+description = "Extracting a selection into a function, a local function, or a constant"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-semantics = { path = "../../core/semantics" }
+paredit-core-edit = { path = "../../core/edit" }
+paredit-core-cli = { path = "../../core/cli" }
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true
