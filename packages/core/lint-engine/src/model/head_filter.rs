@@ -12,6 +12,7 @@
 pub struct NormalizedHead(&'static str);
 
 impl NormalizedHead {
+    #[must_use]
     pub const fn new(value: &'static str) -> Self {
         assert!(
             is_normalized(value),
@@ -20,6 +21,7 @@ impl NormalizedHead {
         Self(value)
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         self.0
     }

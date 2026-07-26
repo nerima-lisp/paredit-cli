@@ -15,6 +15,7 @@ pub enum Fixability {
 }
 
 impl Fixability {
+    #[must_use]
     pub const fn is_fixable(self) -> bool {
         matches!(self, Self::Fixable)
     }

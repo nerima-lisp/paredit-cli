@@ -2,8 +2,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::domain::lint::model::{LintFinding, LintPolicy, LintPolicyOptions, LintSummary};
-use crate::domain::lint::rule::RuleCatalog;
+use crate::model::{LintFinding, LintPolicy, LintPolicyOptions, LintSummary};
+use crate::rule::RuleCatalog;
 
 /// Summarizes findings, keeping only those from `active` rules; `per_rule`
 /// lists exactly the active rules (in [`RULES`] order) so the checklist

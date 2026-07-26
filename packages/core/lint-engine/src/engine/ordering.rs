@@ -30,7 +30,7 @@ impl RuleIndex {
 /// A node's position in the dispatcher's pre-order walk.
 ///
 /// Pre-order is what the old per-rule walk
-/// ([`crate::domain::view_query::for_each_subview`], applied to each root child
+/// ([`paredit_core_syntax::view_query::for_each_subview`], applied to each root child
 /// in turn) produced, so matching it node-for-node is what reproduces each
 /// rule's internal order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

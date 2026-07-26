@@ -4,7 +4,7 @@ use std::fmt;
 
 use anyhow::Result;
 
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::engine::{RuleContext, RuleSink};
 use super::model::{HeadFilter, RuleCategory, RuleMeta, Severity};
@@ -103,6 +103,13 @@ impl RuleCatalog {
     #[must_use]
     pub const fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    /// Always false for the shipped catalogue, but required of a public `len`
+    /// and meaningful for a catalogue built in a test.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 
     /// Rule names in registration order, which is also report order.

@@ -1,6 +1,6 @@
 //! Which dialects a lint rule is meaningful for.
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 /// The dialects a rule applies to.
 ///
@@ -20,10 +20,12 @@ impl RuleDialectScope {
     /// every shipped rule encodes CLHS semantics — but the value layer's
     /// dialect tables will.
     #[cfg(test)]
+    #[must_use]
     pub const fn new(dialects: &'static [Dialect]) -> Self {
         Self(dialects)
     }
 
+    #[must_use]
     pub fn includes(self, dialect: Dialect) -> bool {
         self.0.contains(&dialect)
     }

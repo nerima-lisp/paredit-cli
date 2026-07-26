@@ -2,10 +2,10 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 use super::ordering::{OutcomeOrder, RuleIndex, VisitIndex};
-use crate::domain::lint::model::{LintFinding, LintOutcome, RuleFix, RuleName};
+use crate::model::{LintFinding, LintOutcome, RuleFix, RuleName};
 
 /// Collects every rule's findings during the single pass and hands them back in
 /// the historical order.
@@ -116,7 +116,7 @@ impl RuleSink<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::ByteOffset;
+    use paredit_core_syntax::sexpr::ByteOffset;
 
     fn span(start: usize, end: usize) -> ByteSpan {
         ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))

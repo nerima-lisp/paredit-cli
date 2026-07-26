@@ -11,8 +11,8 @@ mod tests {
     use std::path::Path;
 
     use crate::domain::dialect::Dialect;
-    use crate::domain::lint::policy::RuleSelection;
     use crate::domain::lint::collect_lint_outcomes;
+    use crate::domain::lint::policy::RuleSelection;
     use crate::domain::sexpr::SyntaxTree;
 
     /// `self-assignment` (`WholeTree`) sits at registry position 0;

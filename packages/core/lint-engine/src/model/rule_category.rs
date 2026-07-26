@@ -31,6 +31,7 @@ impl RuleCategory {
 
     /// The category's wire name, as accepted by `--category` and printed in
     /// reports.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Arity => "arity",

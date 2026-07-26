@@ -12,13 +12,15 @@
 //! for decisions that need no tree, [`engine`] for the pass, [`registry`] for
 //! the catalogue, and [`rules`] for the rules themselves.
 
-pub mod engine;
+// Phase 2 facade (section 4.1). engine/model/policy/rule now live in
+// `paredit-core-lint-engine`; `registry` and `rules` stay here, because a
+// registry naming every rule while every rule depends on the engine is a cycle
+// (section 4.2).
+pub use paredit_core_lint_engine::{engine, model, policy, rule};
+
 #[cfg(test)]
 mod engine_dispatch_tests;
-pub mod model;
-pub mod policy;
 pub mod registry;
-pub mod rule;
 pub mod rules;
 
 use std::path::Path;

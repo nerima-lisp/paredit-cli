@@ -1,13 +1,13 @@
 //! The automatic rewrite a fixable rule attaches to a finding.
 
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 /// One byte region replaced by new text.
 ///
 /// Spans come straight from the tree, so a fix never has to re-derive offsets
 /// and can copy untouched sub-forms verbatim from the source — the discipline
 /// that keeps formatting intact (see the module docs of
-/// [`crate::domain::rename`]).
+/// `rename`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Replacement {
     span: ByteSpan,
@@ -22,10 +22,12 @@ impl Replacement {
         }
     }
 
+    #[must_use]
     pub const fn span(&self) -> ByteSpan {
         self.span
     }
 
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -88,7 +90,7 @@ impl RuleFix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::ByteOffset;
+    use paredit_core_syntax::sexpr::ByteOffset;
 
     fn span(start: usize, end: usize) -> ByteSpan {
         ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))

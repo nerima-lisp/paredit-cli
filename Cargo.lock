@@ -651,6 +651,7 @@ dependencies = [
  "criterion",
  "libc",
  "paredit-core-edit",
+ "paredit-core-lint-engine",
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",
@@ -663,6 +664,17 @@ dependencies = [
 
 [[package]]
 name = "paredit-core-edit"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-core-lint-engine"
 version = "1.1.0"
 dependencies = [
  "anyhow",

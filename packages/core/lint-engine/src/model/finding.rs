@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 use super::RuleFix;
 
@@ -34,10 +34,12 @@ pub struct LintOutcome {
 }
 
 impl LintOutcome {
+    #[must_use]
     pub const fn new(finding: LintFinding, fix: Option<RuleFix>) -> Self {
         Self { finding, fix }
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (LintFinding, Option<RuleFix>) {
         (self.finding, self.fix)
     }

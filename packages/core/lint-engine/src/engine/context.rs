@@ -3,12 +3,12 @@
 use std::cell::OnceCell;
 use std::path::Path;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::binding::{BindingTable, build_binding_table};
-use crate::domain::semantics::typing::TypeTable;
-use crate::domain::semantics::typing::service::build_type_table;
-use crate::domain::semantics::value::{ValueTable, build_value_table};
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_semantics::semantics::binding::{BindingTable, build_binding_table};
+use paredit_core_semantics::semantics::typing::TypeTable;
+use paredit_core_semantics::semantics::typing::service::build_type_table;
+use paredit_core_semantics::semantics::value::{ValueTable, build_value_table};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
 /// The read-only surroundings of a check: which file, which dialect, the whole
 /// tree, and the exact source bytes.
@@ -24,7 +24,7 @@ use crate::domain::sexpr::{ByteSpan, SyntaxTree};
 ///
 /// The tables own their data and link to each other by id rather than by
 /// borrow. A `ValueTable` holding `&BindingTable` would make this struct
-/// self-referential, which is why [`crate::domain::semantics`] indexes
+/// self-referential, which is why [`paredit_core_semantics::semantics`] indexes
 /// everything by `BindingId`.
 #[derive(Debug)]
 pub struct RuleContext<'a> {
@@ -38,6 +38,7 @@ pub struct RuleContext<'a> {
 }
 
 impl<'a> RuleContext<'a> {
+    #[must_use]
     pub const fn new(
         path: &'a Path,
         dialect: Dialect,
@@ -111,7 +112,7 @@ impl<'a> RuleContext<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::ByteOffset;
+    use paredit_core_syntax::sexpr::ByteOffset;
 
     #[test]
     fn slices_the_exact_source_of_a_span() {

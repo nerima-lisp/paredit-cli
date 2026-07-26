@@ -15,12 +15,14 @@ pub struct RuleName(&'static str);
 impl RuleName {
     /// Wraps a rule identifier. `const` so the registry can build its metadata
     /// at compile time.
+    #[must_use]
     pub const fn new(value: &'static str) -> Self {
         assert!(!value.is_empty(), "a lint rule name cannot be empty");
         Self(value)
     }
 
     /// The identifier as it appears in selectors and reports.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         self.0
     }

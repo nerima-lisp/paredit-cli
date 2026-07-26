@@ -3,12 +3,12 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::dialect::Dialect;
 
 use super::ordering::RuleIndex;
-use crate::domain::lint::model::HeadFilter;
-use crate::domain::lint::rule::RuleCatalog;
+use crate::model::HeadFilter;
+use crate::rule::RuleCatalog;
 
 /// Rules grouped by what they want to see, built once for the process.
 #[derive(Debug)]
@@ -25,11 +25,13 @@ impl HeadIndex {
     }
 
     /// Rules that examine every node regardless of operator.
+    #[must_use]
     pub fn all_nodes(&self) -> &[RuleIndex] {
         &self.all_nodes
     }
 
     /// Rules handed the whole document once.
+    #[must_use]
     pub fn whole_tree(&self) -> &[RuleIndex] {
         &self.whole_tree
     }

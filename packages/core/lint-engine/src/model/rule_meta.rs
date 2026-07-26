@@ -20,6 +20,7 @@ pub struct RuleMeta {
 }
 
 impl RuleMeta {
+    #[must_use]
     pub const fn new(
         name: &'static str,
         category: RuleCategory,
@@ -40,22 +41,27 @@ impl RuleMeta {
         }
     }
 
+    #[must_use]
     pub const fn name(&self) -> RuleName {
         self.name
     }
 
+    #[must_use]
     pub const fn category(&self) -> RuleCategory {
         self.category
     }
 
+    #[must_use]
     pub const fn severity(&self) -> Severity {
         self.severity
     }
 
+    #[must_use]
     pub const fn description(&self) -> &'static str {
         self.description
     }
 
+    #[must_use]
     pub const fn fixability(&self) -> Fixability {
         self.fixability
     }

@@ -4,17 +4,17 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::list_head;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::list_head;
 
 use super::context::RuleContext;
 use super::head_index::{HeadIndex, head_key};
 use super::ordering::{RuleIndex, VisitIndex};
 use super::sink::FindingSink;
-use crate::domain::lint::model::LintOutcome;
-use crate::domain::lint::policy::RuleSelection;
-use crate::domain::lint::rule::RuleCatalog;
+use crate::model::LintOutcome;
+use crate::policy::RuleSelection;
+use crate::rule::RuleCatalog;
 
 /// The rules that will actually run, decided once before the walk.
 ///

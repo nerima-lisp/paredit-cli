@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 
-use crate::domain::lint::model::{RuleCategory, RuleName};
-use crate::domain::lint::rule::RuleCatalog;
+use crate::model::{RuleCategory, RuleName};
+use crate::rule::RuleCatalog;
 
 /// Which rules a dispatch pass should run.
 ///
@@ -20,6 +20,7 @@ pub enum RuleSelection<'a> {
 }
 
 impl RuleSelection<'_> {
+    #[must_use]
     pub fn includes(self, rule: RuleName) -> bool {
         match self {
             Self::All => true,
