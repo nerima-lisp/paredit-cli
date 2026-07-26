@@ -124,6 +124,15 @@ pub fn resolve_symbol(
 /// Without the fold `cl:list` and `common-lisp:list` would be two symbols.
 /// `domain::common_lisp` already makes this identification in
 /// `canonical_common_lisp_package_identity`, which is private to that module.
+///
+/// Public because a package designator is not always attached to a symbol:
+/// `defpackage` and `in-package` name one directly, and a report comparing
+/// those two needs the same identity a qualified reference gets, or the same
+/// package written two ways reads as two packages.
+pub fn canonical_package_id(designator: &str) -> PackageId {
+    package_id(designator)
+}
+
 fn package_id(designator: &str) -> PackageId {
     let id = PackageId::new(normalize_common_lisp_package_designator(designator));
     match id.as_str() {

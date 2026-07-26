@@ -8,6 +8,16 @@
 //! without a `defpackage` form — `CL`, `COMMON-LISP`, `CL-USER`,
 //! `COMMON-LISP-USER`, `KEYWORD` — are never flagged.
 //!
+//! Both sides of the comparison are canonicalized by the project layer's
+//! [`PackageId`] rather than by a bare upcasing, which is what makes a
+//! *nickname* a legitimate designator: `(defpackage :my-app (:nicknames :app))`
+//! declares two names for one package, and `(in-package :app)` is not a typo.
+//! Reading only the primary name reported it as undefined.
+//!
+//! The canonicalization can only ever *add* declared names, never remove a
+//! reference's grounds for matching: a designator the layer cannot
+//! canonicalize keeps the bare-name comparison it always had.
+//!
 //! [`crate::domain::unused_package_report`]'s own caveat applies here in
 //! reverse: a package whose `defpackage` lives in a file outside the
 //! analyzed fileset is indistinguishable, from a purely syntactic view,
@@ -25,6 +35,7 @@ use crate::domain::common_lisp::{
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::package_report::build_package_report;
+use crate::domain::semantics::project::service::canonical_package_id;
 use crate::domain::sexpr::{ByteSpan, SyntaxTree};
 
 /// Packages every Common Lisp image provides without a `defpackage` form.
@@ -92,7 +103,12 @@ pub struct UndefinedPackagePolicy {
     pub violations: Vec<String>,
 }
 
-/// Collects every `defpackage`-declared name in one file.
+/// Collects every name a `defpackage` in one file declares.
+///
+/// A package's `:nicknames` are declared names too — CLHS makes a nickname a
+/// designator for the same package — so a file that declares them and then
+/// says `(in-package <nickname>)` is correct code. Collecting only the primary
+/// name reported that as an undefined package.
 pub fn collect_declared_package_names(dialect: Dialect, tree: &SyntaxTree) -> Result<Vec<String>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
@@ -102,7 +118,11 @@ pub fn collect_declared_package_names(dialect: Dialect, tree: &SyntaxTree) -> Re
     Ok(report
         .defpackages
         .into_iter()
-        .map(|defpackage| normalize_common_lisp_package_designator(&defpackage.name).to_owned())
+        .flat_map(|defpackage| {
+            std::iter::once(defpackage.name)
+                .chain(defpackage.nicknames)
+                .map(|name| normalize_common_lisp_package_designator(&name).to_owned())
+        })
         .collect())
 }
 
@@ -134,20 +154,30 @@ fn is_standard_package(needle: &str) -> bool {
     STANDARD_PACKAGE_NEEDLES.contains(&needle)
 }
 
+/// One designator's canonical identity, as the project layer sees it.
+///
+/// [`PackageId`] folds the two standard nicknames (`CL`/`COMMON-LISP`,
+/// `CL-USER`/`COMMON-LISP-USER`) on top of the upcasing the bare needle does,
+/// so the same package written two ways compares equal. Both sides go through
+/// it, which is the whole of what makes the comparison an identity test rather
+/// than a spelling test.
+fn package_identity(designator: &str) -> String {
+    canonical_package_id(designator).as_str().to_owned()
+}
+
 pub fn analyze_undefined_packages(
     declared: &[String],
     referenced: &[InPackageReference],
 ) -> UndefinedPackageSummary {
-    let declared_needles: BTreeSet<String> = declared
-        .iter()
-        .map(|name| common_lisp_symbol_reference_needle(name))
-        .collect();
+    let declared_identities: BTreeSet<String> =
+        declared.iter().map(|name| package_identity(name)).collect();
 
     let undefined = referenced
         .iter()
         .filter(|reference| {
             let needle = common_lisp_symbol_reference_needle(&reference.name);
-            !declared_needles.contains(&needle) && !is_standard_package(&needle)
+            !declared_identities.contains(&package_identity(&reference.name))
+                && !is_standard_package(&needle)
         })
         .map(|reference| UndefinedPackageItem {
             path: reference.path.clone(),
@@ -214,6 +244,61 @@ mod tests {
 
         let summary = analyze_undefined_packages(&declared_names, &referenced_names);
         assert!(summary.undefined.is_empty());
+    }
+
+    #[test]
+    fn does_not_flag_an_in_package_form_naming_a_declared_nickname() {
+        // CLHS makes a nickname a designator for the same package, so this is
+        // correct code. Reading only the primary name called it a typo.
+        let declared_names = declared("(defpackage :my-application (:nicknames :app) (:use :cl))");
+        let referenced_names = referenced("app.lisp", "(in-package :app)");
+
+        let summary = analyze_undefined_packages(&declared_names, &referenced_names);
+        assert!(summary.undefined.is_empty());
+    }
+
+    #[test]
+    fn still_flags_a_typo_that_is_neither_the_name_nor_a_nickname() {
+        // The nickname must widen what counts as declared, not disable the
+        // check: `aap` is still nobody's designator.
+        let declared_names = declared("(defpackage :my-application (:nicknames :app) (:use :cl))");
+        let referenced_names = referenced("app.lisp", "(in-package :aap)");
+
+        let summary = analyze_undefined_packages(&declared_names, &referenced_names);
+        assert_eq!(summary.undefined.len(), 1);
+        assert_eq!(summary.undefined[0].name, "aap");
+    }
+
+    #[test]
+    fn two_packages_of_the_same_bare_name_stay_two_packages() {
+        // `app` and `test` both declare a package; an `in-package` naming a
+        // third is undefined regardless of how many others exist. The
+        // identity comparison must not collapse distinct designators.
+        let declared_names =
+            declared("(defpackage :app (:use :cl))\n(defpackage :test (:use :cl))");
+        let referenced_names = referenced("app.lisp", "(in-package :app)\n(in-package :prod)");
+
+        let summary = analyze_undefined_packages(&declared_names, &referenced_names);
+        assert_eq!(summary.undefined.len(), 1);
+        assert_eq!(summary.undefined[0].name, "prod");
+    }
+
+    #[test]
+    fn a_designator_spelled_four_ways_names_one_package() {
+        // Symbol, keyword, uninterned symbol, and string all designate the
+        // same package. Routing both sides through the project layer's
+        // identity is what makes them compare equal.
+        let declared_names = declared(r#"(defpackage "APP" (:use :cl))"#);
+        for reference in [
+            "(in-package app)",
+            "(in-package :app)",
+            "(in-package #:app)",
+            r#"(in-package "APP")"#,
+        ] {
+            let referenced_names = referenced("app.lisp", reference);
+            let summary = analyze_undefined_packages(&declared_names, &referenced_names);
+            assert!(summary.undefined.is_empty(), "{reference}");
+        }
     }
 
     #[test]
