@@ -33,13 +33,27 @@ pub use types::{
     ImpactSymbolOccurrenceContext,
 };
 
-use crate::domain::refactor_plan::RefactorPlanSummary;
+use crate::domain::refactor_plan::{RefactorPlanSummary, RefactorRiskLevel};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ImpactRiskLevel {
     Info,
     Warning,
     Error,
+}
+
+// Lives here, not in `refactor_plan`, so the dependency runs one way only.
+// `refactor_plan` is core and `impact_report` is a feature-level report, so
+// core must not name it. The orphan rule permits the impl here because
+// `ImpactRiskLevel` is local to this module's crate.
+impl From<ImpactRiskLevel> for RefactorRiskLevel {
+    fn from(value: ImpactRiskLevel) -> Self {
+        match value {
+            ImpactRiskLevel::Info => Self::Info,
+            ImpactRiskLevel::Warning => Self::Warning,
+            ImpactRiskLevel::Error => Self::Error,
+        }
+    }
 }
 
 impl ImpactRiskLevel {

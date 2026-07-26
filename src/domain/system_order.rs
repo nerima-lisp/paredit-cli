@@ -1,3 +1,20 @@
+//! ASDF system ordering: `:depends-on` edges and the analysis order they imply.
+//!
+//! Moved out of `domain::semantics` for the package split. It reads as project
+//! analysis rather than language semantics, and more concretely it was the one
+//! thing making `core/semantics` depend on `dependency_report` and
+//! `system_cycle_report`, which are feature-level reports. Core must not name a
+//! feature, so this stays in the root crate until the project-analysis feature
+//! package exists to receive it.
+//!
+//! Unused by design, exactly as it was inside `semantics`: cross-file constant
+//! resolution turned out not to need it, because the project table carries a
+//! value only for a `defconstant` defined exactly once project-wide, and
+//! "exactly once" holds however the files are visited. An analysis whose answer
+//! depends on which file was seen first would need it, and none does yet. Its
+//! own tests are what exercise it.
+#![allow(dead_code, reason = "retained resolver, see the module docs")]
+
 //! The order a project's systems must be analysed in.
 //!
 //! ASDF `:depends-on` is the only load order read here. A source-level `load`

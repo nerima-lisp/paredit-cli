@@ -1,5 +1,3 @@
-use crate::domain::impact_report::ImpactRiskLevel;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RefactorOperation {
     Rename,
@@ -98,16 +96,6 @@ impl RefactorRiskLevel {
             Self::Info => "info",
             Self::Warning => "warning",
             Self::Error => "error",
-        }
-    }
-}
-
-impl From<ImpactRiskLevel> for RefactorRiskLevel {
-    fn from(value: ImpactRiskLevel) -> Self {
-        match value {
-            ImpactRiskLevel::Info => Self::Info,
-            ImpactRiskLevel::Warning => Self::Warning,
-            ImpactRiskLevel::Error => Self::Error,
         }
     }
 }

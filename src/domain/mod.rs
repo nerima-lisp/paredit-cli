@@ -207,6 +207,7 @@ pub mod struct_cycle_report;
 pub mod subseq_zero_report;
 pub mod system_conflict_report;
 pub mod system_cycle_report;
+pub(crate) mod system_order;
 pub mod t_comparison_report;
 pub mod the_arity_report;
 pub(crate) mod thread_expression;
