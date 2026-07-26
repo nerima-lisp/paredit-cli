@@ -2,6 +2,7 @@
 name = "paredit-cli"
 version = "1.0.0"
 edition = "2024"
+publish = false
 rust-version = "1.85"
 license = "MIT"
 description = "Structure-editing CLI for safe S-expression refactoring by AI coding agents"

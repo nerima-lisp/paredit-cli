@@ -6,6 +6,7 @@ fn cargo_manifest_keeps_public_crate_metadata_explicit() {
 
     for required in [
         "name = \"paredit-cli\"",
+        "publish = false",
         "license = \"MIT\"",
         "readme = \"README.md\"",
         "repository = \"https://github.com/nerima-lisp/paredit-cli\"",
