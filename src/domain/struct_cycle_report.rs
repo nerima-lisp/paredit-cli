@@ -46,7 +46,7 @@ pub struct StructCyclePolicyOptions {
 
 impl StructCyclePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_cycle: bool) -> Self {
+    pub const fn new(fail_on_cycle: bool) -> Self {
         Self { fail_on_cycle }
     }
 

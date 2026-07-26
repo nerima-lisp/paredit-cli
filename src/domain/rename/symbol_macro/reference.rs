@@ -205,7 +205,7 @@ fn match_reference_spans_to_sites(
     (matches, probes)
 }
 
-fn span_key(
+const fn span_key(
     span: ByteSpan,
 ) -> (
     crate::domain::sexpr::ByteOffset,

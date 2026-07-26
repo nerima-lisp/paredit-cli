@@ -112,7 +112,7 @@ impl DefinitionShape {
     }
 
     #[must_use]
-    pub fn body_range(self) -> DefinitionBodyRange {
+    pub const fn body_range(self) -> DefinitionBodyRange {
         DefinitionBodyRange {
             start_child_index: self.body_start_child_index,
             end_child_index: None,
@@ -145,7 +145,7 @@ impl DefinitionBodyRange {
 
 impl DefinitionCategory {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Function => "function",
             Self::Macro => "macro",
@@ -192,7 +192,7 @@ impl DefinitionCategory {
     }
 
     #[must_use]
-    pub fn is_callable(self) -> bool {
+    pub const fn is_callable(self) -> bool {
         matches!(
             self,
             Self::Function | Self::Macro | Self::GenericFunction | Self::Method
@@ -232,7 +232,7 @@ impl DefinitionCategory {
     /// or a customize buffer rather than called by name from other Lisp
     /// forms, so the same reasoning applies to them.
     #[must_use]
-    pub fn is_bulk_removable(self) -> bool {
+    pub const fn is_bulk_removable(self) -> bool {
         matches!(
             self,
             Self::Function
@@ -249,7 +249,7 @@ impl DefinitionCategory {
     }
 }
 
-fn definition_name_child_index(_head: &str) -> Option<usize> {
+const fn definition_name_child_index(_head: &str) -> Option<usize> {
     Some(1)
 }
 

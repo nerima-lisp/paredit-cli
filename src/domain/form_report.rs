@@ -154,7 +154,7 @@ fn collect_stats(view: &ExpressionView, stats: &mut FormStats) {
     }
 }
 
-fn form_kind(view: &ExpressionView) -> FormKind {
+const fn form_kind(view: &ExpressionView) -> FormKind {
     match view.kind {
         ExpressionKind::Atom => FormKind::Atom,
         ExpressionKind::List | ExpressionKind::Root => FormKind::List,

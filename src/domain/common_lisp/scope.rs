@@ -52,7 +52,7 @@ pub(crate) fn common_lisp_macro_expander_path(
     Ok(false)
 }
 
-pub(crate) fn is_macro_callable_form(form: CommonLispLocalCallableForm) -> bool {
+pub(crate) const fn is_macro_callable_form(form: CommonLispLocalCallableForm) -> bool {
     form.is_macro()
 }
 
@@ -81,7 +81,7 @@ pub(crate) fn local_callable_body_scope(
     body_scope
 }
 
-pub(crate) fn local_callable_binding_body_scope<'a>(
+pub(crate) const fn local_callable_binding_body_scope<'a>(
     form: CommonLispLocalCallableForm,
     local_callables: &'a [String],
     body_scope: &'a [String],
@@ -94,7 +94,7 @@ pub(crate) fn local_callable_binding_body_scope<'a>(
     }
 }
 
-pub(crate) fn local_callable_definition_reference_scope<'a>(
+pub(crate) const fn local_callable_definition_reference_scope<'a>(
     form: CommonLispLocalCallableForm,
     local_callables: &'a [String],
     body_scope: &'a [String],

@@ -30,7 +30,7 @@ impl SharedFormText {
         }
     }
 
-    pub(crate) fn from_source(source: Arc<str>, span: ByteSpan) -> Self {
+    pub(crate) const fn from_source(source: Arc<str>, span: ByteSpan) -> Self {
         Self { source, span }
     }
 
@@ -106,7 +106,7 @@ impl SimilarityFormReport {
         }
     }
 
-    pub(crate) fn new_shared(
+    pub(crate) const fn new_shared(
         path: PathBuf,
         dialect: Dialect,
         form_path: Path,
@@ -152,7 +152,7 @@ impl SimilarityFormReport {
     }
 
     #[must_use]
-    pub fn head(&self) -> Option<&FormHead> {
+    pub const fn head(&self) -> Option<&FormHead> {
         self.head.as_ref()
     }
 
@@ -162,7 +162,7 @@ impl SimilarityFormReport {
     }
 
     #[must_use]
-    pub fn contains_span(&self, other: &Self) -> bool {
+    pub const fn contains_span(&self, other: &Self) -> bool {
         self.span.contains_span(other.span)
     }
 
@@ -193,7 +193,7 @@ impl SimilarityCandidate {
     }
 
     #[must_use]
-    pub fn form(&self) -> &Arc<SimilarityFormReport> {
+    pub const fn form(&self) -> &Arc<SimilarityFormReport> {
         &self.form
     }
 
@@ -203,7 +203,7 @@ impl SimilarityCandidate {
     }
 
     #[must_use]
-    pub fn comparison_head(&self) -> Option<&ComparisonHead> {
+    pub const fn comparison_head(&self) -> Option<&ComparisonHead> {
         self.comparison_head.as_ref()
     }
 
@@ -310,7 +310,7 @@ impl SimilarityPairReport {
         }
     }
 
-    pub(crate) fn from_shared(
+    pub(crate) const fn from_shared(
         similarity: SimilarityRatio,
         score: SimilarityScore,
         left: Arc<SimilarityFormReport>,
@@ -460,12 +460,12 @@ impl ReportLimit {
     }
 
     #[must_use]
-    pub fn reached(self) -> bool {
+    pub const fn reached(self) -> bool {
         matches!(self, Self::Limited(_))
     }
 
     #[must_use]
-    pub fn omitted(self) -> usize {
+    pub const fn omitted(self) -> usize {
         match self {
             Self::Complete => 0,
             Self::Limited(count) => count.get(),
@@ -585,7 +585,7 @@ pub struct PairResultCounts {
 }
 
 impl PairResultCounts {
-    pub fn new(
+    pub const fn new(
         matched: usize,
         suppressed: usize,
         reported: usize,
@@ -636,62 +636,62 @@ impl SimilarityReportSummary {
     }
 
     #[must_use]
-    pub fn candidate_limit_reached(&self) -> bool {
+    pub const fn candidate_limit_reached(&self) -> bool {
         self.candidate_limit.reached()
     }
 
     #[must_use]
-    pub fn omitted_candidates(&self) -> usize {
+    pub const fn omitted_candidates(&self) -> usize {
         self.candidate_limit.omitted()
     }
 
     #[must_use]
-    pub fn possible_pairs(&self) -> usize {
+    pub const fn possible_pairs(&self) -> usize {
         self.pair_processing.possible
     }
 
     #[must_use]
-    pub fn evaluated_pairs(&self) -> usize {
+    pub const fn evaluated_pairs(&self) -> usize {
         self.pair_processing.evaluated
     }
 
     #[must_use]
-    pub fn pruned_by_size(&self) -> usize {
+    pub const fn pruned_by_size(&self) -> usize {
         self.pair_processing.pruned_by_size
     }
 
     #[must_use]
-    pub fn resource_skipped_pairs(&self) -> usize {
+    pub const fn resource_skipped_pairs(&self) -> usize {
         self.pair_processing.resource_skipped
     }
 
     #[must_use]
-    pub fn comparison_limit_reached(&self) -> bool {
+    pub const fn comparison_limit_reached(&self) -> bool {
         self.comparison_limit.reached()
     }
 
     #[must_use]
-    pub fn unprocessed_pairs(&self) -> usize {
+    pub const fn unprocessed_pairs(&self) -> usize {
         self.comparison_limit.omitted()
     }
 
     #[must_use]
-    pub fn matched_pairs(&self) -> usize {
+    pub const fn matched_pairs(&self) -> usize {
         self.pair_results.matched
     }
 
     #[must_use]
-    pub fn suppressed_pairs(&self) -> usize {
+    pub const fn suppressed_pairs(&self) -> usize {
         self.pair_results.suppressed
     }
 
     #[must_use]
-    pub fn reported_pairs(&self) -> usize {
+    pub const fn reported_pairs(&self) -> usize {
         self.pair_results.reported
     }
 
     #[must_use]
-    pub fn truncated(&self) -> bool {
+    pub const fn truncated(&self) -> bool {
         self.reported_pairs() < self.matched_pairs().saturating_sub(self.suppressed_pairs())
     }
 }

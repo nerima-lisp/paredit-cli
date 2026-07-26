@@ -34,7 +34,7 @@ pub struct LintOutcome {
 }
 
 impl LintOutcome {
-    pub fn new(finding: LintFinding, fix: Option<RuleFix>) -> Self {
+    pub const fn new(finding: LintFinding, fix: Option<RuleFix>) -> Self {
         Self { finding, fix }
     }
 

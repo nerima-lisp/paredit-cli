@@ -141,7 +141,7 @@ pub enum PackageRenameKind {
 
 impl PackageRenameKind {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::DefpackageName => "defpackage-name",
             Self::InPackageName => "in-package-name",

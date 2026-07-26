@@ -92,7 +92,7 @@ pub struct ZeroDivisorPolicyOptions {
 
 impl ZeroDivisorPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -181,7 +181,7 @@ pub fn collect_zero_divisors(
 }
 
 #[must_use]
-pub fn summarize_zero_divisors(
+pub const fn summarize_zero_divisors(
     division_form_count: usize,
     violations: Vec<ZeroDivisorItem>,
 ) -> ZeroDivisorSummary {

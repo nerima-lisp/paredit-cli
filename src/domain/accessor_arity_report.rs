@@ -84,7 +84,7 @@ pub struct AccessorArityPolicyOptions {
 
 impl AccessorArityPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -163,7 +163,7 @@ pub fn collect_accessor_arity_violations(
 }
 
 #[must_use]
-pub fn summarize_accessor_arity(
+pub const fn summarize_accessor_arity(
     call_count: usize,
     violations: Vec<AccessorArityItem>,
 ) -> AccessorAritySummary {

@@ -6,7 +6,7 @@ use super::super::{
 use super::{CommonLispOperator, classify};
 
 impl CommonLispOperator {
-    pub(crate) fn is_parallel_let_binding(self) -> bool {
+    pub(crate) const fn is_parallel_let_binding(self) -> bool {
         matches!(self, Self::Let | Self::SymbolMacrolet)
     }
 
@@ -18,7 +18,7 @@ impl CommonLispOperator {
         self.is_parallel_let_binding() || self.is_sequential_let_binding()
     }
 
-    pub(crate) fn let_binding_form(self) -> Option<CommonLispLetBindingForm> {
+    pub(crate) const fn let_binding_form(self) -> Option<CommonLispLetBindingForm> {
         match self {
             Self::Let => Some(CommonLispLetBindingForm::Parallel),
             Self::LetStar => Some(CommonLispLetBindingForm::Sequential),
@@ -27,15 +27,15 @@ impl CommonLispOperator {
         }
     }
 
-    pub(crate) fn is_value_binding(self) -> bool {
+    pub(crate) const fn is_value_binding(self) -> bool {
         matches!(self, Self::DestructuringBind | Self::MultipleValueBind)
     }
 
-    pub(crate) fn is_clause_binding(self) -> bool {
+    pub(crate) const fn is_clause_binding(self) -> bool {
         matches!(self, Self::HandlerCase | Self::RestartCase)
     }
 
-    pub(crate) fn is_handler_bind_binding(self) -> bool {
+    pub(crate) const fn is_handler_bind_binding(self) -> bool {
         matches!(self, Self::HandlerBind | Self::RestartBind)
     }
 
@@ -43,7 +43,7 @@ impl CommonLispOperator {
         self == Self::RestartBind
     }
 
-    pub(crate) fn handler_binding_form(self) -> Option<CommonLispHandlerBindingForm> {
+    pub(crate) const fn handler_binding_form(self) -> Option<CommonLispHandlerBindingForm> {
         match self {
             Self::HandlerBind => Some(CommonLispHandlerBindingForm::Handler),
             Self::RestartBind => Some(CommonLispHandlerBindingForm::Restart),
@@ -51,23 +51,23 @@ impl CommonLispOperator {
         }
     }
 
-    pub(crate) fn is_iteration_binding(self) -> bool {
+    pub(crate) const fn is_iteration_binding(self) -> bool {
         matches!(self, Self::Dolist | Self::Dotimes)
     }
 
-    pub(crate) fn is_do_binding(self) -> bool {
+    pub(crate) const fn is_do_binding(self) -> bool {
         matches!(self, Self::Do | Self::DoStar)
     }
 
-    pub(crate) fn is_prog_binding(self) -> bool {
+    pub(crate) const fn is_prog_binding(self) -> bool {
         matches!(self, Self::Prog | Self::ProgStar)
     }
 
-    pub(crate) fn is_sequential_variable_binding(self) -> bool {
+    pub(crate) const fn is_sequential_variable_binding(self) -> bool {
         matches!(self, Self::DoStar | Self::ProgStar)
     }
 
-    pub(crate) fn variable_binding_form(self) -> Option<CommonLispVariableBindingForm> {
+    pub(crate) const fn variable_binding_form(self) -> Option<CommonLispVariableBindingForm> {
         match self {
             Self::Do | Self::Prog => Some(CommonLispVariableBindingForm::Parallel),
             Self::DoStar | Self::ProgStar => Some(CommonLispVariableBindingForm::Sequential),
@@ -75,11 +75,11 @@ impl CommonLispOperator {
         }
     }
 
-    pub(crate) fn has_variable_step_forms(self) -> bool {
+    pub(crate) const fn has_variable_step_forms(self) -> bool {
         self.is_do_binding()
     }
 
-    pub(crate) fn value_scope_form(self) -> Option<CommonLispValueScopeForm> {
+    pub(crate) const fn value_scope_form(self) -> Option<CommonLispValueScopeForm> {
         if let Some(form) = self.let_binding_form() {
             return Some(CommonLispValueScopeForm::Let(form));
         }
@@ -110,11 +110,11 @@ impl CommonLispOperator {
         }
     }
 
-    pub(crate) fn is_slot_binding(self) -> bool {
+    pub(crate) const fn is_slot_binding(self) -> bool {
         matches!(self, Self::WithSlots | Self::WithAccessors)
     }
 
-    pub(crate) fn resource_binding_form(self) -> Option<CommonLispResourceBindingForm> {
+    pub(crate) const fn resource_binding_form(self) -> Option<CommonLispResourceBindingForm> {
         match self {
             Self::WithOpenFile => Some(CommonLispResourceBindingForm::OpenFile),
             Self::WithOpenStream => Some(CommonLispResourceBindingForm::OpenStream),
@@ -124,7 +124,7 @@ impl CommonLispOperator {
         }
     }
 
-    pub(crate) fn slot_binding_form(self) -> Option<CommonLispSlotBindingForm> {
+    pub(crate) const fn slot_binding_form(self) -> Option<CommonLispSlotBindingForm> {
         match self {
             Self::WithSlots => Some(CommonLispSlotBindingForm::WithSlots),
             Self::WithAccessors => Some(CommonLispSlotBindingForm::WithAccessors),
@@ -132,14 +132,14 @@ impl CommonLispOperator {
         }
     }
 
-    pub(crate) fn is_local_callable_binding(self) -> bool {
+    pub(crate) const fn is_local_callable_binding(self) -> bool {
         matches!(
             self,
             Self::Flet | Self::Labels | Self::Macrolet | Self::CompilerMacrolet
         )
     }
 
-    pub(crate) fn local_callable_form(self) -> Option<CommonLispLocalCallableForm> {
+    pub(crate) const fn local_callable_form(self) -> Option<CommonLispLocalCallableForm> {
         classify::local_callable_form(self)
     }
 

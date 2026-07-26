@@ -74,7 +74,7 @@ pub struct AppendListToConsPolicyOptions {
 
 impl AppendListToConsPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -156,7 +156,7 @@ pub fn collect_append_list_to_cons(
 }
 
 #[must_use]
-pub fn summarize_append_list_to_cons(
+pub const fn summarize_append_list_to_cons(
     append_form_count: usize,
     violations: Vec<AppendListToConsItem>,
 ) -> AppendListToConsSummary {

@@ -375,7 +375,7 @@ impl<'a> Parser<'a> {
     /// This keeps character literals such as `#\[`, `#\)`, and `#\Space`, as well
     /// as escaped symbol constituents like `\(`, from being split at what would
     /// otherwise be a delimiter or whitespace boundary.
-    fn consume_single_escape(&mut self) -> std::result::Result<(), ParseError> {
+    const fn consume_single_escape(&mut self) -> std::result::Result<(), ParseError> {
         let start = self.pos.get();
         self.advance();
         if self.pos.get() >= self.bytes.len() {
@@ -822,11 +822,11 @@ impl<'a> Parser<'a> {
         self.bytes.get(self.pos.get() + 1).copied()
     }
 
-    fn advance(&mut self) {
+    const fn advance(&mut self) {
         self.pos = ByteOffset::new(self.pos.get() + 1);
     }
 
-    fn advance_by(&mut self, width: usize) {
+    const fn advance_by(&mut self, width: usize) {
         self.pos = ByteOffset::new(self.pos.get() + width);
     }
 

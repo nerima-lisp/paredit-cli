@@ -49,7 +49,7 @@ pub struct DuplicateLambdaListKeywordPolicyOptions {
 
 impl DuplicateLambdaListKeywordPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_duplicate: bool) -> Self {
+    pub const fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
@@ -139,7 +139,7 @@ pub fn collect_duplicate_lambda_list_keywords(
 }
 
 #[must_use]
-pub fn summarize_duplicate_lambda_list_keywords(
+pub const fn summarize_duplicate_lambda_list_keywords(
     definition_count: usize,
     duplicates: Vec<DuplicateLambdaListKeywordItem>,
 ) -> DuplicateLambdaListKeywordSummary {

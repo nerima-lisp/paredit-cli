@@ -127,7 +127,7 @@ impl Dialect {
         }
     }
 
-    pub(crate) fn inline_function_sequence_head(self) -> &'static str {
+    pub(crate) const fn inline_function_sequence_head(self) -> &'static str {
         match self {
             Self::CommonLisp | Self::EmacsLisp | Self::Lfe | Self::Unknown => "progn",
             Self::Scheme | Self::Racket => "begin",
@@ -135,7 +135,7 @@ impl Dialect {
         }
     }
 
-    pub(crate) fn supports_common_lisp_lambda_list_refactor_model(self) -> bool {
+    pub(crate) const fn supports_common_lisp_lambda_list_refactor_model(self) -> bool {
         matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown)
     }
 

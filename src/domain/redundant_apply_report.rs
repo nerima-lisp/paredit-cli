@@ -75,7 +75,7 @@ pub struct RedundantApplyPolicyOptions {
 
 impl RedundantApplyPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -167,7 +167,7 @@ pub fn collect_redundant_applies(
 }
 
 #[must_use]
-pub fn summarize_redundant_applies(
+pub const fn summarize_redundant_applies(
     apply_form_count: usize,
     violations: Vec<RedundantApplyItem>,
 ) -> RedundantApplySummary {

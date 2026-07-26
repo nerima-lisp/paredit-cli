@@ -65,7 +65,7 @@ pub struct DefpackageQuotedPolicyOptions {
 
 impl DefpackageQuotedPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -149,7 +149,7 @@ pub fn collect_defpackage_quoted(
 }
 
 #[must_use]
-pub fn summarize_defpackage_quoted(
+pub const fn summarize_defpackage_quoted(
     defpackage_form_count: usize,
     violations: Vec<DefpackageQuotedItem>,
 ) -> DefpackageQuotedSummary {

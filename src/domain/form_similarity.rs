@@ -647,7 +647,7 @@ impl TreeEditOperationBudgets<'_> {
 }
 
 impl TreeEditOperationBudget {
-    fn new(limit: usize) -> Self {
+    const fn new(limit: usize) -> Self {
         Self {
             operations: 0,
             limit,
@@ -674,7 +674,7 @@ impl TreeEditOperationBudget {
 }
 
 #[inline]
-fn index(row: usize, column: usize, width: usize) -> usize {
+const fn index(row: usize, column: usize, width: usize) -> usize {
     row * width + column
 }
 

@@ -8,7 +8,7 @@ pub(super) struct AtomPathIndex<'a> {
 }
 
 impl<'a> AtomPathIndex<'a> {
-    pub(super) fn new(occurrences: &'a AtomOccurrenceIndex<'a>) -> Self {
+    pub(super) const fn new(occurrences: &'a AtomOccurrenceIndex<'a>) -> Self {
         Self { occurrences }
     }
 

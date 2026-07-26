@@ -13,7 +13,7 @@ impl FunctionCallScope {
     }
 
     #[must_use]
-    pub fn explicit(paths: Vec<Path>) -> Self {
+    pub const fn explicit(paths: Vec<Path>) -> Self {
         Self::ExplicitPaths(paths)
     }
 

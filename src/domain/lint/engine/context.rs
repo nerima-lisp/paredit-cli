@@ -38,7 +38,7 @@ pub struct RuleContext<'a> {
 }
 
 impl<'a> RuleContext<'a> {
-    pub fn new(path: &'a Path, dialect: Dialect, tree: &'a SyntaxTree, source: &'a str) -> Self {
+    pub const fn new(path: &'a Path, dialect: Dialect, tree: &'a SyntaxTree, source: &'a str) -> Self {
         Self {
             path,
             dialect,

@@ -70,7 +70,7 @@ pub struct MalformedIterationSpecPolicyOptions {
 
 impl MalformedIterationSpecPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -173,7 +173,7 @@ pub fn collect_malformed_iteration_specs(
 }
 
 #[must_use]
-pub fn summarize_malformed_iteration_specs(
+pub const fn summarize_malformed_iteration_specs(
     iteration_form_count: usize,
     violations: Vec<MalformedIterationSpecItem>,
 ) -> MalformedIterationSpecSummary {

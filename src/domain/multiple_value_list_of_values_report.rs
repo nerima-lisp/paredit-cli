@@ -56,7 +56,7 @@ pub struct MultipleValueListOfValuesPolicyOptions {
 
 impl MultipleValueListOfValuesPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -149,7 +149,7 @@ pub fn collect_multiple_value_list_of_values(
 }
 
 #[must_use]
-pub fn summarize_multiple_value_list_of_values(
+pub const fn summarize_multiple_value_list_of_values(
     mvl_form_count: usize,
     violations: Vec<MultipleValueListOfValuesItem>,
 ) -> MultipleValueListOfValuesSummary {

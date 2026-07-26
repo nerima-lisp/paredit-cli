@@ -61,7 +61,7 @@ pub struct OneArmedIfPolicyOptions {
 
 impl OneArmedIfPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -136,7 +136,7 @@ pub fn collect_one_armed_ifs(
 }
 
 #[must_use]
-pub fn summarize_one_armed_ifs(
+pub const fn summarize_one_armed_ifs(
     if_form_count: usize,
     violations: Vec<OneArmedIfItem>,
 ) -> OneArmedIfSummary {

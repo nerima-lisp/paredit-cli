@@ -55,7 +55,7 @@ pub struct DuplicateLetBindingPolicyOptions {
 
 impl DuplicateLetBindingPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_duplicate: bool) -> Self {
+    pub const fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
@@ -143,7 +143,7 @@ pub fn collect_duplicate_let_bindings(
 }
 
 #[must_use]
-pub fn summarize_duplicate_let_bindings(
+pub const fn summarize_duplicate_let_bindings(
     let_form_count: usize,
     duplicates: Vec<DuplicateLetBindingItem>,
 ) -> DuplicateLetBindingSummary {

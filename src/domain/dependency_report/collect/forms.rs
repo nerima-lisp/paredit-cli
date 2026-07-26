@@ -23,7 +23,7 @@ pub(super) fn collect_list_dependency_items(
     push_dependency_from_child(view, path, 1, kind, Some(head.to_owned()), dependencies);
 }
 
-fn runtime_dependency_kind(form: CommonLispRuntimeDependencyForm) -> DependencyKind {
+const fn runtime_dependency_kind(form: CommonLispRuntimeDependencyForm) -> DependencyKind {
     match form {
         CommonLispRuntimeDependencyForm::Require => DependencyKind::Require,
         CommonLispRuntimeDependencyForm::Provide => DependencyKind::Provide,

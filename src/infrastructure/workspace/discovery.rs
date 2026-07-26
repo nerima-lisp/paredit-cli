@@ -168,7 +168,7 @@ struct ReadReservation<'a> {
 }
 
 impl<'a> ReadReservation<'a> {
-    fn new(total: &'a AtomicU64) -> Self {
+    const fn new(total: &'a AtomicU64) -> Self {
         Self {
             total,
             reserved: 0,

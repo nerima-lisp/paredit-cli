@@ -111,7 +111,7 @@ pub enum SignatureCallStatus {
 
 impl SignatureCallStatus {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Exact => "exact",
             Self::MissingArguments => "missing-arguments",

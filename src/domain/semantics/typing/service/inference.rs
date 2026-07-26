@@ -201,7 +201,7 @@ fn the_asserted_type(view: &ExpressionView) -> Option<Ty> {
     Ty::from_name(atom_symbol_text(spec)?)
 }
 
-fn ty_of_literal(value: &LiteralValue) -> Ty {
+const fn ty_of_literal(value: &LiteralValue) -> Ty {
     match value {
         LiteralValue::Integer(_) => Ty::Integer,
         LiteralValue::Float(_) => Ty::Float,

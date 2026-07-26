@@ -95,7 +95,7 @@ pub enum RefactorExecuteOutcome {
 }
 
 impl RefactorExecuteOutcome {
-    pub fn from_decision(
+    pub const fn from_decision(
         decision: RefactorExecuteDecision,
         post_verification: Option<RefactorExecutePostVerificationResult>,
     ) -> Result<Self, &'static str> {
@@ -138,7 +138,7 @@ impl RefactorExecuteOutcome {
     }
 
     #[must_use]
-    pub fn steps(self) -> [RefactorExecuteStep; 5] {
+    pub const fn steps(self) -> [RefactorExecuteStep; 5] {
         use RefactorExecuteStepStatus::{Failed, Passed, Scheduled, Skipped};
         let preview_policy = if matches!(self, Self::BlockedByPolicy) {
             Failed
@@ -194,7 +194,7 @@ impl RefactorExecuteOutcome {
 
 impl RefactorExecuteDecisionStatus {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "blocked-by-policy",
             Self::RefusedUnparsableOutput => "refused-unparsable-output",
@@ -205,7 +205,7 @@ impl RefactorExecuteDecisionStatus {
     }
 
     #[must_use]
-    pub fn reason(self) -> &'static str {
+    pub const fn reason(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "preview-policy-failed",
             Self::RefusedUnparsableOutput => "rewritten-output-did-not-parse",
@@ -216,7 +216,7 @@ impl RefactorExecuteDecisionStatus {
     }
 
     #[must_use]
-    pub fn next_action(self) -> &'static str {
+    pub const fn next_action(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "review-policy-violations",
             Self::RefusedUnparsableOutput => "inspect-preview-parse-errors",
@@ -237,7 +237,7 @@ pub enum RefactorExecuteStepStatus {
 
 impl RefactorExecuteStepStatus {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Passed => "passed",
             Self::Failed => "failed",
@@ -420,7 +420,7 @@ impl RefactorExecuteDecision {
 }
 
 #[must_use]
-pub fn build_refactor_execute_decision(
+pub const fn build_refactor_execute_decision(
     inputs: RefactorExecuteGateInputs,
 ) -> RefactorExecuteDecision {
     let status = match (
@@ -462,7 +462,7 @@ pub fn build_refactor_execute_decision(
 }
 
 #[must_use]
-pub fn build_refactor_execute_preflight_decision(
+pub const fn build_refactor_execute_preflight_decision(
     inputs: RefactorExecutePreflightInputs,
 ) -> RefactorExecuteDecision {
     build_refactor_execute_decision(RefactorExecuteGateInputs::new(

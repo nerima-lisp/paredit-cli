@@ -49,25 +49,25 @@ enum Conversion {
 }
 
 impl Conversion {
-    fn command(self) -> &'static str {
+    const fn command(self) -> &'static str {
         match self {
             Self::Do => "convert-do-star-to-do",
             Self::Prog => "convert-prog-star-to-prog",
         }
     }
-    fn source_head(self) -> &'static str {
+    const fn source_head(self) -> &'static str {
         match self {
             Self::Do => "do*",
             Self::Prog => "prog*",
         }
     }
-    fn target_head(self) -> &'static str {
+    const fn target_head(self) -> &'static str {
         match self {
             Self::Do => "do",
             Self::Prog => "prog",
         }
     }
-    fn max_binding_parts(self) -> usize {
+    const fn max_binding_parts(self) -> usize {
         match self {
             Self::Do => 3,
             Self::Prog => 2,

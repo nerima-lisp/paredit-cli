@@ -9,7 +9,7 @@ pub struct DependencyReport {
 
 impl DependencyReport {
     #[must_use]
-    pub fn new(dependencies: Vec<DependencyReportItem>) -> Self {
+    pub const fn new(dependencies: Vec<DependencyReportItem>) -> Self {
         Self { dependencies }
     }
 }
@@ -68,7 +68,7 @@ pub enum DependencyKind {
 
 impl DependencyKind {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::AsdfDependsOn => "asdf-depends-on",
             Self::AsdfComponent => "asdf-component",

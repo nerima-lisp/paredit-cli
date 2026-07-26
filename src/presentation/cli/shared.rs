@@ -29,7 +29,7 @@ pub(crate) use io::{
     write_file_with_rollback, write_files_with_rollback, write_files_with_rollback_expected,
 };
 
-pub(crate) fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {
+pub(crate) const fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {
     TerminalSafe(value)
 }
 
@@ -41,7 +41,7 @@ impl<T: Display> Display for TerminalSafe<T> {
     }
 }
 
-pub(crate) fn terminal_safe_error_chain(error: &anyhow::Error) -> TerminalSafeErrorChain<'_> {
+pub(crate) const fn terminal_safe_error_chain(error: &anyhow::Error) -> TerminalSafeErrorChain<'_> {
     TerminalSafeErrorChain(error)
 }
 
@@ -68,7 +68,7 @@ impl Write for TerminalEscapeWriter<'_, '_> {
     }
 }
 
-fn is_terminal_control(character: char) -> bool {
+const fn is_terminal_control(character: char) -> bool {
     matches!(
         character,
         '\u{0}'..='\u{1f}'

@@ -63,7 +63,7 @@ impl ByteSpan {
 
     /// Returns the span length in bytes, saturating at zero for invalid order.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.end.get().saturating_sub(self.start.get())
     }
 
@@ -75,19 +75,19 @@ impl ByteSpan {
 
     /// Returns `true` when `offset` lies inside the half-open range.
     #[must_use]
-    pub fn contains(&self, offset: ByteOffset) -> bool {
+    pub const fn contains(&self, offset: ByteOffset) -> bool {
         self.start.get() <= offset.get() && offset.get() < self.end.get()
     }
 
     /// Returns `true` when `inner` lies entirely inside this span.
     #[must_use]
-    pub fn contains_span(&self, inner: ByteSpan) -> bool {
+    pub const fn contains_span(&self, inner: ByteSpan) -> bool {
         self.start.get() <= inner.start.get() && inner.end.get() <= self.end.get()
     }
 
     /// Exposes the span as a Rust range over byte indexes.
     #[must_use]
-    pub fn as_range(&self) -> Range<usize> {
+    pub const fn as_range(&self) -> Range<usize> {
         self.start.get()..self.end.get()
     }
 
@@ -375,7 +375,7 @@ pub enum Delimiter {
 }
 
 impl Delimiter {
-    pub(in crate::domain::sexpr) fn from_open(byte: u8) -> Option<Self> {
+    pub(in crate::domain::sexpr) const fn from_open(byte: u8) -> Option<Self> {
         match byte {
             b'(' => Some(Self::Paren),
             b'[' => Some(Self::Bracket),
@@ -384,7 +384,7 @@ impl Delimiter {
         }
     }
 
-    pub(in crate::domain::sexpr) fn from_close(byte: u8) -> Option<Self> {
+    pub(in crate::domain::sexpr) const fn from_close(byte: u8) -> Option<Self> {
         match byte {
             b')' => Some(Self::Paren),
             b']' => Some(Self::Bracket),
@@ -393,7 +393,7 @@ impl Delimiter {
         }
     }
 
-    pub(in crate::domain::sexpr) fn open(self) -> char {
+    pub(in crate::domain::sexpr) const fn open(self) -> char {
         match self {
             Self::Paren => '(',
             Self::Bracket => '[',
@@ -401,7 +401,7 @@ impl Delimiter {
         }
     }
 
-    pub(in crate::domain::sexpr) fn close(self) -> char {
+    pub(in crate::domain::sexpr) const fn close(self) -> char {
         match self {
             Self::Paren => ')',
             Self::Bracket => ']',
@@ -410,6 +410,6 @@ impl Delimiter {
     }
 }
 
-pub(in crate::domain::sexpr) fn is_symbol_boundary(byte: u8) -> bool {
+pub(in crate::domain::sexpr) const fn is_symbol_boundary(byte: u8) -> bool {
     byte.is_ascii_whitespace() || matches!(byte, b'(' | b')' | b'[' | b']' | b'{' | b'}' | b';')
 }

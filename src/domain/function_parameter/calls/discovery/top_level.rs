@@ -123,7 +123,7 @@ struct TraversalStats {
 }
 
 impl TraversalStats {
-    fn record_visit(&mut self, copied_path_indexes: usize) {
+    const fn record_visit(&mut self, copied_path_indexes: usize) {
         #[cfg(test)]
         {
             self.visited_nodes += 1;
@@ -133,7 +133,7 @@ impl TraversalStats {
         let _ = copied_path_indexes;
     }
 
-    fn record_match(&mut self) {
+    const fn record_match(&mut self) {
         #[cfg(test)]
         {
             self.materialized_paths += 1;

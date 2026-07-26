@@ -69,7 +69,7 @@ pub struct SystemConflictPolicyOptions {
 
 impl SystemConflictPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_conflict: bool) -> Self {
+    pub const fn new(fail_on_conflict: bool) -> Self {
         Self { fail_on_conflict }
     }
 

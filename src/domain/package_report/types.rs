@@ -8,7 +8,7 @@ pub struct PackageReport {
 
 impl PackageReport {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         defpackages: Vec<PackageDefinitionReport>,
         in_packages: Vec<InPackageReport>,
     ) -> Self {

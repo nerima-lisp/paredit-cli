@@ -9,7 +9,7 @@ pub enum ThreadStyle {
 
 impl ThreadStyle {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::First => "first",
             Self::Last => "last",
@@ -17,14 +17,14 @@ impl ThreadStyle {
     }
 
     #[must_use]
-    pub fn default_operator(self) -> &'static str {
+    pub const fn default_operator(self) -> &'static str {
         match self {
             Self::First => "->",
             Self::Last => "->>",
         }
     }
 
-    pub(super) fn threaded_child_index(self, child_count: usize) -> usize {
+    pub(super) const fn threaded_child_index(self, child_count: usize) -> usize {
         match self {
             Self::First => 1,
             Self::Last => child_count.saturating_sub(1),

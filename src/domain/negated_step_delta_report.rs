@@ -73,7 +73,7 @@ pub struct NegatedStepDeltaPolicyOptions {
 
 impl NegatedStepDeltaPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -157,7 +157,7 @@ pub fn collect_negated_step_deltas(
 }
 
 #[must_use]
-pub fn summarize_negated_step_deltas(
+pub const fn summarize_negated_step_deltas(
     step_form_count: usize,
     violations: Vec<NegatedStepDeltaItem>,
 ) -> NegatedStepDeltaSummary {

@@ -60,7 +60,7 @@ pub struct GethashDefaultPolicyOptions {
 
 impl GethashDefaultPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -142,7 +142,7 @@ pub fn collect_gethash_defaults(
 }
 
 #[must_use]
-pub fn summarize_gethash_defaults(
+pub const fn summarize_gethash_defaults(
     gethash_form_count: usize,
     violations: Vec<GethashDefaultItem>,
 ) -> GethashDefaultSummary {

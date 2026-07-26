@@ -13,7 +13,7 @@ impl BindingIndex {
         Ok(Self(value))
     }
 
-    pub(crate) fn get(self) -> usize {
+    pub(crate) const fn get(self) -> usize {
         self.0
     }
 }

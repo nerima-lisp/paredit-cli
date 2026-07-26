@@ -73,7 +73,7 @@ pub struct NestedBooleanPolicyOptions {
 
 impl NestedBooleanPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -159,7 +159,7 @@ pub fn collect_nested_booleans(
 }
 
 #[must_use]
-pub fn summarize_nested_booleans(
+pub const fn summarize_nested_booleans(
     boolean_form_count: usize,
     violations: Vec<NestedBooleanItem>,
 ) -> NestedBooleanSummary {

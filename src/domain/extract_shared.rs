@@ -10,7 +10,7 @@ pub enum TopLevelInsert {
 }
 
 impl TopLevelInsert {
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Append => "append",
             Self::Before => "before",

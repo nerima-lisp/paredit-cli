@@ -92,7 +92,7 @@ pub struct ManualPushnewPolicyOptions {
 
 impl ManualPushnewPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -174,7 +174,7 @@ pub fn collect_manual_pushnews(
 }
 
 #[must_use]
-pub fn summarize_manual_pushnews(
+pub const fn summarize_manual_pushnews(
     assignment_form_count: usize,
     violations: Vec<ManualPushnewItem>,
 ) -> ManualPushnewSummary {

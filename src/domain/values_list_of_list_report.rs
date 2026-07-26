@@ -55,7 +55,7 @@ pub struct ValuesListOfListPolicyOptions {
 
 impl ValuesListOfListPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -148,7 +148,7 @@ pub fn collect_values_list_of_lists(
 }
 
 #[must_use]
-pub fn summarize_values_list_of_lists(
+pub const fn summarize_values_list_of_lists(
     values_list_form_count: usize,
     violations: Vec<ValuesListOfListItem>,
 ) -> ValuesListOfListSummary {

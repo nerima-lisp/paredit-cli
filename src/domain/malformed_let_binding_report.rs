@@ -49,7 +49,7 @@ pub struct MalformedLetBindingPolicyOptions {
 
 impl MalformedLetBindingPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -131,7 +131,7 @@ pub fn collect_malformed_let_bindings(
 }
 
 #[must_use]
-pub fn summarize_malformed_let_bindings(
+pub const fn summarize_malformed_let_bindings(
     let_form_count: usize,
     violations: Vec<MalformedLetBindingItem>,
 ) -> MalformedLetBindingSummary {

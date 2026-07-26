@@ -213,11 +213,11 @@ fn first_partially_overlapping_read_time_evaluation(
     None
 }
 
-fn overlaps_partially(left: ByteSpan, right: ByteSpan) -> bool {
+const fn overlaps_partially(left: ByteSpan, right: ByteSpan) -> bool {
     spans_overlap(left, right) && !left.contains_span(right)
 }
 
-fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
+const fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
     left.start().get() < right.end().get() && right.start().get() < left.end().get()
 }
 

@@ -74,7 +74,7 @@ impl Dialect {
 
     /// Returns the stable CLI and JSON identifier for this dialect.
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::CommonLisp => "common-lisp",
             Self::EmacsLisp => "emacs-lisp",
@@ -92,7 +92,7 @@ impl Dialect {
 
     /// Returns a human-facing family label for diagnostics and reports.
     #[must_use]
-    pub fn family(self) -> &'static str {
+    pub const fn family(self) -> &'static str {
         match self {
             Self::CommonLisp => "Common Lisp",
             Self::EmacsLisp => "Emacs Lisp",

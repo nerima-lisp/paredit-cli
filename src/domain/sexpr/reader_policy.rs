@@ -49,7 +49,7 @@ impl DialectReaderPolicy {
         }
     }
 
-    pub(super) fn is_whitespace(self, byte: u8) -> bool {
+    pub(super) const fn is_whitespace(self, byte: u8) -> bool {
         byte.is_ascii_whitespace() || matches!(self.dialect, Dialect::Clojure) && byte == b','
     }
 
@@ -63,7 +63,7 @@ impl DialectReaderPolicy {
         }
     }
 
-    pub(super) fn supports_block_comments(self) -> bool {
+    pub(super) const fn supports_block_comments(self) -> bool {
         matches!(
             self.dialect,
             Dialect::CommonLisp
@@ -74,7 +74,7 @@ impl DialectReaderPolicy {
         )
     }
 
-    pub(super) fn supports_symbol_escapes(self) -> bool {
+    pub(super) const fn supports_symbol_escapes(self) -> bool {
         matches!(self.dialect, Dialect::CommonLisp | Dialect::Unknown)
     }
 
@@ -88,7 +88,7 @@ impl DialectReaderPolicy {
         self.allows_delimiter(delimiter).then_some(delimiter)
     }
 
-    pub(super) fn is_raw_delimiter(byte: u8) -> bool {
+    pub(super) const fn is_raw_delimiter(byte: u8) -> bool {
         Delimiter::from_open(byte).is_some() || Delimiter::from_close(byte).is_some()
     }
 
@@ -130,7 +130,7 @@ impl DialectReaderPolicy {
         }
     }
 
-    fn allows_delimiter(self, delimiter: Delimiter) -> bool {
+    const fn allows_delimiter(self, delimiter: Delimiter) -> bool {
         match self.dialect {
             Dialect::CommonLisp | Dialect::Scheme => matches!(delimiter, Delimiter::Paren),
             Dialect::EmacsLisp => matches!(delimiter, Delimiter::Paren | Delimiter::Bracket),
@@ -145,7 +145,7 @@ impl DialectReaderPolicy {
         }
     }
 
-    fn classify_legacy(self, byte: u8, next: Option<u8>, third: Option<u8>) -> Option<ReaderMacro> {
+    const fn classify_legacy(self, byte: u8, next: Option<u8>, third: Option<u8>) -> Option<ReaderMacro> {
         if byte == b'#' && matches!(next, Some(b';' | b'_')) {
             return Some(ReaderMacro::Discard { width: 2 });
         }
@@ -195,7 +195,7 @@ impl DialectReaderPolicy {
         }
     }
 
-    fn classify_emacs_lisp(self, byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
+    const fn classify_emacs_lisp(self, byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
         if let Some(prefix) = classify_quote_prefix(byte, next) {
             return Some(prefix);
         }
@@ -331,7 +331,7 @@ impl DialectReaderPolicy {
         Some(cursor - pos)
     }
 
-    fn classify_janet(self, byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
+    const fn classify_janet(self, byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
         match byte {
             b';' => prefix(ReaderPrefix::UnquoteSplicing, 1),
             b'~' => prefix(ReaderPrefix::Quasiquote, 1),
@@ -356,7 +356,7 @@ impl DialectReaderPolicy {
     }
 }
 
-fn classify_shared_prefix(byte: u8, next: Option<u8>, third: Option<u8>) -> Option<ReaderMacro> {
+const fn classify_shared_prefix(byte: u8, next: Option<u8>, third: Option<u8>) -> Option<ReaderMacro> {
     if let Some(prefix) = classify_quote_prefix(byte, next) {
         return Some(prefix);
     }
@@ -407,7 +407,7 @@ fn is_numeric_radix_dispatch(bytes: &[u8], pos: usize) -> bool {
     marker_pos > pos + 1 && matches!(bytes.get(marker_pos), Some(b'r' | b'R'))
 }
 
-fn classify_quote_prefix(byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
+const fn classify_quote_prefix(byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
     match (byte, next) {
         (b'\'', _) => prefix(ReaderPrefix::Quote, 1),
         (b'`', _) => prefix(ReaderPrefix::Quasiquote, 1),

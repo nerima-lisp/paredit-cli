@@ -84,7 +84,7 @@ pub struct RedefinitionPolicyOptions {
 
 impl RedefinitionPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_redefinition: bool) -> Self {
+    pub const fn new(fail_on_redefinition: bool) -> Self {
         Self {
             fail_on_redefinition,
         }

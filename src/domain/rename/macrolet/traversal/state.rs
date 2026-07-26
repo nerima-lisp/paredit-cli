@@ -19,7 +19,7 @@ pub(in crate::domain::rename::macrolet) struct TraversalState {
 }
 
 impl TraversalState {
-    pub(super) fn with_scope(&self, scope: MacroletRenameScope) -> Self {
+    pub(super) const fn with_scope(&self, scope: MacroletRenameScope) -> Self {
         Self {
             scope,
             reader_lambda_body_scope: self.reader_lambda_body_scope,
@@ -27,7 +27,7 @@ impl TraversalState {
         }
     }
 
-    pub(super) fn with_scopes(
+    pub(super) const fn with_scopes(
         &self,
         scope: MacroletRenameScope,
         reader_lambda_body_scope: MacroletRenameScope,
@@ -39,7 +39,7 @@ impl TraversalState {
         }
     }
 
-    pub(super) fn with_quasiquote_depth(&self, quasiquote_depth: usize) -> Self {
+    pub(super) const fn with_quasiquote_depth(&self, quasiquote_depth: usize) -> Self {
         Self {
             scope: self.scope,
             reader_lambda_body_scope: self.reader_lambda_body_scope,
@@ -47,7 +47,7 @@ impl TraversalState {
         }
     }
 
-    pub(super) fn allows_active_rename(&self, scope: MacroletRenameScope) -> bool {
+    pub(super) const fn allows_active_rename(&self, scope: MacroletRenameScope) -> bool {
         self.quasiquote_depth == 0 && scope.is_target_active() && !scope.is_shadowed()
     }
 }

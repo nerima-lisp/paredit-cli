@@ -374,7 +374,7 @@ fn push_unicode_display_control_escape(output: &mut String, character: char) {
     write!(output, "\\u{{{:x}}}", character as u32).expect("writing to a String cannot fail");
 }
 
-fn hunk_header_start(start: Option<usize>, len: usize) -> usize {
+const fn hunk_header_start(start: Option<usize>, len: usize) -> usize {
     match start {
         Some(index) => index.saturating_add(1),
         None if len == 0 => 0,

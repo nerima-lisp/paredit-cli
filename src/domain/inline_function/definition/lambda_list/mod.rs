@@ -25,7 +25,7 @@ enum InlineLambdaListSection {
 }
 
 impl InlineLambdaListSection {
-    fn label(self) -> &'static str {
+    const fn label(self) -> &'static str {
         match self {
             Self::Required => "required parameters",
             Self::Optional => "&optional",

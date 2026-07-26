@@ -112,7 +112,7 @@ pub struct EqlSearchLiteralPolicyOptions {
 
 impl EqlSearchLiteralPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -183,7 +183,7 @@ pub fn collect_eql_search_literals(
 }
 
 #[must_use]
-pub fn summarize_eql_search_literals(
+pub const fn summarize_eql_search_literals(
     search_call_count: usize,
     violations: Vec<EqlSearchLiteralItem>,
 ) -> EqlSearchLiteralSummary {

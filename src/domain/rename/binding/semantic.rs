@@ -818,7 +818,7 @@ fn identifiers_equal(
     semantic.identifiers_equal(candidate, from.as_str())
 }
 
-fn is_lisp2_call_head(
+const fn is_lisp2_call_head(
     semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
     is_call_head: bool,
 ) -> bool {

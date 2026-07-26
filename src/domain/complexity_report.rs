@@ -38,7 +38,7 @@ fn list_head(view: &ExpressionView) -> Option<&str> {
 /// body, even when both contain a similar number of forms.
 const DEPTH_WEIGHT: usize = 3;
 
-fn complexity_score(max_depth: usize, list_count: usize) -> usize {
+const fn complexity_score(max_depth: usize, list_count: usize) -> usize {
     max_depth
         .saturating_mul(DEPTH_WEIGHT)
         .saturating_add(list_count)
@@ -72,7 +72,7 @@ pub struct ComplexityReportPolicyOptions {
 
 impl ComplexityReportPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_max_depth: Option<usize>) -> Self {
+    pub const fn new(fail_on_max_depth: Option<usize>) -> Self {
         Self { fail_on_max_depth }
     }
 

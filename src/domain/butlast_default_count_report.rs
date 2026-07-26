@@ -58,7 +58,7 @@ pub struct ButlastDefaultCountPolicyOptions {
 
 impl ButlastDefaultCountPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -134,7 +134,7 @@ pub fn collect_butlast_default_counts(
 }
 
 #[must_use]
-pub fn summarize_butlast_default_counts(
+pub const fn summarize_butlast_default_counts(
     call_form_count: usize,
     violations: Vec<ButlastDefaultCountItem>,
 ) -> ButlastDefaultCountSummary {

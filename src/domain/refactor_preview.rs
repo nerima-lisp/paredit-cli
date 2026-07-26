@@ -19,7 +19,7 @@ pub enum RefactorPreviewParseStatus {
 
 impl RefactorPreviewSummary {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         changed_files: Vec<String>,
         unchanged_file_count: usize,
         definition_count: usize,

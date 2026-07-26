@@ -407,15 +407,15 @@ impl Formatter {
         " ".repeat(self.indentation_width(depth))
     }
 
-    pub(super) fn continuation_column(&self, depth: usize, offset: usize) -> usize {
+    pub(super) const fn continuation_column(&self, depth: usize, offset: usize) -> usize {
         self.indentation_width(depth).saturating_add(offset)
     }
 
-    pub(super) fn add_indent(&self, column: usize) -> usize {
+    pub(super) const fn add_indent(&self, column: usize) -> usize {
         column.saturating_add(self.indent)
     }
 
-    fn indentation_width(&self, depth: usize) -> usize {
+    const fn indentation_width(&self, depth: usize) -> usize {
         depth.saturating_mul(self.indent)
     }
 }

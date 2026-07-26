@@ -23,7 +23,7 @@ pub enum RefactorPlanAutomationStatus {
 
 impl RefactorPlanAutomationStatus {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Ready => "ready",
             Self::ManualReview => "manual_review",
@@ -42,7 +42,7 @@ pub enum RefactorPlanAutomationStepStatus {
 
 impl RefactorPlanAutomationStepStatus {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Passed => "passed",
             Self::Failed => "failed",
@@ -80,7 +80,7 @@ pub struct RefactorPlanAutomationDecision {
 }
 
 impl RefactorPlanAutomationDecision {
-    pub(super) fn policy_failed(reason: String, blocking_gate_count: usize) -> Self {
+    pub(super) const fn policy_failed(reason: String, blocking_gate_count: usize) -> Self {
         Self {
             state: RefactorPlanAutomationState::PolicyFailed {
                 reason,
@@ -89,7 +89,7 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
-    pub(super) fn manual_review(
+    pub(super) const fn manual_review(
         reason: String,
         next_action: &'static str,
         blocking_gate_count: usize,
@@ -103,14 +103,14 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
-    pub(super) fn ready(next_action: &'static str) -> Self {
+    pub(super) const fn ready(next_action: &'static str) -> Self {
         Self {
             state: RefactorPlanAutomationState::Ready { next_action },
         }
     }
 
     #[must_use]
-    pub fn status(&self) -> RefactorPlanAutomationStatus {
+    pub const fn status(&self) -> RefactorPlanAutomationStatus {
         match self.state {
             RefactorPlanAutomationState::PolicyFailed { .. } => {
                 RefactorPlanAutomationStatus::PolicyFailed
@@ -134,7 +134,7 @@ impl RefactorPlanAutomationDecision {
     }
 
     #[must_use]
-    pub fn next_action(&self) -> &'static str {
+    pub const fn next_action(&self) -> &'static str {
         match self.state {
             RefactorPlanAutomationState::PolicyFailed { .. } => "resolve-policy-violations",
             RefactorPlanAutomationState::ManualReview { next_action, .. }
@@ -143,17 +143,17 @@ impl RefactorPlanAutomationDecision {
     }
 
     #[must_use]
-    pub fn safe_to_automate(&self) -> bool {
+    pub const fn safe_to_automate(&self) -> bool {
         matches!(self.state, RefactorPlanAutomationState::Ready { .. })
     }
 
     #[must_use]
-    pub fn policy_passed(&self) -> bool {
+    pub const fn policy_passed(&self) -> bool {
         !matches!(self.state, RefactorPlanAutomationState::PolicyFailed { .. })
     }
 
     #[must_use]
-    pub fn blocking_gate_count(&self) -> usize {
+    pub const fn blocking_gate_count(&self) -> usize {
         match self.state {
             RefactorPlanAutomationState::PolicyFailed {
                 blocking_gate_count,
@@ -168,7 +168,7 @@ impl RefactorPlanAutomationDecision {
     }
 
     #[must_use]
-    pub fn steps(&self) -> [RefactorPlanAutomationStep; 3] {
+    pub const fn steps(&self) -> [RefactorPlanAutomationStep; 3] {
         let policy_status = if self.policy_passed() {
             RefactorPlanAutomationStepStatus::Passed
         } else {

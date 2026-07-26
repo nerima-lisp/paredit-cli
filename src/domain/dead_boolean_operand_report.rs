@@ -58,7 +58,7 @@ pub struct DeadBooleanOperandPolicyOptions {
 
 impl DeadBooleanOperandPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -138,7 +138,7 @@ pub fn collect_dead_boolean_operands(
 }
 
 #[must_use]
-pub fn summarize_dead_boolean_operands(
+pub const fn summarize_dead_boolean_operands(
     boolean_form_count: usize,
     violations: Vec<DeadBooleanOperandItem>,
 ) -> DeadBooleanOperandSummary {

@@ -95,7 +95,7 @@ pub struct EqNumberComparisonPolicyOptions {
 
 impl EqNumberComparisonPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -124,7 +124,7 @@ pub struct EqNumberComparisonPolicy {
 pub(crate) type IsNumberArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
 
 /// The [`IsNumberArgument`] of a caller with no type context.
-fn never(_: &ExpressionView) -> bool {
+const fn never(_: &ExpressionView) -> bool {
     false
 }
 
@@ -193,7 +193,7 @@ pub fn collect_eq_number_comparisons(
 }
 
 #[must_use]
-pub fn summarize_eq_number_comparisons(
+pub const fn summarize_eq_number_comparisons(
     comparison_form_count: usize,
     violations: Vec<EqNumberComparisonItem>,
 ) -> EqNumberComparisonSummary {

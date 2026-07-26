@@ -6,7 +6,7 @@ use super::super::{
 };
 use super::CommonLispOperator;
 
-pub(super) fn definition_category(operator: CommonLispOperator) -> Option<DefinitionCategory> {
+pub(super) const fn definition_category(operator: CommonLispOperator) -> Option<DefinitionCategory> {
     Some(match operator {
         CommonLispOperator::Defun => DefinitionCategory::Function,
         CommonLispOperator::Defmacro
@@ -38,7 +38,7 @@ pub(super) fn definition_category(operator: CommonLispOperator) -> Option<Defini
     })
 }
 
-pub(super) fn definition_lambda_list_shape(
+pub(super) const fn definition_lambda_list_shape(
     operator: CommonLispOperator,
 ) -> Option<CommonLispLambdaListShape> {
     Some(match operator {
@@ -57,7 +57,7 @@ pub(super) fn definition_lambda_list_shape(
     })
 }
 
-pub(super) fn runtime_dependency_form(
+pub(super) const fn runtime_dependency_form(
     operator: CommonLispOperator,
 ) -> Option<CommonLispRuntimeDependencyForm> {
     match operator {
@@ -72,7 +72,7 @@ pub(super) fn runtime_dependency_form(
     }
 }
 
-pub(super) fn package_declaration_form(
+pub(super) const fn package_declaration_form(
     operator: CommonLispOperator,
 ) -> Option<CommonLispPackageDeclarationForm> {
     match operator {
@@ -82,7 +82,7 @@ pub(super) fn package_declaration_form(
     }
 }
 
-pub(super) fn local_callable_form(
+pub(super) const fn local_callable_form(
     operator: CommonLispOperator,
 ) -> Option<CommonLispLocalCallableForm> {
     match operator {

@@ -120,7 +120,7 @@ fn compute_slot_starts(input: &str, current: &[RawDefinition]) -> Vec<usize> {
     starts
 }
 
-fn is_sortable_category(category: DefinitionCategory) -> bool {
+const fn is_sortable_category(category: DefinitionCategory) -> bool {
     !matches!(
         category,
         DefinitionCategory::Package | DefinitionCategory::System

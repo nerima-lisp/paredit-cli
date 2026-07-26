@@ -86,7 +86,7 @@ pub struct UndefinedPackagePolicyOptions {
 
 impl UndefinedPackagePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_undefined: bool) -> Self {
+    pub const fn new(fail_on_undefined: bool) -> Self {
         Self { fail_on_undefined }
     }
 

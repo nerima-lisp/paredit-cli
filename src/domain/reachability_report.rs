@@ -45,7 +45,7 @@ pub struct ReachabilityReportPolicyOptions {
 
 impl ReachabilityReportPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_unreachable: bool) -> Self {
+    pub const fn new(fail_on_unreachable: bool) -> Self {
         Self {
             fail_on_unreachable,
         }

@@ -7,7 +7,7 @@ pub struct FormShape(String);
 
 impl FormShape {
     #[must_use]
-    pub fn new(shape: String) -> Self {
+    pub const fn new(shape: String) -> Self {
         Self(shape)
     }
 

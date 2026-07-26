@@ -10,7 +10,7 @@ pub enum RefactorOperation {
 
 impl RefactorOperation {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Rename => "rename",
             Self::Remove => "remove",
@@ -32,7 +32,7 @@ pub enum RefactorPlanTargetKind {
 
 impl RefactorPlanTargetKind {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Callable => "callable",
             Self::Macro => "macro",
@@ -44,7 +44,7 @@ impl RefactorPlanTargetKind {
     }
 
     #[must_use]
-    pub fn is_macro_like(self) -> bool {
+    pub const fn is_macro_like(self) -> bool {
         matches!(
             self,
             Self::Macro | Self::CompilerMacro | Self::SetfExpander | Self::SymbolMacro
@@ -52,12 +52,12 @@ impl RefactorPlanTargetKind {
     }
 
     #[must_use]
-    pub fn skips_signature_compatibility(self) -> bool {
+    pub const fn skips_signature_compatibility(self) -> bool {
         self.is_macro_like()
     }
 
     #[must_use]
-    pub fn requires_call_coverage(self, operation: RefactorOperation) -> bool {
+    pub const fn requires_call_coverage(self, operation: RefactorOperation) -> bool {
         match operation {
             RefactorOperation::Rename | RefactorOperation::Move => {
                 !matches!(self, Self::SymbolMacro)
@@ -76,7 +76,7 @@ pub enum VerificationPhase {
 
 impl VerificationPhase {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Pre => "pre",
             Self::Post => "post",
@@ -93,7 +93,7 @@ pub enum RefactorRiskLevel {
 
 impl RefactorRiskLevel {
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Info => "info",
             Self::Warning => "warning",

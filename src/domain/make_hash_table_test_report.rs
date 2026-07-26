@@ -77,7 +77,7 @@ pub struct MakeHashTableTestPolicyOptions {
 
 impl MakeHashTableTestPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -160,7 +160,7 @@ pub fn collect_make_hash_table_tests(
 }
 
 #[must_use]
-pub fn summarize_make_hash_table_tests(
+pub const fn summarize_make_hash_table_tests(
     make_hash_table_form_count: usize,
     violations: Vec<MakeHashTableTestItem>,
 ) -> MakeHashTableTestSummary {

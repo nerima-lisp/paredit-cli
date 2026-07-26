@@ -40,7 +40,7 @@ impl ActiveRules {
         Self { enabled, any }
     }
 
-    fn contains(&self, rule: RuleIndex) -> bool {
+    const fn contains(&self, rule: RuleIndex) -> bool {
         self.enabled[rule.get()]
     }
 }

@@ -59,7 +59,7 @@ pub(crate) struct KeywordParameterInsertion {
 }
 
 impl KeywordParameterInsertion {
-    pub(crate) fn item_index(&self, insert: FunctionParameterInsert) -> usize {
+    pub(crate) const fn item_index(&self, insert: FunctionParameterInsert) -> usize {
         match insert {
             FunctionParameterInsert::Start => self.first_item_index,
             FunctionParameterInsert::End => self.end_item_index,
@@ -76,14 +76,14 @@ pub(crate) struct OptionalParameterInsertion {
 }
 
 impl OptionalParameterInsertion {
-    pub(crate) fn item_index(&self, insert: FunctionParameterInsert) -> usize {
+    pub(crate) const fn item_index(&self, insert: FunctionParameterInsert) -> usize {
         match insert {
             FunctionParameterInsert::Start => self.first_item_index,
             FunctionParameterInsert::End => self.end_item_index,
         }
     }
 
-    pub(crate) fn call_argument_index(&self, insert: FunctionParameterInsert) -> usize {
+    pub(crate) const fn call_argument_index(&self, insert: FunctionParameterInsert) -> usize {
         match insert {
             FunctionParameterInsert::Start => self.positional_prefix_count,
             FunctionParameterInsert::End => {

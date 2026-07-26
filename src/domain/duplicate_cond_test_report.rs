@@ -46,7 +46,7 @@ pub struct DuplicateCondTestPolicyOptions {
 
 impl DuplicateCondTestPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_duplicate: bool) -> Self {
+    pub const fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
@@ -138,7 +138,7 @@ pub fn collect_duplicate_cond_tests(
 }
 
 #[must_use]
-pub fn summarize_duplicate_cond_tests(
+pub const fn summarize_duplicate_cond_tests(
     cond_form_count: usize,
     duplicates: Vec<DuplicateCondTestItem>,
 ) -> DuplicateCondTestSummary {

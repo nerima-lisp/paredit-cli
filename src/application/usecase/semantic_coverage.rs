@@ -263,7 +263,7 @@ impl BindingNonResolutionBreakdown {
             + self.initial_form_not_propagatable
     }
 
-    fn record(&mut self, reason: BindingNonResolutionReason) {
+    const fn record(&mut self, reason: BindingNonResolutionReason) {
         match reason {
             BindingNonResolutionReason::Reassigned => self.reassigned += 1,
             BindingNonResolutionReason::OpaqueScope => self.opaque_scope += 1,

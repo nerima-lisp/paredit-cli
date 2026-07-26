@@ -63,7 +63,7 @@ pub struct TheArityPolicyOptions {
 
 impl TheArityPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -136,7 +136,7 @@ pub fn collect_the_arity_violations(
 }
 
 #[must_use]
-pub fn summarize_the_arity(
+pub const fn summarize_the_arity(
     the_form_count: usize,
     violations: Vec<TheArityItem>,
 ) -> TheAritySummary {

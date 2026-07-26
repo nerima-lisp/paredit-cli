@@ -19,21 +19,21 @@ pub enum RefactorWriteRefusal {
 
 impl RefactorWriteRefusal {
     #[must_use]
-    pub fn label(&self) -> &'static str {
+    pub const fn label(&self) -> &'static str {
         match self {
             Self::UnparsableOutputs { .. } => "unparsable-outputs",
         }
     }
 
     #[must_use]
-    pub fn reason(&self) -> &'static str {
+    pub const fn reason(&self) -> &'static str {
         match self {
             Self::UnparsableOutputs { .. } => "rewritten-output-did-not-parse",
         }
     }
 
     #[must_use]
-    pub fn next_action(&self) -> &'static str {
+    pub const fn next_action(&self) -> &'static str {
         match self {
             Self::UnparsableOutputs { .. } => "inspect-preview-parse-errors",
         }
@@ -53,31 +53,31 @@ pub struct RefactorWritePlan {
 }
 
 impl RefactorWritePlan {
-    pub(super) fn not_requested() -> Self {
+    pub(super) const fn not_requested() -> Self {
         Self {
             state: RefactorWritePlanState::NotRequested,
         }
     }
 
-    pub(super) fn refused(refusal: RefactorWriteRefusal) -> Self {
+    pub(super) const fn refused(refusal: RefactorWriteRefusal) -> Self {
         Self {
             state: RefactorWritePlanState::Refused(refusal),
         }
     }
 
-    pub(super) fn allowed(writable_indexes: Vec<usize>) -> Self {
+    pub(super) const fn allowed(writable_indexes: Vec<usize>) -> Self {
         Self {
             state: RefactorWritePlanState::Allowed { writable_indexes },
         }
     }
 
     #[must_use]
-    pub fn write_requested(&self) -> bool {
+    pub const fn write_requested(&self) -> bool {
         !matches!(self.state, RefactorWritePlanState::NotRequested)
     }
 
     #[must_use]
-    pub fn write_allowed(&self) -> bool {
+    pub const fn write_allowed(&self) -> bool {
         matches!(self.state, RefactorWritePlanState::Allowed { .. })
     }
 
@@ -90,7 +90,7 @@ impl RefactorWritePlan {
     }
 
     #[must_use]
-    pub fn refusal(&self) -> Option<&RefactorWriteRefusal> {
+    pub const fn refusal(&self) -> Option<&RefactorWriteRefusal> {
         match &self.state {
             RefactorWritePlanState::Refused(refusal) => Some(refusal),
             RefactorWritePlanState::NotRequested | RefactorWritePlanState::Allowed { .. } => None,

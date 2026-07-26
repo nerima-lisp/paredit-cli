@@ -55,7 +55,7 @@ pub struct ListStarToConsPolicyOptions {
 
 impl ListStarToConsPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -131,7 +131,7 @@ pub fn collect_list_star_to_cons(
 }
 
 #[must_use]
-pub fn summarize_list_star_to_cons(
+pub const fn summarize_list_star_to_cons(
     list_star_form_count: usize,
     violations: Vec<ListStarToConsItem>,
 ) -> ListStarToConsSummary {

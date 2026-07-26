@@ -88,7 +88,7 @@ pub struct RedundantThePolicyOptions {
 
 impl RedundantThePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -118,7 +118,7 @@ pub(crate) type IsAssertedTypeAlreadyKnown<'a> =
     &'a dyn Fn(&ExpressionView, &ExpressionView) -> bool;
 
 /// The [`IsAssertedTypeAlreadyKnown`] of a caller with no type context.
-fn never(_: &ExpressionView, _: &ExpressionView) -> bool {
+const fn never(_: &ExpressionView, _: &ExpressionView) -> bool {
     false
 }
 
@@ -193,7 +193,7 @@ pub fn collect_redundant_thes(
 }
 
 #[must_use]
-pub fn summarize_redundant_thes(
+pub const fn summarize_redundant_thes(
     the_form_count: usize,
     violations: Vec<RedundantTheItem>,
 ) -> RedundantTheSummary {

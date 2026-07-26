@@ -33,7 +33,7 @@ impl Severity {
 
     /// Whether this severity is at least as serious as `threshold`.
     #[must_use]
-    pub fn at_least(self, threshold: Severity) -> bool {
+    pub const fn at_least(self, threshold: Severity) -> bool {
         self.rank() >= threshold.rank()
     }
 }

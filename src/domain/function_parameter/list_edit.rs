@@ -129,7 +129,7 @@ pub(super) fn ensure_non_overlapping_spans(
     Ok(())
 }
 
-pub(super) fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
+pub(super) const fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
     left.start().get() < right.end().get() && right.start().get() < left.end().get()
 }
 

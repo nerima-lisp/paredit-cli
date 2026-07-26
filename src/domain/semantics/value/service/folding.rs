@@ -300,7 +300,7 @@ fn fold_integers(operation: FoldableOperation, operands: &[i128]) -> Value {
 ///
 /// Common Lisp's `/` yields a rational otherwise, and rationals are outside
 /// this model — reporting the truncated quotient would be a different number.
-fn exact_quotient(numerator: i128, divisor: i128) -> Option<i128> {
+const fn exact_quotient(numerator: i128, divisor: i128) -> Option<i128> {
     if divisor == 0 || numerator % divisor != 0 {
         return None;
     }
@@ -344,12 +344,12 @@ fn predicate(operands: &[i128], holds: fn(i128) -> bool) -> Value {
     }
 }
 
-fn integer(value: i128) -> Value {
+const fn integer(value: i128) -> Value {
     Value::Known(LiteralValue::Integer(value))
 }
 
 /// A Common Lisp predicate answers `t` or `nil`, not `t` or `false`.
-fn boolean(holds: bool) -> Value {
+const fn boolean(holds: bool) -> Value {
     Value::Known(if holds {
         LiteralValue::Boolean(true)
     } else {

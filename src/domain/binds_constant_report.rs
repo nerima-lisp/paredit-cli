@@ -69,7 +69,7 @@ pub struct BindsConstantPolicyOptions {
 
 impl BindsConstantPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -155,7 +155,7 @@ pub fn collect_binds_constant(
 }
 
 #[must_use]
-pub fn summarize_binds_constant(
+pub const fn summarize_binds_constant(
     binding_form_count: usize,
     violations: Vec<BindsConstantItem>,
 ) -> BindsConstantSummary {

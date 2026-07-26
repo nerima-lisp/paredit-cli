@@ -11,7 +11,7 @@ use crate::domain::remove_unused_definition::types::UnusedDefinitionDefinition;
 /// references alone. `remove-unused-definitions` and `unused-definition-report`
 /// share this single definition so the two commands never disagree on which
 /// categories "zero direct references" is a trustworthy signal for.
-pub(super) fn definition_is_bulk_removable(category: DefinitionCategory) -> bool {
+pub(super) const fn definition_is_bulk_removable(category: DefinitionCategory) -> bool {
     category.is_bulk_removable()
 }
 

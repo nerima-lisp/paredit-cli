@@ -86,7 +86,7 @@ pub struct DeMorganPolicyOptions {
 
 impl DeMorganPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -170,7 +170,7 @@ pub fn collect_de_morgans(
 }
 
 #[must_use]
-pub fn summarize_de_morgans(
+pub const fn summarize_de_morgans(
     boolean_form_count: usize,
     violations: Vec<DeMorganItem>,
 ) -> DeMorganSummary {

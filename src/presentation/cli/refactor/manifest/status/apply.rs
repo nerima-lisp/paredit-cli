@@ -27,7 +27,7 @@ pub(in crate::presentation::cli) fn refactor_apply_status_and_action(
     )
 }
 
-fn refactor_apply_next_action_from_status(
+const fn refactor_apply_next_action_from_status(
     next_action: RefactorStatusNextAction,
 ) -> RefactorApplyNextAction {
     match next_action {

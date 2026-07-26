@@ -75,7 +75,7 @@ pub struct SingleOperandArithmeticPolicyOptions {
 
 impl SingleOperandArithmeticPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -149,7 +149,7 @@ pub fn collect_single_operand_arithmetic(
 }
 
 #[must_use]
-pub fn summarize_single_operand_arithmetic(
+pub const fn summarize_single_operand_arithmetic(
     arithmetic_form_count: usize,
     violations: Vec<SingleOperandArithmeticItem>,
 ) -> SingleOperandArithmeticSummary {

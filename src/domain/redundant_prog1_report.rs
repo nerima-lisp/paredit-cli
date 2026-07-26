@@ -56,7 +56,7 @@ pub struct RedundantProg1PolicyOptions {
 
 impl RedundantProg1PolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -130,7 +130,7 @@ pub fn collect_redundant_prog1s(
 }
 
 #[must_use]
-pub fn summarize_redundant_prog1s(
+pub const fn summarize_redundant_prog1s(
     prog1_form_count: usize,
     violations: Vec<RedundantProg1Item>,
 ) -> RedundantProg1Summary {

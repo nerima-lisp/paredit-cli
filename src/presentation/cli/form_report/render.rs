@@ -82,7 +82,7 @@ pub(super) fn print_form_report(report: &FormReport, output: OutputFormat) -> Re
     Ok(())
 }
 
-fn delimiter_label(delimiter: Delimiter) -> &'static str {
+const fn delimiter_label(delimiter: Delimiter) -> &'static str {
     match delimiter {
         Delimiter::Paren => "paren",
         Delimiter::Bracket => "bracket",

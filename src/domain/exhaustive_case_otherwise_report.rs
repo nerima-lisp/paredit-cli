@@ -67,7 +67,7 @@ pub struct ExhaustiveCaseOtherwisePolicyOptions {
 
 impl ExhaustiveCaseOtherwisePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -150,7 +150,7 @@ pub fn collect_exhaustive_case_otherwise(
 }
 
 #[must_use]
-pub fn summarize_exhaustive_case_otherwise(
+pub const fn summarize_exhaustive_case_otherwise(
     case_form_count: usize,
     violations: Vec<ExhaustiveCaseOtherwiseItem>,
 ) -> ExhaustiveCaseOtherwiseSummary {

@@ -37,7 +37,7 @@ pub(in crate::presentation::cli) enum RefactorStatusKind {
 }
 
 impl RefactorStatusKind {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::Ready => "ready",
             Self::Blocked => "blocked",
@@ -115,7 +115,7 @@ pub(in crate::presentation::cli) enum RefactorStatusNextAction {
 }
 
 impl RefactorStatusNextAction {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::RunDiffThenApplyWrite => "run_refactor_diff_then_refactor_apply_write",
             Self::RegeneratePreview => "regenerate_refactor_preview",
@@ -160,7 +160,7 @@ pub(in crate::presentation::cli) enum RefactorApplyDecisionStatus {
 }
 
 impl RefactorApplyDecisionStatus {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::Applied => "applied",
             Self::DryRunReady => "dry-run-ready",
@@ -178,7 +178,7 @@ pub(in crate::presentation::cli) enum RefactorApplyNextAction {
 }
 
 impl RefactorApplyNextAction {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::RunVerificationOrReviewDiff => "run_verification_or_review_diff",
             Self::RerunWithWrite => "rerun_refactor_apply_with_write",
@@ -199,7 +199,7 @@ pub(in crate::presentation::cli) enum RefactorStatusBlockedReason {
 }
 
 impl RefactorStatusBlockedReason {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::ManifestPolicyFailed => "manifest_policy_failed",
             Self::ManifestOutputsDoNotParse => "manifest_outputs_do_not_parse",
@@ -220,7 +220,7 @@ pub(in crate::presentation::cli) enum RefactorManifestDecisionStepStatus {
 }
 
 impl RefactorManifestDecisionStepStatus {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::Passed => "passed",
             Self::Failed => "failed",

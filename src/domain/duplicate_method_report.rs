@@ -114,7 +114,7 @@ pub struct DuplicateMethodPolicyOptions {
 
 impl DuplicateMethodPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_duplicate: bool) -> Self {
+    pub const fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 

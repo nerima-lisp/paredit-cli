@@ -34,7 +34,7 @@ pub(super) struct ThreadExpressionArgs {
 }
 
 impl ThreadStyleArg {
-    fn application_style(self) -> ApplicationThreadStyle {
+    const fn application_style(self) -> ApplicationThreadStyle {
         match self {
             Self::First => ApplicationThreadStyle::First,
             Self::Last => ApplicationThreadStyle::Last,

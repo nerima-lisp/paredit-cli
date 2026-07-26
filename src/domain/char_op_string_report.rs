@@ -143,7 +143,7 @@ pub struct CharOpStringPolicyOptions {
 
 impl CharOpStringPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -173,7 +173,7 @@ pub struct CharOpStringPolicy {
 pub(crate) type IsNonCharacterArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
 
 /// The [`IsNonCharacterArgument`] of a caller with no type context.
-fn never(_: &ExpressionView) -> bool {
+const fn never(_: &ExpressionView) -> bool {
     false
 }
 
@@ -231,7 +231,7 @@ pub fn collect_char_op_strings(
 }
 
 #[must_use]
-pub fn summarize_char_op_strings(
+pub const fn summarize_char_op_strings(
     char_call_count: usize,
     violations: Vec<CharOpStringItem>,
 ) -> CharOpStringSummary {

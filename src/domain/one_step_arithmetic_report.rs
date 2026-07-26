@@ -65,7 +65,7 @@ pub struct OneStepArithmeticPolicyOptions {
 
 impl OneStepArithmeticPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -158,7 +158,7 @@ pub fn collect_one_step_arithmetic(
 }
 
 #[must_use]
-pub fn summarize_one_step_arithmetic(
+pub const fn summarize_one_step_arithmetic(
     arithmetic_form_count: usize,
     violations: Vec<OneStepArithmeticItem>,
 ) -> OneStepArithmeticSummary {

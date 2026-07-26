@@ -62,7 +62,7 @@ pub struct TypecaseNilKeyPolicyOptions {
 
 impl TypecaseNilKeyPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -147,7 +147,7 @@ pub fn collect_typecase_nil_keys(
 }
 
 #[must_use]
-pub fn summarize_typecase_nil_keys(
+pub const fn summarize_typecase_nil_keys(
     typecase_form_count: usize,
     violations: Vec<TypecaseNilKeyItem>,
 ) -> TypecaseNilKeySummary {

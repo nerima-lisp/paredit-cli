@@ -216,7 +216,7 @@ fn is_path_shadowed_by_variable_binding_spec(
     }
 }
 
-fn variable_binding_spec_child_shadowed(
+const fn variable_binding_spec_child_shadowed(
     child_index: usize,
     init_shadowed: bool,
     step_shadowed: bool,

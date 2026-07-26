@@ -66,7 +66,7 @@ pub struct SingleOperandBooleanPolicyOptions {
 
 impl SingleOperandBooleanPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -140,7 +140,7 @@ pub fn collect_single_operand_booleans(
 }
 
 #[must_use]
-pub fn summarize_single_operand_booleans(
+pub const fn summarize_single_operand_booleans(
     boolean_form_count: usize,
     violations: Vec<SingleOperandBooleanItem>,
 ) -> SingleOperandBooleanSummary {

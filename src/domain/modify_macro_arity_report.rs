@@ -85,7 +85,7 @@ pub struct ModifyMacroArityPolicyOptions {
 
 impl ModifyMacroArityPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -164,7 +164,7 @@ pub fn collect_modify_macro_arity_violations(
 }
 
 #[must_use]
-pub fn summarize_modify_macro_arity(
+pub const fn summarize_modify_macro_arity(
     call_count: usize,
     violations: Vec<ModifyMacroArityItem>,
 ) -> ModifyMacroAritySummary {

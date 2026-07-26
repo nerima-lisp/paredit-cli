@@ -59,7 +59,7 @@ pub struct FuncallLambdaPolicyOptions {
 
 impl FuncallLambdaPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -134,7 +134,7 @@ pub fn collect_funcall_lambdas(
 }
 
 #[must_use]
-pub fn summarize_funcall_lambdas(
+pub const fn summarize_funcall_lambdas(
     funcall_form_count: usize,
     violations: Vec<FuncallLambdaItem>,
 ) -> FuncallLambdaSummary {

@@ -74,7 +74,7 @@ pub struct DuplicateKeywordPolicyOptions {
 
 impl DuplicateKeywordPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -166,7 +166,7 @@ pub fn collect_duplicate_keywords(
 }
 
 #[must_use]
-pub fn summarize_duplicate_keywords(
+pub const fn summarize_duplicate_keywords(
     call_form_count: usize,
     violations: Vec<DuplicateKeywordItem>,
 ) -> DuplicateKeywordSummary {

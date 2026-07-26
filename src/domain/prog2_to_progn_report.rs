@@ -53,7 +53,7 @@ pub struct Prog2ToPrognPolicyOptions {
 
 impl Prog2ToPrognPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -126,7 +126,7 @@ pub fn collect_prog2_to_progn(
 }
 
 #[must_use]
-pub fn summarize_prog2_to_progn(
+pub const fn summarize_prog2_to_progn(
     prog2_form_count: usize,
     violations: Vec<Prog2ToPrognItem>,
 ) -> Prog2ToPrognSummary {

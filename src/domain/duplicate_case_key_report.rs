@@ -82,7 +82,7 @@ pub struct DuplicateCaseKeyPolicyOptions {
 
 impl DuplicateCaseKeyPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_duplicate: bool) -> Self {
+    pub const fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
@@ -172,7 +172,7 @@ pub fn collect_duplicate_case_keys(
 }
 
 #[must_use]
-pub fn summarize_duplicate_case_keys(
+pub const fn summarize_duplicate_case_keys(
     case_form_count: usize,
     duplicates: Vec<DuplicateCaseKeyItem>,
 ) -> DuplicateCaseKeySummary {

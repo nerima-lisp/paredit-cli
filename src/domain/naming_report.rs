@@ -133,7 +133,7 @@ pub struct NamingReportPolicyOptions {
 
 impl NamingReportPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_non_idiomatic: bool) -> Self {
+    pub const fn new(fail_on_non_idiomatic: bool) -> Self {
         Self {
             fail_on_non_idiomatic,
         }

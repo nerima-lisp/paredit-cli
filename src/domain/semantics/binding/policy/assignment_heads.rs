@@ -145,7 +145,7 @@ const SET_BANG: [AssignmentForm; 1] = [AssignmentForm::new("set!", PlacePosition
 /// Empty for dialects whose local bindings cannot be reassigned at all —
 /// Clojure `let` bindings are immutable, so nothing there can invalidate a
 /// propagated value.
-pub fn assignment_forms(dialect: Dialect) -> &'static [AssignmentForm] {
+pub const fn assignment_forms(dialect: Dialect) -> &'static [AssignmentForm] {
     match dialect {
         Dialect::CommonLisp => &COMMON_LISP,
         Dialect::EmacsLisp => &EMACS_LISP,

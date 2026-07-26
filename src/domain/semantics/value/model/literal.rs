@@ -92,7 +92,7 @@ impl LiteralValue {
     /// Common Lisp has exactly one false value, `nil`; Scheme and Racket have
     /// exactly one, `#f`, and treat the empty list as true. Getting this
     /// backwards would make a dead-branch lint delete the live branch.
-    pub fn is_truthy(&self, dialect: Dialect) -> bool {
+    pub const fn is_truthy(&self, dialect: Dialect) -> bool {
         match dialect {
             Dialect::Scheme | Dialect::Racket => !matches!(self, Self::Boolean(false)),
             _ => !matches!(self, Self::Nil | Self::Boolean(false)),

@@ -90,7 +90,7 @@ impl RefactorPreviewDecision {
         matches!(self.status, RefactorPreviewDecisionStatus::WriteApplied)
     }
 
-    pub(in crate::presentation::cli) fn steps(&self) -> [RefactorPreviewDecisionStep; 3] {
+    pub(in crate::presentation::cli) const fn steps(&self) -> [RefactorPreviewDecisionStep; 3] {
         [
             RefactorPreviewDecisionStep {
                 name: "preview-policy",
@@ -147,7 +147,7 @@ pub(in crate::presentation::cli) enum RefactorPreviewDecisionStepStatus {
 }
 
 impl RefactorPreviewDecisionStepStatus {
-    pub(in crate::presentation::cli) fn label(&self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(&self) -> &'static str {
         match self {
             Self::Passed => "passed",
             Self::Failed => "failed",

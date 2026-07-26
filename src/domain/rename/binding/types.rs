@@ -44,21 +44,21 @@ enum BindingEditKind {
 }
 
 impl BindingEdit {
-    pub(super) fn rename_atom(span: ByteSpan) -> Self {
+    pub(super) const fn rename_atom(span: ByteSpan) -> Self {
         Self {
             span,
             kind: BindingEditKind::RenameAtom,
         }
     }
 
-    pub(super) fn bare_slot_spec(span: ByteSpan, slot_name: String) -> Self {
+    pub(super) const fn bare_slot_spec(span: ByteSpan, slot_name: String) -> Self {
         Self {
             span,
             kind: BindingEditKind::RewriteBareSlotSpec { slot_name },
         }
     }
 
-    pub(super) fn clojure_keys_map(
+    pub(super) const fn clojure_keys_map(
         map_pattern: ExpressionView,
         span: ByteSpan,
         renamed_name: String,

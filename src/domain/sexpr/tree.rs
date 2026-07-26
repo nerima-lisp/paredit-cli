@@ -109,7 +109,7 @@ pub enum ReaderPrefix {
 impl ReaderPrefix {
     /// Returns the exact source spelling for this reader prefix.
     #[must_use]
-    pub fn as_source(self) -> &'static str {
+    pub const fn as_source(self) -> &'static str {
         match self {
             Self::Quote => "'",
             Self::Quasiquote => "`",
@@ -126,7 +126,7 @@ impl ReaderPrefix {
 
     /// Returns true when this prefix makes the following form opaque to structural refactors.
     #[must_use]
-    pub fn is_opaque_reader_form(self) -> bool {
+    pub const fn is_opaque_reader_form(self) -> bool {
         matches!(self, Self::ReadEval)
     }
 }

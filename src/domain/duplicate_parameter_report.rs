@@ -50,7 +50,7 @@ pub struct DuplicateParameterPolicyOptions {
 
 impl DuplicateParameterPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_duplicate: bool) -> Self {
+    pub const fn new(fail_on_duplicate: bool) -> Self {
         Self { fail_on_duplicate }
     }
 
@@ -137,7 +137,7 @@ pub fn collect_duplicate_parameters(
 }
 
 #[must_use]
-pub fn summarize_duplicate_parameters(
+pub const fn summarize_duplicate_parameters(
     definition_count: usize,
     duplicates: Vec<DuplicateParameterItem>,
 ) -> DuplicateParameterSummary {

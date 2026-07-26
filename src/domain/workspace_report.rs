@@ -10,7 +10,7 @@ pub enum WorkspaceFileStatus {
 
 impl WorkspaceFileStatus {
     #[must_use]
-    pub fn label(&self) -> &'static str {
+    pub const fn label(&self) -> &'static str {
         match self {
             Self::Parsed => "parsed",
             Self::ParseError(_) => "parse-error",
@@ -18,7 +18,7 @@ impl WorkspaceFileStatus {
     }
 
     #[must_use]
-    pub fn is_parsed(&self) -> bool {
+    pub const fn is_parsed(&self) -> bool {
         matches!(self, Self::Parsed)
     }
 }

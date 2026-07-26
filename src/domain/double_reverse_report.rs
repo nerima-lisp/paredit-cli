@@ -69,7 +69,7 @@ pub struct DoubleReversePolicyOptions {
 
 impl DoubleReversePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -142,7 +142,7 @@ pub fn collect_double_reverses(
 }
 
 #[must_use]
-pub fn summarize_double_reverses(
+pub const fn summarize_double_reverses(
     reverse_form_count: usize,
     violations: Vec<DoubleReverseItem>,
 ) -> DoubleReverseSummary {

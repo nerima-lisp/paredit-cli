@@ -197,7 +197,7 @@ impl WorkspaceRefactorExecuteOutcomeSummary {
 }
 
 impl WorkspaceRefactorExecuteOutcomeStatus {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "blocked-by-policy",
             Self::RefusedUnparsableOutput => "refused-unparsable-output",
@@ -208,7 +208,7 @@ impl WorkspaceRefactorExecuteOutcomeStatus {
         }
     }
 
-    pub(in crate::presentation::cli) fn reason(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn reason(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "preview-policy-failed",
             Self::RefusedUnparsableOutput => "rewritten-output-did-not-parse",
@@ -219,7 +219,7 @@ impl WorkspaceRefactorExecuteOutcomeStatus {
         }
     }
 
-    pub(in crate::presentation::cli) fn next_action(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn next_action(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "review-policy-violations",
             Self::RefusedUnparsableOutput => "inspect-preview-parse-errors",

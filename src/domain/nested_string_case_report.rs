@@ -68,7 +68,7 @@ pub struct NestedStringCasePolicyOptions {
 
 impl NestedStringCasePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -157,7 +157,7 @@ pub fn collect_nested_string_cases(
 }
 
 #[must_use]
-pub fn summarize_nested_string_cases(
+pub const fn summarize_nested_string_cases(
     string_case_form_count: usize,
     violations: Vec<NestedStringCaseItem>,
 ) -> NestedStringCaseSummary {

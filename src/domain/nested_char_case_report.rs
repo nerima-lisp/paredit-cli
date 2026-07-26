@@ -64,7 +64,7 @@ pub struct NestedCharCasePolicyOptions {
 
 impl NestedCharCasePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -153,7 +153,7 @@ pub fn collect_nested_char_cases(
 }
 
 #[must_use]
-pub fn summarize_nested_char_cases(
+pub const fn summarize_nested_char_cases(
     char_case_form_count: usize,
     violations: Vec<NestedCharCaseItem>,
 ) -> NestedCharCaseSummary {

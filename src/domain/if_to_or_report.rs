@@ -67,7 +67,7 @@ pub struct IfToOrPolicyOptions {
 
 impl IfToOrPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -159,7 +159,7 @@ pub fn collect_if_to_ors(
 }
 
 #[must_use]
-pub fn summarize_if_to_ors(if_form_count: usize, violations: Vec<IfToOrItem>) -> IfToOrSummary {
+pub const fn summarize_if_to_ors(if_form_count: usize, violations: Vec<IfToOrItem>) -> IfToOrSummary {
     IfToOrSummary {
         if_form_count,
         violations,

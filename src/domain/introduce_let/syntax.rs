@@ -277,7 +277,7 @@ fn resolve_relative(view: &ExpressionView, path: RelativeNodePath) -> Option<&Ex
         .map_or(Some(child), |grandchild| child.children.get(grandchild))
 }
 
-fn body_contains_child(body: BodyShape, child_index: usize) -> bool {
+const fn body_contains_child(body: BodyShape, child_index: usize) -> bool {
     match body {
         BodyShape::ChildrenFrom(first) => child_index >= first,
         BodyShape::ChildrenAfter(path) => child_index > path.child(),

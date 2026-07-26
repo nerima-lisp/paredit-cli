@@ -518,7 +518,7 @@ fn shape_fingerprint(
     hasher.finish()
 }
 
-fn expression_kind_tag(kind: ExpressionKind) -> u8 {
+const fn expression_kind_tag(kind: ExpressionKind) -> u8 {
     match kind {
         ExpressionKind::Root => 0,
         ExpressionKind::Atom => 1,
@@ -526,7 +526,7 @@ fn expression_kind_tag(kind: ExpressionKind) -> u8 {
     }
 }
 
-fn delimiter_tag(delimiter: Option<Delimiter>) -> u8 {
+const fn delimiter_tag(delimiter: Option<Delimiter>) -> u8 {
     match delimiter {
         None => 0,
         Some(Delimiter::Paren) => 1,

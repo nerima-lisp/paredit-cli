@@ -126,7 +126,7 @@ pub(in crate::presentation::cli) enum RefactorPreviewMode {
 }
 
 impl RefactorPreviewMode {
-    pub(in crate::presentation::cli) fn label(self) -> &'static str {
+    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
         match self {
             Self::Symbol => "symbol",
             Self::Function => "function",

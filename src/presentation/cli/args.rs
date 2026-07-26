@@ -193,7 +193,7 @@ pub(super) enum MoveInsert {
 }
 
 impl MoveInsert {
-    pub(super) fn label(self) -> &'static str {
+    pub(super) const fn label(self) -> &'static str {
         match self {
             Self::Append => "append",
             Self::Before => "before",
@@ -201,7 +201,7 @@ impl MoveInsert {
         }
     }
 
-    pub(super) fn into_extract_function_insert(self) -> ExtractFunctionInsert {
+    pub(super) const fn into_extract_function_insert(self) -> ExtractFunctionInsert {
         match self {
             Self::Append => ExtractFunctionInsert::Append,
             Self::Before => ExtractFunctionInsert::Before,
@@ -217,7 +217,7 @@ pub(super) enum ParameterInsert {
 }
 
 impl ParameterInsert {
-    pub(super) fn into_function_parameter_insert(self) -> FunctionParameterInsert {
+    pub(super) const fn into_function_parameter_insert(self) -> FunctionParameterInsert {
         match self {
             Self::Start => FunctionParameterInsert::Start,
             Self::End => FunctionParameterInsert::End,

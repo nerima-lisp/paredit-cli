@@ -71,7 +71,7 @@ struct Scope {
     label: Option<String>,
 }
 
-fn spans_contain(outer: ByteSpan, inner: ByteSpan) -> bool {
+const fn spans_contain(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
@@ -99,7 +99,7 @@ pub struct ShadowedBindingPolicyOptions {
 
 impl ShadowedBindingPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_shadowed: bool) -> Self {
+    pub const fn new(fail_on_shadowed: bool) -> Self {
         Self { fail_on_shadowed }
     }
 

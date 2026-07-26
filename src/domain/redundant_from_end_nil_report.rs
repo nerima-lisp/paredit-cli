@@ -92,7 +92,7 @@ pub struct RedundantFromEndNilPolicyOptions {
 
 impl RedundantFromEndNilPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -174,7 +174,7 @@ pub fn collect_redundant_from_end_nils(
 }
 
 #[must_use]
-pub fn summarize_redundant_from_end_nils(
+pub const fn summarize_redundant_from_end_nils(
     call_form_count: usize,
     violations: Vec<RedundantFromEndNilItem>,
 ) -> RedundantFromEndNilSummary {

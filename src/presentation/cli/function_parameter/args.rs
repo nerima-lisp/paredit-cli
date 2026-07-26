@@ -15,7 +15,7 @@ pub(in crate::presentation::cli::function_parameter) enum ParameterSection {
 }
 
 impl ParameterSection {
-    pub(in crate::presentation::cli::function_parameter) fn into_function_parameter_section(
+    pub(in crate::presentation::cli::function_parameter) const fn into_function_parameter_section(
         self,
     ) -> FunctionParameterSection {
         match self {

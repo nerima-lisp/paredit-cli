@@ -59,7 +59,7 @@ pub struct SubseqZeroPolicyOptions {
 
 impl SubseqZeroPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -137,7 +137,7 @@ pub fn collect_subseq_zeros(
 }
 
 #[must_use]
-pub fn summarize_subseq_zeros(
+pub const fn summarize_subseq_zeros(
     subseq_form_count: usize,
     violations: Vec<SubseqZeroItem>,
 ) -> SubseqZeroSummary {

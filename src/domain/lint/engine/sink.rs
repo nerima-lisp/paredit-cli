@@ -22,7 +22,7 @@ pub struct FindingSink<'a> {
 }
 
 impl<'a> FindingSink<'a> {
-    pub fn new(path: &'a Path) -> Self {
+    pub const fn new(path: &'a Path) -> Self {
         Self {
             path,
             entries: Vec::new(),
@@ -32,7 +32,7 @@ impl<'a> FindingSink<'a> {
 
     /// Lends a rule-and-node-scoped view of this sink for the duration of one
     /// `check` call.
-    pub fn visiting(
+    pub const fn visiting(
         &mut self,
         rule: RuleIndex,
         name: RuleName,

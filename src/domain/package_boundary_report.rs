@@ -77,7 +77,7 @@ pub struct PackageBoundaryPolicyOptions {
 
 impl PackageBoundaryPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 

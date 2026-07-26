@@ -58,7 +58,7 @@ pub struct IfNotPolicyOptions {
 
 impl IfNotPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -133,7 +133,7 @@ pub fn collect_if_nots(
 }
 
 #[must_use]
-pub fn summarize_if_nots(if_form_count: usize, violations: Vec<IfNotItem>) -> IfNotSummary {
+pub const fn summarize_if_nots(if_form_count: usize, violations: Vec<IfNotItem>) -> IfNotSummary {
     IfNotSummary {
         if_form_count,
         violations,

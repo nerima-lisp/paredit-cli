@@ -90,7 +90,7 @@ pub struct UnusedExportPolicyOptions {
 
 impl UnusedExportPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_unused: bool) -> Self {
+    pub const fn new(fail_on_unused: bool) -> Self {
         Self { fail_on_unused }
     }
 

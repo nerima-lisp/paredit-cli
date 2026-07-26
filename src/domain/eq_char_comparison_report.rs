@@ -86,7 +86,7 @@ pub struct EqCharComparisonPolicyOptions {
 
 impl EqCharComparisonPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -115,7 +115,7 @@ pub struct EqCharComparisonPolicy {
 pub(crate) type IsCharacterArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
 
 /// The [`IsCharacterArgument`] of a caller with no type context.
-fn never(_: &ExpressionView) -> bool {
+const fn never(_: &ExpressionView) -> bool {
     false
 }
 
@@ -184,7 +184,7 @@ pub fn collect_eq_char_comparisons(
 }
 
 #[must_use]
-pub fn summarize_eq_char_comparisons(
+pub const fn summarize_eq_char_comparisons(
     comparison_form_count: usize,
     violations: Vec<EqCharComparisonItem>,
 ) -> EqCharComparisonSummary {

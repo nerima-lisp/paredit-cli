@@ -66,7 +66,7 @@ pub struct QuotedCaseKeyPolicyOptions {
 
 impl QuotedCaseKeyPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -151,7 +151,7 @@ pub fn collect_quoted_case_keys(
 }
 
 #[must_use]
-pub fn summarize_quoted_case_keys(
+pub const fn summarize_quoted_case_keys(
     case_form_count: usize,
     violations: Vec<QuotedCaseKeyItem>,
 ) -> QuotedCaseKeySummary {

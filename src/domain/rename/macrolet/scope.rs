@@ -33,7 +33,7 @@ pub(super) struct LocalCallableScopes {
 }
 
 impl LocalCallableRenameKind {
-    pub(super) fn matches_target_form(self, form: CommonLispLocalCallableForm) -> bool {
+    pub(super) const fn matches_target_form(self, form: CommonLispLocalCallableForm) -> bool {
         match self {
             Self::Macro => is_macro_callable_form(form),
             Self::Function => matches!(
@@ -45,20 +45,20 @@ impl LocalCallableRenameKind {
 }
 
 impl MacroletRenameScope {
-    pub(super) fn is_target_active(self) -> bool {
+    pub(super) const fn is_target_active(self) -> bool {
         self.active_target_depth > 0
     }
 
-    pub(super) fn is_shadowed(self) -> bool {
+    pub(super) const fn is_shadowed(self) -> bool {
         self.shadowed_depth > 0
     }
 
-    fn enter_active_target(mut self) -> Self {
+    const fn enter_active_target(mut self) -> Self {
         self.active_target_depth += 1;
         self
     }
 
-    fn enter_shadowed(mut self) -> Self {
+    const fn enter_shadowed(mut self) -> Self {
         self.shadowed_depth += 1;
         self
     }
@@ -71,7 +71,7 @@ pub(super) fn allows_function_reference_rename(
     !scope.is_shadowed() || has_common_lisp_package_qualifier(target_text)
 }
 
-pub(super) fn reader_lambda_body_scope(scope: MacroletRenameScope) -> MacroletRenameScope {
+pub(super) const fn reader_lambda_body_scope(scope: MacroletRenameScope) -> MacroletRenameScope {
     scope.enter_active_target()
 }
 
@@ -172,7 +172,7 @@ pub(super) fn local_callable_binding_body_scope(
     }
 }
 
-fn shadow_current_target_in_definition_body(scope: MacroletRenameScope) -> MacroletRenameScope {
+const fn shadow_current_target_in_definition_body(scope: MacroletRenameScope) -> MacroletRenameScope {
     if scope.is_target_active() || scope.is_shadowed() {
         scope
     } else {

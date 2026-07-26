@@ -71,7 +71,7 @@ pub struct IfArityPolicyOptions {
 
 impl IfArityPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -146,7 +146,7 @@ pub fn collect_if_arity_violations(
 }
 
 #[must_use]
-pub fn summarize_if_arity(if_form_count: usize, violations: Vec<IfArityItem>) -> IfAritySummary {
+pub const fn summarize_if_arity(if_form_count: usize, violations: Vec<IfArityItem>) -> IfAritySummary {
     IfAritySummary {
         if_form_count,
         violations,

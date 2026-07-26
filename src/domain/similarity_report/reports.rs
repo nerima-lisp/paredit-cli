@@ -219,7 +219,7 @@ struct RetainedPairs<'a> {
 }
 
 impl<'a> RetainedPairs<'a> {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             storage: RetainedPairStorage::Buffered(Vec::new()),
             min_total_span_len: None,
@@ -863,7 +863,7 @@ fn effective_worker_count(available_workers: usize, possible_pairs: usize) -> us
     }
 }
 
-fn result_bounded_worker_count(requested_workers: usize, limit: Option<usize>) -> usize {
+const fn result_bounded_worker_count(requested_workers: usize, limit: Option<usize>) -> usize {
     let Some(limit) = limit else {
         return requested_workers;
     };
@@ -874,7 +874,7 @@ fn result_bounded_worker_count(requested_workers: usize, limit: Option<usize>) -
     }
 }
 
-fn should_spawn_worker_threads(worker_item_count: usize) -> bool {
+const fn should_spawn_worker_threads(worker_item_count: usize) -> bool {
     worker_item_count > 1
 }
 
@@ -1160,7 +1160,7 @@ fn scoped_pair_count(
     }
 }
 
-fn pair_count(count: usize) -> usize {
+const fn pair_count(count: usize) -> usize {
     let previous = count.saturating_sub(1);
     if count % 2 == 0 {
         (count / 2).saturating_mul(previous)
@@ -1179,7 +1179,7 @@ pub(crate) struct GroupComparisonOutput<'a> {
 }
 
 impl<'a> GroupComparisonOutput<'a> {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             pairs: RetainedPairs::new(),
             matched_pairs: 0,
@@ -2270,11 +2270,11 @@ fn compare_form_endpoints(left: &SimilarityFormReport, right: &SimilarityFormRep
         .then_with(|| left.form_path().cmp(right.form_path()))
 }
 
-fn form_span_key(form: &SimilarityFormReport) -> SpanKey {
+const fn form_span_key(form: &SimilarityFormReport) -> SpanKey {
     (form.span().start().get(), form.span().end().get())
 }
 
-fn span_contains(outer: SpanKey, inner: SpanKey) -> bool {
+const fn span_contains(outer: SpanKey, inner: SpanKey) -> bool {
     outer.0 <= inner.0 && inner.1 <= outer.1
 }
 

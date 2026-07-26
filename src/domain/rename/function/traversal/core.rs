@@ -98,18 +98,18 @@ impl TraversalPathArena {
 }
 
 impl TraversalState {
-    pub(super) fn with_path(&self, path: TraversalPath) -> Self {
+    pub(super) const fn with_path(&self, path: TraversalPath) -> Self {
         Self { path, ..*self }
     }
 
-    pub(super) fn with_quasiquote_depth(&self, quasiquote_depth: usize) -> Self {
+    pub(super) const fn with_quasiquote_depth(&self, quasiquote_depth: usize) -> Self {
         Self {
             quasiquote_depth,
             ..*self
         }
     }
 
-    pub(super) fn with_local_shadowing(
+    pub(super) const fn with_local_shadowing(
         &self,
         local_callable_shadowed: bool,
         local_function_shadowed: bool,
@@ -121,7 +121,7 @@ impl TraversalState {
         }
     }
 
-    pub(super) fn in_macro_expander(&self) -> Self {
+    pub(super) const fn in_macro_expander(&self) -> Self {
         Self {
             in_macro_expander: true,
             ..*self

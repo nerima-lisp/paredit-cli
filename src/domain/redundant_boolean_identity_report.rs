@@ -86,7 +86,7 @@ pub struct RedundantBooleanIdentityPolicyOptions {
 
 impl RedundantBooleanIdentityPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -180,7 +180,7 @@ pub fn collect_redundant_boolean_identities(
 }
 
 #[must_use]
-pub fn summarize_redundant_boolean_identities(
+pub const fn summarize_redundant_boolean_identities(
     boolean_form_count: usize,
     violations: Vec<RedundantBooleanIdentityItem>,
 ) -> RedundantBooleanIdentitySummary {

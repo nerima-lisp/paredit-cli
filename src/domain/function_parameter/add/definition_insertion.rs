@@ -33,7 +33,7 @@ pub(super) enum DefinitionInsertionPlan<'a> {
 }
 
 impl DefinitionInsertionPlan<'_> {
-    pub(super) fn resolved_section(&self) -> FunctionParameterSection {
+    pub(super) const fn resolved_section(&self) -> FunctionParameterSection {
         match self {
             Self::ExistingPositional(_) => FunctionParameterSection::Positional,
             Self::ExistingOptional(_) | Self::CreateOptional { .. } => {

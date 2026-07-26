@@ -30,7 +30,7 @@ pub struct Binding {
 impl Binding {
     /// The bound name, normalized by the dialect's rules (case-folded for
     /// Common Lisp).
-    pub fn name(&self) -> &SymbolName {
+    pub const fn name(&self) -> &SymbolName {
         &self.name
     }
 
@@ -112,7 +112,7 @@ pub struct BindingDraft {
 }
 
 impl BindingDraft {
-    pub fn new(name: SymbolName, kind: BindingKind, scope: ScopeId, definition: ByteSpan) -> Self {
+    pub const fn new(name: SymbolName, kind: BindingKind, scope: ScopeId, definition: ByteSpan) -> Self {
         Self {
             binding: Binding {
                 name,
@@ -137,7 +137,7 @@ impl BindingDraft {
     }
 
     #[must_use]
-    pub fn with_init_form(mut self, span: ByteSpan) -> Self {
+    pub const fn with_init_form(mut self, span: ByteSpan) -> Self {
         self.binding.init_form = Some(span);
         self
     }

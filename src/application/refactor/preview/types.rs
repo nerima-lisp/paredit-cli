@@ -8,7 +8,7 @@ pub struct RefactorPreviewEdit {
 
 impl RefactorPreviewEdit {
     #[must_use]
-    pub fn new(span: ByteSpan, replacement: String) -> Self {
+    pub const fn new(span: ByteSpan, replacement: String) -> Self {
         Self { span, replacement }
     }
 
@@ -18,12 +18,12 @@ impl RefactorPreviewEdit {
     }
 
     #[must_use]
-    pub fn start(&self) -> usize {
+    pub const fn start(&self) -> usize {
         self.span.start().get()
     }
 
     #[must_use]
-    pub fn end(&self) -> usize {
+    pub const fn end(&self) -> usize {
         self.span.end().get()
     }
 

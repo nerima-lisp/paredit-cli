@@ -59,7 +59,7 @@ pub struct MakeListDefaultElementPolicyOptions {
 
 impl MakeListDefaultElementPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -137,7 +137,7 @@ pub fn collect_make_list_default_elements(
 }
 
 #[must_use]
-pub fn summarize_make_list_default_elements(
+pub const fn summarize_make_list_default_elements(
     call_form_count: usize,
     violations: Vec<MakeListDefaultElementItem>,
 ) -> MakeListDefaultElementSummary {

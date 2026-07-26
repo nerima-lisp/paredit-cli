@@ -81,7 +81,7 @@ pub struct FormatToStringPolicyOptions {
 
 impl FormatToStringPolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -164,7 +164,7 @@ pub fn collect_format_to_strings(
 }
 
 #[must_use]
-pub fn summarize_format_to_strings(
+pub const fn summarize_format_to_strings(
     format_form_count: usize,
     violations: Vec<FormatToStringItem>,
 ) -> FormatToStringSummary {

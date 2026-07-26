@@ -335,7 +335,7 @@ fn collect_named_let_references(
     collect_body_forms(dialect, &view.children[3..], symbol, input, output);
 }
 
-fn should_scan_definition_body(operator: CommonLispOperator) -> bool {
+const fn should_scan_definition_body(operator: CommonLispOperator) -> bool {
     !matches!(
         operator,
         CommonLispOperator::DefineSetfExpander | CommonLispOperator::DefineCompilerMacro

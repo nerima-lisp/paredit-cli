@@ -57,7 +57,7 @@ pub struct CarReversePolicyOptions {
 
 impl CarReversePolicyOptions {
     #[must_use]
-    pub fn new(fail_on_violation: bool) -> Self {
+    pub const fn new(fail_on_violation: bool) -> Self {
         Self { fail_on_violation }
     }
 
@@ -146,7 +146,7 @@ pub fn collect_car_reverses(
 }
 
 #[must_use]
-pub fn summarize_car_reverses(
+pub const fn summarize_car_reverses(
     accessor_form_count: usize,
     violations: Vec<CarReverseItem>,
 ) -> CarReverseSummary {

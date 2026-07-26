@@ -142,11 +142,11 @@ pub(crate) enum CommonLispLambdaListShape {
 }
 
 impl CommonLispLocalCallableForm {
-    pub(crate) fn is_macro(self) -> bool {
+    pub(crate) const fn is_macro(self) -> bool {
         matches!(self, Self::Macrolet | Self::CompilerMacrolet)
     }
 
-    pub(crate) fn operator_name(self) -> &'static str {
+    pub(crate) const fn operator_name(self) -> &'static str {
         match self {
             Self::Flet => "flet",
             Self::Labels => "labels",
@@ -157,23 +157,23 @@ impl CommonLispLocalCallableForm {
 }
 
 impl CommonLispLetBindingForm {
-    pub(crate) fn is_sequential(self) -> bool {
+    pub(crate) const fn is_sequential(self) -> bool {
         matches!(self, Self::Sequential)
     }
 
-    pub(crate) fn supports_inline_refactor(self) -> bool {
+    pub(crate) const fn supports_inline_refactor(self) -> bool {
         matches!(self, Self::Parallel | Self::Sequential | Self::SymbolMacro)
     }
 }
 
 impl CommonLispVariableBindingForm {
-    pub(crate) fn is_sequential(self) -> bool {
+    pub(crate) const fn is_sequential(self) -> bool {
         matches!(self, Self::Sequential)
     }
 }
 
 impl CommonLispHandlerBindingForm {
-    pub(crate) fn includes_restart_options(self) -> bool {
+    pub(crate) const fn includes_restart_options(self) -> bool {
         matches!(self, Self::Restart)
     }
 }
@@ -200,7 +200,7 @@ impl CommonLispValueScopeForm {
 impl CommonLispBindingRefactorForm {
     /// Whether this form introduces value bindings that can dynamically bind
     /// a variable declared special.
-    pub(crate) fn supports_dynamic_special_binding(self) -> bool {
+    pub(crate) const fn supports_dynamic_special_binding(self) -> bool {
         matches!(
             self,
             Self::Let(CommonLispLetBindingForm::Parallel | CommonLispLetBindingForm::Sequential)
@@ -209,25 +209,25 @@ impl CommonLispBindingRefactorForm {
         )
     }
 
-    pub(crate) fn supports_remove_unused_binding(self) -> bool {
+    pub(crate) const fn supports_remove_unused_binding(self) -> bool {
         matches!(
             self,
             Self::Let(_) | Self::LocalCallable(_) | Self::Do(_) | Self::Prog(_) | Self::Slot(_)
         )
     }
 
-    pub(crate) fn remove_unused_body_start_index(self) -> usize {
+    pub(crate) const fn remove_unused_body_start_index(self) -> usize {
         match self {
             Self::Slot(_) | Self::Do(_) => 3,
             _ => 2,
         }
     }
 
-    pub(crate) fn preserves_binding_form_when_empty(self) -> bool {
+    pub(crate) const fn preserves_binding_form_when_empty(self) -> bool {
         matches!(self, Self::Do(_) | Self::Prog(_))
     }
 
-    pub(crate) fn binding_list_shape(self) -> Option<CommonLispBindingListShape> {
+    pub(crate) const fn binding_list_shape(self) -> Option<CommonLispBindingListShape> {
         match self {
             Self::Let(_) => Some(CommonLispBindingListShape::NameValuePairs),
             Self::LocalCallable(form) => {
@@ -244,7 +244,7 @@ impl CommonLispBindingRefactorForm {
         }
     }
 
-    pub(crate) fn reference_scope(self) -> Option<CommonLispBindingReferenceScope> {
+    pub(crate) const fn reference_scope(self) -> Option<CommonLispBindingReferenceScope> {
         match self {
             Self::Let(form) => Some(CommonLispBindingReferenceScope::NameValuePairs(form)),
             Self::LocalCallable(form) => Some(
@@ -265,32 +265,32 @@ impl CommonLispBindingRefactorForm {
 }
 
 impl CommonLispVariableSpecForm {
-    pub(crate) fn form_name(self) -> &'static str {
+    pub(crate) const fn form_name(self) -> &'static str {
         match self {
             Self::Do => "do",
             Self::Prog => "prog",
         }
     }
 
-    pub(crate) fn max_children(self) -> usize {
+    pub(crate) const fn max_children(self) -> usize {
         match self {
             Self::Do => 3,
             Self::Prog => 2,
         }
     }
 
-    pub(crate) fn has_step_forms(self) -> bool {
+    pub(crate) const fn has_step_forms(self) -> bool {
         matches!(self, Self::Do)
     }
 
-    pub(crate) fn end_clause_index(self) -> Option<usize> {
+    pub(crate) const fn end_clause_index(self) -> Option<usize> {
         match self {
             Self::Do => Some(2),
             Self::Prog => None,
         }
     }
 
-    pub(crate) fn body_start_index(self) -> usize {
+    pub(crate) const fn body_start_index(self) -> usize {
         match self {
             Self::Do => 3,
             Self::Prog => 2,

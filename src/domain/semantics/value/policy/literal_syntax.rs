@@ -34,7 +34,7 @@ pub fn named_constant(dialect: Dialect, text: &str) -> Option<LiteralValue> {
 
 /// Whether `dialect` folds symbol case when reading, which decides whether
 /// `:Foo` and `:foo` name the same keyword.
-pub fn folds_symbol_case(dialect: Dialect) -> bool {
+pub const fn folds_symbol_case(dialect: Dialect) -> bool {
     matches!(dialect, Dialect::CommonLisp)
 }
 
