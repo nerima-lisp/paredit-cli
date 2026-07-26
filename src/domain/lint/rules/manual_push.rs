@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Reconstruct `(push E P)` from exact source slices of the pushed
                 // element and the place variable.
                 let text = format!(

@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Drop the redundant delta: (incf place 1) -> (incf place).
 
                 RuleFix::single(

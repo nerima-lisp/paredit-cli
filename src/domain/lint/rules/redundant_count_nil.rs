@@ -61,8 +61,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
-
                 RuleFix::multi(
                     "Drop the redundant :count nil".to_owned(),
                     Replacement::new(item.removal_span, String::new()),

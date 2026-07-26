@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite just the head symbol: a ≤1-binding let* is exactly let.
 
                 RuleFix::single(

@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Reconstruct `(pushnew E P KW…)` by reusing adjoin's operand list.
                 let text = format!("(pushnew {})", context_slice(item.args_span));
 

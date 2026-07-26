@@ -58,7 +58,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (floor x 1) is (floor x): drop the redundant unit divisor.
                 let text = format!(
                     "({} {})",

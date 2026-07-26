@@ -50,7 +50,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (OUTER (INNER c)) is (OUTER c), keeping the outer op.
                 let text = format!(
                     "({} {})",

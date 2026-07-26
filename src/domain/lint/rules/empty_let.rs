@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Replace the `(let ()` prefix with `(progn`, leaving the body intact.
 
                 RuleFix::multi(

@@ -69,7 +69,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Replace the whole form with the live branch (or `nil` for a false
                 // one-armed if), dropping the dead branch.
                 let text = match item.result_span {

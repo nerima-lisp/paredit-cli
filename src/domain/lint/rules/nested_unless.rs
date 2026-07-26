@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Merge the two tests: (unless a (unless b body)) -> (unless (or a b) body).
                 let or = format!(
                     "(or {} {})",

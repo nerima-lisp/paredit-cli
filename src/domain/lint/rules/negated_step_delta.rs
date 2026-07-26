@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Flip the operator and drop the sign: (incf x -5) -> (decf x 5).
                 let magnitude = context_slice(item.delta_span);
                 let magnitude = magnitude.strip_prefix('-').unwrap_or(&magnitude);

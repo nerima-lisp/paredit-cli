@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (char= (char-downcase a) (char-downcase b)) is (char-equal a b).
                 let text = format!(
                     "(char-equal {} {})",

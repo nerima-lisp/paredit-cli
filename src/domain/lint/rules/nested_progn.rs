@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Splice the inner progn's body (exact source) in place of the
                 // whole `(progn …)` wrapper.
 

@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Delete the ` nil` else (from the then branch's end to the nil's).
 
                 RuleFix::multi(

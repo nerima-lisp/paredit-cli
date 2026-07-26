@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Delete `funcall ` from the head up to the lambda form, leaving the
                 // lambda in operator position: ((lambda …) …).
 

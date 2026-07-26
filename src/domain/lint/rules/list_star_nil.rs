@@ -46,7 +46,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Two disjoint edits: rewrite the head to list and drop the nil tail.
                 let fix_first = Replacement::new(item.head_span, "list".to_owned());
                 let fix_rest = [Replacement::new(item.removal_span, String::new())];

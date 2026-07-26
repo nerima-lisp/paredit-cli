@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite as the unary shorthand: (+ x 1) -> (1+ x), (- x 1) -> (1- x).
                 let text = format!("({} {})", item.shorthand, context_slice(item.operand_span));
 

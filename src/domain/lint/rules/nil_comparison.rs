@@ -52,7 +52,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite the whole form as `(null X)`, copying X's exact source.
 
                 RuleFix::single(

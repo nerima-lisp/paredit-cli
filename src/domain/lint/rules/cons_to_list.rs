@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite as `(list ELEMENT [TAIL_ELEMENTS])`.
                 let element = context_slice(item.element_span);
                 let text = match item.tail_elements_span {

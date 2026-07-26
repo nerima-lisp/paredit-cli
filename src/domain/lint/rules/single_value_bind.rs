@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite as a plain let: (multiple-value-bind (x) f body) -> (let ((x f)) body).
                 let binding = format!(
                     "({} {})",

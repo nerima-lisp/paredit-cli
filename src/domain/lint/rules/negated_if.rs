@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite `(if (not X) A B)` as `(if X B A)`: drop the negation and
                 // swap the branches, copying each subform's exact source.
                 let text = format!(

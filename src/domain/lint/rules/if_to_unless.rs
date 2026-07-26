@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (if c nil e) is (unless c e).
                 let text = format!(
                     "(unless {} {})",

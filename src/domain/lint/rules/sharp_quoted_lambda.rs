@@ -49,7 +49,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Strip the leading `#'` (tolerating rare whitespace) from the form.
                 let whole = context_slice(item.span);
                 let text = whole

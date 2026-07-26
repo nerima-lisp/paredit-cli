@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (multiple-value-list (values a b)) is (list a b); empty -> (list).
                 let text = match item.elements_span {
                     Some(span) => format!("(list {})", context_slice(span)),

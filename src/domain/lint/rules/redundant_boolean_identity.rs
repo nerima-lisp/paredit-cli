@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Reconstruct `(op kept…)` from the surviving operands, or collapse
                 // to the bare identity when every operand was the identity.
                 let kept: Vec<String> = item.kept_spans.iter().map(|s| context_slice(*s)).collect();

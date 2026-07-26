@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // An empty progn is `nil`; a single-form progn becomes that form,
                 // copied verbatim from source to preserve reader prefixes/spacing.
                 let replacement = item

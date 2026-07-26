@@ -50,7 +50,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Drop the redundant nil result, preserving the operator (and block).
                 let text = match item.block_span {
                     Some(block) => format!(

@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite `(if x x y)` as `(or x y)`, evaluating x once.
                 let text = format!(
                     "(or {} {})",

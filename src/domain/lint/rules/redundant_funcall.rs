@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Delete `funcall ` and the `#'` prefix in one cut, from the funcall
                 // head up to the callee symbol, leaving `(foo …)` byte-identical.
 

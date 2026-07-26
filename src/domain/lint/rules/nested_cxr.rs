@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Collapse to the combined accessor over the innermost argument.
                 let text = format!("({} {})", item.combined, context_slice(item.arg_span));
 

@@ -49,7 +49,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite as unary `(- X)`, copying X's source.
 
                 RuleFix::single(

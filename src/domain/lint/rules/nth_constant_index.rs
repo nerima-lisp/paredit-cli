@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite `(nth N x)` as `(ordinal x)`, copying the list source.
 
                 RuleFix::single(

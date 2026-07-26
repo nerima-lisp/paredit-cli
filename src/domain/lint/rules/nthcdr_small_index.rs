@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (nthcdr 2 x) is (cddr x): rewrite to the named cdr accessor.
                 let text = format!("({} {})", item.accessor, context_slice(item.list_span));
 

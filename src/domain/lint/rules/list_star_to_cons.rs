@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (list* a b) is (cons a b).
                 let text = format!(
                     "(cons {} {})",

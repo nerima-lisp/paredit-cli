@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (car (nthcdr n x)) is (nth n x).
                 let text = format!(
                     "(nth {} {})",

@@ -52,7 +52,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (handler-case x) is x.
 
                 RuleFix::single(

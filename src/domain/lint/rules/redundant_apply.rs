@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Reconstruct the direct call `(callee args…)`, copying the list's
                 // element source; an empty `(list)` yields a zero-argument call.
                 let text = match item.args_span {

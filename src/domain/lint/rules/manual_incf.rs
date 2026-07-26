@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Reconstruct `(incf V)` / `(incf V D)` / `(decf …)` from exact
                 // source slices of the variable and (when present) the delta.
                 let place = context_slice(item.place_span);

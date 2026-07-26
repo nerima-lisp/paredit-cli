@@ -46,8 +46,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
-
                 RuleFix::single(
                     item.head_span,
                     "when".to_owned(),

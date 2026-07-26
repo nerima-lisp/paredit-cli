@@ -45,15 +45,15 @@ impl LintRule for Rule {
         examine_quote(view, context.path(), &mut quoted_form_count, &mut items);
         for item in items {
             let span = item.span;
-            let fix = {
-                let item = item.clone();
-
-                RuleFix::single(
-                    item.span,
-                    item.literal,
-                    "Remove the redundant quote".to_owned(),
-                )
-            };
+            // The replacement is the quoted datum's own source, which the
+            // message also names — so it is cloned here rather than moved out
+            // of the item, which is the one place in the suite where the fix
+            // genuinely needs a copy of a field.
+            let fix = RuleFix::single(
+                item.span,
+                item.literal.clone(),
+                "Remove the redundant quote".to_owned(),
+            );
 
             sink.report_fixed(
                 span,

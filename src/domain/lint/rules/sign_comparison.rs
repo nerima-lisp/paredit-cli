@@ -51,7 +51,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite the whole form as `(predicate X)`, copying X's source.
 
                 RuleFix::single(

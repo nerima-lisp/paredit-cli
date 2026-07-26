@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (append x nil) is (copy-list x).
                 let text = format!("(copy-list {})", context_slice(item.list_span));
 

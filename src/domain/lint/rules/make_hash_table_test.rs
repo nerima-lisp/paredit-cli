@@ -51,7 +51,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Delete the redundant ` :test 'eql` argument pair.
 
                 RuleFix::multi(

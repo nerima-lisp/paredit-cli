@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (format nil "~A"/"~S" x) is (princ-to-string x)/(prin1-to-string x).
                 let text = format!(
                     "({} {})",

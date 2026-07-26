@@ -46,7 +46,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite the operator token prog2 -> progn, keeping the two forms.
 
                 RuleFix::single(

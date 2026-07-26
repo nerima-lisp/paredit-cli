@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (typep x 'TYPE) is (PRED x).
                 let text = format!("({} {})", item.predicate, context_slice(item.object_span));
 

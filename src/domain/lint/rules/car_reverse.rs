@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (car (reverse x)) is (car (last x)), keeping the outer accessor.
                 let text = format!(
                     "({} (last {}))",

@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Rewrite `(and (not a) (not b))` as `(not (or a b))`, copying each
                 // negation's inner operand.
                 let inners: Vec<String> =

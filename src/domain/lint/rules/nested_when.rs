@@ -48,7 +48,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Merge the two tests: (when a (when b body)) -> (when (and a b) body).
                 let and = format!(
                     "(and {} {})",

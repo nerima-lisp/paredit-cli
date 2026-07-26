@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (reverse (reverse x)) is (copy-seq x): keep the inner argument.
                 let text = format!("(copy-seq {})", context_slice(item.inner_span));
 

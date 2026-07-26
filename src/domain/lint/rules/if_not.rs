@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (if test nil t) is (not test): keep the test verbatim.
                 let text = format!("(not {})", context_slice(item.test_span));
 

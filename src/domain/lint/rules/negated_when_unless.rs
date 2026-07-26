@@ -52,7 +52,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // Two disjoint edits: flip the head macro and drop the negation,
                 // leaving the body and all spacing byte-identical.
                 let fix_first = Replacement::new(item.head_span, item.suggested_head.to_owned());

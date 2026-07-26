@@ -47,7 +47,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (nthcdr 0 x) is x: replace the whole form with the list source.
 
                 RuleFix::single(

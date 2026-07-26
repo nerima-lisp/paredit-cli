@@ -46,7 +46,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 if item.always_runs {
                     // The body always runs: splice `(when t` / `(unless nil` down to
                     // `(progn`, keeping the body forms verbatim.

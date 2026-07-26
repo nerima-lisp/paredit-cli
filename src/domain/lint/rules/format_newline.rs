@@ -46,7 +46,6 @@ impl LintRule for Rule {
         for item in items {
             let span = item.span;
             let fix = {
-                let item = item.clone();
                 // (format t "~%") is (terpri).
 
                 RuleFix::single(
