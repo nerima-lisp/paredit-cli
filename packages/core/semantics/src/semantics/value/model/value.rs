@@ -1,6 +1,6 @@
 //! The result of asking what an expression evaluates to.
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 use super::literal::LiteralValue;
 
@@ -18,10 +18,12 @@ pub enum Value {
 }
 
 impl Value {
+    #[must_use]
     pub const fn known(value: LiteralValue) -> Self {
         Self::Known(value)
     }
 
+    #[must_use]
     pub const fn as_known(&self) -> Option<&LiteralValue> {
         match self {
             Self::Known(value) => Some(value),
@@ -30,6 +32,7 @@ impl Value {
     }
 
     /// The integer this evaluates to, if it provably evaluates to one.
+    #[must_use]
     pub const fn as_integer(&self) -> Option<i128> {
         match self {
             Self::Known(LiteralValue::Integer(value)) => Some(*value),
@@ -41,16 +44,19 @@ impl Value {
     ///
     /// The question a lint actually asks — "is this divisor zero?", "is this
     /// radix ten?" — phrased so a caller cannot forget to handle `Unknown`.
+    #[must_use]
     pub fn is_integer(&self, expected: i128) -> bool {
         self.as_integer() == Some(expected)
     }
 
     /// Whether this provably evaluates to something true, false, or neither
     /// (because it is not `Known`).
+    #[must_use]
     pub fn truthiness(&self, dialect: Dialect) -> Option<bool> {
         self.as_known().map(|value| value.is_truthy(dialect))
     }
 
+    #[must_use]
     pub const fn is_known(&self) -> bool {
         matches!(self, Self::Known(_))
     }

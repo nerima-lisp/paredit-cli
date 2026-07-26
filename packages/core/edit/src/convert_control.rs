@@ -2,10 +2,10 @@
 
 use anyhow::{Context, Result, anyhow, bail};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct ConvertIfToCondRequest<'a> {
@@ -121,7 +121,7 @@ pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<Co
     })
 }
 
-pub(crate) fn require_supported_dialect(dialect: Dialect, operation: &str) -> Result<()> {
+pub fn require_supported_dialect(dialect: Dialect, operation: &str) -> Result<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         bail!("{operation} currently supports only Common Lisp and Emacs Lisp");
     }

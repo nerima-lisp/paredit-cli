@@ -1,8 +1,8 @@
 //! Recording which bindings a form reassigns.
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
 
 use super::super::policy::assignment_form;
 use super::builder::Walk;

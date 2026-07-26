@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::domain::semantics::value::PropagatableValue;
+use crate::semantics::value::PropagatableValue;
 
 use super::qualified_symbol::QualifiedSymbol;
 
@@ -28,18 +28,22 @@ pub struct GlobalDefinition {
 }
 
 impl GlobalDefinition {
+    #[must_use]
     pub const fn new(symbol: QualifiedSymbol, kind: GlobalKind, file: usize) -> Self {
         Self { symbol, kind, file }
     }
 
+    #[must_use]
     pub const fn symbol(&self) -> &QualifiedSymbol {
         &self.symbol
     }
 
+    #[must_use]
     pub const fn kind(&self) -> GlobalKind {
         self.kind
     }
 
+    #[must_use]
     pub const fn file(&self) -> usize {
         self.file
     }
@@ -66,6 +70,7 @@ impl GlobalTable {
 
     /// The value of a project-wide constant, when exactly one file defines it
     /// and that definition is provably constant.
+    #[must_use]
     pub fn constant_value(&self, symbol: &QualifiedSymbol) -> Option<&PropagatableValue> {
         self.constants.get(symbol)
     }
@@ -93,6 +98,7 @@ pub struct GlobalTableBuilder {
 }
 
 impl GlobalTableBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -114,6 +120,7 @@ impl GlobalTableBuilder {
         self.constants.insert(symbol, value);
     }
 
+    #[must_use]
     pub fn finish(mut self) -> GlobalTable {
         // A symbol defined more than once has no single value, whichever of
         // the definitions were constant.
@@ -132,8 +139,8 @@ impl GlobalTableBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::project::model::PackageId;
-    use crate::domain::sexpr::SymbolName;
+    use crate::semantics::project::model::PackageId;
+    use paredit_core_syntax::sexpr::SymbolName;
 
     fn symbol(package: &str, name: &str) -> QualifiedSymbol {
         QualifiedSymbol::new(

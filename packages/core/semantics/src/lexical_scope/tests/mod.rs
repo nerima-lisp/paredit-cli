@@ -1,8 +1,8 @@
 use super::*;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
 
-fn selected_form(input: &str) -> crate::domain::sexpr::ExpressionView {
+fn selected_form(input: &str) -> paredit_core_syntax::sexpr::ExpressionView {
     let tree = SyntaxTree::parse(input).expect("parse");
     tree.select_path(&"0".parse::<Path>().expect("path"))
         .expect("select")
@@ -12,7 +12,7 @@ fn selected_form(input: &str) -> crate::domain::sexpr::ExpressionView {
 fn selected_form_with_dialect(
     input: &str,
     dialect: Dialect,
-) -> crate::domain::sexpr::ExpressionView {
+) -> paredit_core_syntax::sexpr::ExpressionView {
     let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse");
     tree.select_path(&"0".parse::<Path>().expect("path"))
         .expect("select")

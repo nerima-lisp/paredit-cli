@@ -1,11 +1,13 @@
 //! Which package each form in a file belongs to.
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_symbol_reference_needle,
     has_common_lisp_package_qualifier, normalize_common_lisp_package_designator,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree,
+};
 
 use super::super::model::{PackageId, QualifiedSymbol};
 
@@ -20,10 +22,12 @@ pub struct PackageRegion {
 }
 
 impl PackageRegion {
+    #[must_use]
     pub const fn package(&self) -> &PackageId {
         &self.package
     }
 
+    #[must_use]
     pub const fn span(&self) -> ByteSpan {
         self.span
     }
@@ -47,10 +51,12 @@ impl FilePackages {
             .map(PackageRegion::package)
     }
 
+    #[must_use]
     pub fn region_count(&self) -> usize {
         self.regions.len()
     }
 
+    #[must_use]
     pub fn regions(&self) -> &[PackageRegion] {
         &self.regions
     }
@@ -61,6 +67,7 @@ impl FilePackages {
 /// A region runs from its `in-package` form to the next one, or to the end of
 /// the file. Only Common Lisp has the form; every other dialect gets no
 /// regions, which reads as "no package is known" rather than a guessed one.
+#[must_use]
 pub fn resolve_file_packages(dialect: Dialect, tree: &SyntaxTree) -> FilePackages {
     if dialect != Dialect::CommonLisp {
         return FilePackages::default();
@@ -99,6 +106,7 @@ pub fn resolve_file_packages(dialect: Dialect, tree: &SyntaxTree) -> FilePackage
 /// package it is in — and is deliberately representable, because guessing
 /// `CL-USER` would manufacture the cross-package confusion this layer exists
 /// to remove.
+#[must_use]
 pub fn resolve_symbol(
     packages: &FilePackages,
     text: &str,
@@ -129,6 +137,7 @@ pub fn resolve_symbol(
 /// `defpackage` and `in-package` name one directly, and a report comparing
 /// those two needs the same identity a qualified reference gets, or the same
 /// package written two ways reads as two packages.
+#[must_use]
 pub fn canonical_package_id(designator: &str) -> PackageId {
     package_id(designator)
 }

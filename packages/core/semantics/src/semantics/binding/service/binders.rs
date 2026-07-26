@@ -8,12 +8,12 @@
 //! that backwards is exactly the kind of silent divergence the differential
 //! test exists to catch.
 
-use crate::domain::common_lisp::{CommonLispLocalCallableForm, CommonLispOperator};
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::{BoundName, binding_pattern_bound_names};
-use crate::domain::sexpr::reader::atom_symbol_span;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use crate::lexical_scope::{BoundName, binding_pattern_bound_names};
+use paredit_core_syntax::common_lisp::{CommonLispLocalCallableForm, CommonLispOperator};
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_span;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::model::{BindingKind, OpacityCause, OpacityCauseKind, ScopeId};
 use super::builder::{Walk, head_text};

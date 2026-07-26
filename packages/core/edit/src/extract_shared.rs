@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TopLevelInsert {
@@ -10,6 +10,7 @@ pub enum TopLevelInsert {
 }
 
 impl TopLevelInsert {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Append => "append",
@@ -19,7 +20,8 @@ impl TopLevelInsert {
     }
 }
 
-pub(crate) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+#[must_use]
+pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut output = String::with_capacity(input.len() - span.len() + replacement.len());
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);
@@ -27,11 +29,7 @@ pub(crate) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> St
     output
 }
 
-pub(crate) fn replace_span_checked(
-    input: &str,
-    span: ByteSpan,
-    replacement: &str,
-) -> Result<String> {
+pub fn replace_span_checked(input: &str, span: ByteSpan, replacement: &str) -> Result<String> {
     span.validate_against(input)
         .map_err(|error| anyhow::anyhow!("replacement span is invalid: {error}"))?;
     input
@@ -42,7 +40,7 @@ pub(crate) fn replace_span_checked(
     Ok(replace_span(input, span, replacement))
 }
 
-pub(crate) fn insert_top_level_form(
+pub fn insert_top_level_form(
     input: &str,
     tree: &SyntaxTree,
     form: &str,

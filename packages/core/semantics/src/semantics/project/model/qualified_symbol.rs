@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
 /// A package's identity, normalized the way the Common Lisp reader would.
 ///
@@ -16,20 +16,24 @@ pub struct PackageId(String);
 
 impl PackageId {
     /// The identity of a designator already stripped of its `:`/`#:`/quotes.
+    #[must_use]
     pub fn new(name: &str) -> Self {
         Self(name.to_ascii_uppercase())
     }
 
     /// `COMMON-LISP`, which `CL` also names.
+    #[must_use]
     pub fn common_lisp() -> Self {
         Self("COMMON-LISP".to_owned())
     }
 
     /// `KEYWORD`, the home of every `:foo`.
+    #[must_use]
     pub fn keyword() -> Self {
         Self("KEYWORD".to_owned())
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -55,14 +59,17 @@ pub struct QualifiedSymbol {
 }
 
 impl QualifiedSymbol {
+    #[must_use]
     pub const fn new(package: PackageId, name: SymbolName) -> Self {
         Self { package, name }
     }
 
+    #[must_use]
     pub const fn package(&self) -> &PackageId {
         &self.package
     }
 
+    #[must_use]
     pub const fn name(&self) -> &SymbolName {
         &self.name
     }

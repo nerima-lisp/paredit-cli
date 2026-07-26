@@ -650,7 +650,10 @@ dependencies = [
  "clap_complete",
  "criterion",
  "libc",
+ "paredit-core-edit",
+ "paredit-core-semantics",
  "paredit-core-syntax",
+ "paredit-core-workspace",
  "predicates",
  "proptest",
  "serde_json",
@@ -659,10 +662,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-core-edit"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-core-semantics"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "paredit-core-syntax",
+ "proptest",
+ "thiserror",
+]
+
+[[package]]
 name = "paredit-core-syntax"
 version = "1.1.0"
 dependencies = [
  "anyhow",
+ "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-core-workspace"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "cap-std",
+ "libc",
+ "paredit-core-syntax",
  "proptest",
  "thiserror",
 ]

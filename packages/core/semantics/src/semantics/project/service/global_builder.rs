@@ -1,10 +1,10 @@
 //! Assembling every file's top-level definitions into one project table.
 
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::value::ValueTable;
-use crate::domain::semantics::value::service::constant_key;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
+use crate::semantics::value::ValueTable;
+use crate::semantics::value::service::constant_key;
+use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
 
 use super::super::model::{
     GlobalDefinition, GlobalKind, GlobalTable, GlobalTableBuilder, QualifiedSymbol,
@@ -24,6 +24,7 @@ pub struct ProjectFile<'a> {
 }
 
 impl<'a> ProjectFile<'a> {
+    #[must_use]
     pub const fn new(
         tree: &'a SyntaxTree,
         packages: &'a FilePackages,
@@ -42,6 +43,7 @@ impl<'a> ProjectFile<'a> {
 ///
 /// Only Common Lisp is analysed; every other dialect gets an empty table
 /// rather than one built on guessed definition forms.
+#[must_use]
 pub fn build_global_table(dialect: Dialect, files: &[ProjectFile<'_>]) -> GlobalTable {
     let mut builder = GlobalTableBuilder::new();
     if dialect != Dialect::CommonLisp {
@@ -103,7 +105,7 @@ fn record_constant(
 
 /// The kind of global a top-level form defines.
 ///
-/// Deliberately narrower than [`crate::domain::definition::definition_shape`],
+/// Deliberately narrower than [`paredit_core_syntax::definition::definition_shape`],
 /// whose `Variable` category also covers `defglobal` and
 /// `define-symbol-macro` — neither of which is a variable this table can make
 /// a claim about.
@@ -146,8 +148,8 @@ fn definition_name(form: &ExpressionView) -> Option<DefinitionName<'_>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::project::model::PackageId;
-    use crate::domain::semantics::project::service::resolve_file_packages;
+    use crate::semantics::project::model::PackageId;
+    use crate::semantics::project::service::resolve_file_packages;
 
     struct File {
         tree: SyntaxTree,

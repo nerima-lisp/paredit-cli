@@ -59,6 +59,7 @@ static INDEX: LazyLock<HashSet<&'static str>> =
 
 /// Whether `head` names a declaration specifier or optimize quality, and so
 /// names something that is never evaluated.
+#[must_use]
 pub fn is_standard_declaration_identifier(head: &str) -> bool {
     contains_folded(&INDEX, head)
 }

@@ -8,8 +8,10 @@
 //! captured" by reusing the shared shadow-aware reference collector rather than
 //! re-deriving shadowing rules.
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree,
+};
 
 use super::syntax::atom_symbol_text;
 use super::traversal::{collect_unshadowed_symbol_references, symbol_name_matches};

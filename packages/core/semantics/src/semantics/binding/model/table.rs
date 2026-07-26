@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
-use crate::domain::semantics::NodeKey;
+use crate::semantics::NodeKey;
 
 use super::binding::{Binding, BindingDraft};
 use super::ids::{BindingId, ScopeId};
@@ -18,10 +18,12 @@ pub struct Scope {
 }
 
 impl Scope {
+    #[must_use]
     pub const fn parent(&self) -> Option<ScopeId> {
         self.parent
     }
 
+    #[must_use]
     pub const fn opener(&self) -> Option<ByteSpan> {
         self.opener
     }
@@ -47,14 +49,17 @@ pub struct BindingTable {
 }
 
 impl BindingTable {
+    #[must_use]
     pub fn binding(&self, id: BindingId) -> &Binding {
         &self.bindings[id.index()]
     }
 
+    #[must_use]
     pub fn scope(&self, id: ScopeId) -> &Scope {
         &self.scopes[id.index()]
     }
 
+    #[must_use]
     pub fn bindings(&self) -> impl ExactSizeIterator<Item = (BindingId, &Binding)> {
         self.bindings
             .iter()
@@ -62,17 +67,20 @@ impl BindingTable {
             .map(|(index, binding)| (BindingId::new(index as u32), binding))
     }
 
+    #[must_use]
     pub fn scope_count(&self) -> usize {
         self.scopes.len()
     }
 
     /// The binding a reference at `key` resolves to, or `None` when it is not
     /// statically resolvable.
+    #[must_use]
     pub fn resolve(&self, key: NodeKey) -> Option<BindingId> {
         self.resolution.get(&key).copied()
     }
 
     /// Whether `scope` is `ancestor` or is lexically nested inside it.
+    #[must_use]
     pub fn is_within(&self, scope: ScopeId, ancestor: ScopeId) -> bool {
         let mut current = Some(scope);
         while let Some(id) = current {
@@ -99,6 +107,7 @@ pub struct BindingTableBuilder {
 }
 
 impl BindingTableBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             scopes: vec![Scope {
@@ -162,8 +171,8 @@ impl Default for BindingTableBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::binding::model::{BindingDraft, BindingKind};
-    use crate::domain::sexpr::{ByteOffset, SymbolName};
+    use crate::semantics::binding::model::{BindingDraft, BindingKind};
+    use paredit_core_syntax::sexpr::{ByteOffset, SymbolName};
 
     fn span(start: usize, end: usize) -> ByteSpan {
         ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))

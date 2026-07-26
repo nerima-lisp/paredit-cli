@@ -3,17 +3,18 @@
 use anyhow::{Result, bail};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct BindingIndex(usize);
+pub struct BindingIndex(usize);
 
 impl BindingIndex {
-    pub(crate) fn new(value: usize) -> Result<Self> {
+    pub fn new(value: usize) -> Result<Self> {
         if value == 0 {
             bail!("binding index must be greater than zero");
         }
         Ok(Self(value))
     }
 
-    pub(crate) const fn get(self) -> usize {
+    #[must_use]
+    pub const fn get(self) -> usize {
         self.0
     }
 }

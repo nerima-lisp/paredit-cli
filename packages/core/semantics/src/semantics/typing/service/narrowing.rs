@@ -9,12 +9,12 @@
 
 use std::collections::HashMap;
 
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
-use crate::domain::sexpr::{ExpressionKind, ExpressionView};
+use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
+use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView};
 
-use crate::domain::semantics::NodeKey;
-use crate::domain::semantics::binding::BindingId;
+use crate::semantics::NodeKey;
+use crate::semantics::binding::BindingId;
 
 use super::super::model::{Ty, Type, TypeTableBuilder, join, meet};
 use super::super::policy::narrowed_by_predicate;

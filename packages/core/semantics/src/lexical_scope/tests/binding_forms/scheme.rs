@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 fn reference_texts_for(dialect: Dialect, input: &str, symbol: &str) -> Vec<String> {
     let view = selected_form(input);

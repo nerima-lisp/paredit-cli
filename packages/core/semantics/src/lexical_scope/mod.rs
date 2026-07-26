@@ -18,4 +18,4 @@ pub use traversal::collect_unshadowed_symbol_references;
     unused_imports,
     reason = "the binding-table builder that consumes these lands with the value layer"
 )]
-pub(crate) use patterns::{BoundName, binding_pattern_bound_names, lambda_list_bound_names};
+pub use patterns::{BoundName, binding_pattern_bound_names, lambda_list_bound_names};

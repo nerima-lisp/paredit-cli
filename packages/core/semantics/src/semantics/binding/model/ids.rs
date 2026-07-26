@@ -11,10 +11,11 @@
 pub struct BindingId(u32);
 
 impl BindingId {
-    pub(in crate::domain::semantics) const fn new(value: u32) -> Self {
+    pub(in crate::semantics) const fn new(value: u32) -> Self {
         Self(value)
     }
 
+    #[must_use]
     pub const fn index(self) -> usize {
         self.0 as usize
     }
@@ -28,10 +29,11 @@ impl ScopeId {
     /// The file-level scope, which every table has and which has no parent.
     pub const FILE: Self = Self(0);
 
-    pub(in crate::domain::semantics) const fn new(value: u32) -> Self {
+    pub(in crate::semantics) const fn new(value: u32) -> Self {
         Self(value)
     }
 
+    #[must_use]
     pub const fn index(self) -> usize {
         self.0 as usize
     }

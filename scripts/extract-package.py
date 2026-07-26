@@ -127,13 +127,23 @@ def extract(kind: str, name: str, layer: str, modules: list[str], crate: str) ->
     print("  COMMIT NOW, content-free, before running --rewrite (section 13.1)")
 
 
-def rewrite(kind: str, name: str, layer: str, crate: str) -> None:
+def rewrite(kind: str, name: str, layer: str, crate: str, owners: dict[str, str]) -> None:
     src = ROOT / "packages" / kind / name / "src"
     paths = list(src.rglob("*.rs"))
 
     counts: collections.Counter = collections.Counter()
     for path in paths:
         text = original = path.read_text()
+
+        # Modules that already left the root crate must name their new crate.
+        # Rewriting these FIRST matters: the blanket `crate::<layer>::` rule
+        # below would otherwise turn `crate::domain::sexpr` into `crate::sexpr`,
+        # which silently claims a module this package does not own.
+        for module, owner in owners.items():
+            if owner == crate:
+                continue
+            text, hits = re.subn(rf"\bcrate::{layer}::{module}\b", f"{owner}::{module}", text)
+            counts["cross_package"] += hits
 
         # `crate::<layer>::x` is `crate::x` once the layer module is the crate root.
         counts["paths"] += text.count(f"crate::{layer}::")
@@ -158,8 +168,9 @@ def rewrite(kind: str, name: str, layer: str, crate: str) -> None:
         if text != original:
             path.write_text(text)
 
-    print(f"  rewrote {counts['paths']} module paths, {counts['pub_in']} pub(in ...), "
-          f"{counts['pub_crate']} pub(crate), {counts['doctests']} doctest imports")
+    print(f"  rewrote {counts['paths']} module paths, {counts['cross_package']} cross-package "
+          f"references, {counts['pub_in']} pub(in ...), {counts['pub_crate']} pub(crate), "
+          f"{counts['doctests']} doctest imports")
 
     leftovers = collections.Counter()
     for path in paths:
@@ -195,6 +206,11 @@ def main() -> int:
                         help="rewrite paths and visibility after the move has been committed")
     parser.add_argument("--allow", default="",
                         help="comma-separated modules already extracted, so references to them are fine")
+    parser.add_argument("--owned-by", action="append", default=[], metavar="CRATE=mod,mod",
+                        help="modules an earlier package already owns, so --rewrite points at that "
+                             "crate instead of claiming them. Repeatable. Omitting this silently "
+                             "rewrites `crate::domain::sexpr` to `crate::sexpr`, which compiles "
+                             "only if this package really does own `sexpr`.")
     args = parser.parse_args()
 
     crate = f"paredit_{args.kind}_{args.name.replace('-', '_')}"
@@ -202,8 +218,15 @@ def main() -> int:
 
     print(f"packages/{args.kind}/{args.name}  ({crate})")
 
+    owners: dict[str, str] = {}
+    for entry in args.owned_by:
+        owner_crate, _, mods = entry.partition("=")
+        for module in mods.split(","):
+            if module:
+                owners[module] = owner_crate
+
     if args.rewrite:
-        rewrite(args.kind, args.name, args.layer, crate)
+        rewrite(args.kind, args.name, args.layer, crate, owners)
         return 0
 
     if not check(args.layer, args.modules, allow):

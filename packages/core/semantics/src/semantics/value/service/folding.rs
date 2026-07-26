@@ -1,16 +1,16 @@
 //! Constant evaluation of an expression.
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_reader_conditional_kind, common_lisp_reader_label_kind,
     common_lisp_symbol_reference_needle,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
-use crate::domain::view_query::list_head;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
+use paredit_core_syntax::view_query::list_head;
 
-use crate::domain::semantics::NodeKey;
-use crate::domain::semantics::binding::BindingTable;
+use crate::semantics::NodeKey;
+use crate::semantics::binding::BindingTable;
 
 use super::super::model::{LiteralValue, Value, ValueTable};
 use super::super::policy::{
@@ -25,6 +25,7 @@ use super::literal_reader::literal_value;
 /// fold whitelist. That last case is the important one — an unregistered head
 /// may be a macro, and a macro can do anything with what it encloses, so the
 /// subtree is not entered at all.
+#[must_use]
 pub fn evaluate_constant(
     dialect: Dialect,
     view: &ExpressionView,
@@ -109,6 +110,7 @@ fn resolve_reference(view: &ExpressionView, bindings: &BindingTable, values: &Va
 /// Only Common Lisp populates the constant map at all, so folding here cannot
 /// affect a dialect whose symbols are case-sensitive: their map is empty and
 /// every lookup misses either way.
+#[must_use]
 pub fn constant_key(text: &str) -> Option<SymbolName> {
     SymbolName::new(common_lisp_symbol_reference_needle(text)).ok()
 }
@@ -360,8 +362,8 @@ const fn boolean(holds: bool) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::binding::build_binding_table;
-    use crate::domain::sexpr::{Path, SyntaxTree};
+    use crate::semantics::binding::build_binding_table;
+    use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
     fn evaluate(input: &str) -> Value {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");

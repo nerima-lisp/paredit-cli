@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
-use crate::domain::semantics::binding::BindingId;
+use crate::semantics::binding::BindingId;
 
 use super::literal::PropagatableValue;
 
@@ -27,6 +27,7 @@ pub struct ValueTable {
 
 impl ValueTable {
     /// The value of a resolved binding, if it provably has a constant one.
+    #[must_use]
     pub fn binding_value(&self, binding: BindingId) -> Option<&PropagatableValue> {
         self.bindings.get(&binding)
     }
@@ -36,18 +37,21 @@ impl ValueTable {
     ///
     /// `name` must be folded the way the reader folds a symbol — upper-cased
     /// for Common Lisp — which is what
-    /// [`constant_key`](crate::domain::semantics::value::service::constant_key)
+    /// [`constant_key`](crate::semantics::value::service::constant_key)
     /// produces. The convention is not cosmetic: `+limit+` and `+LIMIT+` name
     /// the same symbol, and a constant arriving from the project table is
     /// already folded, so a raw-spelling key would find neither reliably.
+    #[must_use]
     pub fn constant_value(&self, name: &SymbolName) -> Option<&PropagatableValue> {
         self.constants.get(name)
     }
 
+    #[must_use]
     pub fn binding_count(&self) -> usize {
         self.bindings.len()
     }
 
+    #[must_use]
     pub fn constant_count(&self) -> usize {
         self.constants.len()
     }
@@ -64,6 +68,7 @@ pub struct ValueTableBuilder {
 }
 
 impl ValueTableBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -78,7 +83,7 @@ impl ValueTableBuilder {
     /// overwriting it: with two `defconstant`s in one file there is no way to
     /// know which one a reference sees, so the honest answer is neither. This
     /// mirrors the conservative rejection in
-    /// [`crate::domain::inline_literal_constant`].
+    /// [`crate::inline_literal_constant`].
     pub fn define_constant(&mut self, name: SymbolName, value: PropagatableValue) {
         if self.ambiguous_constants.contains(&name) {
             return;
@@ -122,6 +127,7 @@ impl ValueTableBuilder {
     /// Propagation is a fixpoint — a `let*` initial form may reference a
     /// binding resolved in an earlier round — and each round needs to read
     /// what previous rounds proved.
+    #[must_use]
     pub fn snapshot(&self) -> ValueTable {
         ValueTable {
             bindings: self.bindings.clone(),
@@ -129,6 +135,7 @@ impl ValueTableBuilder {
         }
     }
 
+    #[must_use]
     pub fn finish(self) -> ValueTable {
         ValueTable {
             bindings: self.bindings,

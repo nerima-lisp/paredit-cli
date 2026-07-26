@@ -2,14 +2,16 @@
 
 use std::collections::HashSet;
 
-use crate::domain::common_lisp::{
+use crate::lexical_scope::BoundName;
+use paredit_core_syntax::common_lisp::{
     common_lisp_dynamic_binding_is_declared, common_lisp_reader_conditional_kind,
     common_lisp_reader_label_kind, is_common_lisp_declaration_form,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::BoundName;
-use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::apply_reader_prefix_context;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree,
+};
 
 use super::super::model::{
     BindingDraft, BindingId, BindingKind, BindingTable, BindingTableBuilder, OpacityCause,
@@ -30,6 +32,7 @@ use super::special_names::SpecialNameIndex;
 /// `input` is taken but not read: every fact the table records is a span, and
 /// the assertion below is the whole of what the source text is good for here —
 /// pinning that those spans index into the string the caller will slice with.
+#[must_use]
 pub fn build_binding_table(dialect: Dialect, tree: &SyntaxTree, input: &str) -> BindingTable {
     let builder = BindingTableBuilder::new();
     if dialect != Dialect::CommonLisp {

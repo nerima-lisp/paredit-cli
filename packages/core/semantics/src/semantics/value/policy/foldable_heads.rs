@@ -6,7 +6,7 @@
 //! does not belong: a wrong `Known` is worse than no answer at all, because
 //! rules downstream trust `Known` absolutely.
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 /// A pure operation on constants that can be evaluated at analysis time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +97,7 @@ const COMMON_LISP_CONTROL: [(&str, FoldableControlForm); 5] = [
 /// Only Common Lisp for now. Other dialects reach this layer through the same
 /// skeleton but with an empty table, so they yield `Unknown` everywhere rather
 /// than borrowing CLHS semantics that may not hold.
+#[must_use]
 pub fn foldable_operation(dialect: Dialect, head: &str) -> Option<FoldableOperation> {
     if dialect != Dialect::CommonLisp {
         return None;
@@ -108,6 +109,7 @@ pub fn foldable_operation(dialect: Dialect, head: &str) -> Option<FoldableOperat
 }
 
 /// The branching form `head` names, if `dialect` has one.
+#[must_use]
 pub fn foldable_control_form(dialect: Dialect, head: &str) -> Option<FoldableControlForm> {
     if dialect != Dialect::CommonLisp {
         return None;

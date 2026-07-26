@@ -66,6 +66,7 @@ impl Ty {
     /// `Null` having two parents is the whole reason this returns a slice:
     /// `nil` really is both a symbol and a list, and collapsing that would let
     /// a rule conclude `(symbolp x)` rules out `(listp x)`.
+    #[must_use]
     pub const fn supertypes(self) -> &'static [Self] {
         match self {
             Self::Top | Self::Bottom => &[],
@@ -85,6 +86,7 @@ impl Ty {
     }
 
     /// The CLHS type name, as it would be written in a `the` or `declare`.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Top => "t",
@@ -112,6 +114,7 @@ impl Ty {
     /// An unmodelled name yields `None` rather than [`Ty::Top`]: "I don't know
     /// this type" and "this could be anything" are different answers, and only
     /// the caller knows which one is safe where it stands.
+    #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL
             .into_iter()
@@ -120,6 +123,7 @@ impl Ty {
 
     /// This type and every type above it, `Bottom` included by convention
     /// since it is below everything.
+    #[must_use]
     pub fn ancestors(self) -> Vec<Self> {
         let mut seen = vec![self];
         let mut frontier = vec![self];
@@ -135,6 +139,7 @@ impl Ty {
     }
 
     /// Whether every object of this type is also of type `other`.
+    #[must_use]
     pub fn is_subtype_of(self, other: Self) -> bool {
         self == Self::Bottom || self.ancestors().contains(&other)
     }

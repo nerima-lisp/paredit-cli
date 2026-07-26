@@ -2,29 +2,29 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::domain::binding_index::BindingIndex;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{
+use paredit_core_semantics::binding_index::BindingIndex;
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct MergeNestedLetRequest<'a> {
+pub struct MergeNestedLetRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Path,
 }
 #[derive(Debug, Clone)]
-pub(crate) struct MergeNestedLetStarRequest<'a> {
+pub struct MergeNestedLetStarRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Path,
 }
 #[derive(Debug, Clone)]
-pub(crate) struct SplitLetRequest<'a> {
+pub struct SplitLetRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Path,
@@ -32,7 +32,7 @@ pub(crate) struct SplitLetRequest<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct LetCompositionPlan {
+pub struct LetCompositionPlan {
     pub dialect: Dialect,
     pub path: Path,
     pub form_span: ByteSpan,
@@ -43,7 +43,7 @@ pub(crate) struct LetCompositionPlan {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SplitLetPlan {
+pub struct SplitLetPlan {
     pub dialect: Dialect,
     pub path: Path,
     pub form_span: ByteSpan,
@@ -54,9 +54,7 @@ pub(crate) struct SplitLetPlan {
     pub changed: bool,
 }
 
-pub(crate) fn plan_merge_nested_let(
-    request: MergeNestedLetRequest<'_>,
-) -> Result<LetCompositionPlan> {
+pub fn plan_merge_nested_let(request: MergeNestedLetRequest<'_>) -> Result<LetCompositionPlan> {
     let (tree, outer) = select(
         request.input,
         request.dialect,
@@ -123,7 +121,7 @@ pub(crate) fn plan_merge_nested_let(
     )
 }
 
-pub(crate) fn plan_merge_nested_let_star(
+pub fn plan_merge_nested_let_star(
     request: MergeNestedLetStarRequest<'_>,
 ) -> Result<LetCompositionPlan> {
     let (tree, outer) = select(
@@ -168,7 +166,7 @@ pub(crate) fn plan_merge_nested_let_star(
     )
 }
 
-pub(crate) fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
+pub fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
     let (tree, form) = select(request.input, request.dialect, &request.path, "split-let")?;
     require_form(request.dialect, &form, "let", "split-let selected form")?;
     reject_unsafe(&tree, request.dialect, &form, "split-let")?;
@@ -246,7 +244,7 @@ fn select(
     Ok((tree, view))
 }
 
-pub(crate) fn validate_dialect(dialect: Dialect, operation: &str) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect, operation: &str) -> Result<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         bail!("{operation} supports only Common Lisp and Emacs Lisp");
     }

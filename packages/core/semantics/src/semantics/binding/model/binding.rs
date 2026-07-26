@@ -1,6 +1,6 @@
 //! One name introduced by one binding form.
 
-use crate::domain::sexpr::{ByteSpan, SymbolName};
+use paredit_core_syntax::sexpr::{ByteSpan, SymbolName};
 
 use super::facts::{BindingKind, OpacityCause, ScopeOpacity, SpecialBinding};
 use super::ids::ScopeId;
@@ -30,50 +30,60 @@ pub struct Binding {
 impl Binding {
     /// The bound name, normalized by the dialect's rules (case-folded for
     /// Common Lisp).
+    #[must_use]
     pub const fn name(&self) -> &SymbolName {
         &self.name
     }
 
+    #[must_use]
     pub const fn kind(&self) -> BindingKind {
         self.kind
     }
 
+    #[must_use]
     pub const fn scope(&self) -> ScopeId {
         self.scope
     }
 
     /// The span of the atom that spells the name in the binding form.
+    #[must_use]
     pub const fn definition(&self) -> ByteSpan {
         self.definition
     }
 
     /// The head of the form that introduced it (`let`, `defun`, …), or `None`
     /// for a binding with no operator (a top-level definition's own name).
+    #[must_use]
     pub fn binder_head(&self) -> Option<&str> {
         self.binder_head.as_deref()
     }
 
     /// The span of the initial-value form, when the binder has one.
+    #[must_use]
     pub const fn init_form(&self) -> Option<ByteSpan> {
         self.init_form
     }
 
     /// Every reference that resolves to this binding, in source order. The
     /// defining occurrence is not a reference and is excluded.
+    #[must_use]
     pub fn references(&self) -> &[ByteSpan] {
         &self.references
     }
 
     /// Every site that reassigns this binding (`setq`, `incf`, `push`, …).
     /// A non-empty list is what stops the value layer from propagating.
+    #[must_use]
     pub fn assignments(&self) -> &[ByteSpan] {
         &self.assignments
     }
 
+    #[must_use]
     pub const fn special(&self) -> SpecialBinding {
         self.special
     }
 
+    #[must_use]
     pub const fn opacity(&self) -> ScopeOpacity {
         self.opacity
     }
@@ -87,6 +97,7 @@ impl Binding {
     /// attribution per binding anyway. "First in walk order" is the earliest
     /// such region in the scope, which is a well-defined choice rather than an
     /// arbitrary one.
+    #[must_use]
     pub const fn opacity_cause(&self) -> Option<OpacityCause> {
         self.opacity_cause
     }
@@ -97,6 +108,7 @@ impl Binding {
     /// scope, lexically bound, and an initial value to propagate. Any one of
     /// them failing means a caller could observe a different value than the
     /// initial form suggests, so the answer is no.
+    #[must_use]
     pub fn is_propagatable(&self) -> bool {
         self.assignments.is_empty()
             && self.opacity.is_transparent()
@@ -112,6 +124,7 @@ pub struct BindingDraft {
 }
 
 impl BindingDraft {
+    #[must_use]
     pub const fn new(
         name: SymbolName,
         kind: BindingKind,
@@ -174,6 +187,7 @@ impl BindingDraft {
         self.binding.opacity_cause.get_or_insert(cause);
     }
 
+    #[must_use]
     pub fn finish(self) -> Binding {
         self.binding
     }
@@ -182,8 +196,8 @@ impl BindingDraft {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::binding::model::facts::OpacityCauseKind;
-    use crate::domain::sexpr::ByteOffset;
+    use crate::semantics::binding::model::facts::OpacityCauseKind;
+    use paredit_core_syntax::sexpr::ByteOffset;
 
     fn span(start: usize, end: usize) -> ByteSpan {
         ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))

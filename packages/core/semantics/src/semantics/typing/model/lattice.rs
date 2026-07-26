@@ -13,6 +13,7 @@ use super::ty::Ty;
 /// on `list`. Where the minimum is not unique this returns [`Ty::Top`] rather
 /// than picking one. Widening too far only ever loses a deduction; picking
 /// wrongly would license a false one.
+#[must_use]
 pub fn join(left: Ty, right: Ty) -> Ty {
     if left == right {
         return left;
@@ -38,6 +39,7 @@ pub fn join(left: Ty, right: Ty) -> Ty {
 /// Used where facts accumulate — a `declare type` plus a `stringp` guard —
 /// and yields [`Ty::Bottom`] when they contradict, which is itself a useful
 /// answer: the branch is unreachable.
+#[must_use]
 pub fn meet(left: Ty, right: Ty) -> Ty {
     if left == right {
         return left;

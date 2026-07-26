@@ -1,6 +1,6 @@
 //! The properties of a binding that later layers gate on.
 
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 /// What kind of thing a name is bound to.
 ///
@@ -36,6 +36,7 @@ pub enum SpecialBinding {
 }
 
 impl SpecialBinding {
+    #[must_use]
     pub const fn is_lexical(self) -> bool {
         matches!(self, Self::Lexical)
     }
@@ -57,11 +58,13 @@ pub enum ScopeOpacity {
 }
 
 impl ScopeOpacity {
+    #[must_use]
     pub const fn is_transparent(self) -> bool {
         matches!(self, Self::Transparent)
     }
 
     /// Combines two observations; opacity is absorbing.
+    #[must_use]
     pub const fn join(self, other: Self) -> Self {
         match (self, other) {
             (Self::Transparent, Self::Transparent) => Self::Transparent,
@@ -99,6 +102,7 @@ pub enum OpacityCauseKind {
 }
 
 impl OpacityCauseKind {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::UnknownHead => "unknown head",
@@ -128,14 +132,17 @@ pub struct OpacityCause {
 }
 
 impl OpacityCause {
+    #[must_use]
     pub const fn new(kind: OpacityCauseKind, site: ByteSpan) -> Self {
         Self { kind, site }
     }
 
+    #[must_use]
     pub const fn kind(self) -> OpacityCauseKind {
         self.kind
     }
 
+    #[must_use]
     pub const fn site(self) -> ByteSpan {
         self.site
     }

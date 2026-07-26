@@ -1,8 +1,8 @@
 //! Which forms count as reassigning a binding.
 
 use super::{assignment_labels, binding_at, build};
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::binding::policy::{PlacePositions, assignment_forms};
+use crate::semantics::binding::policy::{PlacePositions, assignment_forms};
+use paredit_core_syntax::dialect::Dialect;
 
 /// A call to `head` that puts `x` and `y` in its place positions.
 ///

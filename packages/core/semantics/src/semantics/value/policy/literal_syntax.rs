@@ -1,8 +1,8 @@
 //! How each dialect spells the literals that are not just numbers.
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
-use crate::domain::semantics::value::model::LiteralValue;
+use crate::semantics::value::model::LiteralValue;
 
 /// The named constant `text` denotes in `dialect`, if any.
 ///
@@ -11,6 +11,7 @@ use crate::domain::semantics::value::model::LiteralValue;
 /// Racket use `#t`/`#f` and consider `'()` true; Clojure uses `true`/`false`
 /// with a separate `nil`. Reading `nil` as false in Scheme would invert a
 /// conditional.
+#[must_use]
 pub fn named_constant(dialect: Dialect, text: &str) -> Option<LiteralValue> {
     match dialect {
         Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Lfe => {
@@ -34,6 +35,7 @@ pub fn named_constant(dialect: Dialect, text: &str) -> Option<LiteralValue> {
 
 /// Whether `dialect` folds symbol case when reading, which decides whether
 /// `:Foo` and `:foo` name the same keyword.
+#[must_use]
 pub const fn folds_symbol_case(dialect: Dialect) -> bool {
     matches!(dialect, Dialect::CommonLisp)
 }

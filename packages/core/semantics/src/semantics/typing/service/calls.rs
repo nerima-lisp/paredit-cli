@@ -1,11 +1,9 @@
 //! Ordinary calls: standard-function and locally declared-`ftype` results.
 
-use crate::domain::common_lisp::{CommonLispOperator, common_lisp_operator_head_eq};
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::common_lisp::{CommonLispOperator, common_lisp_operator_head_eq};
+use paredit_core_syntax::sexpr::ExpressionView;
 
-use crate::domain::semantics::binding::policy::{
-    is_pure_standard_function, is_standard_control_form,
-};
+use crate::semantics::binding::policy::{is_pure_standard_function, is_standard_control_form};
 
 use super::super::model::{Type, TypeTableBuilder};
 use super::super::policy::standard_return_type;

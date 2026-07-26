@@ -115,6 +115,7 @@ static INDEX: LazyLock<HashSet<&'static str>> =
 
 /// Whether `head` names a standard form whose subforms are evaluated in place,
 /// so that any assignment it performs is visible in the source.
+#[must_use]
 pub fn is_standard_control_form(head: &str) -> bool {
     contains_folded(&INDEX, head)
 }

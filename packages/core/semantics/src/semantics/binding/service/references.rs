@@ -1,11 +1,11 @@
 //! Turning a symbol occurrence into a resolved reference.
 
-use crate::domain::common_lisp::{
+use crate::semantics::NodeKey;
+use paredit_core_syntax::common_lisp::{
     common_lisp_operator_head_eq, normalize_common_lisp_operator_head,
 };
-use crate::domain::semantics::NodeKey;
-use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
+use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::super::model::{OpacityCause, OpacityCauseKind, ScopeId};
 use super::builder::{Walk, head_text, is_reader_dispatch};

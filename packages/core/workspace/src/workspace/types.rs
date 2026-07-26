@@ -5,7 +5,7 @@ use std::sync::atomic::AtomicU64;
 
 use cap_std::fs::Dir;
 
-use crate::infrastructure::fs_identity::FilesystemIdentity;
+use crate::fs_identity::FilesystemIdentity;
 
 #[derive(Debug, Clone)]
 pub struct WorkspaceDiscoveryOptions {

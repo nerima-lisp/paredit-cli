@@ -1,9 +1,9 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::super::body::collect_body_forms;
 use super::super::collect_unshadowed_symbol_references_in_context;
-use crate::domain::lexical_scope::bindings::parameter_form_binds;
+use crate::lexical_scope::bindings::parameter_form_binds;
 
 pub(super) fn collect_value_binding_references(
     dialect: Dialect,

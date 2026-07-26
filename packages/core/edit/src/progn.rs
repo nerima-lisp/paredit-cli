@@ -2,10 +2,10 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct FlattenPrognRequest<'a> {
@@ -153,7 +153,7 @@ pub fn plan_eliminate_empty_binding_form(
     })
 }
 
-pub(crate) fn require_supported(dialect: Dialect, operation: &str) -> Result<()> {
+pub fn require_supported(dialect: Dialect, operation: &str) -> Result<()> {
     if matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         Ok(())
     } else {

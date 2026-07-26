@@ -336,6 +336,7 @@ static INDEX: LazyLock<HashSet<&'static str>> =
 
 /// Whether `head` names a standard function, and so cannot reassign anything
 /// in the caller's scope.
+#[must_use]
 pub fn is_pure_standard_function(head: &str) -> bool {
     contains_folded(&INDEX, head)
 }

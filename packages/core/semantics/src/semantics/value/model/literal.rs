@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 /// A keyword's name, without its leading colon and normalized by the dialect's
 /// reader rules (case-folded for Common Lisp).
@@ -18,6 +18,7 @@ impl KeywordName {
         Self(name.into())
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -38,6 +39,7 @@ impl TextLiteral {
         Self(text.into())
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -52,10 +54,12 @@ impl TextLiteral {
 pub struct FloatLiteral(f64);
 
 impl FloatLiteral {
+    #[must_use]
     pub const fn new(value: f64) -> Self {
         Self(value)
     }
 
+    #[must_use]
     pub const fn get(self) -> f64 {
         self.0
     }
@@ -92,6 +96,7 @@ impl LiteralValue {
     /// Common Lisp has exactly one false value, `nil`; Scheme and Racket have
     /// exactly one, `#f`, and treat the empty list as true. Getting this
     /// backwards would make a dead-branch lint delete the live branch.
+    #[must_use]
     pub const fn is_truthy(&self, dialect: Dialect) -> bool {
         match dialect {
             Dialect::Scheme | Dialect::Racket => !matches!(self, Self::Boolean(false)),
@@ -101,6 +106,7 @@ impl LiteralValue {
 
     /// This value as something that may be propagated through a binding, or
     /// `None` for the two kinds that may not.
+    #[must_use]
     pub fn propagatable(&self) -> Option<PropagatableValue> {
         match self {
             Self::Integer(value) => Some(PropagatableValue::Integer(*value)),

@@ -1,4 +1,4 @@
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
 
 use super::syntax::{atom_symbol_span, atom_text};
 
@@ -11,9 +11,9 @@ use super::syntax::{atom_symbol_span, atom_text};
 /// both readings are now derived from the same traversal so the binding table
 /// and the reference query cannot disagree about what a form binds.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BoundName {
-    pub(crate) name: String,
-    pub(crate) span: ByteSpan,
+pub struct BoundName {
+    pub name: String,
+    pub span: ByteSpan,
 }
 
 pub(super) fn binding_pattern_names(pattern: &ExpressionView) -> Vec<String> {
@@ -31,14 +31,16 @@ pub(super) fn lambda_list_names(parameter_form: &ExpressionView) -> Vec<String> 
 }
 
 /// Every name a destructuring pattern binds, with its defining span.
-pub(crate) fn binding_pattern_bound_names(pattern: &ExpressionView) -> Vec<BoundName> {
+#[must_use]
+pub fn binding_pattern_bound_names(pattern: &ExpressionView) -> Vec<BoundName> {
     let mut names = Vec::new();
     collect_binding_pattern_names(pattern, &mut names);
     names
 }
 
 /// Every name a lambda list binds, with its defining span.
-pub(crate) fn lambda_list_bound_names(parameter_form: &ExpressionView) -> Vec<BoundName> {
+#[must_use]
+pub fn lambda_list_bound_names(parameter_form: &ExpressionView) -> Vec<BoundName> {
     let mut names = Vec::new();
     collect_lambda_list_names(parameter_form, &mut names);
     names

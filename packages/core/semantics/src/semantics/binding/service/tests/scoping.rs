@@ -1,7 +1,7 @@
 //! What each binder makes visible, and where.
 
 use super::{binding_at, binding_labels, build, reference_labels};
-use crate::domain::semantics::binding::model::{BindingKind, ScopeOpacity, SpecialBinding};
+use crate::semantics::binding::model::{BindingKind, ScopeOpacity, SpecialBinding};
 
 #[test]
 fn a_parallel_let_hides_its_own_names_from_its_initial_values() {
@@ -266,5 +266,5 @@ fn every_scope_hangs_off_the_file_scope() {
     let inner = table.binding(binding_at(&table, 20)).scope();
     assert!(table.is_within(inner, outer));
     assert!(!table.is_within(outer, inner));
-    assert!(table.is_within(outer, crate::domain::semantics::binding::ScopeId::FILE));
+    assert!(table.is_within(outer, crate::semantics::binding::ScopeId::FILE));
 }

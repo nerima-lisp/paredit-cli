@@ -11,10 +11,8 @@
 //! the shared [`binding_pattern_bound_names`], and
 //! `per_spec_names_match_the_shared_extractor` pins the mirror to the original.
 
-use crate::domain::lexical_scope::{
-    BoundName, binding_pattern_bound_names, lambda_list_bound_names,
-};
-use crate::domain::sexpr::{ExpressionKind, ExpressionView};
+use crate::lexical_scope::{BoundName, binding_pattern_bound_names, lambda_list_bound_names};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView};
 
 use super::super::model::{BindingKind, ScopeId};
 use super::builder::{Walk, head_text};
@@ -175,8 +173,8 @@ fn key_parameter_names(spec_name: &ExpressionView) -> Vec<BoundName> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::{Path, SyntaxTree};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
     fn lambda_list(input: &str) -> ExpressionView {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");

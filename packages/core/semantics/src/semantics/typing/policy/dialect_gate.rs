@@ -1,6 +1,6 @@
 //! Which dialects the type layer runs for.
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 /// Whether type inference is enabled for `dialect`.
 ///
@@ -9,6 +9,7 @@ use crate::domain::dialect::Dialect;
 /// are all CLHS-specific; applying them to Scheme or Clojure would be
 /// borrowing a type system those dialects do not have. Other dialects get an
 /// empty table, so every rule that consumes types stays silent there.
+#[must_use]
 pub const fn supports_type_inference(dialect: Dialect) -> bool {
     matches!(dialect, Dialect::CommonLisp)
 }

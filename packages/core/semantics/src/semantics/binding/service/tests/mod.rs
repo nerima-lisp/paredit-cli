@@ -1,8 +1,8 @@
 //! Tests for the binding-table builder.
 
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::binding::model::{BindingId, BindingTable};
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use crate::semantics::binding::model::{BindingId, BindingTable};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
 use super::build_binding_table;
 

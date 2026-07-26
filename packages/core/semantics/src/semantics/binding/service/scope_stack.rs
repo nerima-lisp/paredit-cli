@@ -1,6 +1,6 @@
 //! The bindings visible at the current point of the walk.
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 
 use super::super::model::{BindingId, BindingKind};
 

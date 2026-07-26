@@ -11,14 +11,14 @@
 
 use std::collections::HashMap;
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
-use crate::domain::view_query::list_head;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_name_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::view_query::list_head;
 
-use crate::domain::semantics::NodeKey;
-use crate::domain::semantics::binding::{BindingId, BindingTable};
+use crate::semantics::NodeKey;
+use crate::semantics::binding::{BindingId, BindingTable};
 
 use super::super::model::{Ty, TypeTableBuilder};
 
@@ -194,7 +194,7 @@ fn record_ftype(spec: &ExpressionView, table: &mut HashMap<String, Ty>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::binding::build_binding_table;
+    use crate::semantics::binding::build_binding_table;
 
     #[test]
     fn a_non_common_lisp_file_declares_nothing() {
@@ -235,8 +235,8 @@ mod tests {
         let bindings = build_binding_table(Dialect::CommonLisp, &tree, input);
         let declare_at = input.find("x))))").expect("declare's x");
         let span = ByteSpan::new(
-            crate::domain::sexpr::ByteOffset::new(declare_at),
-            crate::domain::sexpr::ByteOffset::new(declare_at + 1),
+            paredit_core_syntax::sexpr::ByteOffset::new(declare_at),
+            paredit_core_syntax::sexpr::ByteOffset::new(declare_at + 1),
         );
         let outer = bindings
             .bindings()

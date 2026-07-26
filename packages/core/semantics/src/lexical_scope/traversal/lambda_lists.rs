@@ -1,10 +1,10 @@
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::body::collect_body_forms;
 use super::{collect_unshadowed_symbol_references_in_context, symbol_name_matches};
-use crate::domain::lexical_scope::patterns::binding_pattern_names;
+use crate::lexical_scope::patterns::binding_pattern_names;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum LambdaListMode {

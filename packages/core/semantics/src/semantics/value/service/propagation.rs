@@ -2,16 +2,18 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::project::model::PackageId;
-use crate::domain::semantics::project::service::{FilePackages, PackageRegion};
-use crate::domain::semantics::project::{GlobalTable, QualifiedSymbol};
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SymbolName, SyntaxTree};
-use crate::domain::view_query::list_head;
+use crate::semantics::project::model::PackageId;
+use crate::semantics::project::service::{FilePackages, PackageRegion};
+use crate::semantics::project::{GlobalTable, QualifiedSymbol};
+use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, SymbolName, SyntaxTree,
+};
+use paredit_core_syntax::view_query::list_head;
 
-use crate::domain::semantics::binding::{BindingId, BindingKind, BindingTable};
+use crate::semantics::binding::{BindingId, BindingKind, BindingTable};
 
 use super::super::model::{ValueTable, ValueTableBuilder};
 use super::folding::evaluate_constant;
@@ -32,6 +34,7 @@ const MAX_ROUNDS: usize = 8;
 ///
 /// Only Common Lisp is analysed. Another dialect gets an empty table rather
 /// than one built from borrowed CLHS semantics.
+#[must_use]
 pub fn build_value_table(
     dialect: Dialect,
     tree: &SyntaxTree,
@@ -50,6 +53,7 @@ pub fn build_value_table(
 ///
 /// `None` reproduces [`build_value_table`] exactly, which is what every
 /// single-file caller passes.
+#[must_use]
 pub fn build_value_table_in_project(
     dialect: Dialect,
     tree: &SyntaxTree,
@@ -121,6 +125,7 @@ pub struct ProjectConstants<'a> {
 }
 
 impl<'a> ProjectConstants<'a> {
+    #[must_use]
     pub const fn new(globals: &'a GlobalTable, packages: &'a FilePackages) -> Self {
         Self { globals, packages }
     }
@@ -158,7 +163,7 @@ fn root_forms(tree: &SyntaxTree) -> Vec<ExpressionView> {
 /// The initial-form span of every binding a value may travel through, mapped
 /// to the binding it would reach.
 ///
-/// The four conditions [`crate::domain::semantics::binding::Binding`] checks —
+/// The four conditions [`crate::semantics::binding::Binding`] checks —
 /// never reassigned, no opaque region in scope, lexical, and initialized — are
 /// applied here rather than after evaluation, so an initial form that could
 /// never be propagated is not even evaluated.
@@ -252,9 +257,9 @@ fn collect_constants(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::NodeKey;
-    use crate::domain::semantics::binding::build_binding_table;
-    use crate::domain::semantics::value::model::{LiteralValue, PropagatableValue, Value};
+    use crate::semantics::NodeKey;
+    use crate::semantics::binding::build_binding_table;
+    use crate::semantics::value::model::{LiteralValue, PropagatableValue, Value};
 
     struct Analysis {
         tree: SyntaxTree,
@@ -283,8 +288,8 @@ mod tests {
             .rfind(symbol)
             .unwrap_or_else(|| panic!("{symbol} does not occur"));
         let span = ByteSpan::new(
-            crate::domain::sexpr::ByteOffset::new(offset),
-            crate::domain::sexpr::ByteOffset::new(offset + symbol.len()),
+            paredit_core_syntax::sexpr::ByteOffset::new(offset),
+            paredit_core_syntax::sexpr::ByteOffset::new(offset + symbol.len()),
         );
         analysis
             .bindings
@@ -412,8 +417,8 @@ mod tests {
     /// Builds a project table from `sources`, then the value table of the
     /// file at `index` with that project behind it.
     fn analyze_in_project(sources: &[&str], index: usize) -> Analysis {
-        use crate::domain::semantics::binding::build_binding_table;
-        use crate::domain::semantics::project::service::{
+        use crate::semantics::binding::build_binding_table;
+        use crate::semantics::project::service::{
             ProjectFile, build_global_table, resolve_file_packages,
         };
 

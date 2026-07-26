@@ -1,8 +1,8 @@
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispLocalCallableForm, common_lisp_symbol_reference_eq, local_callable_names,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::body::collect_body_forms;
 use super::super::lambda_lists::collect_lambda_list_references;

@@ -2,17 +2,19 @@
 
 use std::collections::HashSet;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispLocalCallableForm, CommonLispPackageDeclarationForm, common_lisp_local_callable_form,
     common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
     common_lisp_symbol_reference_needle, is_local_callable_bound,
     local_callable_binding_body_scope, local_callable_body_scope,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::{atom_symbol_text, atom_text};
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::{atom_symbol_text, atom_text};
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName,
+};
 
-pub(crate) fn collect_reference_needles(view: &ExpressionView, output: &mut HashSet<String>) {
+pub fn collect_reference_needles(view: &ExpressionView, output: &mut HashSet<String>) {
     if view.kind == ExpressionKind::Atom {
         if let Some(text) = atom_symbol_text(view) {
             output.insert(common_lisp_symbol_reference_needle(text));
@@ -24,7 +26,7 @@ pub(crate) fn collect_reference_needles(view: &ExpressionView, output: &mut Hash
     }
 }
 
-pub(crate) fn collect_package_form_spans(
+pub fn collect_package_form_spans(
     dialect: Dialect,
     view: &ExpressionView,
     output: &mut Vec<ByteSpan>,
@@ -43,7 +45,7 @@ pub(crate) fn collect_package_form_spans(
     }
 }
 
-pub(crate) fn collect_function_quote_references(
+pub fn collect_function_quote_references(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
@@ -206,7 +208,7 @@ fn function_quote_symbol_matches(dialect: Dialect, candidate: &str, symbol: &str
     }
 }
 
-pub(crate) fn collect_quoted_data_references(
+pub fn collect_quoted_data_references(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
@@ -256,14 +258,14 @@ fn collect_atoms_in_quoted_region(
     }
 }
 
-pub(crate) fn collect_symbol_references(
+pub fn collect_symbol_references(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
     source: &str,
     output: &mut Vec<ByteSpan>,
 ) {
-    crate::domain::lexical_scope::collect_unshadowed_symbol_references(
+    crate::lexical_scope::collect_unshadowed_symbol_references(
         dialect, view, symbol, source, output,
     );
     collect_function_quote_references(dialect, view, symbol, output);

@@ -1,6 +1,6 @@
 //! Node identity for the semantic side tables.
 
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView};
 
 /// The identity of one node of a parsed document.
 ///
@@ -14,7 +14,7 @@ use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView};
 /// node's kind separates them, and excludes the root from ever colliding with
 /// a real form. That every non-root node then has a unique `(span, kind)` is
 /// the invariant the whole side-table design rests on, and it is pinned by a
-/// property test in [`crate::domain::sexpr`].
+/// property test in [`paredit_core_syntax::sexpr`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeKey {
     span: ByteSpan,
@@ -24,6 +24,7 @@ pub struct NodeKey {
 impl NodeKey {
     /// The key for a view, or `None` for the virtual root — which is not a
     /// form and is deliberately outside every side table.
+    #[must_use]
     pub fn of(view: &ExpressionView) -> Option<Self> {
         (view.kind != ExpressionKind::Root).then_some(Self {
             span: view.span,
@@ -33,6 +34,7 @@ impl NodeKey {
 
     /// The key for an atom at `span`, for callers that hold a reference's span
     /// rather than its view (reference lists are collected as bare spans).
+    #[must_use]
     pub const fn atom(span: ByteSpan) -> Self {
         Self {
             span,
@@ -40,10 +42,12 @@ impl NodeKey {
         }
     }
 
+    #[must_use]
     pub const fn span(self) -> ByteSpan {
         self.span
     }
 
+    #[must_use]
     pub const fn kind(self) -> ExpressionKind {
         self.kind
     }
@@ -52,8 +56,8 @@ impl NodeKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::{Path, SyntaxTree};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
     fn root_form(input: &str) -> ExpressionView {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");

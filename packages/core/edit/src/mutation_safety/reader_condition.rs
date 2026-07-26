@@ -1,14 +1,14 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispReaderConditionalKind, CommonLispReaderLabelKind, CommonLispReaderLiteralKind,
     common_lisp_reader_conditional_forms, common_lisp_reader_conditional_kind,
     common_lisp_reader_label_forms, common_lisp_reader_label_kind, common_lisp_reader_literal_kind,
     common_lisp_reader_literals,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, ReaderPrefix, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, ReaderPrefix, SyntaxTree};
 
 /// Rejects mutations whose meaning depends on Common Lisp reader-time behavior.
 ///
@@ -16,7 +16,7 @@ use crate::domain::sexpr::{ByteSpan, ExpressionView, ReaderPrefix, SyntaxTree};
 /// identity, and `#.` needs an evaluation environment. None is available to a
 /// structural source transformation, so changing any part of such a document
 /// would make a partially rewritten result unsafe to apply.
-pub(crate) fn reject_common_lisp_reader_conditionals(
+pub fn reject_common_lisp_reader_conditionals(
     tree: &SyntaxTree,
     dialect: Dialect,
 ) -> Result<(), ReaderConditionalSafetyError> {
@@ -72,7 +72,7 @@ pub(crate) fn reject_common_lisp_reader_conditionals(
 /// target spans. Structural whole-span rewrites may safely delete or replace a
 /// reader-time form when the mutation fully covers it, but edits that cut
 /// through the form remain unsafe.
-pub(crate) fn reject_overlapping_common_lisp_reader_time_forms(
+pub fn reject_overlapping_common_lisp_reader_time_forms(
     tree: &SyntaxTree,
     dialect: Dialect,
     mutation_spans: impl IntoIterator<Item = ByteSpan>,
@@ -224,7 +224,7 @@ const fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::ByteOffset;
+    use paredit_core_syntax::sexpr::ByteOffset;
 
     #[test]
     fn rejects_common_lisp_vector_literals_for_semantic_mutations() {

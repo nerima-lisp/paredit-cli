@@ -10,6 +10,7 @@ use super::super::model::Ty;
 /// narrows to nothing rather than to something wrong. The one exception is
 /// [`narrowed_by_predicate`]'s handling of `atom`, whose complement *is* a
 /// modelled type.
+#[must_use]
 pub fn type_predicate(name: &str) -> Option<Ty> {
     const PREDICATES: [(&str, Ty); 13] = [
         ("null", Ty::Null),
@@ -36,6 +37,7 @@ pub fn type_predicate(name: &str) -> Option<Ty> {
 ///
 /// `atom` is the one predicate whose *false* branch is expressible: everything
 /// that is not an atom is a cons.
+#[must_use]
 pub fn narrowed_by_predicate(name: &str, holds: bool) -> Option<Ty> {
     if name.eq_ignore_ascii_case("atom") {
         return (!holds).then_some(Ty::Cons);

@@ -13,8 +13,8 @@ use cap_std::fs::{OpenOptions, OpenOptionsExt};
 
 use super::filters::{is_generated_workspace_path, is_hidden_workspace_path};
 use super::types::{WorkspaceDiscovery, WorkspaceDiscoveryOptions, WorkspaceLimits};
-use crate::domain::dialect::Dialect;
-use crate::infrastructure::fs_identity::FilesystemIdentity;
+use crate::fs_identity::FilesystemIdentity;
+use paredit_core_syntax::dialect::Dialect;
 
 pub(super) const READ_CHUNK_BYTES: usize = 64 * 1024;
 const MAX_EXCLUDE_PATHS: usize = 4_096;
@@ -594,7 +594,7 @@ fn validate_workspace_root_identity(
 }
 
 impl WorkspaceDiscovery {
-    pub(crate) fn read_file(&self, path: &Path) -> Result<Vec<u8>> {
+    pub fn read_file(&self, path: &Path) -> Result<Vec<u8>> {
         let metadata = fs::symlink_metadata(path)
             .with_context(|| format!("failed to inspect {}", path.display()))?;
         anyhow::ensure!(

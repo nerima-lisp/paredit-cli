@@ -7,9 +7,9 @@
 
 use proptest::prelude::*;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::NodeKey;
-use crate::domain::sexpr::SyntaxTree;
+use crate::semantics::NodeKey;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 use super::build;
 use super::differential::assert_partition;

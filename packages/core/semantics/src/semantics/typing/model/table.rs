@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
-use crate::domain::semantics::NodeKey;
-use crate::domain::semantics::binding::BindingId;
+use crate::semantics::NodeKey;
+use crate::semantics::binding::BindingId;
 
 use super::ty::Ty;
 
@@ -19,6 +19,7 @@ pub enum Type {
 }
 
 impl Type {
+    #[must_use]
     pub const fn as_known(self) -> Option<Ty> {
         match self {
             Self::Known(ty) => Some(ty),
@@ -27,12 +28,14 @@ impl Type {
     }
 
     /// Whether this is provably a subtype of `bound`.
+    #[must_use]
     pub fn is_definitely(self, bound: Ty) -> bool {
         self.as_known().is_some_and(|ty| ty.is_subtype_of(bound))
     }
 
     /// Whether this provably shares no member with `bound` — the question
     /// "can this argument possibly be a number?" asked in the safe direction.
+    #[must_use]
     pub fn is_definitely_not(self, bound: Ty) -> bool {
         self.as_known()
             .is_some_and(|ty| super::lattice::meet(ty, bound) == Ty::Bottom)
@@ -61,10 +64,12 @@ impl TypeTable {
             .map_or(Type::Unknown, Type::Known)
     }
 
+    #[must_use]
     pub fn binding_count(&self) -> usize {
         self.bindings.len()
     }
 
+    #[must_use]
     pub fn expression_count(&self) -> usize {
         self.expressions.len()
     }
@@ -78,6 +83,7 @@ pub struct TypeTableBuilder {
 }
 
 impl TypeTableBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -109,6 +115,7 @@ impl TypeTableBuilder {
         self.expressions.insert(key, ty);
     }
 
+    #[must_use]
     pub fn finish(self) -> TypeTable {
         TypeTable {
             bindings: self.bindings,
@@ -120,7 +127,7 @@ impl TypeTableBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::{ByteOffset, ByteSpan};
+    use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 
     fn key(start: usize, end: usize) -> NodeKey {
         NodeKey::atom(ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end)))
@@ -135,7 +142,7 @@ mod tests {
     #[test]
     fn the_builder_reports_what_it_has_narrowed_so_far() {
         let mut builder = TypeTableBuilder::new();
-        let binding = crate::domain::semantics::binding::BindingId::new(0);
+        let binding = crate::semantics::binding::BindingId::new(0);
         assert_eq!(builder.binding_type(binding), Type::Unknown);
         builder.narrow_binding(binding, Ty::Number);
         assert_eq!(builder.binding_type(binding), Type::Known(Ty::Number));
@@ -164,7 +171,7 @@ mod tests {
     #[test]
     fn agreeing_sources_narrow_and_contradicting_ones_empty_the_type() {
         let mut builder = TypeTableBuilder::new();
-        let binding = crate::domain::semantics::binding::BindingId::new(0);
+        let binding = crate::semantics::binding::BindingId::new(0);
         builder.narrow_binding(binding, Ty::Number);
         builder.narrow_binding(binding, Ty::Integer);
         assert_eq!(

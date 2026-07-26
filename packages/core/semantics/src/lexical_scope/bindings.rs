@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::patterns::{binding_pattern_names, lambda_list_names};
 

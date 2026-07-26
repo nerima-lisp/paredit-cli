@@ -7,7 +7,7 @@
 //! positive tests and be worthless.
 
 use super::{binding_at, build};
-use crate::domain::semantics::binding::OpacityCauseKind;
+use crate::semantics::binding::OpacityCauseKind;
 
 /// Whether the binding defined at `offset` sees a fully readable scope.
 fn is_transparent(input: &str, offset: usize) -> bool {

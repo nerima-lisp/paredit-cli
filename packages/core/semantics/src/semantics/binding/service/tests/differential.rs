@@ -14,17 +14,17 @@
 
 use std::collections::HashSet;
 
-use crate::domain::common_lisp::{
+use crate::lexical_scope::collect_unshadowed_symbol_references;
+use crate::semantics::NodeKey;
+use paredit_core_syntax::common_lisp::{
     CommonLispOperator, common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
     is_common_lisp_declaration_form, normalize_common_lisp_operator_head,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::semantics::NodeKey;
-use crate::domain::sexpr::reader::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
-use crate::domain::sexpr::{
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName, SyntaxTree,
 };
 

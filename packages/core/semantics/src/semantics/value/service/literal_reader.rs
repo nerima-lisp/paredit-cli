@@ -1,7 +1,7 @@
 //! Lexical interpretation of a single literal atom.
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView};
 
 use super::super::model::{FloatLiteral, KeywordName, LiteralValue, TextLiteral};
 use super::super::policy::{folds_symbol_case, named_constant};
@@ -12,6 +12,7 @@ use super::super::policy::{folds_symbol_case, named_constant};
 /// An atom carrying reader prefixes is not a literal in its own right — `'5`
 /// is a quoted datum and `#.x` is read-time evaluation — so those yield `None`
 /// rather than the value of whatever they enclose.
+#[must_use]
 pub fn literal_value(dialect: Dialect, view: &ExpressionView) -> Option<LiteralValue> {
     if view.kind != ExpressionKind::Atom || !view.reader_prefixes.is_empty() {
         return None;
@@ -172,7 +173,7 @@ fn float_literal(text: &str) -> Option<FloatLiteral> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::{Path, SyntaxTree};
+    use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
     fn read(input: &str) -> Option<LiteralValue> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");

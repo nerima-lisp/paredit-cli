@@ -1,10 +1,12 @@
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
     normalize_common_lisp_operator_head,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::apply_reader_prefix_context;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName,
+};
 
 mod binding_forms;
 mod body;

@@ -1,12 +1,14 @@
-use crate::domain::common_lisp::CommonLispOperator;
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::{BinderShape, BodyShape, Dialect, ParameterShape, RelativeNodePath};
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::CommonLispOperator;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::{
+    BinderShape, BodyShape, Dialect, ParameterShape, RelativeNodePath,
+};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::body::collect_body_forms;
 use super::lambda_lists::collect_lambda_list_references;
 use super::{collect_unshadowed_symbol_references_in_context, symbol_name_matches};
-use crate::domain::lexical_scope::bindings::{binding_binds, generic_binding_groups};
+use crate::lexical_scope::bindings::{binding_binds, generic_binding_groups};
 
 mod clause_bindings;
 mod local_callables;

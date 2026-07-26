@@ -1,6 +1,6 @@
-use crate::domain::common_lisp::is_common_lisp_declaration_form;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::is_common_lisp_declaration_form;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::collect_unshadowed_symbol_references_in_context;
 

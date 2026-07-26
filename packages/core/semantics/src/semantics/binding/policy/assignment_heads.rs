@@ -8,8 +8,8 @@
 //! whether the value layer may propagate through it. Missing one spelling here
 //! makes the value layer confidently wrong.
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 /// Where the places sit among a form's arguments.
 ///
@@ -42,6 +42,7 @@ impl PlacePositions {
     ///
     /// [`Self::NestedInArgument`] has none: its places are one level further
     /// down, which is what [`Self::places_in`] exists to reach.
+    #[must_use]
     pub fn indices(self, child_count: usize) -> Vec<usize> {
         match self {
             Self::Pairs => (1..child_count).step_by(2).collect(),
@@ -57,6 +58,7 @@ impl PlacePositions {
     ///
     /// The single entry point for callers, so a nested shape cannot be missed
     /// by one that only remembered to consult [`Self::indices`].
+    #[must_use]
     pub fn places_in(self, view: &ExpressionView) -> Vec<&ExpressionView> {
         if let Self::NestedInArgument(index) = self {
             return view
@@ -145,6 +147,7 @@ const SET_BANG: [AssignmentForm; 1] = [AssignmentForm::new("set!", PlacePosition
 /// Empty for dialects whose local bindings cannot be reassigned at all —
 /// Clojure `let` bindings are immutable, so nothing there can invalidate a
 /// propagated value.
+#[must_use]
 pub const fn assignment_forms(dialect: Dialect) -> &'static [AssignmentForm] {
     match dialect {
         Dialect::CommonLisp => &COMMON_LISP,
@@ -155,6 +158,7 @@ pub const fn assignment_forms(dialect: Dialect) -> &'static [AssignmentForm] {
 }
 
 /// The assignment form named by `head`, if `dialect` has one.
+#[must_use]
 pub fn assignment_form(dialect: Dialect, head: &str) -> Option<AssignmentForm> {
     assignment_forms(dialect)
         .iter()

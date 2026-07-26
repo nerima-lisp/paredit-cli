@@ -2,10 +2,10 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct ConvertFletToLabelsRequest<'a> {
@@ -24,11 +24,11 @@ pub struct ConvertFletToLabelsPlan {
     pub changed: bool,
 }
 
-pub(crate) fn validate_convert_flet_to_labels_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_flet_to_labels_dialect(dialect: Dialect) -> Result<()> {
     validate_common_lisp_dialect(dialect, "convert-flet-to-labels")
 }
 
-pub(crate) fn validate_convert_labels_to_flet_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_labels_to_flet_dialect(dialect: Dialect) -> Result<()> {
     validate_common_lisp_dialect(dialect, "convert-labels-to-flet")
 }
 

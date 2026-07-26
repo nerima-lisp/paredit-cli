@@ -17,7 +17,7 @@
 //! table that stopped at `(print x)` would attribute no references at all,
 //! since Common Lisp has no registry of ordinary function heads.
 
-use crate::domain::common_lisp::CommonLispOperator;
+use paredit_core_syntax::common_lisp::CommonLispOperator;
 
 use super::super::policy::{
     is_pure_standard_function, is_standard_control_form, is_standard_declaration_identifier,

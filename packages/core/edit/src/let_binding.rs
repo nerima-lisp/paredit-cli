@@ -2,11 +2,11 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -26,14 +26,14 @@ pub struct ConvertLetToLetStarPlan {
     pub changed: bool,
 }
 
-pub(crate) fn validate_convert_let_to_let_star_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_let_to_let_star_dialect(dialect: Dialect) -> Result<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         bail!("convert-let-to-let-star supports only Common Lisp and Emacs Lisp");
     }
     Ok(())
 }
 
-pub(crate) fn validate_convert_let_star_to_let_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_let_star_to_let_dialect(dialect: Dialect) -> Result<()> {
     if dialect != Dialect::CommonLisp {
         bail!("convert-let-star-to-let currently supports only Common Lisp");
     }

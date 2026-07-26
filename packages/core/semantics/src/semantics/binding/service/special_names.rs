@@ -1,6 +1,6 @@
 //! Which names a file could possibly declare special.
 //!
-//! [`crate::domain::common_lisp::common_lisp_dynamic_binding_is_declared`]
+//! [`paredit_core_syntax::common_lisp::common_lisp_dynamic_binding_is_declared`]
 //! answers the real question, but it re-scans the whole document per binding,
 //! which is quadratic over a file's variable bindings. Almost every binding is
 //! an ordinary lexical one whose name appears in no declaration at all, so this
@@ -14,8 +14,8 @@
 
 use std::collections::HashSet;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, SymbolName};
 
 /// The heads under which a special variable's name is written, canonicalized.
 const DECLARING_HEADS: [&str; 3] = ["SPECIAL", "DEFVAR", "DEFPARAMETER"];
@@ -90,8 +90,8 @@ fn atom_text(view: &ExpressionView) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
 
     fn index_of(input: &str) -> SpecialNameIndex {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");

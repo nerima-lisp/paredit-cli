@@ -1,21 +1,21 @@
 //! Pure planning rules for splitting sequential `let*` bindings.
 
-use crate::domain::binding_index::BindingIndex;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
 use anyhow::{Context, Result, bail};
+use paredit_core_semantics::binding_index::BindingIndex;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]
-pub(crate) struct Request<'a> {
+pub struct Request<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Path,
     pub binding_index: BindingIndex,
 }
 #[derive(Debug, Clone)]
-pub(crate) struct Plan {
+pub struct Plan {
     pub dialect: Dialect,
     pub path: Path,
     pub form_span: ByteSpan,
@@ -26,7 +26,7 @@ pub(crate) struct Plan {
     pub changed: bool,
 }
 
-pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> Result<Plan> {
     validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("split-let-star input is not a valid S-expression document")?;
@@ -83,7 +83,7 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
     })
 }
 
-pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> Result<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         bail!("split-let-star supports only Common Lisp and Emacs Lisp");
     }

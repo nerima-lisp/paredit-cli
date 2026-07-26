@@ -24,6 +24,9 @@ codegen-units = 1
 [dependencies]
 # Extracted core packages (Phase 1 onwards).
 paredit-core-syntax = { path = "packages/core/syntax" }
+paredit-core-semantics = { path = "packages/core/semantics" }
+paredit-core-edit = { path = "packages/core/edit" }
+paredit-core-workspace = { path = "packages/core/workspace" }
 
 anyhow = "1.0"
 blake3 = "1.8"

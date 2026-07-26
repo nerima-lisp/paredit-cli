@@ -1,7 +1,7 @@
 //! Building the type table for one file.
 //!
 //! One recursive descent over the tree, in the same style as
-//! [`crate::domain::semantics::value::service::folding`]: [`infer_view`]
+//! [`crate::semantics::value::service::folding`]: [`infer_view`]
 //! dispatches on node kind, and every source described in the module doc —
 //! literals, `the`, `check-type`, `declare`/`declaim`, standard-function
 //! returns, flow narrowing, and branch merges — feeds the same builder by
@@ -10,18 +10,18 @@
 
 use std::collections::HashMap;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_reader_conditional_kind,
     common_lisp_reader_label_kind, is_common_lisp_declaration_form,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, ReaderPrefix, SyntaxTree};
-use crate::domain::view_query::list_head;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, Path, ReaderPrefix, SyntaxTree};
+use paredit_core_syntax::view_query::list_head;
 
-use crate::domain::semantics::NodeKey;
-use crate::domain::semantics::binding::BindingTable;
-use crate::domain::semantics::value::{LiteralValue, ValueTable, evaluate_constant};
+use crate::semantics::NodeKey;
+use crate::semantics::binding::BindingTable;
+use crate::semantics::value::{LiteralValue, ValueTable, evaluate_constant};
 
 use super::super::model::{Ty, Type, TypeTable, TypeTableBuilder, meet};
 use super::super::policy::supports_type_inference;
@@ -42,6 +42,7 @@ pub(super) struct Ctx<'a> {
 
 /// Builds the type table for one parsed file, on top of its binding and value
 /// tables.
+#[must_use]
 pub fn build_type_table(
     dialect: Dialect,
     tree: &SyntaxTree,
@@ -243,10 +244,10 @@ pub(super) fn record(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::semantics::binding::build_binding_table;
-    use crate::domain::semantics::value::service::build_value_table;
-    use crate::domain::sexpr::{ByteOffset, ByteSpan};
-    use crate::domain::view_query::for_each_subview;
+    use crate::semantics::binding::build_binding_table;
+    use crate::semantics::value::service::build_value_table;
+    use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
+    use paredit_core_syntax::view_query::for_each_subview;
 
     struct Analysis {
         tree: SyntaxTree,

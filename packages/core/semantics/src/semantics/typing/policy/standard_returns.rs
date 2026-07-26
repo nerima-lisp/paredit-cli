@@ -78,6 +78,7 @@ const STANDARD_RETURNS: [(&str, Ty); 58] = [
 ];
 
 /// The return type of the standard function `name`, if this table knows it.
+#[must_use]
 pub fn standard_return_type(name: &str) -> Option<Ty> {
     STANDARD_RETURNS
         .iter()
