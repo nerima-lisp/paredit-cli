@@ -8,6 +8,7 @@ use super::build_binding_table;
 
 mod assignments;
 mod differential;
+mod opacity;
 mod property;
 mod scoping;
 
