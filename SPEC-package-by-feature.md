@@ -1613,6 +1613,27 @@ scripts/extract-package.sh <kind> <name> <module...>
 | 未使用依存の検出 | 分割後、各パッケージが実際には使っていない依存を持つ可能性がある。`cargo-machete` または `cargo-udeps` を Phase 6 で 1 回流す |
 | `benches/` の帰属 | `benches/{similarity_report,lint_report}.rs` は `paredit_cli::domain::...` を使う。façade が維持されるため**無改修で動く**が、Phase 6 で対応パッケージへ移すかを判断する |
 
+### 11.5.1 【実装時の追記】§5.1 の割り当てには「合成ルートの部品」が混ざっている
+
+Phase 1〜2 で **4 回続けて同じ原因**により、§5.1 が core に割り当てたモジュールが
+実際には core に置けなかった。**共通する見分け方があるので、Phase 3 以降は
+移送前にこれを確認すること。**
+
+| モジュール | §5.1 の割り当て | 実際の帰属 | 理由 |
+| --- | --- | --- | --- |
+| `report_policy` | C5 | **ルート** | 3 つの feature が持つ policy 型の再エクスポートのみ |
+| `system_order` | C3 | **ルート**（将来 F2） | `dependency_report` / `system_cycle_report` を呼ぶ |
+| `lint_report` / `lint_suppression` | C5 | **F11** | registry 付きで engine を呼ぶ |
+| `presentation::cli::contract` | C7 | **ルート** | 3 つの feature の `supports_*_dialect` を列挙 |
+
+**判定基準**: そのモジュールが**複数の feature を名前で列挙・集約している**なら、
+それは core ではなく**合成ルート**である。§4.2 が `REGISTRY` について述べている
+論理がそのまま適用される — 列挙する側は列挙される側すべてに依存するため、
+core に置くと core → feature の逆流になる。
+
+行数や「層」ではなく、**依存の向き**で判定すること。`report_policy` は 7 行、
+`contract.rs` は 521 行だが、どちらも同じ理由でルートに残る。
+
 ### 11.6 Phase 1 で判明した手順上の追加事項
 
 以下はいずれも**本書に記載がなく、ゲートに落ちて初めて判明した**もの。
