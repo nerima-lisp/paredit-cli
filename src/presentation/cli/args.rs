@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
 
-use crate::application::usecase::extract_function::ExtractFunctionInsert;
-use crate::application::usecase::function_parameter::FunctionParameterInsert;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, Path};
 
@@ -200,29 +198,12 @@ impl MoveInsert {
             Self::After => "after",
         }
     }
-
-    pub(super) const fn into_extract_function_insert(self) -> ExtractFunctionInsert {
-        match self {
-            Self::Append => ExtractFunctionInsert::Append,
-            Self::Before => ExtractFunctionInsert::Before,
-            Self::After => ExtractFunctionInsert::After,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub(super) enum ParameterInsert {
     Start,
     End,
-}
-
-impl ParameterInsert {
-    pub(super) const fn into_function_parameter_insert(self) -> FunctionParameterInsert {
-        match self {
-            Self::Start => FunctionParameterInsert::Start,
-            Self::End => FunctionParameterInsert::End,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

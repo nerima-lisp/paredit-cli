@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::extract_function::{
-    ExtractFunctionPlan, ExtractFunctionRequest, plan_extract_function,
+    ExtractFunctionInsert, ExtractFunctionPlan, ExtractFunctionRequest, plan_extract_function,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
@@ -67,7 +67,7 @@ pub(super) fn extract_function(args: ExtractFunctionArgs) -> Result<()> {
         name: args.name,
         explicit_params,
         infer_params: args.infer_params,
-        insert: args.insert.into_extract_function_insert(),
+        insert: extract_function_insert(args.insert),
         anchor_path: args.anchor_path,
     })?;
 
@@ -138,4 +138,17 @@ fn print_extract_function_plan(
         ),
     }
     Ok(())
+}
+
+/// Maps the CLI's insert position onto the use case's.
+///
+/// Lives here rather than on `MoveInsert` so that `cli::args` - which becomes
+/// part of `core/cli` - does not name a feature use case. The dependency then
+/// runs feature -> core, which is the direction the crate graph allows.
+const fn extract_function_insert(insert: MoveInsert) -> ExtractFunctionInsert {
+    match insert {
+        MoveInsert::Append => ExtractFunctionInsert::Append,
+        MoveInsert::Before => ExtractFunctionInsert::Before,
+        MoveInsert::After => ExtractFunctionInsert::After,
+    }
 }

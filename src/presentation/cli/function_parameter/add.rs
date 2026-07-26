@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::application::usecase::function_parameter::{
-    AddFunctionParameterRequest, plan_add_function_parameter,
+    AddFunctionParameterRequest, FunctionParameterInsert, plan_add_function_parameter,
 };
 use crate::presentation::cli::{
     read_input_and_dialect, require_output_file, write_file_with_rollback,
@@ -9,6 +9,7 @@ use crate::presentation::cli::{
 
 use super::args::AddFunctionParameterArgs;
 use super::render::add::print_add_function_parameter_plan;
+use crate::presentation::cli::args::ParameterInsert;
 
 pub(in crate::presentation::cli) fn add_function_parameter(
     args: AddFunctionParameterArgs,
@@ -26,7 +27,7 @@ pub(in crate::presentation::cli) fn add_function_parameter(
         argument: args.argument,
         call_paths: args.call_paths,
         all_calls: args.all_calls,
-        insert: args.insert.into_function_parameter_insert(),
+        insert: function_parameter_insert(args.insert),
         section: args.section.into_function_parameter_section(),
     })?;
 
@@ -37,4 +38,15 @@ pub(in crate::presentation::cli) fn add_function_parameter(
     }
 
     print_add_function_parameter_plan(&plan, written, args.output)
+}
+
+/// Maps the CLI's insert position onto the use case's.
+///
+/// Lives here rather than on `ParameterInsert` so that `cli::args` - which
+/// becomes part of `core/cli` - does not name a feature use case.
+const fn function_parameter_insert(insert: ParameterInsert) -> FunctionParameterInsert {
+    match insert {
+        ParameterInsert::Start => FunctionParameterInsert::Start,
+        ParameterInsert::End => FunctionParameterInsert::End,
+    }
 }
