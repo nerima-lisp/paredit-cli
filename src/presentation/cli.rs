@@ -38,11 +38,11 @@ mod contract;
 // (section 11.5.1).
 use paredit_core_cli::{args, gate, shared};
 // Phase 3 facade: the composition root sees each slice's Args type and run fn.
-use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
-use paredit_feature_similarity::similarity_report::cli as similarity_report;
+use paredit_feature_extract::extract_constant::cli as extract_constant;
 use paredit_feature_extract::extract_function::cli as extract_function;
 use paredit_feature_extract::extract_local_function::cli as extract_local_function;
-use paredit_feature_extract::extract_constant::cli as extract_constant;
+use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
+use paredit_feature_similarity::similarity_report::cli as similarity_report;
 mod convert_cond_to_if;
 mod convert_flet_to_labels;
 mod convert_if_to_cond;

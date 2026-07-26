@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 
+use paredit_core_edit::extract_shared::{
+    TopLevelInsert, insert_top_level_form, replace_span_checked,
+};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_edit::extract_shared::{TopLevelInsert, insert_top_level_form, replace_span_checked};
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, ReaderPrefix, Selection, SymbolName, SyntaxTree,
 };

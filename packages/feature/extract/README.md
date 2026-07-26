@@ -63,7 +63,7 @@ inference or push it into core prematurely.
 
 Slice-first, per §3.1:
 
-```
+```text
 src/
 ├── extract_function/
 │   ├── domain.rs + domain/     inference, rewriting, syntax helpers

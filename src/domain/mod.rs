@@ -10,13 +10,13 @@
 // `pub(crate)` module to `pub` here would silently widen the public API.
 pub use paredit_core_syntax::{common_lisp, definition, dialect, form_shape, sexpr};
 // Phase 3 facade: benches/similarity_report.rs uses the public library API.
-pub use paredit_feature_similarity::similarity_report::domain as similarity_report;
-pub use paredit_feature_similarity::duplicate_report::domain as duplicate_report;
-pub use paredit_feature_similarity::form_similarity;
+pub(crate) use paredit_core_syntax::{expression_equality, graph, leading_trivia, view_query};
+pub use paredit_feature_extract::extract_constant::domain as extract_constant;
 pub use paredit_feature_extract::extract_function::domain as extract_function;
 pub use paredit_feature_extract::extract_local_function::domain as extract_local_function;
-pub use paredit_feature_extract::extract_constant::domain as extract_constant;
-pub(crate) use paredit_core_syntax::{expression_equality, graph, leading_trivia, view_query};
+pub use paredit_feature_similarity::duplicate_report::domain as duplicate_report;
+pub use paredit_feature_similarity::form_similarity;
+pub use paredit_feature_similarity::similarity_report::domain as similarity_report;
 
 // Phase 2 facade (section 4.1), visibility mirroring the original `mod` lines.
 pub(crate) use paredit_core_edit::{

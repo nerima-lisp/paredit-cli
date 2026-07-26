@@ -1,5 +1,5 @@
-use paredit_core_cli::safe_text;
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
 use crate::similarity_report::usecase::{
@@ -7,8 +7,8 @@ use crate::similarity_report::usecase::{
 };
 use paredit_core_syntax::dialect::Dialect;
 
-use paredit_core_cli::args::OutputFormat;
 use super::args::SimilarityReportArgs;
+use paredit_core_cli::args::OutputFormat;
 
 pub fn print_similarity_report(
     plan: &SimilarityReportPlan,

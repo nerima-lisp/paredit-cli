@@ -1,10 +1,10 @@
-use anyhow::Result;
-use serde_json::json;
-use paredit_core_cli::args::OutputFormat;
-use paredit_core_cli::safe_text;
 use crate::duplicate_report::usecase::{
     DuplicateFormReport, DuplicateShapeReport, ReplacementPlanBatch,
 };
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use serde_json::json;
 
 pub fn print_duplicate_report(
     reports: &[DuplicateShapeReport],

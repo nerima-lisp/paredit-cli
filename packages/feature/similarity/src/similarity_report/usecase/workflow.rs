@@ -1,10 +1,10 @@
 use anyhow::Result;
 use std::path::Path;
 
-use paredit_core_syntax::sexpr::SyntaxTree;
 use crate::similarity_report::domain::{
     SimilarityCandidate, build_similarity_pairs_with_omissions, collect_similarity_candidates,
 };
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 use super::types::{
     DiscoveredSimilarityFile, SimilarityErrorPolicy, SimilarityFileError, SimilarityInventory,

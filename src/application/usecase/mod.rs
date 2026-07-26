@@ -216,9 +216,9 @@ pub mod zero_divisor_report;
 
 // Phase 3 facade (section 4.1). benches/similarity_report.rs uses
 // `paredit_cli::application::usecase::similarity_report`, so this path stays.
-pub use paredit_feature_similarity::similarity_report::usecase as similarity_report;
 pub use paredit_feature_similarity::duplicate_report::usecase as duplicate_report;
+pub use paredit_feature_similarity::similarity_report::usecase as similarity_report;
 
+pub use paredit_feature_extract::extract_constant::usecase as extract_constant;
 pub use paredit_feature_extract::extract_function::usecase as extract_function;
 pub use paredit_feature_extract::extract_local_function::usecase as extract_local_function;
-pub use paredit_feature_extract::extract_constant::usecase as extract_constant;

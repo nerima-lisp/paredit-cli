@@ -2,15 +2,15 @@
 
 use anyhow::{Context, Result, bail};
 
+use crate::extract_function::domain::{infer_extract_function_params, rewrite::extracted_call};
+use paredit_core_edit::extract_shared::replace_span;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::common_lisp::{
     CommonLispLocalCallableForm, CommonLispOperator, common_lisp_local_callable_form,
     common_lisp_operator_head_eq, common_lisp_symbol_identity_eq, common_lisp_symbol_reference_eq,
     local_callable_names,
 };
 use paredit_core_syntax::dialect::Dialect;
-use crate::extract_function::domain::{infer_extract_function_params, rewrite::extracted_call};
-use paredit_core_edit::extract_shared::replace_span;
-use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::reader::{apply_reader_prefix_context, atom_symbol_text};
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, ReaderPrefix, Selection, SymbolName, SyntaxTree,

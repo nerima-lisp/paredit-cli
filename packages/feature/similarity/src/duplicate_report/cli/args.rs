@@ -1,7 +1,7 @@
-use std::path::PathBuf;
 use clap::Args;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
 pub struct DuplicateReportArgs {

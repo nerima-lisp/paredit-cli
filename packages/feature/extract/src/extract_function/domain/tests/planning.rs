@@ -1,8 +1,8 @@
+use super::*;
+use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::Path;
 use paredit_core_syntax::sexpr::SymbolName;
 use paredit_core_syntax::sexpr::SyntaxTree;
-use paredit_core_syntax::dialect::Dialect;
-use super::*;
 
 #[test]
 fn rejects_unknown_dialect_before_extract_function_planning() {

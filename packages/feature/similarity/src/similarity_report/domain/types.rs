@@ -6,8 +6,8 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use paredit_core_syntax::dialect::Dialect;
 use crate::form_similarity::StructuralTree;
+use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path};
 
 #[allow(unused_imports)]

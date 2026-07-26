@@ -5,10 +5,12 @@ use std::sync::Arc;
 use anyhow::Error as AnyhowError;
 use thiserror::Error;
 
+use crate::form_similarity::StructuralTree;
 use paredit_core_syntax::common_lisp::normalize_common_lisp_operator_head;
 use paredit_core_syntax::dialect::Dialect;
-use crate::form_similarity::StructuralTree;
-use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::sexpr::{
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree,
+};
 
 use super::SimilarityReportOptionsError;
 use super::types::{

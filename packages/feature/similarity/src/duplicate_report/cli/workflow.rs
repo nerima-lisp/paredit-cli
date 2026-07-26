@@ -1,4 +1,3 @@
-use anyhow::Result;
 use super::args::{DuplicateReportArgs, ReplacementPlanArgs};
 use super::render::{print_duplicate_report, print_replacement_plan};
 use super::workspace::discover_duplicate_report_files;
@@ -6,6 +5,7 @@ use crate::duplicate_report::usecase::{
     DuplicateCandidateAccumulator, DuplicateCandidateGroups, build_duplicate_shape_reports,
     collect_replacement_plan_batches,
 };
+use anyhow::Result;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {

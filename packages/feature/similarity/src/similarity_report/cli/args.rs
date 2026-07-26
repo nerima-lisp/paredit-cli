@@ -6,8 +6,8 @@ use crate::similarity_report::usecase::{
     SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,
 };
 
-use paredit_core_cli::args::{DialectArg, OutputFormat};
 use super::types::ErrorPolicy;
+use paredit_core_cli::args::{DialectArg, OutputFormat};
 
 #[derive(Debug, Args)]
 pub struct SimilarityReportArgs {

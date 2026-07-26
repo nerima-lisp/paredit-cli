@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
-use paredit_core_syntax::dialect::Dialect;
 use crate::similarity_report::domain::{
     PairProcessingCounts, PairResultCounts, ReportLimit, SimilarityReport, SimilarityReportSummary,
 };
+use paredit_core_syntax::dialect::Dialect;
 
 use super::SimilarityReportOptions;
 use super::types::{

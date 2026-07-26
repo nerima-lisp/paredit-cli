@@ -8,7 +8,9 @@ use anyhow::Result;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::form_shape::{FormShape, duplicate_shape};
-use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::sexpr::{
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree,
+};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateFormReport {

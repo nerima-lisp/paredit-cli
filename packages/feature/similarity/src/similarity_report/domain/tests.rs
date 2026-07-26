@@ -634,8 +634,7 @@ fn split_scoped_comparisons_match_the_sequential_path() {
 fn threshold_is_inclusive() {
     let values = candidates("a.lisp", "(foo a b) (foo x y)", 2);
     let similarity =
-        crate::form_similarity::tree_similarity(values[0].tree(), values[1].tree())
-            .unwrap();
+        crate::form_similarity::tree_similarity(values[0].tree(), values[1].tree()).unwrap();
     let report = build_similarity_pairs(values, similarity, SimilarityOverlapPolicy::All, None);
     assert_eq!(report.pairs.len(), 1);
     assert_eq!(report.summary.evaluated_pairs(), 1);

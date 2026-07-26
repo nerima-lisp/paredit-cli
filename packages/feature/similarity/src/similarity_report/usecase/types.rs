@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
-use paredit_core_syntax::dialect::Dialect;
 use crate::similarity_report::domain::{SimilarityReport, SimilarityReportOptions};
+use paredit_core_syntax::dialect::Dialect;
 
 #[derive(Debug, Clone)]
 pub struct SimilarityReportRequest {

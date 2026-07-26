@@ -42,7 +42,7 @@ share:
 The composition root needs exactly two names per slice — the `clap` argument
 type and the function that runs it (§4.2). Everything else is internal:
 
-```rust
+```rust,ignore
 pub use similarity_report::cli::{SimilarityReportArgs, similarity_report};
 pub use duplicate_report::cli::{DuplicateReportArgs, duplicate_report};
 ```
@@ -63,7 +63,7 @@ building unchanged.
 
 Slice-first, per §3.1 — the layers are names, not directories:
 
-```
+```text
 src/
 ├── form_similarity.rs          shared scoring primitive
 ├── similarity_report/
