@@ -5,6 +5,8 @@ use std::path::Path;
 
 use crate::domain::dialect::Dialect;
 use crate::domain::semantics::binding::{BindingTable, build_binding_table};
+use crate::domain::semantics::typing::TypeTable;
+use crate::domain::semantics::typing::service::build_type_table;
 use crate::domain::semantics::value::{ValueTable, build_value_table};
 use crate::domain::sexpr::{ByteSpan, SyntaxTree};
 
@@ -32,6 +34,7 @@ pub struct RuleContext<'a> {
     source: &'a str,
     bindings: OnceCell<BindingTable>,
     values: OnceCell<ValueTable>,
+    types: OnceCell<TypeTable>,
 }
 
 impl<'a> RuleContext<'a> {
@@ -43,6 +46,7 @@ impl<'a> RuleContext<'a> {
             source,
             bindings: OnceCell::new(),
             values: OnceCell::new(),
+            types: OnceCell::new(),
         }
     }
 
@@ -59,6 +63,21 @@ impl<'a> RuleContext<'a> {
     pub fn value_table(&self) -> &ValueTable {
         self.values
             .get_or_init(|| build_value_table(self.dialect, self.tree, self.binding_table()))
+    }
+
+    /// What each expression in this file is provably of type.
+    ///
+    /// Stacks on the two tables above it, so asking for this builds those too;
+    /// a run whose rules ask for none of the three still pays for none.
+    pub fn type_table(&self) -> &TypeTable {
+        self.types.get_or_init(|| {
+            build_type_table(
+                self.dialect,
+                self.tree,
+                self.binding_table(),
+                self.value_table(),
+            )
+        })
     }
 
     pub const fn path(&self) -> &'a Path {

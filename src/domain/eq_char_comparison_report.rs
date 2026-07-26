@@ -12,7 +12,11 @@
 //! (`#\Newline`, `#\Space`).
 //!
 //! This is the character sibling of `eq-number-comparison` — the same identity
-//! pitfall, a different literal type.
+//! pitfall, a different literal type — including in how the bug is detected:
+//! the CLHS groups characters with numbers as objects an implementation may
+//! copy at any time, so `eq` is unreliable on any character whatever produced
+//! it. Callers that have a type context therefore pass a second test — see
+//! [`IsCharacterArgument`] — which catches `(eq (char s 0) c)` too.
 //!
 //! Reuses the shared whole-tree walk from
 //! [`crate::domain::view_query::for_each_subview`].
@@ -31,13 +35,41 @@ fn character_argument(view: &ExpressionView) -> Option<&str> {
     atom_text(view).filter(|text| text.starts_with("#\\"))
 }
 
+/// Why an argument counts as a character.
+///
+/// An enum rather than an empty `literal`, because "recognized without a
+/// spelling to quote" and "recognized by the empty spelling" are different
+/// facts and only one of them is ever true.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CharacterEvidence {
+    /// A character literal written at the call site: `(eq c #\a)`.
+    Literal(String),
+    /// An argument a type context proves is a character however it is
+    /// spelled: `(eq (char s 0) c)`.
+    InferredType,
+}
+
 #[derive(Debug, Clone)]
 pub struct EqCharComparisonItem {
     pub path: PathBuf,
     pub span: ByteSpan,
     /// The span of the `eq` head symbol, for an `eq` -> `eql` fix.
     pub head_span: ByteSpan,
-    pub literal: String,
+    pub evidence: CharacterEvidence,
+}
+
+impl EqCharComparisonItem {
+    /// The literal spelling this was recognized by.
+    ///
+    /// Empty for a type-derived detection, which the standalone `inspect`
+    /// command never produces — it passes [`never`], so every item it renders
+    /// carries a spelling.
+    pub fn literal(&self) -> &str {
+        match &self.evidence {
+            CharacterEvidence::Literal(text) => text,
+            CharacterEvidence::InferredType => "",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -70,9 +102,24 @@ pub struct EqCharComparisonPolicy {
     pub violations: Vec<String>,
 }
 
+/// Whether an argument is provably a character without being spelled as one.
+///
+/// The standalone `inspect eq-char-comparison` command has no semantic tables
+/// to consult, so it passes [`never`] and keeps reading literals only. The
+/// lint suite passes a test backed by the type context, so it also sees
+/// `(eq (char s 0) c)` — the same unreliable comparison, spelled in a way the
+/// reader alone cannot recognize.
+pub(crate) type IsCharacterArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
+
+/// The [`IsCharacterArgument`] of a caller with no type context.
+fn never(_: &ExpressionView) -> bool {
+    false
+}
+
 pub(crate) fn examine_comparison(
     view: &ExpressionView,
     path: &Path,
+    is_character: IsCharacterArgument<'_>,
     comparison_form_count: &mut usize,
     violations: &mut Vec<EqCharComparisonItem>,
 ) {
@@ -81,14 +128,26 @@ pub(crate) fn examine_comparison(
     }
     *comparison_form_count += 1;
 
-    // Report the first character-literal argument (after the operator); a call
-    // with two character literals is still one bug, not two.
-    if let Some(literal) = view.children.iter().skip(1).find_map(character_argument) {
+    // Report the first character argument (after the operator); a call with
+    // two characters is still one bug, not two. A literal is looked for across
+    // every argument before the type context is asked about any, so a call
+    // that has one is still reported by its spelling.
+    let arguments = || view.children.iter().skip(1);
+    let evidence = arguments()
+        .find_map(character_argument)
+        .map(|literal| CharacterEvidence::Literal(literal.to_owned()))
+        .or_else(|| {
+            arguments()
+                .any(is_character)
+                .then_some(CharacterEvidence::InferredType)
+        });
+
+    if let Some(evidence) = evidence {
         violations.push(EqCharComparisonItem {
             path: path.to_path_buf(),
             span: view.span,
             head_span: view.children[0].span,
-            literal: literal.to_owned(),
+            evidence,
         });
     }
 }
@@ -109,7 +168,13 @@ pub fn collect_eq_char_comparisons(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(subview, path, &mut comparison_form_count, &mut violations)
+            examine_comparison(
+                subview,
+                path,
+                &never,
+                &mut comparison_form_count,
+                &mut violations,
+            )
         });
     }
     Ok((comparison_form_count, violations))
@@ -159,14 +224,14 @@ mod tests {
         let (count, violations) = comparisons("(eq c #\\a)");
         assert_eq!(count, 1);
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].literal, "#\\a");
+        assert_eq!(violations[0].literal(), "#\\a");
     }
 
     #[test]
     fn flags_eq_against_a_named_character() {
         let (_, violations) = comparisons("(eq (char s 0) #\\Space)");
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].literal, "#\\Space");
+        assert_eq!(violations[0].literal(), "#\\Space");
     }
 
     #[test]
@@ -195,6 +260,18 @@ mod tests {
         let (count, violations) = comparisons("(defun f (c) (when (eq c #\\z) :zed))");
         assert_eq!(count, 1);
         assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn the_standalone_collector_only_ever_reports_a_spelling() {
+        // It passes `never`, so the type-derived case cannot arise here and
+        // the rendered `literal=` field is always populated.
+        assert!(comparisons("(eq (char s 0) c)").1.is_empty());
+        let (_, violations) = comparisons("(eq c #\\a)");
+        assert_eq!(
+            violations[0].evidence,
+            CharacterEvidence::Literal("#\\a".to_owned())
+        );
     }
 
     #[test]

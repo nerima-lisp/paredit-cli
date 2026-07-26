@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 use std::path::Path as FsPath;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{AtomOccurrence, ByteSpan, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{AtomOccurrence, ByteSpan, SyntaxTree};
 use crate::domain::signature_report::SignatureCallItem;
 
+use super::identity::SymbolIdentity;
 use super::types::{ImpactDefinitionItem, ImpactSymbolOccurrence};
 
 pub(super) fn count_non_call_references(
@@ -51,30 +51,30 @@ fn symbol_occurrence_key(path: &FsPath, span: ByteSpan) -> (String, usize, usize
 pub(super) fn matching_symbol_occurrences(
     dialect: Dialect,
     tree: &SyntaxTree,
-    symbol: &SymbolName,
+    identity: &SymbolIdentity,
 ) -> Vec<AtomOccurrence> {
     let occurrences = tree.atom_occurrences();
 
     if dialect == Dialect::CommonLisp {
-        return matching_common_lisp_symbol_occurrences(occurrences, tree, symbol);
+        return matching_common_lisp_symbol_occurrences(occurrences, tree, identity);
     }
 
     occurrences
         .into_iter()
-        .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str()))
+        .filter(|occurrence| identity.matches(&occurrence.text, occurrence.span.start().get()))
         .collect()
 }
 
 fn matching_common_lisp_symbol_occurrences(
     occurrences: Vec<AtomOccurrence>,
     tree: &SyntaxTree,
-    symbol: &SymbolName,
+    identity: &SymbolIdentity,
 ) -> Vec<AtomOccurrence> {
     let mut spans = Vec::new();
     collect_unshadowed_symbol_references(
         Dialect::CommonLisp,
         &tree.root_view(),
-        symbol,
+        identity.symbol(),
         "",
         &mut spans,
     );
@@ -86,7 +86,7 @@ fn matching_common_lisp_symbol_occurrences(
     occurrences
         .into_iter()
         .filter(|occurrence| {
-            common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str())
+            identity.matches(&occurrence.text, occurrence.span.start().get())
                 && matched_spans
                     .contains(&(occurrence.span.start().get(), occurrence.span.end().get()))
         })

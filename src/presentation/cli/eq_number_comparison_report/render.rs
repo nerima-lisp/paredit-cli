@@ -23,7 +23,7 @@ pub(super) fn print_eq_number_comparison_report(
                     "violation\t{}\t{}\tliteral={}",
                     safe_text!(item.path.display()),
                     item.span.start().get(),
-                    safe_text!(item.literal),
+                    safe_text!(item.literal()),
                 );
             }
         }
@@ -47,7 +47,7 @@ pub(super) fn print_eq_number_comparison_report(
                                 "start": item.span.start().get(),
                                 "end": item.span.end().get(),
                             },
-                            "literal": &item.literal,
+                            "literal": item.literal(),
                         }))
                         .collect::<Vec<_>>(),
                 }))?
