@@ -65,6 +65,7 @@ pub struct ReachabilityReportPolicy {
 }
 
 /// Builds the reachability summary across every scanned file's call graph.
+///
 /// `files` and their definitions/edges come from
 /// [`crate::domain::call_graph_report::build_call_graph_report`] with
 /// `include_external: false`, so every edge in the input already targets a

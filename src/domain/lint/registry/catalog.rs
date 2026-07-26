@@ -142,6 +142,7 @@ pub fn rule_is_fixable(name: &str) -> bool {
 }
 
 /// The severity of a rule's findings (`error` unless it is a style rule).
+///
 /// An unknown name reports `Error`, matching the historical `contains`-based
 /// lookup that treated anything not listed as a warning as an error.
 pub fn rule_severity(name: &str) -> Severity {

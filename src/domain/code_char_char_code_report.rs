@@ -1,4 +1,5 @@
 //! Common Lisp `code-char`-of-`char-code` detection: a `(code-char (char-code c))`.
+//!
 //! `char-code` maps a character to its code and `code-char` maps that code back to
 //! the same character, so `(code-char (char-code c))` is exactly `c` — same
 //! character, `c` evaluated once. The bare `c` reads more directly than the

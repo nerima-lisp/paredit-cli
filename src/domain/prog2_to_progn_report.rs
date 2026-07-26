@@ -1,4 +1,5 @@
 //! Common Lisp `prog2`-to-`progn` detection: a two-argument `(prog2 a b)`.
+//!
 //! `prog2` evaluates its forms left to right and returns the value(s) of the
 //! *second*; with exactly two forms the second is also the last, so
 //! `(prog2 a b)` returns the same value(s) as `(progn a b)` — same evaluation

@@ -1,4 +1,5 @@
 //! Common Lisp redundant-`the` detection: a `(the t form)` type declaration.
+//!
 //! `the` asserts that `form` yields values of the given type; the type `t`
 //! matches every object, so `(the t form)` asserts nothing and simply returns
 //! `form`'s values unchanged (`the` passes all values through, so this holds in
