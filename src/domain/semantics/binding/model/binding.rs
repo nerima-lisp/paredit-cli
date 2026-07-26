@@ -2,7 +2,7 @@
 
 use crate::domain::sexpr::{ByteSpan, SymbolName};
 
-use super::facts::{BindingKind, ScopeOpacity, SpecialBinding};
+use super::facts::{BindingKind, OpacityCause, ScopeOpacity, SpecialBinding};
 use super::ids::ScopeId;
 
 /// A single binding: what was bound, where, and everything the value and type
@@ -24,6 +24,7 @@ pub struct Binding {
     assignments: Vec<ByteSpan>,
     special: SpecialBinding,
     opacity: ScopeOpacity,
+    opacity_cause: Option<OpacityCause>,
 }
 
 impl Binding {
@@ -77,6 +78,19 @@ impl Binding {
         self.opacity
     }
 
+    /// The first region that cost this binding's scope its transparency, in
+    /// walk order, or `None` when the scope is transparent.
+    ///
+    /// Only the first is kept. A scope can enclose any number of opaque
+    /// regions, and holding them all would grow a `Vec` per binding for
+    /// evidence no lint rule reads; a corpus histogram wants exactly one
+    /// attribution per binding anyway. "First in walk order" is the earliest
+    /// such region in the scope, which is a well-defined choice rather than an
+    /// arbitrary one.
+    pub const fn opacity_cause(&self) -> Option<OpacityCause> {
+        self.opacity_cause
+    }
+
     /// Whether a constant value may be propagated through this binding.
     ///
     /// All four conditions must hold: never reassigned, no opaque region in
@@ -111,6 +125,7 @@ impl BindingDraft {
                 assignments: Vec::new(),
                 special: SpecialBinding::Lexical,
                 opacity: ScopeOpacity::Transparent,
+                opacity_cause: None,
             },
         }
     }
@@ -141,8 +156,17 @@ impl BindingDraft {
         self.binding.assignments.push(span);
     }
 
-    pub fn observe_opacity(&mut self, opacity: ScopeOpacity) {
-        self.binding.opacity = self.binding.opacity.join(opacity);
+    /// Records that the scope encloses a region this layer cannot see through.
+    ///
+    /// Opacity itself is absorbing, so repeating the observation is harmless;
+    /// the cause is kept only the first time, which is what makes
+    /// [`Binding::opacity_cause`] "the earliest such region".
+    pub fn observe_opacity(&mut self, cause: OpacityCause) {
+        self.binding.opacity = self
+            .binding
+            .opacity
+            .join(ScopeOpacity::ContainsOpaqueRegion);
+        self.binding.opacity_cause.get_or_insert(cause);
     }
 
     pub fn finish(self) -> Binding {
@@ -153,10 +177,15 @@ impl BindingDraft {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::semantics::binding::model::facts::OpacityCauseKind;
     use crate::domain::sexpr::ByteOffset;
 
     fn span(start: usize, end: usize) -> ByteSpan {
         ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))
+    }
+
+    fn cause(start: usize, end: usize) -> OpacityCause {
+        OpacityCause::new(OpacityCauseKind::UnknownHead, span(start, end))
     }
 
     fn draft() -> BindingDraft {
@@ -182,7 +211,7 @@ mod tests {
         assert!(!reassigned.finish().is_propagatable());
 
         let mut opaque = draft();
-        opaque.observe_opacity(ScopeOpacity::ContainsOpaqueRegion);
+        opaque.observe_opacity(cause(30, 40));
         assert!(!opaque.finish().is_propagatable());
 
         let special = draft().with_special(SpecialBinding::DeclaredSpecial);
@@ -195,6 +224,27 @@ mod tests {
             span(0, 1),
         );
         assert!(!uninitialized.finish().is_propagatable());
+    }
+
+    #[test]
+    fn a_transparent_binding_names_no_cause() {
+        assert_eq!(draft().finish().opacity_cause(), None);
+    }
+
+    #[test]
+    fn the_first_observed_cause_is_the_one_kept() {
+        // A scope can enclose many opaque regions; the histogram this feeds
+        // wants one attribution per binding, and the earliest is the
+        // well-defined choice.
+        let mut binding = draft();
+        binding.observe_opacity(cause(30, 40));
+        binding.observe_opacity(OpacityCause::new(
+            OpacityCauseKind::QuotedOrReadTime,
+            span(50, 60),
+        ));
+        let binding = binding.finish();
+        assert_eq!(binding.opacity_cause(), Some(cause(30, 40)));
+        assert_eq!(binding.opacity(), ScopeOpacity::ContainsOpaqueRegion);
     }
 
     #[test]

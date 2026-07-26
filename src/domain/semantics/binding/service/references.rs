@@ -7,7 +7,7 @@ use crate::domain::semantics::NodeKey;
 use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
-use super::super::model::ScopeId;
+use super::super::model::{OpacityCause, OpacityCauseKind, ScopeId};
 use super::builder::{Walk, head_text, is_reader_dispatch};
 use super::scope_stack::Namespace;
 
@@ -41,7 +41,10 @@ impl Walk<'_> {
         }
 
         if is_reader_dispatch(view) {
-            self.mark_opaque();
+            self.mark_opaque(OpacityCause::new(
+                OpacityCauseKind::ReaderDispatch,
+                view.span,
+            ));
             return;
         }
 
@@ -82,7 +85,10 @@ impl Walk<'_> {
         let normalized_head = normalize_common_lisp_operator_head(head);
 
         if common_lisp_operator_head_eq(normalized_head, "quote") {
-            self.mark_opaque();
+            // The explicit spelling of `'…`, and inert for the same reason:
+            // `(quote (setq x 2))` evaluates to a list. The walk stops because
+            // there are no references inside, not because the scope became
+            // unreadable.
             return true;
         }
 

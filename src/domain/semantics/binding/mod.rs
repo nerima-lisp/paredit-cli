@@ -16,5 +16,7 @@ pub mod model;
 pub mod policy;
 pub mod service;
 
-pub use model::{Binding, BindingId, BindingKind, BindingTable, ScopeId};
+pub use model::{
+    Binding, BindingId, BindingKind, BindingTable, OpacityCause, OpacityCauseKind, ScopeId,
+};
 pub use service::build_binding_table;

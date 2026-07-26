@@ -12,8 +12,8 @@ use crate::domain::sexpr::reader::apply_reader_prefix_context;
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
 
 use super::super::model::{
-    BindingDraft, BindingId, BindingKind, BindingTable, BindingTableBuilder, ScopeId, ScopeOpacity,
-    SpecialBinding,
+    BindingDraft, BindingId, BindingKind, BindingTable, BindingTableBuilder, OpacityCause,
+    OpacityCauseKind, ScopeId, SpecialBinding,
 };
 use super::opacity::head_has_registered_semantics;
 use super::scope_stack::{Namespace, ScopeStack};
@@ -86,9 +86,27 @@ impl Walk<'_> {
     /// two together.
     pub(super) fn form(&mut self, view: &ExpressionView, scope: ScopeId, quasiquote_depth: usize) {
         let Some(quasiquote_depth) = apply_reader_prefix_context(view, quasiquote_depth) else {
-            // Quoted data, `#.`, and `#'(...)`: text whose effect on a binding
-            // cannot be read off the source.
-            self.mark_opaque();
+            // Two unrelated refusals hide behind that `None`, and they deserve
+            // different answers.
+            //
+            // `#.` splices whatever the reader computed into the program *as
+            // code*, so a scope containing one may contain an assignment that
+            // is nowhere in the source. Nothing can be concluded there.
+            //
+            // A top-level quote is the opposite. Nothing inside `'…` is ever
+            // evaluated, so it cannot reassign anything: `'(setq x 2)` is a
+            // three-element list. Even a `#.` nested inside a quote only ever
+            // produces more data. The walk still stops — there are no live
+            // references in quoted data, which is why this arm exists — but
+            // stopping and distrusting the scope are separate decisions, and
+            // conflating them was costing roughly one opaque scope in ten on
+            // a real corpus.
+            if is_read_time_evaluated(view) {
+                self.mark_opaque(OpacityCause::new(
+                    OpacityCauseKind::QuotedOrReadTime,
+                    view.span,
+                ));
+            }
             return;
         };
 
@@ -120,12 +138,20 @@ impl Walk<'_> {
     /// A form that binds nothing. It may still be a macro call that rebinds or
     /// reassigns, which is what the opacity mark records.
     fn call(&mut self, view: &ExpressionView, scope: ScopeId) {
-        let head = view.children.first().and_then(head_text);
+        let first = view.children.first();
+        let head = first.and_then(head_text);
 
         // A computed head (`((lambda ...) x)`) is as unreadable as an unknown
-        // macro, so both land here.
+        // macro, so both land here. They are told apart in the cause: only an
+        // unknown *name* is something a transparency table could ever fix.
         if !head.is_some_and(head_has_registered_semantics) {
-            self.mark_opaque();
+            let cause = match (head, first) {
+                (Some(_), Some(atom)) => {
+                    OpacityCause::new(OpacityCauseKind::UnknownHead, atom.span)
+                }
+                _ => OpacityCause::new(OpacityCauseKind::UnreadableHead, view.span),
+            };
+            self.mark_opaque(cause);
         }
 
         if let Some(head) = head {
@@ -138,7 +164,10 @@ impl Walk<'_> {
             if index == 0 && child.kind == ExpressionKind::Atom {
                 match apply_reader_prefix_context(child, 0) {
                     Some(depth) => self.atom_in(child, depth, Namespace::Function),
-                    None => self.mark_opaque(),
+                    None => self.mark_opaque(OpacityCause::new(
+                        OpacityCauseKind::QuotedOrReadTime,
+                        child.span,
+                    )),
                 }
                 continue;
             }
@@ -167,12 +196,10 @@ impl Walk<'_> {
     }
 
     /// Records that every binding currently in scope encloses a region this
-    /// layer cannot see through.
-    pub(super) fn mark_opaque(&mut self) {
+    /// layer cannot see through, and what that region was.
+    pub(super) fn mark_opaque(&mut self, cause: OpacityCause) {
         for id in self.stack.visible_ids() {
-            self.builder
-                .draft_mut(id)
-                .observe_opacity(ScopeOpacity::ContainsOpaqueRegion);
+            self.builder.draft_mut(id).observe_opacity(cause);
         }
     }
 
@@ -225,6 +252,17 @@ pub(super) fn head_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom && view.reader_prefixes.is_empty())
         .then_some(view.text.as_deref())
         .flatten()
+}
+
+/// Whether the reader evaluates this form's text while reading it.
+///
+/// True for `#.` alone. That is the one prefix whose result re-enters the
+/// program as code, which is what separates it from quotation: `'x` yields a
+/// datum no matter what produced it.
+pub(super) fn is_read_time_evaluated(view: &ExpressionView) -> bool {
+    view.reader_prefixes
+        .iter()
+        .any(|prefix| prefix.is_opaque_reader_form())
 }
 
 /// Whether an atom is a reader dispatch rather than a symbol.

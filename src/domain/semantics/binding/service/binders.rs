@@ -15,7 +15,7 @@ use crate::domain::lexical_scope::{BoundName, binding_pattern_bound_names};
 use crate::domain::sexpr::reader::atom_symbol_span;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-use super::super::model::{BindingKind, ScopeId};
+use super::super::model::{BindingKind, OpacityCause, OpacityCauseKind, ScopeId};
 use super::builder::{Walk, head_text};
 use super::lambda_lists::lambda_list_names;
 
@@ -122,7 +122,10 @@ impl Walk<'_> {
         let Some(groups) = binding_groups(binding_form) else {
             // A shape the shared binding-list parser rejects. It collects no
             // references there, so the table must record nothing either.
-            self.mark_opaque();
+            self.mark_opaque(OpacityCause::new(
+                OpacityCauseKind::UnreadableBinderList,
+                binding_form.span,
+            ));
             return;
         };
 

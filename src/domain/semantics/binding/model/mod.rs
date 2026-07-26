@@ -7,6 +7,6 @@ mod ids;
 mod table;
 
 pub use binding::{Binding, BindingDraft};
-pub use facts::{BindingKind, ScopeOpacity, SpecialBinding};
+pub use facts::{BindingKind, OpacityCause, OpacityCauseKind, ScopeOpacity, SpecialBinding};
 pub use ids::{BindingId, ScopeId};
 pub use table::{BindingTable, BindingTableBuilder, Scope};
