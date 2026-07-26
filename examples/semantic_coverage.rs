@@ -19,6 +19,22 @@ use paredit_cli::application::usecase::semantic_coverage::{
 
 const EXTENSIONS: [&str; 3] = ["lisp", "lsp", "cl"];
 
+/// How many entries of each histogram to print by default. Long enough to see
+/// whether a tail exists, short enough that the answer to "what should I
+/// register next" is on one screen.
+const DEFAULT_TOP_CAUSES: usize = 25;
+
+/// The histogram depth, from `SEMANTIC_COVERAGE_TOP` when it holds a number.
+///
+/// An environment variable rather than a flag because the positional arguments
+/// are paths, and a development harness is not worth an argument parser.
+fn top_causes() -> usize {
+    std::env::var("SEMANTIC_COVERAGE_TOP")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(DEFAULT_TOP_CAUSES)
+}
+
 /// Walks the given paths for `.lisp`/`.lsp`/`.cl` files and reads them
 /// straight off disk. A throwaway implementation of the port: the CLI shell
 /// has a full workspace discovery module, but this harness has no CLI
@@ -152,10 +168,45 @@ fn print_report(report: &SemanticCoverageReport) {
     print_reason("special", breakdown.special(), unresolved);
     print_reason("no initial form", breakdown.no_initial_form(), unresolved);
     print_reason(
-        "initial form not constant",
+        "initial form did not fold",
         breakdown.initial_form_not_constant(),
         unresolved,
     );
+    print_reason(
+        "initial form folded but cannot propagate",
+        breakdown.initial_form_not_propagatable(),
+        unresolved,
+    );
+
+    let top = top_causes();
+
+    println!(
+        "\n== what made {} scopes opaque (top {top}) ==",
+        breakdown.opaque_scope()
+    );
+    for (label, count) in breakdown.ranked_opacity_causes().into_iter().take(top) {
+        println!(
+            "{}: {count} ({})",
+            label.display(),
+            percentage(count, breakdown.opaque_scope())
+        );
+    }
+
+    println!(
+        "\n== which binder left {} bindings uninitialized (top {top}) ==",
+        breakdown.no_initial_form()
+    );
+    for (head, count) in breakdown
+        .ranked_uninitialized_binders()
+        .into_iter()
+        .take(top)
+    {
+        println!(
+            "{}: {count} ({})",
+            head.as_deref().unwrap_or("<no binder>"),
+            percentage(count, breakdown.no_initial_form())
+        );
+    }
 }
 
 fn print_reason(label: &str, count: usize, unresolved: usize) {
