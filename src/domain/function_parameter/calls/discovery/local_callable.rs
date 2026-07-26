@@ -141,6 +141,16 @@ impl TraversalStats {
         }
     }
 
+    // Const-eligible only outside `cfg(test)`: the test-only body calls
+    // non-const `CallableScopeArena` methods, so clippy (which lints the lib
+    // target and never sees that body) suggests a `const` that fails to
+    // compile as E0015 in the `lib test` target.
+    // `expect` cannot be used: the lint fires for the lib target but not for
+    // the `lib test` target, so an expectation would go unfulfilled there.
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "cfg(test) body calls non-const methods"
+    )]
     fn record_scope_retention(&mut self, scopes: &CallableScopeArena) {
         #[cfg(test)]
         {

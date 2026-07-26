@@ -54,3 +54,12 @@ missing_debug_implementations = "warn"
 
 [lints.clippy]
 all = "warn"
+# Individually promoted after Phase -1 cleared every existing occurrence.
+# `clippy::pedantic` is deliberately NOT enabled wholesale: it also carries
+# lints this project rejects, such as `needless_pass_by_value`.
+must_use_candidate = "warn"
+semicolon_if_nothing_returned = "warn"
+uninlined_format_args = "warn"
+# Nursery lint, kept because it guards the 574 `const fn` signatures added in
+# Phase -1. Its two known false positives carry a local `expect` with a reason.
+missing_const_for_fn = "warn"

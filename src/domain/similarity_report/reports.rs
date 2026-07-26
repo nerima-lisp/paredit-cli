@@ -891,7 +891,7 @@ pub(super) fn scheduling_policy_for_test(
 }
 
 #[cfg(test)]
-pub(super) fn result_bounded_worker_count_for_test(
+pub(super) const fn result_bounded_worker_count_for_test(
     requested_workers: usize,
     limit: Option<usize>,
 ) -> usize {

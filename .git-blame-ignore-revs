@@ -14,3 +14,20 @@
 #     git config blame.ignoreRevsFile .git-blame-ignore-revs
 #
 # Entries are full 40-character SHAs, one per line, newest last.
+
+# Phase -1: mechanical Clippy fixes, no behavioural change.
+
+# style: trailing semicolons (clippy::semicolon_if_nothing_returned)
+378ae94c0c8f744e0a17dc999c36314d857e5ffd
+
+# style: inlined format arguments (clippy::uninlined_format_args)
+d2c09b4452711e4f3f57e0b46f0219e422cadabd
+
+# docs: split overlong first doc paragraphs (clippy::too_long_first_doc_paragraph)
+903e3489d65b73a70e2dd1cec76184643dc813d5
+
+# style: #[must_use] annotations (clippy::must_use_candidate)
+df2d9e19c494f33ee7d5903c09f8369c8fee9353
+
+# perf: const fn signatures (clippy::missing_const_for_fn)
+fd3f2d7468b88844c4d5544fc9ad695c4bb7df85
