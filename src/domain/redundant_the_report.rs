@@ -4,10 +4,21 @@
 //! `form`'s values unchanged (`the` passes all values through, so this holds in
 //! multiple-value contexts too). `(the t x)` is exactly `x`.
 //!
-//! Only the `t` value-type is flagged — a specific type like `(the fixnum x)`
-//! is a meaningful assertion and is left alone. Only the exact
-//! `(the t form)` three-element shape is matched; a reader-conditional operand
-//! is left alone (build-dependent).
+//! `t` is only the *unconditionally* vacuous case. `(the integer (length xs))`
+//! is just as empty a claim — `length` returns an integer whatever it is
+//! given — but saying so needs a type context, so callers that have one pass
+//! a second test (see [`IsAssertedTypeAlreadyKnown`]) and callers that do not
+//! keep reading `t` alone.
+//!
+//! The reasoning is not circular: the type layer records a `the` form's
+//! asserted type against *that form's* key and infers the inner form
+//! independently, so asking what the inner form is never returns the
+//! assertion being judged.
+//!
+//! Only the exact `(the TYPE form)` three-element shape is matched; a
+//! reader-conditional operand is left alone (build-dependent), and a compound
+//! or unmodelled specifier (`(integer 0 9)`, `fixnum`) is one the type layer
+//! declines to name, so it stays silent rather than guessing.
 //!
 //! The fix replaces the whole form with the inner form's source, so the rule is
 //! auto-fixable.
@@ -37,13 +48,30 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
     atom_text(view).is_some_and(|text| text.starts_with("#+") || text.starts_with("#-"))
 }
 
+/// Why the assertion says nothing.
+///
+/// An enum rather than a type-name string that is empty for the `t` case:
+/// "vacuous for every form there is" and "already satisfied by this form" are
+/// different facts, and a rewrite that dropped the distinction would leave the
+/// message unable to say which one it found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TheRedundancy {
+    /// `(the t form)`: `t` matches every object, so the claim is empty
+    /// whatever the form is.
+    Vacuous,
+    /// `(the integer (length xs))`: a real type, which the form provably has
+    /// already. Carries the asserted type's source spelling.
+    AlreadySatisfied(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct RedundantTheItem {
     pub path: PathBuf,
-    /// The span of the whole `(the t form)` form.
+    /// The span of the whole `(the TYPE form)` form.
     pub span: ByteSpan,
     /// The span of the inner form (for reconstructing the fix).
     pub form_span: ByteSpan,
+    pub redundancy: TheRedundancy,
 }
 
 #[derive(Debug)]
@@ -76,11 +104,27 @@ pub struct RedundantThePolicy {
     pub violations: Vec<String>,
 }
 
+/// Whether `form` provably already has the type `value_type` asserts.
+///
+/// The standalone `inspect redundant-the` command has no semantic tables to
+/// consult, so it passes [`never`] and keeps reading `t` only. The lint suite
+/// passes a test backed by the type context, so it also sees
+/// `(the integer (length xs))` — an assertion just as empty, spelled in a way
+/// the reader alone cannot recognize.
+pub(crate) type IsAssertedTypeAlreadyKnown<'a> =
+    &'a dyn Fn(&ExpressionView, &ExpressionView) -> bool;
+
+/// The [`IsAssertedTypeAlreadyKnown`] of a caller with no type context.
+fn never(_: &ExpressionView, _: &ExpressionView) -> bool {
+    false
+}
+
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub(crate) fn examine_the(
     view: &ExpressionView,
     path: &Path,
+    already_known: IsAssertedTypeAlreadyKnown<'_>,
     the_form_count: &mut usize,
     violations: &mut Vec<RedundantTheItem>,
 ) {
@@ -101,14 +145,25 @@ pub(crate) fn examine_the(
     if is_reader_conditional(value_type) || is_reader_conditional(form) {
         return;
     }
-    if !is_t_type(value_type) {
+
+    // `t` first, so a form that is both keeps the message that needs no type
+    // context to explain.
+    let redundancy = if is_t_type(value_type) {
+        TheRedundancy::Vacuous
+    } else if already_known(value_type, form) {
+        let Some(name) = atom_text(value_type) else {
+            return;
+        };
+        TheRedundancy::AlreadySatisfied(name.to_owned())
+    } else {
         return;
-    }
+    };
 
     violations.push(RedundantTheItem {
         path: path.to_path_buf(),
         span: view.span,
         form_span: form.span,
+        redundancy,
     });
 }
 
@@ -128,7 +183,7 @@ pub fn collect_redundant_thes(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_the(subview, path, &mut the_form_count, &mut violations)
+            examine_the(subview, path, &never, &mut the_form_count, &mut violations);
         });
     }
     Ok((the_form_count, violations))
