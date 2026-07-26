@@ -1,6 +1,8 @@
 use super::*;
 
 proptest! {
+    #![proptest_config(cli_proptest_config_replaying_recorded_failures(24))]
+
     #[test]
     fn pbt_cli_reorder_function_parameters_output_remains_parseable(
         name in "[a-z][a-z0-9]{0,8}",

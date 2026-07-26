@@ -488,6 +488,18 @@ fn cli_proptest_config(cases: u32) -> ProptestConfig {
     config
 }
 
+/// Bounds the case count like [`cli_proptest_config`] while keeping proptest's
+/// default source-parallel failure persistence.
+///
+/// [`cli_proptest_config`] pins persistence to [`FileFailurePersistence::Off`],
+/// which resolves to no path at all: a `*.proptest-regressions` file sitting
+/// next to the test is then never loaded, so recorded shrinks stop being
+/// replayed without any warning. Properties that have committed seeds must use
+/// this variant instead, so those seeds keep running ahead of novel cases.
+fn cli_proptest_config_replaying_recorded_failures(cases: u32) -> ProptestConfig {
+    ProptestConfig::with_cases(cases)
+}
+
 fn stable_manifest_hash(text: &str) -> String {
     let mut hash = 0xcbf29ce484222325_u64;
     for byte in text.as_bytes() {
