@@ -8,4 +8,5 @@ mod sink;
 
 pub use context::RuleContext;
 pub use dispatch::collect_lint_outcomes;
+pub use head_index::{HeadIndex, build_head_index};
 pub use sink::RuleSink;

@@ -22,12 +22,14 @@ use crate::domain::sexpr::{ByteSpan, SyntaxTree};
 pub use crate::domain::lint::model::{
     LintFinding, LintPolicy, LintPolicyOptions, LintSummary, Severity,
 };
-pub use crate::domain::lint::policy::{
-    evaluate_lint_policy, lint_gate_violations, resolve_active_rules, summarize_lint_findings,
-};
+// The registry-injecting wrappers, not the raw `policy` functions: those now
+// take the catalogue explicitly so the engine can live without a registry.
 pub use crate::domain::lint::registry::catalog::{
     CATEGORIES, FIXABLE_RULES, RULE_DOCS, RULES, WARNING_RULES, rule_description, rule_is_fixable,
     rule_severity,
+};
+pub use crate::domain::lint::{
+    evaluate_lint_policy, lint_gate_violations, resolve_active_rules, summarize_lint_findings,
 };
 
 /// One rule's rewrite for one finding: the rule that offered it and the span

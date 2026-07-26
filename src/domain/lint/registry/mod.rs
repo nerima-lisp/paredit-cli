@@ -9,34 +9,8 @@
 
 pub mod catalog;
 
-use super::model::RuleMeta;
-use super::rule::LintRule;
+use super::rule::RuleEntry;
 use super::rules;
-
-/// One registered rule: its compile-time description and its behaviour.
-///
-/// The metadata is a plain field rather than a trait method because a trait
-/// method cannot be called in a `const` context, and the catalogue constants
-/// must be derivable at compile time.
-#[derive(Debug)]
-pub struct RuleEntry {
-    meta: &'static RuleMeta,
-    rule: &'static (dyn LintRule + Sync),
-}
-
-impl RuleEntry {
-    pub const fn new(meta: &'static RuleMeta, rule: &'static (dyn LintRule + Sync)) -> Self {
-        Self { meta, rule }
-    }
-
-    pub const fn meta(&self) -> &'static RuleMeta {
-        self.meta
-    }
-
-    pub const fn rule(&self) -> &'static (dyn LintRule + Sync) {
-        self.rule
-    }
-}
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.

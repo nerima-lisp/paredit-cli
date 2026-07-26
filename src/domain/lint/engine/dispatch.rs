@@ -9,12 +9,12 @@ use crate::domain::sexpr::{ExpressionView, Path as SexprPath, SyntaxTree};
 use crate::domain::view_query::list_head;
 
 use super::context::RuleContext;
-use super::head_index::{head_index, head_key};
+use super::head_index::{HeadIndex, head_key};
 use super::ordering::{RuleIndex, VisitIndex};
 use super::sink::FindingSink;
 use crate::domain::lint::model::LintOutcome;
 use crate::domain::lint::policy::RuleSelection;
-use crate::domain::lint::registry::{REGISTRY, RULE_COUNT};
+use crate::domain::lint::rule::RuleCatalog;
 
 /// The rules that will actually run, decided once before the walk.
 ///
@@ -23,24 +23,31 @@ use crate::domain::lint::registry::{REGISTRY, RULE_COUNT};
 /// comparison against the active list for every node.
 #[derive(Debug)]
 struct ActiveRules {
-    enabled: [bool; RULE_COUNT],
+    // Sized from the catalogue rather than a `RULE_COUNT` const, which would
+    // make this type's size depend on how many rules exist. Built once per
+    // file, never per node, so the allocation is not on the hot path - and
+    // `contains` stays an index either way.
+    enabled: Box<[bool]>,
     any: bool,
 }
 
 impl ActiveRules {
-    fn resolve(dialect: Dialect, selection: RuleSelection<'_>) -> Self {
-        let mut enabled = [false; RULE_COUNT];
+    fn resolve(catalog: RuleCatalog, dialect: Dialect, selection: RuleSelection<'_>) -> Self {
+        let mut enabled = vec![false; catalog.len()];
         let mut any = false;
-        for (position, entry) in REGISTRY.iter().enumerate() {
+        for (position, entry) in catalog.entries().iter().enumerate() {
             let active = selection.includes(entry.meta().name())
                 && entry.rule().dialect_scope().includes(dialect);
             enabled[position] = active;
             any |= active;
         }
-        Self { enabled, any }
+        Self {
+            enabled: enabled.into_boxed_slice(),
+            any,
+        }
     }
 
-    const fn contains(&self, rule: RuleIndex) -> bool {
+    fn contains(&self, rule: RuleIndex) -> bool {
         self.enabled[rule.get()]
     }
 }
@@ -51,33 +58,39 @@ impl ActiveRules {
 /// One pre-order walk serves all of them: head-specific rules are reached
 /// through the operator index, shape rules see every node, and the few rules
 /// that correlate separate definitions get the document once before the walk.
+///
+/// `catalog` and `index` are supplied by whoever owns the registry, so this
+/// module never names a rule or counts them (section 4.2).
 pub fn collect_lint_outcomes(
+    catalog: RuleCatalog,
+    index: &HeadIndex,
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
     source: &str,
     selection: RuleSelection<'_>,
 ) -> Result<Vec<LintOutcome>> {
-    let active = ActiveRules::resolve(dialect, selection);
+    let active = ActiveRules::resolve(catalog, dialect, selection);
     if !active.any {
         return Ok(Vec::new());
     }
 
     let context = RuleContext::new(path, dialect, tree, source);
-    let index = head_index();
     let mut sink = FindingSink::new(path);
 
     let root = tree.root_view();
     for rule in index.whole_tree() {
         if active.contains(*rule) {
-            check(&context, *rule, VisitIndex::ROOT, &root, &mut sink)?;
+            check(catalog, &context, *rule, VisitIndex::ROOT, &root, &mut sink)?;
         }
     }
 
     let mut visit = VisitIndex::ROOT;
     for child in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(child))?.view();
-        walk(&context, &active, &view, &mut visit, &mut sink)?;
+        walk(
+            catalog, index, &context, &active, &view, &mut visit, &mut sink,
+        )?;
     }
 
     Ok(sink.into_ordered())
@@ -87,13 +100,14 @@ pub fn collect_lint_outcomes(
 /// depth, and pre-order is exactly what the per-rule walks it replaces
 /// produced.
 fn walk(
+    catalog: RuleCatalog,
+    index: &HeadIndex,
     context: &RuleContext<'_>,
     active: &ActiveRules,
     root: &ExpressionView,
     visit: &mut VisitIndex,
     sink: &mut FindingSink<'_>,
 ) -> Result<()> {
-    let index = head_index();
     let mut stack = vec![root];
 
     while let Some(view) = stack.pop() {
@@ -102,7 +116,7 @@ fn walk(
 
         for rule in index.all_nodes() {
             if active.contains(*rule) {
-                check(context, *rule, position, view, sink)?;
+                check(catalog, context, *rule, position, view, sink)?;
             }
         }
 
@@ -110,7 +124,7 @@ fn walk(
             let key = head_key(context.dialect(), head);
             for rule in index.for_head(&key) {
                 if active.contains(*rule) {
-                    check(context, *rule, position, view, sink)?;
+                    check(catalog, context, *rule, position, view, sink)?;
                 }
             }
         }
@@ -122,13 +136,14 @@ fn walk(
 }
 
 fn check(
+    catalog: RuleCatalog,
     context: &RuleContext<'_>,
     rule: RuleIndex,
     visit: VisitIndex,
     view: &ExpressionView,
     sink: &mut FindingSink<'_>,
 ) -> Result<()> {
-    let entry = &REGISTRY[rule.get()];
+    let entry = &catalog.entries()[rule.get()];
     let mut scoped = sink.visiting(rule, entry.meta().name(), visit);
     entry.rule().check(context, view, &mut scoped)
 }
@@ -146,6 +161,8 @@ mod tests {
     fn rule_names(input: &str, selection: RuleSelection<'_>) -> Vec<&'static str> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
         collect_lint_outcomes(
+            crate::domain::lint::CATALOG,
+            crate::domain::lint::head_index(),
             Path::new("test.lisp"),
             Dialect::CommonLisp,
             &tree,
@@ -192,6 +209,8 @@ mod tests {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
 
         let excluded = collect_lint_outcomes(
+            crate::domain::lint::CATALOG,
+            crate::domain::lint::head_index(),
             Path::new("test.lisp"),
             Dialect::CommonLisp,
             &tree,
@@ -202,6 +221,8 @@ mod tests {
         assert!(excluded.is_empty());
 
         let included = collect_lint_outcomes(
+            crate::domain::lint::CATALOG,
+            crate::domain::lint::head_index(),
             Path::new("test.lisp"),
             Dialect::CommonLisp,
             &tree,
@@ -227,6 +248,8 @@ mod tests {
         // false for any other dialect and the walk must never start.
         let tree = SyntaxTree::parse_with_dialect(MIXED_INPUT, Dialect::CommonLisp).expect("parse");
         let clojure_outcomes = collect_lint_outcomes(
+            crate::domain::lint::CATALOG,
+            crate::domain::lint::head_index(),
             Path::new("test.clj"),
             Dialect::Clojure,
             &tree,

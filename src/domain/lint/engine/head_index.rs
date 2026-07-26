@@ -2,14 +2,13 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::OnceLock;
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 use crate::domain::dialect::Dialect;
 
 use super::ordering::RuleIndex;
 use crate::domain::lint::model::HeadFilter;
-use crate::domain::lint::registry::REGISTRY;
+use crate::domain::lint::rule::RuleCatalog;
 
 /// Rules grouped by what they want to see, built once for the process.
 #[derive(Debug)]
@@ -36,19 +35,16 @@ impl HeadIndex {
     }
 }
 
-/// The process-wide index. Building it touches every registered rule once, so
-/// it is cached rather than rebuilt per file.
-pub fn head_index() -> &'static HeadIndex {
-    static INDEX: OnceLock<HeadIndex> = OnceLock::new();
-    INDEX.get_or_init(build)
-}
-
-fn build() -> HeadIndex {
+/// Builds the index for `catalog`. Touching every rule once is why the caller
+/// caches this rather than rebuilding it per file; the cache lives with
+/// whoever owns the registry, so the engine stays registry-agnostic.
+#[must_use]
+pub fn build_head_index(catalog: RuleCatalog) -> HeadIndex {
     let mut by_head: HashMap<&'static str, Vec<RuleIndex>> = HashMap::new();
     let mut all_nodes = Vec::new();
     let mut whole_tree = Vec::new();
 
-    for (position, entry) in REGISTRY.iter().enumerate() {
+    for (position, entry) in catalog.entries().iter().enumerate() {
         let index = RuleIndex::new(u16::try_from(position).expect("registry fits in u16"));
         match entry.rule().head_filter() {
             HeadFilter::Heads(heads) => {

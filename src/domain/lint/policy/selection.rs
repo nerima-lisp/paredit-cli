@@ -3,7 +3,7 @@
 use anyhow::Result;
 
 use crate::domain::lint::model::{RuleCategory, RuleName};
-use crate::domain::lint::registry::catalog::{CATEGORIES, RULES, rule_category};
+use crate::domain::lint::rule::RuleCatalog;
 
 /// Which rules a dispatch pass should run.
 ///
@@ -36,39 +36,43 @@ impl RuleSelection<'_> {
 /// exclusive at the CLI layer. Every named rule must be one of [`RULES`] and
 /// every named category one of [`CATEGORIES`] — an unknown name is a hard error
 /// rather than a silent no-op, so a typo in CI fails loudly. The result
-/// preserves [`RULES`] order.
+/// preserves the catalogue's registration order.
 pub fn resolve_active_rules(
+    catalog: RuleCatalog,
     only: &[String],
     exclude: &[String],
     categories: &[String],
 ) -> Result<Vec<&'static str>> {
+    let rules: Vec<&'static str> = catalog.names().collect();
+    let category_names = catalog.categories();
     for name in only.iter().chain(exclude) {
-        if !RULES.contains(&name.as_str()) {
+        if !rules.contains(&name.as_str()) {
             anyhow::bail!(
                 "unknown lint rule {name:?}; valid rules: {}",
-                RULES.join(", ")
+                rules.join(", ")
             );
         }
     }
     for name in categories {
-        if !CATEGORIES.contains(&name.as_str()) {
+        if !category_names.contains(&name.as_str()) {
             anyhow::bail!(
                 "unknown lint category {name:?}; valid categories: {}",
-                CATEGORIES.join(", ")
+                category_names.join(", ")
             );
         }
     }
 
-    Ok(RULES
-        .iter()
-        .copied()
+    Ok(rules
+        .into_iter()
         .filter(|rule| {
             let included = if !only.is_empty() {
                 only.iter().any(|name| name == rule)
             } else if !categories.is_empty() {
-                rule_category(rule).is_some_and(|category: RuleCategory| {
-                    categories.iter().any(|name| name == category.as_str())
-                })
+                catalog
+                    .category_of(rule)
+                    .is_some_and(|category: RuleCategory| {
+                        categories.iter().any(|name| name == category.as_str())
+                    })
             } else {
                 true
             };
