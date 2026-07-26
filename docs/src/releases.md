@@ -92,5 +92,5 @@ deprecated commands and flags, `schema_version` bumps, exit-code behaviour,
 Nix interface changes, and MSRV increases.
 
 Maintainers follow
-[RELEASING.md](https://github.com/nerima-lisp/paredit-cli/blob/main/RELEASING.md)
+[releasing.md](releasing.md)
 to verify the documentation and Nix checks before tagging.

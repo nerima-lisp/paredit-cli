@@ -7,7 +7,7 @@ commit.
 ## Choose the version
 
 `paredit-cli` follows [Semantic Versioning](https://semver.org/), and the
-[release and compatibility guide](docs/src/releases.md) defines exactly which
+[release and compatibility guide](releases.md) defines exactly which
 surfaces are covered. Before picking a number, diff the command catalog of the
 release candidate against the previous tag:
 
@@ -32,7 +32,7 @@ diff -u /tmp/prev.json /tmp/next.json
 2. Refresh `Cargo.lock` (`cargo update --workspace --offline`, or any build)
    so the recorded `paredit-cli` version matches.
 3. Update the documentation for anything the release changes.
-4. Commit as `release: vX.Y.Z`.
+4. Commit as `chore(release): vX.Y.Z`.
 
 ## Verify the release candidate
 
@@ -63,5 +63,5 @@ README and the MkDocs site describe the released command surface.
    MSRV, or Nix interfaces, call out the migration in the release notes.
 
 The release process does not replace the compatibility rules in the
-[agent interface](docs/src/agents.md) and the
-[release and compatibility guide](docs/src/releases.md).
+[agent interface](agents.md) and the
+[release and compatibility guide](releases.md).

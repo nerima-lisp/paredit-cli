@@ -9,7 +9,7 @@ documentation corrections, tests, and focused implementation changes.
 - Reduce bugs to a minimal, balanced S-expression and include the command,
   expected result, actual result, and `paredit --version` output.
 - Do not report security-sensitive behavior in a public issue. Follow
-  [SECURITY.md](SECURITY.md) instead.
+  [security-policy.md](security-policy.md) instead.
 
 ## Development environment
 
@@ -25,7 +25,7 @@ nix flake check
 GitHub Actions syntax, Clippy, the test suite, package construction, rendered
 documentation, the exact MSRV build/test, and the lint/format integration
 paths. See the full
-[development guide](docs/src/development.md) for the local development loop
+[development guide](development.md) for the local development loop
 and MSRV verification.
 
 ## Pull requests
@@ -51,5 +51,5 @@ The codebase is layered `domain` → `application` → `infrastructure` →
 innermost layer that owns it — parsing and safety rules in `domain`, workflow
 orchestration in `application` behind a source port, source discovery in
 `infrastructure`, and command wiring in `presentation`. The
-[architecture guide](docs/src/architecture.md) explains the boundaries and
+[architecture guide](architecture.md) explains the boundaries and
 where each kind of change belongs.

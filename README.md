@@ -72,11 +72,11 @@ at the [documentation site](https://nerima-lisp.github.io/paredit-cli/).
 
 ## Community and security
 
-- [Contributing](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Support](SUPPORT.md)
-- [Security](SECURITY.md)
-- [Releasing](RELEASING.md)
+- [Contributing](https://nerima-lisp.github.io/paredit-cli/contributing/)
+- [Code of Conduct](https://nerima-lisp.github.io/paredit-cli/code-of-conduct/)
+- [Support](https://nerima-lisp.github.io/paredit-cli/support/)
+- [Security](https://nerima-lisp.github.io/paredit-cli/security-policy/)
+- [Releasing](https://nerima-lisp.github.io/paredit-cli/releasing/)
 
 ## License
 

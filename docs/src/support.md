@@ -13,5 +13,5 @@ For a reproducible defect or an actionable feature request, use the repository
 templates. Include the command, a minimal input, expected behavior, actual
 behavior, and the version or commit.
 
-Security concerns are handled through [SECURITY.md](SECURITY.md), not public
+Security concerns are handled through [security-policy.md](security-policy.md), not public
 issues.
