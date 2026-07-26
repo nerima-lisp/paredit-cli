@@ -114,16 +114,17 @@ fn a_scope_with_no_calls_at_all_stays_transparent() {
 }
 
 #[test]
-fn quoted_data_is_opaque_and_holds_no_references() {
+fn quoted_data_holds_no_references_but_leaves_the_scope_readable() {
+    // Two claims that used to be one. The walk stops at `'(x)` because the
+    // `x` in there is a symbol in a list, not a use of the binding — that
+    // half is unchanged. What it is *not* is a reason to distrust the scope:
+    // quoted data is never evaluated, so it cannot reassign anything.
     let input = "(let ((x 1)) '(x))";
 
     let table = build(input);
     let x = binding_at(&table, 7);
     assert!(reference_labels(&table, x, input).is_empty());
-    assert_eq!(
-        table.binding(x).opacity(),
-        ScopeOpacity::ContainsOpaqueRegion
-    );
+    assert_eq!(table.binding(x).opacity(), ScopeOpacity::Transparent);
 }
 
 #[test]
