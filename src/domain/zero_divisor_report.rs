@@ -109,9 +109,21 @@ pub struct ZeroDivisorPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine(
+/// Whether a divisor is provably zero.
+///
+/// The standalone `inspect zero-divisor` command reads only the literal `0`,
+/// because it has no semantic tables to consult. The lint suite passes a test
+/// that also resolves constants and folds arithmetic, so it sees
+/// `(let ((z 0)) (/ x z))` and `(/ x (- 1 1))` — the same bug, spelled in a
+/// way the reader alone cannot recognise.
+pub(crate) type IsZeroDivisor<'a> = &'a dyn Fn(&ExpressionView) -> bool;
+
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine(
     view: &ExpressionView,
     path: &Path,
+    is_zero: IsZeroDivisor<'_>,
     division_form_count: &mut usize,
     violations: &mut Vec<ZeroDivisorItem>,
 ) {
@@ -126,7 +138,7 @@ fn examine(
 
     for index in divisor_indices(&lower, view.children.len()) {
         let divisor = &view.children[index];
-        if is_zero_literal(divisor) {
+        if is_zero(divisor) {
             violations.push(ZeroDivisorItem {
                 path: path.to_path_buf(),
                 span: view.span,
@@ -154,7 +166,13 @@ pub fn collect_zero_divisors(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut division_form_count, &mut violations)
+            examine(
+                subview,
+                path,
+                &is_zero_literal,
+                &mut division_form_count,
+                &mut violations,
+            );
         });
     }
     Ok((division_form_count, violations))

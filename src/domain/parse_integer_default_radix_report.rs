@@ -75,9 +75,21 @@ pub struct ParseIntegerDefaultRadixPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine(
+/// Whether a `:radix` argument is provably ten.
+///
+/// The standalone `inspect parse-integer-default-radix` command reads only the
+/// literal `10`, having no semantic tables to consult. The lint suite passes a
+/// test that resolves constants and folds arithmetic, so it also sees `#xA`
+/// and `(let ((r 10)) … :radix r)` — the same redundant argument, spelled
+/// differently.
+pub(crate) type IsDefaultRadix<'a> = &'a dyn Fn(&ExpressionView) -> bool;
+
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine(
     view: &ExpressionView,
     path: &Path,
+    is_ten: IsDefaultRadix<'_>,
     call_form_count: &mut usize,
     violations: &mut Vec<ParseIntegerDefaultRadixItem>,
 ) {
@@ -93,7 +105,7 @@ fn examine(
         if !is_radix_keyword(&view.children[index]) {
             continue;
         }
-        if !is_ten_literal(&view.children[index + 1]) {
+        if !is_ten(&view.children[index + 1]) {
             continue;
         }
         let removal_span = ByteSpan::new(
@@ -125,7 +137,13 @@ pub fn collect_parse_integer_default_radixes(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut call_form_count, &mut violations)
+            examine(
+                subview,
+                path,
+                &is_ten_literal,
+                &mut call_form_count,
+                &mut violations,
+            );
         });
     }
     Ok((call_form_count, violations))

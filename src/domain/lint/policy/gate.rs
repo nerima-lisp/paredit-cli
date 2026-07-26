@@ -32,19 +32,22 @@ pub fn summarize_lint_findings(findings: Vec<LintFinding>, active: &[&str]) -> L
     }
 }
 
-/// Judges a summary against the requested gate, listing each violated
-/// condition so the caller can report why the run failed.
-pub fn evaluate_lint_policy(options: LintPolicyOptions, summary: &LintSummary) -> LintPolicy {
-    let finding_count = summary.finding_count;
+/// Every gate condition `finding_rules` violates, phrased for a report.
+///
+/// Takes the rule name of each reported finding rather than a whole summary,
+/// because the SARIF and GitHub output paths have only that much: they stream
+/// findings out as they are produced and never build one. Both readings go
+/// through this function so the gate has a single implementation — two would
+/// drift the moment a third condition is added.
+pub fn lint_gate_violations(options: LintPolicyOptions, finding_rules: &[&str]) -> Vec<String> {
     let mut violations = Vec::new();
-    if options.fail_on_finding() && finding_count > 0 {
-        violations.push(format!("finding_count {finding_count} exceeds 0"));
+    if options.fail_on_finding() && !finding_rules.is_empty() {
+        violations.push(format!("finding_count {} exceeds 0", finding_rules.len()));
     }
     if let Some(threshold) = options.fail_on_severity() {
-        let count = summary
-            .findings
+        let count = finding_rules
             .iter()
-            .filter(|finding| rule_severity(finding.rule).at_least(threshold))
+            .filter(|rule| rule_severity(rule).at_least(threshold))
             .count();
         if count > 0 {
             violations.push(format!(
@@ -53,10 +56,22 @@ pub fn evaluate_lint_policy(options: LintPolicyOptions, summary: &LintSummary) -
             ));
         }
     }
+    violations
+}
+
+/// Judges a summary against the requested gate, listing each violated
+/// condition so the caller can report why the run failed.
+pub fn evaluate_lint_policy(options: LintPolicyOptions, summary: &LintSummary) -> LintPolicy {
+    let finding_rules: Vec<&str> = summary
+        .findings
+        .iter()
+        .map(|finding| finding.rule)
+        .collect();
+    let violations = lint_gate_violations(options, &finding_rules);
 
     LintPolicy {
         fail_on_finding: options.fail_on_finding(),
-        finding_count,
+        finding_count: summary.finding_count,
         passed: violations.is_empty(),
         violations,
     }

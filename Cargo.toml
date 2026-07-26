@@ -43,6 +43,10 @@ proptest = "1.11"
 name = "similarity_report"
 harness = false
 
+[[bench]]
+name = "lint_report"
+harness = false
+
 [lints.rust]
 unsafe_code = "deny"
 missing_debug_implementations = "warn"

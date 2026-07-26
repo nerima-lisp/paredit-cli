@@ -50,7 +50,10 @@ impl<'a> FindingSink<'a> {
     /// pre-order".
     pub fn into_ordered(mut self) -> Vec<LintOutcome> {
         self.entries.sort_by_key(|(order, _)| *order);
-        self.entries.into_iter().map(|(_, outcome)| outcome).collect()
+        self.entries
+            .into_iter()
+            .map(|(_, outcome)| outcome)
+            .collect()
     }
 
     fn push(
@@ -138,7 +141,7 @@ mod tests {
         let messages: Vec<String> = sink
             .into_ordered()
             .into_iter()
-            .map(|outcome| outcome.finding().message.clone())
+            .map(|outcome| outcome.into_parts().0.message)
             .collect();
         assert_eq!(
             messages,
@@ -159,7 +162,7 @@ mod tests {
         let messages: Vec<String> = sink
             .into_ordered()
             .into_iter()
-            .map(|outcome| outcome.finding().message.clone())
+            .map(|outcome| outcome.into_parts().0.message)
             .collect();
         assert_eq!(messages, vec!["first duplicate", "second duplicate"]);
     }
@@ -168,16 +171,25 @@ mod tests {
     fn a_reported_fix_travels_with_its_finding() {
         let path = Path::new("test.lisp");
         let mut sink = FindingSink::new(path);
-        sink.visiting(RuleIndex::new(0), RuleName::new("redundant-quote"), VisitIndex::new(1))
-            .report_fixed(
-                span(0, 2),
-                "quote is redundant",
-                RuleFix::single(span(0, 2), "x", "Remove the redundant quote"),
-            );
+        sink.visiting(
+            RuleIndex::new(0),
+            RuleName::new("redundant-quote"),
+            VisitIndex::new(1),
+        )
+        .report_fixed(
+            span(0, 2),
+            "quote is redundant",
+            RuleFix::single(span(0, 2), "x", "Remove the redundant quote"),
+        );
         let outcomes = sink.into_ordered();
         assert_eq!(outcomes.len(), 1);
+        let (_, fix) = outcomes
+            .into_iter()
+            .next()
+            .expect("one outcome")
+            .into_parts();
         assert_eq!(
-            outcomes[0].fix().expect("fix").description(),
+            fix.expect("fix").description(),
             "Remove the redundant quote"
         );
     }

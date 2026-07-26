@@ -72,8 +72,13 @@ impl RuleFix {
         &self.description
     }
 
+    /// How many regions this fix edits. Always at least one.
+    pub fn replacement_count(&self) -> usize {
+        1 + self.rest.len()
+    }
+
     /// Every replacement, in the order the rule produced them.
-    pub fn replacements(&self) -> impl ExactSizeIterator<Item = &Replacement> {
+    pub fn replacements(&self) -> impl Iterator<Item = &Replacement> {
         std::iter::once(&self.first).chain(&self.rest)
     }
 }
@@ -90,7 +95,7 @@ mod tests {
     #[test]
     fn a_single_fix_has_exactly_one_replacement() {
         let fix = RuleFix::single(span(0, 3), "x", "Unwrap");
-        assert_eq!(fix.replacements().len(), 1);
+        assert_eq!(fix.replacement_count(), 1);
         assert_eq!(fix.description(), "Unwrap");
         assert_eq!(fix.replacements().next().expect("one edit").text(), "x");
     }

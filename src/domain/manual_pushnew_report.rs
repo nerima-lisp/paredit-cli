@@ -109,7 +109,9 @@ pub struct ManualPushnewPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_assignment(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_assignment(
     view: &ExpressionView,
     path: &Path,
     assignment_form_count: &mut usize,

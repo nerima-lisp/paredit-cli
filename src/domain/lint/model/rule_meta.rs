@@ -77,10 +77,9 @@ mod tests {
     fn exposes_every_field_in_a_const_context() {
         const NAME: &str = SAMPLE.name().as_str();
         const CATEGORY: &str = SAMPLE.category().as_str();
-        const FIXABLE: bool = SAMPLE.fixability().is_fixable();
         assert_eq!(NAME, "zero-divisor");
         assert_eq!(CATEGORY, "suspicious");
-        assert!(!FIXABLE);
+        assert_eq!(SAMPLE.fixability(), Fixability::ReportOnly);
         assert_eq!(SAMPLE.severity(), Severity::Warning);
     }
 }

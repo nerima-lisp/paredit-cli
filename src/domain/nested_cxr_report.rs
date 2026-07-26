@@ -81,7 +81,9 @@ pub struct NestedCxrPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_accessor(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_accessor(
     view: &ExpressionView,
     path: &Path,
     accessor_form_count: &mut usize,

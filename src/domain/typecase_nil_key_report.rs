@@ -79,7 +79,9 @@ pub struct TypecaseNilKeyPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_case(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_case(
     view: &ExpressionView,
     path: &Path,
     typecase_form_count: &mut usize,

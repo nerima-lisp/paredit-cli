@@ -71,7 +71,7 @@ pub struct SelfComparisonPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_comparison(
+pub(crate) fn examine_comparison(
     view: &ExpressionView,
     path: &Path,
     comparison_form_count: &mut usize,

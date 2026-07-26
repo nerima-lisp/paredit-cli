@@ -100,7 +100,9 @@ pub struct NegatedWhenUnlessPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_conditional(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_conditional(
     view: &ExpressionView,
     path: &Path,
     conditional_form_count: &mut usize,

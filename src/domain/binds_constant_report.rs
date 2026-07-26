@@ -86,7 +86,9 @@ pub struct BindsConstantPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_binding_form(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_binding_form(
     view: &ExpressionView,
     path: &Path,
     binding_form_count: &mut usize,

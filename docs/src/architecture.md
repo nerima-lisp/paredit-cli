@@ -50,6 +50,75 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
+## Lint rules: one trait, one registry line
+
+`src/domain/lint` is a concrete example of the domain discipline above, worth
+knowing on its own because it is the most frequently extended part of the
+domain. `src/domain/lint_report.rs` is the stable façade the application and
+CLI layers import — report types, catalogue constants (`RULES`, `RULE_DOCS`,
+`FIXABLE_RULES`, `WARNING_RULES`), and the two entry points that lint one
+parsed file. Underneath it:
+
+| Submodule | Role |
+| --- | --- |
+| `rule` | The `LintRule` trait. A rule declares which nodes it wants (`head_filter`) and what to do with one (`check`); it never walks the tree itself. |
+| `model` | Vocabulary shared by every rule and the façade — `Severity`, `RuleCategory`, `Fixability`, `RuleMeta`, `LintFinding`, `RuleFix`. |
+| `policy` | Dialect scope, rule selection, and gate decisions — logic that needs no tree. |
+| `engine` | The single pass: walks the document once, dispatching each node to every rule whose `head_filter` matches it. |
+| `registry` | `REGISTRY`, the one array every rule is listed in. The catalogue constants the façade re-exports are derived from it at compile time. |
+| `rules` | One file per rule (`rules/redundant_apply.rs`, `rules/car_reverse.rs`, …): a `META: RuleMeta` constant plus a `LintRule` impl. A rule that auto-fixes attaches a `RuleFix` from `check` — the fix lives with the rule, not in the CLI layer. |
+
+Adding a rule touches exactly three places:
+
+1. Add `src/domain/lint/rules/your_rule.rs` with a `META` constant and a
+   `LintRule` implementation.
+2. Add one `RuleEntry::new(...)` line to `REGISTRY` in
+   `src/domain/lint/registry/mod.rs`.
+3. Add one integration test in `tests/cli/lint_report.rs` (or a fixture pair
+   under `tests/fixtures/lint_golden` for the golden test in
+   `tests/cli/lint_report_golden.rs`).
+
+No parallel arrays to keep in sync and no separate fix implementation to wire
+into the CLI: `--fix`, `--fix-plan`, and `--diff` all read the same `RuleFix`
+the rule itself produced.
+
+## Semantics: read-only tables beside the tree
+
+`src/domain/semantics` lets a rule reason about what code *means* rather than
+how it is spelled. It is why `zero-divisor` flags `(let ((z 0)) (/ x z))` and
+not just `(/ x 0)`.
+
+Nothing here rewrites the tree. Formatting survives a refactor because every
+edit is a byte-span replacement over untouched source, and that discipline only
+holds while the tree stays authoritative — so the analyses hang beside it as
+side tables keyed by `NodeKey`, never as annotations on it.
+
+| Context | Answers |
+| --- | --- |
+| `binding` | Which binding does the name at this position mean? Built once per file, from the same knowledge `lexical_scope` uses to answer the inverse question. |
+| `value` | What does this expression provably evaluate to? |
+| `typing` | What type is this, at a coarse CLHS granularity? Common Lisp only. |
+| `project` | Which package owns this symbol, so `app:run` and `test:run` are two things? |
+
+Each context splits into `model` (vocabulary), `policy` (dialect tables), and
+`service` (the pass that builds a table). They stack — values need bindings,
+types need values — and link downward **by id, never by borrow**: a
+`ValueTable` holding a `&BindingTable` would make them one self-referential
+struct. A rule reaches them through `RuleContext`, which builds each on first
+use, so a run whose rules ask for none pays for none.
+
+Two rules hold throughout, and both cost deductions on purpose:
+
+- **A fact is recorded only when it is provable.** Anything uncertain is absent
+  rather than guessed, because a rule that trusts a wrong `Known` reports a bug
+  in working code.
+- **An unknown head is opaque.** A macro can expand into an assignment that
+  appears nowhere in the source, so propagation stops at any head whose
+  semantics are not registered. Ordinary function calls and standard control
+  forms are exempt — a function cannot reach the caller's lexical environment
+  at all, and a control form evaluates its subforms where they are written, so
+  any assignment inside is visible.
+
 ## Application: use cases behind source ports
 
 Each non-trivial CLI workflow is an application **use case** that owns the
@@ -127,6 +196,8 @@ identity: they share the domain, not just a serialization format.
 | Change | Layer |
 | --- | --- |
 | New parsing rule, dialect capability, or refactor safety check | `domain` |
+| New lint rule | `domain/lint/rules` plus one `registry` line |
+| New static fact about values, types, or bindings | `domain/semantics` |
 | New report, plan, or multi-file workflow orchestration | `application` |
 | New way to discover or read sources | `infrastructure` |
 | New command, flag, output format, or exit-code mapping | `presentation` |

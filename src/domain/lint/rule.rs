@@ -1,8 +1,9 @@
 //! The contract every lint rule implements.
 
+use std::fmt;
+
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::ExpressionView;
 
 use super::engine::{RuleContext, RuleSink};
@@ -21,14 +22,14 @@ use super::policy::RuleDialectScope;
 /// than on this trait: the public `RULES`, `RULE_DOCS`, `FIXABLE_RULES`, and
 /// `WARNING_RULES` constants are derived from the registry at compile time, and
 /// a trait method cannot be called in a `const` context.
-pub trait LintRule: Sync {
+pub trait LintRule: Sync + fmt::Debug {
     /// Which nodes of the single pass this rule wants to see.
     fn head_filter(&self) -> HeadFilter;
 
     /// The dialects the rule is meaningful for. Almost every rule encodes CLHS
     /// operator semantics, so Common Lisp only is the default.
     fn dialect_scope(&self) -> RuleDialectScope {
-        RuleDialectScope::CommonLispOnly
+        RuleDialectScope::COMMON_LISP_ONLY
     }
 
     /// Examines one matched node and reports what it finds.
@@ -42,9 +43,4 @@ pub trait LintRule: Sync {
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> Result<()>;
-}
-
-/// Whether this rule runs at all for `dialect`.
-pub fn applies_to(rule: &dyn LintRule, dialect: Dialect) -> bool {
-    rule.dialect_scope().includes(dialect)
 }

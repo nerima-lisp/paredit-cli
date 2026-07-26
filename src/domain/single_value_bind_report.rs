@@ -85,7 +85,9 @@ pub struct SingleValueBindPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_bind(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_bind(
     view: &ExpressionView,
     path: &Path,
     bind_form_count: &mut usize,

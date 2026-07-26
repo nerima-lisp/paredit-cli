@@ -16,6 +16,12 @@ impl Severity {
         }
     }
 
+    /// Whether this is the style-only level. `const` so the catalogue can
+    /// derive its warning list at compile time.
+    pub const fn is_warning(self) -> bool {
+        matches!(self, Self::Warning)
+    }
+
     const fn rank(self) -> u8 {
         match self {
             Self::Error => 2,

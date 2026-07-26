@@ -104,7 +104,7 @@ fn quotient_operator(head: &str) -> Option<&'static str> {
         .find(|op| head.eq_ignore_ascii_case(op))
 }
 
-fn examine(
+pub(crate) fn examine(
     view: &ExpressionView,
     path: &Path,
     quotient_form_count: &mut usize,

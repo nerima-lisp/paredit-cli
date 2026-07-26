@@ -61,7 +61,9 @@ pub struct IdenticalIfBranchPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_if(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_if(
     view: &ExpressionView,
     path: &Path,
     if_form_count: &mut usize,

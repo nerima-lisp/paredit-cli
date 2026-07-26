@@ -134,7 +134,9 @@ pub struct DestructiveLiteralPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_call(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_call(
     view: &ExpressionView,
     path: &Path,
     destructive_call_count: &mut usize,
