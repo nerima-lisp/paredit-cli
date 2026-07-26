@@ -22,7 +22,7 @@ pub(super) fn print_char_op_string_report(
                     safe_text!(item.path.display()),
                     item.span.start().get(),
                     safe_text!(item.operator),
-                    safe_text!(item.literal),
+                    safe_text!(item.literal()),
                 );
             }
         }
@@ -47,7 +47,7 @@ pub(super) fn print_char_op_string_report(
                                 "end": item.span.end().get(),
                             },
                             "operator": &item.operator,
-                            "literal": &item.literal,
+                            "literal": item.literal(),
                         }))
                         .collect::<Vec<_>>(),
                 }))?
