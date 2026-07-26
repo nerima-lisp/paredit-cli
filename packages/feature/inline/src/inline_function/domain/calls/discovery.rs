@@ -1,11 +1,11 @@
 use anyhow::Result;
 
-use crate::domain::callable_scope::{
+use paredit_core_semantics::callable_scope::{
     common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
 };
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -18,7 +18,7 @@ struct InlineCallTraversal<'a> {
     function_name: &'a SymbolName,
 }
 
-pub(super) fn discover_function_call_paths(
+pub fn discover_function_call_paths(
     tree: &SyntaxTree,
     dialect: Dialect,
     definition_span: ByteSpan,

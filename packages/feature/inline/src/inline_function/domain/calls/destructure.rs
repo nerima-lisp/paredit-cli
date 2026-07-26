@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::super::definition::{
     InlineDestructureKeyPattern, InlineDestructureListPattern, InlineDestructureOptionalPattern,
@@ -12,7 +12,7 @@ use super::binding::{bind_aux_parameter, destructured_binding_entries};
 use super::keyword_args::{call_side_allow_other_keys_from_views, is_allow_other_keys_keyword};
 use super::types::CallSideAllowOtherKeys;
 
-pub(super) fn destructure_argument_entries(
+pub fn destructure_argument_entries(
     dialect: Dialect,
     pattern: &InlineDestructurePattern,
     argument: &str,

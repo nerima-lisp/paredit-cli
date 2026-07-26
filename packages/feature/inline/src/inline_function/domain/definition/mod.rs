@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 mod body;
 mod destructure;
@@ -15,13 +15,13 @@ use body::{
 };
 use lambda_list::{inline_parameter_names, inline_parameter_names_from_children};
 
-pub(super) use types::{
+pub use types::{
     InlineDefinition, InlineDefinitionKind, InlineDestructureKeyPattern,
     InlineDestructureListPattern, InlineDestructureOptionalPattern, InlineDestructurePattern,
     InlineParameter, InlineParameterBinding, InlineParameterKind,
 };
 
-pub(super) fn parse_inline_function_definition(
+pub fn parse_inline_function_definition(
     dialect: Dialect,
     input: &str,
     view: ExpressionView,

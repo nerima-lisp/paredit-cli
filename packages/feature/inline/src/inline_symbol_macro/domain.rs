@@ -2,15 +2,15 @@
 
 use anyhow::{Context, Result, bail};
 
-use super::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::common_lisp::{
+use crate::inline_let::domain::{InlineLetRequest, plan_inline_let};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_eq, is_common_lisp_declaration_form,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::inline_let::{InlineLetRequest, plan_inline_let};
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 

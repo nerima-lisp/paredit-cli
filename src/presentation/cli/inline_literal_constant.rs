@@ -1,10 +1,19 @@
-use super::*;
 use crate::application::usecase::inline_literal_constant::{
     InlineLiteralConstantPlan, InlineLiteralConstantRequest, plan_inline_literal_constant,
 };
+use crate::domain::sexpr::Path;
+use crate::presentation::cli::DialectArg;
+use crate::presentation::cli::OutputFormat;
+use crate::presentation::cli::read_input_and_dialect;
+use crate::presentation::cli::require_output_file;
+use crate::presentation::cli::write_file_with_rollback;
+use anyhow::Result;
+use clap::Args;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct InlineLiteralConstantArgs {
+pub struct InlineLiteralConstantArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -17,7 +26,7 @@ pub(super) struct InlineLiteralConstantArgs {
     output: OutputFormat,
 }
 
-pub(super) fn inline_literal_constant(args: InlineLiteralConstantArgs) -> Result<()> {
+pub fn inline_literal_constant(args: InlineLiteralConstantArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

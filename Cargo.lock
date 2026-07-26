@@ -657,6 +657,7 @@ dependencies = [
  "paredit-core-syntax",
  "paredit-core-workspace",
  "paredit-feature-extract",
+ "paredit-feature-inline",
  "paredit-feature-similarity",
  "predicates",
  "proptest",
@@ -741,6 +742,21 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-extract"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-edit",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "proptest",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-inline"
 version = "1.1.0"
 dependencies = [
  "anyhow",

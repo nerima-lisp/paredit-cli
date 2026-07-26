@@ -1,13 +1,10 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{CommonLispOperator, is_common_lisp_declaration_form};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView};
+use paredit_core_syntax::common_lisp::{CommonLispOperator, is_common_lisp_declaration_form};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView};
 
-pub(super) fn unsupported_inline_function_definition_message(
-    dialect: Dialect,
-    head: &str,
-) -> String {
+pub fn unsupported_inline_function_definition_message(dialect: Dialect, head: &str) -> String {
     if matches!(dialect, Dialect::CommonLisp | Dialect::Unknown)
         && CommonLispOperator::from_head(head) == Some(CommonLispOperator::DefineSetfExpander)
     {
@@ -19,7 +16,7 @@ pub(super) fn unsupported_inline_function_definition_message(
     format!("inline-function does not support definition head: {head}")
 }
 
-pub(super) fn inline_function_body_view(body_forms: &[ExpressionView]) -> Result<ExpressionView> {
+pub fn inline_function_body_view(body_forms: &[ExpressionView]) -> Result<ExpressionView> {
     let [body] = body_forms else {
         let first = body_forms
             .first()
@@ -41,10 +38,7 @@ pub(super) fn inline_function_body_view(body_forms: &[ExpressionView]) -> Result
     Ok(body.clone())
 }
 
-pub(super) fn effective_body_forms(
-    dialect: Dialect,
-    body_forms: &[ExpressionView],
-) -> &[ExpressionView] {
+pub fn effective_body_forms(dialect: Dialect, body_forms: &[ExpressionView]) -> &[ExpressionView] {
     if !dialect.supports_common_lisp_lambda_list_refactor_model() {
         return body_forms;
     }

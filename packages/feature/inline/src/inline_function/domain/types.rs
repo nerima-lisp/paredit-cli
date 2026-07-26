@@ -1,5 +1,5 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SymbolName};
 
 #[derive(Debug, Clone)]
 pub struct InlineFunctionRequest<'a> {

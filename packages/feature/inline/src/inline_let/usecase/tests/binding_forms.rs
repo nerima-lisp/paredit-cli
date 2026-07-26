@@ -1,4 +1,5 @@
 use super::{target, *};
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_common_lisp_inline_let() {

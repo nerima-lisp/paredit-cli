@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionView};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionView};
 
 use super::super::syntax::atom_text;
 use super::types::{
@@ -351,7 +351,7 @@ impl InlineLambdaListParseState {
     }
 }
 
-pub(super) fn inline_parameter_names(
+pub fn inline_parameter_names(
     dialect: Dialect,
     input: &str,
     definition_kind: InlineDefinitionKind,
@@ -368,7 +368,7 @@ pub(super) fn inline_parameter_names(
     }
 }
 
-pub(super) fn inline_parameter_names_from_children(
+pub fn inline_parameter_names_from_children(
     dialect: Dialect,
     input: &str,
     definition_kind: InlineDefinitionKind,

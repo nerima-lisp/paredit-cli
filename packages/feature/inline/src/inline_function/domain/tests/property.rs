@@ -1,3 +1,4 @@
+use paredit_core_syntax::sexpr::SyntaxTree;
 use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::*;

@@ -1,4 +1,5 @@
 use super::{target, *};
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_inline_let_without_touching_shadowed_lambda_parameter() {

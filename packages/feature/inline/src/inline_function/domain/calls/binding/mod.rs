@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use self::parameter_binding::{
     bind_keyword_parameter, bind_positional_parameter, bound_parameter_argument_entries,
@@ -30,7 +30,7 @@ struct InlineBindingContext<'a> {
     allow_drop_arguments: bool,
 }
 
-pub(super) fn bind_inline_function_arguments(
+pub fn bind_inline_function_arguments(
     dialect: Dialect,
     params: &[InlineParameter],
     call: InlineFunctionCall,
@@ -312,7 +312,7 @@ fn list_argument(arguments: &[String]) -> String {
     format!("({})", arguments.join(" "))
 }
 
-pub(super) fn bind_aux_parameter(
+pub fn bind_aux_parameter(
     dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
@@ -320,7 +320,7 @@ pub(super) fn bind_aux_parameter(
     parameter_binding::bind_aux_parameter(dialect, param, default_scope)
 }
 
-pub(super) fn destructured_binding_entries(
+pub fn destructured_binding_entries(
     dialect: Dialect,
     pattern: &super::super::definition::InlineDestructurePattern,
     argument: String,

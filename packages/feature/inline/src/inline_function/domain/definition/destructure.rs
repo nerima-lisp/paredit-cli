@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::{Delimiter, ExpressionView};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionView};
 
 use super::super::syntax::atom_text;
 use super::lambda_list::parameters::{
@@ -12,7 +12,7 @@ use super::types::{
     InlineDestructurePattern,
 };
 
-pub(super) fn parse_macro_destructure_pattern(
+pub fn parse_macro_destructure_pattern(
     input: &str,
     child: &ExpressionView,
 ) -> Result<InlineDestructurePattern> {

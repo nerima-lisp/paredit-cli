@@ -2,30 +2,30 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
 #[derive(Debug, Clone)]
-pub(crate) struct Request<'a> {
+pub struct Request<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Path,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ParameterPlan {
+pub struct ParameterPlan {
     pub name: SymbolName,
     pub argument: String,
     pub reference_count: usize,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Plan {
+pub struct Plan {
     pub dialect: Dialect,
     pub path: Path,
     pub form_span: ByteSpan,
@@ -37,7 +37,7 @@ pub(crate) struct Plan {
     pub changed: bool,
 }
 
-pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> Result<Plan> {
     validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("inline-local-function input is not a valid S-expression document")?;
@@ -139,7 +139,7 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
     })
 }
 
-pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> Result<()> {
     if dialect != Dialect::CommonLisp {
         bail!("inline-local-function currently supports only Common Lisp");
     }

@@ -1,10 +1,8 @@
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::types::CallSideAllowOtherKeys;
 
-pub(super) fn call_side_allow_other_keys_from_strings(
-    keyword_args: &[String],
-) -> CallSideAllowOtherKeys {
+pub fn call_side_allow_other_keys_from_strings(keyword_args: &[String]) -> CallSideAllowOtherKeys {
     for pair in keyword_args.chunks_exact(2) {
         if is_allow_other_keys_keyword(&pair[0]) {
             return parse_call_side_allow_other_keys_value(&pair[1]);
@@ -13,7 +11,7 @@ pub(super) fn call_side_allow_other_keys_from_strings(
     CallSideAllowOtherKeys::AbsentOrFalse
 }
 
-pub(super) fn call_side_allow_other_keys_from_views(
+pub fn call_side_allow_other_keys_from_views(
     keyword_args: &[ExpressionView],
     source: &str,
 ) -> CallSideAllowOtherKeys {
@@ -25,7 +23,7 @@ pub(super) fn call_side_allow_other_keys_from_views(
     CallSideAllowOtherKeys::AbsentOrFalse
 }
 
-pub(super) fn is_allow_other_keys_keyword(key: &str) -> bool {
+pub fn is_allow_other_keys_keyword(key: &str) -> bool {
     key.eq_ignore_ascii_case(":allow-other-keys")
 }
 

@@ -1,10 +1,20 @@
-use super::*;
-use crate::application::usecase::inline_function::{
+use crate::inline_function::usecase::{
     InlineFunctionPlan, InlineFunctionRequest, plan_inline_function,
 };
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct InlineFunctionArgs {
+pub struct InlineFunctionArgs {
     /// Input file. Required when --write is used; reads stdin otherwise.
     #[arg(short, long)]
     file: Option<PathBuf>,
@@ -37,7 +47,7 @@ pub(super) struct InlineFunctionArgs {
     output: OutputFormat,
 }
 
-pub(super) fn inline_function(args: InlineFunctionArgs) -> Result<()> {
+pub fn inline_function(args: InlineFunctionArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

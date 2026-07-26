@@ -1,10 +1,18 @@
-use super::*;
-use crate::application::usecase::inline_lambda::{
-    InlineLambdaPlan, InlineLambdaRequest, plan_inline_lambda,
-};
+use crate::inline_lambda::usecase::{InlineLambdaPlan, InlineLambdaRequest, plan_inline_lambda};
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct InlineLambdaArgs {
+pub struct InlineLambdaArgs {
     /// Input file. Required when --write is used; reads stdin otherwise.
     #[arg(short, long)]
     file: Option<PathBuf>,
@@ -22,7 +30,7 @@ pub(super) struct InlineLambdaArgs {
     output: OutputFormat,
 }
 
-pub(super) fn inline_lambda(args: InlineLambdaArgs) -> Result<()> {
+pub fn inline_lambda(args: InlineLambdaArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

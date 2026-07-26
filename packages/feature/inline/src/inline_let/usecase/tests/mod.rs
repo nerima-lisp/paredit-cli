@@ -1,8 +1,9 @@
+use paredit_core_syntax::sexpr::SyntaxTree;
 use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::*;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path};
 
 fn target(input: &str) -> ExpressionView {
     let tree = SyntaxTree::parse(input).expect("parse");

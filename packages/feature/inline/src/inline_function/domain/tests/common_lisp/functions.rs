@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_single_common_lisp_call() {

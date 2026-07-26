@@ -1,1 +1,1 @@
-pub use crate::domain::inline_symbol_macro::*;
+pub use crate::inline_symbol_macro::domain::*;

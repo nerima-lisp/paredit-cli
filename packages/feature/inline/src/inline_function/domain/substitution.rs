@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
 use super::InlineFunctionParameterPlan;
 use super::rewrite::apply_relative_body_edits;
 
-pub(super) fn substitute_inline_function_body(
+pub fn substitute_inline_function_body(
     dialect: Dialect,
     input: &str,
     body: &ExpressionView,
@@ -27,7 +27,7 @@ pub(super) fn substitute_inline_function_body(
     )
 }
 
-pub(super) fn substitute_expression(
+pub fn substitute_expression(
     dialect: Dialect,
     input: &str,
     params: &[String],

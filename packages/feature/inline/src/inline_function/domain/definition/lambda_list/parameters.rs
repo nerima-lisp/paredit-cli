@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::super::super::syntax::atom_text;
 use super::super::destructure::parse_macro_destructure_pattern;
@@ -8,22 +8,22 @@ use super::super::types::{
     InlineDefinitionKind, InlineParameter, InlineParameterBinding, InlineParameterKind,
 };
 
-pub(super) fn rest_parameter_name(child: &ExpressionView) -> Result<&str> {
+pub fn rest_parameter_name(child: &ExpressionView) -> Result<&str> {
     atom_text(child)
         .context("inline-function currently supports only simple symbol &rest parameters")
 }
 
-pub(super) fn whole_parameter_name(child: &ExpressionView) -> Result<&str> {
+pub fn whole_parameter_name(child: &ExpressionView) -> Result<&str> {
     atom_text(child)
         .context("inline-function currently supports only simple symbol &whole parameters")
 }
 
-pub(super) fn environment_parameter_name(child: &ExpressionView) -> Result<&str> {
+pub fn environment_parameter_name(child: &ExpressionView) -> Result<&str> {
     atom_text(child)
         .context("inline-function currently supports only simple symbol &environment parameters")
 }
 
-pub(super) fn optional_parameter(
+pub fn optional_parameter(
     input: &str,
     definition_kind: InlineDefinitionKind,
     child: &ExpressionView,
@@ -84,7 +84,7 @@ fn optional_parameter_default_value(input: &str, child: &ExpressionView) -> Opti
         .map(|default| default.span.slice(input).to_owned())
 }
 
-pub(super) fn keyword_parameter(
+pub fn keyword_parameter(
     input: &str,
     definition_kind: InlineDefinitionKind,
     child: &ExpressionView,
@@ -229,7 +229,7 @@ pub(in super::super) fn dotted_tail_parameter_name(child: &ExpressionView) -> Re
     Ok(name)
 }
 
-pub(super) fn parse_required_parameter(
+pub fn parse_required_parameter(
     input: &str,
     definition_kind: InlineDefinitionKind,
     child: &ExpressionView,

@@ -1,10 +1,20 @@
-use super::*;
-use crate::application::usecase::inline_symbol_macro::{
+use crate::inline_symbol_macro::usecase::{
     InlineSymbolMacroPlan, InlineSymbolMacroRequest, plan_inline_symbol_macro,
 };
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct InlineSymbolMacroArgs {
+pub struct InlineSymbolMacroArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -17,7 +27,7 @@ pub(super) struct InlineSymbolMacroArgs {
     output: OutputFormat,
 }
 
-pub(super) fn inline_symbol_macro(args: InlineSymbolMacroArgs) -> Result<()> {
+pub fn inline_symbol_macro(args: InlineSymbolMacroArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

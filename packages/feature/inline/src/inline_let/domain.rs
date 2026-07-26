@@ -2,9 +2,9 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::{collect_unshadowed_symbol_references, value_capture};
-use crate::domain::sexpr::{
+use paredit_core_semantics::lexical_scope::{collect_unshadowed_symbol_references, value_capture};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -31,7 +31,8 @@ pub struct InlineLetPlan {
     pub changed: bool,
 }
 
-pub(crate) const fn supports_inline_let_dialect(dialect: Dialect) -> bool {
+#[must_use]
+pub const fn supports_inline_let_dialect(dialect: Dialect) -> bool {
     matches!(
         dialect,
         Dialect::CommonLisp
@@ -61,7 +62,7 @@ pub fn plan_inline_let(request: InlineLetRequest<'_>) -> Result<InlineLetPlan> {
     require_supported_dialect(request.dialect)?;
     let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("inline-let input is not a valid S-expression document")?;
-    crate::domain::mutation_safety::reject_common_lisp_reader_conditionals(
+    paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals(
         &input_tree,
         request.dialect,
     )?;
@@ -88,7 +89,7 @@ pub fn plan_inline_let(request: InlineLetRequest<'_>) -> Result<InlineLetPlan> {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CoreRequest<'a> {
+pub struct CoreRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Option<Path>,
@@ -97,7 +98,7 @@ pub(crate) struct CoreRequest<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CorePlan {
+pub struct CorePlan {
     pub dialect: Dialect,
     pub path: Option<Path>,
     pub let_span: ByteSpan,
@@ -126,7 +127,7 @@ fn select_target_from_tree(
     Ok(target)
 }
 
-pub(crate) fn plan(request: CoreRequest<'_>) -> Result<CorePlan> {
+pub fn plan(request: CoreRequest<'_>) -> Result<CorePlan> {
     require_supported_dialect(request.dialect)?;
     let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("inline-let input is not a valid S-expression document")?;

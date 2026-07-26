@@ -1,10 +1,10 @@
 //! Application facade for inlining an immediately invoked Common Lisp lambda.
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::dialect::Dialect;
-use crate::domain::inline_lambda::{self, Request as DomainRequest};
-use crate::domain::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
+use crate::inline_lambda::domain::{self as inline_lambda, Request as DomainRequest};
 use anyhow::Result;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct InlineLambdaRequest<'a> {

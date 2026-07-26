@@ -2,10 +2,10 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::{
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -139,7 +139,8 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
     })
 }
 
-pub(crate) const fn supports_inline_function_dialect(dialect: Dialect) -> bool {
+#[must_use]
+pub const fn supports_inline_function_dialect(dialect: Dialect) -> bool {
     matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp)
 }
 
@@ -287,7 +288,7 @@ fn validate_macro_environment_parameters(
                     format!("inline-function could not parse {context}: {default_value}")
                 })?;
             let default_expression = default_tree
-                .select_path(&crate::domain::sexpr::Path::root_child(0))?
+                .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))?
                 .view();
             reject_environment_references_in_expression(
                 dialect,

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 use super::super::super::definition::{
     InlineDestructurePattern, InlineParameter, InlineParameterBinding,
@@ -9,7 +9,7 @@ use super::super::super::substitution::substitute_expression;
 use super::super::destructure::destructure_argument_entries;
 use super::super::types::ParameterBinding;
 
-pub(super) fn bind_positional_parameter(
+pub fn bind_positional_parameter(
     dialect: Dialect,
     param: &InlineParameter,
     argument: Option<String>,
@@ -23,7 +23,7 @@ pub(super) fn bind_positional_parameter(
     missing_parameter_binding(dialect, param, default_scope, allow_drop_arguments)
 }
 
-pub(super) fn bind_keyword_parameter(
+pub fn bind_keyword_parameter(
     dialect: Dialect,
     param: &InlineParameter,
     argument: Option<String>,
@@ -37,7 +37,7 @@ pub(super) fn bind_keyword_parameter(
     missing_parameter_binding(dialect, param, default_scope, allow_drop_arguments)
 }
 
-pub(super) fn bind_aux_parameter(
+pub fn bind_aux_parameter(
     dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
@@ -125,7 +125,7 @@ fn supplied_parameter_default_scope_entries(
     Ok(entries)
 }
 
-pub(super) fn bound_parameter_argument_entries(
+pub fn bound_parameter_argument_entries(
     dialect: Dialect,
     param: &InlineParameter,
     argument: String,
@@ -146,7 +146,7 @@ fn simple_binding_name(param: &InlineParameter) -> Result<String> {
         .context("inline-function internal error: expected simple parameter binding")
 }
 
-pub(super) fn destructured_binding_entries(
+pub fn destructured_binding_entries(
     dialect: Dialect,
     pattern: &InlineDestructurePattern,
     argument: String,

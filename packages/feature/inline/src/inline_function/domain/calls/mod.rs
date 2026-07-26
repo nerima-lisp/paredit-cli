@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -16,7 +16,7 @@ use super::definition::InlineParameter;
 use super::syntax::{atom_text, list_head};
 use types::{InlineArgumentBindings, InlineFunctionCall};
 
-pub(super) fn bind_inline_function_arguments(
+pub fn bind_inline_function_arguments(
     dialect: Dialect,
     params: &[InlineParameter],
     call: InlineFunctionCall,
@@ -34,12 +34,12 @@ pub(super) fn bind_inline_function_arguments(
     )
 }
 
-pub(super) fn resolve_function_call_paths(
+pub fn resolve_function_call_paths(
     tree: &SyntaxTree,
     dialect: Dialect,
     explicit_call_paths: Vec<Path>,
     all_calls: bool,
-    definition_span: crate::domain::sexpr::ByteSpan,
+    definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
     command: &str,
 ) -> Result<Vec<Path>> {
@@ -54,7 +54,7 @@ pub(super) fn resolve_function_call_paths(
     )
 }
 
-pub(super) fn parse_inline_function_call(
+pub fn parse_inline_function_call(
     dialect: Dialect,
     view: ExpressionView,
     function_name: &SymbolName,
@@ -88,7 +88,7 @@ fn validate_explicit_function_call_paths(
     tree: &SyntaxTree,
     dialect: Dialect,
     explicit_call_paths: &[Path],
-    definition_span: crate::domain::sexpr::ByteSpan,
+    definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
     command: &str,
 ) -> Result<()> {
@@ -120,11 +120,7 @@ fn validate_explicit_function_call_paths(
     Ok(())
 }
 
-pub(super) fn inline_function_symbol_reference_eq(
-    dialect: Dialect,
-    left: &str,
-    right: &str,
-) -> bool {
+pub fn inline_function_symbol_reference_eq(dialect: Dialect, left: &str, right: &str) -> bool {
     match dialect {
         Dialect::CommonLisp => common_lisp_symbol_reference_eq(left, right),
         Dialect::EmacsLisp
@@ -140,12 +136,12 @@ pub(super) fn inline_function_symbol_reference_eq(
     }
 }
 
-pub(super) fn validate_or_resolve_function_call_paths(
+pub fn validate_or_resolve_function_call_paths(
     tree: &SyntaxTree,
     dialect: Dialect,
     explicit_call_paths: Vec<Path>,
     all_calls: bool,
-    definition_span: crate::domain::sexpr::ByteSpan,
+    definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
     command: &str,
 ) -> Result<Vec<Path>> {

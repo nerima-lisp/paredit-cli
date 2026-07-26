@@ -1,8 +1,8 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{ByteOffset, ByteSpan};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 
-pub(super) fn apply_relative_body_edits(
+pub fn apply_relative_body_edits(
     input: &str,
     body_span: ByteSpan,
     mut replacements: Vec<(ByteSpan, String)>,
@@ -20,10 +20,7 @@ pub(super) fn apply_relative_body_edits(
     Ok(output)
 }
 
-pub(super) fn apply_byte_span_edits(
-    input: &str,
-    mut edits: Vec<(ByteSpan, String)>,
-) -> Result<String> {
+pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) -> Result<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 
@@ -34,9 +31,7 @@ pub(super) fn apply_byte_span_edits(
     Ok(output)
 }
 
-pub(super) fn ensure_non_overlapping_spans(
-    spans: impl IntoIterator<Item = ByteSpan>,
-) -> Result<()> {
+pub fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Result<()> {
     let mut previous_end = None;
     for span in spans {
         let start = span.start().get();
@@ -51,7 +46,7 @@ pub(super) fn ensure_non_overlapping_spans(
     Ok(())
 }
 
-pub(super) fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
+pub fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
     let bytes = input.as_bytes();
     let mut start = span.start().get();
     let mut end = span.end().get();

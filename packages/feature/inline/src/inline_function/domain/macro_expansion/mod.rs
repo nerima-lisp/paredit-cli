@@ -5,8 +5,8 @@ use expansion::{
     count_references_in_expanded_expression, expand_unquote_expression, expand_unquote_splicing,
 };
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::InlineFunctionParameterPlan;
 use super::substitution::substitute_inline_function_body;
@@ -14,7 +14,7 @@ use super::substitution::substitute_inline_function_body;
 mod expansion;
 mod literal_render;
 
-pub(super) fn expand_inline_macro_body(
+pub fn expand_inline_macro_body(
     dialect: Dialect,
     input: &str,
     body: &ExpressionView,
@@ -99,7 +99,7 @@ fn expand_plain_macro_body(
 
     let intermediate_tree = expansion::parse_single_expression_tree(dialect, &intermediate)?;
     let intermediate_expression = intermediate_tree
-        .select_path(&crate::domain::sexpr::Path::root_child(0))?
+        .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))?
         .view();
     let (expanded, _) = substitute_inline_function_body(
         dialect,

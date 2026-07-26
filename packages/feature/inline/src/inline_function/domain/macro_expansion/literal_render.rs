@@ -1,8 +1,8 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub(super) fn render_unquoted_source(view: &ExpressionView) -> Result<String> {
+pub fn render_unquoted_source(view: &ExpressionView) -> Result<String> {
     Ok(render_literal_expression_from(view, 1))
 }
 
@@ -20,7 +20,7 @@ fn render_core_literal(view: &ExpressionView) -> String {
     }
 }
 
-pub(super) fn render_literal_expression(view: &ExpressionView) -> String {
+pub fn render_literal_expression(view: &ExpressionView) -> String {
     render_literal_expression_from(view, 0)
 }
 
@@ -33,7 +33,7 @@ fn render_literal_expression_from(view: &ExpressionView, prefix_index: usize) ->
     rendered
 }
 
-pub(super) fn render_list(delimiter: Delimiter, children: Vec<String>) -> String {
+pub fn render_list(delimiter: Delimiter, children: Vec<String>) -> String {
     let (open, close) = match delimiter {
         Delimiter::Paren => ('(', ')'),
         Delimiter::Bracket => ('[', ']'),

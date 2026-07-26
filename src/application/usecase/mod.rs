@@ -84,12 +84,7 @@ pub mod if_not_report;
 pub mod if_to_or_report;
 pub mod if_to_unless_report;
 pub mod impact_report;
-pub mod inline_function;
-pub mod inline_lambda;
-pub mod inline_let;
 pub mod inline_literal_constant;
-pub mod inline_local_function;
-pub mod inline_symbol_macro;
 pub mod introduce_let;
 pub mod lambda_list_keyword_order_report;
 pub mod last_default_count_report;
@@ -222,3 +217,9 @@ pub use paredit_feature_similarity::similarity_report::usecase as similarity_rep
 pub use paredit_feature_extract::extract_constant::usecase as extract_constant;
 pub use paredit_feature_extract::extract_function::usecase as extract_function;
 pub use paredit_feature_extract::extract_local_function::usecase as extract_local_function;
+
+pub use paredit_feature_inline::inline_function::usecase as inline_function;
+pub use paredit_feature_inline::inline_lambda::usecase as inline_lambda;
+pub use paredit_feature_inline::inline_let::usecase as inline_let;
+pub use paredit_feature_inline::inline_local_function::usecase as inline_local_function;
+pub use paredit_feature_inline::inline_symbol_macro::usecase as inline_symbol_macro;

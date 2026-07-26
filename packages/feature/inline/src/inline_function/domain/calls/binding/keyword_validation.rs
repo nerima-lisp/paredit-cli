@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::super::super::definition::{InlineParameter, InlineParameterKind};
 use super::super::keyword_args::is_allow_other_keys_keyword;
 use super::super::types::CallSideAllowOtherKeys;
 
-pub(super) fn validate_unknown_keyword_arguments(
+pub fn validate_unknown_keyword_arguments(
     keyword_args: &[String],
     keyword_params: &[InlineParameter],
     rest_index: Option<usize>,

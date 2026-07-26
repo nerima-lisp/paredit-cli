@@ -1,24 +1,24 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::domain::inline_function) struct InlineFunctionCall {
-    pub(in crate::domain::inline_function) raw_args: Vec<String>,
-    pub(in crate::domain::inline_function) whole_call: String,
+pub(in crate::inline_function::domain) struct InlineFunctionCall {
+    pub(in crate::inline_function::domain) raw_args: Vec<String>,
+    pub(in crate::inline_function::domain) whole_call: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::domain::inline_function) struct InlineArgumentBindings {
-    pub(in crate::domain::inline_function) body_bindings: Vec<(String, String)>,
-    pub(in crate::domain::inline_function) argument_bindings: Vec<(String, String)>,
+pub(in crate::inline_function::domain) struct InlineArgumentBindings {
+    pub(in crate::inline_function::domain) body_bindings: Vec<(String, String)>,
+    pub(in crate::inline_function::domain) argument_bindings: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum CallSideAllowOtherKeys {
+pub enum CallSideAllowOtherKeys {
     AbsentOrFalse,
     True,
     Unknown(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ParameterBinding {
+pub struct ParameterBinding {
     pub body_entries: Vec<(String, String)>,
     pub argument_entries: Vec<(String, String)>,
     pub default_scope_entries: Vec<(String, String)>,

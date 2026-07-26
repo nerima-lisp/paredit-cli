@@ -1,4 +1,5 @@
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::Path;
 
 use super::*;
 

@@ -134,6 +134,17 @@ def rewrite(name: str, slices: list[str]) -> int:
                 text, n = re.subn(rf"\bcrate::{layer}::{slice_}\b",
                                   f"crate::{slice_}::{dest}", text)
                 counts["own_slices"] += n
+            # `use crate::domain::x::{self, ..}` bound the name `x`. After the
+            # collapse `self` would bind `domain`, silently orphaning every
+            # unqualified `x::` call site in the file.
+            for dest in ("domain", "usecase", "cli"):
+                text, n = re.subn(rf"use crate::{slice_}::{dest}::\{{self,",
+                                  f"use crate::{slice_}::{dest}::{{self as {slice_},", text)
+                counts["self_alias"] += n
+                text, n = re.subn(rf"^use crate::{slice_}::{dest};$",
+                                  f"use crate::{slice_}::{dest} as {slice_};",
+                                  text, flags=re.M)
+                counts["self_alias"] += n
 
         # 3. Anything still addressing the old cli root is a shared helper.
         text, n = re.subn(r"\bcrate::presentation::cli\b", "paredit_core_cli::shared", text)
@@ -165,6 +176,11 @@ def rewrite(name: str, slices: list[str]) -> int:
             if import_line in text:
                 continue
             if re.search(rf"use [A-Za-z_:]*\{{[^}}]*\b{symbol}\b", text):
+                continue
+            # Never shadow a definition in this very file: `inline_function`
+            # defines its own `apply_byte_span_edits`, and importing core's
+            # alongside it is an E0255 name collision.
+            if re.search(rf"\b(fn|struct|enum|trait|type|const|static)\s+{symbol}\b", text):
                 continue
             missing.append(import_line)
         if missing:

@@ -1,4 +1,6 @@
 use super::{target, *};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 proptest! {
     #[test]

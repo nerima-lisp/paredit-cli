@@ -30,6 +30,7 @@ paredit-core-lint-engine = { path = "packages/core/lint-engine" }
 paredit-core-cli = { path = "packages/core/cli" }
 paredit-feature-similarity = { path = "packages/feature/similarity" }
 paredit-feature-extract = { path = "packages/feature/extract" }
+paredit-feature-inline = { path = "packages/feature/inline" }
 paredit-core-workspace = { path = "packages/core/workspace" }
 
 anyhow = "1.0"

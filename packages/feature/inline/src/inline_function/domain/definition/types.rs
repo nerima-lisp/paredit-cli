@@ -1,13 +1,13 @@
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum InlineDefinitionKind {
+pub enum InlineDefinitionKind {
     Function,
     Macro,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct InlineDefinition {
+pub struct InlineDefinition {
     pub name: SymbolName,
     pub params: Vec<InlineParameter>,
     pub body: ExpressionView,
@@ -16,7 +16,7 @@ pub(crate) struct InlineDefinition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum InlineParameterKind {
+pub enum InlineParameterKind {
     Positional { optional: bool },
     Keyword { keyword: String },
     Rest,
@@ -26,7 +26,7 @@ pub(crate) enum InlineParameterKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct InlineParameter {
+pub struct InlineParameter {
     pub binding: InlineParameterBinding,
     pub kind: InlineParameterKind,
     pub default_value: Option<String>,
@@ -34,19 +34,19 @@ pub(crate) struct InlineParameter {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum InlineParameterBinding {
+pub enum InlineParameterBinding {
     Name(String),
     Destructure(InlineDestructurePattern),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum InlineDestructurePattern {
+pub enum InlineDestructurePattern {
     Name(String),
     List(InlineDestructureListPattern),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct InlineDestructureListPattern {
+pub struct InlineDestructureListPattern {
     pub whole: Option<String>,
     pub required: Vec<InlineDestructurePattern>,
     pub optional: Vec<InlineDestructureOptionalPattern>,
@@ -57,14 +57,14 @@ pub(crate) struct InlineDestructureListPattern {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct InlineDestructureOptionalPattern {
+pub struct InlineDestructureOptionalPattern {
     pub binding: InlineDestructurePattern,
     pub default_value: Option<String>,
     pub supplied_p: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct InlineDestructureKeyPattern {
+pub struct InlineDestructureKeyPattern {
     pub binding: InlineDestructurePattern,
     pub keyword: String,
     pub default_value: Option<String>,

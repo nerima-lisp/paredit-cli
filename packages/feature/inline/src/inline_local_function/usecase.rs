@@ -1,10 +1,12 @@
 //! Application facade for inlining a single Common Lisp `flet` call.
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::dialect::Dialect;
-use crate::domain::inline_local_function::{self, Request as DomainRequest};
-use crate::domain::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
+use crate::inline_local_function::domain::{
+    self as inline_local_function, Request as DomainRequest,
+};
 use anyhow::Result;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct InlineLocalFunctionRequest<'a> {

@@ -1,5 +1,7 @@
 use super::super::calls::inline_function_symbol_reference_eq;
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 #[test]
 fn common_lisp_reader_collision_output_reparses_with_the_same_dialect() {

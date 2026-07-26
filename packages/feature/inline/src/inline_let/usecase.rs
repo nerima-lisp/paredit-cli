@@ -1,1 +1,1 @@
-pub use crate::domain::inline_let::{InlineLetPlan, InlineLetRequest, plan_inline_let};
+pub use crate::inline_let::domain::{InlineLetPlan, InlineLetRequest, plan_inline_let};
