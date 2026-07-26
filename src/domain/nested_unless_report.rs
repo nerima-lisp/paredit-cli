@@ -89,7 +89,9 @@ pub struct NestedUnlessPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_unless(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_unless(
     view: &ExpressionView,
     path: &Path,
     unless_form_count: &mut usize,

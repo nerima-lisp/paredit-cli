@@ -89,7 +89,9 @@ pub struct ExplicitNilReturnPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_return(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_return(
     view: &ExpressionView,
     path: &Path,
     return_form_count: &mut usize,

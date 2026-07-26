@@ -93,7 +93,9 @@ pub struct NegatedComparisonPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_negation(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_negation(
     view: &ExpressionView,
     path: &Path,
     negation_form_count: &mut usize,

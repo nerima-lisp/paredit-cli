@@ -50,6 +50,38 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
+## Lint rules: one trait, one registry line
+
+`src/domain/lint` is a concrete example of the domain discipline above, worth
+knowing on its own because it is the most frequently extended part of the
+domain. `src/domain/lint_report.rs` is the stable façade the application and
+CLI layers import — report types, catalogue constants (`RULES`, `RULE_DOCS`,
+`FIXABLE_RULES`, `WARNING_RULES`), and the two entry points that lint one
+parsed file. Underneath it:
+
+| Submodule | Role |
+| --- | --- |
+| `rule` | The `LintRule` trait. A rule declares which nodes it wants (`head_filter`) and what to do with one (`check`); it never walks the tree itself. |
+| `model` | Vocabulary shared by every rule and the façade — `Severity`, `RuleCategory`, `Fixability`, `RuleMeta`, `LintFinding`, `RuleFix`. |
+| `policy` | Dialect scope, rule selection, and gate decisions — logic that needs no tree. |
+| `engine` | The single pass: walks the document once, dispatching each node to every rule whose `head_filter` matches it. |
+| `registry` | `REGISTRY`, the one array every rule is listed in. The catalogue constants the façade re-exports are derived from it at compile time. |
+| `rules` | One file per rule (`rules/redundant_apply.rs`, `rules/car_reverse.rs`, …): a `META: RuleMeta` constant plus a `LintRule` impl. A rule that auto-fixes attaches a `RuleFix` from `check` — the fix lives with the rule, not in the CLI layer. |
+
+Adding a rule touches exactly three places:
+
+1. Add `src/domain/lint/rules/your_rule.rs` with a `META` constant and a
+   `LintRule` implementation.
+2. Add one `RuleEntry::new(...)` line to `REGISTRY` in
+   `src/domain/lint/registry/mod.rs`.
+3. Add one integration test in `tests/cli/lint_report.rs` (or a fixture pair
+   under `tests/fixtures/lint_golden` for the golden test in
+   `tests/cli/lint_report_golden.rs`).
+
+No parallel arrays to keep in sync and no separate fix implementation to wire
+into the CLI: `--fix`, `--fix-plan`, and `--diff` all read the same `RuleFix`
+the rule itself produced.
+
 ## Application: use cases behind source ports
 
 Each non-trivial CLI workflow is an application **use case** that owns the

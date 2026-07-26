@@ -88,9 +88,24 @@ pub struct ConstantIfTestPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_if(
+/// Whether a test is provably constant, and to what.
+///
+/// The standalone `inspect constant-if-test` command recognises only the
+/// literal `t`/`nil` spelling, having no semantic tables to consult. The lint
+/// suite passes a test backed by the value layer, so `(if (= 1 1) a b)` and
+/// `(let ((flag t)) (if flag a b))` are the same settled branch.
+///
+/// Widening is safe for the fix as well as the report: the value layer folds
+/// only pure operations, so a test it can evaluate has no side effect for the
+/// rewrite to drop.
+pub(crate) type ConstantTest<'a> = &'a dyn Fn(&ExpressionView) -> Option<bool>;
+
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_if(
     view: &ExpressionView,
     path: &Path,
+    constant_test: ConstantTest<'_>,
     if_form_count: &mut usize,
     violations: &mut Vec<ConstantIfTestItem>,
 ) {
@@ -148,7 +163,13 @@ pub fn collect_constant_if_tests(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, path, &mut if_form_count, &mut violations)
+            examine_if(
+                subview,
+                path,
+                &constant_test,
+                &mut if_form_count,
+                &mut violations,
+            );
         });
     }
     Ok((if_form_count, violations))

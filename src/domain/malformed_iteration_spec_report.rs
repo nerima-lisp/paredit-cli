@@ -87,7 +87,9 @@ pub struct MalformedIterationSpecPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_iteration(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_iteration(
     view: &ExpressionView,
     path: &Path,
     iteration_form_count: &mut usize,

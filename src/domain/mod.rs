@@ -102,6 +102,7 @@ pub(crate) mod let_composition;
 pub mod let_report;
 pub(crate) mod let_star_composition;
 pub mod lexical_scope;
+pub(crate) mod lint;
 pub mod lint_report;
 pub mod lint_suppression;
 pub mod list_star_nil_report;

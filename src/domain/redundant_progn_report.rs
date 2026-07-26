@@ -72,7 +72,9 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
     atom_text(view).is_some_and(|text| text.starts_with("#+") || text.starts_with("#-"))
 }
 
-fn examine_progn(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine_progn(
     view: &ExpressionView,
     path: &Path,
     progn_form_count: &mut usize,

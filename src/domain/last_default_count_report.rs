@@ -68,7 +68,9 @@ pub struct LastDefaultCountPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine(
+/// Examines one node. Shared with the lint suite's rule, which reaches every
+/// node through the single dispatch pass instead of walking the tree again.
+pub(crate) fn examine(
     view: &ExpressionView,
     path: &Path,
     call_form_count: &mut usize,

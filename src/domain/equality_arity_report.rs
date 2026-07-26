@@ -86,7 +86,7 @@ pub struct EqualityArityPolicy {
     pub violations: Vec<String>,
 }
 
-fn examine_call(
+pub(crate) fn examine_call(
     view: &ExpressionView,
     path: &Path,
     call_count: &mut usize,

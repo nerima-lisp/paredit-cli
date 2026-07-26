@@ -38,14 +38,6 @@ impl LintOutcome {
         Self { finding, fix }
     }
 
-    pub fn finding(&self) -> &LintFinding {
-        &self.finding
-    }
-
-    pub fn fix(&self) -> Option<&RuleFix> {
-        self.fix.as_ref()
-    }
-
     pub fn into_parts(self) -> (LintFinding, Option<RuleFix>) {
         (self.finding, self.fix)
     }

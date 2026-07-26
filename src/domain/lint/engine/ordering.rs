@@ -39,6 +39,7 @@ pub struct VisitIndex(u32);
 impl VisitIndex {
     pub const ROOT: Self = Self(0);
 
+    #[cfg(test)]
     pub const fn new(value: u32) -> Self {
         Self(value)
     }

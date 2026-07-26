@@ -175,6 +175,7 @@ pub mod rename_control;
 pub mod replace_forms;
 pub mod self_assignment_report;
 pub mod self_comparison_report;
+pub mod semantic_coverage;
 pub mod setf_arity_report;
 pub mod setq_non_variable_report;
 pub mod shadowed_binding_report;
