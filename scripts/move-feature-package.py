@@ -46,6 +46,7 @@ extract_shared let_binding progn local_function_binding let_composition let_star
 flet_composition convert_control args io diff shared gate macos_acl usecase cli
 similarity_report duplicate_report form_similarity
 extract_function extract_local_function extract_constant
+inline_function inline_let inline_lambda inline_local_function inline_symbol_macro
 """.split())
 
 
@@ -96,9 +97,12 @@ def check(slices: list[str]) -> bool:
             # A file directly under a layer reaches its siblings as `super::x`,
             # which the `crate::` pattern above never sees. F7 depended on
             # `rename` through exactly this and was reported closed.
-            if path.parent == (ROOT / base) or path.parent.parent == (ROOT / base):
+            # Only a file sitting DIRECTLY under the layer reaches a layer
+            # sibling through `super::`. Deeper files reach their own module's
+            # children that way, which is internal and must not be reported.
+            if path.parent == (ROOT / base):
                 for target in re.findall(r"\buse super::([a-z_0-9]+)(?:::|;)", code):
-                    if target not in known:
+                    if target not in known and target != "super":
                         outbound[f"super::{target}"] += 1
 
     total = sum(len(p.read_text().splitlines()) for p in files)
