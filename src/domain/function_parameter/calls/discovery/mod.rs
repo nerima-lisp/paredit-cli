@@ -109,9 +109,7 @@ fn validate_explicit_function_call_paths(
                 anyhow::bail!("{command} --call-path {call_path} must select a function call list");
             };
             anyhow::bail!(
-                "{command} --call-path {call_path} head '{}' does not match selected definition '{}'",
-                head,
-                function_name
+                "{command} --call-path {call_path} head '{head}' does not match selected definition '{function_name}'"
             );
         }
 

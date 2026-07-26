@@ -33,9 +33,7 @@ pub(super) fn validate_unknown_keyword_arguments(
                 continue;
             }
             anyhow::bail!(
-                "inline-function call for {} supplies unsupported keyword {}",
-                function_name,
-                key
+                "inline-function call for {function_name} supplies unsupported keyword {key}"
             );
         }
     }
@@ -71,8 +69,7 @@ fn call_side_allows_other_keys(
         CallSideAllowOtherKeys::True => Ok(true),
         CallSideAllowOtherKeys::Unknown(value) => {
             anyhow::bail!(
-                "inline-function cannot determine whether :allow-other-keys value {} suppresses unknown keyword",
-                value
+                "inline-function cannot determine whether :allow-other-keys value {value} suppresses unknown keyword"
             );
         }
         CallSideAllowOtherKeys::AbsentOrFalse => Ok(false),

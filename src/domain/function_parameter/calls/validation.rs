@@ -30,9 +30,7 @@ pub(super) fn ensure_matching_function_call(
         )
         .with_context(|| format!("{command} call must start with an atom"))?;
         anyhow::bail!(
-            "{command} call head '{}' does not match selected definition '{}'",
-            head,
-            function_name
+            "{command} call head '{head}' does not match selected definition '{function_name}'"
         );
     }
 

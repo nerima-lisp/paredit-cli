@@ -63,16 +63,12 @@ fn substitute_references(
 
         if spans.is_empty() && !allow_drop_arguments {
             anyhow::bail!(
-                "inline-function would drop argument '{}' for unused parameter '{}'; pass --allow-drop-arguments to permit it",
-                argument,
-                param
+                "inline-function would drop argument '{argument}' for unused parameter '{param}'; pass --allow-drop-arguments to permit it"
             );
         }
         if spans.len() > 1 && !allow_duplicate_evaluation {
             anyhow::bail!(
-                "inline-function would duplicate argument '{}' for parameter '{}'; pass --allow-duplicate-evaluation to permit it",
-                argument,
-                param
+                "inline-function would duplicate argument '{argument}' for parameter '{param}'; pass --allow-duplicate-evaluation to permit it"
             );
         }
 

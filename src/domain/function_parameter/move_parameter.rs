@@ -89,8 +89,7 @@ pub fn plan_move_function_parameter(
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
             anyhow::bail!(
-                "move-function-parameter call path {} overlaps the selected definition",
-                call_path
+                "move-function-parameter call path {call_path} overlaps the selected definition"
             );
         }
         let moved_argument = argument_for_parameter(

@@ -56,7 +56,7 @@ impl LintRule for Rule {
                 );
                 let text = match item.inner_body_span {
                     Some(body) => format!("(when {} {})", and, context_slice(body)),
-                    None => format!("(when {})", and),
+                    None => format!("(when {and})"),
                 };
 
                 RuleFix::single(

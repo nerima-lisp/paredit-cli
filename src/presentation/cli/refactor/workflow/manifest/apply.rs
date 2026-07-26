@@ -58,8 +58,7 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
         source_bytes = source_bytes.saturating_add(input.len() as u64);
         if source_bytes > MAX_MANIFEST_SOURCE_TOTAL_BYTES {
             anyhow::bail!(
-                "refusing manifest sources: cumulative input exceeds {} bytes",
-                MAX_MANIFEST_SOURCE_TOTAL_BYTES
+                "refusing manifest sources: cumulative input exceeds {MAX_MANIFEST_SOURCE_TOTAL_BYTES} bytes"
             );
         }
         let input_hash = stable_text_hash(&input);

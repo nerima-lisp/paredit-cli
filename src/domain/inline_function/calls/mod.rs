@@ -71,9 +71,7 @@ pub(super) fn parse_inline_function_call(
     .context("inline-function call must start with an atom")?;
     if !inline_function_symbol_reference_eq(dialect, head, function_name.as_str()) {
         anyhow::bail!(
-            "inline-function call head '{}' does not match selected definition '{}'",
-            head,
-            function_name
+            "inline-function call head '{head}' does not match selected definition '{function_name}'"
         );
     }
 
@@ -108,9 +106,7 @@ fn validate_explicit_function_call_paths(
             .to_owned();
         if !inline_function_symbol_reference_eq(dialect, &head, function_name.as_str()) {
             anyhow::bail!(
-                "{command} --call-path {call_path} head '{}' does not match selected definition '{}'",
-                head,
-                function_name
+                "{command} --call-path {call_path} head '{head}' does not match selected definition '{function_name}'"
             );
         }
 
@@ -162,8 +158,7 @@ pub(super) fn validate_or_resolve_function_call_paths(
             discovery::discover_function_call_paths(tree, dialect, definition_span, function_name)?;
         if call_paths.is_empty() {
             anyhow::bail!(
-                "{command} --all-calls found no same-file calls for {}",
-                function_name
+                "{command} --all-calls found no same-file calls for {function_name}"
             );
         }
         return Ok(call_paths);

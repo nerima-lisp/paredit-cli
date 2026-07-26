@@ -56,7 +56,7 @@ impl LintRule for Rule {
                 );
                 let text = match item.inner_body_span {
                     Some(body) => format!("(unless {} {})", or, context_slice(body)),
-                    None => format!("(unless {})", or),
+                    None => format!("(unless {or})"),
                 };
 
                 RuleFix::single(

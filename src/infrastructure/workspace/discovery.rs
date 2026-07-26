@@ -105,8 +105,7 @@ impl ExcludeIndex {
             } else {
                 anyhow::ensure!(
                     self.nodes.len() < MAX_EXCLUDE_COMPONENTS,
-                    "workspace exclude index component limit exceeded: maximum is {}",
-                    MAX_EXCLUDE_COMPONENTS
+                    "workspace exclude index component limit exceeded: maximum is {MAX_EXCLUDE_COMPONENTS}"
                 );
                 let index = self.nodes.len();
                 self.nodes.push(ExcludeNode::default());

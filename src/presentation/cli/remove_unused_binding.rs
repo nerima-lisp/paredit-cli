@@ -112,7 +112,7 @@ fn print_remove_unused_binding_plan(
             );
             println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
-            println!("written\t{}", written);
+            println!("written\t{written}");
         }
         OutputFormat::Json => println!(
             "{}",

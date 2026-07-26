@@ -19,9 +19,9 @@ proptest! {
 
         SyntaxTree::parse(&plan.rewritten).unwrap();
         prop_assert!(plan.changed);
-        let rewritten_definition = format!("(labels (({} (x)", to);
-        let rewritten_recursive_call = format!("({} x)", to);
-        let rewritten_body_call = format!("({} 1)", to);
+        let rewritten_definition = format!("(labels (({to} (x)");
+        let rewritten_recursive_call = format!("({to} x)");
+        let rewritten_body_call = format!("({to} 1)");
 
         prop_assert!(plan.rewritten.contains(&rewritten_definition));
         prop_assert!(plan.rewritten.contains(&rewritten_recursive_call));

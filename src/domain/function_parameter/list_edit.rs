@@ -61,8 +61,7 @@ pub(super) fn removal_edit_for_list_item(
     }
     if item_index >= container.children.len() {
         anyhow::bail!(
-            "remove-function-parameter removal item index {} is out of bounds",
-            item_index
+            "remove-function-parameter removal item index {item_index} is out of bounds"
         );
     }
 

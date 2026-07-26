@@ -54,16 +54,12 @@ pub(super) fn expand_inline_macro_body(
         let reference_count = reference_counts.remove(name).unwrap_or_default();
         if reference_count == 0 && !allow_drop_arguments {
             anyhow::bail!(
-                "inline-function would drop argument '{}' for unused parameter '{}'; pass --allow-drop-arguments to permit it",
-                argument,
-                name
+                "inline-function would drop argument '{argument}' for unused parameter '{name}'; pass --allow-drop-arguments to permit it"
             );
         }
         if reference_count > 1 && !allow_duplicate_evaluation {
             anyhow::bail!(
-                "inline-function would duplicate argument '{}' for parameter '{}'; pass --allow-duplicate-evaluation to permit it",
-                argument,
-                name
+                "inline-function would duplicate argument '{argument}' for parameter '{name}'; pass --allow-duplicate-evaluation to permit it"
             );
         }
         parameters.push(InlineFunctionParameterPlan {

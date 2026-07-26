@@ -19,9 +19,9 @@ proptest! {
 
         SyntaxTree::parse(&plan.rewritten).unwrap();
         prop_assert!(plan.changed);
-        let rewritten_definition = format!("(defun {} (x)", to);
-        let rewritten_call = format!("({} 1)", to);
-        let preserved_value_reference = format!("(list {} x)", from);
+        let rewritten_definition = format!("(defun {to} (x)");
+        let rewritten_call = format!("({to} 1)");
+        let preserved_value_reference = format!("(list {from} x)");
 
         prop_assert!(plan.rewritten.contains(&rewritten_definition));
         prop_assert!(plan.rewritten.contains(&rewritten_call));

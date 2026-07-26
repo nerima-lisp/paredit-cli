@@ -367,8 +367,6 @@ fn reject_environment_references_in_expression(
     }
 
     anyhow::bail!(
-        "inline-function cannot inline macros that reference &environment parameter '{}' in the {}; source-level inlining cannot reconstruct macro expansion environments",
-        parameter_name,
-        context
+        "inline-function cannot inline macros that reference &environment parameter '{parameter_name}' in the {context}; source-level inlining cannot reconstruct macro expansion environments"
     );
 }

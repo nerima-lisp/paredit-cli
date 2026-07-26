@@ -38,7 +38,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_add_function_param
                 );
             }
             println!("changed\t{}", plan.changed);
-            println!("written\t{}", written);
+            println!("written\t{written}");
         }
         OutputFormat::Json => println!(
             "{}",

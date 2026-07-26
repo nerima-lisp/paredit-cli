@@ -24,8 +24,8 @@ proptest! {
         SyntaxTree::parse(&plan.rewritten).unwrap();
         prop_assert!(plan.changed);
         prop_assert_eq!(plan.calls.len(), 1);
-        let replaced_call = format!("({} {})", to, arg);
-        let preserved_definition = format!("(defun keep () {})", from);
+        let replaced_call = format!("({to} {arg})");
+        let preserved_definition = format!("(defun keep () {from})");
         prop_assert!(plan.rewritten.contains(&replaced_call));
         prop_assert!(plan.rewritten.contains(&preserved_definition));
     }

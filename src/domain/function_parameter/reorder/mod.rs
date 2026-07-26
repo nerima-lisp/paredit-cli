@@ -82,8 +82,7 @@ pub fn plan_reorder_function_parameters(
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
             anyhow::bail!(
-                "reorder-function-parameters call path {} overlaps the selected definition",
-                call_path
+                "reorder-function-parameters call path {call_path} overlaps the selected definition"
             );
         }
         let (call_span, reordered_argument, edit) = reorder_function_parameter_call_edit(

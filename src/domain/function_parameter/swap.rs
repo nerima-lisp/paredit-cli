@@ -97,8 +97,7 @@ pub fn plan_swap_function_parameters(
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
             anyhow::bail!(
-                "swap-function-parameters call path {} overlaps the selected definition",
-                call_path
+                "swap-function-parameters call path {call_path} overlaps the selected definition"
             );
         }
         ensure_positional_arguments_available(

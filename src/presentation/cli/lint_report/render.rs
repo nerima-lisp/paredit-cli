@@ -16,7 +16,7 @@ pub(super) fn print_lint_report(
         OutputFormat::Text => {
             println!("finding_count\t{}", summary.finding_count);
             for (rule, count) in &summary.per_rule {
-                println!("rule\t{}\t{}", rule, count);
+                println!("rule\t{rule}\t{count}");
             }
             if policy.fail_on_finding {
                 println!("policy\tfail_on_finding=true\tpassed={}", policy.passed);

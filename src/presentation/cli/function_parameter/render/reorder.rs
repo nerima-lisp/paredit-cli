@@ -49,7 +49,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_reorder_function_p
                 );
             }
             println!("changed\t{}", plan.changed);
-            println!("written\t{}", written);
+            println!("written\t{written}");
         }
         OutputFormat::Json => println!(
             "{}",

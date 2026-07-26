@@ -38,8 +38,7 @@ pub(in crate::domain::function_parameter) fn build_new_relative_order(
     for (index, name) in old_order.iter().enumerate() {
         if old_indexes.insert(name.as_str(), index).is_some() {
             anyhow::bail!(
-                "reorder-function-parameters cannot reorder duplicate definition parameter '{}'",
-                name
+                "reorder-function-parameters cannot reorder duplicate definition parameter '{name}'"
             );
         }
     }
@@ -49,14 +48,12 @@ pub(in crate::domain::function_parameter) fn build_new_relative_order(
     for name in new_order {
         if !requested_names.insert(name.as_str()) {
             anyhow::bail!(
-                "reorder-function-parameters requested parameter '{}' more than once",
-                name
+                "reorder-function-parameters requested parameter '{name}' more than once"
             );
         }
         let index = old_indexes.get(name.as_str()).copied().with_context(|| {
             format!(
-                "reorder-function-parameters requested unknown parameter '{}'",
-                name
+                "reorder-function-parameters requested unknown parameter '{name}'"
             )
         })?;
         relative_order.push(index);
@@ -65,8 +62,7 @@ pub(in crate::domain::function_parameter) fn build_new_relative_order(
     for name in old_order {
         if !requested_names.contains(name.as_str()) {
             anyhow::bail!(
-                "reorder-function-parameters missing parameter '{}' from requested order",
-                name
+                "reorder-function-parameters missing parameter '{name}' from requested order"
             );
         }
     }

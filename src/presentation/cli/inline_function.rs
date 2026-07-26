@@ -99,7 +99,7 @@ fn print_inline_function_plan(
             println!("remove_definition\t{}", plan.remove_definition);
             println!("definition_removed\t{}", plan.definition_removed);
             println!("changed\t{}", plan.changed);
-            println!("written\t{}", written);
+            println!("written\t{written}");
         }
         OutputFormat::Json => println!(
             "{}",

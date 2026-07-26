@@ -74,7 +74,7 @@ fn parameter_locations_from_children(
             let tail_name = atom_text(tail)
                 .with_context(|| format!("{operation} dotted lambda-list tail must be a symbol"))?;
             SymbolName::new(tail_name.to_owned()).with_context(|| {
-                format!("{operation} found invalid parameter symbol '{}'", tail_name)
+                format!("{operation} found invalid parameter symbol '{tail_name}'")
             })?;
             if tail_index + 1 != children.len() {
                 anyhow::bail!("{operation} dotted lambda-list tail must be the final parameter");

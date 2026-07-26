@@ -16,11 +16,10 @@ pub(crate) fn find_unique_parameter_location<'a>(
             && found.replace(parameter).is_some()
         {
             anyhow::bail!(
-                "{operation} parameter '{}' appears more than once",
-                parameter_name
+                "{operation} parameter '{parameter_name}' appears more than once"
             );
         }
     }
 
-    found.with_context(|| format!("{operation} parameter '{}' was not found", parameter_name))
+    found.with_context(|| format!("{operation} parameter '{parameter_name}' was not found"))
 }

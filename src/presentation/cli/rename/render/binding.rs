@@ -34,7 +34,7 @@ pub(in crate::presentation::cli::rename) fn print_rename_binding_plan(
                 println!("reference\t{}..{}", span.start().get(), span.end().get());
             }
             println!("changed\t{}", plan.changed);
-            println!("written\t{}", written);
+            println!("written\t{written}");
         }
         OutputFormat::Json => println!(
             "{}",

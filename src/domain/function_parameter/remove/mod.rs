@@ -45,8 +45,7 @@ pub fn plan_remove_function_parameter(
         let call_selection = tree.select_path(call_path)?;
         if spans_overlap(target.definition_span, call_selection.span()) {
             anyhow::bail!(
-                "remove-function-parameter call path {} overlaps the selected definition",
-                call_path
+                "remove-function-parameter call path {call_path} overlaps the selected definition"
             );
         }
         let call_edit = remove_call_argument_edit(

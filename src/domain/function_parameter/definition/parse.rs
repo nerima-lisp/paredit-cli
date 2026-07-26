@@ -203,17 +203,14 @@ fn parse_function_parameter_definition(
     if let Some(new_parameter) = new_parameter {
         if new_parameter.as_str().starts_with(['&', ':']) {
             anyhow::bail!(
-                "add-function-parameter found invalid parameter symbol '{}'",
-                new_parameter
+                "add-function-parameter found invalid parameter symbol '{new_parameter}'"
             );
         }
         if parameters.iter().any(|parameter| {
             common_lisp_symbol_reference_eq(&parameter.name, new_parameter.as_str())
         }) {
             anyhow::bail!(
-                "add-function-parameter parameter '{}' already exists in {}",
-                new_parameter,
-                function_name
+                "add-function-parameter parameter '{new_parameter}' already exists in {function_name}"
             );
         }
     }

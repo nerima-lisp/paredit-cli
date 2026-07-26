@@ -55,7 +55,7 @@ impl LintRule for Rule {
                 );
                 let text = match item.body_span {
                     Some(body) => format!("(let ({}) {})", binding, context_slice(body)),
-                    None => format!("(let ({}))", binding),
+                    None => format!("(let ({binding}))"),
                 };
 
                 RuleFix::single(

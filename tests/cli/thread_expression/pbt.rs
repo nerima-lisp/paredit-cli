@@ -71,7 +71,7 @@ fn assert_thread_expression_property(
         .map_err(|err| TestCaseError::fail(format!("parse json: {err}")))?;
     prop_assert_eq!(report["changed"].as_bool(), Some(true));
     let replacement = report["replacement"].as_str().unwrap_or_default();
-    let expected_prefix = format!("({} seed", expected_operator);
+    let expected_prefix = format!("({expected_operator} seed");
     prop_assert!(replacement.starts_with(&expected_prefix));
 
     let rewritten = report["rewritten"].as_str().unwrap_or_default();

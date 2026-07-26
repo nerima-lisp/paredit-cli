@@ -177,7 +177,7 @@ fn print_outcome(label: &str, outcome: &WorkspaceRefactorExecuteOutcome) {
     );
     println!("{}\twrite_applied\t{}", label, outcome.write_applied());
     match outcome.post_verification_passed() {
-        Some(passed) => println!("{}\tpost_verification_passed\t{}", label, passed),
-        None => println!("{}\tpost_verification_passed\tnull", label),
+        Some(passed) => println!("{label}\tpost_verification_passed\t{passed}"),
+        None => println!("{label}\tpost_verification_passed\tnull"),
     }
 }

@@ -68,8 +68,7 @@ pub fn plan_add_function_parameter(
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
             anyhow::bail!(
-                "add-function-parameter call path {} overlaps the selected definition",
-                call_path
+                "add-function-parameter call path {call_path} overlaps the selected definition"
             );
         }
         let edit = if let Some(insertion_plan) = insertion_plan.as_ref() {

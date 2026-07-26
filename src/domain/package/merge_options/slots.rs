@@ -25,8 +25,7 @@ fn analyze_option_slot(
 ) -> Result<Option<OptionSlot>> {
     if option.kind != ExpressionKind::List || option.children.is_empty() {
         anyhow::bail!(
-            "cannot merge defpackage options at {}; only direct option lists are supported",
-            defpackage_path
+            "cannot merge defpackage options at {defpackage_path}; only direct option lists are supported"
         );
     }
     let Some(option_head) = atom_text(&option.children[0]) else {

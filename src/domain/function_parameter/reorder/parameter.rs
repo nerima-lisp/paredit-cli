@@ -102,8 +102,7 @@ pub(in crate::domain::function_parameter) fn ensure_parameter_is_reorderable(
         .position(|candidate| candidate.item_index == item_index)
         .with_context(|| {
             format!(
-                "{operation} does not support reordering parameter '{}' because it is not a direct call argument",
-                parameter_name
+                "{operation} does not support reordering parameter '{parameter_name}' because it is not a direct call argument"
             )
         })
 }

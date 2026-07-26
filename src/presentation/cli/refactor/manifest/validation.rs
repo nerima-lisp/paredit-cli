@@ -17,9 +17,7 @@ pub(in crate::presentation::cli) fn validate_manifest_edits(
         }
         if !input.is_char_boundary(start) || !input.is_char_boundary(end) {
             anyhow::bail!(
-                "edit span {}..{} is not on UTF-8 character boundaries",
-                start,
-                end
+                "edit span {start}..{end} is not on UTF-8 character boundaries"
             );
         }
     }

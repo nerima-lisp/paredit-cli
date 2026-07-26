@@ -87,8 +87,7 @@ fn analyze_export_option(
     for child in option.children.iter().skip(1) {
         let Some(symbol) = atom_text(child) else {
             anyhow::bail!(
-                "cannot sort :export option at {}; only atom symbol designators are supported",
-                option_path
+                "cannot sort :export option at {option_path}; only atom symbol designators are supported"
             );
         };
         symbols.push((child.span, symbol.to_owned()));

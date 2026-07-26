@@ -93,7 +93,7 @@ fn print_replace_forms_plan(
             );
             println!("replacement_shape\t{}", plan.replacement_shape);
             println!("changed\t{}", plan.changed);
-            println!("written\t{}", written);
+            println!("written\t{written}");
             for target in &plan.targets {
                 println!(
                     "target\t{}\t{}..{}\t{}",

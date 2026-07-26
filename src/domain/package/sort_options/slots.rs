@@ -79,8 +79,7 @@ fn analyze_option_slot(
 ) -> Result<OptionSlot> {
     if option.kind != ExpressionKind::List || option.children.is_empty() {
         anyhow::bail!(
-            "cannot sort defpackage options at {}; only direct option lists are supported",
-            defpackage_path
+            "cannot sort defpackage options at {defpackage_path}; only direct option lists are supported"
         );
     }
     let Some(option_head) = atom_text(&option.children[0]) else {

@@ -73,7 +73,7 @@ pub(super) fn print_remove_unused_definitions_plan(
             println!("removal_count\t{}", plan.removal_count);
             println!("skipped_count\t{}", plan.skipped_count);
             println!("changed\t{}", plan.changed);
-            println!("written\t{}", written);
+            println!("written\t{written}");
             for file in &plan.files {
                 println!(
                     "{}\t{}\tremovals={}\tskipped={}\tchanged={}\tpackage={}",
