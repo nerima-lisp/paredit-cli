@@ -22,26 +22,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
-      - name: Configure Cachix (pull-only)
-        if: ${{ env.CACHIX_CACHE != '' && env.CACHIX_AUTH_TOKEN == '' }}
-        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
-          name: ${{ env.CACHIX_CACHE }}
-          extraPullNames: nix-community
-          skipPush: true
-      - name: Configure Cachix (push-enabled)
-        if: ${{ env.CACHIX_CACHE != '' && env.CACHIX_AUTH_TOKEN != '' }}
-        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+          persist-credentials: false
+      - uses: ./.github/actions/nix-setup
         with:
-          name: ${{ env.CACHIX_CACHE }}
-          authToken: ${{ env.CACHIX_AUTH_TOKEN }}
-          extraPullNames: nix-community
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Build documentation
         run: |
           nix build .#docs
@@ -55,6 +44,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -134,20 +134,63 @@ fn flake_lisp_includes_cover_exactly_the_recognized_dialect_extensions() {
     );
 }
 
+/// The org-wide conformance check expects `checks.{default,formatting,docs}`
+/// aliases inside the `checks` flake output. Scoped to that block
+/// specifically: `default` and `docs` also appear as `packages.default` and
+/// `packages.docs` keys elsewhere in flake.nix, so an unscoped substring
+/// search would pass vacuously even if these aliases were removed from
+/// `checks`.
 #[test]
-fn ci_checks_each_host_and_audits_dependencies_on_linux() {
+fn flake_checks_expose_the_org_conformance_aliases() {
+    let flake = fs::read_to_string("flake.nix").expect("read flake.nix");
+    let marker = "checks = lib.genAttrs systems (";
+    let start = flake.find(marker).expect("flake.nix defines checks") + marker.len();
+    let end_marker = "overlays.default = final: _prev: {";
+    let end = start
+        + flake[start..]
+            .find(end_marker)
+            .expect("checks block is followed by overlays.default");
+    let checks_block = &flake[start..end];
+
+    for alias in [
+        "default = nextest;",
+        "formatting = treefmt;",
+        "docs = documentation;",
+    ] {
+        assert!(
+            checks_block.contains(alias),
+            "flake.nix checks block must keep the org conformance alias: {alias}"
+        );
+    }
+}
+
+/// CI keeps two gates: the flake checks and the dependency audit.
+///
+/// The host matrix this test used to pin is gone on purpose. `nix flake check`
+/// only ever evaluated the checks for the host it ran on, so the macOS leg
+/// verified the `aarch64-darwin` outputs and nothing the Linux leg did — and
+/// the two legs shared no work, so a matrix was paying twice for one
+/// verification while the Nix setup itself was duplicated in every job.
+/// Both jobs now run on Linux through the shared `nix-setup` composite action.
+///
+/// What is asserted is therefore the *gates*, not the hosts: whichever way the
+/// jobs are arranged, a run that stops checking the flake or stops auditing
+/// dependencies is a run that has lost its purpose. Darwin coverage is a
+/// deliberate gap — see `docs/src/development.md`.
+#[test]
+fn ci_runs_the_flake_checks_and_audits_dependencies() {
     let workflow = fs::read_to_string(".github/workflows/ci.yml").expect("read CI workflow");
 
     for needle in [
-        "ubuntu-latest",
-        "macos-latest",
-        "runs-on: ${{ matrix.os }}",
+        "runs-on: ubuntu-latest",
+        "./.github/actions/nix-setup",
+        "nix flake check",
         "supply-chain:",
         "nix develop --command cargo audit --deny warnings",
     ] {
         assert!(
             workflow.contains(needle),
-            "CI must keep its cross-host and supply-chain gate: {needle}"
+            "CI must keep its verification and supply-chain gates: {needle}"
         );
     }
 }
@@ -158,6 +201,12 @@ fn external_github_actions_are_immutably_pinned() {
     let ci = fs::read_to_string(".github/workflows/ci.yml").expect("read CI workflow");
     let docs =
         fs::read_to_string(".github/workflows/docs.yml").expect("read documentation workflow");
+    let nix_setup = fs::read_to_string(".github/actions/nix-setup/action.yml")
+        .expect("read shared nix-setup composite action");
+    let release =
+        fs::read_to_string(".github/workflows/release.yml").expect("read release workflow");
+    let flake_update = fs::read_to_string(".github/workflows/flake-update.yml")
+        .expect("read flake-update workflow");
 
     for pin in [
         "cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31",
@@ -169,21 +218,14 @@ fn external_github_actions_are_immutably_pinned() {
         );
     }
 
-    for pin in [
-        "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7",
-        "cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31",
-        "cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17",
-    ] {
-        assert!(
-            ci.contains(pin),
-            "CI must keep the approved immutable action pin: {pin}"
-        );
-    }
+    let pin = "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7";
+    assert!(
+        ci.contains(pin),
+        "CI must keep the approved immutable action pin: {pin}"
+    );
 
     for pin in [
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7",
-        "cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31",
-        "cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17",
         "actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5",
         "actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4",
         "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4",
@@ -194,10 +236,43 @@ fn external_github_actions_are_immutably_pinned() {
         );
     }
 
+    for pin in [
+        "DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22",
+        "cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17",
+    ] {
+        assert!(
+            nix_setup.contains(pin),
+            "the shared nix-setup composite action must keep the approved immutable action pin: {pin}"
+        );
+    }
+
+    for pin in [
+        "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7",
+        "softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2",
+    ] {
+        assert!(
+            release.contains(pin),
+            "the release workflow must keep the approved immutable action pin: {pin}"
+        );
+    }
+
+    for pin in [
+        "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7",
+        "DeterminateSystems/update-flake-lock@834c491b2ece4de0bbd00d85214bb5e83b4da5c6 # v28",
+    ] {
+        assert!(
+            flake_update.contains(pin),
+            "the flake-update workflow must keep the approved immutable action pin: {pin}"
+        );
+    }
+
     for (path, contents) in [
         ("action.yml", action.as_str()),
         (".github/workflows/ci.yml", ci.as_str()),
         (".github/workflows/docs.yml", docs.as_str()),
+        (".github/actions/nix-setup/action.yml", nix_setup.as_str()),
+        (".github/workflows/release.yml", release.as_str()),
+        (".github/workflows/flake-update.yml", flake_update.as_str()),
     ] {
         for mutable_tag in [
             "actions/checkout@v",
@@ -206,6 +281,9 @@ fn external_github_actions_are_immutably_pinned() {
             "actions/configure-pages@v",
             "actions/upload-pages-artifact@v",
             "actions/deploy-pages@v",
+            "DeterminateSystems/nix-installer-action@v",
+            "softprops/action-gh-release@v",
+            "DeterminateSystems/update-flake-lock@v",
         ] {
             assert!(
                 !contents.contains(mutable_tag),
