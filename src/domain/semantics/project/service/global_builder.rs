@@ -3,6 +3,7 @@
 use crate::domain::common_lisp::common_lisp_operator_head_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::semantics::value::ValueTable;
+use crate::domain::semantics::value::service::constant_key;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
 
 use super::super::model::{
@@ -88,9 +89,11 @@ fn record_constant(
     symbol: QualifiedSymbol,
     text: &str,
 ) {
-    // The value table keys file-level constants by the name as written, since
-    // it never had a package to fold against.
-    let Some(name) = SymbolName::new(text).ok() else {
+    // The value table keys constants by the folded name, the way the reader
+    // reads a symbol. Looking one up by the spelling at the definition site
+    // would miss a file that writes `+LIMIT+` where the table holds `+limit+`
+    // folded — and, worse, would only miss it sometimes.
+    let Some(name) = constant_key(text) else {
         return;
     };
     if let Some(value) = file.values.constant_value(&name) {

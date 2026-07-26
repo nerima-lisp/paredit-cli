@@ -2,6 +2,7 @@
 
 use crate::domain::common_lisp::{
     common_lisp_reader_conditional_kind, common_lisp_reader_label_kind,
+    common_lisp_symbol_reference_needle,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::{atom_symbol_span, atom_symbol_text};
@@ -92,9 +93,24 @@ fn resolve_reference(view: &ExpressionView, bindings: &BindingTable, values: &Va
     }
 
     atom_symbol_text(view)
-        .and_then(|text| SymbolName::new(text).ok())
+        .and_then(constant_key)
         .and_then(|name| values.constant_value(&name).cloned())
         .map_or(Value::Unknown, |value| Value::Known(value.into()))
+}
+
+/// The key a file-level constant is stored and looked up under.
+///
+/// Folded the way the reader folds a symbol, so `+limit+` and `+LIMIT+` are
+/// one constant — they name the same symbol, and keying on the raw spelling
+/// made a reference in the other case fail to resolve. It is also what lets a
+/// constant arriving from the project table, whose names are already folded,
+/// be found by a reference written in any case.
+///
+/// Only Common Lisp populates the constant map at all, so folding here cannot
+/// affect a dialect whose symbols are case-sensitive: their map is empty and
+/// every lookup misses either way.
+pub fn constant_key(text: &str) -> Option<SymbolName> {
+    SymbolName::new(common_lisp_symbol_reference_needle(text)).ok()
 }
 
 fn evaluate_list(

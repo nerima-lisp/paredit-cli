@@ -31,8 +31,15 @@ impl ValueTable {
         self.bindings.get(&binding)
     }
 
-    /// The value of a file-level `defconstant`, if the file defines exactly
-    /// one with that name.
+    /// The value of a `defconstant` visible to this file, if exactly one
+    /// definition of that name is known.
+    ///
+    /// `name` must be folded the way the reader folds a symbol — upper-cased
+    /// for Common Lisp — which is what
+    /// [`constant_key`](crate::domain::semantics::value::service::constant_key)
+    /// produces. The convention is not cosmetic: `+limit+` and `+LIMIT+` name
+    /// the same symbol, and a constant arriving from the project table is
+    /// already folded, so a raw-spelling key would find neither reliably.
     pub fn constant_value(&self, name: &SymbolName) -> Option<&PropagatableValue> {
         self.constants.get(name)
     }
@@ -78,6 +85,24 @@ impl ValueTableBuilder {
         }
         if self.constants.remove(&name).is_some() {
             self.ambiguous_constants.push(name);
+            return;
+        }
+        self.constants.insert(name, value);
+    }
+
+    /// Records a constant this file does not define itself.
+    ///
+    /// The one way a value crosses a file boundary. Unlike
+    /// [`Self::define_constant`] a collision is *not* an ambiguity to retract:
+    /// a name the file already settled — defined once, or retracted for being
+    /// defined twice — is the more local and more certain answer, and the
+    /// project's copy must not overwrite or poison it.
+    ///
+    /// Callers must therefore fill only after the file's own constants are
+    /// collected. Filling first would make the file's own `defconstant` look
+    /// like a second definition of the same name and retract both.
+    pub fn fill_missing_constant(&mut self, name: SymbolName, value: PropagatableValue) {
+        if self.ambiguous_constants.contains(&name) || self.constants.contains_key(&name) {
             return;
         }
         self.constants.insert(name, value);
