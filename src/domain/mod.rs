@@ -181,6 +181,7 @@ pub(crate) mod replace_forms;
 pub mod report_policy;
 pub mod self_assignment_report;
 pub mod self_comparison_report;
+pub(crate) mod semantics;
 pub mod setf_arity_report;
 pub mod setq_non_variable_report;
 pub mod sexpr;
