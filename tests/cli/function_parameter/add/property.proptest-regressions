@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 6dcf32a8cbe73d9ab55fa1dd2c7ac41de305dcbbcb831599a3632a011926374e # shrinks to name = "d1r", a = "y", b = "cs19612", c = "fn6", first = "2765", second = "-13", third = "72"
+cc ab0b926c4ed0a2c8dc19a7bc45030ca53b954e2c613038f91d76fc07a3abe8fa # shrinks to name = "s6z1bx", a = "yyu5r3l", b = "wj3p547su", c = "nwty", first = "6259", second = "-2", third = "3"
