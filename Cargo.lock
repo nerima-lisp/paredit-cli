@@ -650,12 +650,33 @@ dependencies = [
  "clap_complete",
  "criterion",
  "libc",
+ "paredit-core-cli",
  "paredit-core-edit",
  "paredit-core-lint-engine",
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",
  "predicates",
+ "proptest",
+ "serde_json",
+ "thiserror",
+ "xattr",
+]
+
+[[package]]
+name = "paredit-core-cli"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "cap-std",
+ "clap",
+ "libc",
+ "paredit-core-edit",
+ "paredit-core-lint-engine",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "paredit-core-workspace",
  "proptest",
  "serde_json",
  "thiserror",

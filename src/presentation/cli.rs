@@ -8,7 +8,6 @@ mod accessor_arity_report;
 mod analysis_report;
 mod append_list_to_cons_report;
 mod append_nil_report;
-mod args;
 mod basic_edit;
 mod binds_constant_report;
 mod butlast_default_count_report;
@@ -32,6 +31,12 @@ mod cons_to_list_report;
 mod constant_if_test_report;
 mod constant_when_test_report;
 mod contract;
+
+// Phase 2 facade (section 4.1). args/shared/gate - and shared's io, diff and
+// macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
+// it enumerates three features' capabilities, which makes it composition root
+// (section 11.5.1).
+use paredit_core_cli::{args, gate, shared};
 mod convert_cond_to_if;
 mod convert_flet_to_labels;
 mod convert_if_to_cond;
@@ -88,7 +93,6 @@ mod format_newline_report;
 mod format_to_string_report;
 mod funcall_lambda_report;
 mod function_parameter;
-mod gate;
 mod getf_default_nil_report;
 mod gethash_default_report;
 mod handler_case_no_clauses_report;
@@ -184,7 +188,6 @@ mod self_comparison_report;
 mod setf_arity_report;
 mod setq_non_variable_report;
 mod shadowed_binding_report;
-mod shared;
 mod sharp_quoted_lambda_report;
 mod sign_comparison_report;
 mod signature_report;

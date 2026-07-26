@@ -1,0 +1,35 @@
+[package]
+name = "paredit-core-cli"
+description = "CLI I/O conventions: input, diffing, atomic writes, and shared argument types"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../syntax" }
+paredit-core-semantics = { path = "../semantics" }
+paredit-core-edit = { path = "../edit" }
+paredit-core-workspace = { path = "../workspace" }
+paredit-core-lint-engine = { path = "../lint-engine" }
+anyhow.workspace = true
+blake3.workspace = true
+cap-std.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+xattr.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

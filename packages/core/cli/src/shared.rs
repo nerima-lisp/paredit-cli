@@ -3,14 +3,14 @@ use std::collections::BTreeSet;
 use std::fmt::{self, Display, Write};
 use std::path::PathBuf;
 
-use super::{DialectArg, EditTargetArgs, SourceInput};
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use crate::args::{DialectArg, EditTargetArgs, SourceInput};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SymbolName, SyntaxTree,
 };
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 #[path = "diff.rs"]
 mod diff;
@@ -20,20 +20,23 @@ mod io;
 #[path = "macos_acl.rs"]
 mod macos_acl;
 
-pub(crate) use diff::unified_diff;
-pub(crate) use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored};
-pub(crate) use io::{
+pub use diff::unified_diff;
+pub use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored};
+pub use io::{
     ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, parse_document, read_file_or_empty,
     read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_expected_target,
     read_text_file_with_limit, read_text_with_limit, write_artifact_with_rollback,
     write_file_with_rollback, write_files_with_rollback, write_files_with_rollback_expected,
 };
 
-pub(crate) const fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {
+pub const fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {
     TerminalSafe(value)
 }
 
-pub(crate) struct TerminalSafe<T>(T);
+// Public since the extraction: this was crate-internal, a visibility that
+// cannot cross a crate boundary, so the lint applies to it for the first time.
+#[derive(Debug)]
+pub struct TerminalSafe<T>(T);
 
 impl<T: Display> Display for TerminalSafe<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -41,11 +44,15 @@ impl<T: Display> Display for TerminalSafe<T> {
     }
 }
 
-pub(crate) const fn terminal_safe_error_chain(error: &anyhow::Error) -> TerminalSafeErrorChain<'_> {
+#[must_use]
+pub const fn terminal_safe_error_chain(error: &anyhow::Error) -> TerminalSafeErrorChain<'_> {
     TerminalSafeErrorChain(error)
 }
 
-pub(crate) struct TerminalSafeErrorChain<'a>(&'a anyhow::Error);
+// Public since the extraction: this was crate-internal, a visibility that
+// cannot cross a crate boundary, so the lint applies to it for the first time.
+#[derive(Debug)]
+pub struct TerminalSafeErrorChain<'a>(&'a anyhow::Error);
 
 impl Display for TerminalSafeErrorChain<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -81,10 +88,7 @@ const fn is_terminal_control(character: char) -> bool {
     )
 }
 
-pub(crate) fn apply_byte_span_edits(
-    input: &str,
-    mut edits: Vec<(ByteSpan, String)>,
-) -> Result<String> {
+pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) -> Result<String> {
     for (span, _) in &edits {
         span.validate_against(input)
             .context("rewrite span is outside input or not UTF-8 aligned")?;
@@ -99,7 +103,8 @@ pub(crate) fn apply_byte_span_edits(
     Ok(output)
 }
 
-pub(crate) fn stable_text_hash(text: &str) -> String {
+#[must_use]
+pub fn stable_text_hash(text: &str) -> String {
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in text.as_bytes() {
         hash ^= u64::from(*byte);
@@ -108,7 +113,8 @@ pub(crate) fn stable_text_hash(text: &str) -> String {
     format!("fnv1a64:{hash:016x}")
 }
 
-pub(crate) fn bounded_preview(text: &str, max_bytes: usize) -> String {
+#[must_use]
+pub fn bounded_preview(text: &str, max_bytes: usize) -> String {
     if text.len() <= max_bytes {
         return text.to_owned();
     }
@@ -135,7 +141,7 @@ fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Re
     Ok(())
 }
 
-pub(crate) fn package_context_before_top_level(
+pub fn package_context_before_top_level(
     tree: &SyntaxTree,
     dialect: Dialect,
     target_index: usize,
@@ -157,17 +163,19 @@ pub(crate) fn package_context_before_top_level(
     Ok(current_package)
 }
 
-pub(crate) fn atom_text(view: &ExpressionView) -> Option<&str> {
+#[must_use]
+pub fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
         .then_some(view.text.as_deref())
         .flatten()
 }
 
-pub(crate) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
-pub(crate) fn list_head(view: &ExpressionView) -> Option<&str> {
+#[must_use]
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return None;
     }
@@ -175,10 +183,8 @@ pub(crate) fn list_head(view: &ExpressionView) -> Option<&str> {
     atom_child(view, 0)
 }
 
-pub(crate) fn matching_symbol_occurrences(
-    tree: &SyntaxTree,
-    symbol: &SymbolName,
-) -> Vec<AtomOccurrence> {
+#[must_use]
+pub fn matching_symbol_occurrences(tree: &SyntaxTree, symbol: &SymbolName) -> Vec<AtomOccurrence> {
     tree.atom_occurrences()
         .into_iter()
         // Bare quoted-symbol designators (`'foo`) are also included: they are
@@ -191,7 +197,7 @@ pub(crate) fn matching_symbol_occurrences(
         .collect()
 }
 
-pub(crate) fn edit_target(
+pub fn edit_target(
     args: EditTargetArgs,
     f: fn(&str, &SyntaxTree, Selection<'_>) -> Result<String>,
 ) -> Result<()> {
@@ -207,7 +213,7 @@ pub(crate) fn edit_target(
 /// Print the rewritten document to stdout, or with `write` persist it back to
 /// the source file after confirming the result reparses with the input dialect.
 /// With `diff`, stdout carries a unified diff instead of the whole document.
-pub(crate) fn emit_document(
+pub fn emit_document(
     input: &SourceInput,
     dialect: Dialect,
     write: bool,
@@ -234,7 +240,7 @@ pub(crate) fn emit_document(
     Ok(())
 }
 
-pub(crate) fn resolve_target<'a>(
+pub fn resolve_target<'a>(
     tree: &'a SyntaxTree,
     path: Option<&Path>,
     at: Option<usize>,
@@ -247,11 +253,11 @@ pub(crate) fn resolve_target<'a>(
     }
 }
 
-pub(crate) fn detect_dialect(input: &SourceInput, explicit: Option<DialectArg>) -> Dialect {
+pub fn detect_dialect(input: &SourceInput, explicit: Option<DialectArg>) -> Dialect {
     Dialect::detect(input.file.as_deref(), explicit.map(Into::into))
 }
 
-pub(crate) fn require_output_file(file: Option<&PathBuf>) -> Result<&PathBuf> {
+pub fn require_output_file(file: Option<&PathBuf>) -> Result<&PathBuf> {
     file.context("--write requires --file")
 }
 
@@ -261,10 +267,7 @@ pub(crate) fn require_output_file(file: Option<&PathBuf>) -> Result<&PathBuf> {
 /// path) are dropped. When `dialect` is set, unknown-extension files under a
 /// directory are included, since the caller will parse them with that
 /// dialect regardless of extension.
-pub(crate) fn expand_input_files(
-    inputs: &[PathBuf],
-    dialect: Option<DialectArg>,
-) -> Result<Vec<PathBuf>> {
+pub fn expand_input_files(inputs: &[PathBuf], dialect: Option<DialectArg>) -> Result<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
 

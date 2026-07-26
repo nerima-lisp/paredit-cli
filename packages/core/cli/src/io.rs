@@ -17,9 +17,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::{Context, Result};
 
 use super::{DialectArg, SourceInput};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ParseError, SyntaxTree};
-use crate::infrastructure::fs_identity::FilesystemIdentity;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ParseError, SyntaxTree};
+use paredit_core_workspace::fs_identity::FilesystemIdentity;
 
 #[cfg(any(unix, test))]
 static STAGED_WRITE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -29,7 +29,7 @@ const UNIQUE_SIBLING_ATTEMPTS: usize = 128;
 const CLEANUP_QUARANTINE_NAME: &str = ".paredit.cleanup";
 #[cfg(unix)]
 const CLEANUP_QUARANTINE_MODE: u32 = 0o700;
-pub(crate) const MAX_SOURCE_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+pub const MAX_SOURCE_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[cfg(all(test, unix))]
 type BeforeExistingFileOpenHook = (PathBuf, Box<dyn FnOnce()>);
@@ -280,11 +280,7 @@ fn run_after_artifact_validation_hook(path: &FsPath) {
     }
 }
 
-pub(crate) fn read_text_with_limit(
-    reader: impl Read,
-    limit: u64,
-    description: &str,
-) -> Result<String> {
+pub fn read_text_with_limit(reader: impl Read, limit: u64, description: &str) -> Result<String> {
     let mut bytes = Vec::new();
     reader
         .take(limit.saturating_add(1))
@@ -296,13 +292,13 @@ pub(crate) fn read_text_with_limit(
     String::from_utf8(bytes).with_context(|| format!("{description} is not valid UTF-8"))
 }
 
-pub(crate) fn read_text_file_with_limit(path: &FsPath, limit: u64) -> Result<String> {
+pub fn read_text_file_with_limit(path: &FsPath, limit: u64) -> Result<String> {
     let file = open_regular_input_file(path)
         .with_context(|| format!("failed to open or inspect {}", path.display()))?;
     read_text_with_limit(file, limit, &path.display().to_string())
 }
 
-pub(crate) fn read_text_file_with_expected_target(
+pub fn read_text_file_with_expected_target(
     path: &FsPath,
     limit: u64,
 ) -> Result<(String, ExpectedWriteTarget)> {
@@ -357,7 +353,7 @@ fn describe_refused_input_link(path: &FsPath, error: io::Error) -> io::Error {
     error
 }
 
-pub(crate) fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
+pub fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
     match file {
         Some(path) => {
             let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES)?;
@@ -380,16 +376,16 @@ pub(crate) fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
     }
 }
 
-pub(crate) fn read_input_and_dialect(
+pub fn read_input_and_dialect(
     file: Option<PathBuf>,
     explicit: Option<DialectArg>,
 ) -> Result<(SourceInput, Dialect)> {
     let input = read_input(file)?;
-    let dialect = super::detect_dialect(&input, explicit);
+    let dialect = crate::shared::detect_dialect(&input, explicit);
     Ok((input, dialect))
 }
 
-pub(crate) fn read_input_dialect_and_tree(
+pub fn read_input_dialect_and_tree(
     file: Option<PathBuf>,
     explicit: Option<DialectArg>,
 ) -> Result<(SourceInput, Dialect, SyntaxTree)> {
@@ -401,7 +397,7 @@ pub(crate) fn read_input_dialect_and_tree(
 /// Parses a source document with its resolved dialect, naming the input and
 /// the error's line/column in the context. The underlying [`ParseError`] keeps
 /// the raw byte offset, which feeds directly into `--at`.
-pub(crate) fn parse_document(input: &SourceInput, dialect: Dialect) -> Result<SyntaxTree> {
+pub fn parse_document(input: &SourceInput, dialect: Dialect) -> Result<SyntaxTree> {
     SyntaxTree::parse_with_dialect(&input.text, dialect).map_err(|error| {
         let location = parse_error_line_column(&input.text, &error);
         let source = match input.file.as_deref() {
@@ -438,7 +434,7 @@ fn parse_error_line_column(text: &str, error: &ParseError) -> String {
     format!("line {line}, column {column}")
 }
 
-pub(crate) fn read_file_or_empty(path: &FsPath) -> Result<(SourceInput, bool)> {
+pub fn read_file_or_empty(path: &FsPath) -> Result<(SourceInput, bool)> {
     match open_regular_input_file(path) {
         Ok(file) => Ok((
             SourceInput {
@@ -462,7 +458,7 @@ pub(crate) fn read_file_or_empty(path: &FsPath) -> Result<(SourceInput, bool)> {
     }
 }
 
-pub(crate) fn write_files_with_rollback<I>(files: I) -> Result<()>
+pub fn write_files_with_rollback<I>(files: I) -> Result<()>
 where
     I: IntoIterator<Item = (PathBuf, String)>,
 {
@@ -475,16 +471,13 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct ExpectedWriteTarget {
+pub struct ExpectedWriteTarget {
     identity: FileIdentity,
     digest: [u8; 32],
 }
 
 impl ExpectedWriteTarget {
-    pub(crate) fn from_metadata_and_content(
-        metadata: &fs::Metadata,
-        content: &str,
-    ) -> io::Result<Self> {
+    pub fn from_metadata_and_content(metadata: &fs::Metadata, content: &str) -> io::Result<Self> {
         Ok(Self {
             identity: file_identity(metadata)?,
             digest: *blake3::hash(content.as_bytes()).as_bytes(),
@@ -492,7 +485,7 @@ impl ExpectedWriteTarget {
     }
 }
 
-pub(crate) fn write_files_with_rollback_expected<I>(files: I) -> Result<()>
+pub fn write_files_with_rollback_expected<I>(files: I) -> Result<()>
 where
     I: IntoIterator<Item = (PathBuf, String, ExpectedWriteTarget)>,
 {
@@ -504,15 +497,18 @@ where
     )
 }
 
-pub(crate) struct AnchoredExpectedWrite {
-    pub(crate) display_path: PathBuf,
-    pub(crate) parent_dir: Arc<cap_std::fs::Dir>,
-    pub(crate) file_name: OsString,
-    pub(crate) content: String,
-    pub(crate) expected: ExpectedWriteTarget,
+// Public since the extraction: this was crate-internal, a visibility that
+// cannot cross a crate boundary, so the lint applies to it for the first time.
+#[derive(Debug)]
+pub struct AnchoredExpectedWrite {
+    pub display_path: PathBuf,
+    pub parent_dir: Arc<cap_std::fs::Dir>,
+    pub file_name: OsString,
+    pub content: String,
+    pub expected: ExpectedWriteTarget,
 }
 
-pub(crate) fn write_files_with_rollback_expected_anchored(
+pub fn write_files_with_rollback_expected_anchored(
     files: Vec<AnchoredExpectedWrite>,
 ) -> Result<()> {
     #[cfg(unix)]
@@ -658,11 +654,11 @@ fn apply_staged_writes(staged: Vec<StagedWriteTarget>) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn write_file_with_rollback(path: PathBuf, content: String) -> Result<()> {
+pub fn write_file_with_rollback(path: PathBuf, content: String) -> Result<()> {
     write_files_with_rollback([(path, content)])
 }
 
-pub(crate) fn write_artifact_with_rollback(path: PathBuf, content: String) -> Result<()> {
+pub fn write_artifact_with_rollback(path: PathBuf, content: String) -> Result<()> {
     write_files_transactionally(vec![(path, content, None)])
 }
 
@@ -748,7 +744,7 @@ struct SecurityMetadata {
     mode: u32,
     xattrs: Vec<(OsString, Vec<u8>)>,
     #[cfg(target_os = "macos")]
-    acl: Option<super::macos_acl::SerializedAcl>,
+    acl: Option<crate::shared::macos_acl::SerializedAcl>,
 }
 
 type FileIdentity = FilesystemIdentity;
@@ -2355,7 +2351,7 @@ fn read_security_metadata(file: &fs::File) -> io::Result<SecurityMetadata> {
         mode: metadata.permissions().mode() & 0o7777,
         xattrs,
         #[cfg(target_os = "macos")]
-        acl: super::macos_acl::read_acl(file)?,
+        acl: crate::shared::macos_acl::read_acl(file)?,
     })
 }
 
@@ -2399,7 +2395,7 @@ fn apply_security_metadata(
         destination.set_xattr(name, value)?;
     }
     #[cfg(target_os = "macos")]
-    super::macos_acl::write_acl(destination, expected.acl.as_ref())?;
+    crate::shared::macos_acl::write_acl(destination, expected.acl.as_ref())?;
 
     let actual = read_security_metadata(destination)?;
     if &actual != expected {
@@ -4450,7 +4446,7 @@ mod tests {
             .status()
             .expect("run chmod");
         assert!(status.success(), "set target ACL");
-        let original_acl = super::super::macos_acl::read_acl(
+        let original_acl = crate::shared::macos_acl::read_acl(
             &open_existing_file(&target).expect("open original target"),
         )
         .expect("read original ACL")
@@ -4459,7 +4455,7 @@ mod tests {
         let staged =
             stage_write_target(target.clone(), "(new)".to_owned()).expect("stage target with ACL");
         for path in [&staged.staged_path, &staged.backup_path] {
-            let acl = super::super::macos_acl::read_acl(
+            let acl = crate::shared::macos_acl::read_acl(
                 &open_existing_file(path).expect("open transaction file"),
             )
             .expect("read transaction ACL")
@@ -4468,7 +4464,7 @@ mod tests {
         }
         apply_staged_writes(vec![staged]).expect("commit write");
 
-        let committed_acl = super::super::macos_acl::read_acl(
+        let committed_acl = crate::shared::macos_acl::read_acl(
             &open_existing_file(&target).expect("open committed target"),
         )
         .expect("read committed ACL")
@@ -4494,16 +4490,16 @@ mod tests {
         assert!(status.success(), "set target ACL");
         let file = open_existing_file(&target).expect("open target");
         assert!(
-            super::super::macos_acl::read_acl(&file)
+            crate::shared::macos_acl::read_acl(&file)
                 .expect("read original ACL")
                 .is_some(),
             "target must have an ACL before removal"
         );
 
-        super::super::macos_acl::write_acl(&file, None).expect("remove target ACL");
+        crate::shared::macos_acl::write_acl(&file, None).expect("remove target ACL");
 
         assert_eq!(
-            super::super::macos_acl::read_acl(&file).expect("read removed ACL"),
+            crate::shared::macos_acl::read_acl(&file).expect("read removed ACL"),
             None
         );
         fs::remove_dir_all(directory).expect("remove test directory");

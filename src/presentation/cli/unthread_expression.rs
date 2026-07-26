@@ -33,12 +33,15 @@ pub(super) struct UnthreadExpressionArgs {
     output: OutputFormat,
 }
 
-impl ThreadStyleArg {
-    const fn application_unthread_style(self) -> ApplicationUnthreadStyle {
-        match self {
-            Self::First => ApplicationUnthreadStyle::First,
-            Self::Last => ApplicationUnthreadStyle::Last,
-        }
+/// Maps the CLI's thread style onto the use case's.
+///
+/// A free function rather than an inherent method: `ThreadStyleArg` now lives
+/// in `paredit-core-cli`, and Rust does not allow an inherent impl on a type
+/// from another crate.
+const fn application_unthread_style(style: ThreadStyleArg) -> ApplicationUnthreadStyle {
+    match style {
+        ThreadStyleArg::First => ApplicationUnthreadStyle::First,
+        ThreadStyleArg::Last => ApplicationUnthreadStyle::Last,
     }
 }
 
@@ -47,7 +50,7 @@ pub(super) fn unthread_expression(args: UnthreadExpressionArgs) -> Result<()> {
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let selected = selection.view();
     let path = args.path.clone();
-    let style = args.style.map(ThreadStyleArg::application_unthread_style);
+    let style = args.style.map(application_unthread_style);
     let plan = plan_unthread_expression(UnthreadExpressionRequest {
         input: &input.text,
         tree: &tree,

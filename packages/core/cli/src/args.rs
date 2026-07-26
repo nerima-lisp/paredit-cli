@@ -2,133 +2,133 @@ use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, Path};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, Path};
 
 #[derive(Debug, Args)]
-pub(super) struct AnalyzeArgs {
+pub struct AnalyzeArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
-    pub(super) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(super) struct FormatArgs {
+pub struct FormatArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
-    pub(super) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Number of spaces per nesting level.
     #[arg(long, default_value_t = 2)]
-    pub(super) indent: usize,
+    pub indent: usize,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Print a unified diff against the input instead of the rewritten document.
     #[arg(long)]
-    pub(super) diff: bool,
+    pub diff: bool,
 }
 
 #[derive(Debug, Args)]
-pub(super) struct RepairArgs {
+pub struct RepairArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
-    pub(super) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Write the repaired document back to --file instead of stdout.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Print a unified diff against the input instead of the repaired document.
     #[arg(long)]
-    pub(super) diff: bool,
+    pub diff: bool,
 }
 
 #[derive(Debug, Args)]
-pub(crate) struct TargetArgs {
+pub struct TargetArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
-    pub(super) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Select by child index path, for example 0.2.1.
     #[arg(long, conflicts_with = "at")]
-    pub(super) path: Option<Path>,
+    pub path: Option<Path>,
     /// Select the smallest expression containing byte offset.
     #[arg(long, conflicts_with = "path")]
-    pub(super) at: Option<usize>,
+    pub at: Option<usize>,
 }
 
 /// Target selection plus in-place write support for mutating edit commands.
 /// `select` keeps the plain [`TargetArgs`] because it never rewrites source.
 #[derive(Debug, Args)]
-pub(crate) struct EditTargetArgs {
+pub struct EditTargetArgs {
     #[command(flatten)]
-    pub(super) target: TargetArgs,
+    pub target: TargetArgs,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Print a unified diff against the input instead of the rewritten document.
     #[arg(long)]
-    pub(super) diff: bool,
+    pub diff: bool,
 }
 
 #[derive(Debug, Args)]
-pub(super) struct ReplaceArgs {
+pub struct ReplaceArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
-    pub(super) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Select by child index path, for example 0.2.1.
     #[arg(long, conflicts_with = "at")]
-    pub(super) path: Option<Path>,
+    pub path: Option<Path>,
     /// Select the smallest expression containing byte offset.
     #[arg(long, conflicts_with = "path")]
-    pub(super) at: Option<usize>,
+    pub at: Option<usize>,
     /// Replacement S-expression text.
     #[arg(long)]
-    pub(super) with: String,
+    pub with: String,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Print a unified diff against the input instead of the rewritten document.
     #[arg(long)]
-    pub(super) diff: bool,
+    pub diff: bool,
 }
 
 /// Target selection plus in-place write support and a wrapping delimiter.
 /// `wrap` extends [`EditTargetArgs`] with `--delimiter` so callers can wrap in
 /// parentheses, square brackets, or curly braces.
 #[derive(Debug, Args)]
-pub(crate) struct WrapArgs {
+pub struct WrapArgs {
     #[command(flatten)]
-    pub(super) target: TargetArgs,
+    pub target: TargetArgs,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Print a unified diff against the input instead of the rewritten document.
     #[arg(long)]
-    pub(super) diff: bool,
+    pub diff: bool,
     /// Delimiter to wrap the selected expression in.
     #[arg(long, value_enum, default_value_t = WrapDelimiter::Paren)]
-    pub(super) delimiter: WrapDelimiter,
+    pub delimiter: WrapDelimiter,
 }
 
 /// The list delimiter a `wrap` edit surrounds the selection with.
 #[derive(Debug, Clone, Copy, ValueEnum)]
-pub(crate) enum WrapDelimiter {
+pub enum WrapDelimiter {
     Paren,
     Bracket,
     Brace,
@@ -145,7 +145,7 @@ impl From<WrapDelimiter> for Delimiter {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-pub(crate) enum DialectArg {
+pub enum DialectArg {
     CommonLisp,
     EmacsLisp,
     Lfe,
@@ -178,20 +178,21 @@ impl From<DialectArg> for Dialect {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(super) enum OutputFormat {
+pub enum OutputFormat {
     Text,
     Json,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(super) enum MoveInsert {
+pub enum MoveInsert {
     Append,
     Before,
     After,
 }
 
 impl MoveInsert {
-    pub(super) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Append => "append",
             Self::Before => "before",
@@ -201,25 +202,25 @@ impl MoveInsert {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(super) enum ParameterInsert {
+pub enum ParameterInsert {
     Start,
     End,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(super) enum ThreadStyleArg {
+pub enum ThreadStyleArg {
     First,
     Last,
 }
 
 #[derive(Debug)]
-pub(crate) struct SourceInput {
-    pub(super) text: String,
-    pub(super) file: Option<PathBuf>,
+pub struct SourceInput {
+    pub text: String,
+    pub file: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub(super) enum ImpactRiskLevel {
+pub enum ImpactRiskLevel {
     Info,
     Warning,
     Error,

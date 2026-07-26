@@ -33,12 +33,16 @@ pub(super) struct ThreadExpressionArgs {
     output: OutputFormat,
 }
 
-impl ThreadStyleArg {
-    const fn application_style(self) -> ApplicationThreadStyle {
-        match self {
-            Self::First => ApplicationThreadStyle::First,
-            Self::Last => ApplicationThreadStyle::Last,
-        }
+/// Maps the CLI's thread style onto the use case's.
+///
+/// A free function rather than an inherent method: `ThreadStyleArg` now lives
+/// in `paredit-core-cli`, and Rust does not allow an inherent impl on a type
+/// from another crate. Keeping the conversion here is also the right side of
+/// the boundary - core/cli must not name a use case.
+const fn application_style(style: ThreadStyleArg) -> ApplicationThreadStyle {
+    match style {
+        ThreadStyleArg::First => ApplicationThreadStyle::First,
+        ThreadStyleArg::Last => ApplicationThreadStyle::Last,
     }
 }
 
@@ -47,7 +51,7 @@ pub(super) fn thread_expression(args: ThreadExpressionArgs) -> Result<()> {
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let selected = selection.view();
     let path = args.path.clone();
-    let style = args.style.application_style();
+    let style = application_style(args.style);
     let operator = match args.operator {
         Some(operator) => operator,
         None => SymbolName::new(style.default_operator())?,

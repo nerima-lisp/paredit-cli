@@ -29,7 +29,8 @@ enum DiffOp {
     Insert(usize),
 }
 
-pub(crate) fn unified_diff(path: &FsPath, before: &str, after: &str) -> String {
+#[must_use]
+pub fn unified_diff(path: &FsPath, before: &str, after: &str) -> String {
     unified_diff_with_limits(path, before, after, DEFAULT_DIFF_LIMITS)
 }
 

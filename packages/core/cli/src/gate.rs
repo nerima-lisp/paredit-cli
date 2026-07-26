@@ -7,13 +7,13 @@ use thiserror::Error;
 
 /// Exit status used when a requested policy gate fails after the report was
 /// printed.
-pub(crate) const GATE_FAILURE_EXIT_CODE: i32 = 3;
+pub const GATE_FAILURE_EXIT_CODE: i32 = 3;
 
 #[derive(Debug, Error)]
 #[error("{0}")]
-pub(crate) struct GateFailure(pub(crate) String);
+pub struct GateFailure(pub String);
 
 /// Builds an [`anyhow::Error`] carrying the gate marker type.
-pub(crate) fn gate_failure(message: impl Into<String>) -> anyhow::Error {
+pub fn gate_failure(message: impl Into<String>) -> anyhow::Error {
     anyhow::Error::new(GateFailure(message.into()))
 }
