@@ -281,10 +281,10 @@ mod tests {
                     return;
                 }
                 let start = view.span.start().get();
-                if best.is_none_or(|(best_start, _)| start > best_start)
-                    && let Some(key) = NodeKey::of(view)
-                {
-                    best = Some((start, key));
+                if best.is_none_or(|(best_start, _)| start > best_start) {
+                    if let Some(key) = NodeKey::of(view) {
+                        best = Some((start, key));
+                    }
                 }
             });
         }

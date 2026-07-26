@@ -84,9 +84,10 @@ fn resolve_reference(view: &ExpressionView, bindings: &BindingTable, values: &Va
     let Some(span) = atom_symbol_span(view) else {
         return Value::Unknown;
     };
-    if let Some(binding) = bindings.resolve(NodeKey::atom(span))
-        && let Some(value) = values.binding_value(binding)
-    {
+    let resolved = bindings
+        .resolve(NodeKey::atom(span))
+        .and_then(|binding| values.binding_value(binding));
+    if let Some(value) = resolved {
         return Value::Known(value.clone().into());
     }
 

@@ -96,14 +96,17 @@ fn propagate_in(
     let mut stack = vec![view];
 
     while let Some(node) = stack.pop() {
-        if let Some(binding) = targets.get(&node.span)
-            && known.binding_value(*binding).is_none()
-            && let Some(value) = evaluate_constant(dialect, node, bindings, known)
+        let unresolved = targets
+            .get(&node.span)
+            .filter(|binding| known.binding_value(**binding).is_none());
+        if let Some(binding) = unresolved {
+            let value = evaluate_constant(dialect, node, bindings, known)
                 .as_known()
-                .and_then(super::super::model::LiteralValue::propagatable)
-        {
-            builder.set_binding_value(*binding, value);
-            learned = true;
+                .and_then(super::super::model::LiteralValue::propagatable);
+            if let Some(value) = value {
+                builder.set_binding_value(*binding, value);
+                learned = true;
+            }
         }
         stack.extend(node.children.iter().rev());
     }
