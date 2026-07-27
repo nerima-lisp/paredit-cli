@@ -1,7 +1,7 @@
 //! Workspace filesystem discovery adapters.
 
-pub mod error;
 mod discovery;
+pub mod error;
 mod filters;
 mod types;
 

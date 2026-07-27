@@ -78,7 +78,8 @@ impl ExcludeIndex {
             .into());
         }
 
-        let current_dir = std::env::current_dir().map_err(WorkspaceError::io("failed to resolve current directory"))?;
+        let current_dir = std::env::current_dir()
+            .map_err(WorkspaceError::io("failed to resolve current directory"))?;
         let mut index = Self {
             nodes: vec![ExcludeNode::default()],
             current_dir,
@@ -179,12 +180,15 @@ impl<'a> ReadReservation<'a> {
         }
     }
 
-    fn reserve(&mut self, bytes: u64, maximum: u64, path: &Path) -> std::result::Result<(), WorkspaceError> {
+    fn reserve(
+        &mut self,
+        bytes: u64,
+        maximum: u64,
+        path: &Path,
+    ) -> std::result::Result<(), WorkspaceError> {
         self.total
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
-                current
-                    .checked_add(bytes)
-                    .filter(|total| *total <= maximum)
+                current.checked_add(bytes).filter(|total| *total <= maximum)
             })
             .map_err(|current| WorkspaceLimit::TotalRead {
                 path: path.to_path_buf(),
@@ -228,7 +232,10 @@ pub(super) fn read_bounded<R: Read>(
     loop {
         let count = reader
             .read(&mut chunk)
-            .map_err(|source| WorkspaceError::Io { context: format!("failed to read {}", path.display()), source })?;
+            .map_err(|source| WorkspaceError::Io {
+                context: format!("failed to read {}", path.display()),
+                source,
+            })?;
         if count == 0 {
             break;
         }
@@ -237,11 +244,16 @@ pub(super) fn read_bounded<R: Read>(
             .len()
             .checked_add(count)
             .ok_or(WorkspaceError::Unavailable("workspace file size overflow"))?;
-        if !(u64::try_from(next_len).unwrap_or(u64::MAX) <= limits.max_file_bytes) {
-    return Err(WorkspaceLimit::ReadSize { path: path.to_path_buf(), maximum: limits.max_file_bytes }.into());
-}
+        if u64::try_from(next_len).unwrap_or(u64::MAX) > limits.max_file_bytes {
+            return Err(WorkspaceLimit::ReadSize {
+                path: path.to_path_buf(),
+                maximum: limits.max_file_bytes,
+            }
+            .into());
+        }
 
-        let bytes = u64::try_from(count).map_err(|_| WorkspaceError::Unavailable("workspace read chunk size overflow"))?;
+        let bytes = u64::try_from(count)
+            .map_err(|_| WorkspaceError::Unavailable("workspace read chunk size overflow"))?;
         reservation.reserve(bytes, limits.max_total_bytes, path)?;
         content
             .try_reserve(count)
@@ -282,10 +294,14 @@ pub(super) fn discover_workspace_files_with_limits(
         .roots
         .iter()
         .map(|root| {
-            let canonical = fs::canonicalize(root)
-                .map_err(|source| WorkspaceError::Io { context: format!("failed to resolve workspace root {}", root.display()), source })?;
-            let metadata = fs::symlink_metadata(root)
-                .map_err(|source| WorkspaceError::Io { context: format!("failed to inspect {}", root.display()), source })?;
+            let canonical = fs::canonicalize(root).map_err(|source| WorkspaceError::Io {
+                context: format!("failed to resolve workspace root {}", root.display()),
+                source,
+            })?;
+            let metadata = fs::symlink_metadata(root).map_err(|source| WorkspaceError::Io {
+                context: format!("failed to inspect {}", root.display()),
+                source,
+            })?;
             Ok(ResolvedRoot {
                 lexical: root.clone(),
                 canonical,
@@ -311,29 +327,46 @@ pub(super) fn discover_workspace_files_with_limits(
         .iter()
         .map(|root| {
             let capability_base = if root.is_file() {
-                root.parent().ok_or_else(|| WorkspaceError::Io { context: format!("workspace file root has no parent: {}", root.display()), source: std::io::Error::other("") })?
+                root.parent().ok_or_else(|| WorkspaceError::Io {
+                    context: format!("workspace file root has no parent: {}", root.display()),
+                    source: std::io::Error::other(""),
+                })?
             } else {
                 root.as_path()
             };
-            let ambient_metadata = fs::metadata(capability_base).map_err(|source| WorkspaceError::Io { context: format!(
-                    "failed to inspect ambient workspace root {}",
-                    capability_base.display()
-                ), source })?;
-            let dir = Dir::open_ambient_dir(capability_base, ambient_authority())
-                .map_err(|source| WorkspaceError::Io { context: format!("failed to open workspace root {}", root.display()), source })?;
-            let capability_metadata = dir.dir_metadata().map_err(|source| WorkspaceError::Io { context: format!(
+            let ambient_metadata =
+                fs::metadata(capability_base).map_err(|source| WorkspaceError::Io {
+                    context: format!(
+                        "failed to inspect ambient workspace root {}",
+                        capability_base.display()
+                    ),
+                    source,
+                })?;
+            let dir =
+                Dir::open_ambient_dir(capability_base, ambient_authority()).map_err(|source| {
+                    WorkspaceError::Io {
+                        context: format!("failed to open workspace root {}", root.display()),
+                        source,
+                    }
+                })?;
+            let capability_metadata = dir.dir_metadata().map_err(|source| WorkspaceError::Io {
+                context: format!(
                     "failed to inspect workspace root capability {}",
                     capability_base.display()
-                ), source })?;
-            let identity = FilesystemIdentity::from_cap(&capability_metadata)
-                .ok_or(WorkspaceError::Unavailable("workspace root capability identity is unavailable"))?;
-            if !(ambient_metadata.is_dir()
-                    && FilesystemIdentity::from_std(&ambient_metadata) == Some(identity)) {
-    return Err(WorkspaceRefusal::RootChanged {
+                ),
+                source,
+            })?;
+            let identity = FilesystemIdentity::from_cap(&capability_metadata).ok_or(
+                WorkspaceError::Unavailable("workspace root capability identity is unavailable"),
+            )?;
+            let root_is_unchanged = ambient_metadata.is_dir()
+                && FilesystemIdentity::from_std(&ambient_metadata) == Some(identity);
+            if !root_is_unchanged {
+                return Err(WorkspaceRefusal::RootChanged {
                     path: capability_base.to_path_buf(),
                 }
                 .into());
-}
+            }
             Ok((
                 root.clone(),
                 capability_base.to_path_buf(),
@@ -374,8 +407,7 @@ pub(super) fn discover_workspace_files_with_limits(
             &excludes,
             &mut discovery,
             &mut seen,
-        )
-        ?;
+        )?;
     }
 
     discovery.files.sort();
@@ -396,8 +428,10 @@ fn collect_workspace_files(
         return Ok(());
     }
 
-    let metadata = fs::symlink_metadata(path)
-        .map_err(|source| WorkspaceError::Io { context: format!("failed to inspect {}", path.display()), source })?;
+    let metadata = fs::symlink_metadata(path).map_err(|source| WorkspaceError::Io {
+        context: format!("failed to inspect {}", path.display()),
+        source,
+    })?;
 
     if metadata.file_type().is_symlink() {
         discovery.skipped_symlink_count += 1;
@@ -443,21 +477,30 @@ fn collect_workspace_directory(
     }
 
     let mut entries = Vec::new();
-    for entry in fs::read_dir(path).map_err(|source| WorkspaceError::Io { context: format!("failed to list {}", path.display()), source })? {
-        discovery.visited_entry_count = discovery
-            .visited_entry_count
-            .checked_add(1)
-            .ok_or(WorkspaceError::Unavailable("workspace entry count overflow"))?;
+    for entry in fs::read_dir(path).map_err(|source| WorkspaceError::Io {
+        context: format!("failed to list {}", path.display()),
+        source,
+    })? {
+        discovery.visited_entry_count =
+            discovery
+                .visited_entry_count
+                .checked_add(1)
+                .ok_or(WorkspaceError::Unavailable(
+                    "workspace entry count overflow",
+                ))?;
         if discovery.visited_entry_count > discovery.limits.max_entries {
-                return Err(WorkspaceLimit::Entries {
-                    path: path.to_path_buf(),
-                    maximum: discovery.limits.max_entries,
-                }
-                .into());
+            return Err(WorkspaceLimit::Entries {
+                path: path.to_path_buf(),
+                maximum: discovery.limits.max_entries,
             }
+            .into());
+        }
         entries.push(
             entry
-                .map_err(|source| WorkspaceError::Io { context: format!("failed to list {}", path.display()), source })?
+                .map_err(|source| WorkspaceError::Io {
+                    context: format!("failed to list {}", path.display()),
+                    source,
+                })?
                 .path(),
         );
     }
@@ -495,45 +538,52 @@ fn collect_workspace_file(
         return Ok(());
     }
 
-    let canonical = fs::canonicalize(path)
-        .map_err(|source| WorkspaceError::Io { context: format!("failed to resolve workspace file {}", path.display()), source })?;
+    let canonical = fs::canonicalize(path).map_err(|source| WorkspaceError::Io {
+        context: format!("failed to resolve workspace file {}", path.display()),
+        source,
+    })?;
     if discovery.root_capability_for(&canonical).is_none() {
         return Err(WorkspaceRefusal::OutsideRoots {
             path: canonical.clone(),
         }
         .into());
     }
-    let metadata = fs::symlink_metadata(&canonical)
-        .map_err(|source| WorkspaceError::Io { context: format!("failed to inspect {}", canonical.display()), source })?;
-    if !(metadata.is_file()) {
-    return Err(WorkspaceRefusal::NonRegularFile { path: canonical.clone() }.into());
-}
+    let metadata = fs::symlink_metadata(&canonical).map_err(|source| WorkspaceError::Io {
+        context: format!("failed to inspect {}", canonical.display()),
+        source,
+    })?;
+    if !metadata.is_file() {
+        return Err(WorkspaceRefusal::NonRegularFile {
+            path: canonical.clone(),
+        }
+        .into());
+    }
     if seen.insert(canonical.clone()) {
         if discovery.files.len() >= discovery.limits.max_files {
-        return Err(WorkspaceLimit::Files {
-            maximum: discovery.limits.max_files,
+            return Err(WorkspaceLimit::Files {
+                maximum: discovery.limits.max_files,
+            }
+            .into());
         }
-        .into());
-    }
         if metadata.len() > discovery.limits.max_file_bytes {
-        return Err(WorkspaceLimit::FileSize {
-            path: canonical.clone(),
-            actual: metadata.len(),
-            maximum: discovery.limits.max_file_bytes,
+            return Err(WorkspaceLimit::FileSize {
+                path: canonical.clone(),
+                actual: metadata.len(),
+                maximum: discovery.limits.max_file_bytes,
+            }
+            .into());
         }
-        .into());
-    }
         let total = discovery
             .discovered_bytes
             .checked_add(metadata.len())
             .ok_or(WorkspaceError::Unavailable("workspace byte count overflow"))?;
         if total > discovery.limits.max_total_bytes {
-        return Err(WorkspaceLimit::TotalBytes {
-            actual: total,
-            maximum: discovery.limits.max_total_bytes,
+            return Err(WorkspaceLimit::TotalBytes {
+                actual: total,
+                maximum: discovery.limits.max_total_bytes,
+            }
+            .into());
         }
-        .into());
-    }
         discovery.discovered_bytes = total;
         discovery.canonical_files.insert(canonical);
         discovery.files.push(path.to_path_buf());
@@ -569,37 +619,61 @@ fn validate_workspace_root_identity(
     root_dir: &Dir,
     expected_identity: FilesystemIdentity,
 ) -> std::result::Result<(), WorkspaceError> {
-    let ambient_metadata = fs::metadata(capability_base).map_err(|source| WorkspaceError::Io { context: format!(
+    let ambient_metadata = fs::metadata(capability_base).map_err(|source| WorkspaceError::Io {
+        context: format!(
             "failed to inspect ambient workspace root {}",
             capability_base.display()
-        ), source })?;
-    let capability_metadata = root_dir.dir_metadata().map_err(|source| WorkspaceError::Io { context: format!(
-            "failed to inspect workspace root capability {}",
-            capability_base.display()
-        ), source })?;
-    if !(ambient_metadata.is_dir()
-            && FilesystemIdentity::from_std(&ambient_metadata) == Some(expected_identity)
-            && FilesystemIdentity::from_cap(&capability_metadata) == Some(expected_identity)) {
-    return Err(WorkspaceRefusal::RootIdentityChanged { path: capability_base.to_path_buf() }.into());
-}
+        ),
+        source,
+    })?;
+    let capability_metadata = root_dir
+        .dir_metadata()
+        .map_err(|source| WorkspaceError::Io {
+            context: format!(
+                "failed to inspect workspace root capability {}",
+                capability_base.display()
+            ),
+            source,
+        })?;
+    let identity_is_unchanged = ambient_metadata.is_dir()
+        && FilesystemIdentity::from_std(&ambient_metadata) == Some(expected_identity)
+        && FilesystemIdentity::from_cap(&capability_metadata) == Some(expected_identity);
+    if !identity_is_unchanged {
+        return Err(WorkspaceRefusal::RootIdentityChanged {
+            path: capability_base.to_path_buf(),
+        }
+        .into());
+    }
     Ok(())
 }
 
 impl WorkspaceDiscovery {
     pub fn read_file(&self, path: &Path) -> std::result::Result<Vec<u8>, WorkspaceError> {
-        let metadata = fs::symlink_metadata(path)
-            .map_err(|source| WorkspaceError::Io { context: format!("failed to inspect {}", path.display()), source })?;
-        if !(metadata.is_file() && !metadata.file_type().is_symlink()) {
-    return Err(WorkspaceRefusal::ReplacedOrNonRegular { path: path.to_path_buf() }.into());
-}
+        let metadata = fs::symlink_metadata(path).map_err(|source| WorkspaceError::Io {
+            context: format!("failed to inspect {}", path.display()),
+            source,
+        })?;
+        let is_regular_file = metadata.is_file() && !metadata.file_type().is_symlink();
+        if !is_regular_file {
+            return Err(WorkspaceRefusal::ReplacedOrNonRegular {
+                path: path.to_path_buf(),
+            }
+            .into());
+        }
 
-        let canonical = fs::canonicalize(path)
-            .map_err(|source| WorkspaceError::Io { context: format!("failed to resolve workspace file {}", path.display()), source })?;
-        let (_, capability_base, root_dir, root_identity) =
-            self.root_capability_for(&canonical).ok_or_else(|| WorkspaceError::Io { context: format!(
+        let canonical = fs::canonicalize(path).map_err(|source| WorkspaceError::Io {
+            context: format!("failed to resolve workspace file {}", path.display()),
+            source,
+        })?;
+        let (_, capability_base, root_dir, root_identity) = self
+            .root_capability_for(&canonical)
+            .ok_or_else(|| WorkspaceError::Io {
+                context: format!(
                     "refusing workspace file outside canonical roots: {}",
                     canonical.display()
-                ), source: std::io::Error::other("") })?;
+                ),
+                source: std::io::Error::other(""),
+            })?;
         if !self.contains_canonical_file(&canonical) {
             return Err(WorkspaceRefusal::NotSelected {
                 path: canonical.clone(),
@@ -607,22 +681,36 @@ impl WorkspaceDiscovery {
             .into());
         }
         validate_workspace_root_identity(capability_base, root_dir, *root_identity)?;
-        let relative = canonical
-            .strip_prefix(capability_base)
-            .map_err(|_| WorkspaceError::Unavailable("workspace file is outside selected root capability"))?;
-        let pre_open_metadata = root_dir
-            .symlink_metadata(relative)
-            .map_err(|source| WorkspaceError::Io { context: format!("failed to inspect {}", canonical.display()), source })?;
-        if !(pre_open_metadata.is_file() && !pre_open_metadata.file_type().is_symlink()) {
-    return Err(WorkspaceRefusal::ReplacedOrNonRegular { path: canonical.clone() }.into());
-}
-        let ambient_identity = FilesystemIdentity::from_std(&metadata)
-            .ok_or(WorkspaceError::Unavailable("ambient workspace file identity is unavailable"))?;
-        let pre_open_identity = FilesystemIdentity::from_cap(&pre_open_metadata)
-            .ok_or(WorkspaceError::Unavailable("workspace file capability identity is unavailable"))?;
-        if !(ambient_identity == pre_open_identity) {
-    return Err(WorkspaceRefusal::IdentityMismatch { path: canonical.clone() }.into());
-}
+        let relative = canonical.strip_prefix(capability_base).map_err(|_| {
+            WorkspaceError::Unavailable("workspace file is outside selected root capability")
+        })?;
+        let pre_open_metadata =
+            root_dir
+                .symlink_metadata(relative)
+                .map_err(|source| WorkspaceError::Io {
+                    context: format!("failed to inspect {}", canonical.display()),
+                    source,
+                })?;
+        let is_regular_file =
+            pre_open_metadata.is_file() && !pre_open_metadata.file_type().is_symlink();
+        if !is_regular_file {
+            return Err(WorkspaceRefusal::ReplacedOrNonRegular {
+                path: canonical.clone(),
+            }
+            .into());
+        }
+        let ambient_identity = FilesystemIdentity::from_std(&metadata).ok_or(
+            WorkspaceError::Unavailable("ambient workspace file identity is unavailable"),
+        )?;
+        let pre_open_identity = FilesystemIdentity::from_cap(&pre_open_metadata).ok_or(
+            WorkspaceError::Unavailable("workspace file capability identity is unavailable"),
+        )?;
+        if ambient_identity != pre_open_identity {
+            return Err(WorkspaceRefusal::IdentityMismatch {
+                path: canonical.clone(),
+            }
+            .into());
+        }
         #[cfg(unix)]
         let cap_file = {
             let mut options = OpenOptions::new();
@@ -633,19 +721,29 @@ impl WorkspaceDiscovery {
         };
         #[cfg(not(unix))]
         let cap_file = root_dir.open(relative);
-        let cap_file =
-            cap_file.map_err(|source| WorkspaceError::Io { context: format!("failed to open {}", canonical.display()), source })?;
-        let opened_metadata = cap_file
-            .metadata()
-            .map_err(|source| WorkspaceError::Io { context: format!("failed to inspect open file {}", canonical.display()), source })?;
-        if !(opened_metadata.is_file()) {
-    return Err(WorkspaceRefusal::NonRegularFile { path: canonical.clone() }.into());
-}
-        let opened_identity = FilesystemIdentity::from_cap(&opened_metadata)
-            .ok_or(WorkspaceError::Unavailable("open workspace file identity is unavailable"))?;
-        if !(pre_open_identity == opened_identity) {
-    return Err(WorkspaceRefusal::ReplacedWhileOpening { path: canonical.clone() }.into());
-}
+        let cap_file = cap_file.map_err(|source| WorkspaceError::Io {
+            context: format!("failed to open {}", canonical.display()),
+            source,
+        })?;
+        let opened_metadata = cap_file.metadata().map_err(|source| WorkspaceError::Io {
+            context: format!("failed to inspect open file {}", canonical.display()),
+            source,
+        })?;
+        if !opened_metadata.is_file() {
+            return Err(WorkspaceRefusal::NonRegularFile {
+                path: canonical.clone(),
+            }
+            .into());
+        }
+        let opened_identity = FilesystemIdentity::from_cap(&opened_metadata).ok_or(
+            WorkspaceError::Unavailable("open workspace file identity is unavailable"),
+        )?;
+        if pre_open_identity != opened_identity {
+            return Err(WorkspaceRefusal::ReplacedWhileOpening {
+                path: canonical.clone(),
+            }
+            .into());
+        }
         let content = read_bounded(
             cap_file.into_std(),
             &canonical,
@@ -653,13 +751,20 @@ impl WorkspaceDiscovery {
             self.read_bytes.as_ref(),
         )?;
         validate_workspace_root_identity(capability_base, root_dir, *root_identity)?;
-        let current_ambient_metadata = fs::symlink_metadata(&canonical)
-            .map_err(|source| WorkspaceError::Io { context: format!("failed to re-inspect {}", canonical.display()), source })?;
-        if !(current_ambient_metadata.is_file()
-                && !current_ambient_metadata.file_type().is_symlink()
-                && FilesystemIdentity::from_std(&current_ambient_metadata) == Some(opened_identity)) {
-    return Err(WorkspaceRefusal::ChangedWhileReading { path: canonical.to_path_buf() }.into());
-}
+        let current_ambient_metadata =
+            fs::symlink_metadata(&canonical).map_err(|source| WorkspaceError::Io {
+                context: format!("failed to re-inspect {}", canonical.display()),
+                source,
+            })?;
+        let file_is_unchanged = current_ambient_metadata.is_file()
+            && !current_ambient_metadata.file_type().is_symlink()
+            && FilesystemIdentity::from_std(&current_ambient_metadata) == Some(opened_identity);
+        if !file_is_unchanged {
+            return Err(WorkspaceRefusal::ChangedWhileReading {
+                path: canonical.to_path_buf(),
+            }
+            .into());
+        }
         validate_workspace_root_identity(capability_base, root_dir, *root_identity)?;
         Ok(content)
     }

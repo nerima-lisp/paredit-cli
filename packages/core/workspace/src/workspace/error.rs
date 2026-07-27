@@ -51,7 +51,9 @@ pub enum WorkspaceLimit {
     #[error("workspace file limit exceeded: maximum is {maximum}")]
     Files { maximum: usize },
 
-    #[error("workspace file size limit exceeded for {path}: {actual} bytes exceeds maximum {maximum}")]
+    #[error(
+        "workspace file size limit exceeded for {path}: {actual} bytes exceeds maximum {maximum}"
+    )]
     FileSize {
         path: PathBuf,
         actual: u64,
