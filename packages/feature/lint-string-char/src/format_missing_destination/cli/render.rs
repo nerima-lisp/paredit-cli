@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::format_missing_destination_report::{
+use crate::format_missing_destination::usecase::{
     FormatMissingDestinationPolicy, FormatMissingDestinationSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_format_missing_destination_report(
+pub fn print_format_missing_destination_report(
     summary: &FormatMissingDestinationSummary,
     policy: &FormatMissingDestinationPolicy,
     output: OutputFormat,

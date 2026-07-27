@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::char_op_string_report::{CharOpStringPolicy, CharOpStringSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::char_op_string::usecase::{CharOpStringPolicy, CharOpStringSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_char_op_string_report(
+pub fn print_char_op_string_report(
     summary: &CharOpStringSummary,
     policy: &CharOpStringPolicy,
     output: OutputFormat,

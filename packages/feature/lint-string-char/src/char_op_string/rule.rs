@@ -1,20 +1,20 @@
 //! `char-op-string`: a character function (char=/char-code/alpha-char-p/...) applied to a string literal (type error).
 //!
-//! The analysis lives in [`crate::domain::char_op_string_report`], which also backs the
+//! The analysis lives in [`crate::char_op_string::domain`], which also backs the
 //! standalone `inspect char-op-string` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::char_op_string_report::{CharacterMismatch, examine_call};
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::char_op_string::domain::{CharacterMismatch, examine_call};
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::semantics::NodeKey;
-use crate::domain::semantics::typing::Ty;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_semantics::semantics::NodeKey;
+use paredit_core_semantics::semantics::typing::Ty;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "char-op-string",

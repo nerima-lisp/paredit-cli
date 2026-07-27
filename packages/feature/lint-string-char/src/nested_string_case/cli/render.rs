@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nested_string_case_report::{
-    NestedStringCasePolicy, NestedStringCaseSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::nested_string_case::usecase::{NestedStringCasePolicy, NestedStringCaseSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nested_string_case_report(
+pub fn print_nested_string_case_report(
     summary: &NestedStringCaseSummary,
     policy: &NestedStringCasePolicy,
     output: OutputFormat,

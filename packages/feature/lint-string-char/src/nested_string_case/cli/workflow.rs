@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::nested_string_case_report::{
+use crate::nested_string_case::cli::args::NestedStringCaseReportArgs;
+use crate::nested_string_case::cli::render::print_nested_string_case_report;
+use crate::nested_string_case::usecase::{
     NestedStringCasePolicyOptions, collect_nested_string_cases, evaluate_nested_string_case_policy,
     summarize_nested_string_cases,
 };
-use crate::presentation::cli::nested_string_case_report::args::NestedStringCaseReportArgs;
-use crate::presentation::cli::nested_string_case_report::render::print_nested_string_case_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn nested_string_case_report(
-    args: NestedStringCaseReportArgs,
-) -> Result<()> {
+pub fn nested_string_case_report(args: NestedStringCaseReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut string_case_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn nested_string_case_report(
     print_nested_string_case_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "nested-string-case-report policy failed: {policy_message}"
         )));
     }

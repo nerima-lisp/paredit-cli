@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::format_newline_report::{
-    FormatNewlinePolicy, FormatNewlineSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::format_newline::usecase::{FormatNewlinePolicy, FormatNewlineSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_format_newline_report(
+pub fn print_format_newline_report(
     summary: &FormatNewlineSummary,
     policy: &FormatNewlinePolicy,
     output: OutputFormat,

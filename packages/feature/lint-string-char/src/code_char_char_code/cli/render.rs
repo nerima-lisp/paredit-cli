@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::code_char_char_code_report::{
-    CodeCharCharCodePolicy, CodeCharCharCodeSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::code_char_char_code::usecase::{CodeCharCharCodePolicy, CodeCharCharCodeSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_code_char_char_code_report(
+pub fn print_code_char_char_code_report(
     summary: &CodeCharCharCodeSummary,
     policy: &CodeCharCharCodePolicy,
     output: OutputFormat,

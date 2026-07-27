@@ -1,18 +1,18 @@
 //! `code-char-char-code`: a code-char of a char-code, a round-trip that is just the character ((code-char (char-code c)) is c).
 //!
-//! The analysis lives in [`crate::domain::code_char_char_code_report`], which also backs the
+//! The analysis lives in [`crate::code_char_char_code::domain`], which also backs the
 //! standalone `inspect code-char-char-code` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::code_char_char_code_report::examine;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::code_char_char_code::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "code-char-char-code",

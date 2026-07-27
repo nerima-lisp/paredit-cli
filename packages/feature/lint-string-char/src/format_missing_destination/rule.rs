@@ -1,18 +1,18 @@
 //! `format-missing-destination`: a format call whose first argument is a string literal (nil/t/stream destination is missing).
 //!
-//! The analysis lives in [`crate::domain::format_missing_destination_report`], which also backs the
+//! The analysis lives in [`crate::format_missing_destination::domain`], which also backs the
 //! standalone `inspect format-missing-destination` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::format_missing_destination_report::examine_format;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::format_missing_destination::domain::examine_format;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "format-missing-destination",

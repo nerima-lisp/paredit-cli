@@ -154,10 +154,13 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::append_list_to_cons::RULE,
     ),
     RuleEntry::new(
-        &rules::format_to_string::META,
-        &rules::format_to_string::RULE,
+        &paredit_feature_lint_string_char::format_to_string::rule::META,
+        &paredit_feature_lint_string_char::format_to_string::rule::RULE,
     ),
-    RuleEntry::new(&rules::format_newline::META, &rules::format_newline::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_string_char::format_newline::rule::META,
+        &paredit_feature_lint_string_char::format_newline::rule::RULE,
+    ),
     RuleEntry::new(
         &rules::redundant_divisor::META,
         &rules::redundant_divisor::RULE,
@@ -273,15 +276,18 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::single_value_bind::RULE,
     ),
     RuleEntry::new(
-        &rules::format_missing_destination::META,
-        &rules::format_missing_destination::RULE,
+        &paredit_feature_lint_string_char::format_missing_destination::rule::META,
+        &paredit_feature_lint_string_char::format_missing_destination::rule::RULE,
     ),
     RuleEntry::new(&rules::literal_place::META, &rules::literal_place::RULE),
     RuleEntry::new(
         &rules::destructive_literal::META,
         &rules::destructive_literal::RULE,
     ),
-    RuleEntry::new(&rules::char_op_string::META, &rules::char_op_string::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_string_char::char_op_string::rule::META,
+        &paredit_feature_lint_string_char::char_op_string::rule::RULE,
+    ),
     RuleEntry::new(&rules::empty_body::META, &rules::empty_body::RULE),
     RuleEntry::new(
         &rules::identity_arithmetic::META,
@@ -352,17 +358,20 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::redundant_count_nil::RULE,
     ),
     RuleEntry::new(
-        &rules::string_case_fold::META,
-        &rules::string_case_fold::RULE,
-    ),
-    RuleEntry::new(&rules::char_case_fold::META, &rules::char_case_fold::RULE),
-    RuleEntry::new(
-        &rules::nested_string_case::META,
-        &rules::nested_string_case::RULE,
+        &paredit_feature_lint_string_char::string_case_fold::rule::META,
+        &paredit_feature_lint_string_char::string_case_fold::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::code_char_char_code::META,
-        &rules::code_char_char_code::RULE,
+        &paredit_feature_lint_string_char::char_case_fold::rule::META,
+        &paredit_feature_lint_string_char::char_case_fold::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_string_char::nested_string_case::rule::META,
+        &paredit_feature_lint_string_char::nested_string_case::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_string_char::code_char_char_code::rule::META,
+        &paredit_feature_lint_string_char::code_char_char_code::rule::RULE,
     ),
     RuleEntry::new(
         &rules::last_default_count::META,

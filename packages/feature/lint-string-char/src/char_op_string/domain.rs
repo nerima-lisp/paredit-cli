@@ -23,7 +23,7 @@
 //! same string/char confusion for `eq`/`eql`.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -31,9 +31,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// Functions that require character arguments (a string literal is a type error
 /// in any argument position).
@@ -170,7 +170,7 @@ pub struct CharOpStringPolicy {
 /// suite passes a test backed by the type context, so it also sees
 /// `(char= (length xs) c)` — the same guaranteed type error, spelled in a way
 /// the reader alone cannot recognize.
-pub(crate) type IsNonCharacterArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
+pub type IsNonCharacterArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
 
 /// The [`IsNonCharacterArgument`] of a caller with no type context.
 const fn never(_: &ExpressionView) -> bool {
@@ -179,7 +179,7 @@ const fn never(_: &ExpressionView) -> bool {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_call(
+pub fn examine_call(
     view: &ExpressionView,
     path: &Path,
     is_non_character: IsNonCharacterArgument<'_>,

@@ -1,18 +1,18 @@
 //! `format-to-string`: a (format nil "~A"/"~S" x), which is (princ-to-string x)/(prin1-to-string x).
 //!
-//! The analysis lives in [`crate::domain::format_to_string_report`], which also backs the
+//! The analysis lives in [`crate::format_to_string::domain`], which also backs the
 //! standalone `inspect format-to-string` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::format_to_string_report::examine;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::format_to_string::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "format-to-string",

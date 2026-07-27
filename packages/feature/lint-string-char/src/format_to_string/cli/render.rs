@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::format_to_string_report::{
-    FormatToStringPolicy, FormatToStringSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::format_to_string::usecase::{FormatToStringPolicy, FormatToStringSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_format_to_string_report(
+pub fn print_format_to_string_report(
     summary: &FormatToStringSummary,
     policy: &FormatToStringPolicy,
     output: OutputFormat,

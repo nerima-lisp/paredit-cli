@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::char_case_fold_report::{CharCaseFoldPolicy, CharCaseFoldSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::char_case_fold::usecase::{CharCaseFoldPolicy, CharCaseFoldSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_char_case_fold_report(
+pub fn print_char_case_fold_report(
     summary: &CharCaseFoldSummary,
     policy: &CharCaseFoldPolicy,
     output: OutputFormat,

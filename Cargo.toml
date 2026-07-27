@@ -41,6 +41,7 @@ paredit-feature-remove-unused = { path = "packages/feature/remove-unused" }
 paredit-feature-rename = { path = "packages/feature/rename" }
 paredit-feature-project-analysis = { path = "packages/feature/project-analysis" }
 paredit-feature-refactor-workflow = { path = "packages/feature/refactor-workflow" }
+paredit-feature-lint-string-char = { path = "packages/feature/lint-string-char" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"

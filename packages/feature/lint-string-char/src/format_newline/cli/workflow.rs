@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::format_newline_report::{
+use crate::format_newline::cli::args::FormatNewlineReportArgs;
+use crate::format_newline::cli::render::print_format_newline_report;
+use crate::format_newline::usecase::{
     FormatNewlinePolicyOptions, collect_format_newlines, evaluate_format_newline_policy,
     summarize_format_newlines,
 };
-use crate::presentation::cli::format_newline_report::args::FormatNewlineReportArgs;
-use crate::presentation::cli::format_newline_report::render::print_format_newline_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn format_newline_report(
-    args: FormatNewlineReportArgs,
-) -> Result<()> {
+pub fn format_newline_report(args: FormatNewlineReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut format_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn format_newline_report(
     print_format_newline_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "format-newline-report policy failed: {policy_message}"
         )));
     }

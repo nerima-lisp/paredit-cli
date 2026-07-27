@@ -1,18 +1,18 @@
 //! `string-case-fold`: a string= of two same-case-folded operands ((string= (string-downcase a) (string-downcase b)) is (string-equal a b)).
 //!
-//! The analysis lives in [`crate::domain::string_case_fold_report`], which also backs the
+//! The analysis lives in [`crate::string_case_fold::domain`], which also backs the
 //! standalone `inspect string-case-fold` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::string_case_fold::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::string_case_fold_report::examine;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "string-case-fold",

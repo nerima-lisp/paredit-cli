@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::format_missing_destination_report::{
+use crate::format_missing_destination::cli::args::FormatMissingDestinationReportArgs;
+use crate::format_missing_destination::cli::render::print_format_missing_destination_report;
+use crate::format_missing_destination::usecase::{
     FormatMissingDestinationPolicyOptions, collect_format_missing_destinations,
     evaluate_format_missing_destination_policy, summarize_format_missing_destinations,
 };
-use crate::presentation::cli::format_missing_destination_report::args::FormatMissingDestinationReportArgs;
-use crate::presentation::cli::format_missing_destination_report::render::print_format_missing_destination_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn format_missing_destination_report(
-    args: FormatMissingDestinationReportArgs,
-) -> Result<()> {
+pub fn format_missing_destination_report(args: FormatMissingDestinationReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut format_call_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn format_missing_destination_report(
     print_format_missing_destination_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "format-missing-destination-report policy failed: {policy_message}"
         )));
     }
