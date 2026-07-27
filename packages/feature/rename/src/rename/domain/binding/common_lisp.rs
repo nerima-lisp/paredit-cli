@@ -1,8 +1,8 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::CommonLispHandlerBindingForm;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::CommonLispHandlerBindingForm;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::selection::atom_text;
 use super::destructure::binding_pattern_name_spans;
@@ -10,14 +10,14 @@ use super::forms::parameter_name_spans;
 use super::types::{BindingEdit, ParameterNameSpan};
 
 #[derive(Clone)]
-pub(super) struct LoopBindingSpec {
-    pub(super) name: String,
-    pub(super) name_span: ByteSpan,
-    pub(super) binding_edit: BindingEdit,
-    pub(super) reference_start_index: usize,
+pub struct LoopBindingSpec {
+    pub name: String,
+    pub name_span: ByteSpan,
+    pub binding_edit: BindingEdit,
+    pub reference_start_index: usize,
 }
 
-pub(super) fn loop_binding_specs(view: &ExpressionView, input: &str) -> Vec<LoopBindingSpec> {
+pub fn loop_binding_specs(view: &ExpressionView, input: &str) -> Vec<LoopBindingSpec> {
     let mut specs = Vec::new();
     let mut index = 1usize;
 
@@ -49,7 +49,7 @@ pub(super) fn loop_binding_specs(view: &ExpressionView, input: &str) -> Vec<Loop
     specs
 }
 
-pub(super) fn variable_spec_binding_name(spec: &ExpressionView) -> Option<(&str, ByteSpan)> {
+pub fn variable_spec_binding_name(spec: &ExpressionView) -> Option<(&str, ByteSpan)> {
     match &spec.kind {
         ExpressionKind::Atom => Some((atom_text(spec)?, spec.span)),
         ExpressionKind::List => {
@@ -60,19 +60,19 @@ pub(super) fn variable_spec_binding_name(spec: &ExpressionView) -> Option<(&str,
     }
 }
 
-pub(super) fn variable_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+pub fn variable_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {
     (spec.kind == ExpressionKind::List)
         .then(|| spec.children.get(1))
         .flatten()
 }
 
-pub(super) fn do_variable_spec_step_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+pub fn do_variable_spec_step_form(spec: &ExpressionView) -> Option<&ExpressionView> {
     (spec.kind == ExpressionKind::List)
         .then(|| spec.children.get(2))
         .flatten()
 }
 
-pub(super) fn handler_bind_function_forms(
+pub fn handler_bind_function_forms(
     view: &ExpressionView,
     handler_form: CommonLispHandlerBindingForm,
 ) -> Vec<&ExpressionView> {
@@ -102,7 +102,7 @@ pub(super) fn handler_bind_function_forms(
     forms
 }
 
-pub(super) fn collect_lambda_binding_targets<'a>(
+pub fn collect_lambda_binding_targets<'a>(
     view: &'a ExpressionView,
     from: &SymbolName,
     input: &str,
@@ -132,9 +132,7 @@ pub(super) fn collect_lambda_binding_targets<'a>(
     Ok(())
 }
 
-pub(super) fn slot_spec_binding_name(
-    spec: &ExpressionView,
-) -> Option<(&str, ByteSpan, BindingEdit)> {
+pub fn slot_spec_binding_name(spec: &ExpressionView) -> Option<(&str, ByteSpan, BindingEdit)> {
     match &spec.kind {
         ExpressionKind::Atom => {
             let name = atom_text(spec)?;
@@ -171,10 +169,7 @@ fn push_loop_binding_specs(
     );
 }
 
-pub(super) fn loop_for_reference_start_index(
-    children: &[ExpressionView],
-    mut index: usize,
-) -> usize {
+pub fn loop_for_reference_start_index(children: &[ExpressionView], mut index: usize) -> usize {
     let Some(keyword) = children.get(index).and_then(atom_text) else {
         return index;
     };
@@ -195,7 +190,7 @@ pub(super) fn loop_for_reference_start_index(
     index
 }
 
-pub(super) fn loop_with_reference_start_index(children: &[ExpressionView], index: usize) -> usize {
+pub fn loop_with_reference_start_index(children: &[ExpressionView], index: usize) -> usize {
     if children
         .get(index)
         .is_some_and(|child| loop_keyword_is(child, "="))
@@ -206,11 +201,11 @@ pub(super) fn loop_with_reference_start_index(children: &[ExpressionView], index
     index
 }
 
-pub(super) fn loop_keyword_is(view: &ExpressionView, keyword: &str) -> bool {
+pub fn loop_keyword_is(view: &ExpressionView, keyword: &str) -> bool {
     atom_text(view).is_some_and(|text| text.eq_ignore_ascii_case(keyword))
 }
 
-pub(super) fn loop_syntax_atom(view: &ExpressionView) -> bool {
+pub fn loop_syntax_atom(view: &ExpressionView) -> bool {
     atom_text(view).is_some_and(|text| {
         matches_loop_keyword(
             text,

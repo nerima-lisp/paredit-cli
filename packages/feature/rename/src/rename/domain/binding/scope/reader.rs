@@ -1,14 +1,14 @@
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::super::selection::atom_text;
 use super::collect_symbol_atom_spans_unshadowed_in_context;
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-pub(super) use crate::domain::rename::reader::{
+pub use crate::rename::domain::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
+use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn collect_explicit_reader_form(
+pub fn collect_explicit_reader_form(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -30,7 +30,7 @@ pub(super) fn collect_explicit_reader_form(
         return true;
     }
 
-    match crate::domain::common_lisp::normalize_common_lisp_operator_head(head)
+    match paredit_core_syntax::common_lisp::normalize_common_lisp_operator_head(head)
         .to_ascii_lowercase()
         .as_str()
     {

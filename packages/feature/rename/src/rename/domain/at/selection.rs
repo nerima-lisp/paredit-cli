@@ -1,18 +1,18 @@
 use anyhow::{Result, anyhow};
 
-use crate::domain::sexpr::{AtomOccurrenceIndex, ByteSpan, ExpressionView, Path};
+use paredit_core_syntax::sexpr::{AtomOccurrenceIndex, ByteSpan, ExpressionView, Path};
 
 #[derive(Clone, Copy)]
-pub(super) struct AtomPathIndex<'a> {
+pub struct AtomPathIndex<'a> {
     occurrences: &'a AtomOccurrenceIndex<'a>,
 }
 
 impl<'a> AtomPathIndex<'a> {
-    pub(super) const fn new(occurrences: &'a AtomOccurrenceIndex<'a>) -> Self {
+    pub const fn new(occurrences: &'a AtomOccurrenceIndex<'a>) -> Self {
         Self { occurrences }
     }
 
-    pub(super) fn path_for_span(&self, span: ByteSpan) -> Option<Path> {
+    pub fn path_for_span(&self, span: ByteSpan) -> Option<Path> {
         self.occurrences.path_for_span(span)
     }
 
@@ -21,13 +21,13 @@ impl<'a> AtomPathIndex<'a> {
     }
 }
 
-pub(super) fn is_common_lisp_value_position(atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
+pub fn is_common_lisp_value_position(atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
     atom_paths
         .last_index_for_span(span)
         .is_some_and(|index| index != 0)
 }
 
-pub(super) fn ancestor_views<'a>(
+pub fn ancestor_views<'a>(
     root: &'a ExpressionView,
     path: &Path,
 ) -> Result<Vec<&'a ExpressionView>> {
@@ -49,7 +49,7 @@ pub(super) fn ancestor_views<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::{ByteOffset, SyntaxTree};
+    use paredit_core_syntax::sexpr::{ByteOffset, SyntaxTree};
 
     #[test]
     fn resolves_atom_paths_by_span_without_owning_them() {

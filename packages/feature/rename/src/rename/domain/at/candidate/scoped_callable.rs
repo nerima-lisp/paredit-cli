@@ -3,13 +3,13 @@ use anyhow::Result;
 use super::super::RenameAtNamespace;
 use super::scope::{enclosing_specialized_scope, occurrence_has_scope};
 use super::{Candidate, SpecializedCandidateContext, push_candidate};
-use crate::domain::rename::{
+use crate::rename::domain::{
     RenameFunctionOccurrence, RenameLocalFunctionRequest, RenameMacroletRequest,
     plan_rename_local_function, plan_rename_macrolet, selection::apply_byte_span_edits,
 };
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
-pub(super) fn add_local_function(
+pub fn add_local_function(
     output: &mut Vec<Candidate>,
     context: &SpecializedCandidateContext<'_>,
 ) -> Result<()> {
@@ -28,7 +28,7 @@ pub(super) fn add_local_function(
     )
 }
 
-pub(super) fn add_macro(
+pub fn add_macro(
     output: &mut Vec<Candidate>,
     context: &SpecializedCandidateContext<'_>,
 ) -> Result<()> {

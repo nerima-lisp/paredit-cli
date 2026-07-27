@@ -1,8 +1,8 @@
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path, SymbolName};
+use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SymbolName};
 
-use crate::domain::rename::reader::apply_reader_prefix_context;
+use crate::rename::domain::reader::apply_reader_prefix_context;
 
 use super::super::RenameFunctionOccurrence;
 use super::super::scope::{
@@ -13,21 +13,21 @@ use super::reader::{collect_explicit_reader_form_renames, collect_reader_lambda_
 use super::state::{TraversalContext, TraversalState};
 
 #[derive(Clone, Copy)]
-pub(in crate::domain::rename::macrolet) struct TraversalPath(usize);
+pub struct TraversalPath(usize);
 
 struct TraversalPathNode {
     parent: Option<usize>,
     index: usize,
 }
 
-pub(in crate::domain::rename::macrolet) struct TraversalPathArena {
+pub struct TraversalPathArena {
     nodes: Vec<TraversalPathNode>,
     edge_count: usize,
     materialized_index_count: usize,
 }
 
 impl TraversalPathArena {
-    pub(super) fn from_path(path: &Path) -> (Self, TraversalPath) {
+    pub fn from_path(path: &Path) -> (Self, TraversalPath) {
         let mut arena = Self {
             nodes: vec![TraversalPathNode {
                 parent: None,
@@ -44,11 +44,7 @@ impl TraversalPathArena {
         (arena, current)
     }
 
-    pub(in crate::domain::rename::macrolet) fn child(
-        &mut self,
-        parent: TraversalPath,
-        index: usize,
-    ) -> TraversalPath {
+    pub fn child(&mut self, parent: TraversalPath, index: usize) -> TraversalPath {
         self.nodes.push(TraversalPathNode {
             parent: Some(parent.0),
             index,
@@ -57,7 +53,7 @@ impl TraversalPathArena {
         TraversalPath(self.nodes.len() - 1)
     }
 
-    pub(super) fn descendant<const N: usize>(
+    pub fn descendant<const N: usize>(
         &mut self,
         mut path: TraversalPath,
         indexes: [usize; N],
@@ -68,7 +64,7 @@ impl TraversalPathArena {
         path
     }
 
-    pub(in crate::domain::rename::macrolet) fn materialize(&mut self, path: TraversalPath) -> Path {
+    pub fn materialize(&mut self, path: TraversalPath) -> Path {
         let mut indexes = Vec::new();
         let mut node_index = path.0;
         while let Some(parent) = self.nodes[node_index].parent {
@@ -82,13 +78,13 @@ impl TraversalPathArena {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct TraversalFrame<'a> {
-    pub(super) view: &'a ExpressionView,
-    pub(super) path: TraversalPath,
-    pub(super) state: TraversalState,
+pub struct TraversalFrame<'a> {
+    pub view: &'a ExpressionView,
+    pub path: TraversalPath,
+    pub state: TraversalState,
 }
 
-pub(super) enum TraversalTask<'a> {
+pub enum TraversalTask<'a> {
     Visit(TraversalFrame<'a>),
     ExplicitFunctionLambdaAtom(TraversalFrame<'a>),
     ReaderQuotedLambdaAtom(TraversalFrame<'a>),
@@ -101,7 +97,7 @@ pub(super) enum TraversalTask<'a> {
     },
 }
 
-pub(in crate::domain::rename::macrolet) trait RenameTraversalMode {
+pub trait RenameTraversalMode {
     fn collect_pre_reader_renames(
         _view: &ExpressionView,
         _path: TraversalPath,
@@ -176,7 +172,7 @@ pub(in crate::domain::rename::macrolet) trait RenameTraversalMode {
     clippy::too_many_arguments,
     reason = "traversal setup carries scope, quasiquote state, and accumulator"
 )]
-pub(in crate::domain::rename::macrolet) fn collect_renames_from_view<M: RenameTraversalMode>(
+pub fn collect_renames_from_view<M: RenameTraversalMode>(
     view: &ExpressionView,
     path: Path,
     dialect: Dialect,
@@ -336,7 +332,7 @@ fn schedule_view<'a, M: RenameTraversalMode>(
     }
 }
 
-pub(super) fn schedule_children<'a>(
+pub fn schedule_children<'a>(
     frame: TraversalFrame<'a>,
     paths: &mut TraversalPathArena,
     tasks: &mut Vec<TraversalTask<'a>>,
@@ -354,8 +350,8 @@ pub(super) fn schedule_children<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::rename::macrolet::traversal::CallTraversal;
-    use crate::domain::sexpr::SyntaxTree;
+    use crate::rename::domain::macrolet::traversal::CallTraversal;
+    use paredit_core_syntax::sexpr::SyntaxTree;
 
     #[test]
     fn deep_walk_uses_one_path_node_per_edge_without_materializing_paths() {

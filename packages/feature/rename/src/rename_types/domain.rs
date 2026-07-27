@@ -1,4 +1,4 @@
-use crate::domain::sexpr::Path;
+use paredit_core_syntax::sexpr::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionCallScope {

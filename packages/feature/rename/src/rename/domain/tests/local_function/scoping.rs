@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn skips_nested_labels_calls_when_renaming_outer_flet() {

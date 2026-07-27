@@ -1,21 +1,25 @@
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
+use paredit_core_syntax::common_lisp::{
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
+};
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName,
+};
 
 use super::RenameFunctionOccurrence;
 use super::scope::{
     LocalCallableRenameKind, MacroletRenameScope, allows_function_reference_rename,
 };
 use super::traversal::{TraversalPath, TraversalPathArena};
-pub(super) use crate::domain::rename::reader::{atom_symbol_span, atom_symbol_text};
-use crate::domain::rename::selection::atom_text;
+pub use crate::rename::domain::reader::{atom_symbol_span, atom_symbol_text};
+use crate::rename::domain::selection::atom_text;
 
-pub(super) struct CallableTarget<'a> {
-    pub(super) span: ByteSpan,
-    pub(super) text: &'a str,
+pub struct CallableTarget<'a> {
+    pub span: ByteSpan,
+    pub text: &'a str,
     suffix: Option<usize>,
 }
 
-pub(super) fn callable_target(view: &ExpressionView) -> Option<CallableTarget<'_>> {
+pub fn callable_target(view: &ExpressionView) -> Option<CallableTarget<'_>> {
     if let Some(text) = atom_symbol_text(view) {
         return Some(CallableTarget {
             span: atom_symbol_span(view).unwrap_or(view.span),
@@ -42,7 +46,7 @@ pub(super) fn callable_target(view: &ExpressionView) -> Option<CallableTarget<'_
     clippy::too_many_arguments,
     reason = "reader designator handling needs rename kind, scope, and accumulator state"
 )]
-pub(super) fn collect_local_function_designator_renames(
+pub fn collect_local_function_designator_renames(
     view: &ExpressionView,
     path: TraversalPath,
     paths: &mut TraversalPathArena,
@@ -77,7 +81,7 @@ pub(super) fn collect_local_function_designator_renames(
     false
 }
 
-pub(super) fn push_callable_target_rename_if_match(
+pub fn push_callable_target_rename_if_match(
     target: CallableTarget<'_>,
     mut path: TraversalPath,
     prefix: &[usize],
@@ -105,7 +109,7 @@ pub(super) fn push_callable_target_rename_if_match(
     true
 }
 
-pub(super) fn push_atom_rename_if_match(
+pub fn push_atom_rename_if_match(
     view: &ExpressionView,
     path: TraversalPath,
     paths: &mut TraversalPathArena,

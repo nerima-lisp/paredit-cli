@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{SymbolName, SyntaxTree};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
 
 use super::RenameFunctionOccurrence;
 use super::selection::list_head;
 
-pub(in crate::domain::rename) mod target;
+pub mod target;
 mod traversal;
 
 pub use traversal::collect_function_call_head_renames;
@@ -22,7 +22,7 @@ pub fn collect_callable_definition_renames(
     let mut renames = Vec::new();
 
     for (top_index, _) in tree.root_children().iter().enumerate() {
-        let form_path = crate::domain::sexpr::Path::root_child(top_index);
+        let form_path = paredit_core_syntax::sexpr::Path::root_child(top_index);
         let view = tree.select_path(&form_path)?.view();
         let Some(head) = list_head(&view) else {
             continue;

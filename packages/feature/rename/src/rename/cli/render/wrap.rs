@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::super::OutputFormat;
 use super::super::args::WrapFunctionCallsArgs;
 use super::super::types::{CallSitePolicy, WrapFunctionCallsFileReport};
 use super::shared::wrap_call_sites_json;
 
-pub(in crate::presentation::cli::rename) fn print_wrap_function_calls_report(
+pub fn print_wrap_function_calls_report(
     reports: &[WrapFunctionCallsFileReport],
     args: &WrapFunctionCallsArgs,
     policy: &CallSitePolicy,

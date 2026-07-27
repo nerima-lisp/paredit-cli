@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispLetBindingForm, CommonLispVariableBindingForm, common_lisp_symbol_reference_eq,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionView, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionView, SymbolName};
 
 use super::build_binding_rename_parts;
 use super::collect_symbol_atom_spans_unshadowed;
@@ -12,7 +12,7 @@ use super::common_lisp;
 use super::forms::{binding_groups, parameter_name_spans};
 use super::types::{BindingEdit, BindingRenameParts};
 
-pub(super) fn let_binding_rename_parts(
+pub fn let_binding_rename_parts(
     dialect: Dialect,
     view: &ExpressionView,
     from: &SymbolName,
@@ -80,7 +80,7 @@ pub(super) fn let_binding_rename_parts(
     ))
 }
 
-pub(super) fn value_binding_rename_parts(
+pub fn value_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,
@@ -120,7 +120,7 @@ pub(super) fn value_binding_rename_parts(
     ))
 }
 
-pub(super) fn iteration_binding_rename_parts(
+pub fn iteration_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,
@@ -170,7 +170,7 @@ pub(super) fn iteration_binding_rename_parts(
     ))
 }
 
-pub(super) fn common_lisp_variable_binding_rename_parts(
+pub fn common_lisp_variable_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,

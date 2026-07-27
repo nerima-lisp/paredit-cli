@@ -68,3 +68,6 @@ fn distinguishes_flet_and_labels_definition_body_scope() {
     );
 }
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::SymbolName;

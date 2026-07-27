@@ -1,12 +1,12 @@
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::rename::call_identity::call_reference_eq;
-use crate::domain::rename::selection::list_head;
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use crate::rename::domain::call_identity::call_reference_eq;
+use crate::rename::domain::selection::list_head;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
 use super::ReplaceFunctionCallSite;
 
-pub(super) fn replace_call_site_from_view(
+pub fn replace_call_site_from_view(
     view: &ExpressionView,
     dialect: Dialect,
     input: &str,

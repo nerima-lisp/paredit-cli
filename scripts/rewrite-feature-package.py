@@ -277,6 +277,17 @@ def rewrite(name: str, slices: list[str]) -> int:
             counts["cli_args"] += n
         # A file inside a cli subdirectory reached those same helpers through
         # `super::super::`, which names the old cli module and no longer exists.
+        for depth in ("super::super::super::super::", "super::super::super::"):
+            text, n = re.subn(rf"use {depth}\{{([^}}]*)\}};",
+                              lambda m: "use paredit_core_cli::args::{" + m.group(1) + "};",
+                              text)
+            counts["cli_super"] += n
+            for name in ARGS_ITEMS:
+                text, n = re.subn(rf"\b{depth}{name}\b", f"paredit_core_cli::args::{name}", text)
+                counts["cli_super"] += n
+            for name in SHARED_ITEMS:
+                text, n = re.subn(rf"\b{depth}{name}\b", f"paredit_core_cli::shared::{name}", text)
+                counts["cli_super"] += n
         text, n = re.subn(r"use super::super::\{([^}]*)\};",
                           lambda m: "use paredit_core_cli::shared::{" + m.group(1) + "};",
                           text)

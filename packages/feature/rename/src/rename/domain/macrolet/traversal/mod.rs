@@ -4,5 +4,5 @@ mod modes;
 mod reader;
 mod state;
 
-pub(super) use core::{TraversalPath, TraversalPathArena, collect_renames_from_view};
-pub(super) use modes::{BindingTraversal, CallTraversal};
+pub use core::{TraversalPath, TraversalPathArena, collect_renames_from_view};
+pub use modes::{BindingTraversal, CallTraversal};

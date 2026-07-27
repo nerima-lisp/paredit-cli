@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::super::OutputFormat;
-use crate::application::usecase::rename::RenameAtPlan;
+use crate::rename::usecase::RenameAtPlan;
 
-pub(in crate::presentation::cli::rename) fn print_rename_at_plan(
+pub fn print_rename_at_plan(
     plan: &RenameAtPlan,
     written: bool,
     output: OutputFormat,

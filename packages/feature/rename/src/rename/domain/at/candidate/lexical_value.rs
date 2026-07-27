@@ -4,11 +4,11 @@ use super::super::RenameAtNamespace;
 use super::super::safety::ensure_binding_target_is_available;
 use super::super::selection::{AtomPathIndex, ancestor_views, is_common_lisp_value_position};
 use super::Candidate;
-use crate::domain::dialect::Dialect;
-use crate::domain::rename::{binding_rename_parts, selection::apply_byte_span_edits};
-use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
+use crate::rename::domain::{binding_rename_parts, selection::apply_byte_span_edits};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
-pub(in crate::domain::rename::at) fn binding_candidates(
+pub fn binding_candidates(
     tree: &SyntaxTree,
     root_view: &ExpressionView,
     atom_paths: AtomPathIndex<'_>,

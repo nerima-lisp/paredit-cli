@@ -1,4 +1,7 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 fn plan(input: &str, dialect: Dialect, from: &str, to: &str) -> ReplaceFunctionCallsPlan {
     plan_replace_function_calls(ReplaceFunctionCallsRequest {

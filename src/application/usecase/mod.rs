@@ -136,8 +136,6 @@ pub mod redundant_progn_report;
 pub mod redundant_quote_report;
 pub mod redundant_start_zero_report;
 pub mod redundant_the_report;
-pub mod rename;
-pub mod rename_control;
 pub mod self_assignment_report;
 pub mod self_comparison_report;
 pub mod semantic_coverage;
@@ -225,3 +223,5 @@ pub use paredit_feature_remove_unused::remove_definition::usecase as remove_defi
 pub use paredit_feature_remove_unused::remove_unused_binding::usecase as remove_unused_binding;
 pub use paredit_feature_remove_unused::remove_unused_control::usecase as remove_unused_control;
 pub use paredit_feature_remove_unused::remove_unused_definition::usecase as remove_unused_definition;
+pub use paredit_feature_rename::rename::usecase as rename;
+pub use paredit_feature_rename::rename_control::usecase as rename_control;

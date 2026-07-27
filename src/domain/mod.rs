@@ -30,7 +30,7 @@ pub use paredit_feature_similarity::form_similarity;
 pub use paredit_feature_similarity::similarity_report::domain as similarity_report;
 
 // Phase 2 facade (section 4.1), visibility mirroring the original `mod` lines.
-pub(crate) use paredit_core_edit::{convert_control, extract_shared, mutation_safety};
+pub(crate) use paredit_core_edit::{convert_control, mutation_safety};
 pub use paredit_core_edit::{refactor_execute, refactor_plan, refactor_preview};
 pub use paredit_core_semantics::lexical_scope;
 pub(crate) use paredit_core_semantics::{callable_scope, semantics};
@@ -163,9 +163,6 @@ pub mod redundant_progn_report;
 pub mod redundant_quote_report;
 pub mod redundant_start_zero_report;
 pub mod redundant_the_report;
-pub mod rename;
-pub(crate) mod rename_control;
-mod rename_types;
 pub mod report_policy;
 pub mod self_assignment_report;
 pub mod self_comparison_report;
@@ -220,3 +217,6 @@ pub use paredit_feature_remove_unused::definition_report::domain as definition_r
 pub use paredit_feature_remove_unused::remove_unused_binding::domain as remove_unused_binding;
 pub use paredit_feature_remove_unused::remove_unused_control::domain as remove_unused_control;
 pub use paredit_feature_remove_unused::remove_unused_definition::domain as remove_unused_definition;
+pub use paredit_feature_rename::rename::domain as rename;
+pub use paredit_feature_rename::rename_control::domain as rename_control;
+pub use paredit_feature_rename::rename_types::domain as rename_types;

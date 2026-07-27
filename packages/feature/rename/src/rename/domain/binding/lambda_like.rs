@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{CommonLispHandlerBindingForm, common_lisp_symbol_reference_eq};
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::{
+    CommonLispHandlerBindingForm, common_lisp_symbol_reference_eq,
+};
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::build_binding_rename_parts;
 use super::collect_symbol_atom_spans_unshadowed;
@@ -12,7 +14,7 @@ use super::destructure::binding_pattern_name_spans;
 use super::forms::{parameter_name_spans, specialized_parameter_name_spans};
 use super::types::BindingRenameParts;
 
-pub(super) fn parameter_binding_rename_parts(
+pub fn parameter_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,
@@ -71,7 +73,7 @@ fn collect_lambda_list_parameter_references(
     parameter_form: &ExpressionView,
     from: &SymbolName,
     input: &str,
-    output: &mut Vec<crate::domain::sexpr::ByteSpan>,
+    output: &mut Vec<paredit_core_syntax::sexpr::ByteSpan>,
     shadowed_scope_count: &mut usize,
 ) {
     if parameter_form.kind != ExpressionKind::List {
@@ -143,11 +145,11 @@ fn collect_lambda_list_parameter_references(
     }
 }
 
-pub(in crate::domain::rename) fn collect_enclosing_lambda_list_references(
+pub fn collect_enclosing_lambda_list_references(
     parameter_form: &ExpressionView,
     symbol: &SymbolName,
     input: &str,
-    output: &mut Vec<crate::domain::sexpr::ByteSpan>,
+    output: &mut Vec<paredit_core_syntax::sexpr::ByteSpan>,
     shadowed_scope_count: &mut usize,
 ) -> bool {
     if parameter_form.kind != ExpressionKind::List {
@@ -230,7 +232,7 @@ fn collect_lambda_list_spec_references(
     mode: LambdaListMode,
     symbol: &SymbolName,
     input: &str,
-    output: &mut Vec<crate::domain::sexpr::ByteSpan>,
+    output: &mut Vec<paredit_core_syntax::sexpr::ByteSpan>,
     shadowed_scope_count: &mut usize,
 ) {
     match mode {
@@ -285,7 +287,7 @@ fn lambda_list_spec_binds(spec: &ExpressionView, mode: LambdaListMode, from: &Sy
     }
 }
 
-pub(super) fn defmethod_binding_rename_parts(
+pub fn defmethod_binding_rename_parts(
     dialect: Dialect,
     view: &ExpressionView,
     from: &SymbolName,
@@ -326,7 +328,7 @@ pub(super) fn defmethod_binding_rename_parts(
     ))
 }
 
-pub(super) fn local_callable_lambda_binding_rename_parts(
+pub fn local_callable_lambda_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,
@@ -402,7 +404,7 @@ pub(super) fn local_callable_lambda_binding_rename_parts(
     ))
 }
 
-pub(super) fn handler_bind_lambda_binding_rename_parts(
+pub fn handler_bind_lambda_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,

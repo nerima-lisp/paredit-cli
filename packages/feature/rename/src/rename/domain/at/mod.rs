@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 
 use super::reader::executable_reader_context_at_path;
-use crate::domain::dialect::Dialect;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::{SymbolName, SyntaxTree};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
 
 mod candidate;
 mod error;
@@ -16,7 +16,8 @@ pub use error::RenameAtError;
 use selection::AtomPathIndex;
 pub use types::{RenameAtNamespace, RenameAtPlan, RenameAtRequest};
 
-pub(crate) const fn supports_rename_at_dialect(dialect: Dialect) -> bool {
+#[must_use]
+pub const fn supports_rename_at_dialect(dialect: Dialect) -> bool {
     matches!(dialect, Dialect::CommonLisp)
 }
 

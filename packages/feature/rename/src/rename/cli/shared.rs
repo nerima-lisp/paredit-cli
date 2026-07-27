@@ -1,10 +1,10 @@
 use anyhow::Result;
 
-use crate::application::usecase::rename::{self as rename_usecase, RenameTarget};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
+use crate::rename::usecase::{self as rename_usecase, RenameTarget};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
 
-pub(super) fn rename_target(path: Option<Path>, at: Option<usize>) -> Result<RenameTarget> {
+pub fn rename_target(path: Option<Path>, at: Option<usize>) -> Result<RenameTarget> {
     match (path, at) {
         (Some(path), None) => Ok(RenameTarget::Path(path)),
         (None, Some(offset)) => Ok(RenameTarget::Offset(offset)),
@@ -13,7 +13,7 @@ pub(super) fn rename_target(path: Option<Path>, at: Option<usize>) -> Result<Ren
     }
 }
 
-pub(in crate::presentation::cli) fn collect_callable_definition_renames(
+pub fn collect_callable_definition_renames(
     tree: &SyntaxTree,
     dialect: Dialect,
     from: &SymbolName,
@@ -22,7 +22,7 @@ pub(in crate::presentation::cli) fn collect_callable_definition_renames(
     rename_usecase::collect_callable_definition_renames(tree, dialect, from, to)
 }
 
-pub(in crate::presentation::cli) fn collect_function_call_head_renames(
+pub fn collect_function_call_head_renames(
     tree: &SyntaxTree,
     dialect: Dialect,
     from: &SymbolName,
@@ -31,13 +31,9 @@ pub(in crate::presentation::cli) fn collect_function_call_head_renames(
     rename_usecase::collect_function_call_head_renames(tree, dialect, from, to)
 }
 
-pub(super) fn ensure_rename_changed(
-    fail_on_no_change: bool,
-    changed: bool,
-    command: &str,
-) -> Result<()> {
+pub fn ensure_rename_changed(fail_on_no_change: bool, changed: bool, command: &str) -> Result<()> {
     if fail_on_no_change && !changed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "{command} policy failed: no occurrence changed"
         )));
     }
@@ -46,7 +42,8 @@ pub(super) fn ensure_rename_changed(
 
 /// Evaluates the shared --fail-on-no-change / --require-calls policy used by
 /// the wrap/replace/unwrap call-site commands.
-pub(super) fn evaluate_call_site_policy(
+#[must_use]
+pub fn evaluate_call_site_policy(
     selected_call_count: usize,
     fail_on_no_change: bool,
     require_calls: Option<usize>,
@@ -72,29 +69,35 @@ pub(super) fn evaluate_call_site_policy(
 
 /// One planned file for the callable rename family, mapped from the
 /// per-command usecase plan types (which stay separate in the public API).
-pub(super) struct CallableRenamePlanData {
-    pub(super) dialect: Dialect,
-    pub(super) definitions: Vec<rename_usecase::RenameFunctionOccurrence>,
-    pub(super) calls: Vec<rename_usecase::RenameFunctionOccurrence>,
-    pub(super) rewritten: String,
-    pub(super) changed: bool,
+// Public since the extraction: crate-internal visibility cannot cross a
+// crate boundary, so this lint applies for the first time.
+#[derive(Debug)]
+pub struct CallableRenamePlanData {
+    pub dialect: Dialect,
+    pub definitions: Vec<rename_usecase::RenameFunctionOccurrence>,
+    pub calls: Vec<rename_usecase::RenameFunctionOccurrence>,
+    pub rewritten: String,
+    pub changed: bool,
 }
 
-pub(super) struct CallableRenameCommand<'a> {
-    pub(super) files: &'a [std::path::PathBuf],
-    pub(super) dialect: Option<crate::presentation::cli::DialectArg>,
-    pub(super) from: &'a SymbolName,
-    pub(super) to: &'a SymbolName,
-    pub(super) write: bool,
-    pub(super) fail_on_no_change: bool,
-    pub(super) output: crate::presentation::cli::OutputFormat,
-    pub(super) command: &'static str,
-    pub(super) missing_definition_error: &'static str,
+// Public since the extraction: crate-internal visibility cannot cross a
+// crate boundary, so this lint applies for the first time.
+#[derive(Debug)]
+pub struct CallableRenameCommand<'a> {
+    pub files: &'a [std::path::PathBuf],
+    pub dialect: Option<paredit_core_cli::args::DialectArg>,
+    pub from: &'a SymbolName,
+    pub to: &'a SymbolName,
+    pub write: bool,
+    pub fail_on_no_change: bool,
+    pub output: paredit_core_cli::args::OutputFormat,
+    pub command: &'static str,
+    pub missing_definition_error: &'static str,
 }
 
 /// Shared plan→write→report→gate runner for rename-function,
 /// rename-macrolet, and rename-local-function.
-pub(super) fn run_callable_rename(
+pub fn run_callable_rename(
     command: CallableRenameCommand<'_>,
     plan: impl Fn(&str, Dialect) -> Result<CallableRenamePlanData>,
 ) -> Result<()> {
@@ -104,10 +107,8 @@ pub(super) fn run_callable_rename(
     let mut definition_count = 0usize;
 
     for file in command.files {
-        let (input, dialect) = crate::presentation::cli::shared::read_input_and_dialect(
-            Some(file.clone()),
-            command.dialect,
-        )?;
+        let (input, dialect) =
+            paredit_core_cli::shared::read_input_and_dialect(Some(file.clone()), command.dialect)?;
         let plan_data = plan(&input.text, dialect).with_context(|| {
             format!("failed to plan {} for {}", command.command, file.display())
         })?;
@@ -132,7 +133,7 @@ pub(super) fn run_callable_rename(
         .map(|file| (file.path.clone(), file.rewritten.clone()))
         .collect::<Vec<_>>();
     if !written_files.is_empty() {
-        crate::presentation::cli::shared::write_files_with_rollback(written_files)?;
+        paredit_core_cli::shared::write_files_with_rollback(written_files)?;
     }
 
     let mut reports = Vec::with_capacity(pending.len());

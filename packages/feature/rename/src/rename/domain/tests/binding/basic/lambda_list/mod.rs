@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 macro_rules! assert_binding_rename {
     (

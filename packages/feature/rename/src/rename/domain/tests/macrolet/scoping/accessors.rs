@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn renames_macrolet_calls_without_touching_global_macro_cell_accessors() {

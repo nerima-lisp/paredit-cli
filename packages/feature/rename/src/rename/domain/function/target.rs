@@ -1,16 +1,16 @@
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path};
+use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path};
 
 use super::super::reader::{atom_symbol_span, atom_symbol_text};
 use super::super::selection::atom_text;
 
-pub(in crate::domain::rename) struct CallableNameTarget<'a> {
-    pub(in crate::domain::rename) path: Path,
-    pub(in crate::domain::rename) span: ByteSpan,
-    pub(in crate::domain::rename) text: &'a str,
+pub struct CallableNameTarget<'a> {
+    pub path: Path,
+    pub span: ByteSpan,
+    pub text: &'a str,
 }
 
-pub(in crate::domain::rename) fn callable_name_target<'a>(
+pub fn callable_name_target<'a>(
     view: &'a ExpressionView,
     path: &Path,
 ) -> Option<CallableNameTarget<'a>> {

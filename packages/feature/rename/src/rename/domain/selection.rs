@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-pub(super) use crate::domain::sexpr::reader::atom_text;
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+pub use paredit_core_syntax::sexpr::reader::atom_text;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Selection, SymbolName, SyntaxTree,
 };
 
 use super::RenameTarget;
 
-pub(super) fn select_rename_target<'a>(
+pub fn select_rename_target<'a>(
     tree: &'a SyntaxTree,
     target: &RenameTarget,
 ) -> Result<Selection<'a>> {
@@ -18,7 +18,7 @@ pub(super) fn select_rename_target<'a>(
     }
 }
 
-pub(super) fn collect_symbol_atom_spans(
+pub fn collect_symbol_atom_spans(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -32,10 +32,7 @@ pub(super) fn collect_symbol_atom_spans(
     }
 }
 
-pub(super) fn apply_byte_span_edits(
-    input: &str,
-    mut edits: Vec<(ByteSpan, String)>,
-) -> Result<String> {
+pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) -> Result<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 
@@ -65,7 +62,7 @@ fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Re
     Ok(())
 }
 
-pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return None;
     }
@@ -73,20 +70,18 @@ pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
     atom_child(view, 0)
 }
 
-pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
-pub(super) trait SpannedCallSite {
+pub trait SpannedCallSite {
     fn span(&self) -> ByteSpan;
 }
 
 /// Keeps only the outermost call site among any that nest inside one
 /// another (e.g. `(foo (foo x))`), since rewriting the outer site already
 /// rewrites everything nested inside its span.
-pub(super) fn select_outermost_call_sites<T: SpannedCallSite>(
-    mut candidates: Vec<T>,
-) -> (Vec<T>, Vec<T>) {
+pub fn select_outermost_call_sites<T: SpannedCallSite>(mut candidates: Vec<T>) -> (Vec<T>, Vec<T>) {
     candidates.sort_by_key(|site| {
         (
             site.span().start().get(),

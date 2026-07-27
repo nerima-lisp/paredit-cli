@@ -31,3 +31,6 @@ fn renames_macro_lambda_binding_as_a_value() {
     );
 }
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::SymbolName;

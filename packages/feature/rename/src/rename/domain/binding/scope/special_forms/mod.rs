@@ -3,11 +3,11 @@ mod let_like;
 mod loop_scope;
 mod slots_clause;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispBindingReferenceScope, CommonLispLetBindingForm,
     common_lisp_binding_refactor_form_for_head,
 };
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::super::selection::atom_text;
 use callable::{
@@ -22,7 +22,7 @@ use let_like::{
 use loop_scope::collect_loop_references;
 use slots_clause::{collect_clause_form_references, collect_slot_binding_references};
 
-pub(super) fn collect_shadow_aware_special_form(
+pub fn collect_shadow_aware_special_form(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,

@@ -1,5 +1,8 @@
-use crate::domain::common_lisp::CommonLispReaderConditionalKind;
-use crate::domain::rename::RenameReaderSafetyError;
+use crate::rename::domain::RenameReaderSafetyError;
+use paredit_core_syntax::common_lisp::CommonLispReaderConditionalKind;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn rejects_common_lisp_reader_conditionals_without_changing_input() {

@@ -3,20 +3,17 @@ use anyhow::Result;
 use super::super::RenameAtNamespace;
 use super::super::safety::ensure_function_occurrences_are_unqualified;
 use super::{Candidate, SpecializedCandidateContext, push_candidate};
-use crate::domain::common_lisp::CommonLispOperator;
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::rename::reader::executable_reader_context_at_path;
-use crate::domain::rename::selection::{apply_byte_span_edits, list_head};
-use crate::domain::rename::{
+use crate::rename::domain::reader::executable_reader_context_at_path;
+use crate::rename::domain::selection::{apply_byte_span_edits, list_head};
+use crate::rename::domain::{
     RenameFunctionOccurrence, RenameFunctionRequest, plan_rename_function,
 };
-use crate::domain::sexpr::Path;
+use paredit_core_syntax::common_lisp::CommonLispOperator;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::Path;
 
-pub(super) fn add(
-    output: &mut Vec<Candidate>,
-    context: &SpecializedCandidateContext<'_>,
-) -> Result<()> {
+pub fn add(output: &mut Vec<Candidate>, context: &SpecializedCandidateContext<'_>) -> Result<()> {
     if output
         .iter()
         .any(|candidate| candidate.namespace == RenameAtNamespace::Value)

@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_outer_flet_rename_inside_macrolet_expander_but_not_shadowed_body() {

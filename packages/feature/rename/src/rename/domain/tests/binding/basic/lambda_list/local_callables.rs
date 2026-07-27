@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn plans_labels_lambda_list_parameter_rename_without_touching_outer_body_call() {

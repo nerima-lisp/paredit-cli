@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::super::OutputFormat;
-use crate::application::usecase::rename as rename_usecase;
+use crate::rename::usecase as rename_usecase;
 
-pub(in crate::presentation::cli::rename) fn print_rename_binding_plan(
+pub fn print_rename_binding_plan(
     plan: &rename_usecase::RenameBindingPlan,
     written: bool,
     output: OutputFormat,

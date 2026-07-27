@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispOperator, common_lisp_binding_refactor_form_for_head,
     common_lisp_symbol_reference_eq, is_common_lisp_declaration_form,
 };
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, NonEmptyExpressionPath, Path,
     ReaderPrefix, SymbolName, SyntaxTree,
 };
@@ -208,8 +208,8 @@ fn match_reference_spans_to_sites(
 const fn span_key(
     span: ByteSpan,
 ) -> (
-    crate::domain::sexpr::ByteOffset,
-    crate::domain::sexpr::ByteOffset,
+    paredit_core_syntax::sexpr::ByteOffset,
+    paredit_core_syntax::sexpr::ByteOffset,
 ) {
     (span.start(), span.end())
 }
@@ -472,8 +472,8 @@ fn collect_symbol_reference_sites(
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
 
     use super::{
         ReferencePath, SymbolReferenceSite, collect_symbol_reference_sites,

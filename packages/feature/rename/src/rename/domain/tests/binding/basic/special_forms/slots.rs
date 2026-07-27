@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn plans_binding_rename_without_touching_with_slots_scope() {

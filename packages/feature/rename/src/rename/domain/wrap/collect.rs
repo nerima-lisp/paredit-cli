@@ -1,24 +1,24 @@
 use anyhow::{Context, Result};
 
-use crate::domain::callable_scope::{
+use crate::rename::domain::call_identity::{call_reference_eq, is_local_call_bound};
+use crate::rename::domain::reader::{
+    apply_reader_prefix_context, executable_reader_context_at_path,
+};
+use crate::rename::domain::selection::list_head;
+use paredit_core_semantics::callable_scope::{
     common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
     local_callable_scope_at_path,
 };
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::definition::{definition_shape, macro_expander_body_range};
-use crate::domain::dialect::Dialect;
-use crate::domain::rename::call_identity::{call_reference_eq, is_local_call_bound};
-use crate::domain::rename::reader::{
-    apply_reader_prefix_context, executable_reader_context_at_path,
-};
-use crate::domain::rename::selection::list_head;
-use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
+use paredit_core_syntax::definition::{definition_shape, macro_expander_body_range};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
 use super::call_site::wrap_call_site_from_view;
 use super::choose::select_outermost_wrap_call_sites;
 use super::{WrapFunctionCallSite, WrapFunctionCallTemplate};
 
-pub(super) fn collect_wrap_all_call_sites(
+pub fn collect_wrap_all_call_sites(
     tree: &SyntaxTree,
     dialect: Dialect,
     input: &str,
@@ -52,7 +52,7 @@ pub(super) fn collect_wrap_all_call_sites(
     Ok((calls, skipped_already_wrapped, skipped_nested))
 }
 
-pub(super) fn collect_wrap_explicit_call_sites(
+pub fn collect_wrap_explicit_call_sites(
     tree: &SyntaxTree,
     dialect: Dialect,
     input: &str,

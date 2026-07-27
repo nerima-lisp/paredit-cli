@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn renames_function_calls_inside_reader_quoted_lambda_bodies() {

@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_emacs_lisp_cl_defmethod_optional_parameter_rename_without_touching_default_form() {

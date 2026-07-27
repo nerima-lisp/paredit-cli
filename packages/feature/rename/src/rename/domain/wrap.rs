@@ -1,9 +1,9 @@
 use anyhow::{Context, Result, ensure};
 
-use crate::domain::dialect::Dialect;
-pub use crate::domain::rename::WrapFunctionCallsScope;
-use crate::domain::rename::call_identity::call_reference_eq;
-use crate::domain::sexpr::{
+pub use crate::rename::domain::WrapFunctionCallsScope;
+use crate::rename::domain::call_identity::call_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -50,7 +50,7 @@ pub struct WrapFunctionCallsPlan {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct WrapFunctionCallTemplate {
+pub struct WrapFunctionCallTemplate {
     source: String,
     placeholder_span: ByteSpan,
 }
@@ -65,7 +65,7 @@ impl WrapFunctionCallTemplate {
         );
 
         let root = tree.select_path(&Path::root_child(0))?.view();
-        let head = crate::domain::rename::selection::list_head(&root)
+        let head = crate::rename::domain::selection::list_head(&root)
             .context("wrapper template root form must be a parenthesized list")?;
         ensure!(
             call_reference_eq(dialect, head, wrapper.as_str()),
@@ -86,7 +86,7 @@ impl WrapFunctionCallTemplate {
         })
     }
 
-    pub(super) fn apply(&self, call_text: &str) -> Result<String> {
+    pub fn apply(&self, call_text: &str) -> Result<String> {
         apply_byte_span_edits(
             &self.source,
             vec![(self.placeholder_span, call_text.to_owned())],

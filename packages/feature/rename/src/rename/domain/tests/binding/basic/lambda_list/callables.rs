@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_lambda_parameter_rename_without_shadowed_inner_binding() {

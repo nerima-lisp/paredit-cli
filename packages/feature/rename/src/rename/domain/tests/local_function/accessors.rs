@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_flet_rename_without_touching_global_function_cell_accessors() {

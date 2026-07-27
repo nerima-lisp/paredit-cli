@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::super::OutputFormat;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{SymbolName, SyntaxTree};
-use crate::presentation::cli::shared::matching_symbol_occurrences;
+use paredit_core_cli::shared::matching_symbol_occurrences;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
 
-pub(in crate::presentation::cli::rename) fn print_rename_plan(
+pub fn print_rename_plan(
     tree: &SyntaxTree,
     dialect: Dialect,
     from: &SymbolName,

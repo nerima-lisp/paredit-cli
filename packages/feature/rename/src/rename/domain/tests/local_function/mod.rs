@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::sexpr::SymbolName;
 
 macro_rules! assert_local_function_rename {
     (

@@ -2,8 +2,8 @@ use anyhow::Result;
 
 use super::RenameAtNamespace;
 use super::selection::AtomPathIndex;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 mod global_callable;
 mod lexical_value;
@@ -11,27 +11,27 @@ mod scope;
 mod scoped_callable;
 mod symbol_macro;
 
-pub(super) struct Candidate {
-    pub(super) namespace: RenameAtNamespace,
-    pub(super) occurrences: Vec<ByteSpan>,
-    pub(super) rewritten: String,
+pub struct Candidate {
+    pub namespace: RenameAtNamespace,
+    pub occurrences: Vec<ByteSpan>,
+    pub rewritten: String,
 }
 
-pub(super) struct SpecializedCandidateContext<'a> {
-    pub(super) input: &'a str,
-    pub(super) dialect: Dialect,
-    pub(super) tree: &'a SyntaxTree,
-    pub(super) root_view: &'a ExpressionView,
-    pub(super) atom_paths: AtomPathIndex<'a>,
-    pub(super) path: &'a Path,
-    pub(super) selected_span: ByteSpan,
-    pub(super) from: &'a SymbolName,
-    pub(super) to: &'a SymbolName,
+pub struct SpecializedCandidateContext<'a> {
+    pub input: &'a str,
+    pub dialect: Dialect,
+    pub tree: &'a SyntaxTree,
+    pub root_view: &'a ExpressionView,
+    pub atom_paths: AtomPathIndex<'a>,
+    pub path: &'a Path,
+    pub selected_span: ByteSpan,
+    pub from: &'a SymbolName,
+    pub to: &'a SymbolName,
 }
 
-pub(in crate::domain::rename::at) use lexical_value::binding_candidates;
+pub use lexical_value::binding_candidates;
 
-pub(super) fn add_specialized_candidates(
+pub fn add_specialized_candidates(
     output: &mut Vec<Candidate>,
     context: SpecializedCandidateContext<'_>,
 ) -> Result<()> {

@@ -1,15 +1,13 @@
 use anyhow::{Context, Result};
 
-use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::ReplaceFunctionCallsArgs;
 use super::render::replace_call::print_replace_function_calls_report;
 use super::shared::evaluate_call_site_policy;
 use super::types::{PendingReplaceFunctionCallsFile, ReplaceFunctionCallsFileReport};
-use crate::application::usecase::rename::{self as rename_usecase, ReplaceFunctionCallsScope};
+use crate::rename::usecase::{self as rename_usecase, ReplaceFunctionCallsScope};
+use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub(in crate::presentation::cli) fn replace_function_calls(
-    args: ReplaceFunctionCallsArgs,
-) -> Result<()> {
+pub fn replace_function_calls(args: ReplaceFunctionCallsArgs) -> Result<()> {
     if args.all_calls != args.call_paths.is_empty() {
         anyhow::bail!("replace-function-calls requires either --all-calls or repeated --call-path");
     }
@@ -53,7 +51,7 @@ pub(in crate::presentation::cli) fn replace_function_calls(
         args.require_calls,
     );
     if !policy.passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "replace-function-calls policy failed: {}",
             policy.violations.join("; ")
         )));

@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::build_binding_rename_parts;
 use super::collect_symbol_atom_spans_unshadowed;
@@ -9,7 +9,7 @@ use super::common_lisp;
 use super::forms::parameter_name_spans;
 use super::types::BindingRenameParts;
 
-pub(super) fn clause_binding_rename_parts(
+pub fn clause_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,
@@ -69,7 +69,7 @@ pub(super) fn clause_binding_rename_parts(
     ))
 }
 
-pub(super) fn loop_binding_rename_parts(
+pub fn loop_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,
@@ -117,7 +117,7 @@ pub(super) fn loop_binding_rename_parts(
     ))
 }
 
-pub(super) fn slot_binding_rename_parts(
+pub fn slot_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     form: String,

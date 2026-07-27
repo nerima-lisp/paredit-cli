@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn renames_outer_function_inside_macrolet_expander_but_not_shadowed_body() {

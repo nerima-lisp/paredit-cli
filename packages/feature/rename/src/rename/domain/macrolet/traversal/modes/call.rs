@@ -1,6 +1,6 @@
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::rename::macrolet::RenameFunctionOccurrence;
-use crate::domain::sexpr::ExpressionView;
+use crate::rename::domain::macrolet::RenameFunctionOccurrence;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::super::super::reader::{
     atom_symbol_span, atom_symbol_text, callable_target, collect_local_function_designator_renames,
@@ -11,7 +11,7 @@ use super::super::core::{RenameTraversalMode, TraversalPath, TraversalPathArena}
 use super::super::state::{TraversalContext, TraversalState};
 use super::common::{callable_list_head_target, collect_active_atom_rename};
 
-pub(in crate::domain::rename::macrolet) struct CallTraversal;
+pub struct CallTraversal;
 
 impl RenameTraversalMode for CallTraversal {
     fn collect_pre_reader_renames(
@@ -87,7 +87,7 @@ impl RenameTraversalMode for CallTraversal {
             }
         }
 
-        let Some(head) = crate::domain::rename::selection::list_head(view) else {
+        let Some(head) = crate::rename::domain::selection::list_head(view) else {
             return;
         };
         if !common_lisp_symbol_reference_eq(head, context.from.as_str())

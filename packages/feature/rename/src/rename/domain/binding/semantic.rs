@@ -1,17 +1,17 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::{
+use paredit_core_syntax::dialect::{
     BinderShape, BindingVisibility, BodyShape, DefinitionShape, ParameterShape, RelativeNodePath,
     RenameBindingOperation, ScopeShape, VerifiedSemanticPolicy,
 };
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::build_binding_rename_parts;
 use super::destructure::binding_pattern_name_spans;
 use super::forms::{binding_groups, parameter_name_spans};
 use super::types::{BindingGroup, BindingRenameParts, ParameterNameSpan};
 
-pub(super) fn semantic_binding_rename_parts(
+pub fn semantic_binding_rename_parts(
     semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
     view: &ExpressionView,
     from: &SymbolName,
@@ -424,7 +424,7 @@ fn collect_references(
         );
         return;
     }
-    if semantic.dialect() == crate::domain::dialect::Dialect::EmacsLisp
+    if semantic.dialect() == paredit_core_syntax::dialect::Dialect::EmacsLisp
         && super::collect_shadow_aware_special_form(view, from, output, shadowed_scope_count, input)
     {
         return;
@@ -825,7 +825,7 @@ const fn is_lisp2_call_head(
     is_call_head
         && matches!(
             semantic.dialect(),
-            crate::domain::dialect::Dialect::CommonLisp
-                | crate::domain::dialect::Dialect::EmacsLisp
+            paredit_core_syntax::dialect::Dialect::CommonLisp
+                | paredit_core_syntax::dialect::Dialect::EmacsLisp
         )
 }

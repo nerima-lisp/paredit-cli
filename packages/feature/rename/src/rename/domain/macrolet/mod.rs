@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
 
 use super::RenameFunctionOccurrence;
 
@@ -16,7 +16,7 @@ use call::collect_macrolet_call_head_renames_from_view;
 use scope::{LocalCallableRenameKind, MacroletRenameScope};
 
 type RenameCollector = fn(
-    &crate::domain::sexpr::ExpressionView,
+    &paredit_core_syntax::sexpr::ExpressionView,
     Path,
     Dialect,
     &SymbolName,

@@ -1,15 +1,15 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::destructure::{
     binding_pattern_name_spans, lambda_list_name_spans, specialized_lambda_list_name_spans,
 };
 use super::types::{BindingGroup, ParameterNameSpan};
 
-pub(super) fn binding_groups(
+pub fn binding_groups(
     dialect: Dialect,
     binding_form: &ExpressionView,
     input: &str,
@@ -27,7 +27,7 @@ pub(super) fn binding_groups(
     }
 }
 
-pub(super) fn generic_binding_groups(
+pub fn generic_binding_groups(
     binding_form: &ExpressionView,
     input: &str,
 ) -> Result<Vec<BindingGroup>> {
@@ -38,7 +38,7 @@ pub(super) fn generic_binding_groups(
     }
 }
 
-pub(super) fn parameter_name_spans(
+pub fn parameter_name_spans(
     parameter_form: &ExpressionView,
     input: &str,
 ) -> Result<Vec<ParameterNameSpan>> {
@@ -49,7 +49,7 @@ pub(super) fn parameter_name_spans(
     Ok(lambda_list_name_spans(parameter_form, input))
 }
 
-pub(in crate::domain::rename) fn parameter_form_binds(
+pub fn parameter_form_binds(
     parameter_form: &ExpressionView,
     symbol: &SymbolName,
     input: &str,
@@ -60,7 +60,7 @@ pub(in crate::domain::rename) fn parameter_form_binds(
             .any(|name| common_lisp_symbol_reference_eq(&name.name, symbol.as_str()))
 }
 
-pub(super) fn specialized_parameter_name_spans(
+pub fn specialized_parameter_name_spans(
     parameter_form: &ExpressionView,
     input: &str,
 ) -> Result<Vec<ParameterNameSpan>> {
@@ -71,7 +71,7 @@ pub(super) fn specialized_parameter_name_spans(
     Ok(specialized_lambda_list_name_spans(parameter_form, input))
 }
 
-pub(super) fn binding_binds(binding: &BindingGroup, symbol: &SymbolName) -> bool {
+pub fn binding_binds(binding: &BindingGroup, symbol: &SymbolName) -> bool {
     binding
         .names
         .iter()

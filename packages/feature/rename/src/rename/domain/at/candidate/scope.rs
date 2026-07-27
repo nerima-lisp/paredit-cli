@@ -2,10 +2,10 @@ use anyhow::Result;
 
 use super::super::RenameAtNamespace;
 use super::super::selection::{AtomPathIndex, ancestor_views};
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path};
+use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path};
 
-pub(super) fn enclosing_specialized_scope(
+pub fn enclosing_specialized_scope(
     root_view: &ExpressionView,
     path: &Path,
     namespace: RenameAtNamespace,
@@ -57,7 +57,7 @@ pub(super) fn enclosing_specialized_scope(
     Ok(None)
 }
 
-pub(super) fn occurrence_has_scope(
+pub fn occurrence_has_scope(
     root_view: &ExpressionView,
     atom_paths: AtomPathIndex<'_>,
     span: ByteSpan,

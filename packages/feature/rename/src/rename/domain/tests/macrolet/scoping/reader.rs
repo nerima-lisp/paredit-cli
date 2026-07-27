@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn renames_macrolet_calls_inside_reader_quoted_lambda_bodies() {

@@ -1,15 +1,13 @@
 use anyhow::{Context, Result};
 
-use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::UnwrapFunctionCallsArgs;
 use super::render::unwrap::print_unwrap_function_calls_report;
 use super::shared::evaluate_call_site_policy;
 use super::types::{PendingUnwrapFunctionCallsFile, UnwrapFunctionCallsFileReport};
-use crate::application::usecase::rename::{self as rename_usecase, UnwrapFunctionCallsScope};
+use crate::rename::usecase::{self as rename_usecase, UnwrapFunctionCallsScope};
+use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub(in crate::presentation::cli) fn unwrap_function_calls(
-    args: UnwrapFunctionCallsArgs,
-) -> Result<()> {
+pub fn unwrap_function_calls(args: UnwrapFunctionCallsArgs) -> Result<()> {
     if args.all_calls != args.call_paths.is_empty() {
         anyhow::bail!("unwrap-function-calls requires either --all-calls or repeated --call-path");
     }
@@ -55,7 +53,7 @@ pub(in crate::presentation::cli) fn unwrap_function_calls(
         args.require_calls,
     );
     if !policy.passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "unwrap-function-calls policy failed: {}",
             policy.violations.join("; ")
         )));

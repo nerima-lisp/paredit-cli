@@ -1,12 +1,12 @@
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
-use crate::domain::rename::selection::atom_text;
+use crate::rename::domain::selection::atom_text;
 
 use super::super::super::forms::parameter_form_binds;
 use super::super::collect_symbol_atom_spans_unshadowed;
 
-pub(super) fn collect_slot_binding_references(
+pub fn collect_slot_binding_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -42,7 +42,7 @@ pub(super) fn collect_slot_binding_references(
     }
 }
 
-pub(super) fn collect_clause_form_references(
+pub fn collect_clause_form_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,

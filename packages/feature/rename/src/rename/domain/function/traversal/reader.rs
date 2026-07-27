@@ -1,9 +1,9 @@
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::rename::reader::{
+use crate::rename::domain::reader::{
     bare_lambda_body_children, explicit_reader_form_kind,
     explicit_reader_function_lambda_body_children,
 };
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::super::RenameFunctionOccurrence;
 use super::super::target::callable_name_target;
@@ -40,7 +40,7 @@ fn collect_callable_target_rename(
     true
 }
 
-pub(in crate::domain::rename::function) fn collect_function_designator_renames(
+pub fn collect_function_designator_renames(
     view: &ExpressionView,
     state: &TraversalState,
     paths: &TraversalPathArena,
@@ -57,7 +57,7 @@ pub(in crate::domain::rename::function) fn collect_function_designator_renames(
 /// Handles a bare `(lambda ...)` form directly, skipping its parameter list
 /// the same way the `#'(lambda ...)` case below skips it via
 /// `explicit_reader_function_lambda_body_children`; see `bare_lambda_body_children`.
-pub(in crate::domain::rename::function) fn collect_bare_lambda_call_renames<'a>(
+pub fn collect_bare_lambda_call_renames<'a>(
     view: &'a ExpressionView,
     state: &TraversalState,
     paths: &mut TraversalPathArena,
@@ -78,7 +78,7 @@ pub(in crate::domain::rename::function) fn collect_bare_lambda_call_renames<'a>(
     true
 }
 
-pub(in crate::domain::rename::function) fn collect_explicit_reader_form_call_renames<'a>(
+pub fn collect_explicit_reader_form_call_renames<'a>(
     view: &'a ExpressionView,
     context: &TraversalContext<'_>,
     state: TraversalState,

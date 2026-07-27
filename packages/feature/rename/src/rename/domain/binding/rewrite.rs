@@ -1,8 +1,8 @@
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::selection::atom_text;
 
-pub(super) fn rewrite_clojure_keys_map_pattern(
+pub fn rewrite_clojure_keys_map_pattern(
     input: &str,
     map_pattern: &ExpressionView,
     renamed_name: &str,

@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn preserves_unquote_prefixes_when_renaming_macrolet_calls_inside_quasiquote() {

@@ -1,22 +1,21 @@
-use crate::domain::callable_scope::{common_lisp_local_callable_form, local_callable_names};
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::definition::{DefinitionBodyRange, definition_shape};
-use crate::domain::sexpr::{Delimiter, ExpressionKind};
+use paredit_core_semantics::callable_scope::{
+    common_lisp_local_callable_form, local_callable_names,
+};
+use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
+use paredit_core_syntax::definition::{DefinitionBodyRange, definition_shape};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind};
 
 use super::super::RenameFunctionOccurrence;
 use super::super::scope::{local_callable_scopes, target_binding_presence};
 use super::core::{RenameTraversalMode, TraversalFrame, TraversalPathArena, TraversalTask};
 use super::state::TraversalContext;
 
-pub(in crate::domain::rename::macrolet) enum LocalCallableTraversal {
+pub enum LocalCallableTraversal {
     Handled,
     DefinitionBody(Option<DefinitionBodyRange>),
 }
 
-pub(in crate::domain::rename::macrolet) fn collect_local_callable_or_definition<
-    'a,
-    M: RenameTraversalMode,
->(
+pub fn collect_local_callable_or_definition<'a, M: RenameTraversalMode>(
     frame: TraversalFrame<'a>,
     context: TraversalContext<'_>,
     paths: &mut TraversalPathArena,
@@ -27,7 +26,7 @@ pub(in crate::domain::rename::macrolet) fn collect_local_callable_or_definition<
         return LocalCallableTraversal::DefinitionBody(None);
     }
 
-    let Some(head) = crate::domain::rename::selection::list_head(frame.view) else {
+    let Some(head) = crate::rename::domain::selection::list_head(frame.view) else {
         M::collect_list_head_renames(frame.view, frame.path, paths, context, frame.state, renames);
         return LocalCallableTraversal::DefinitionBody(None);
     };

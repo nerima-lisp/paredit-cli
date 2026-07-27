@@ -1,12 +1,12 @@
-use crate::domain::rename::macrolet::RenameFunctionOccurrence;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView};
+use crate::rename::domain::macrolet::RenameFunctionOccurrence;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView};
 
 use super::super::super::reader::{CallableTarget, callable_target, push_atom_rename_if_match};
 use super::super::super::scope::MacroletRenameScope;
 use super::super::core::{TraversalPath, TraversalPathArena};
 use super::super::state::{TraversalContext, TraversalState};
 
-pub(super) fn collect_active_atom_rename(
+pub fn collect_active_atom_rename(
     child: &ExpressionView,
     child_path: TraversalPath,
     paths: &mut TraversalPathArena,
@@ -28,11 +28,11 @@ pub(super) fn collect_active_atom_rename(
     false
 }
 
-pub(super) fn callable_binding_name_target(binding: &ExpressionView) -> Option<CallableTarget<'_>> {
+pub fn callable_binding_name_target(binding: &ExpressionView) -> Option<CallableTarget<'_>> {
     callable_target(binding.children.first()?)
 }
 
-pub(super) fn callable_list_head_target(view: &ExpressionView) -> Option<CallableTarget<'_>> {
+pub fn callable_list_head_target(view: &ExpressionView) -> Option<CallableTarget<'_>> {
     let head = view.children.first()?;
     if head.kind != ExpressionKind::List {
         return None;
@@ -43,13 +43,13 @@ pub(super) fn callable_list_head_target(view: &ExpressionView) -> Option<Callabl
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::rename::macrolet::scope::{LocalCallableRenameKind, MacroletRenameScope};
-    use crate::domain::rename::macrolet::traversal::BindingTraversal;
-    use crate::domain::rename::macrolet::traversal::core::{
+    use crate::rename::domain::macrolet::scope::{LocalCallableRenameKind, MacroletRenameScope};
+    use crate::rename::domain::macrolet::traversal::BindingTraversal;
+    use crate::rename::domain::macrolet::traversal::core::{
         RenameTraversalMode, TraversalPathArena,
     };
-    use crate::domain::rename::macrolet::traversal::state::TraversalState;
-    use crate::domain::sexpr::{Path, SyntaxTree};
+    use crate::rename::domain::macrolet::traversal::state::TraversalState;
+    use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
     #[test]
     fn extracts_setf_callable_binding_name_target() {
@@ -77,10 +77,10 @@ mod tests {
             .view();
         let bindings = view.children.get(1).expect("bindings list");
         let binding = bindings.children.first().expect("binding");
-        let from = crate::domain::sexpr::SymbolName::new("foo").expect("symbol");
-        let to = crate::domain::sexpr::SymbolName::new("bar").expect("symbol");
+        let from = paredit_core_syntax::sexpr::SymbolName::new("foo").expect("symbol");
+        let to = paredit_core_syntax::sexpr::SymbolName::new("bar").expect("symbol");
         let context = TraversalContext {
-            dialect: crate::domain::dialect::Dialect::CommonLisp,
+            dialect: paredit_core_syntax::dialect::Dialect::CommonLisp,
             from: &from,
             to: &to,
             kind: LocalCallableRenameKind::Function,
@@ -98,7 +98,7 @@ mod tests {
             0,
             path,
             &mut paths,
-            crate::domain::common_lisp::CommonLispLocalCallableForm::Flet,
+            paredit_core_syntax::common_lisp::CommonLispLocalCallableForm::Flet,
             context,
             state,
             &mut renames,

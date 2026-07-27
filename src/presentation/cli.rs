@@ -165,8 +165,6 @@ mod redundant_quote_report;
 mod redundant_start_zero_report;
 mod redundant_the_report;
 mod refactor;
-mod rename;
-mod rename_control;
 mod self_assignment_report;
 mod self_comparison_report;
 mod setf_arity_report;
@@ -243,7 +241,7 @@ pub(crate) use shared::{
     read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_limit,
     read_text_with_limit, require_output_file, stable_text_hash, terminal_safe,
     terminal_safe_error_chain, unified_diff, write_artifact_with_rollback,
-    write_file_with_rollback, write_files_with_rollback,
+    write_file_with_rollback,
 };
 
 #[derive(Debug, Parser)]
@@ -303,6 +301,8 @@ use paredit_feature_remove_unused::definition_removal::cli as definition_removal
 use paredit_feature_remove_unused::definition_report::cli as definition_report;
 use paredit_feature_remove_unused::remove_unused_binding::cli as remove_unused_binding;
 use paredit_feature_remove_unused::remove_unused_control::cli as remove_unused_control;
+use paredit_feature_rename::rename::cli as rename;
+use paredit_feature_rename::rename_control::cli as rename_control;
 
 #[cfg(test)]
 mod tests {

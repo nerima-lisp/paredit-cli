@@ -1,19 +1,16 @@
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::selection::atom_text;
 use super::types::{BindingEdit, ParameterNameSpan};
 
-pub(super) fn binding_pattern_name_spans(
-    pattern: &ExpressionView,
-    input: &str,
-) -> Vec<ParameterNameSpan> {
+pub fn binding_pattern_name_spans(pattern: &ExpressionView, input: &str) -> Vec<ParameterNameSpan> {
     let mut names = Vec::new();
     let _ = input;
     collect_binding_pattern_name_spans(pattern, &mut names);
     names
 }
 
-pub(super) fn lambda_list_name_spans(
+pub fn lambda_list_name_spans(
     parameter_form: &ExpressionView,
     input: &str,
 ) -> Vec<ParameterNameSpan> {
@@ -23,7 +20,7 @@ pub(super) fn lambda_list_name_spans(
     names
 }
 
-pub(super) fn specialized_lambda_list_name_spans(
+pub fn specialized_lambda_list_name_spans(
     parameter_form: &ExpressionView,
     input: &str,
 ) -> Vec<ParameterNameSpan> {

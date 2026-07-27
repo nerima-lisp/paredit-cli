@@ -1,11 +1,11 @@
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::super::super::common_lisp;
 use super::super::super::destructure::binding_pattern_name_spans;
 use super::super::collect_symbol_atom_spans_unshadowed;
 
-pub(super) fn collect_loop_references(
+pub fn collect_loop_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,

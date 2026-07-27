@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 
-use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::RenameSymbolMacroArgs;
 use super::render::symbol_macro::print_rename_symbol_macro_report;
 use super::types::{PendingRenameSymbolMacroFile, RenameSymbolMacroFileReport};
-use crate::application::usecase::rename as rename_usecase;
+use crate::rename::usecase as rename_usecase;
+use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub(in crate::presentation::cli) fn rename_symbol_macro(args: RenameSymbolMacroArgs) -> Result<()> {
+pub fn rename_symbol_macro(args: RenameSymbolMacroArgs) -> Result<()> {
     let mut pending = Vec::with_capacity(args.files.len());
     let mut definition_count = 0usize;
 

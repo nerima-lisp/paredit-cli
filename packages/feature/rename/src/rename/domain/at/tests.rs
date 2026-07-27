@@ -1,7 +1,7 @@
 use super::{RenameAtError, plan_rename_at};
-use crate::domain::dialect::Dialect;
-use crate::domain::rename::{RenameAtNamespace, RenameAtRequest};
-use crate::domain::sexpr::{ByteOffset, SymbolName};
+use crate::rename::domain::{RenameAtNamespace, RenameAtRequest};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteOffset, SymbolName};
 
 mod global;
 mod local;

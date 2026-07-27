@@ -1,16 +1,16 @@
-use crate::domain::common_lisp::{
+use crate::rename::domain::selection::list_head;
+use paredit_core_syntax::common_lisp::{
     common_lisp_macro_expander_path, common_lisp_operator_head_eq,
     normalize_common_lisp_operator_head,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::rename::selection::list_head;
-use crate::domain::sexpr::reader::atom_text;
-pub(crate) use crate::domain::sexpr::reader::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_text;
+pub use paredit_core_syntax::sexpr::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
 
-pub(crate) fn executable_reader_context_at_path(
+pub fn executable_reader_context_at_path(
     tree: &SyntaxTree,
     dialect: Dialect,
     path: &Path,
@@ -30,7 +30,7 @@ pub(crate) fn executable_reader_context_at_path(
     Ok(quasiquote_depth == 0 || common_lisp_macro_expander_path(tree, dialect, path)?)
 }
 
-pub(crate) fn explicit_reader_form_kind(view: &ExpressionView) -> Option<String> {
+pub fn explicit_reader_form_kind(view: &ExpressionView) -> Option<String> {
     if view.kind != ExpressionKind::List || view.children.len() < 2 {
         return None;
     }
@@ -39,9 +39,7 @@ pub(crate) fn explicit_reader_form_kind(view: &ExpressionView) -> Option<String>
     Some(normalize_common_lisp_operator_head(head).to_ascii_lowercase())
 }
 
-pub(crate) fn explicit_reader_function_lambda_view(
-    view: &ExpressionView,
-) -> Option<&ExpressionView> {
+pub fn explicit_reader_function_lambda_view(view: &ExpressionView) -> Option<&ExpressionView> {
     if explicit_reader_form_kind(view)?.as_str() != "function" {
         return None;
     }
@@ -52,7 +50,7 @@ pub(crate) fn explicit_reader_function_lambda_view(
         .then_some(lambda_view)
 }
 
-pub(crate) fn explicit_reader_function_lambda_body_children(
+pub fn explicit_reader_function_lambda_body_children(
     view: &ExpressionView,
 ) -> Option<impl Iterator<Item = (usize, &ExpressionView)>> {
     explicit_reader_function_lambda_view(view)
@@ -66,7 +64,7 @@ pub(crate) fn explicit_reader_function_lambda_body_children(
 /// callable-namespace scope as its reader-quoted spelling and must skip its
 /// parameter list the same way `explicit_reader_function_lambda_body_children`
 /// does for the `#'(lambda ...)` case.
-pub(crate) fn bare_lambda_body_children(
+pub fn bare_lambda_body_children(
     view: &ExpressionView,
 ) -> Option<impl Iterator<Item = (usize, &ExpressionView)>> {
     let head = list_head(view)?;

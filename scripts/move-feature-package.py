@@ -54,6 +54,9 @@ convert_labels_to_flet convert_sequential_binding eliminate_empty_binding_form f
 function_parameter
 package package_report unused_package_report unused_nickname_report unused_export_report
 package_boundary_report package_conflict_report system_conflict_report dependency_report
+remove_unused_binding remove_unused_control remove_unused_definition definition_removal
+definition_movement remove_definition definition_report
+rename rename_control rename_types
 """.split())
 
 

@@ -1,5 +1,5 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, SymbolName};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenameAtNamespace {

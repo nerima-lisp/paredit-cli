@@ -1,11 +1,11 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::rename::call_identity::call_reference_eq;
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use crate::rename::domain::call_identity::call_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
 use super::{WrapFunctionCallSite, WrapFunctionCallTemplate};
-use crate::domain::rename::selection::list_head;
+use crate::rename::domain::selection::list_head;
 
-pub(super) fn wrap_call_site_from_view(
+pub fn wrap_call_site_from_view(
     view: &ExpressionView,
     dialect: Dialect,
     input: &str,

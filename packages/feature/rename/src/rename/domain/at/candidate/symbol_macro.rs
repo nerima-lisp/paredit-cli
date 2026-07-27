@@ -3,14 +3,11 @@ use anyhow::Result;
 use super::super::RenameAtNamespace;
 use super::scope::{enclosing_specialized_scope, occurrence_has_scope};
 use super::{Candidate, SpecializedCandidateContext, push_candidate};
-use crate::domain::rename::{
+use crate::rename::domain::{
     RenameSymbolMacroRequest, plan_rename_symbol_macro, selection::apply_byte_span_edits,
 };
 
-pub(super) fn add(
-    output: &mut Vec<Candidate>,
-    context: &SpecializedCandidateContext<'_>,
-) -> Result<()> {
+pub fn add(output: &mut Vec<Candidate>, context: &SpecializedCandidateContext<'_>) -> Result<()> {
     let plan = plan_rename_symbol_macro(RenameSymbolMacroRequest {
         input: context.input,
         dialect: context.dialect,

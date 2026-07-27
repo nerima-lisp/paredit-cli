@@ -45,3 +45,6 @@ fn renames_global_compiler_macro_definition_calls_and_function_designators() {
     );
 }
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::SymbolName;

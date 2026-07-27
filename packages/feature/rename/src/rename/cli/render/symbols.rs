@@ -1,11 +1,12 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::super::OutputFormat;
 use super::super::types::RenameFileReport;
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
-pub(in crate::presentation::cli::rename) fn print_rename_symbols_report(
+pub fn print_rename_symbols_report(
     reports: &[RenameFileReport],
     from: &SymbolName,
     to: &SymbolName,

@@ -11,9 +11,9 @@ mod value_like;
 
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::CommonLispBindingRefactorForm;
-use crate::domain::dialect::{RenameBindingOperation, VerifiedSemanticPolicy};
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::CommonLispBindingRefactorForm;
+use paredit_core_syntax::dialect::{RenameBindingOperation, VerifiedSemanticPolicy};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use lambda_like::{
     defmethod_binding_rename_parts, handler_bind_lambda_binding_rename_parts,
@@ -26,13 +26,13 @@ use value_like::{
     let_binding_rename_parts, value_binding_rename_parts,
 };
 
-pub(in crate::domain::rename) use forms::parameter_form_binds;
-pub(in crate::domain::rename) use lambda_like::collect_enclosing_lambda_list_references;
-pub(super) use scope::collect_symbol_atom_spans_unshadowed;
-pub(super) use scope::collect_symbol_atom_spans_unshadowed_ignoring_declared_specials;
-pub(super) use types::BindingRenameParts;
+pub use forms::parameter_form_binds;
+pub use lambda_like::collect_enclosing_lambda_list_references;
+pub use scope::collect_symbol_atom_spans_unshadowed;
+pub use scope::collect_symbol_atom_spans_unshadowed_ignoring_declared_specials;
+pub use types::BindingRenameParts;
 
-pub(super) fn collect_shadow_aware_special_form(
+pub fn collect_shadow_aware_special_form(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -42,7 +42,7 @@ pub(super) fn collect_shadow_aware_special_form(
     scope::collect_shadow_aware_special_form(view, symbol, output, shadowed_scope_count, input)
 }
 
-pub(super) fn binding_rename_parts(
+pub fn binding_rename_parts(
     semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
     view: &ExpressionView,
     from: &SymbolName,
@@ -53,7 +53,7 @@ pub(super) fn binding_rename_parts(
         .context("selected form is not a supported binding form")?
         .to_owned();
 
-    if dialect != crate::domain::dialect::Dialect::CommonLisp
+    if dialect != paredit_core_syntax::dialect::Dialect::CommonLisp
         && (semantic.scope_shape(view).is_some() || semantic.definition_shape(view).is_some())
     {
         return semantic::semantic_binding_rename_parts(semantic, view, from, form, input);

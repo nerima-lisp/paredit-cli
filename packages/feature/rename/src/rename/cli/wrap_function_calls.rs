@@ -1,13 +1,13 @@
 use anyhow::{Context, Result};
 
-use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::WrapFunctionCallsArgs;
 use super::render::wrap::print_wrap_function_calls_report;
 use super::shared::evaluate_call_site_policy;
 use super::types::{PendingWrapFunctionCallsFile, WrapFunctionCallsFileReport};
-use crate::application::usecase::rename::{self as rename_usecase, WrapFunctionCallsScope};
+use crate::rename::usecase::{self as rename_usecase, WrapFunctionCallsScope};
+use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub(in crate::presentation::cli) fn wrap_function_calls(args: WrapFunctionCallsArgs) -> Result<()> {
+pub fn wrap_function_calls(args: WrapFunctionCallsArgs) -> Result<()> {
     if args.all_calls != args.call_paths.is_empty() {
         anyhow::bail!("wrap-function-calls requires either --all-calls or repeated --call-path");
     }
@@ -50,7 +50,7 @@ pub(in crate::presentation::cli) fn wrap_function_calls(args: WrapFunctionCallsA
         args.require_calls,
     );
     if !policy.passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "wrap-function-calls policy failed: {}",
             policy.violations.join("; ")
         )));

@@ -1,16 +1,27 @@
-use super::*;
-use crate::application::usecase::rename_control::{
+use anyhow::Result;
+use clap::Args;
+use serde_json::json;
+use std::path::PathBuf;
+
+use crate::rename_control::usecase::{
     RenameControlPlan, RenameControlRequest, plan_rename_block, plan_rename_tag,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[derive(Debug, Args)]
-pub(super) struct RenameBlockArgs {
+pub struct RenameBlockArgs {
     #[command(flatten)]
     common: RenameControlArgs,
 }
 #[derive(Debug, Args)]
-pub(super) struct RenameTagArgs {
+pub struct RenameTagArgs {
     #[command(flatten)]
     common: RenameControlArgs,
 }
@@ -33,10 +44,10 @@ struct RenameControlArgs {
     output: OutputFormat,
 }
 
-pub(super) fn rename_block(args: RenameBlockArgs) -> Result<()> {
+pub fn rename_block(args: RenameBlockArgs) -> Result<()> {
     run(args.common, plan_rename_block)
 }
-pub(super) fn rename_tag(args: RenameTagArgs) -> Result<()> {
+pub fn rename_tag(args: RenameTagArgs) -> Result<()> {
     run(args.common, plan_rename_tag)
 }
 

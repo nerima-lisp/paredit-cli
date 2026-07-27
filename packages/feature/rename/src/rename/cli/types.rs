@@ -1,136 +1,136 @@
 use std::path::PathBuf;
 
-use crate::application::usecase::rename::{
+use crate::rename::usecase::{
     RenameFunctionOccurrence, ReplaceFunctionCallSite, UnwrapFunctionCallSite, WrapFunctionCallSite,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 #[derive(Debug)]
-pub(super) struct RenameFileReport {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) occurrences: Vec<ByteSpan>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct RenameFileReport {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub occurrences: Vec<ByteSpan>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 /// Shared per-file report for the callable rename family
 /// (rename-function, rename-macrolet, rename-local-function).
 #[derive(Debug)]
-pub(super) struct CallableRenameFileReport {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) definitions: Vec<RenameFunctionOccurrence>,
-    pub(super) calls: Vec<RenameFunctionOccurrence>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct CallableRenameFileReport {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub definitions: Vec<RenameFunctionOccurrence>,
+    pub calls: Vec<RenameFunctionOccurrence>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 #[derive(Debug)]
-pub(super) struct RenameSymbolMacroFileReport {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) definitions: Vec<RenameFunctionOccurrence>,
-    pub(super) references: Vec<RenameFunctionOccurrence>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct RenameSymbolMacroFileReport {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub definitions: Vec<RenameFunctionOccurrence>,
+    pub references: Vec<RenameFunctionOccurrence>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 /// Shared pre-write state for the callable rename family.
 #[derive(Debug)]
-pub(super) struct PendingCallableRenameFile {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) definitions: Vec<RenameFunctionOccurrence>,
-    pub(super) calls: Vec<RenameFunctionOccurrence>,
-    pub(super) rewritten: String,
-    pub(super) changed: bool,
+pub struct PendingCallableRenameFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub definitions: Vec<RenameFunctionOccurrence>,
+    pub calls: Vec<RenameFunctionOccurrence>,
+    pub rewritten: String,
+    pub changed: bool,
 }
 
 #[derive(Debug)]
-pub(super) struct PendingRenameSymbolMacroFile {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) definitions: Vec<RenameFunctionOccurrence>,
-    pub(super) references: Vec<RenameFunctionOccurrence>,
-    pub(super) rewritten: String,
-    pub(super) changed: bool,
+pub struct PendingRenameSymbolMacroFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub definitions: Vec<RenameFunctionOccurrence>,
+    pub references: Vec<RenameFunctionOccurrence>,
+    pub rewritten: String,
+    pub changed: bool,
 }
 
 #[derive(Debug)]
-pub(super) struct WrapFunctionCallsFileReport {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) calls: Vec<WrapFunctionCallSite>,
-    pub(super) skipped_already_wrapped: Vec<WrapFunctionCallSite>,
-    pub(super) skipped_nested: Vec<WrapFunctionCallSite>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct WrapFunctionCallsFileReport {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub calls: Vec<WrapFunctionCallSite>,
+    pub skipped_already_wrapped: Vec<WrapFunctionCallSite>,
+    pub skipped_nested: Vec<WrapFunctionCallSite>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 #[derive(Debug)]
-pub(super) struct PendingWrapFunctionCallsFile {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) calls: Vec<WrapFunctionCallSite>,
-    pub(super) skipped_already_wrapped: Vec<WrapFunctionCallSite>,
-    pub(super) skipped_nested: Vec<WrapFunctionCallSite>,
-    pub(super) rewritten: String,
-    pub(super) changed: bool,
+pub struct PendingWrapFunctionCallsFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub calls: Vec<WrapFunctionCallSite>,
+    pub skipped_already_wrapped: Vec<WrapFunctionCallSite>,
+    pub skipped_nested: Vec<WrapFunctionCallSite>,
+    pub rewritten: String,
+    pub changed: bool,
 }
 
 /// Shared policy outcome for the wrap/replace/unwrap call-site commands.
 #[derive(Debug)]
-pub(super) struct CallSitePolicy {
-    pub(super) fail_on_no_change: bool,
-    pub(super) require_calls: Option<usize>,
-    pub(super) passed: bool,
-    pub(super) violations: Vec<String>,
+pub struct CallSitePolicy {
+    pub fail_on_no_change: bool,
+    pub require_calls: Option<usize>,
+    pub passed: bool,
+    pub violations: Vec<String>,
 }
 
 #[derive(Debug)]
-pub(super) struct ReplaceFunctionCallsFileReport {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) calls: Vec<ReplaceFunctionCallSite>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct ReplaceFunctionCallsFileReport {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub calls: Vec<ReplaceFunctionCallSite>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 #[derive(Debug)]
-pub(super) struct PendingReplaceFunctionCallsFile {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) calls: Vec<ReplaceFunctionCallSite>,
-    pub(super) rewritten: String,
-    pub(super) changed: bool,
+pub struct PendingReplaceFunctionCallsFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub calls: Vec<ReplaceFunctionCallSite>,
+    pub rewritten: String,
+    pub changed: bool,
 }
 
 #[derive(Debug)]
-pub(super) struct UnwrapFunctionCallsFileReport {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) calls: Vec<UnwrapFunctionCallSite>,
-    pub(super) skipped_non_unary_wrapper: Vec<UnwrapFunctionCallSite>,
-    pub(super) skipped_nested: Vec<UnwrapFunctionCallSite>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct UnwrapFunctionCallsFileReport {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub calls: Vec<UnwrapFunctionCallSite>,
+    pub skipped_non_unary_wrapper: Vec<UnwrapFunctionCallSite>,
+    pub skipped_nested: Vec<UnwrapFunctionCallSite>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 #[derive(Debug)]
-pub(super) struct PendingUnwrapFunctionCallsFile {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) calls: Vec<UnwrapFunctionCallSite>,
-    pub(super) skipped_non_unary_wrapper: Vec<UnwrapFunctionCallSite>,
-    pub(super) skipped_nested: Vec<UnwrapFunctionCallSite>,
-    pub(super) rewritten: String,
-    pub(super) changed: bool,
+pub struct PendingUnwrapFunctionCallsFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub calls: Vec<UnwrapFunctionCallSite>,
+    pub skipped_non_unary_wrapper: Vec<UnwrapFunctionCallSite>,
+    pub skipped_nested: Vec<UnwrapFunctionCallSite>,
+    pub rewritten: String,
+    pub changed: bool,
 }

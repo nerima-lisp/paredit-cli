@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-pub use crate::domain::rename::ReplaceFunctionCallsScope;
-use crate::domain::sexpr::{ByteSpan, SymbolName, SyntaxTree};
+pub use crate::rename::domain::ReplaceFunctionCallsScope;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SymbolName, SyntaxTree};
 
 mod call_site;
 mod collect;

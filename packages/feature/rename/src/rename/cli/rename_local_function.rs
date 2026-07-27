@@ -2,11 +2,9 @@ use anyhow::Result;
 
 use super::args::RenameLocalFunctionArgs;
 use super::shared::{CallableRenameCommand, CallableRenamePlanData, run_callable_rename};
-use crate::application::usecase::rename as rename_usecase;
+use crate::rename::usecase as rename_usecase;
 
-pub(in crate::presentation::cli) fn rename_local_function(
-    args: RenameLocalFunctionArgs,
-) -> Result<()> {
+pub fn rename_local_function(args: RenameLocalFunctionArgs) -> Result<()> {
     run_callable_rename(
         CallableRenameCommand {
             files: &args.files,

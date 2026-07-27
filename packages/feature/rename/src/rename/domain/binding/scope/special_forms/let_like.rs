@@ -1,14 +1,14 @@
-use crate::domain::common_lisp::CommonLispVariableSpecForm;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionView, SymbolName};
+use paredit_core_syntax::common_lisp::CommonLispVariableSpecForm;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionView, SymbolName};
 
-use crate::domain::rename::selection;
+use crate::rename::domain::selection;
 
 use super::super::super::common_lisp;
 use super::super::super::forms::{binding_binds, generic_binding_groups, parameter_form_binds};
 use super::super::collect_symbol_atom_spans_unshadowed;
 
-pub(super) fn collect_parallel_let_references(
+pub fn collect_parallel_let_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -51,7 +51,7 @@ pub(super) fn collect_parallel_let_references(
     }
 }
 
-pub(super) fn collect_value_binding_references(
+pub fn collect_value_binding_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -78,7 +78,7 @@ pub(super) fn collect_value_binding_references(
     }
 }
 
-pub(super) fn collect_sequential_let_references(
+pub fn collect_sequential_let_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -113,7 +113,7 @@ pub(super) fn collect_sequential_let_references(
     }
 }
 
-pub(super) fn collect_iteration_binding_references(
+pub fn collect_iteration_binding_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -154,7 +154,7 @@ pub(super) fn collect_iteration_binding_references(
     }
 }
 
-pub(super) fn collect_variable_spec_binding_references(
+pub fn collect_variable_spec_binding_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,

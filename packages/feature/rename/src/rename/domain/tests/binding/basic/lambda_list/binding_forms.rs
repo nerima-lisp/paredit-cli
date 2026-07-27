@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_destructuring_bind_rename_without_touching_value_form() {

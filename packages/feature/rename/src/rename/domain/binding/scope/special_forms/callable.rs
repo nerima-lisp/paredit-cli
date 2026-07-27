@@ -1,11 +1,11 @@
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::super::collect_enclosing_lambda_list_references;
 use super::super::collect_symbol_atom_spans_unshadowed;
 
-pub(super) fn collect_defmethod_references(
+pub fn collect_defmethod_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -36,7 +36,7 @@ pub(super) fn collect_defmethod_references(
     }
 }
 
-pub(super) fn collect_handler_bind_references(
+pub fn collect_handler_bind_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -79,7 +79,7 @@ pub(super) fn collect_handler_bind_references(
     }
 }
 
-pub(super) fn collect_local_callable_references(
+pub fn collect_local_callable_references(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,

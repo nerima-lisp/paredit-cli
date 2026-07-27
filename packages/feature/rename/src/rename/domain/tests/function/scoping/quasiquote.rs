@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn preserves_unquote_prefixes_when_renaming_function_calls_inside_quasiquote() {

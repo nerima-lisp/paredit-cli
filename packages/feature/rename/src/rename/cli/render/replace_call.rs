@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::super::OutputFormat;
 use super::super::args::ReplaceFunctionCallsArgs;
 use super::super::types::{CallSitePolicy, ReplaceFunctionCallsFileReport};
 use super::shared::replace_call_sites_json;
 
-pub(in crate::presentation::cli::rename) fn print_replace_function_calls_report(
+pub fn print_replace_function_calls_report(
     reports: &[ReplaceFunctionCallsFileReport],
     args: &ReplaceFunctionCallsArgs,
     policy: &CallSitePolicy,

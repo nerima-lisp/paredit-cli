@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use super::super::{read_input_dialect_and_tree, write_files_with_rollback};
 use super::args::RenameSymbolsArgs;
 use super::render::symbols::print_rename_symbols_report;
 use super::types::RenameFileReport;
-use crate::presentation::cli::shared::{apply_byte_span_edits, matching_symbol_occurrences};
+use paredit_core_cli::shared::{apply_byte_span_edits, matching_symbol_occurrences};
+use paredit_core_cli::shared::{read_input_dialect_and_tree, write_files_with_rollback};
 
-pub(in crate::presentation::cli) fn rename_symbols(args: RenameSymbolsArgs) -> Result<()> {
+pub fn rename_symbols(args: RenameSymbolsArgs) -> Result<()> {
     let mut reports = Vec::with_capacity(args.files.len());
     let mut written_files = Vec::new();
     for file in &args.files {

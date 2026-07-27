@@ -1,1 +1,1 @@
-pub use crate::domain::rename_control::*;
+pub use crate::rename_control::domain::*;

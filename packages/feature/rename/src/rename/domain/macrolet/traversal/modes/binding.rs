@@ -1,13 +1,13 @@
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::rename::macrolet::RenameFunctionOccurrence;
-use crate::domain::sexpr::ExpressionView;
+use crate::rename::domain::macrolet::RenameFunctionOccurrence;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::super::super::reader::push_callable_target_rename_if_match;
 use super::super::core::{RenameTraversalMode, TraversalPath, TraversalPathArena};
 use super::super::state::{TraversalContext, TraversalState};
 use super::common::{callable_binding_name_target, collect_active_atom_rename};
 
-pub(in crate::domain::rename::macrolet) struct BindingTraversal;
+pub struct BindingTraversal;
 
 impl RenameTraversalMode for BindingTraversal {
     fn collect_binding_name_renames(
@@ -15,7 +15,7 @@ impl RenameTraversalMode for BindingTraversal {
         binding_index: usize,
         path: TraversalPath,
         paths: &mut TraversalPathArena,
-        form: crate::domain::common_lisp::CommonLispLocalCallableForm,
+        form: paredit_core_syntax::common_lisp::CommonLispLocalCallableForm,
         context: TraversalContext<'_>,
         state: TraversalState,
         renames: &mut Vec<RenameFunctionOccurrence>,

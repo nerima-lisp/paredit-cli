@@ -1,5 +1,5 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SymbolName};
 
 use super::RenameFunctionOccurrence;
 use super::scope::{LocalCallableRenameKind, MacroletRenameScope};
@@ -9,7 +9,7 @@ use super::traversal::{BindingTraversal, collect_renames_from_view};
     clippy::too_many_arguments,
     reason = "macrolet binding traversal carries recursive scope and quasiquote state"
 )]
-pub(super) fn collect_macrolet_binding_renames_from_view(
+pub fn collect_macrolet_binding_renames_from_view(
     view: &ExpressionView,
     path: Path,
     dialect: Dialect,

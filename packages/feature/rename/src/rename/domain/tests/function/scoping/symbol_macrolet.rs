@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn renames_outer_function_without_touching_nested_symbol_macrolet_shadowing() {

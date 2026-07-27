@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn renames_outer_macrolet_calls_inside_same_name_nested_expander_body() {

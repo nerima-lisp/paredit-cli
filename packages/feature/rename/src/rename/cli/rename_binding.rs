@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 
-use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::args::RenameBindingArgs;
 use super::render::binding::print_rename_binding_plan;
 use super::shared::{ensure_rename_changed, rename_target};
-use crate::application::usecase::rename as rename_usecase;
+use crate::rename::usecase as rename_usecase;
+use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub(in crate::presentation::cli) fn rename_binding(args: RenameBindingArgs) -> Result<()> {
+pub fn rename_binding(args: RenameBindingArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

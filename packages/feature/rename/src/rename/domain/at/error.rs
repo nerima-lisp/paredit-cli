@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::domain::mutation_safety::ReaderConditionalSafetyError;
+use paredit_core_edit::mutation_safety::ReaderConditionalSafetyError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenameAtError {

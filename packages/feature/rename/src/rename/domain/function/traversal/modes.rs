@@ -1,13 +1,15 @@
-use crate::domain::callable_scope::{common_lisp_local_callable_form, local_callable_names};
-use crate::domain::common_lisp::{
+use paredit_core_semantics::callable_scope::{
+    common_lisp_local_callable_form, local_callable_names,
+};
+use paredit_core_syntax::common_lisp::{
     CommonLispLocalCallableForm, CommonLispOperator, common_lisp_symbol_reference_eq,
 };
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::super::RenameFunctionOccurrence;
 use super::core::{TraversalContext, TraversalFrame, TraversalPathArena, TraversalState};
 
-pub(in crate::domain::rename::function) fn collect_local_callable_function_call_renames<'a>(
+pub fn collect_local_callable_function_call_renames<'a>(
     view: &'a ExpressionView,
     head: &str,
     context: &TraversalContext<'_>,
@@ -74,7 +76,7 @@ pub(in crate::domain::rename::function) fn collect_local_callable_function_call_
     true
 }
 
-pub(in crate::domain::rename::function) fn collect_symbol_macrolet_function_call_renames<'a>(
+pub fn collect_symbol_macrolet_function_call_renames<'a>(
     view: &'a ExpressionView,
     head: &str,
     _context: &TraversalContext<'_>,

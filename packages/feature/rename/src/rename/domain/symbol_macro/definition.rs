@@ -1,9 +1,11 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::{
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
+};
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ExpressionKind, ExpressionView, NonEmptyExpressionPath, Path, SymbolName, SyntaxTree,
 };
 

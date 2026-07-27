@@ -1,7 +1,7 @@
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
 
-pub(super) fn call_reference_eq(dialect: Dialect, candidate: &str, expected: &str) -> bool {
+pub fn call_reference_eq(dialect: Dialect, candidate: &str, expected: &str) -> bool {
     match dialect {
         Dialect::CommonLisp => common_lisp_symbol_reference_eq(candidate, expected),
         Dialect::EmacsLisp
@@ -17,11 +17,7 @@ pub(super) fn call_reference_eq(dialect: Dialect, candidate: &str, expected: &st
     }
 }
 
-pub(super) fn is_local_call_bound(
-    dialect: Dialect,
-    local_callables: &[String],
-    expected: &str,
-) -> bool {
+pub fn is_local_call_bound(dialect: Dialect, local_callables: &[String], expected: &str) -> bool {
     local_callables
         .iter()
         .rev()

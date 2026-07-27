@@ -1,4 +1,4 @@
-use crate::domain::rename::reader::{
+use crate::rename::domain::reader::{
     bare_lambda_body_children, explicit_reader_form_kind,
     explicit_reader_function_lambda_body_children,
 };
@@ -8,10 +8,7 @@ use super::super::scope::reader_lambda_body_scope as activate_reader_lambda_body
 use super::core::{RenameTraversalMode, TraversalFrame, TraversalPathArena, TraversalTask};
 use super::state::TraversalContext;
 
-pub(in crate::domain::rename::macrolet) fn collect_explicit_reader_form_renames<
-    'a,
-    M: RenameTraversalMode,
->(
+pub fn collect_explicit_reader_form_renames<'a, M: RenameTraversalMode>(
     frame: TraversalFrame<'a>,
     context: TraversalContext<'_>,
     paths: &mut TraversalPathArena,
@@ -78,10 +75,7 @@ pub(in crate::domain::rename::macrolet) fn collect_explicit_reader_form_renames<
 
 /// Handles a bare `(lambda ...)` form directly, not just the `#'(lambda ...)`
 /// spelling handled by the "function" arm above; see `bare_lambda_body_children`.
-pub(in crate::domain::rename::macrolet) fn collect_reader_lambda_renames<
-    'a,
-    M: RenameTraversalMode,
->(
+pub fn collect_reader_lambda_renames<'a, M: RenameTraversalMode>(
     frame: TraversalFrame<'a>,
     _context: TraversalContext<'_>,
     paths: &mut TraversalPathArena,

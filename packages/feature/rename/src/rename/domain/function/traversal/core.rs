@@ -1,15 +1,15 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_eq, has_common_lisp_package_qualifier,
 };
-use crate::domain::definition::{definition_shape, is_macro_expander_definition};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::definition::{definition_shape, is_macro_expander_definition};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
-use crate::domain::rename::reader::{
+use crate::rename::domain::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
 
@@ -23,31 +23,31 @@ use super::reader::{
     collect_function_designator_renames,
 };
 
-pub(in crate::domain::rename::function) struct TraversalContext<'a> {
-    pub(super) dialect: Dialect,
-    pub(super) from: &'a SymbolName,
-    pub(super) to: &'a SymbolName,
+pub struct TraversalContext<'a> {
+    pub dialect: Dialect,
+    pub from: &'a SymbolName,
+    pub to: &'a SymbolName,
 }
 
 #[derive(Clone, Copy)]
-pub(in crate::domain::rename::function) struct TraversalState {
-    pub(super) path: TraversalPath,
-    pub(super) local_callable_shadowed: bool,
-    pub(super) local_function_shadowed: bool,
-    pub(super) quasiquote_depth: usize,
-    pub(super) in_macro_expander: bool,
-    pub(super) shadowed_depth: usize,
+pub struct TraversalState {
+    pub path: TraversalPath,
+    pub local_callable_shadowed: bool,
+    pub local_function_shadowed: bool,
+    pub quasiquote_depth: usize,
+    pub in_macro_expander: bool,
+    pub shadowed_depth: usize,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct TraversalPath(usize);
+pub struct TraversalPath(usize);
 
 struct TraversalPathNode {
     parent: Option<usize>,
     index: usize,
 }
 
-pub(super) struct TraversalPathArena {
+pub struct TraversalPathArena {
     nodes: Vec<TraversalPathNode>,
 }
 
@@ -64,7 +64,7 @@ impl TraversalPathArena {
         )
     }
 
-    pub(super) fn child(&mut self, path: TraversalPath, index: usize) -> TraversalPath {
+    pub fn child(&mut self, path: TraversalPath, index: usize) -> TraversalPath {
         let next = self.nodes.len();
         self.nodes.push(TraversalPathNode {
             parent: Some(path.0),
@@ -73,7 +73,7 @@ impl TraversalPathArena {
         TraversalPath(next)
     }
 
-    pub(super) fn descendant(
+    pub fn descendant(
         &mut self,
         mut path: TraversalPath,
         indexes: impl IntoIterator<Item = usize>,
@@ -84,7 +84,7 @@ impl TraversalPathArena {
         path
     }
 
-    pub(super) fn materialize(&self, path: TraversalPath) -> Path {
+    pub fn materialize(&self, path: TraversalPath) -> Path {
         let mut indexes = Vec::new();
         let mut cursor = Some(path.0);
         while let Some(node_index) = cursor {
@@ -98,18 +98,18 @@ impl TraversalPathArena {
 }
 
 impl TraversalState {
-    pub(super) const fn with_path(&self, path: TraversalPath) -> Self {
+    pub const fn with_path(&self, path: TraversalPath) -> Self {
         Self { path, ..*self }
     }
 
-    pub(super) const fn with_quasiquote_depth(&self, quasiquote_depth: usize) -> Self {
+    pub const fn with_quasiquote_depth(&self, quasiquote_depth: usize) -> Self {
         Self {
             quasiquote_depth,
             ..*self
         }
     }
 
-    pub(super) const fn with_local_shadowing(
+    pub const fn with_local_shadowing(
         &self,
         local_callable_shadowed: bool,
         local_function_shadowed: bool,
@@ -121,7 +121,7 @@ impl TraversalState {
         }
     }
 
-    pub(super) const fn in_macro_expander(&self) -> Self {
+    pub const fn in_macro_expander(&self) -> Self {
         Self {
             in_macro_expander: true,
             ..*self
@@ -129,15 +129,12 @@ impl TraversalState {
     }
 }
 
-pub(super) struct TraversalFrame<'a> {
-    pub(super) view: &'a ExpressionView,
-    pub(super) state: TraversalState,
+pub struct TraversalFrame<'a> {
+    pub view: &'a ExpressionView,
+    pub state: TraversalState,
 }
 
-pub(in crate::domain::rename::function) fn allows_function_reference_rename(
-    state: &TraversalState,
-    target_text: &str,
-) -> bool {
+pub fn allows_function_reference_rename(state: &TraversalState, target_text: &str) -> bool {
     if state.local_function_shadowed {
         return false;
     }
@@ -178,7 +175,7 @@ pub fn collect_function_call_head_renames(
     Ok(renames)
 }
 
-pub(in crate::domain::rename::function) fn collect_function_call_head_renames_from_view(
+pub fn collect_function_call_head_renames_from_view(
     view: &ExpressionView,
     context: &TraversalContext<'_>,
     state: TraversalState,

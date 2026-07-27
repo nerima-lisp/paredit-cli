@@ -69,3 +69,6 @@ fn renames_symbol_macrolet_only_in_value_positions() {
     );
 }
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::SymbolName;

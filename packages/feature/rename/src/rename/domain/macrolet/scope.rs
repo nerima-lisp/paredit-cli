@@ -1,39 +1,39 @@
-use crate::domain::callable_scope::is_macro_callable_form;
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::common_lisp::{
+use crate::rename::domain::reader::atom_symbol_text;
+use crate::rename::domain::selection::list_head;
+use paredit_core_semantics::callable_scope::is_macro_callable_form;
+use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
+use paredit_core_syntax::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
     has_common_lisp_package_qualifier,
 };
-use crate::domain::rename::reader::atom_symbol_text;
-use crate::domain::rename::selection::list_head;
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
 #[derive(Debug, Clone, Copy, Default)]
-pub(super) struct MacroletRenameScope {
+pub struct MacroletRenameScope {
     active_target_depth: usize,
     shadowed_depth: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum LocalCallableRenameKind {
+pub enum LocalCallableRenameKind {
     Macro,
     Function,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum TargetBindingPresence {
+pub enum TargetBindingPresence {
     Absent,
     Present,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct LocalCallableScopes {
-    pub(super) body: MacroletRenameScope,
-    pub(super) binding_body: MacroletRenameScope,
+pub struct LocalCallableScopes {
+    pub body: MacroletRenameScope,
+    pub binding_body: MacroletRenameScope,
 }
 
 impl LocalCallableRenameKind {
-    pub(super) const fn matches_target_form(self, form: CommonLispLocalCallableForm) -> bool {
+    pub const fn matches_target_form(self, form: CommonLispLocalCallableForm) -> bool {
         match self {
             Self::Macro => is_macro_callable_form(form),
             Self::Function => matches!(
@@ -45,11 +45,11 @@ impl LocalCallableRenameKind {
 }
 
 impl MacroletRenameScope {
-    pub(super) const fn is_target_active(self) -> bool {
+    pub const fn is_target_active(self) -> bool {
         self.active_target_depth > 0
     }
 
-    pub(super) const fn is_shadowed(self) -> bool {
+    pub const fn is_shadowed(self) -> bool {
         self.shadowed_depth > 0
     }
 
@@ -64,18 +64,15 @@ impl MacroletRenameScope {
     }
 }
 
-pub(super) fn allows_function_reference_rename(
-    scope: MacroletRenameScope,
-    target_text: &str,
-) -> bool {
+pub fn allows_function_reference_rename(scope: MacroletRenameScope, target_text: &str) -> bool {
     !scope.is_shadowed() || has_common_lisp_package_qualifier(target_text)
 }
 
-pub(super) const fn reader_lambda_body_scope(scope: MacroletRenameScope) -> MacroletRenameScope {
+pub const fn reader_lambda_body_scope(scope: MacroletRenameScope) -> MacroletRenameScope {
     scope.enter_active_target()
 }
 
-pub(super) fn symbol_macrolet_shadowing_scope(
+pub fn symbol_macrolet_shadowing_scope(
     scope: MacroletRenameScope,
     view: &ExpressionView,
     from: &SymbolName,
@@ -108,7 +105,7 @@ fn symbol_macrolet_binds_name(view: &ExpressionView, from: &SymbolName) -> bool 
     })
 }
 
-pub(super) fn local_callable_body_scope(
+pub fn local_callable_body_scope(
     scope: MacroletRenameScope,
     kind: LocalCallableRenameKind,
     form: CommonLispLocalCallableForm,
@@ -141,7 +138,7 @@ pub(super) fn local_callable_body_scope(
     }
 }
 
-pub(super) fn local_callable_binding_body_scope(
+pub fn local_callable_binding_body_scope(
     scope: MacroletRenameScope,
     kind: LocalCallableRenameKind,
     form: CommonLispLocalCallableForm,
@@ -182,10 +179,7 @@ const fn shadow_current_target_in_definition_body(
     }
 }
 
-pub(super) fn target_binding_presence(
-    local_names: &[String],
-    from: &SymbolName,
-) -> TargetBindingPresence {
+pub fn target_binding_presence(local_names: &[String], from: &SymbolName) -> TargetBindingPresence {
     if local_names
         .iter()
         .any(|name| common_lisp_symbol_reference_eq(name, from.as_str()))
@@ -196,7 +190,7 @@ pub(super) fn target_binding_presence(
     }
 }
 
-pub(super) fn local_callable_scopes(
+pub fn local_callable_scopes(
     scope: MacroletRenameScope,
     kind: LocalCallableRenameKind,
     form: CommonLispLocalCallableForm,

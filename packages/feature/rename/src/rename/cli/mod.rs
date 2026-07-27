@@ -1,16 +1,36 @@
-pub(in crate::presentation::cli) mod args;
-pub(in crate::presentation::cli) mod rename_at;
-pub(in crate::presentation::cli) mod rename_binding;
-pub(in crate::presentation::cli) mod rename_function;
-pub(in crate::presentation::cli) mod rename_in_form;
-pub(in crate::presentation::cli) mod rename_local_function;
-pub(in crate::presentation::cli) mod rename_macrolet;
-pub(in crate::presentation::cli) mod rename_symbol;
-pub(in crate::presentation::cli) mod rename_symbol_macro;
-pub(in crate::presentation::cli) mod rename_symbols;
+pub mod args;
+pub mod rename_at;
+pub mod rename_binding;
+pub mod rename_function;
+pub mod rename_in_form;
+pub mod rename_local_function;
+pub mod rename_macrolet;
+pub mod rename_symbol;
+pub mod rename_symbol_macro;
+pub mod rename_symbols;
 mod render;
-pub(in crate::presentation::cli) mod replace_function_calls;
-pub(in crate::presentation::cli) mod shared;
+pub mod replace_function_calls;
+pub mod shared;
 mod types;
-pub(in crate::presentation::cli) mod unwrap_function_calls;
-pub(in crate::presentation::cli) mod wrap_function_calls;
+pub mod unwrap_function_calls;
+pub mod wrap_function_calls;
+
+// Hoisted for the composition root (section 4.2): the argument type and
+// run function of each subcommand this slice owns.
+pub use args::{
+    RenameAtArgs, RenameBindingArgs, RenameFunctionArgs, RenameInFormArgs, RenameLocalFunctionArgs,
+    RenameMacroletArgs, RenameSymbolArgs, RenameSymbolMacroArgs, RenameSymbolsArgs,
+    ReplaceFunctionCallsArgs, UnwrapFunctionCallsArgs, WrapFunctionCallsArgs,
+};
+pub use rename_at::rename_at;
+pub use rename_binding::rename_binding;
+pub use rename_function::rename_function;
+pub use rename_in_form::rename_in_form;
+pub use rename_local_function::rename_local_function;
+pub use rename_macrolet::rename_macrolet;
+pub use rename_symbol::rename_symbol;
+pub use rename_symbol_macro::rename_symbol_macro;
+pub use rename_symbols::rename_symbols;
+pub use replace_function_calls::replace_function_calls;
+pub use unwrap_function_calls::unwrap_function_calls;
+pub use wrap_function_calls::wrap_function_calls;

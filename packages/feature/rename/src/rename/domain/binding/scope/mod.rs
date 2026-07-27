@@ -1,14 +1,18 @@
 mod reader;
 mod special_forms;
 
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
+use paredit_core_syntax::common_lisp::{
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
+};
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName,
+};
 
 use reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text, collect_explicit_reader_form,
 };
 
-pub(in crate::domain::rename) fn collect_symbol_atom_spans_unshadowed(
+pub fn collect_symbol_atom_spans_unshadowed(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -28,7 +32,7 @@ pub(in crate::domain::rename) fn collect_symbol_atom_spans_unshadowed(
 
 /// Symbol-macro renaming has no notion of a `(declare (special ...))` form,
 /// so declared-special specifiers must not be treated as references.
-pub(in crate::domain::rename) fn collect_symbol_atom_spans_unshadowed_ignoring_declared_specials(
+pub fn collect_symbol_atom_spans_unshadowed_ignoring_declared_specials(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -47,7 +51,7 @@ pub(in crate::domain::rename) fn collect_symbol_atom_spans_unshadowed_ignoring_d
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn collect_symbol_atom_spans_unshadowed_in_context(
+pub fn collect_symbol_atom_spans_unshadowed_in_context(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -84,7 +88,7 @@ pub(super) fn collect_symbol_atom_spans_unshadowed_in_context(
         .children
         .first()
         .and_then(super::super::selection::atom_text)
-        .is_some_and(crate::domain::common_lisp::is_common_lisp_declaration_form)
+        .is_some_and(paredit_core_syntax::common_lisp::is_common_lisp_declaration_form)
     {
         return;
     }
@@ -133,7 +137,7 @@ pub(super) fn collect_symbol_atom_spans_unshadowed_in_context(
     }
 }
 
-pub(super) fn collect_shadow_aware_special_form(
+pub fn collect_shadow_aware_special_form(
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
