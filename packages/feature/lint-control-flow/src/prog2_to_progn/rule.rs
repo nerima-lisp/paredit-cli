@@ -1,18 +1,18 @@
 //! `prog2-to-progn`: a two-form prog2, which is just progn ((prog2 a b) is (progn a b)).
 //!
-//! The analysis lives in [`crate::domain::prog2_to_progn_report`], which also backs the
+//! The analysis lives in [`crate::prog2_to_progn::domain`], which also backs the
 //! standalone `inspect prog2-to-progn` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::prog2_to_progn::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::prog2_to_progn_report::examine;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "prog2-to-progn",

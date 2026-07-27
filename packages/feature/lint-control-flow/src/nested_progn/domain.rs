@@ -6,7 +6,7 @@
 //! structure noise — common after mechanical macro expansion or code motion.
 //!
 //! This rule is the multi-form companion to
-//! [`crate::domain::redundant_progn_report`]: that rule owns the 0-form and
+//! [`crate::redundant_progn::domain`]: that rule owns the 0-form and
 //! 1-form progns (which are redundant on their own, in any position), while this
 //! rule owns progns with two or more body forms that are redundant *because* of
 //! where they sit. The two never flag the same span, so `inspect lint` reports
@@ -16,7 +16,7 @@
 //! inner body's contents, so no `#+`/`#-` guard is needed here.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -24,9 +24,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 
 /// Whether `view` is a `(progn …)` form.
 fn is_progn(view: &ExpressionView) -> bool {
@@ -80,7 +80,7 @@ pub struct NestedPrognPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_progn(
+pub fn examine_progn(
     view: &ExpressionView,
     path: &Path,
     progn_form_count: &mut usize,

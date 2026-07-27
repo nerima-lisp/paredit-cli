@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::eval_when_situation_report::{
+use crate::eval_when_situation::cli::args::EvalWhenSituationReportArgs;
+use crate::eval_when_situation::cli::render::print_eval_when_situation_report;
+use crate::eval_when_situation::usecase::{
     EvalWhenSituationPolicyOptions, collect_eval_when_situations,
     evaluate_eval_when_situation_policy, summarize_eval_when_situations,
 };
-use crate::presentation::cli::eval_when_situation_report::args::EvalWhenSituationReportArgs;
-use crate::presentation::cli::eval_when_situation_report::render::print_eval_when_situation_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn eval_when_situation_report(
-    args: EvalWhenSituationReportArgs,
-) -> Result<()> {
+pub fn eval_when_situation_report(args: EvalWhenSituationReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut eval_when_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn eval_when_situation_report(
     print_eval_when_situation_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "eval-when-situation-report policy failed: {policy_message}"
         )));
     }

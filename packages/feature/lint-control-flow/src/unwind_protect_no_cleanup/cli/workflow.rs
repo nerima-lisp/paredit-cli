@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::unwind_protect_no_cleanup_report::{
+use crate::unwind_protect_no_cleanup::cli::args::UnwindProtectNoCleanupReportArgs;
+use crate::unwind_protect_no_cleanup::cli::render::print_unwind_protect_no_cleanup_report;
+use crate::unwind_protect_no_cleanup::usecase::{
     UnwindProtectNoCleanupPolicyOptions, collect_unwind_protect_no_cleanup,
     evaluate_unwind_protect_no_cleanup_policy, summarize_unwind_protect_no_cleanup,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::unwind_protect_no_cleanup_report::args::UnwindProtectNoCleanupReportArgs;
-use crate::presentation::cli::unwind_protect_no_cleanup_report::render::print_unwind_protect_no_cleanup_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn unwind_protect_no_cleanup_report(
-    args: UnwindProtectNoCleanupReportArgs,
-) -> Result<()> {
+pub fn unwind_protect_no_cleanup_report(args: UnwindProtectNoCleanupReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut unwind_protect_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn unwind_protect_no_cleanup_report(
     print_unwind_protect_no_cleanup_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "unwind-protect-no-cleanup-report policy failed: {policy_message}"
         )));
     }

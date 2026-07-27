@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::redundant_body_progn_report::{
+use crate::redundant_body_progn::cli::args::RedundantBodyPrognReportArgs;
+use crate::redundant_body_progn::cli::render::print_redundant_body_progn_report;
+use crate::redundant_body_progn::usecase::{
     RedundantBodyPrognPolicyOptions, collect_redundant_body_progns,
     evaluate_redundant_body_progn_policy, summarize_redundant_body_progns,
 };
-use crate::presentation::cli::redundant_body_progn_report::args::RedundantBodyPrognReportArgs;
-use crate::presentation::cli::redundant_body_progn_report::render::print_redundant_body_progn_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn redundant_body_progn_report(
-    args: RedundantBodyPrognReportArgs,
-) -> Result<()> {
+pub fn redundant_body_progn_report(args: RedundantBodyPrognReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut implicit_progn_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn redundant_body_progn_report(
     print_redundant_body_progn_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "redundant-body-progn-report policy failed: {policy_message}"
         )));
     }

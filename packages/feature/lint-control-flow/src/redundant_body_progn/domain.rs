@@ -8,9 +8,9 @@
 //! implicit progn.
 //!
 //! This is the implicit-body companion to two neighbouring rules:
-//! [`crate::domain::redundant_progn_report`] owns the 0-form and 1-form progns
+//! [`crate::redundant_progn::domain`] owns the 0-form and 1-form progns
 //! (redundant on their own, in any position), and
-//! [`crate::domain::nested_progn_report`] owns a multi-form progn nested
+//! [`crate::nested_progn::domain`] owns a multi-form progn nested
 //! directly inside another `progn`. This rule owns a multi-form progn in the
 //! body of the *other* implicit-progn forms. The three never flag the same
 //! span.
@@ -21,7 +21,7 @@
 //! value expression is correctly left alone.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -29,9 +29,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 
 /// The index at which a form's implicit-progn body begins, or `None` if the head
 /// is not one of the recognized implicit-progn forms. Everything from this index
@@ -108,7 +108,7 @@ pub struct RedundantBodyPrognPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_form(
+pub fn examine_form(
     view: &ExpressionView,
     path: &Path,
     implicit_progn_form_count: &mut usize,

@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::handler_case_no_clauses_report::{
+use crate::handler_case_no_clauses::usecase::{
     HandlerCaseNoClausesPolicy, HandlerCaseNoClausesSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_handler_case_no_clauses_report(
+pub fn print_handler_case_no_clauses_report(
     summary: &HandlerCaseNoClausesSummary,
     policy: &HandlerCaseNoClausesPolicy,
     output: OutputFormat,

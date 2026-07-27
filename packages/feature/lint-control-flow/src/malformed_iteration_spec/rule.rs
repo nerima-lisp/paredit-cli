@@ -1,18 +1,18 @@
 //! `malformed-iteration-spec`: a dolist/dotimes spec that is not a (var form [result]) list.
 //!
-//! The analysis lives in [`crate::domain::malformed_iteration_spec_report`], which also backs the
+//! The analysis lives in [`crate::malformed_iteration_spec::domain`], which also backs the
 //! standalone `inspect malformed-iteration-spec` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::malformed_iteration_spec::domain::examine_iteration;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::malformed_iteration_spec_report::examine_iteration;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "malformed-iteration-spec",

@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::malformed_iteration_spec_report::{
+use crate::malformed_iteration_spec::cli::args::MalformedIterationSpecReportArgs;
+use crate::malformed_iteration_spec::cli::render::print_malformed_iteration_spec_report;
+use crate::malformed_iteration_spec::usecase::{
     MalformedIterationSpecPolicyOptions, collect_malformed_iteration_specs,
     evaluate_malformed_iteration_spec_policy, summarize_malformed_iteration_specs,
 };
-use crate::presentation::cli::malformed_iteration_spec_report::args::MalformedIterationSpecReportArgs;
-use crate::presentation::cli::malformed_iteration_spec_report::render::print_malformed_iteration_spec_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn malformed_iteration_spec_report(
-    args: MalformedIterationSpecReportArgs,
-) -> Result<()> {
+pub fn malformed_iteration_spec_report(args: MalformedIterationSpecReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut iteration_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn malformed_iteration_spec_report(
     print_malformed_iteration_spec_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "malformed-iteration-spec-report policy failed: {policy_message}"
         )));
     }

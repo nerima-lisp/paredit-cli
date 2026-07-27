@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_progn_report::{
-    RedundantPrognPolicy, RedundantPrognSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::redundant_progn::usecase::{RedundantPrognPolicy, RedundantPrognSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_progn_report(
+pub fn print_redundant_progn_report(
     summary: &RedundantPrognSummary,
     policy: &RedundantPrognPolicy,
     output: OutputFormat,

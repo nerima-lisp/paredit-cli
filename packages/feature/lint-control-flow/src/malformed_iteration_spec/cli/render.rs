@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::malformed_iteration_spec_report::{
+use crate::malformed_iteration_spec::usecase::{
     MalformedIterationSpecPolicy, MalformedIterationSpecSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_malformed_iteration_spec_report(
+pub fn print_malformed_iteration_spec_report(
     summary: &MalformedIterationSpecSummary,
     policy: &MalformedIterationSpecPolicy,
     output: OutputFormat,

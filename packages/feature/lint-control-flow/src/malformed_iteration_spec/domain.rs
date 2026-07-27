@@ -16,7 +16,7 @@
 //! where the written element count differs from the evaluated one.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -24,10 +24,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::render_expression;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::render_expression;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
+};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 const ITERATION_HEADS: [&str; 2] = ["dolist", "dotimes"];
 
@@ -91,7 +93,7 @@ pub struct MalformedIterationSpecPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_iteration(
+pub fn examine_iteration(
     view: &ExpressionView,
     path: &Path,
     iteration_form_count: &mut usize,

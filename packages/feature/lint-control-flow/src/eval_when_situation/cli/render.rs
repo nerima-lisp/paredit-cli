@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::eval_when_situation_report::{
-    EvalWhenSituationPolicy, EvalWhenSituationSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::eval_when_situation::usecase::{EvalWhenSituationPolicy, EvalWhenSituationSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_eval_when_situation_report(
+pub fn print_eval_when_situation_report(
     summary: &EvalWhenSituationSummary,
     policy: &EvalWhenSituationPolicy,
     output: OutputFormat,

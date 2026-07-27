@@ -1,18 +1,18 @@
 //! `binds-constant`: a let/let*/do/do* binding whose variable is a constant (nil, t, or a keyword).
 //!
-//! The analysis lives in [`crate::domain::binds_constant_report`], which also backs the
+//! The analysis lives in [`crate::binds_constant::domain`], which also backs the
 //! standalone `inspect binds-constant` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::binds_constant_report::examine_binding_form;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::binds_constant::domain::examine_binding_form;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "binds-constant",

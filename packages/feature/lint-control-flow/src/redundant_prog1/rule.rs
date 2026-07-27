@@ -1,18 +1,18 @@
 //! `redundant-prog1`: a prog1 wrapping a single form, which is just that form ((prog1 x) is x).
 //!
-//! The analysis lives in [`crate::domain::redundant_prog1_report`], which also backs the
+//! The analysis lives in [`crate::redundant_prog1::domain`], which also backs the
 //! standalone `inspect redundant-prog1` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::redundant_prog1::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::redundant_prog1_report::examine;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "redundant-prog1",

@@ -11,7 +11,7 @@
 //! `eval-when` (data, not a call).
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -19,9 +19,11 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
+};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 /// Whether a situation atom is one CLHS accepts.
 fn is_valid_situation(text: &str) -> bool {
@@ -85,7 +87,7 @@ pub struct EvalWhenSituationPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_eval_when(
+pub fn examine_eval_when(
     view: &ExpressionView,
     path: &Path,
     eval_when_form_count: &mut usize,

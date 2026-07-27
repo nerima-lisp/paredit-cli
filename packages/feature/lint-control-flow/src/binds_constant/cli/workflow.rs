@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::binds_constant_report::{
+use crate::binds_constant::cli::args::BindsConstantReportArgs;
+use crate::binds_constant::cli::render::print_binds_constant_report;
+use crate::binds_constant::usecase::{
     BindsConstantPolicyOptions, collect_binds_constant, evaluate_binds_constant_policy,
     summarize_binds_constant,
 };
-use crate::presentation::cli::binds_constant_report::args::BindsConstantReportArgs;
-use crate::presentation::cli::binds_constant_report::render::print_binds_constant_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn binds_constant_report(
-    args: BindsConstantReportArgs,
-) -> Result<()> {
+pub fn binds_constant_report(args: BindsConstantReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut binding_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn binds_constant_report(
     print_binds_constant_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "binds-constant-report policy failed: {policy_message}"
         )));
     }

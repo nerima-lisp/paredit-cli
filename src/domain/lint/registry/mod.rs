@@ -41,8 +41,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::negated_step_delta::RULE,
     ),
     RuleEntry::new(
-        &rules::explicit_nil_return::META,
-        &rules::explicit_nil_return::RULE,
+        &paredit_feature_lint_control_flow::explicit_nil_return::rule::META,
+        &paredit_feature_lint_control_flow::explicit_nil_return::rule::RULE,
     ),
     RuleEntry::new(&rules::cons_to_list::META, &rules::cons_to_list::RULE),
     RuleEntry::new(&rules::double_reverse::META, &rules::double_reverse::RULE),
@@ -63,8 +63,14 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::lambda_list_keyword_order::RULE,
     ),
     RuleEntry::new(&rules::redundant_quote::META, &rules::redundant_quote::RULE),
-    RuleEntry::new(&rules::redundant_progn::META, &rules::redundant_progn::RULE),
-    RuleEntry::new(&rules::nested_progn::META, &rules::nested_progn::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::redundant_progn::rule::META,
+        &paredit_feature_lint_control_flow::redundant_progn::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::nested_progn::rule::META,
+        &paredit_feature_lint_control_flow::nested_progn::rule::RULE,
+    ),
     RuleEntry::new(&rules::nested_when::META, &rules::nested_when::RULE),
     RuleEntry::new(&rules::nested_unless::META, &rules::nested_unless::RULE),
     RuleEntry::new(&rules::nested_boolean::META, &rules::nested_boolean::RULE),
@@ -79,8 +85,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::nthcdr_small_index::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_body_progn::META,
-        &rules::redundant_body_progn::RULE,
+        &paredit_feature_lint_control_flow::redundant_body_progn::rule::META,
+        &paredit_feature_lint_control_flow::redundant_body_progn::rule::RULE,
     ),
     RuleEntry::new(&rules::empty_let::META, &rules::empty_let::RULE),
     RuleEntry::new(
@@ -207,14 +213,17 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::malformed_let_binding::META,
         &rules::malformed_let_binding::RULE,
     ),
-    RuleEntry::new(&rules::binds_constant::META, &rules::binds_constant::RULE),
     RuleEntry::new(
-        &rules::malformed_iteration_spec::META,
-        &rules::malformed_iteration_spec::RULE,
+        &paredit_feature_lint_control_flow::binds_constant::rule::META,
+        &paredit_feature_lint_control_flow::binds_constant::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::eval_when_situation::META,
-        &rules::eval_when_situation::RULE,
+        &paredit_feature_lint_control_flow::malformed_iteration_spec::rule::META,
+        &paredit_feature_lint_control_flow::malformed_iteration_spec::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::eval_when_situation::rule::META,
+        &paredit_feature_lint_control_flow::eval_when_situation::rule::RULE,
     ),
     RuleEntry::new(
         &rules::duplicate_boolean_operands::META,
@@ -305,7 +314,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::values_list_of_list::META,
         &rules::values_list_of_list::RULE,
     ),
-    RuleEntry::new(&rules::redundant_prog1::META, &rules::redundant_prog1::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::redundant_prog1::rule::META,
+        &paredit_feature_lint_control_flow::redundant_prog1::rule::RULE,
+    ),
     RuleEntry::new(&rules::subseq_zero::META, &rules::subseq_zero::RULE),
     RuleEntry::new(&rules::car_nthcdr::META, &rules::car_nthcdr::RULE),
     RuleEntry::new(&rules::car_reverse::META, &rules::car_reverse::RULE),
@@ -332,14 +344,17 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     ),
     RuleEntry::new(&rules::step_zero::META, &rules::step_zero::RULE),
     RuleEntry::new(&rules::if_to_unless::META, &rules::if_to_unless::RULE),
-    RuleEntry::new(&rules::prog2_to_progn::META, &rules::prog2_to_progn::RULE),
     RuleEntry::new(
-        &rules::handler_case_no_clauses::META,
-        &rules::handler_case_no_clauses::RULE,
+        &paredit_feature_lint_control_flow::prog2_to_progn::rule::META,
+        &paredit_feature_lint_control_flow::prog2_to_progn::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::unwind_protect_no_cleanup::META,
-        &rules::unwind_protect_no_cleanup::RULE,
+        &paredit_feature_lint_control_flow::handler_case_no_clauses::rule::META,
+        &paredit_feature_lint_control_flow::handler_case_no_clauses::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::unwind_protect_no_cleanup::rule::META,
+        &paredit_feature_lint_control_flow::unwind_protect_no_cleanup::rule::RULE,
     ),
     RuleEntry::new(
         &rules::redundant_start_zero::META,

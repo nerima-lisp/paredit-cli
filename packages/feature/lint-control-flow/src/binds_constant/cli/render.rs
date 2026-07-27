@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::binds_constant_report::{
-    BindsConstantPolicy, BindsConstantSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::binds_constant::usecase::{BindsConstantPolicy, BindsConstantSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_binds_constant_report(
+pub fn print_binds_constant_report(
     summary: &BindsConstantSummary,
     policy: &BindsConstantPolicy,
     output: OutputFormat,

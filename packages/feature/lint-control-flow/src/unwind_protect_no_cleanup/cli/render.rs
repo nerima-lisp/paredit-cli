@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::unwind_protect_no_cleanup_report::{
+use crate::unwind_protect_no_cleanup::usecase::{
     UnwindProtectNoCleanupPolicy, UnwindProtectNoCleanupSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_unwind_protect_no_cleanup_report(
+pub fn print_unwind_protect_no_cleanup_report(
     summary: &UnwindProtectNoCleanupSummary,
     policy: &UnwindProtectNoCleanupPolicy,
     output: OutputFormat,

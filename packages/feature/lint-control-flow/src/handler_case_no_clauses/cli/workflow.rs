@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::handler_case_no_clauses_report::{
+use crate::handler_case_no_clauses::cli::args::HandlerCaseNoClausesReportArgs;
+use crate::handler_case_no_clauses::cli::render::print_handler_case_no_clauses_report;
+use crate::handler_case_no_clauses::usecase::{
     HandlerCaseNoClausesPolicyOptions, collect_handler_case_no_clauses,
     evaluate_handler_case_no_clauses_policy, summarize_handler_case_no_clauses,
 };
-use crate::presentation::cli::handler_case_no_clauses_report::args::HandlerCaseNoClausesReportArgs;
-use crate::presentation::cli::handler_case_no_clauses_report::render::print_handler_case_no_clauses_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn handler_case_no_clauses_report(
-    args: HandlerCaseNoClausesReportArgs,
-) -> Result<()> {
+pub fn handler_case_no_clauses_report(args: HandlerCaseNoClausesReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut handler_case_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn handler_case_no_clauses_report(
     print_handler_case_no_clauses_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "handler-case-no-clauses-report policy failed: {policy_message}"
         )));
     }

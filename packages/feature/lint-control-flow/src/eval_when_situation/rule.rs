@@ -1,18 +1,18 @@
 //! `eval-when-situation`: an eval-when with an invalid situation (not :compile-toplevel/:load-toplevel/:execute).
 //!
-//! The analysis lives in [`crate::domain::eval_when_situation_report`], which also backs the
+//! The analysis lives in [`crate::eval_when_situation::domain`], which also backs the
 //! standalone `inspect eval-when-situation` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::eval_when_situation_report::examine_eval_when;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::eval_when_situation::domain::examine_eval_when;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "eval-when-situation",

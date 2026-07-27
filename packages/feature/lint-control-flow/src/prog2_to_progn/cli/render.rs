@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::prog2_to_progn_report::{Prog2ToPrognPolicy, Prog2ToPrognSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::prog2_to_progn::usecase::{Prog2ToPrognPolicy, Prog2ToPrognSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_prog2_to_progn_report(
+pub fn print_prog2_to_progn_report(
     summary: &Prog2ToPrognSummary,
     policy: &Prog2ToPrognPolicy,
     output: OutputFormat,

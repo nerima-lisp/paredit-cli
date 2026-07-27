@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::explicit_nil_return_report::{
-    ExplicitNilReturnPolicy, ExplicitNilReturnSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::explicit_nil_return::usecase::{ExplicitNilReturnPolicy, ExplicitNilReturnSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_explicit_nil_return_report(
+pub fn print_explicit_nil_return_report(
     summary: &ExplicitNilReturnSummary,
     policy: &ExplicitNilReturnPolicy,
     output: OutputFormat,

@@ -1,18 +1,18 @@
 //! `explicit-nil-return`: a return/return-from with an explicit nil result, the default ((return nil) is (return)).
 //!
-//! The analysis lives in [`crate::domain::explicit_nil_return_report`], which also backs the
+//! The analysis lives in [`crate::explicit_nil_return::domain`], which also backs the
 //! standalone `inspect explicit-nil-return` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::explicit_nil_return_report::examine_return;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::explicit_nil_return::domain::examine_return;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "explicit-nil-return",

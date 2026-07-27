@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::redundant_prog1_report::{
+use crate::redundant_prog1::cli::args::RedundantProg1ReportArgs;
+use crate::redundant_prog1::cli::render::print_redundant_prog1_report;
+use crate::redundant_prog1::usecase::{
     RedundantProg1PolicyOptions, collect_redundant_prog1s, evaluate_redundant_prog1_policy,
     summarize_redundant_prog1s,
 };
-use crate::presentation::cli::redundant_prog1_report::args::RedundantProg1ReportArgs;
-use crate::presentation::cli::redundant_prog1_report::render::print_redundant_prog1_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn redundant_prog1_report(
-    args: RedundantProg1ReportArgs,
-) -> Result<()> {
+pub fn redundant_prog1_report(args: RedundantProg1ReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut prog1_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn redundant_prog1_report(
     print_redundant_prog1_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "redundant-prog1-report policy failed: {policy_message}"
         )));
     }
