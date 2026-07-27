@@ -57,10 +57,31 @@ preserve balanced S-expression syntax, avoid rewriting strings and comments
 unless the command explicitly targets them, and retain the read/preview/write
 separation documented in the project guides.
 
-The codebase is layered `domain` → `application` → `infrastructure` →
-`presentation`, with dependencies pointing only inward. Add a change in the
-innermost layer that owns it — parsing and safety rules in `domain`, workflow
-orchestration in `application` behind a source port, source discovery in
-`infrastructure`, and command wiring in `presentation`. The
-[architecture guide](architecture.md) explains the boundaries and
-where each kind of change belongs.
+The codebase is a Cargo workspace: a thin composition root plus 24 packages
+under `packages/core/` and `packages/feature/`. Find the package that owns what
+you are changing and work inside it — one feature is one directory, so a change
+should not need to span several. Each package's `README.md` says what it is for,
+what it deliberately refuses, and where a change of a given kind belongs; the
+[architecture guide](architecture.md) covers how the packages relate.
+
+Develop against one package rather than the whole tree:
+
+```sh
+cargo nextest run -p paredit-feature-similarity   # ~1s
+cargo nextest run                                 # the whole suite, ~60s
+```
+
+Adding a package means three things, in the same commit:
+
+1. `packages/<kind>/<name>/Cargo.toml`, including `[lints] workspace = true` —
+   without it the package silently loses `unsafe_code = "deny"`.
+2. `packages/<kind>/<name>/README.md`, whose first heading is the package name.
+3. `src/lib.rs` starting with `#![doc = include_str!("../README.md")]`, so a
+   stale README shows up in rustdoc.
+
+Contract tests in `tests/cli/architecture_contract.rs` enforce all three, plus
+two rules that are otherwise invisible until broken: a core package must not
+depend on a feature, and `clap` must not appear outside a `cli` module.
+
+Label fenced code blocks in a package README `text` or `rust,ignore`. Because
+`include_str!` embeds it, an unlabelled block is compiled as a doctest.

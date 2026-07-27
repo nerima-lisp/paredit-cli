@@ -11,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod accessor_arity_report;
 #[path = "cli/action_contract.rs"]
 mod action_contract;
+#[path = "cli/architecture_contract.rs"]
+mod architecture_contract;
 #[path = "cli/analysis_report.rs"]
 mod analysis_report;
 #[path = "cli/append_list_to_cons_report.rs"]
