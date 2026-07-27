@@ -11,13 +11,14 @@ repository.workspace = true
 
 [dependencies]
 paredit-core-syntax = { path = "../syntax" }
-anyhow.workspace = true
 thiserror.workspace = true
 blake3.workspace = true
 cap-std.workspace = true
 libc.workspace = true
 
 [dev-dependencies]
+# The test harness still returns anyhow::Result; production code does not.
+anyhow.workspace = true
 proptest.workspace = true
 
 # Mandatory: without it this package silently opts out of the workspace lint

@@ -684,7 +684,17 @@ fn io_failure_rolls_back_chunks_reserved_by_that_read() -> Result<()> {
     let path = PathBuf::from("injected.lisp");
 
     let error = read_bounded(FailsAfterData(false), &path, limits, &read_bytes).unwrap_err();
-    assert!(format!("{error:#}").contains("injected read failure"));
+    // The underlying I/O failure is the chain's root, not the top message.
+    // `anyhow`'s `{:#}` used to flatten the chain into one string; a typed
+    // error keeps them separate, and the CLI still renders the whole chain
+    // because it converts into `anyhow::Error` first, whose alternate Display
+    // walks `source()`.
+    assert!(
+        error
+            .root_cause()
+            .to_string()
+            .contains("injected read failure")
+    );
     assert_eq!(read_bytes.load(Ordering::Acquire), 0);
     assert_eq!(
         read_bounded(Cursor::new(b"5678"), &path, limits, &read_bytes)?,
