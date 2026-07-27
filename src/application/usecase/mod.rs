@@ -3,17 +3,9 @@
 //! These services orchestrate typed domain operations into agent-facing plans,
 //! reports, and workspace workflows without coupling to the CLI shell.
 
-pub(crate) mod conditional_sugar;
-pub mod convert_cond_to_if;
-pub mod convert_if_to_cond;
-pub mod convert_if_to_unless;
-pub mod convert_if_to_when;
-pub mod convert_unless_to_if;
-pub mod convert_when_to_if;
 pub mod duplicate_export_report;
 pub mod duplicate_method_report;
 pub mod duplicate_slot_report;
-pub mod inline_literal_constant;
 pub mod lint_report;
 pub(crate) mod mutation_safety;
 pub mod semantic_coverage;
@@ -43,6 +35,14 @@ pub use paredit_feature_form_transform::unthread_expression::usecase as unthread
 pub use paredit_feature_form_transform::unwrap_call::usecase as unwrap_call;
 
 // Facade re-exports for extracted feature packages (section 4.1).
+pub use paredit_feature_inline::inline_literal_constant::usecase as inline_literal_constant;
+pub use paredit_feature_conditional_conversion::conditional_sugar::usecase as conditional_sugar;
+pub use paredit_feature_conditional_conversion::convert_cond_to_if::usecase as convert_cond_to_if;
+pub use paredit_feature_conditional_conversion::convert_if_to_cond::usecase as convert_if_to_cond;
+pub use paredit_feature_conditional_conversion::convert_if_to_unless::usecase as convert_if_to_unless;
+pub use paredit_feature_conditional_conversion::convert_if_to_when::usecase as convert_if_to_when;
+pub use paredit_feature_conditional_conversion::convert_unless_to_if::usecase as convert_unless_to_if;
+pub use paredit_feature_conditional_conversion::convert_when_to_if::usecase as convert_when_to_if;
 pub use paredit_feature_binding::convert_flet_to_labels::usecase as convert_flet_to_labels;
 pub use paredit_feature_binding::convert_labels_to_flet::usecase as convert_labels_to_flet;
 pub use paredit_feature_binding::convert_let_star_to_let::usecase as convert_let_star_to_let;

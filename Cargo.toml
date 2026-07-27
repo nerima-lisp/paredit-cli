@@ -47,6 +47,7 @@ paredit-feature-lint-numeric = { path = "packages/feature/lint-numeric" }
 paredit-feature-lint-sequence = { path = "packages/feature/lint-sequence" }
 paredit-feature-lint-conditional = { path = "packages/feature/lint-conditional" }
 paredit-feature-lint-form-shape = { path = "packages/feature/lint-form-shape" }
+paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"

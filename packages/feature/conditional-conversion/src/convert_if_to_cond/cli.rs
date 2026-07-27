@@ -1,11 +1,20 @@
-use super::*;
-use crate::application::usecase::convert_if_to_cond::{
+use paredit_core_syntax::sexpr::Path;
+use anyhow::Result;
+use clap::Args;
+use serde_json::json;
+use std::path::PathBuf;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use crate::convert_if_to_cond::usecase::{
     ConvertIfToCondPlan, ConvertIfToCondRequest, plan_convert_if_to_cond,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
-pub(super) struct ConvertIfToCondArgs {
+pub struct ConvertIfToCondArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -18,7 +27,7 @@ pub(super) struct ConvertIfToCondArgs {
     output: OutputFormat,
 }
 
-pub(super) fn convert_if_to_cond(args: ConvertIfToCondArgs) -> Result<()> {
+pub fn convert_if_to_cond(args: ConvertIfToCondArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

@@ -1,12 +1,13 @@
-use crate::application::usecase::inline_literal_constant::{
+use paredit_core_cli::safe_text;
+use crate::inline_literal_constant::usecase::{
     InlineLiteralConstantPlan, InlineLiteralConstantRequest, plan_inline_literal_constant,
 };
-use crate::domain::sexpr::Path;
-use crate::presentation::cli::DialectArg;
-use crate::presentation::cli::OutputFormat;
-use crate::presentation::cli::read_input_and_dialect;
-use crate::presentation::cli::require_output_file;
-use crate::presentation::cli::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
 use anyhow::Result;
 use clap::Args;
 use serde_json::json;

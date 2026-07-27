@@ -1,11 +1,20 @@
-use super::*;
-use crate::application::usecase::conditional_sugar::{
+use paredit_core_syntax::sexpr::Path;
+use anyhow::Result;
+use clap::Args;
+use serde_json::json;
+use std::path::PathBuf;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use crate::conditional_sugar::usecase::{
     ConditionalConversionPlan, ConditionalConversionRequest,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
-pub(super) struct ConditionalConversionArgs {
+pub struct ConditionalConversionArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -18,7 +27,7 @@ pub(super) struct ConditionalConversionArgs {
     output: OutputFormat,
 }
 
-pub(super) fn run(
+pub fn run(
     args: ConditionalConversionArgs,
     planner: fn(ConditionalConversionRequest<'_>) -> Result<ConditionalConversionPlan>,
 ) -> Result<()> {

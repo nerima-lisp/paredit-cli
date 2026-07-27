@@ -2,12 +2,12 @@
 
 use anyhow::{Context, Result, bail};
 
-use super::mutation_safety::reject_common_lisp_reader_conditionals;
-use super::rename::collect_define_symbol_macro_reference_renames;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_feature_rename::rename::domain::collect_define_symbol_macro_reference_renames;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 

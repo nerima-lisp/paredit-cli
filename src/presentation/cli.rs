@@ -8,7 +8,6 @@ mod analysis_report;
 mod basic_edit;
 mod capabilities;
 mod command;
-mod conditional_conversion;
 mod contract;
 mod dependency_report;
 
@@ -32,17 +31,10 @@ use paredit_feature_inline::inline_local_function::cli as inline_local_function;
 use paredit_feature_inline::inline_symbol_macro::cli as inline_symbol_macro;
 use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
 use paredit_feature_similarity::similarity_report::cli as similarity_report;
-mod convert_cond_to_if;
-mod convert_if_to_cond;
-mod convert_if_to_unless;
-mod convert_if_to_when;
-mod convert_unless_to_if;
-mod convert_when_to_if;
 mod dispatch;
 mod duplicate_export_report;
 mod duplicate_method_report;
 mod duplicate_slot_report;
-mod inline_literal_constant;
 mod lint_report;
 mod shadowed_binding_report;
 mod symbol_report;
@@ -51,7 +43,6 @@ mod unused_parameter_report;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use crate::domain::sexpr::Path;
 use anyhow::Result;
 use clap::{Args, Parser};
 use serde_json::json;
@@ -59,8 +50,8 @@ use serde_json::json;
 use args::*;
 use command::Command;
 pub(crate) use shared::{
-    read_input_and_dialect, read_input_dialect_and_tree, require_output_file, terminal_safe,
-    terminal_safe_error_chain, write_file_with_rollback,
+    read_input_dialect_and_tree, terminal_safe,
+    terminal_safe_error_chain,
 };
 
 #[derive(Debug, Parser)]
@@ -93,6 +84,13 @@ pub fn run() -> ExitCode {
 }
 
 // Facade re-exports for extracted feature packages (section 4.1).
+use paredit_feature_inline::inline_literal_constant::cli as inline_literal_constant;
+use paredit_feature_conditional_conversion::convert_cond_to_if::cli as convert_cond_to_if;
+use paredit_feature_conditional_conversion::convert_if_to_cond::cli as convert_if_to_cond;
+use paredit_feature_conditional_conversion::convert_if_to_unless::cli as convert_if_to_unless;
+use paredit_feature_conditional_conversion::convert_if_to_when::cli as convert_if_to_when;
+use paredit_feature_conditional_conversion::convert_unless_to_if::cli as convert_unless_to_if;
+use paredit_feature_conditional_conversion::convert_when_to_if::cli as convert_when_to_if;
 use paredit_feature_binding::convert_flet_to_labels::cli as convert_flet_to_labels;
 use paredit_feature_binding::convert_labels_to_flet::cli as convert_labels_to_flet;
 use paredit_feature_binding::convert_let_star_to_let::cli as convert_let_star_to_let;

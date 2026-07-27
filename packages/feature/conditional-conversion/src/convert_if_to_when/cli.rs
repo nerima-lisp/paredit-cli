@@ -1,6 +1,6 @@
-use super::*;
-use crate::application::usecase::convert_if_to_when::plan_convert_if_to_when;
-pub(super) type ConvertIfToWhenArgs = super::conditional_conversion::ConditionalConversionArgs;
-pub(super) fn convert_if_to_when(args: ConvertIfToWhenArgs) -> Result<()> {
-    super::conditional_conversion::run(args, plan_convert_if_to_when)
+use anyhow::Result;
+use crate::convert_if_to_when::usecase::plan_convert_if_to_when;
+pub type ConvertIfToWhenArgs = crate::conditional_conversion::cli::ConditionalConversionArgs;
+pub fn convert_if_to_when(args: ConvertIfToWhenArgs) -> Result<()> {
+    crate::conditional_conversion::cli::run(args, plan_convert_if_to_when)
 }

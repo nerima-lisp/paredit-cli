@@ -2,9 +2,9 @@
 
 use anyhow::Result;
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::convert_control as domain;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_edit::convert_control as domain;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConvertIfToCondPlan, ConvertIfToCondRequest};
 
@@ -18,7 +18,7 @@ pub fn plan_convert_if_to_cond(request: ConvertIfToCondRequest<'_>) -> Result<Co
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
 
     const DIALECTS: [Dialect; 7] = [
         Dialect::CommonLisp,

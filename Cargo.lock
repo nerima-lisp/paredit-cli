@@ -657,6 +657,7 @@ dependencies = [
  "paredit-core-syntax",
  "paredit-core-workspace",
  "paredit-feature-binding",
+ "paredit-feature-conditional-conversion",
  "paredit-feature-extract",
  "paredit-feature-form-transform",
  "paredit-feature-function-parameter",
@@ -770,6 +771,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-conditional-conversion"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-edit",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "proptest",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "paredit-feature-extract"
 version = "1.1.0"
 dependencies = [
@@ -825,6 +841,7 @@ dependencies = [
  "paredit-core-edit",
  "paredit-core-semantics",
  "paredit-core-syntax",
+ "paredit-feature-rename",
  "proptest",
  "serde_json",
  "thiserror",

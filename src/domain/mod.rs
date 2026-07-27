@@ -30,16 +30,13 @@ pub use paredit_feature_similarity::form_similarity;
 pub use paredit_feature_similarity::similarity_report::domain as similarity_report;
 
 // Phase 2 facade (section 4.1), visibility mirroring the original `mod` lines.
-pub(crate) use paredit_core_edit::{convert_control, mutation_safety};
 pub use paredit_core_edit::{refactor_execute, refactor_plan, refactor_preview};
 pub use paredit_core_semantics::lexical_scope;
 pub(crate) use paredit_core_semantics::semantics;
 
-pub(crate) mod conditional_sugar;
 pub mod duplicate_export_report;
 pub mod duplicate_method_report;
 pub mod duplicate_slot_report;
-pub(crate) mod inline_literal_constant;
 pub(crate) mod lint;
 pub mod lint_report;
 pub mod lint_suppression;
@@ -48,6 +45,8 @@ pub mod shadowed_binding_report;
 pub mod unused_parameter_report;
 
 // Facade re-exports for extracted feature packages (section 4.1).
+pub use paredit_feature_inline::inline_literal_constant::domain as inline_literal_constant;
+pub use paredit_feature_conditional_conversion::conditional_sugar::domain as conditional_sugar;
 pub use paredit_feature_binding::convert_sequential_binding::domain as convert_sequential_binding;
 pub use paredit_feature_binding::introduce_let::domain as introduce_let;
 pub use paredit_feature_binding::let_report::domain as let_report;
