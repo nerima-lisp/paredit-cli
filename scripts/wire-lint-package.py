@@ -198,6 +198,16 @@ def wire(theme: str, rules: list[str]) -> None:
         text = text.replace(f"rules::{rule}::", f"{crate}::{rule}::rule::")
     registry.write_text(text)
 
+    # The relocated registry-driven tests name each rule the same way REGISTRY
+    # does, so they move with it.
+    tests = ROOT / "src/domain/lint/rule_registry_tests.rs"
+    if tests.is_file():
+        text = tests.read_text()
+        for rule in rules:
+            text = text.replace(f"crate::domain::lint::rules::{rule}::",
+                                f"{crate}::{rule}::rule::")
+        tests.write_text(text)
+
     rules_mod = ROOT / "src/domain/lint/rules/mod.rs"
     text = rules_mod.read_text()
     for rule in rules:
