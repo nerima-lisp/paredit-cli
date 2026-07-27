@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;

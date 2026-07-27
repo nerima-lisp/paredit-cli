@@ -4,12 +4,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path as FsPath, PathBuf};
 
-use anyhow::Result;
-
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::form_shape::{FormShape, duplicate_shape};
 use paredit_core_syntax::sexpr::{
-    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree,
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SexprResult, SyntaxTree,
 };
 
 #[derive(Debug, Clone)]
@@ -74,7 +72,12 @@ impl DuplicateCandidateAccumulator {
         }
     }
 
-    pub fn add_source(&mut self, tree: SyntaxTree, path: PathBuf, dialect: Dialect) -> Result<()> {
+    pub fn add_source(
+        &mut self,
+        tree: SyntaxTree,
+        path: PathBuf,
+        dialect: Dialect,
+    ) -> SexprResult<()> {
         let source_index = self.sources.len();
         for index in 0..tree.root_children().len() {
             let root_path = Path::root_child(index);
@@ -97,7 +100,7 @@ impl DuplicateCandidateAccumulator {
         Ok(())
     }
 
-    pub fn finish(self, min_group_size: usize) -> Result<DuplicateCandidateGroups> {
+    pub fn finish(self, min_group_size: usize) -> SexprResult<DuplicateCandidateGroups> {
         let mut grouped = DuplicateCandidateGroups::new();
         for bucket in self.candidates.into_values() {
             let mut partition_by_shape = HashMap::<FormShape, usize>::new();
@@ -120,7 +123,7 @@ impl DuplicateCandidateAccumulator {
                 let forms = partition
                     .into_iter()
                     .map(|candidate| materialize_candidate(&self.sources, candidate))
-                    .collect::<Result<Vec<_>>>()?;
+                    .collect::<SexprResult<Vec<_>>>()?;
                 grouped.insert(shape, forms);
             }
         }
@@ -190,7 +193,7 @@ fn collect_candidate_locators(
 fn locator_view(
     sources: &[DuplicateSource],
     candidate: &CandidateLocator,
-) -> Result<ExpressionView> {
+) -> SexprResult<ExpressionView> {
     Ok(sources[candidate.source_index]
         .tree
         .select_path(&candidate.path)?
@@ -200,7 +203,7 @@ fn locator_view(
 fn materialize_candidate(
     sources: &[DuplicateSource],
     candidate: CandidateLocator,
-) -> Result<DuplicateFormReport> {
+) -> SexprResult<DuplicateFormReport> {
     let source = &sources[candidate.source_index];
     let selection = source.tree.select_path(&candidate.path)?;
     let view = selection.view();
@@ -226,7 +229,7 @@ pub fn collect_duplicate_candidates(
     dialect: Dialect,
     min_node_count: usize,
     grouped: &mut DuplicateCandidateGroups,
-) -> Result<()> {
+) -> SexprResult<()> {
     let mut path_stack = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&Path::root_child(index))?.view();

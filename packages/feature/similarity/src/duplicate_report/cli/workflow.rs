@@ -60,7 +60,7 @@ fn collect_duplicate_candidate_groups(
         candidates.add_source(tree, file, dialect)?;
     }
 
-    candidates.finish(min_group_size)
+    Ok(candidates.finish(min_group_size)?)
 }
 
 fn ensure_thresholds(min_group_size: usize, min_node_count: usize) -> Result<()> {

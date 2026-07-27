@@ -6,13 +6,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 use std::thread;
 
+use crate::error::{SimilarityAnalysisResult, SimilarityBudgetError, SimilarityWorkerError};
 use crate::form_similarity::{
     MAX_REPORT_TREE_EDIT_OPERATIONS, MAX_TREE_SIMILARITY_WORKSPACES, StructuralTree,
     TreeSimilarityError, TreeSimilarityOperationBudget, TreeSimilarityWorkspace,
     reserve_tree_similarity_workspaces, similarity_upper_bound,
     tree_similarity_with_workspace_and_budget,
 };
-use anyhow::{Result, anyhow};
 
 use super::options::MAX_STORED_RESULTS;
 
@@ -378,7 +378,7 @@ impl PairLike for SimilarityPairReport {
 pub fn build_similarity_pairs(
     candidates: Vec<SimilarityCandidate>,
     options: &SimilarityReportOptions,
-) -> Result<SimilarityReport> {
+) -> SimilarityAnalysisResult<SimilarityReport> {
     build_similarity_pairs_with_omissions(candidates, 0, options)
 }
 
@@ -390,7 +390,7 @@ pub fn build_similarity_pairs_with_omissions(
     mut candidates: Vec<SimilarityCandidate>,
     omitted_candidates: usize,
     options: &SimilarityReportOptions,
-) -> Result<SimilarityReport> {
+) -> SimilarityAnalysisResult<SimilarityReport> {
     options.validate()?;
     validate_candidate_budget(candidates.len())?;
     let result_budget = ResultBudget::new();
@@ -466,7 +466,7 @@ pub fn build_similarity_pairs_with_omissions(
             &result_budget,
         );
     } else {
-        thread::scope(|scope| -> Result<()> {
+        thread::scope(|scope| -> SimilarityAnalysisResult<()> {
             let mut handles = Vec::new();
             let result_budget = &result_budget;
             for chunk in worker_items {
@@ -482,9 +482,7 @@ pub fn build_similarity_pairs_with_omissions(
             }
 
             for handle in handles {
-                let output = handle
-                    .join()
-                    .map_err(|_| anyhow!("similarity comparison worker thread panicked"))?;
+                let output = handle.join().map_err(|_| SimilarityWorkerError::Panicked)?;
                 evaluated_pairs = evaluated_pairs.saturating_add(output.evaluated_pairs);
                 pruned_by_size = pruned_by_size.saturating_add(output.pruned_by_size);
                 resource_skipped_pairs =
@@ -525,7 +523,7 @@ fn build_similarity_pairs_sequential(
     omitted_candidates: usize,
     options: &SimilarityReportOptions,
     result_budget: &ResultBudget,
-) -> Result<SimilarityReport> {
+) -> SimilarityAnalysisResult<SimilarityReport> {
     candidates.sort_unstable_by(compare_candidates_for_scan);
     let possible_pairs = scoped_pair_count(&candidates, options.comparison_scope());
     validate_comparison_budget(possible_pairs, options.max_comparisons())?;
@@ -737,7 +735,7 @@ fn finalize_similarity_pairs(
     comparison_limit_reached: bool,
     omitted_candidates: usize,
     options: &SimilarityReportOptions,
-) -> Result<SimilarityReport> {
+) -> SimilarityAnalysisResult<SimilarityReport> {
     let unprocessed_pairs = counts
         .possible_pairs
         .saturating_sub(counts.evaluated_pairs)
@@ -822,23 +820,30 @@ const SPLIT_MIN_PAIRS: usize = 2048;
 const MAX_CANDIDATES: usize = 100_000;
 const MAX_COMPARISONS: usize = 100_000_000;
 
-fn validate_candidate_budget(candidate_count: usize) -> Result<()> {
+fn validate_candidate_budget(candidate_count: usize) -> SimilarityAnalysisResult<()> {
     if candidate_count > MAX_CANDIDATES {
-        return Err(anyhow!(
-            "similarity candidate budget exceeded: {candidate_count} candidates, limit {MAX_CANDIDATES}"
-        ));
+        return Err(SimilarityBudgetError::Candidates {
+            candidates: candidate_count,
+            limit: MAX_CANDIDATES,
+        }
+        .into());
     }
     Ok(())
 }
 
-fn validate_comparison_budget(possible_pairs: usize, max_comparisons: Option<usize>) -> Result<()> {
+fn validate_comparison_budget(
+    possible_pairs: usize,
+    max_comparisons: Option<usize>,
+) -> SimilarityAnalysisResult<()> {
     let planned_comparisons = max_comparisons
         .map(|limit| limit.min(possible_pairs))
         .unwrap_or(possible_pairs);
     if planned_comparisons > MAX_COMPARISONS {
-        return Err(anyhow!(
-            "similarity comparison budget exceeded: {planned_comparisons} comparisons, limit {MAX_COMPARISONS}"
-        ));
+        return Err(SimilarityBudgetError::Comparisons {
+            comparisons: planned_comparisons,
+            limit: MAX_COMPARISONS,
+        }
+        .into());
     }
     Ok(())
 }
@@ -848,7 +853,7 @@ pub fn validate_resource_budgets_for_test(
     candidate_count: usize,
     possible_pairs: usize,
     max_comparisons: Option<usize>,
-) -> Result<()> {
+) -> SimilarityAnalysisResult<()> {
     validate_candidate_budget(candidate_count)?;
     validate_comparison_budget(possible_pairs, max_comparisons)
 }
@@ -1103,7 +1108,7 @@ fn cross_file_range_cost(
 fn partition_items_for_workers(
     items: Vec<(WorkItem<'_>, usize)>,
     worker_count: usize,
-) -> Result<Vec<Vec<WorkItem<'_>>>> {
+) -> SimilarityAnalysisResult<Vec<Vec<WorkItem<'_>>>> {
     if worker_count <= 1 || items.len() <= 1 {
         return Ok(vec![items.into_iter().map(|(item, _)| item).collect()]);
     }
@@ -1119,7 +1124,7 @@ fn partition_items_for_workers(
             .enumerate()
             .min_by_key(|(_, (load, _))| *load)
             .map(|(index, _)| index)
-            .ok_or_else(|| anyhow!("similarity worker assignment has no available worker"))?;
+            .ok_or(SimilarityWorkerError::NoAvailableWorker)?;
         assignments[target_index].0 = assignments[target_index].0.saturating_add(weight);
         assignments[target_index].1.push(item);
     }
@@ -1453,21 +1458,23 @@ fn merge_pairs<'a>(
     }
 }
 
-fn ensure_result_budget(exceeded: bool) -> Result<()> {
+fn ensure_result_budget(exceeded: bool) -> SimilarityAnalysisResult<()> {
     if exceeded {
-        return Err(anyhow!(
-            "similarity result budget exceeded: more than {MAX_STORED_RESULTS} retained matches"
-        ));
+        return Err(SimilarityBudgetError::Results {
+            limit: MAX_STORED_RESULTS,
+        }
+        .into());
     }
     Ok(())
 }
 
-fn ensure_tree_edit_operation_budget(budget: &ResultBudget) -> Result<()> {
+fn ensure_tree_edit_operation_budget(budget: &ResultBudget) -> SimilarityAnalysisResult<()> {
     if budget.tree_edit_operations.exhausted() {
-        return Err(anyhow!(TreeSimilarityError::OperationBudgetExceeded {
+        return Err(TreeSimilarityError::OperationBudgetExceeded {
             operations: budget.tree_edit_operations.operations(),
             limit: budget.tree_edit_operations.limit(),
-        }));
+        }
+        .into());
     }
     Ok(())
 }

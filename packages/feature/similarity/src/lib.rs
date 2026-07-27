@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod duplicate_report;
+pub mod error;
 pub mod form_similarity;
 pub mod similarity_report;
 
@@ -9,3 +10,7 @@ pub mod similarity_report;
 // `dispatch.rs` in the root need these two names and nothing else.
 pub use duplicate_report::cli::{DuplicateReportArgs, duplicate_report};
 pub use similarity_report::cli::{SimilarityReportArgs, similarity_report};
+
+pub use error::{
+    SimilarityAnalysisError, SimilarityAnalysisResult, SimilarityBudgetError, SimilarityWorkerError,
+};

@@ -271,10 +271,20 @@ fn evaluate_gate(
 
 #[derive(Debug)]
 pub enum SimilarityReportWorkflowError {
+    /// Whatever the source port's adapter failed with.
+    ///
+    /// Stays `anyhow::Error` deliberately: the port exists so this use case
+    /// does *not* know what the outside world can fail with, and enumerating
+    /// an adapter's failures here would defeat the abstraction. Section 9.2
+    /// removes type erasure from the domain; a port's error is the one place
+    /// the erasure is the point.
     Source(anyhow::Error),
     Processing(SimilarityFileError),
     WorkerPanicked,
-    Analysis(anyhow::Error),
+    /// The analysis itself gave up — a resource budget, or an inconsistent
+    /// report aggregate. Typed, because this use case *does* know what its own
+    /// analysis can fail with.
+    Analysis(crate::error::SimilarityAnalysisError),
     InvalidPlan(InvalidSimilarityReportPlan),
 }
 
@@ -301,7 +311,8 @@ impl std::fmt::Display for SimilarityReportWorkflowError {
 impl std::error::Error for SimilarityReportWorkflowError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Source(error) | Self::Analysis(error) => Some(error.as_ref()),
+            Self::Source(error) => Some(error.as_ref()),
+            Self::Analysis(error) => Some(error),
             Self::InvalidPlan(error) => Some(error),
             Self::Processing(_) | Self::WorkerPanicked => None,
         }
@@ -334,20 +345,34 @@ mod workflow_error_tests {
 
     #[test]
     fn analysis_display_adds_boundary_context_without_repeating_cause() {
+        // Now typed: the budget that was exceeded is a value, not a message,
+        // so a caller can offer "narrow the search" without parsing prose.
         let error = SimilarityReportWorkflowError::Analysis(
-            anyhow::anyhow!("tree similarity budget exceeded")
-                .context("could not compare candidates"),
+            crate::error::SimilarityBudgetError::Comparisons {
+                comparisons: 200_000_000,
+                limit: 100_000_000,
+            }
+            .into(),
         );
 
         assert_eq!(error.to_string(), "similarity report analysis failed");
         let source = error.source().expect("analysis error must be retained");
-        assert_eq!(source.to_string(), "could not compare candidates");
         assert_eq!(
-            source
-                .source()
-                .expect("root cause must be retained")
-                .to_string(),
-            "tree similarity budget exceeded"
+            source.to_string(),
+            "similarity comparison budget exceeded: 200000000 comparisons, limit 100000000"
         );
+
+        // The point of typing this: the caller no longer needs the message at
+        // all. It can ask whether the run was too large - and therefore worth
+        // retrying with a narrower search - by matching the variant.
+        let SimilarityReportWorkflowError::Analysis(analysis) = &error else {
+            panic!("expected an analysis failure, got {error:?}");
+        };
+        assert!(matches!(
+            analysis,
+            crate::error::SimilarityAnalysisError::Budget(
+                crate::error::SimilarityBudgetError::Comparisons { .. }
+            )
+        ));
     }
 }
