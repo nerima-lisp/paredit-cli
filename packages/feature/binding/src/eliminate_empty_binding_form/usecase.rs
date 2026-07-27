@@ -1,6 +1,8 @@
 //! Application safety policy for eliminating empty binding forms.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{BindingContextError, BindingResult};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_edit::progn as domain;
@@ -13,10 +15,15 @@ pub use domain::{EliminateEmptyBindingFormPlan, EliminateEmptyBindingFormRequest
 
 pub fn plan_eliminate_empty_binding_form(
     request: EliminateEmptyBindingFormRequest<'_>,
-) -> Result<EliminateEmptyBindingFormPlan> {
+) -> BindingResult<EliminateEmptyBindingFormPlan> {
     domain::require_supported(request.dialect, "eliminate-empty-binding-form")?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "eliminate-empty-binding-form",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     require_known_expression_context(&tree, &request.path, request.dialect)?;
     // The use case unions three error types - the edit's EditRefusal, a
@@ -29,10 +36,10 @@ fn require_known_expression_context(
     tree: &SyntaxTree,
     path: &Path,
     dialect: Dialect,
-) -> Result<()> {
+) -> BindingResult<()> {
     let indexes = path.to_raw_indexes();
     if indexes.len() < 2 {
-        bail!("eliminate-empty-binding-form refuses top-level forms");
+        return Err(BindingContextError::EliminateTopLevel.into());
     }
     for depth in 1..indexes.len() {
         if !tree
@@ -41,10 +48,10 @@ fn require_known_expression_context(
             .reader_prefixes
             .is_empty()
         {
-            bail!("refuses reader-prefixed contexts");
+            return Err(BindingContextError::ReaderPrefixed.into());
         }
     }
-    let child_index = *indexes.last().context("non-empty path")?;
+    let child_index = *indexes.last().ok_or(BindingContextError::EmptyPath)?;
     let parent = tree
         .select_path(&Path::from_indexes(indexes[..indexes.len() - 1].to_vec()))?
         .view();
@@ -52,7 +59,7 @@ fn require_known_expression_context(
         .children
         .first()
         .and_then(atom_symbol_text)
-        .context("known expression context required")?;
+        .ok_or(BindingContextError::UnknownContext)?;
     let is = |expected| {
         if dialect == Dialect::CommonLisp {
             common_lisp_symbol_reference_eq(head, expected)
@@ -69,7 +76,7 @@ fn require_known_expression_context(
     if known {
         Ok(())
     } else {
-        bail!("eliminate-empty-binding-form requires a known expression position")
+        Err(BindingContextError::UnknownPosition.into())
     }
 }
 

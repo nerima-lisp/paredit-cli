@@ -1,6 +1,6 @@
 //! Application facade for converting a non-recursive Common Lisp `labels` into `flet`.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 
 use paredit_core_edit::local_function_binding as domain;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -10,7 +10,7 @@ pub use domain::{ConvertLabelsToFletPlan, ConvertLabelsToFletRequest};
 
 pub fn plan_convert_labels_to_flet(
     request: ConvertLabelsToFletRequest<'_>,
-) -> Result<ConvertLabelsToFletPlan> {
+) -> BindingResult<ConvertLabelsToFletPlan> {
     domain::validate_convert_labels_to_flet_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

@@ -1,6 +1,6 @@
 //! Application facade for safely splitting a parallel `let`.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 use paredit_core_edit::let_composition::{self, SplitLetRequest as DomainRequest};
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_semantics::binding_index::BindingIndex;
@@ -26,7 +26,7 @@ pub struct SplitLetPlan {
     pub changed: bool,
 }
 
-pub fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
+pub fn plan_split_let(request: SplitLetRequest<'_>) -> BindingResult<SplitLetPlan> {
     let_composition::validate_dialect(request.dialect, "split-let")?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

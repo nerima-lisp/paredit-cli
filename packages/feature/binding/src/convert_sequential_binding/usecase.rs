@@ -1,6 +1,6 @@
 //! Application safety facade for sequential-binding domain plans.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 
 use crate::convert_sequential_binding::domain;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -8,7 +8,7 @@ use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConvertSequentialBindingPlan, ConvertSequentialBindingRequest};
 
-fn safe(request: &ConvertSequentialBindingRequest<'_>, command: &str) -> Result<()> {
+fn safe(request: &ConvertSequentialBindingRequest<'_>, command: &'static str) -> BindingResult<()> {
     domain::require_supported_dialect(request.dialect, command)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     Ok(reject_common_lisp_reader_conditionals(
@@ -19,13 +19,13 @@ fn safe(request: &ConvertSequentialBindingRequest<'_>, command: &str) -> Result<
 
 pub fn plan_convert_do_star_to_do(
     request: ConvertSequentialBindingRequest<'_>,
-) -> Result<ConvertSequentialBindingPlan> {
+) -> BindingResult<ConvertSequentialBindingPlan> {
     safe(&request, "convert-do-star-to-do")?;
     domain::plan_convert_do_star_to_do(request)
 }
 pub fn plan_convert_prog_star_to_prog(
     request: ConvertSequentialBindingRequest<'_>,
-) -> Result<ConvertSequentialBindingPlan> {
+) -> BindingResult<ConvertSequentialBindingPlan> {
     safe(&request, "convert-prog-star-to-prog")?;
     domain::plan_convert_prog_star_to_prog(request)
 }

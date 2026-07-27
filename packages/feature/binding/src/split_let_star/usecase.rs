@@ -1,6 +1,6 @@
 //! Application facade for splitting sequential `let*` bindings.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 use paredit_core_edit::let_star_composition::{self, Request as DomainRequest};
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_semantics::binding_index::BindingIndex;
@@ -25,7 +25,7 @@ pub struct SplitLetStarPlan {
     pub rewritten: String,
     pub changed: bool,
 }
-pub fn plan_split_let_star(request: SplitLetStarRequest<'_>) -> Result<SplitLetStarPlan> {
+pub fn plan_split_let_star(request: SplitLetStarRequest<'_>) -> BindingResult<SplitLetStarPlan> {
     let_star_composition::validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

@@ -1,6 +1,6 @@
 //! Application safety policy for the Domain `progn` transformation.
 
-use anyhow::{Result, bail};
+use crate::error::{BindingContextError, BindingResult};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_edit::progn as domain;
@@ -10,10 +10,10 @@ use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
 pub use domain::{FlattenPrognPlan, FlattenPrognRequest};
 
-pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> Result<FlattenPrognPlan> {
+pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> BindingResult<FlattenPrognPlan> {
     domain::require_supported(request.dialect, "flatten-progn")?;
     if request.path.indexes().len() < 2 {
-        bail!("flatten-progn refuses to rewrite a top-level progn");
+        return Err(BindingContextError::TopLevelProgn.into());
     }
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
@@ -24,9 +24,9 @@ pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> Result<FlattenPro
     Ok(domain::plan_flatten_progn(request)?)
 }
 
-fn reject_unsafe_context(tree: &SyntaxTree, path: &Path) -> Result<()> {
+fn reject_unsafe_context(tree: &SyntaxTree, path: &Path) -> BindingResult<()> {
     if path.indexes().last().is_some_and(|index| index.get() == 0) {
-        bail!("flatten-progn refuses to rewrite an operator position");
+        return Err(BindingContextError::OperatorPosition.into());
     }
     let mut ancestor = path.parent();
     while let Some(ancestor_path) = ancestor {
@@ -35,7 +35,7 @@ fn reject_unsafe_context(tree: &SyntaxTree, path: &Path) -> Result<()> {
         }
         let view = tree.select_path(&ancestor_path)?.view();
         if !view.reader_prefixes.is_empty() {
-            bail!("flatten-progn refuses to rewrite inside a reader template");
+            return Err(BindingContextError::InsideReaderTemplate.into());
         }
         if view
             .children
@@ -43,7 +43,7 @@ fn reject_unsafe_context(tree: &SyntaxTree, path: &Path) -> Result<()> {
             .and_then(atom_symbol_text)
             .is_some_and(|head| common_lisp_symbol_reference_eq(head, "declare"))
         {
-            bail!("flatten-progn refuses to rewrite inside a declaration");
+            return Err(BindingContextError::InsideDeclaration.into());
         }
         ancestor = ancestor_path.parent();
     }

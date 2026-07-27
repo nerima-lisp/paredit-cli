@@ -6,6 +6,7 @@ pub mod convert_let_star_to_let;
 pub mod convert_let_to_let_star;
 pub mod convert_sequential_binding;
 pub mod eliminate_empty_binding_form;
+pub mod error;
 pub mod flatten_progn;
 pub mod introduce_let;
 pub mod let_report;
@@ -33,3 +34,7 @@ pub use merge_nested_let::cli::{MergeNestedLetArgs, merge_nested_let};
 pub use merge_nested_let_star::cli::{MergeNestedLetStarArgs, merge_nested_let_star};
 pub use split_let::cli::{SplitLetArgs, split_let};
 pub use split_let_star::cli::{SplitLetStarArgs, split_let_star};
+
+pub use error::{
+    BindingCaptureError, BindingContextError, BindingError, BindingFormShapeError, BindingResult,
+};

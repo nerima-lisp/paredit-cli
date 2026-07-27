@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::BindingResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
@@ -10,7 +10,7 @@ pub fn build_let_report(
     dialect: Dialect,
     input: &str,
     tree: &SyntaxTree,
-) -> Result<Vec<LetFormReport>> {
+) -> BindingResult<Vec<LetFormReport>> {
     let mut reports = Vec::new();
     for index in 0..tree.root_children().len() {
         let path = Path::root_child(index);

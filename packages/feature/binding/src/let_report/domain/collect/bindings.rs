@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{BindingFormShapeError, BindingResult};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
@@ -15,7 +15,7 @@ pub struct LetBindingCandidate {
 pub fn let_binding_candidates(
     dialect: Dialect,
     binding_form: &ExpressionView,
-) -> Result<(&'static str, Vec<LetBindingCandidate>)> {
+) -> BindingResult<(&'static str, Vec<LetBindingCandidate>)> {
     match dialect {
         Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel => {
             vector_let_binding_candidates(binding_form)
@@ -31,14 +31,14 @@ pub fn let_binding_candidates(
 
 fn vector_let_binding_candidates(
     binding_form: &ExpressionView,
-) -> Result<(&'static str, Vec<LetBindingCandidate>)> {
+) -> BindingResult<(&'static str, Vec<LetBindingCandidate>)> {
     if binding_form.kind != ExpressionKind::List
         || binding_form.delimiter != Some(Delimiter::Bracket)
     {
-        anyhow::bail!("dialect expects vector let bindings: [name value ...]");
+        return Err(BindingFormShapeError::ExpectedVectorBindings.into());
     }
     if binding_form.children.len() % 2 != 0 {
-        anyhow::bail!("vector let binding form must contain name/value pairs");
+        return Err(BindingFormShapeError::VectorBindingsNotPaired.into());
     }
 
     let candidates = binding_form
@@ -47,7 +47,7 @@ fn vector_let_binding_candidates(
         .enumerate()
         .map(|(index, pair)| {
             let name = atom_text(&pair[0])
-                .context("let binding name must be an atom")?
+                .ok_or(BindingFormShapeError::BindingNameNotAnAtom)?
                 .to_owned();
             Ok(LetBindingCandidate {
                 index,
@@ -55,17 +55,17 @@ fn vector_let_binding_candidates(
                 value_span: pair[1].span,
             })
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<BindingResult<Vec<_>>>()?;
 
     Ok(("vector", candidates))
 }
 
 fn list_pair_let_binding_candidates(
     binding_form: &ExpressionView,
-) -> Result<(&'static str, Vec<LetBindingCandidate>)> {
+) -> BindingResult<(&'static str, Vec<LetBindingCandidate>)> {
     if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
     {
-        anyhow::bail!("dialect expects list-pair let bindings: ((name value) ...)");
+        return Err(BindingFormShapeError::ExpectedListPairBindings.into());
     }
 
     let candidates = binding_form
@@ -81,7 +81,7 @@ fn list_pair_let_binding_candidates(
             // correctly see no value expression to inspect.
             if pair.kind == ExpressionKind::Atom {
                 let name = atom_text(pair)
-                    .context("let binding name must be an atom")?
+                    .ok_or(BindingFormShapeError::BindingNameNotAnAtom)?
                     .to_owned();
                 let end = pair.span.end();
                 return Ok(LetBindingCandidate {
@@ -91,11 +91,11 @@ fn list_pair_let_binding_candidates(
                 });
             }
             if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("let binding must be a symbol or a (name value) pair");
+                return Err(BindingFormShapeError::BindingNotASymbolOrPair.into());
             }
             if pair.children.len() == 1 {
                 let name = atom_text(&pair.children[0])
-                    .context("let binding name must be an atom")?
+                    .ok_or(BindingFormShapeError::BindingNameNotAnAtom)?
                     .to_owned();
                 let end = pair.span.end();
                 return Ok(LetBindingCandidate {
@@ -105,10 +105,10 @@ fn list_pair_let_binding_candidates(
                 });
             }
             if pair.children.len() != 2 {
-                anyhow::bail!("let binding pair must contain a name and value");
+                return Err(BindingFormShapeError::BindingPairIncomplete.into());
             }
             let name = atom_text(&pair.children[0])
-                .context("let binding name must be an atom")?
+                .ok_or(BindingFormShapeError::BindingNameNotAnAtom)?
                 .to_owned();
             Ok(LetBindingCandidate {
                 index,
@@ -116,7 +116,7 @@ fn list_pair_let_binding_candidates(
                 value_span: pair.children[1].span,
             })
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<BindingResult<Vec<_>>>()?;
 
     Ok(("list-pair", candidates))
 }

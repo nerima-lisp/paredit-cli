@@ -1,6 +1,8 @@
 //! Domain planning for safe Common Lisp sequential-binding conversions.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{ConservativeRefusal, DialectRefusal, DocumentRefusal, ShapeRefusal};
+
+use crate::error::{BindingCaptureError, BindingFormShapeError, BindingResult};
 
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
@@ -35,9 +37,9 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
-pub fn require_supported_dialect(dialect: Dialect, command: &str) -> Result<()> {
+pub fn require_supported_dialect(dialect: Dialect, command: &'static str) -> BindingResult<()> {
     if dialect != Dialect::CommonLisp {
-        bail!("{command} currently supports only Common Lisp");
+        return Err(DialectRefusal::CurrentlyCommonLispOnly { operation: command }.into());
     }
     Ok(())
 }
@@ -77,48 +79,53 @@ impl Conversion {
 
 pub fn plan_convert_do_star_to_do(
     request: ConvertSequentialBindingRequest<'_>,
-) -> Result<ConvertSequentialBindingPlan> {
+) -> BindingResult<ConvertSequentialBindingPlan> {
     plan_conversion(request, Conversion::Do)
 }
 
 pub fn plan_convert_prog_star_to_prog(
     request: ConvertSequentialBindingRequest<'_>,
-) -> Result<ConvertSequentialBindingPlan> {
+) -> BindingResult<ConvertSequentialBindingPlan> {
     plan_conversion(request, Conversion::Prog)
 }
 
 fn plan_conversion(
     request: ConvertSequentialBindingRequest<'_>,
     conversion: Conversion,
-) -> Result<ConvertSequentialBindingPlan> {
+) -> BindingResult<ConvertSequentialBindingPlan> {
     let command = conversion.command();
     require_supported_dialect(request.dialect, command)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .with_context(|| format!("{command} input is not a valid S-expression document"))?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: command,
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
-        bail!("{command} cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments { operation: command }.into());
     }
     if contains_reader_prefix(&form) {
-        bail!("{command} conservatively rejects reader-prefixed syntax");
+        return Err(ConservativeRefusal::ReaderPrefixedSyntax { operation: command }.into());
     }
     require_head(&form, conversion)?;
     if contains_headed_form(&form, "declare") {
-        bail!("{command} conservatively rejects declarations");
+        return Err(ConservativeRefusal::Declarations { operation: command }.into());
     }
     let minimum_children = match conversion {
         Conversion::Do => 3,
         Conversion::Prog => 2,
     };
     if form.children.len() < minimum_children {
-        bail!("{command} selected form is malformed");
+        return Err(BindingFormShapeError::MalformedForm { command }.into());
     }
     let bindings = &form.children[1];
     if bindings.kind != ExpressionKind::List || !bindings.reader_prefixes.is_empty() {
-        bail!("{command} requires a plain binding list");
+        return Err(BindingFormShapeError::NotPlainBindingList { command }.into());
     }
     if matches!(conversion, Conversion::Do) && form.children[2].kind != ExpressionKind::List {
-        bail!("{command} requires a termination clause");
+        return Err(BindingFormShapeError::MissingTerminationClause { command }.into());
     }
     let mut names = Vec::with_capacity(bindings.children.len());
     let mut initializers = Vec::with_capacity(bindings.children.len());
@@ -128,7 +135,7 @@ fn plan_conversion(
         if names.iter().any(|existing: &SymbolName| {
             common_lisp_symbol_reference_eq(existing.as_str(), name.as_str())
         }) {
-            bail!("{command} requires unique binding names");
+            return Err(BindingFormShapeError::DuplicateBindingNames { command }.into());
         }
         names.push(name);
         initializers.push(initializer);
@@ -152,8 +159,12 @@ fn plan_conversion(
     }
     let head = &form.children[0];
     let rewritten = replace_span(request.input, head.span, conversion.target_head());
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .with_context(|| format!("{command} output is not a valid S-expression document"))?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: command,
+            source,
+        }
+    })?;
     Ok(ConvertSequentialBindingPlan {
         dialect: request.dialect,
         path: request.path,
@@ -167,16 +178,16 @@ fn plan_conversion(
 fn parse_binding(
     binding: &ExpressionView,
     conversion: Conversion,
-) -> Result<(SymbolName, Option<ExpressionView>, Option<ExpressionView>)> {
+) -> BindingResult<(SymbolName, Option<ExpressionView>, Option<ExpressionView>)> {
     let command = conversion.command();
     if binding.kind == ExpressionKind::Atom {
         return Ok((plain_symbol(binding, command)?, None, None));
     }
     if binding.kind != ExpressionKind::List || !binding.reader_prefixes.is_empty() {
-        bail!("{command} requires plain variable bindings");
+        return Err(BindingFormShapeError::NotPlainVariableBindings { command }.into());
     }
     if !(1..=conversion.max_binding_parts()).contains(&binding.children.len()) {
-        bail!("{command} rejects destructuring or malformed bindings");
+        return Err(BindingFormShapeError::Destructuring { command }.into());
     }
     let name = plain_symbol(&binding.children[0], command)?;
     Ok((
@@ -192,7 +203,7 @@ fn reject_dependencies(
     names: &[SymbolName],
     expressions: &[Option<ExpressionView>],
     role: &str,
-) -> Result<()> {
+) -> BindingResult<()> {
     for (index, expression) in expressions.iter().enumerate() {
         let Some(expression) = expression else {
             continue;
@@ -207,31 +218,37 @@ fn reject_dependencies(
                 &mut references,
             );
             if !references.is_empty() {
-                bail!(
-                    "{role} for '{}' references earlier binding '{}'",
-                    names[index],
-                    earlier
-                );
+                return Err(BindingCaptureError {
+                    role: role.to_owned(),
+                    name: names[index].to_string(),
+                    earlier: earlier.to_string(),
+                }
+                .into());
             }
         }
     }
     Ok(())
 }
 
-fn plain_symbol(view: &ExpressionView, command: &str) -> Result<SymbolName> {
+fn plain_symbol(view: &ExpressionView, command: &'static str) -> BindingResult<SymbolName> {
     if view.kind != ExpressionKind::Atom || !view.reader_prefixes.is_empty() {
-        bail!("{command} requires a plain binding name");
+        return Err(BindingFormShapeError::NotPlainBindingName { command }.into());
     }
-    let text = atom_symbol_text(view)
-        .with_context(|| format!("{command} requires a plain binding name"))?;
-    SymbolName::new(text).context("invalid binding name")
+    let text =
+        atom_symbol_text(view).ok_or(BindingFormShapeError::NotPlainBindingName { command })?;
+    SymbolName::new(text)
+        .map_err(|source| BindingFormShapeError::InvalidBindingName { source }.into())
 }
 
-fn require_head(view: &ExpressionView, conversion: Conversion) -> Result<()> {
+fn require_head(view: &ExpressionView, conversion: Conversion) -> BindingResult<()> {
     let command = conversion.command();
     let expected = conversion.source_head();
     if view.kind != ExpressionKind::List || !view.reader_prefixes.is_empty() {
-        bail!("{command} selected form must be a plain {expected} form");
+        return Err(ShapeRefusal::NotPlainExpectedForm {
+            operation: command,
+            expected: expected.to_owned(),
+        }
+        .into());
     }
     if !view
         .children
@@ -239,7 +256,11 @@ fn require_head(view: &ExpressionView, conversion: Conversion) -> Result<()> {
         .and_then(atom_symbol_text)
         .is_some_and(|head| common_lisp_symbol_reference_eq(head, expected))
     {
-        bail!("{command} selected form must be a {expected} form");
+        return Err(ShapeRefusal::NotExpectedForm {
+            operation: command,
+            expected: expected.to_owned(),
+        }
+        .into());
     }
     Ok(())
 }

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::BindingResult;
 
 use paredit_core_semantics::lexical_scope::value_capture;
 use paredit_core_syntax::common_lisp::is_common_lisp_earmuffed_special_variable_name;
@@ -15,7 +15,7 @@ pub fn analyze_let_form(
     input: &str,
     view: &ExpressionView,
     path: &Path,
-) -> Result<Option<LetFormReport>> {
+) -> BindingResult<Option<LetFormReport>> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return Ok(None);
     }

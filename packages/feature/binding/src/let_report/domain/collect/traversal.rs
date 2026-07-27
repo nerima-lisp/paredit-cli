@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::BindingResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::apply_reader_prefix_context;
@@ -13,7 +13,7 @@ pub fn collect_let_reports_from_view(
     view: &ExpressionView,
     path: Path,
     reports: &mut Vec<LetFormReport>,
-) -> Result<()> {
+) -> BindingResult<()> {
     collect_let_reports_in_context(dialect, input, view, path, reports, 0)
 }
 
@@ -34,7 +34,7 @@ fn collect_let_reports_in_context(
     path: Path,
     reports: &mut Vec<LetFormReport>,
     quasiquote_depth: usize,
-) -> Result<()> {
+) -> BindingResult<()> {
     let Some(quasiquote_depth) = apply_reader_prefix_context(view, quasiquote_depth) else {
         return Ok(());
     };

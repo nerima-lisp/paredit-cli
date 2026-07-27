@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::BindingResult;
 
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
@@ -16,7 +16,7 @@ pub fn let_binding_reference_spans(
     candidates: &[LetBindingCandidate],
     candidate: &LetBindingCandidate,
     symbol: &SymbolName,
-) -> Result<Vec<ByteSpan>> {
+) -> BindingResult<Vec<ByteSpan>> {
     let mut reference_spans = Vec::new();
     let sequential_scope = list_head(view)
         .and_then(|head| dialect.let_binding_form_for_head(head))

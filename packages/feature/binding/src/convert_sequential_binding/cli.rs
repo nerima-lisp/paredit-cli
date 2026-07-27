@@ -64,9 +64,12 @@ fn run_conversion(
     path: Path,
     write: bool,
     output: OutputFormat,
+    // The planner is a use case in this package, so it carries BindingError;
+    // `?` widens it into this function's anyhow result alongside the CLI's own
+    // I/O failures.
     planner: for<'a> fn(
         ConvertSequentialBindingRequest<'a>,
-    ) -> Result<ConvertSequentialBindingPlan>,
+    ) -> crate::error::BindingResult<ConvertSequentialBindingPlan>,
 ) -> Result<()> {
     if write && file.is_none() {
         anyhow::bail!("--write requires --file");

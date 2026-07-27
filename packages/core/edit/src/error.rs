@@ -126,6 +126,9 @@ pub enum ConservativeRefusal {
     #[error("{operation} conservatively rejects reader prefixes")]
     ReaderPrefixes { operation: &'static str },
 
+    #[error("{operation} conservatively rejects reader-prefixed syntax")]
+    ReaderPrefixedSyntax { operation: &'static str },
+
     #[error("{operation} requires a form without reader prefixes")]
     RequiresNoReaderPrefixes { operation: &'static str },
 

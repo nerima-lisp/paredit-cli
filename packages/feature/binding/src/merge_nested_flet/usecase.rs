@@ -1,6 +1,6 @@
 //! Application facade for merging directly nested Common Lisp `flet` forms.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 use paredit_core_edit::flet_composition::{self, Request as DomainRequest};
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::dialect::Dialect;
@@ -23,7 +23,9 @@ pub struct MergeNestedFletPlan {
     pub changed: bool,
 }
 
-pub fn plan_merge_nested_flet(request: MergeNestedFletRequest<'_>) -> Result<MergeNestedFletPlan> {
+pub fn plan_merge_nested_flet(
+    request: MergeNestedFletRequest<'_>,
+) -> BindingResult<MergeNestedFletPlan> {
     flet_composition::validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

@@ -1,6 +1,6 @@
 //! Application facade for merging directly nested sequential `let*` forms.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 use paredit_core_edit::let_composition::{self, MergeNestedLetStarRequest as DomainRequest};
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::dialect::Dialect;
@@ -25,7 +25,7 @@ pub struct MergeNestedLetStarPlan {
 
 pub fn plan_merge_nested_let_star(
     request: MergeNestedLetStarRequest<'_>,
-) -> Result<MergeNestedLetStarPlan> {
+) -> BindingResult<MergeNestedLetStarPlan> {
     let_composition::validate_dialect(request.dialect, "merge-nested-let-star")?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

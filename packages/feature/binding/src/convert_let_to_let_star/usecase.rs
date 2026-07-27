@@ -1,6 +1,6 @@
 //! Application facade for converting dependency-free `let` into `let*`.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 use paredit_core_edit::let_binding as domain;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -9,7 +9,7 @@ pub use domain::{ConvertLetToLetStarPlan, ConvertLetToLetStarRequest};
 
 pub fn plan_convert_let_to_let_star(
     request: ConvertLetToLetStarRequest<'_>,
-) -> Result<ConvertLetToLetStarPlan> {
+) -> BindingResult<ConvertLetToLetStarPlan> {
     domain::validate_convert_let_to_let_star_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

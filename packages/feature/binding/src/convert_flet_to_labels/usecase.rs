@@ -1,6 +1,6 @@
 //! Application facade for converting a capture-free Common Lisp `flet` into `labels`.
 
-use anyhow::Result;
+use crate::error::BindingResult;
 
 use paredit_core_edit::local_function_binding as domain;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -10,7 +10,7 @@ pub use domain::{ConvertFletToLabelsPlan, ConvertFletToLabelsRequest};
 
 pub fn plan_convert_flet_to_labels(
     request: ConvertFletToLabelsRequest<'_>,
-) -> Result<ConvertFletToLabelsPlan> {
+) -> BindingResult<ConvertFletToLabelsPlan> {
     domain::validate_convert_flet_to_labels_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
