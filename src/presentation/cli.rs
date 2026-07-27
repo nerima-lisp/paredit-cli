@@ -61,9 +61,6 @@ mod convert_unless_to_if;
 mod convert_when_to_if;
 mod de_morgan_report;
 mod dead_boolean_operand_report;
-mod definition_movement;
-mod definition_removal;
-mod definition_report;
 mod defpackage_quoted_report;
 mod destructive_literal_report;
 mod dispatch;
@@ -168,8 +165,6 @@ mod redundant_quote_report;
 mod redundant_start_zero_report;
 mod redundant_the_report;
 mod refactor;
-mod remove_unused_binding;
-mod remove_unused_control;
 mod rename;
 mod rename_control;
 mod self_assignment_report;
@@ -207,7 +202,6 @@ mod verbose_negation_report;
 mod workspace_report;
 mod zero_divisor_report;
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 use std::process::ExitCode;
@@ -235,7 +229,6 @@ use crate::application::usecase::impact_report::{
     ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
     summarize_impact_reports,
 };
-use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
 use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
@@ -248,7 +241,7 @@ use command::Command;
 pub(crate) use shared::{
     MAX_SOURCE_INPUT_BYTES, apply_byte_span_edits, bounded_preview, matching_symbol_occurrences,
     read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_limit,
-    read_text_with_limit, require_output_file, resolve_target, stable_text_hash, terminal_safe,
+    read_text_with_limit, require_output_file, stable_text_hash, terminal_safe,
     terminal_safe_error_chain, unified_diff, write_artifact_with_rollback,
     write_file_with_rollback, write_files_with_rollback,
 };
@@ -305,6 +298,11 @@ use paredit_feature_package::system_conflict_report::cli as system_conflict_repo
 use paredit_feature_package::unused_export_report::cli as unused_export_report;
 use paredit_feature_package::unused_nickname_report::cli as unused_nickname_report;
 use paredit_feature_package::unused_package_report::cli as unused_package_report;
+use paredit_feature_remove_unused::definition_movement::cli as definition_movement;
+use paredit_feature_remove_unused::definition_removal::cli as definition_removal;
+use paredit_feature_remove_unused::definition_report::cli as definition_report;
+use paredit_feature_remove_unused::remove_unused_binding::cli as remove_unused_binding;
+use paredit_feature_remove_unused::remove_unused_control::cli as remove_unused_control;
 
 #[cfg(test)]
 mod tests {

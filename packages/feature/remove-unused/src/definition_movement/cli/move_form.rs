@@ -1,18 +1,18 @@
 use anyhow::{Context, Result};
+use paredit_core_cli::args::MoveInsert;
 
-use crate::domain::sexpr::{Edit, SyntaxTree};
+use paredit_core_syntax::sexpr::{Edit, SyntaxTree};
 
-use super::super::MoveInsert;
-use super::super::shared::{
-    detect_dialect, list_head, read_file_or_empty, read_input_dialect_and_tree,
-    write_files_with_rollback,
-};
 use super::args::MoveFormArgs;
 use super::render::move_form::print_move_form_plan;
 use super::shared::{insert_top_level_form, same_file_path, top_level_path_index};
 use super::types::MoveFormPlan;
+use paredit_core_cli::shared::{
+    detect_dialect, list_head, read_file_or_empty, read_input_dialect_and_tree,
+    write_files_with_rollback,
+};
 
-pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> {
+pub fn move_form(args: MoveFormArgs) -> Result<()> {
     let same_file = same_file_path(&args.from_file, &args.to_file);
     if same_file {
         anyhow::bail!("--from-file and --to-file must refer to different files");

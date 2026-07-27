@@ -1,5 +1,5 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName};
 
 #[derive(Debug, Clone)]
 pub struct RemoveUnusedBindingRequest<'a> {
@@ -38,17 +38,17 @@ pub struct RemovedBindingPlan {
 }
 
 #[derive(Debug)]
-pub(super) struct RemoveUnusedBindingParts {
-    pub(super) form: String,
-    pub(super) form_span: ByteSpan,
-    pub(super) bindings: Vec<RemovedBindingParts>,
-    pub(super) replacement: String,
+pub struct RemoveUnusedBindingParts {
+    pub form: String,
+    pub form_span: ByteSpan,
+    pub bindings: Vec<RemovedBindingParts>,
+    pub replacement: String,
 }
 
 #[derive(Debug)]
-pub(super) struct RemovedBindingParts {
-    pub(super) name: String,
-    pub(super) binding_span: ByteSpan,
-    pub(super) binding_value: String,
-    pub(super) reference_spans: Vec<ByteSpan>,
+pub struct RemovedBindingParts {
+    pub name: String,
+    pub binding_span: ByteSpan,
+    pub binding_value: String,
+    pub reference_spans: Vec<ByteSpan>,
 }

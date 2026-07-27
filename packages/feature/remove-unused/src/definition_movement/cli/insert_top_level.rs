@@ -1,15 +1,16 @@
 use anyhow::{Context, Result, bail};
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
-use super::super::shared::{read_input_dialect_and_tree, write_file_with_rollback};
-use super::super::{MoveInsert, OutputFormat};
 use super::args::InsertTopLevelArgs;
 use super::shared::insert_top_level_form;
+use paredit_core_cli::args::{MoveInsert, OutputFormat};
+use paredit_core_cli::shared::{read_input_dialect_and_tree, write_file_with_rollback};
 
-pub(in crate::presentation::cli) fn insert_top_level(args: InsertTopLevelArgs) -> Result<()> {
+pub fn insert_top_level(args: InsertTopLevelArgs) -> Result<()> {
     if args.insert == MoveInsert::Append && args.anchor_path.is_some() {
         bail!("--anchor-path is only valid with --insert before or --insert after");
     }

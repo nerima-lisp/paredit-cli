@@ -4,13 +4,13 @@ use std::thread;
 
 use anyhow::{Context, Result, anyhow};
 
-use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::definition_reference::{
+use paredit_core_semantics::definition_reference::{
     collect_package_form_spans, collect_reference_needles, collect_symbol_references,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName,
     SyntaxTree,
 };
@@ -268,7 +268,7 @@ fn file_unused_definition_report(
             .filter_map(|definition| {
                 let name = definition.name.as_ref()?;
                 let symbol = SymbolName::new(name.clone()).ok()?;
-                let needle = crate::domain::common_lisp::common_lisp_symbol_reference_needle(
+                let needle = paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle(
                     symbol.as_str(),
                 );
                 let references = files

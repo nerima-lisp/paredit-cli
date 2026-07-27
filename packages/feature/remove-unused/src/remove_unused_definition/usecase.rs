@@ -1,1 +1,1 @@
-pub use crate::domain::remove_unused_definition::*;
+pub use crate::remove_unused_definition::domain::*;

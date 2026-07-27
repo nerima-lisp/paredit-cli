@@ -1,11 +1,22 @@
-use super::*;
-use crate::application::usecase::remove_unused_binding::{
+use crate::remove_unused_binding::usecase::{
     RemoveUnusedBindingPlan, RemoveUnusedBindingRequest, plan_remove_unused_binding,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct RemoveUnusedBindingArgs {
+pub struct RemoveUnusedBindingArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -26,7 +37,7 @@ pub(super) struct RemoveUnusedBindingArgs {
     output: OutputFormat,
 }
 
-pub(super) fn remove_unused_binding(args: RemoveUnusedBindingArgs) -> Result<()> {
+pub fn remove_unused_binding(args: RemoveUnusedBindingArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

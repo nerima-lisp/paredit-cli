@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::PackageDefinitionReport;
-use crate::domain::sexpr::{AtomOccurrence, ByteSpan};
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{AtomOccurrence, ByteSpan};
+use paredit_feature_package::package_report::domain::PackageDefinitionReport;
 
 #[derive(Debug, Clone)]
 pub struct RemoveUnusedDefinitionInputFile {

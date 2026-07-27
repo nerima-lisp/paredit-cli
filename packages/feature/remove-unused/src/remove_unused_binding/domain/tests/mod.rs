@@ -1,7 +1,7 @@
 use proptest::{prelude::*, test_runner::TestCaseError};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
 use super::{RemoveUnusedBindingPlan, RemoveUnusedBindingRequest, plan_remove_unused_binding};
 

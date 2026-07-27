@@ -51,6 +51,9 @@ thread_expression unthread_expression replace_forms unwrap_call sort_definitions
 introduce_let let_report split_let split_let_star merge_nested_let merge_nested_let_star
 merge_nested_flet convert_let_to_let_star convert_let_star_to_let convert_flet_to_labels
 convert_labels_to_flet convert_sequential_binding eliminate_empty_binding_form flatten_progn
+function_parameter
+package package_report unused_package_report unused_nickname_report unused_export_report
+package_boundary_report package_conflict_report system_conflict_report dependency_report
 """.split())
 
 

@@ -2,22 +2,22 @@ use std::fs;
 
 use anyhow::{Context, Result};
 
-use crate::application::usecase::definition_report::DefinitionReportItem;
-use crate::application::usecase::leading_trivia::first_newline_or;
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
+use crate::definition_report::usecase::DefinitionReportItem;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::leading_trivia::first_newline_or;
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
-use super::super::shared::{
-    detect_dialect, list_head, package_context_before_top_level, read_file_or_empty,
-    read_input_dialect_and_tree, write_files_with_rollback,
-};
 use super::args::MoveDefinitionArgs;
 use super::render::move_definition::print_move_definition_plan;
 use super::shared::append_top_level_form;
 use super::types::MoveDefinitionPlan;
+use paredit_core_cli::shared::{
+    detect_dialect, list_head, package_context_before_top_level, read_file_or_empty,
+    read_input_dialect_and_tree, write_files_with_rollback,
+};
 
-pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) -> Result<()> {
+pub fn move_definition(args: MoveDefinitionArgs) -> Result<()> {
     let same_file = match (
         fs::canonicalize(&args.from_file),
         fs::canonicalize(&args.to_file),

@@ -1,30 +1,30 @@
 use anyhow::{Context, Result, anyhow};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::definition_reference::{
-    collect_package_form_spans, collect_reference_needles, collect_symbol_references,
-};
-use crate::domain::dialect::Dialect;
-use crate::domain::remove_unused_definition::types::{
+use crate::remove_unused_definition::domain::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
 };
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName, SyntaxTree};
+use paredit_core_semantics::definition_reference::{
+    collect_package_form_spans, collect_reference_needles, collect_symbol_references,
+};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName, SyntaxTree};
 
 #[derive(Debug)]
-pub(super) struct UnusedDefinitionItem {
-    pub(super) definition: UnusedDefinitionDefinition,
-    pub(super) references: Vec<DefinitionReference>,
+pub struct UnusedDefinitionItem {
+    pub definition: UnusedDefinitionDefinition,
+    pub references: Vec<DefinitionReference>,
 }
 
 #[derive(Debug)]
-pub(super) struct UnusedDefinitionFile {
-    pub(super) definitions: Vec<UnusedDefinitionItem>,
+pub struct UnusedDefinitionFile {
+    pub definitions: Vec<UnusedDefinitionItem>,
 }
 
 #[derive(Debug)]
-pub(super) struct DefinitionReference;
+pub struct DefinitionReference;
 
-pub(super) fn collect_unused_definition_candidates(
+pub fn collect_unused_definition_candidates(
     files: &[RemoveUnusedDefinitionInputFile],
 ) -> Result<Vec<UnusedDefinitionFile>> {
     for file in files {

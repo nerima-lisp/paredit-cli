@@ -1,4 +1,4 @@
-pub(super) mod move_definition;
-pub(super) mod move_form;
-pub(super) mod sort_definitions;
-pub(super) mod split_file;
+pub mod move_definition;
+pub mod move_form;
+pub mod sort_definitions;
+pub mod split_file;

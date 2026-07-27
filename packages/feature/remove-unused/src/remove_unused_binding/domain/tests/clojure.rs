@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn plans_clojure_vector_binding() {

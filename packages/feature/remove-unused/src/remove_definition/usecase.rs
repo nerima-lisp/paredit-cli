@@ -2,10 +2,10 @@ use std::path::{Path as FsPath, PathBuf};
 
 use anyhow::{Context, Result};
 
-use crate::domain::definition::definition_shape;
-use crate::domain::definition_report::{DefinitionReportItem, collect_definition_forms};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use crate::definition_report::domain::{DefinitionReportItem, collect_definition_forms};
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, SyntaxTree,
 };
 
@@ -123,8 +123,8 @@ mod tests {
     use super::{
         DefinitionSourcePort, LoadedDefinitionSource, RemoveDefinitionRequest, remove_definition,
     };
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::Path as ExpressionPath;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::Path as ExpressionPath;
 
     struct MemorySource {
         text: String,

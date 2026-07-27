@@ -1,4 +1,7 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use std::path::PathBuf;
 
 proptest! {
     #[test]
@@ -12,10 +15,10 @@ proptest! {
         // conforming Common Lisp, and the scope-aware reference collector
         // rightly reads `(do ...)` as the special form rather than a call.
         prop_assume!(
-            crate::domain::common_lisp::CommonLispOperator::from_head(&function_name).is_none()
+            paredit_core_syntax::common_lisp::CommonLispOperator::from_head(&function_name).is_none()
         );
         prop_assume!(
-            crate::domain::common_lisp::CommonLispOperator::from_head(&caller_name).is_none()
+            paredit_core_syntax::common_lisp::CommonLispOperator::from_head(&caller_name).is_none()
         );
         let params = (0..arg_count)
             .map(|index| format!("arg{index}"))

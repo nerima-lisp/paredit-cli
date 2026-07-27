@@ -1,1 +1,1 @@
-pub(super) use crate::application::usecase::remove_definition::RemoveDefinitionPlan;
+pub use crate::remove_definition::usecase::RemoveDefinitionPlan;

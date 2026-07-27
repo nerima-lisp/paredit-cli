@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use proptest::prelude::*;
 
 use super::*;
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::PackageDefinitionReport;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
+use paredit_feature_package::package_report::domain::PackageDefinitionReport;
 
 mod basic;
 mod policy;

@@ -3,16 +3,16 @@ use std::path::Path as FsPath;
 
 use anyhow::{Context, Result};
 
-use crate::application::usecase::split_file::{SplitFileRequest, plan_split_file};
+use paredit_feature_form_transform::split_file::usecase::{SplitFileRequest, plan_split_file};
 
-use super::super::shared::{
-    detect_dialect, read_file_or_empty, read_input_and_dialect, write_files_with_rollback,
-};
 use super::args::SplitFileArgs;
 use super::render::split_file::print_split_file_plan;
 use super::shared::same_file_path;
+use paredit_core_cli::shared::{
+    detect_dialect, read_file_or_empty, read_input_and_dialect, write_files_with_rollback,
+};
 
-pub(in crate::presentation::cli) fn split_file(args: SplitFileArgs) -> Result<()> {
+pub fn split_file(args: SplitFileArgs) -> Result<()> {
     if same_file_path(&args.from_file, &args.to_file) {
         anyhow::bail!("--from-file and --to-file must refer to different files");
     }

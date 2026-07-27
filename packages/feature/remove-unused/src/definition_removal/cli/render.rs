@@ -1,11 +1,12 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::OutputFormat;
 use super::types::RemoveDefinitionPlan;
-use crate::application::usecase::remove_unused_definition::RemoveUnusedDefinitionsPlan;
+use crate::remove_unused_definition::usecase::RemoveUnusedDefinitionsPlan;
 
-pub(super) fn print_remove_definition_plan(
+pub fn print_remove_definition_plan(
     plan: &RemoveDefinitionPlan,
     output: OutputFormat,
 ) -> Result<()> {
@@ -61,7 +62,7 @@ pub(super) fn print_remove_definition_plan(
     Ok(())
 }
 
-pub(super) fn print_remove_unused_definitions_plan(
+pub fn print_remove_unused_definitions_plan(
     plan: &RemoveUnusedDefinitionsPlan,
     written: bool,
     output: OutputFormat,

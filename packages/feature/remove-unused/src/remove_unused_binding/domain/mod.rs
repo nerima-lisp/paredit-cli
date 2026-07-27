@@ -2,13 +2,13 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::common_lisp::{
     CommonLispBindingRefactorForm, common_lisp_dynamic_binding_is_declared,
     common_lisp_symbol_reference_eq, is_common_lisp_earmuffed_special_variable_name,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Formatter, SymbolName, SyntaxTree,
 };
 
@@ -90,7 +90,7 @@ pub fn plan_remove_unused_binding(
 }
 
 fn remove_unused_binding_parts(
-    dialect: crate::domain::dialect::Dialect,
+    dialect: paredit_core_syntax::dialect::Dialect,
     input: &str,
     target: &ExpressionView,
     name: Option<&SymbolName>,
@@ -232,7 +232,7 @@ fn remove_unused_binding_parts(
         let last_body = target.children.last().context(
             "remove-unused-binding expected at least one body expression after validation",
         )?;
-        crate::domain::sexpr::ByteSpan::new(first_body.span.start(), last_body.span.end())
+        paredit_core_syntax::sexpr::ByteSpan::new(first_body.span.start(), last_body.span.end())
             .slice(input)
             .to_owned()
     } else {
@@ -256,7 +256,7 @@ fn remove_unused_binding_parts(
 }
 
 fn ensure_variable_binding_form_consistency(
-    dialect: crate::domain::dialect::Dialect,
+    dialect: paredit_core_syntax::dialect::Dialect,
     head: &str,
     refactor_form: CommonLispBindingRefactorForm,
 ) -> Result<()> {

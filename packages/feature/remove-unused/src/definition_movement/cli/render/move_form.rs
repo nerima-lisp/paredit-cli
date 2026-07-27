@@ -1,13 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use super::super::super::OutputFormat;
 use super::super::types::MoveFormPlan;
 
-pub(in crate::presentation::cli::definition_movement) fn print_move_form_plan(
-    plan: &MoveFormPlan,
-    output: OutputFormat,
-) -> Result<()> {
+pub fn print_move_form_plan(plan: &MoveFormPlan, output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => {
             println!("from_file\t{}", safe_text!(plan.from_file.display()));

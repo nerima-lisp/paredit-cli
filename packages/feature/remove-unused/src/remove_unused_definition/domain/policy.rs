@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::package_report::PackageDefinitionReport;
-use crate::domain::remove_unused_definition::types::UnusedDefinitionDefinition;
+use crate::remove_unused_definition::domain::types::UnusedDefinitionDefinition;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_feature_package::package_report::domain::PackageDefinitionReport;
 
 /// Bulk removal requires the explicit `--include-protected` opt-in for any
 /// category `DefinitionCategory::is_bulk_removable` excludes; see that
@@ -11,11 +11,11 @@ use crate::domain::remove_unused_definition::types::UnusedDefinitionDefinition;
 /// references alone. `remove-unused-definitions` and `unused-definition-report`
 /// share this single definition so the two commands never disagree on which
 /// categories "zero direct references" is a trustworthy signal for.
-pub(super) const fn definition_is_bulk_removable(category: DefinitionCategory) -> bool {
+pub const fn definition_is_bulk_removable(category: DefinitionCategory) -> bool {
     category.is_bulk_removable()
 }
 
-pub(super) fn collect_exported_symbol_index(
+pub fn collect_exported_symbol_index(
     packages: &[PackageDefinitionReport],
 ) -> HashMap<String, HashSet<String>> {
     let mut exported = HashMap::new();
@@ -36,7 +36,7 @@ pub(super) fn collect_exported_symbol_index(
     exported
 }
 
-pub(super) fn definition_is_exported(
+pub fn definition_is_exported(
     definition: &UnusedDefinitionDefinition,
     exported_symbols: &HashMap<String, HashSet<String>>,
 ) -> bool {

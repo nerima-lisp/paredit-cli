@@ -1,13 +1,12 @@
+use paredit_core_cli::args::MoveInsert;
 use std::fs;
 use std::path::Path as FsPath;
 
 use anyhow::Result;
 
-use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
 
-use super::super::MoveInsert;
-
-pub(super) fn append_top_level_form(input: &str, form: &str) -> String {
+pub fn append_top_level_form(input: &str, form: &str) -> String {
     let mut output = input.trim_end().to_owned();
     if !output.is_empty() {
         output.push_str("\n\n");
@@ -17,21 +16,21 @@ pub(super) fn append_top_level_form(input: &str, form: &str) -> String {
     output
 }
 
-pub(super) fn same_file_path(left: &FsPath, right: &FsPath) -> bool {
+pub fn same_file_path(left: &FsPath, right: &FsPath) -> bool {
     match (fs::canonicalize(left), fs::canonicalize(right)) {
         (Ok(left), Ok(right)) => left == right,
         _ => left == right,
     }
 }
 
-pub(super) fn top_level_path_index(path: &Path, command: &str) -> Result<usize> {
+pub fn top_level_path_index(path: &Path, command: &str) -> Result<usize> {
     match path.indexes() {
         [index] => Ok(index.get()),
         _ => anyhow::bail!("{command} requires a top-level path, for example --path 2"),
     }
 }
 
-pub(super) fn insert_top_level_form(
+pub fn insert_top_level_form(
     input: &str,
     tree: &SyntaxTree,
     form: &str,

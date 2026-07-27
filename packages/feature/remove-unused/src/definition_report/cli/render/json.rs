@@ -1,6 +1,8 @@
 use super::*;
+use anyhow::Result;
+use serde_json::json;
 
-pub(super) fn print_definition_report(
+pub fn print_definition_report(
     reports: &[DefinitionReportFile],
     summary: &DefinitionReportSummary,
 ) -> Result<()> {
@@ -50,7 +52,7 @@ pub(super) fn print_definition_report(
     Ok(())
 }
 
-pub(super) fn print_unused_definition_report(
+pub fn print_unused_definition_report(
     reports: &[UnusedDefinitionFile],
     policy: &UnusedDefinitionPolicy,
 ) -> Result<()> {

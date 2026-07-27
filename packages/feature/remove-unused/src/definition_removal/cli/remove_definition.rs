@@ -2,16 +2,16 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use super::super::shared::{read_input_and_dialect, write_file_with_rollback};
 use super::args::RemoveDefinitionArgs;
 use super::render::print_remove_definition_plan;
-use crate::application::usecase::remove_definition::{
+use crate::remove_definition::usecase::{
     DefinitionSourcePort, LoadedDefinitionSource, RemoveDefinitionRequest,
     remove_definition as execute_remove_definition,
 };
-use crate::presentation::cli::DialectArg;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub(in crate::presentation::cli) fn remove_definition(args: RemoveDefinitionArgs) -> Result<()> {
+pub fn remove_definition(args: RemoveDefinitionArgs) -> Result<()> {
     let output = args.output;
     let request = RemoveDefinitionRequest {
         file: args.file,

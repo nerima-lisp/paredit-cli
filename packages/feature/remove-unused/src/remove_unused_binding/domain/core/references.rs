@@ -1,18 +1,18 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispBindingReferenceScope, CommonLispLocalCallableForm,
     CommonLispVariableBindingForm, CommonLispVariableSpecForm, common_lisp_local_callable_form,
     common_lisp_symbol_reference_eq, is_local_callable_bound, local_callable_body_scope,
     local_callable_definition_reference_scope,
 };
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::LetBindingRemovalCandidate;
-use crate::domain::remove_unused_binding::syntax::{list_head, view_at_span};
+use crate::remove_unused_binding::domain::syntax::{list_head, view_at_span};
 
 struct BindingReferenceContext<'a> {
     dialect: Dialect,
@@ -28,7 +28,7 @@ struct BindingReferenceContext<'a> {
     clippy::too_many_arguments,
     reason = "binding reference resolution takes the selected binding plus traversal context"
 )]
-pub(crate) fn binding_reference_spans(
+pub fn binding_reference_spans(
     dialect: Dialect,
     input: &str,
     target: &ExpressionView,

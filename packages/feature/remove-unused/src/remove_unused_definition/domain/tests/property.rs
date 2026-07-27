@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 proptest! {
     #[test]

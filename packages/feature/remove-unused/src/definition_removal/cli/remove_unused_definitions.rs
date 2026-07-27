@@ -1,20 +1,16 @@
 use anyhow::{Context, Result};
 
-use super::super::shared::{read_input_dialect_and_tree, write_files_with_rollback};
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
-use crate::application::usecase::definition_report::{
-    DefinitionReportItem, collect_definition_forms,
-};
-use crate::application::usecase::package_report::build_package_report;
-use crate::application::usecase::remove_unused_definition::{
+use crate::definition_report::usecase::{DefinitionReportItem, collect_definition_forms};
+use crate::remove_unused_definition::usecase::{
     RemoveUnusedDefinitionInputFile, RemoveUnusedDefinitionsRequest, UnusedDefinitionDefinition,
     plan_remove_unused_definitions,
 };
+use paredit_core_cli::shared::{read_input_dialect_and_tree, write_files_with_rollback};
+use paredit_feature_package::package_report::usecase::build_package_report;
 
-pub(in crate::presentation::cli) fn remove_unused_definitions(
-    args: RemoveUnusedDefinitionsArgs,
-) -> Result<()> {
+pub fn remove_unused_definitions(args: RemoveUnusedDefinitionsArgs) -> Result<()> {
     let mut input_files = Vec::with_capacity(args.files.len());
     let mut package_definitions = Vec::new();
 

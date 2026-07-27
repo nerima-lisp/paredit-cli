@@ -1,6 +1,6 @@
-use crate::domain::sexpr::{ByteOffset, ByteSpan};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 
-pub(super) fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
+pub fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
     let bytes = input.as_bytes();
     let mut start = span.start().get();
     let mut end = span.end().get();
@@ -16,7 +16,7 @@ pub(super) fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan
     ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))
 }
 
-pub(super) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut output = String::with_capacity(input.len() - span.len() + replacement.len());
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);

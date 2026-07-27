@@ -1,4 +1,9 @@
 use super::*;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::ByteSpan;
+use std::path::PathBuf;
 
 #[test]
 fn skips_protected_definition_categories_by_default() {

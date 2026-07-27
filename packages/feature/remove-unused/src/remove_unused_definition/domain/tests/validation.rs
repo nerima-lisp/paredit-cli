@@ -1,4 +1,10 @@
 use super::*;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use std::path::PathBuf;
 
 #[test]
 fn rejects_unparseable_input_files_instead_of_panicking() {

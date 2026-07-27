@@ -47,6 +47,41 @@ for _m in "workspace fs_identity".split():
 for _m in "args shared gate".split():
     OWNER[_m] = "paredit_core_cli"
 
+# Feature packages already extracted. A feature depending on another feature is
+# legitimate (section 2.2 measured 89 such edges); it just needs the path
+# dependency added to Cargo.toml by hand.
+FEATURE_OWNER = {
+    "similarity_report": "paredit_feature_similarity",
+    "duplicate_report": "paredit_feature_similarity",
+    "form_similarity": "paredit_feature_similarity",
+    "extract_function": "paredit_feature_extract",
+    "extract_local_function": "paredit_feature_extract",
+    "extract_constant": "paredit_feature_extract",
+    "inline_function": "paredit_feature_inline",
+    "inline_let": "paredit_feature_inline",
+    "inline_lambda": "paredit_feature_inline",
+    "inline_local_function": "paredit_feature_inline",
+    "inline_symbol_macro": "paredit_feature_inline",
+    "thread_expression": "paredit_feature_form_transform",
+    "unthread_expression": "paredit_feature_form_transform",
+    "replace_forms": "paredit_feature_form_transform",
+    "unwrap_call": "paredit_feature_form_transform",
+    "sort_definitions": "paredit_feature_form_transform",
+    "split_file": "paredit_feature_form_transform",
+    "introduce_let": "paredit_feature_binding",
+    "let_report": "paredit_feature_binding",
+    "function_parameter": "paredit_feature_function_parameter",
+    "package": "paredit_feature_package",
+    "package_report": "paredit_feature_package",
+    "unused_package_report": "paredit_feature_package",
+    "unused_nickname_report": "paredit_feature_package",
+    "unused_export_report": "paredit_feature_package",
+    "dependency_report": "paredit_feature_package",
+}
+# A feature's layers live under the slice, so the path shape differs from core's.
+FEATURE_LAYER = {"domain": "domain", "application::usecase": "usecase",
+                 "presentation::cli": "cli"}
+
 # Names a feature's cli/ files used without importing, because cli.rs had them
 # in scope. `safe_text` is a macro, so it needs a `use` to be callable bare.
 ARGS_ITEMS = [
@@ -93,7 +128,6 @@ AMBIENT = [
     # cli.rs's own top-level imports, equally inherited by every feature.
     (r"\bByteOffset\b", "use paredit_core_syntax::sexpr::ByteOffset;", "ByteOffset"),
     (r"\bByteSpan\b", "use paredit_core_syntax::sexpr::ByteSpan;", "ByteSpan"),
-    (r"\bPath\b", "use paredit_core_syntax::sexpr::Path;", "Path"),
     (r"\bSymbolName\b", "use paredit_core_syntax::sexpr::SymbolName;", "SymbolName"),
     (r"\bSyntaxTree\b", "use paredit_core_syntax::sexpr::SyntaxTree;", "SyntaxTree"),
     (r"\bDialect\b", "use paredit_core_syntax::dialect::Dialect;", "Dialect"),
@@ -130,8 +164,8 @@ def split_grouped_layer_imports(text: str, slices: list[str]) -> tuple[str, int]
     # Both the multi-line form and the single-line one; neither puts a module
     # name on the same line as `crate::<layer>::` in a way the other rules see.
     pattern = re.compile(
-        r"^use crate::(domain|application::usecase|presentation::cli)::\{\n(.*?)^\};\n"
-        r"|^use crate::(domain|application::usecase|presentation::cli)::\{([^}\n]*)\};\n",
+        r"^[ \t]*use crate::(domain|application::usecase|presentation::cli)::\{\n(.*?)^[ \t]*\};\n"
+        r"|^[ \t]*use crate::(domain|application::usecase|presentation::cli)::\{([^}\n]*)\};\n",
         re.M | re.S,
     )
     count = 0
@@ -189,6 +223,13 @@ def rewrite(name: str, slices: list[str]) -> int:
                 counts["cross_package"] += n
         text, n = re.subn(r"\bcrate::domain::lint\b", "paredit_core_lint_engine", text)
         counts["cross_package"] += n
+        for module, owner in FEATURE_OWNER.items():
+            if module in slices:
+                continue
+            for layer, dest in FEATURE_LAYER.items():
+                text, n = re.subn(rf"\bcrate::{layer}::{module}\b",
+                                  f"{owner}::{module}::{dest}", text)
+                counts["cross_feature"] += n
 
         # 2. This package's own slices: the three layer paths collapse into the
         #    slice directory, which is the whole point of the slice-first layout.

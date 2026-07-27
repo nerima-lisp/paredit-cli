@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::sort_definitions::{
+use paredit_feature_form_transform::sort_definitions::usecase::{
     SortDefinitionsRequest, plan_sort_definitions,
 };
 
-use super::super::shared::{read_input_and_dialect, write_file_with_rollback};
 use super::args::SortDefinitionsArgs;
 use super::render::sort_definitions::print_sort_definitions_plan;
+use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub(in crate::presentation::cli) fn sort_definitions(args: SortDefinitionsArgs) -> Result<()> {
+pub fn sort_definitions(args: SortDefinitionsArgs) -> Result<()> {
     let (input, dialect) = read_input_and_dialect(Some(args.file.clone()), args.dialect)?;
     let plan = plan_sort_definitions(SortDefinitionsRequest {
         file: args.file.clone(),

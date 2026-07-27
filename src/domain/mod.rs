@@ -10,7 +10,7 @@
 // `pub(crate)` module to `pub` here would silently widen the public API.
 pub use paredit_core_syntax::{common_lisp, definition, dialect, form_shape, sexpr};
 // Phase 3 facade: benches/similarity_report.rs uses the public library API.
-pub(crate) use paredit_core_syntax::{expression_equality, graph, leading_trivia, view_query};
+pub(crate) use paredit_core_syntax::{expression_equality, graph, view_query};
 pub use paredit_feature_extract::extract_constant::domain as extract_constant;
 pub use paredit_feature_extract::extract_function::domain as extract_function;
 pub use paredit_feature_extract::extract_local_function::domain as extract_local_function;
@@ -33,7 +33,7 @@ pub use paredit_feature_similarity::similarity_report::domain as similarity_repo
 pub(crate) use paredit_core_edit::{convert_control, extract_shared, mutation_safety};
 pub use paredit_core_edit::{refactor_execute, refactor_plan, refactor_preview};
 pub use paredit_core_semantics::lexical_scope;
-pub(crate) use paredit_core_semantics::{callable_scope, definition_reference, semantics};
+pub(crate) use paredit_core_semantics::{callable_scope, semantics};
 
 pub mod accessor_arity_report;
 pub mod append_list_to_cons_report;
@@ -59,7 +59,6 @@ pub mod constant_if_test_report;
 pub mod constant_when_test_report;
 pub mod de_morgan_report;
 pub mod dead_boolean_operand_report;
-pub mod definition_report;
 pub mod defpackage_quoted_report;
 pub mod destructive_literal_report;
 pub mod double_reverse_report;
@@ -164,9 +163,6 @@ pub mod redundant_progn_report;
 pub mod redundant_quote_report;
 pub mod redundant_start_zero_report;
 pub mod redundant_the_report;
-pub(crate) mod remove_unused_binding;
-pub(crate) mod remove_unused_control;
-pub(crate) mod remove_unused_definition;
 pub mod rename;
 pub(crate) mod rename_control;
 mod rename_types;
@@ -220,3 +216,7 @@ pub use paredit_feature_package::system_conflict_report::domain as system_confli
 pub use paredit_feature_package::unused_export_report::domain as unused_export_report;
 pub use paredit_feature_package::unused_nickname_report::domain as unused_nickname_report;
 pub use paredit_feature_package::unused_package_report::domain as unused_package_report;
+pub use paredit_feature_remove_unused::definition_report::domain as definition_report;
+pub use paredit_feature_remove_unused::remove_unused_binding::domain as remove_unused_binding;
+pub use paredit_feature_remove_unused::remove_unused_control::domain as remove_unused_control;
+pub use paredit_feature_remove_unused::remove_unused_definition::domain as remove_unused_definition;

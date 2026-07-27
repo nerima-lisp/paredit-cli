@@ -1,21 +1,21 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispLocalCallableForm,
     CommonLispSlotBindingForm, CommonLispVariableSpecForm,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
 
 #[derive(Debug)]
-pub(crate) struct LetBindingRemovalCandidate {
-    pub(crate) index: usize,
-    pub(crate) name: String,
-    pub(crate) value_span: ByteSpan,
-    pub(crate) removal_span: ByteSpan,
+pub struct LetBindingRemovalCandidate {
+    pub index: usize,
+    pub name: String,
+    pub value_span: ByteSpan,
+    pub removal_span: ByteSpan,
 }
 
-pub(crate) fn binding_removal_candidates(
+pub fn binding_removal_candidates(
     dialect: Dialect,
     refactor_form: CommonLispBindingRefactorForm,
     binding_form: &ExpressionView,
@@ -323,15 +323,12 @@ fn atom_text(view: &ExpressionView) -> Option<&str> {
 
 mod references;
 
-pub(crate) use references::binding_reference_spans;
+pub use references::binding_reference_spans;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
-        dialect::Dialect,
-        sexpr::{SymbolName, SyntaxTree},
-    };
+    use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
 
     fn target_for(input: &str) -> (SyntaxTree, ExpressionView) {
         let tree = SyntaxTree::parse(input).expect("input should parse");

@@ -1,10 +1,10 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 type SpanEdit = (ByteSpan, String);
 
-pub(super) fn apply_nested_span_edits(
+pub fn apply_nested_span_edits(
     outer_text: &str,
     outer_span: ByteSpan,
     mut edits: Vec<SpanEdit>,
@@ -35,7 +35,7 @@ fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Re
     Ok(())
 }
 
-pub(super) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut output = String::with_capacity(input.len() - span.len() + replacement.len());
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);

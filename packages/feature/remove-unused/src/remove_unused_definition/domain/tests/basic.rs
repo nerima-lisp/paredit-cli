@@ -1,4 +1,8 @@
 use super::*;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use std::path::PathBuf;
 
 #[test]
 fn plans_private_unused_definition_removal() {

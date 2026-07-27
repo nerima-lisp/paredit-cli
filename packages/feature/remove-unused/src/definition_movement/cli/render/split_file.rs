@@ -1,14 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::split_file::SplitFilePlan;
+use paredit_feature_form_transform::split_file::usecase::SplitFilePlan;
 
-use super::super::super::OutputFormat;
-
-pub(in crate::presentation::cli::definition_movement) fn print_split_file_plan(
-    plan: &SplitFilePlan,
-    output: OutputFormat,
-) -> Result<()> {
+pub fn print_split_file_plan(plan: &SplitFilePlan, output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => {
             println!("from_file\t{}", safe_text!(plan.from_file.display()));

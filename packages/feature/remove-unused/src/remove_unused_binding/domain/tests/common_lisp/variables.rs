@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_common_lisp_single_unused_binding() {

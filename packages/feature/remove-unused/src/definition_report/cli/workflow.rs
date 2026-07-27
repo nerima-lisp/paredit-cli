@@ -1,17 +1,20 @@
+use anyhow::Result;
+use paredit_core_cli::args::SourceInput;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_syntax::sexpr::SyntaxTree;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::super::*;
 use super::args::{DefinitionReportArgs, UnusedDefinitionReportArgs};
 use super::render::{print_definition_report, print_unused_definition_report};
-use crate::application::usecase::definition_report::{
+use crate::definition_report::usecase::{
     UnusedDefinitionPolicyOptions, build_definition_report, build_parsed_definition_file,
     collect_unused_definition_candidates, evaluate_unused_definition_policy,
 };
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs) -> Result<()> {
+pub fn definition_report(args: DefinitionReportArgs) -> Result<()> {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -23,9 +26,7 @@ pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs
     print_definition_report(&reports, args.output)
 }
 
-pub(in crate::presentation::cli) fn unused_definition_report(
-    args: UnusedDefinitionReportArgs,
-) -> Result<()> {
+pub fn unused_definition_report(args: UnusedDefinitionReportArgs) -> Result<()> {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
     let mut parsed = Vec::with_capacity(files.len());
 
@@ -42,7 +43,7 @@ pub(in crate::presentation::cli) fn unused_definition_report(
     let reports = collect_unused_definition_candidates(&parsed)?;
     let policy = evaluate_unused_definition_policy(
         UnusedDefinitionPolicyOptions::new(args.fail_on_unused, args.require_unused_definitions)
-            .map_err(crate::presentation::cli::gate::gate_failure)?,
+            .map_err(paredit_core_cli::gate::gate_failure)?,
         &reports,
     );
     let policy_passed = policy.passed;
@@ -51,7 +52,7 @@ pub(in crate::presentation::cli) fn unused_definition_report(
     print_unused_definition_report(&reports, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "unused-definition-report policy failed: {policy_message}"
         )));
     }
@@ -61,7 +62,7 @@ pub(in crate::presentation::cli) fn unused_definition_report(
 
 fn expand_definition_report_inputs(
     files: &[PathBuf],
-    dialect: Option<super::super::DialectArg>,
+    dialect: Option<paredit_core_cli::args::DialectArg>,
 ) -> Result<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
@@ -97,8 +98,13 @@ fn push_unique(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: 
 
 fn load_definition_input(
     file: &Path,
-    dialect: Option<super::super::DialectArg>,
-) -> Result<(PathBuf, SourceInput, super::super::Dialect, SyntaxTree)> {
+    dialect: Option<paredit_core_cli::args::DialectArg>,
+) -> Result<(
+    PathBuf,
+    SourceInput,
+    paredit_core_syntax::dialect::Dialect,
+    SyntaxTree,
+)> {
     let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.to_path_buf()), dialect)?;
 
     Ok((file.to_path_buf(), input, dialect, tree))

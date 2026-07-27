@@ -137,7 +137,13 @@ def scaffold(name: str, slices: list[str], description: str, deps: list[str]) ->
                 "// that runs it. command.rs and dispatch.rs need these two names and no more.\n")
         for slice_ in sorted(with_cli):
             for arg, fn in published(src, slice_):
-                lib += f"pub use {slice_}::cli::{{{arg}, {fn}}};\n"
+                # A run function can share a name with another slice's module -
+                # `definition_removal` publishes `remove_definition`, and
+                # `remove_definition` is also a slice. Alias to keep both.
+                if fn in slices and fn != slice_:
+                    lib += f"pub use {slice_}::cli::{{{arg}, {fn} as run_{fn}}};\n"
+                else:
+                    lib += f"pub use {slice_}::cli::{{{arg}, {fn}}};\n"
     (src / "lib.rs").write_text(lib)
 
     dep_lines = "\n".join(CORE_DEPS[d] for d in deps if d in CORE_DEPS)

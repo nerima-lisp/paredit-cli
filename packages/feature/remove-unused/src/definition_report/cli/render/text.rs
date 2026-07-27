@@ -1,6 +1,7 @@
 use super::*;
+use paredit_core_cli::safe_text;
 
-pub(super) fn print_definition_report(
+pub fn print_definition_report(
     reports: &[DefinitionReportFile],
     summary: &DefinitionReportSummary,
 ) {
@@ -39,7 +40,7 @@ pub(super) fn print_definition_report(
     }
 }
 
-pub(super) fn print_unused_definition_report(
+pub fn print_unused_definition_report(
     reports: &[UnusedDefinitionFile],
     policy: &UnusedDefinitionPolicy,
 ) {

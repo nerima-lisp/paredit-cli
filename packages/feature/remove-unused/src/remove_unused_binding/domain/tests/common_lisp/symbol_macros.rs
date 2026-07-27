@@ -1,4 +1,5 @@
 use super::super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn plans_unused_symbol_macrolet_without_counting_expansion_reference() {

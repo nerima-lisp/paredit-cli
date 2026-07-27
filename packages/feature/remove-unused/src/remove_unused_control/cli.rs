@@ -1,17 +1,26 @@
-use super::*;
-use crate::application::usecase::remove_unused_control::{
+use crate::remove_unused_control::usecase::{
     RemoveUnusedControlPlan, RemoveUnusedControlRequest, plan_remove_unused_block,
     plan_remove_unused_tag,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct RemoveUnusedBlockArgs {
+pub struct RemoveUnusedBlockArgs {
     #[command(flatten)]
     common: RemoveUnusedControlArgs,
 }
 #[derive(Debug, Args)]
-pub(super) struct RemoveUnusedTagArgs {
+pub struct RemoveUnusedTagArgs {
     #[command(flatten)]
     common: RemoveUnusedControlArgs,
 }
@@ -30,10 +39,10 @@ struct RemoveUnusedControlArgs {
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     output: OutputFormat,
 }
-pub(super) fn remove_unused_block(args: RemoveUnusedBlockArgs) -> Result<()> {
+pub fn remove_unused_block(args: RemoveUnusedBlockArgs) -> Result<()> {
     run(args.common, plan_remove_unused_block)
 }
-pub(super) fn remove_unused_tag(args: RemoveUnusedTagArgs) -> Result<()> {
+pub fn remove_unused_tag(args: RemoveUnusedTagArgs) -> Result<()> {
     run(args.common, plan_remove_unused_tag)
 }
 fn run(

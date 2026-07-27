@@ -1,4 +1,7 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use std::path::PathBuf;
 
 #[test]
 fn unused_candidates_ignore_self_references_and_count_external_references() {

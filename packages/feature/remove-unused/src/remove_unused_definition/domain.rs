@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 mod candidates;
 mod policy;
