@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::constant_if_test_report::{
+use crate::constant_if_test::cli::args::ConstantIfTestReportArgs;
+use crate::constant_if_test::cli::render::print_constant_if_test_report;
+use crate::constant_if_test::usecase::{
     ConstantIfTestPolicyOptions, collect_constant_if_tests, evaluate_constant_if_test_policy,
     summarize_constant_if_tests,
 };
-use crate::presentation::cli::constant_if_test_report::args::ConstantIfTestReportArgs;
-use crate::presentation::cli::constant_if_test_report::render::print_constant_if_test_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn constant_if_test_report(
-    args: ConstantIfTestReportArgs,
-) -> Result<()> {
+pub fn constant_if_test_report(args: ConstantIfTestReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn constant_if_test_report(
     print_constant_if_test_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "constant-if-test-report policy failed: {policy_message}"
         )));
     }

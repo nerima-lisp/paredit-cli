@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::nested_unless_report::{
+use crate::nested_unless::cli::args::NestedUnlessReportArgs;
+use crate::nested_unless::cli::render::print_nested_unless_report;
+use crate::nested_unless::usecase::{
     NestedUnlessPolicyOptions, collect_nested_unlesses, evaluate_nested_unless_policy,
     summarize_nested_unlesses,
 };
-use crate::presentation::cli::nested_unless_report::args::NestedUnlessReportArgs;
-use crate::presentation::cli::nested_unless_report::render::print_nested_unless_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn nested_unless_report(
-    args: NestedUnlessReportArgs,
-) -> Result<()> {
+pub fn nested_unless_report(args: NestedUnlessReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut unless_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn nested_unless_report(
     print_nested_unless_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "nested-unless-report policy failed: {policy_message}"
         )));
     }

@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::negated_when_unless_report::{
-    NegatedWhenUnlessPolicy, NegatedWhenUnlessSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::negated_when_unless::usecase::{NegatedWhenUnlessPolicy, NegatedWhenUnlessSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_negated_when_unless_report(
+pub fn print_negated_when_unless_report(
     summary: &NegatedWhenUnlessSummary,
     policy: &NegatedWhenUnlessPolicy,
     output: OutputFormat,

@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::dead_boolean_operand_report::{
-    DeadBooleanOperandPolicy, DeadBooleanOperandSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::dead_boolean_operand::usecase::{DeadBooleanOperandPolicy, DeadBooleanOperandSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_dead_boolean_operand_report(
+pub fn print_dead_boolean_operand_report(
     summary: &DeadBooleanOperandSummary,
     policy: &DeadBooleanOperandPolicy,
     output: OutputFormat,

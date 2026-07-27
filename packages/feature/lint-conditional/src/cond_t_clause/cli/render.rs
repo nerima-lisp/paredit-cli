@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::cond_t_clause_report::{CondTClausePolicy, CondTClauseSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::cond_t_clause::usecase::{CondTClausePolicy, CondTClauseSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_cond_t_clause_report(
+pub fn print_cond_t_clause_report(
     summary: &CondTClauseSummary,
     policy: &CondTClausePolicy,
     output: OutputFormat,

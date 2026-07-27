@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::unreachable_case_clause_report::{
+use crate::unreachable_case_clause::cli::args::UnreachableCaseClauseReportArgs;
+use crate::unreachable_case_clause::cli::render::print_unreachable_case_clause_report;
+use crate::unreachable_case_clause::usecase::{
     UnreachableCaseClausePolicyOptions, collect_unreachable_case_clauses,
     evaluate_unreachable_case_clause_policy, summarize_unreachable_case_clauses,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::unreachable_case_clause_report::args::UnreachableCaseClauseReportArgs;
-use crate::presentation::cli::unreachable_case_clause_report::render::print_unreachable_case_clause_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn unreachable_case_clause_report(
-    args: UnreachableCaseClauseReportArgs,
-) -> Result<()> {
+pub fn unreachable_case_clause_report(args: UnreachableCaseClauseReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut case_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn unreachable_case_clause_report(
     print_unreachable_case_clause_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "unreachable-case-clause-report policy failed: {policy_message}"
         )));
     }

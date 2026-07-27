@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::malformed_case_clause_report::{
+use crate::malformed_case_clause::cli::args::MalformedCaseClauseReportArgs;
+use crate::malformed_case_clause::cli::render::print_malformed_case_clause_report;
+use crate::malformed_case_clause::usecase::{
     MalformedCaseClausePolicyOptions, collect_malformed_case_clauses,
     evaluate_malformed_case_clause_policy, summarize_malformed_case_clauses,
 };
-use crate::presentation::cli::malformed_case_clause_report::args::MalformedCaseClauseReportArgs;
-use crate::presentation::cli::malformed_case_clause_report::render::print_malformed_case_clause_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn malformed_case_clause_report(
-    args: MalformedCaseClauseReportArgs,
-) -> Result<()> {
+pub fn malformed_case_clause_report(args: MalformedCaseClauseReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut case_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn malformed_case_clause_report(
     print_malformed_case_clause_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "malformed-case-clause-report policy failed: {policy_message}"
         )));
     }

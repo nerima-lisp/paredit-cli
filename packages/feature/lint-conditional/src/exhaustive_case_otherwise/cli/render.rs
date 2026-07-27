@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::exhaustive_case_otherwise_report::{
+use crate::exhaustive_case_otherwise::usecase::{
     ExhaustiveCaseOtherwisePolicy, ExhaustiveCaseOtherwiseSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_exhaustive_case_otherwise_report(
+pub fn print_exhaustive_case_otherwise_report(
     summary: &ExhaustiveCaseOtherwiseSummary,
     policy: &ExhaustiveCaseOtherwisePolicy,
     output: OutputFormat,

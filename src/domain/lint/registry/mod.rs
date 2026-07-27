@@ -77,9 +77,18 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_control_flow::nested_progn::rule::META,
         &paredit_feature_lint_control_flow::nested_progn::rule::RULE,
     ),
-    RuleEntry::new(&rules::nested_when::META, &rules::nested_when::RULE),
-    RuleEntry::new(&rules::nested_unless::META, &rules::nested_unless::RULE),
-    RuleEntry::new(&rules::nested_boolean::META, &rules::nested_boolean::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::nested_when::rule::META,
+        &paredit_feature_lint_conditional::nested_when::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::nested_unless::rule::META,
+        &paredit_feature_lint_conditional::nested_unless::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::nested_boolean::rule::META,
+        &paredit_feature_lint_conditional::nested_boolean::rule::RULE,
+    ),
     RuleEntry::new(&rules::nested_cxr::META, &rules::nested_cxr::RULE),
     RuleEntry::new(
         &paredit_feature_lint_sequence::nth_constant_index::rule::META,
@@ -99,8 +108,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     ),
     RuleEntry::new(&rules::empty_let::META, &rules::empty_let::RULE),
     RuleEntry::new(
-        &rules::redundant_if_nil::META,
-        &rules::redundant_if_nil::RULE,
+        &paredit_feature_lint_conditional::redundant_if_nil::rule::META,
+        &paredit_feature_lint_conditional::redundant_if_nil::rule::RULE,
     ),
     RuleEntry::new(
         &rules::redundant_let_star::META,
@@ -130,21 +139,33 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_sequence::redundant_identity_key::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::negated_when_unless::META,
-        &rules::negated_when_unless::RULE,
+        &paredit_feature_lint_conditional::negated_when_unless::rule::META,
+        &paredit_feature_lint_conditional::negated_when_unless::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::negated_comparison::META,
-        &rules::negated_comparison::RULE,
+        &paredit_feature_lint_conditional::negated_comparison::rule::META,
+        &paredit_feature_lint_conditional::negated_comparison::rule::RULE,
     ),
-    RuleEntry::new(&rules::negated_if::META, &rules::negated_if::RULE),
-    RuleEntry::new(&rules::if_to_or::META, &rules::if_to_or::RULE),
-    RuleEntry::new(&rules::if_not::META, &rules::if_not::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::negated_if::rule::META,
+        &paredit_feature_lint_conditional::negated_if::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::if_to_or::rule::META,
+        &paredit_feature_lint_conditional::if_to_or::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::if_not::rule::META,
+        &paredit_feature_lint_conditional::if_not::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::one_step_arithmetic::rule::META,
         &paredit_feature_lint_numeric::one_step_arithmetic::rule::RULE,
     ),
-    RuleEntry::new(&rules::one_armed_if::META, &rules::one_armed_if::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::one_armed_if::rule::META,
+        &paredit_feature_lint_conditional::one_armed_if::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::self_comparison::rule::META,
         &paredit_feature_lint_numeric::self_comparison::rule::RULE,
@@ -158,18 +179,21 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::t_comparison::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::identical_if_branches::META,
-        &rules::identical_if_branches::RULE,
+        &paredit_feature_lint_conditional::identical_if_branches::rule::META,
+        &paredit_feature_lint_conditional::identical_if_branches::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::constant_if_test::META,
-        &rules::constant_if_test::RULE,
+        &paredit_feature_lint_conditional::constant_if_test::rule::META,
+        &paredit_feature_lint_conditional::constant_if_test::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::constant_when_test::META,
-        &rules::constant_when_test::RULE,
+        &paredit_feature_lint_conditional::constant_when_test::rule::META,
+        &paredit_feature_lint_conditional::constant_when_test::rule::RULE,
     ),
-    RuleEntry::new(&rules::if_arity::META, &rules::if_arity::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::if_arity::rule::META,
+        &paredit_feature_lint_conditional::if_arity::rule::RULE,
+    ),
     RuleEntry::new(&rules::the_arity::META, &rules::the_arity::RULE),
     RuleEntry::new(
         &paredit_feature_lint_numeric::equality_arity::rule::META,
@@ -196,38 +220,44 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::redundant_divisor::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::duplicate_case_keys::META,
-        &rules::duplicate_case_keys::RULE,
-    ),
-    RuleEntry::new(&rules::quoted_case_key::META, &rules::quoted_case_key::RULE),
-    RuleEntry::new(&rules::case_nil_key::META, &rules::case_nil_key::RULE),
-    RuleEntry::new(
-        &rules::typecase_nil_key::META,
-        &rules::typecase_nil_key::RULE,
+        &paredit_feature_lint_conditional::duplicate_case_keys::rule::META,
+        &paredit_feature_lint_conditional::duplicate_case_keys::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::malformed_case_clause::META,
-        &rules::malformed_case_clause::RULE,
+        &paredit_feature_lint_conditional::quoted_case_key::rule::META,
+        &paredit_feature_lint_conditional::quoted_case_key::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::unreachable_case_clause::META,
-        &rules::unreachable_case_clause::RULE,
+        &paredit_feature_lint_conditional::case_nil_key::rule::META,
+        &paredit_feature_lint_conditional::case_nil_key::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::exhaustive_case_otherwise::META,
-        &rules::exhaustive_case_otherwise::RULE,
+        &paredit_feature_lint_conditional::typecase_nil_key::rule::META,
+        &paredit_feature_lint_conditional::typecase_nil_key::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::duplicate_cond_tests::META,
-        &rules::duplicate_cond_tests::RULE,
+        &paredit_feature_lint_conditional::malformed_case_clause::rule::META,
+        &paredit_feature_lint_conditional::malformed_case_clause::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::unreachable_cond_clause::META,
-        &rules::unreachable_cond_clause::RULE,
+        &paredit_feature_lint_conditional::unreachable_case_clause::rule::META,
+        &paredit_feature_lint_conditional::unreachable_case_clause::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::malformed_cond_clause::META,
-        &rules::malformed_cond_clause::RULE,
+        &paredit_feature_lint_conditional::exhaustive_case_otherwise::rule::META,
+        &paredit_feature_lint_conditional::exhaustive_case_otherwise::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::duplicate_cond_tests::rule::META,
+        &paredit_feature_lint_conditional::duplicate_cond_tests::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::unreachable_cond_clause::rule::META,
+        &paredit_feature_lint_conditional::unreachable_cond_clause::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::malformed_cond_clause::rule::META,
+        &paredit_feature_lint_conditional::malformed_cond_clause::rule::RULE,
     ),
     RuleEntry::new(
         &rules::duplicate_let_bindings::META,
@@ -250,21 +280,24 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_control_flow::eval_when_situation::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::duplicate_boolean_operands::META,
-        &rules::duplicate_boolean_operands::RULE,
+        &paredit_feature_lint_conditional::duplicate_boolean_operands::rule::META,
+        &paredit_feature_lint_conditional::duplicate_boolean_operands::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::dead_boolean_operand::META,
-        &rules::dead_boolean_operand::RULE,
+        &paredit_feature_lint_conditional::dead_boolean_operand::rule::META,
+        &paredit_feature_lint_conditional::dead_boolean_operand::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_boolean_identity::META,
-        &rules::redundant_boolean_identity::RULE,
+        &paredit_feature_lint_conditional::redundant_boolean_identity::rule::META,
+        &paredit_feature_lint_conditional::redundant_boolean_identity::rule::RULE,
     ),
-    RuleEntry::new(&rules::de_morgan::META, &rules::de_morgan::RULE),
     RuleEntry::new(
-        &rules::single_operand_boolean::META,
-        &rules::single_operand_boolean::RULE,
+        &paredit_feature_lint_conditional::de_morgan::rule::META,
+        &paredit_feature_lint_conditional::de_morgan::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::single_operand_boolean::rule::META,
+        &paredit_feature_lint_conditional::single_operand_boolean::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_sequence::single_operand_list_op::rule::META,
@@ -303,10 +336,13 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::sign_comparison::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::single_clause_cond::META,
-        &rules::single_clause_cond::RULE,
+        &paredit_feature_lint_conditional::single_clause_cond::rule::META,
+        &paredit_feature_lint_conditional::single_clause_cond::rule::RULE,
     ),
-    RuleEntry::new(&rules::cond_t_clause::META, &rules::cond_t_clause::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::cond_t_clause::rule::META,
+        &paredit_feature_lint_conditional::cond_t_clause::rule::RULE,
+    ),
     RuleEntry::new(
         &rules::single_value_bind::META,
         &rules::single_value_bind::RULE,
@@ -327,7 +363,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_string_char::char_op_string::rule::META,
         &paredit_feature_lint_string_char::char_op_string::rule::RULE,
     ),
-    RuleEntry::new(&rules::empty_body::META, &rules::empty_body::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::empty_body::rule::META,
+        &paredit_feature_lint_conditional::empty_body::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::identity_arithmetic::rule::META,
         &paredit_feature_lint_numeric::identity_arithmetic::rule::RULE,
@@ -391,7 +430,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::step_zero::rule::META,
         &paredit_feature_lint_numeric::step_zero::rule::RULE,
     ),
-    RuleEntry::new(&rules::if_to_unless::META, &rules::if_to_unless::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_conditional::if_to_unless::rule::META,
+        &paredit_feature_lint_conditional::if_to_unless::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_control_flow::prog2_to_progn::rule::META,
         &paredit_feature_lint_control_flow::prog2_to_progn::rule::RULE,

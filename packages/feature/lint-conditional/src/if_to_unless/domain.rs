@@ -6,11 +6,11 @@
 //!
 //! To avoid overlapping sibling rules, several else-branch shapes are left alone:
 //!
-//!   - `else = t` is [`crate::domain::if_not_report`] (`(if c nil t)` is
+//!   - `else = t` is [`crate::if_not::domain`] (`(if c nil t)` is
 //!     `(not c)`), a cleaner rewrite;
-//!   - `else = nil` is [`crate::domain::identical_if_branch_report`]
+//!   - `else = nil` is [`crate::identical_if_branches::domain`]
 //!     (`(if c nil nil)`);
-//!   - a literal `t`/`nil` *test* is [`crate::domain::constant_if_test_report`].
+//!   - a literal `t`/`nil` *test* is [`crate::constant_if_test::domain`].
 //!
 //! A reader-conditional test or else operand is also left alone.
 //!
@@ -18,7 +18,7 @@
 //! source, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -26,9 +26,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// Whether `view` is the bare literal atom `expected` (`nil`/`t`), no prefixes.
 fn is_bare_literal(view: &ExpressionView, expected: &str) -> bool {
@@ -86,7 +86,7 @@ pub struct IfToUnlessPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine(
+pub fn examine(
     view: &ExpressionView,
     path: &Path,
     if_form_count: &mut usize,

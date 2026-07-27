@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::de_morgan_report::{
+use crate::de_morgan::cli::args::DeMorganReportArgs;
+use crate::de_morgan::cli::render::print_de_morgan_report;
+use crate::de_morgan::usecase::{
     DeMorganPolicyOptions, collect_de_morgans, evaluate_de_morgan_policy, summarize_de_morgans,
 };
-use crate::presentation::cli::de_morgan_report::args::DeMorganReportArgs;
-use crate::presentation::cli::de_morgan_report::render::print_de_morgan_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn de_morgan_report(args: DeMorganReportArgs) -> Result<()> {
+pub fn de_morgan_report(args: DeMorganReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut boolean_form_count = 0;
@@ -29,7 +29,7 @@ pub(in crate::presentation::cli) fn de_morgan_report(args: DeMorganReportArgs) -
     print_de_morgan_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "de-morgan-report policy failed: {policy_message}"
         )));
     }

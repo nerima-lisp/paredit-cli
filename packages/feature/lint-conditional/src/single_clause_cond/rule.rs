@@ -1,18 +1,18 @@
 //! `single-clause-cond`: a cond with one non-t clause that has a body ((cond (test a b)) is (when test a b)).
 //!
-//! The analysis lives in [`crate::domain::single_clause_cond_report`], which also backs the
+//! The analysis lives in [`crate::single_clause_cond::domain`], which also backs the
 //! standalone `inspect single-clause-cond` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::single_clause_cond::domain::examine_cond;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::single_clause_cond_report::examine_cond;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "single-clause-cond",

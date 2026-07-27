@@ -12,7 +12,7 @@
 //! literal `nil` for a false one-armed `if`), so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -20,9 +20,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// Whether `view` is the bare literal `t` or `nil` (no reader prefixes); returns
 /// which one so the caller can pick the live branch.
@@ -100,11 +100,11 @@ pub struct ConstantIfTestPolicy {
 /// Widening is safe for the fix as well as the report: the value layer folds
 /// only pure operations, so a test it can evaluate has no side effect for the
 /// rewrite to drop.
-pub(crate) type ConstantTest<'a> = &'a dyn Fn(&ExpressionView) -> Option<bool>;
+pub type ConstantTest<'a> = &'a dyn Fn(&ExpressionView) -> Option<bool>;
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_if(
+pub fn examine_if(
     view: &ExpressionView,
     path: &Path,
     constant_test: ConstantTest<'_>,

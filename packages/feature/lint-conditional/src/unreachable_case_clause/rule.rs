@@ -1,18 +1,18 @@
 //! `unreachable-case-clause`: a case/typecase clause after a t/otherwise catch-all that can never run.
 //!
-//! The analysis lives in [`crate::domain::unreachable_case_clause_report`], which also backs the
+//! The analysis lives in [`crate::unreachable_case_clause::domain`], which also backs the
 //! standalone `inspect unreachable-case-clause` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::unreachable_case_clause::domain::examine_case;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::unreachable_case_clause_report::examine_case;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "unreachable-case-clause",

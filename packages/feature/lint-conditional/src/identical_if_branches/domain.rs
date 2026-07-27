@@ -8,7 +8,7 @@
 //! Like [`crate::domain::self_assignment_report`], an `if` can appear
 //! anywhere in a body, so this report walks the whole expression tree and
 //! reuses the same reader-aware structural comparison from
-//! [`crate::domain::expression_equality`].
+//! [`paredit_core_syntax::expression_equality`].
 //!
 //! Scope: Common Lisp only, and only the two-armed `(if test then else)`
 //! shape — a one-armed `(if test then)` has no second branch to compare, and
@@ -19,10 +19,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::{expressions_structurally_equal, render_expression};
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, list_head};
 
 #[derive(Debug, Clone)]
 pub struct IdenticalIfBranchItem {
@@ -65,7 +65,7 @@ pub struct IdenticalIfBranchPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_if(
+pub fn examine_if(
     view: &ExpressionView,
     path: &Path,
     if_form_count: &mut usize,

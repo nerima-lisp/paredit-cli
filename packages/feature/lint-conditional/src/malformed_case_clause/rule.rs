@@ -1,18 +1,18 @@
 //! `malformed-case-clause`: a case/typecase clause that is not a non-empty list.
 //!
-//! The analysis lives in [`crate::domain::malformed_case_clause_report`], which also backs the
+//! The analysis lives in [`crate::malformed_case_clause::domain`], which also backs the
 //! standalone `inspect malformed-case-clause` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::malformed_case_clause::domain::examine_case;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::malformed_case_clause_report::examine_case;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "malformed-case-clause",

@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::quoted_case_key_report::{
-    QuotedCaseKeyPolicy, QuotedCaseKeySummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::quoted_case_key::usecase::{QuotedCaseKeyPolicy, QuotedCaseKeySummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_quoted_case_key_report(
+pub fn print_quoted_case_key_report(
     summary: &QuotedCaseKeySummary,
     policy: &QuotedCaseKeyPolicy,
     output: OutputFormat,

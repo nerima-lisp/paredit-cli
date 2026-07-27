@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::duplicate_case_key_report::{
-    DuplicateCaseKeyPolicy, DuplicateCaseKeySummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::duplicate_case_keys::usecase::{DuplicateCaseKeyPolicy, DuplicateCaseKeySummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_duplicate_case_key_report(
+pub fn print_duplicate_case_key_report(
     summary: &DuplicateCaseKeySummary,
     policy: &DuplicateCaseKeyPolicy,
     output: OutputFormat,

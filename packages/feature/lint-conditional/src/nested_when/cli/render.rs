@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nested_when_report::{NestedWhenPolicy, NestedWhenSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::nested_when::usecase::{NestedWhenPolicy, NestedWhenSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nested_when_report(
+pub fn print_nested_when_report(
     summary: &NestedWhenSummary,
     policy: &NestedWhenPolicy,
     output: OutputFormat,

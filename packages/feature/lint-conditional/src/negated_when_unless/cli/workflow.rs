@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::negated_when_unless_report::{
+use crate::negated_when_unless::cli::args::NegatedWhenUnlessReportArgs;
+use crate::negated_when_unless::cli::render::print_negated_when_unless_report;
+use crate::negated_when_unless::usecase::{
     NegatedWhenUnlessPolicyOptions, collect_negated_when_unless,
     evaluate_negated_when_unless_policy, summarize_negated_when_unless,
 };
-use crate::presentation::cli::negated_when_unless_report::args::NegatedWhenUnlessReportArgs;
-use crate::presentation::cli::negated_when_unless_report::render::print_negated_when_unless_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn negated_when_unless_report(
-    args: NegatedWhenUnlessReportArgs,
-) -> Result<()> {
+pub fn negated_when_unless_report(args: NegatedWhenUnlessReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut conditional_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn negated_when_unless_report(
     print_negated_when_unless_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "negated-when-unless-report policy failed: {policy_message}"
         )));
     }

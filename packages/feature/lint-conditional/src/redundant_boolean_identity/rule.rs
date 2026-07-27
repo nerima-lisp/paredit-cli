@@ -1,18 +1,18 @@
 //! `redundant-boolean-identity`: an and/or with a redundant identity operand (t in and, nil in or; (and a t b) is (and a b)).
 //!
-//! The analysis lives in [`crate::domain::redundant_boolean_identity_report`], which also backs the
+//! The analysis lives in [`crate::redundant_boolean_identity::domain`], which also backs the
 //! standalone `inspect redundant-boolean-identity` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::redundant_boolean_identity::domain::examine_boolean;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::redundant_boolean_identity_report::examine_boolean;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "redundant-boolean-identity",

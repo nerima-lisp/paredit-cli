@@ -7,7 +7,7 @@
 //! mechanical macro expansion or incremental edits.
 //!
 //! This rule is the multi-operand companion to
-//! [`crate::domain::single_operand_boolean_report`]: that rule owns the
+//! [`crate::single_operand_boolean::domain`]: that rule owns the
 //! single-operand collapse (`(or x)` is `x`), while this rule owns a nested
 //! same-operator form with two or more operands that is redundant *because* of
 //! where it sits. Requiring two or more inner operands keeps the two rules from
@@ -20,7 +20,7 @@
 //! (`,(or …)`/`#'(or …)`), which is not a plain boolean subform.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -28,9 +28,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 
 /// The boolean operator (`and`/`or`) heading `view`, or `None` when `view` is
 /// not such a form.
@@ -94,7 +94,7 @@ pub struct NestedBooleanPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_boolean(
+pub fn examine_boolean(
     view: &ExpressionView,
     path: &Path,
     boolean_form_count: &mut usize,

@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::single_operand_boolean_report::{
+use crate::single_operand_boolean::usecase::{
     SingleOperandBooleanPolicy, SingleOperandBooleanSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_single_operand_boolean_report(
+pub fn print_single_operand_boolean_report(
     summary: &SingleOperandBooleanSummary,
     policy: &SingleOperandBooleanPolicy,
     output: OutputFormat,

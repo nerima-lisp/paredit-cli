@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::if_to_or_report::{
+use crate::if_to_or::cli::args::IfToOrReportArgs;
+use crate::if_to_or::cli::render::print_if_to_or_report;
+use crate::if_to_or::usecase::{
     IfToOrPolicyOptions, collect_if_to_ors, evaluate_if_to_or_policy, summarize_if_to_ors,
 };
-use crate::presentation::cli::if_to_or_report::args::IfToOrReportArgs;
-use crate::presentation::cli::if_to_or_report::render::print_if_to_or_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn if_to_or_report(args: IfToOrReportArgs) -> Result<()> {
+pub fn if_to_or_report(args: IfToOrReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;
@@ -29,7 +29,7 @@ pub(in crate::presentation::cli) fn if_to_or_report(args: IfToOrReportArgs) -> R
     print_if_to_or_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "if-to-or-report policy failed: {policy_message}"
         )));
     }

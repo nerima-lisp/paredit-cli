@@ -29,6 +29,10 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+# A handful of rules name their report module in the singular, so the
+# report is not simply `<rule>_report`.
+REPORT_ALIAS = {'duplicate_cond_tests': 'duplicate_cond_test', 'identical_if_branches': 'identical_if_branch', 'duplicate_boolean_operands': 'duplicate_boolean_operand', 'duplicate_case_keys': 'duplicate_case_key'}
+
 OWNER: dict[str, str] = {}
 for _m in ("sexpr dialect common_lisp definition leading_trivia expression_equality "
            "form_shape graph view_query").split():
@@ -67,10 +71,11 @@ def rewrite(theme: str, rules: list[str]) -> collections.Counter:
 
         # A rule's four files collapse into one slice directory.
         for rule in rules:
+            report = REPORT_ALIAS.get(rule, rule)
             for layer, dest in (("domain", "domain"),
                                 ("application::usecase", "usecase"),
                                 ("presentation::cli", "cli")):
-                text, n = re.subn(rf"\bcrate::{layer}::{rule}_report\b",
+                text, n = re.subn(rf"\bcrate::{layer}::{report}_report\b",
                                   f"crate::{rule}::{dest}", text)
                 counts["own"] += n
             text, n = re.subn(rf"\bcrate::domain::lint::rules::{rule}\b",
@@ -221,10 +226,13 @@ def wire(theme: str, rules: list[str]) -> None:
         path = ROOT / rel
         text = path.read_text()
         for rule in rules:
+            report = REPORT_ALIAS.get(rule, rule)
             for vis in ("pub ", "pub(crate) ", ""):
-                text = text.replace(f"{vis}mod {rule}_report;\n", "")
+                text = text.replace(f"{vis}mod {report}_report;\n", "")
         vis = "use" if layer == "cli" else "pub use"
-        block = "\n".join(f"{vis} {crate}::{r}::{layer} as {r}_report;" for r in rules)
+        block = "\n".join(
+            f"{vis} {crate}::{r}::{layer} as {REPORT_ALIAS.get(r, r)}_report;"
+            for r in rules)
         if marker in text:
             text = text.replace(marker, marker + "\n" + block, 1)
         else:

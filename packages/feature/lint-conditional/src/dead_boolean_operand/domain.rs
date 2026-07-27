@@ -14,7 +14,7 @@
 //! operands — so this report leaves them to the redundancy-focused lints.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`], since an `and`/`or` can
+//! [`paredit_core_syntax::view_query::for_each_subview`], since an `and`/`or` can
 //! appear anywhere in a body.
 //!
 //! Scope: Common Lisp only. The empty list `()` is treated as the `nil`
@@ -24,9 +24,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 fn is_nil_literal(view: &ExpressionView) -> bool {
     atom_text(view).is_some_and(|text| text.eq_ignore_ascii_case("nil"))
@@ -79,7 +79,7 @@ pub struct DeadBooleanOperandPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_boolean(
+pub fn examine_boolean(
     view: &ExpressionView,
     path: &Path,
     boolean_form_count: &mut usize,

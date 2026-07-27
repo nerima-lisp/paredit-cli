@@ -5,7 +5,7 @@
 //! `(progn a b)` — same body, same last-form return value.
 //!
 //! This is the `t`-clause complement of
-//! [`crate::domain::single_clause_cond_report`], which rewrites a single
+//! [`crate::single_clause_cond::domain`], which rewrites a single
 //! *non-`t`* clause `(cond (test body…))` to `(when test body…)` and
 //! deliberately leaves the `t` case to this rule.
 //!
@@ -23,7 +23,7 @@
 //! forms verbatim, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -31,9 +31,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 /// Whether `view` is the bare literal `t` (no reader prefixes).
 fn is_literal_t(view: &ExpressionView) -> bool {
@@ -91,7 +91,7 @@ pub struct CondTClausePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_cond(
+pub fn examine_cond(
     view: &ExpressionView,
     path: &Path,
     cond_form_count: &mut usize,

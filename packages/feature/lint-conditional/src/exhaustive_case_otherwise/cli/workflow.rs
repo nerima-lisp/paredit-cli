@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::exhaustive_case_otherwise_report::{
+use crate::exhaustive_case_otherwise::cli::args::ExhaustiveCaseOtherwiseReportArgs;
+use crate::exhaustive_case_otherwise::cli::render::print_exhaustive_case_otherwise_report;
+use crate::exhaustive_case_otherwise::usecase::{
     ExhaustiveCaseOtherwisePolicyOptions, collect_exhaustive_case_otherwise,
     evaluate_exhaustive_case_otherwise_policy, summarize_exhaustive_case_otherwise,
 };
-use crate::presentation::cli::exhaustive_case_otherwise_report::args::ExhaustiveCaseOtherwiseReportArgs;
-use crate::presentation::cli::exhaustive_case_otherwise_report::render::print_exhaustive_case_otherwise_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn exhaustive_case_otherwise_report(
-    args: ExhaustiveCaseOtherwiseReportArgs,
-) -> Result<()> {
+pub fn exhaustive_case_otherwise_report(args: ExhaustiveCaseOtherwiseReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut case_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn exhaustive_case_otherwise_report(
     print_exhaustive_case_otherwise_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "exhaustive-case-otherwise-report policy failed: {policy_message}"
         )));
     }

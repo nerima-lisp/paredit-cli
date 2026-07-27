@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::typecase_nil_key_report::{
-    TypecaseNilKeyPolicy, TypecaseNilKeySummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::typecase_nil_key::usecase::{TypecaseNilKeyPolicy, TypecaseNilKeySummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_typecase_nil_key_report(
+pub fn print_typecase_nil_key_report(
     summary: &TypecaseNilKeySummary,
     policy: &TypecaseNilKeyPolicy,
     output: OutputFormat,

@@ -1,18 +1,18 @@
 //! `dead-boolean-operand`: an and/or whose non-final constant operand makes later operands dead.
 //!
-//! The analysis lives in [`crate::domain::dead_boolean_operand_report`], which also backs the
+//! The analysis lives in [`crate::dead_boolean_operand::domain`], which also backs the
 //! standalone `inspect dead-boolean-operand` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::dead_boolean_operand_report::examine_boolean;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::dead_boolean_operand::domain::examine_boolean;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "dead-boolean-operand",

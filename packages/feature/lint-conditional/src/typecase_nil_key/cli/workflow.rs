@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::typecase_nil_key_report::{
+use crate::typecase_nil_key::cli::args::TypecaseNilKeyReportArgs;
+use crate::typecase_nil_key::cli::render::print_typecase_nil_key_report;
+use crate::typecase_nil_key::usecase::{
     TypecaseNilKeyPolicyOptions, collect_typecase_nil_keys, evaluate_typecase_nil_key_policy,
     summarize_typecase_nil_keys,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::typecase_nil_key_report::args::TypecaseNilKeyReportArgs;
-use crate::presentation::cli::typecase_nil_key_report::render::print_typecase_nil_key_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn typecase_nil_key_report(
-    args: TypecaseNilKeyReportArgs,
-) -> Result<()> {
+pub fn typecase_nil_key_report(args: TypecaseNilKeyReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut typecase_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn typecase_nil_key_report(
     print_typecase_nil_key_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "typecase-nil-key-report policy failed: {policy_message}"
         )));
     }

@@ -8,7 +8,7 @@
 //! `(case x (1 :one) 2 :two)` when `(case x (1 :one) (2 :two))` was meant
 //! leaves `2` and `:two` as bare-atom clauses, which this rule flags directly.
 //!
-//! Unlike [`crate::domain::duplicate_case_key_report`] — which excludes the
+//! Unlike [`crate::duplicate_case_keys::domain`] — which excludes the
 //! type-testing `typecase` family because its clause heads are type specifiers
 //! rather than `eql` keys — this report covers all six forms, since the
 //! *structural* requirement "each clause is a non-empty list" is identical
@@ -20,7 +20,7 @@
 //! in from a template (`,@`).
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -28,10 +28,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::render_expression;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::render_expression;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
+};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 const CASE_HEADS: [&str; 6] = [
     "case",
@@ -101,7 +103,7 @@ pub struct MalformedCaseClausePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_case(
+pub fn examine_case(
     view: &ExpressionView,
     path: &Path,
     case_form_count: &mut usize,

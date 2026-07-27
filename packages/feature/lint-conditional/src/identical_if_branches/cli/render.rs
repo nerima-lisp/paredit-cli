@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::identical_if_branch_report::{
-    IdenticalIfBranchPolicy, IdenticalIfBranchSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::identical_if_branches::usecase::{IdenticalIfBranchPolicy, IdenticalIfBranchSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_identical_if_branch_report(
+pub fn print_identical_if_branch_report(
     summary: &IdenticalIfBranchSummary,
     policy: &IdenticalIfBranchPolicy,
     output: OutputFormat,

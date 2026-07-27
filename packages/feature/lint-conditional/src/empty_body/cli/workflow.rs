@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::empty_body_report::{
+use crate::empty_body::cli::args::EmptyBodyReportArgs;
+use crate::empty_body::cli::render::print_empty_body_report;
+use crate::empty_body::usecase::{
     EmptyBodyPolicyOptions, collect_empty_bodies, evaluate_empty_body_policy,
     summarize_empty_bodies,
 };
-use crate::presentation::cli::empty_body_report::args::EmptyBodyReportArgs;
-use crate::presentation::cli::empty_body_report::render::print_empty_body_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn empty_body_report(args: EmptyBodyReportArgs) -> Result<()> {
+pub fn empty_body_report(args: EmptyBodyReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut body_form_count = 0;
@@ -32,7 +32,7 @@ pub(in crate::presentation::cli) fn empty_body_report(args: EmptyBodyReportArgs)
     print_empty_body_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "empty-body-report policy failed: {policy_message}"
         )));
     }

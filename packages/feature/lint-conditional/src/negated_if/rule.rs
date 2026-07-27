@@ -1,18 +1,18 @@
 //! `negated-if`: a three-argument if with a negated test ((if (not c) a b) is (if c b a)).
 //!
-//! The analysis lives in [`crate::domain::negated_if_report`], which also backs the
+//! The analysis lives in [`crate::negated_if::domain`], which also backs the
 //! standalone `inspect negated-if` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::negated_if::domain::examine_if;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::negated_if_report::examine_if;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "negated-if",

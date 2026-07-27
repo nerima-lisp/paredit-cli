@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::case_nil_key_report::{CaseNilKeyPolicy, CaseNilKeySummary};
-use crate::presentation::cli::OutputFormat;
+use crate::case_nil_key::usecase::{CaseNilKeyPolicy, CaseNilKeySummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_case_nil_key_report(
+pub fn print_case_nil_key_report(
     summary: &CaseNilKeySummary,
     policy: &CaseNilKeyPolicy,
     output: OutputFormat,

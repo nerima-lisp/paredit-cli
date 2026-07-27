@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::single_clause_cond_report::{
+use crate::single_clause_cond::cli::args::SingleClauseCondReportArgs;
+use crate::single_clause_cond::cli::render::print_single_clause_cond_report;
+use crate::single_clause_cond::usecase::{
     SingleClauseCondPolicyOptions, collect_single_clause_conds, evaluate_single_clause_cond_policy,
     summarize_single_clause_conds,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::single_clause_cond_report::args::SingleClauseCondReportArgs;
-use crate::presentation::cli::single_clause_cond_report::render::print_single_clause_cond_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn single_clause_cond_report(
-    args: SingleClauseCondReportArgs,
-) -> Result<()> {
+pub fn single_clause_cond_report(args: SingleClauseCondReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut cond_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn single_clause_cond_report(
     print_single_clause_cond_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "single-clause-cond-report policy failed: {policy_message}"
         )));
     }

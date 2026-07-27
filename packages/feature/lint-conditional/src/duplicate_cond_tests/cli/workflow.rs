@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::duplicate_cond_test_report::{
+use crate::duplicate_cond_tests::cli::args::DuplicateCondTestReportArgs;
+use crate::duplicate_cond_tests::cli::render::print_duplicate_cond_test_report;
+use crate::duplicate_cond_tests::usecase::{
     DuplicateCondTestPolicyOptions, collect_duplicate_cond_tests,
     evaluate_duplicate_cond_test_policy, summarize_duplicate_cond_tests,
 };
-use crate::presentation::cli::duplicate_cond_test_report::args::DuplicateCondTestReportArgs;
-use crate::presentation::cli::duplicate_cond_test_report::render::print_duplicate_cond_test_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn duplicate_cond_test_report(
-    args: DuplicateCondTestReportArgs,
-) -> Result<()> {
+pub fn duplicate_cond_test_report(args: DuplicateCondTestReportArgs) -> Result<()> {
     let mut cond_form_count = 0;
     let mut duplicates = Vec::new();
 
@@ -33,7 +31,7 @@ pub(in crate::presentation::cli) fn duplicate_cond_test_report(
     print_duplicate_cond_test_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "duplicate-cond-test-report policy failed: {policy_message}"
         )));
     }

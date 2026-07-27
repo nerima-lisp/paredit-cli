@@ -1,18 +1,18 @@
 //! `negated-when-unless`: a when/unless whose test is a (not X)/(null X) negation (flip the macro instead).
 //!
-//! The analysis lives in [`crate::domain::negated_when_unless_report`], which also backs the
+//! The analysis lives in [`crate::negated_when_unless::domain`], which also backs the
 //! standalone `inspect negated-when-unless` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::negated_when_unless::domain::examine_conditional;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, Replacement, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::negated_when_unless_report::examine_conditional;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "negated-when-unless",

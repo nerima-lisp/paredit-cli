@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::nested_boolean_report::{
+use crate::nested_boolean::cli::args::NestedBooleanReportArgs;
+use crate::nested_boolean::cli::render::print_nested_boolean_report;
+use crate::nested_boolean::usecase::{
     NestedBooleanPolicyOptions, collect_nested_booleans, evaluate_nested_boolean_policy,
     summarize_nested_booleans,
 };
-use crate::presentation::cli::nested_boolean_report::args::NestedBooleanReportArgs;
-use crate::presentation::cli::nested_boolean_report::render::print_nested_boolean_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn nested_boolean_report(
-    args: NestedBooleanReportArgs,
-) -> Result<()> {
+pub fn nested_boolean_report(args: NestedBooleanReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut boolean_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn nested_boolean_report(
     print_nested_boolean_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "nested-boolean-report policy failed: {policy_message}"
         )));
     }

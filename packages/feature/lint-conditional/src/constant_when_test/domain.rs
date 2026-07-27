@@ -19,8 +19,8 @@
 //! reader-conditional in the body needs no special handling.
 //!
 //! This is the `when`/`unless` sibling of
-//! [`crate::domain::constant_if_test_report`]. Reuses the shared whole-tree walk
-//! from [`crate::domain::view_query::for_each_subview`].
+//! [`crate::constant_if_test::domain`]. Reuses the shared whole-tree walk
+//! from [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -28,9 +28,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// Whether `view` is the bare literal `t` or `nil` (no reader prefixes); returns
 /// which one so the caller can decide the branch.
@@ -99,7 +99,7 @@ pub struct ConstantWhenTestPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_when(
+pub fn examine_when(
     view: &ExpressionView,
     path: &Path,
     when_form_count: &mut usize,

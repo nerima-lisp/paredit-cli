@@ -4,7 +4,7 @@
 //! (`(or a nil b)` is `(or a b)`). The identity operand is evaluated for no
 //! effect and just clutters the form.
 //!
-//! This is the complement of [`crate::domain::dead_boolean_operand_report`],
+//! This is the complement of [`crate::dead_boolean_operand::domain`],
 //! which handles the *dominant* elements (`nil` in `and`, `t` in `or`) that make
 //! later operands dead. Here the constant changes nothing and is simply dropped.
 //!
@@ -23,7 +23,7 @@
 //! operand was removed, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -31,9 +31,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// The canonical operator name (`and`/`or`) and its identity element (`t`/`nil`)
 /// for a boolean head, or `None` otherwise.
@@ -107,7 +107,7 @@ pub struct RedundantBooleanIdentityPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_boolean(
+pub fn examine_boolean(
     view: &ExpressionView,
     path: &Path,
     boolean_form_count: &mut usize,

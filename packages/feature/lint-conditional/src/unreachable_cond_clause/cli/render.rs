@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::unreachable_cond_clause_report::{
+use crate::unreachable_cond_clause::usecase::{
     UnreachableCondClausePolicy, UnreachableCondClauseSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_unreachable_cond_clause_report(
+pub fn print_unreachable_cond_clause_report(
     summary: &UnreachableCondClauseSummary,
     policy: &UnreachableCondClausePolicy,
     output: OutputFormat,

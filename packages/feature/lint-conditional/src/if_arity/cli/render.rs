@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::if_arity_report::{IfArityPolicy, IfAritySummary};
-use crate::presentation::cli::OutputFormat;
+use crate::if_arity::usecase::{IfArityPolicy, IfAritySummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_if_arity_report(
+pub fn print_if_arity_report(
     summary: &IfAritySummary,
     policy: &IfArityPolicy,
     output: OutputFormat,

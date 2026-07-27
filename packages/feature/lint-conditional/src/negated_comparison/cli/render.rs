@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::negated_comparison_report::{
-    NegatedComparisonPolicy, NegatedComparisonSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::negated_comparison::usecase::{NegatedComparisonPolicy, NegatedComparisonSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_negated_comparison_report(
+pub fn print_negated_comparison_report(
     summary: &NegatedComparisonSummary,
     policy: &NegatedComparisonPolicy,
     output: OutputFormat,

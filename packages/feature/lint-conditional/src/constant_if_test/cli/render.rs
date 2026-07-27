@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::constant_if_test_report::{
-    ConstantIfTestPolicy, ConstantIfTestSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::constant_if_test::usecase::{ConstantIfTestPolicy, ConstantIfTestSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_constant_if_test_report(
+pub fn print_constant_if_test_report(
     summary: &ConstantIfTestSummary,
     policy: &ConstantIfTestPolicy,
     output: OutputFormat,

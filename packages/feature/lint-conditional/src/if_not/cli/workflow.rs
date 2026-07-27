@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::if_not_report::{
+use crate::if_not::cli::args::IfNotReportArgs;
+use crate::if_not::cli::render::print_if_not_report;
+use crate::if_not::usecase::{
     IfNotPolicyOptions, collect_if_nots, evaluate_if_not_policy, summarize_if_nots,
 };
-use crate::presentation::cli::if_not_report::args::IfNotReportArgs;
-use crate::presentation::cli::if_not_report::render::print_if_not_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn if_not_report(args: IfNotReportArgs) -> Result<()> {
+pub fn if_not_report(args: IfNotReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;
@@ -28,7 +28,7 @@ pub(in crate::presentation::cli) fn if_not_report(args: IfNotReportArgs) -> Resu
     print_if_not_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "if-not-report policy failed: {policy_message}"
         )));
     }

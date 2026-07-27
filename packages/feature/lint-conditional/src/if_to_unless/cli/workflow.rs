@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::if_to_unless_report::{
+use crate::if_to_unless::cli::args::IfToUnlessReportArgs;
+use crate::if_to_unless::cli::render::print_if_to_unless_report;
+use crate::if_to_unless::usecase::{
     IfToUnlessPolicyOptions, collect_if_to_unless, evaluate_if_to_unless_policy,
     summarize_if_to_unless,
 };
-use crate::presentation::cli::if_to_unless_report::args::IfToUnlessReportArgs;
-use crate::presentation::cli::if_to_unless_report::render::print_if_to_unless_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn if_to_unless_report(args: IfToUnlessReportArgs) -> Result<()> {
+pub fn if_to_unless_report(args: IfToUnlessReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;
@@ -32,7 +32,7 @@ pub(in crate::presentation::cli) fn if_to_unless_report(args: IfToUnlessReportAr
     print_if_to_unless_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "if-to-unless-report policy failed: {policy_message}"
         )));
     }

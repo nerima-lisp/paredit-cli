@@ -1,18 +1,18 @@
 //! `duplicate-boolean-operands`: an and/or that lists the same operand more than once.
 //!
-//! The analysis lives in [`crate::domain::duplicate_boolean_operand_report`], which also backs the
+//! The analysis lives in [`crate::duplicate_boolean_operands::domain`], which also backs the
 //! standalone `inspect duplicate-boolean-operands` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::duplicate_boolean_operand_report::examine_boolean;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::duplicate_boolean_operands::domain::examine_boolean;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "duplicate-boolean-operands",

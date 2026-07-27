@@ -12,7 +12,7 @@
 //! treat it specially), so it is not treated as always-true here.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -20,9 +20,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 /// Whether a `cond` clause's test is the always-true catch-all symbol `t`. The
 /// test must be a bare, unprefixed atom: `'t` is truthy too, but its quoted
@@ -75,7 +75,7 @@ pub struct UnreachableCondClausePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_cond(
+pub fn examine_cond(
     view: &ExpressionView,
     path: &Path,
     cond_form_count: &mut usize,

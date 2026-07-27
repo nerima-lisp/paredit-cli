@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::one_armed_if_report::{OneArmedIfPolicy, OneArmedIfSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::one_armed_if::usecase::{OneArmedIfPolicy, OneArmedIfSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_one_armed_if_report(
+pub fn print_one_armed_if_report(
     summary: &OneArmedIfSummary,
     policy: &OneArmedIfPolicy,
     output: OutputFormat,

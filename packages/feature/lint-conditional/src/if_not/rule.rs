@@ -1,18 +1,18 @@
 //! `if-not`: a three-argument if with then=nil and else=t ((if test nil t) is (not test)).
 //!
-//! The analysis lives in [`crate::domain::if_not_report`], which also backs the
+//! The analysis lives in [`crate::if_not::domain`], which also backs the
 //! standalone `inspect if-not` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::if_not_report::examine_if;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::if_not::domain::examine_if;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "if-not",

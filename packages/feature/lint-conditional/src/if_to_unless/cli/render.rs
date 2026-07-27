@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::if_to_unless_report::{IfToUnlessPolicy, IfToUnlessSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::if_to_unless::usecase::{IfToUnlessPolicy, IfToUnlessSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_if_to_unless_report(
+pub fn print_if_to_unless_report(
     summary: &IfToUnlessSummary,
     policy: &IfToUnlessPolicy,
     output: OutputFormat,

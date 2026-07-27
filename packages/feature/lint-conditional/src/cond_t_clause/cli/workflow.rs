@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::cond_t_clause_report::{
+use crate::cond_t_clause::cli::args::CondTClauseReportArgs;
+use crate::cond_t_clause::cli::render::print_cond_t_clause_report;
+use crate::cond_t_clause::usecase::{
     CondTClausePolicyOptions, collect_cond_t_clauses, evaluate_cond_t_clause_policy,
     summarize_cond_t_clauses,
 };
-use crate::presentation::cli::cond_t_clause_report::args::CondTClauseReportArgs;
-use crate::presentation::cli::cond_t_clause_report::render::print_cond_t_clause_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn cond_t_clause_report(
-    args: CondTClauseReportArgs,
-) -> Result<()> {
+pub fn cond_t_clause_report(args: CondTClauseReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut cond_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn cond_t_clause_report(
     print_cond_t_clause_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "cond-t-clause-report policy failed: {policy_message}"
         )));
     }

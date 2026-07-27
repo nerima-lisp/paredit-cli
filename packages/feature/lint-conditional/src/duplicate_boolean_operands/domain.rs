@@ -7,9 +7,9 @@
 //! distinct test.
 //!
 //! Reuses the two shared expression primitives: the whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`] (an `and`/`or` nests
+//! [`paredit_core_syntax::view_query::for_each_subview`] (an `and`/`or` nests
 //! anywhere) and the reader-aware structural comparison from
-//! [`crate::domain::expression_equality`], so `(or (p x) (p X))` counts as a
+//! [`paredit_core_syntax::expression_equality`], so `(or (p x) (p X))` counts as a
 //! repeat (symbols fold case) while `(or (p x) (p y))` does not.
 //!
 //! Scope: Common Lisp only.
@@ -18,10 +18,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::{expressions_structurally_equal, render_expression};
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, list_head};
 
 const BOOLEAN_HEADS: [&str; 2] = ["and", "or"];
 
@@ -68,7 +68,7 @@ pub struct DuplicateBooleanOperandPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_boolean(
+pub fn examine_boolean(
     view: &ExpressionView,
     path: &Path,
     boolean_form_count: &mut usize,

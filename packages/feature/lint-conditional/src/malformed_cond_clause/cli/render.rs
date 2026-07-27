@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::malformed_cond_clause_report::{
+use crate::malformed_cond_clause::usecase::{
     MalformedCondClausePolicy, MalformedCondClauseSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_malformed_cond_clause_report(
+pub fn print_malformed_cond_clause_report(
     summary: &MalformedCondClauseSummary,
     policy: &MalformedCondClausePolicy,
     output: OutputFormat,

@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::single_operand_boolean_report::{
+use crate::single_operand_boolean::cli::args::SingleOperandBooleanReportArgs;
+use crate::single_operand_boolean::cli::render::print_single_operand_boolean_report;
+use crate::single_operand_boolean::usecase::{
     SingleOperandBooleanPolicyOptions, collect_single_operand_booleans,
     evaluate_single_operand_boolean_policy, summarize_single_operand_booleans,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::single_operand_boolean_report::args::SingleOperandBooleanReportArgs;
-use crate::presentation::cli::single_operand_boolean_report::render::print_single_operand_boolean_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn single_operand_boolean_report(
-    args: SingleOperandBooleanReportArgs,
-) -> Result<()> {
+pub fn single_operand_boolean_report(args: SingleOperandBooleanReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut boolean_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn single_operand_boolean_report(
     print_single_operand_boolean_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "single-operand-boolean-report policy failed: {policy_message}"
         )));
     }

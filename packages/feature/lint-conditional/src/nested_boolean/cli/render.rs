@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nested_boolean_report::{
-    NestedBooleanPolicy, NestedBooleanSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::nested_boolean::usecase::{NestedBooleanPolicy, NestedBooleanSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nested_boolean_report(
+pub fn print_nested_boolean_report(
     summary: &NestedBooleanSummary,
     policy: &NestedBooleanPolicy,
     output: OutputFormat,

@@ -8,7 +8,7 @@
 //! The catch-all must be a *bare* `t`/`otherwise` key designator; a key list
 //! such as `((t) …)` matches the literal symbol `T` and is not a default, so
 //! it is not flagged — the same distinction as
-//! [`crate::domain::unreachable_case_clause_report`], which handles the
+//! [`crate::unreachable_case_clause::domain`], which handles the
 //! non-exhaustive `case`/`typecase` where a default *is* permitted.
 //!
 //! Forms whose clause structure is not statically visible are skipped: a
@@ -16,7 +16,7 @@
 //! conditional (which parse as opaque atoms, not list clauses).
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -24,9 +24,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 const EXHAUSTIVE_HEADS: [&str; 4] = ["ecase", "ccase", "etypecase", "ctypecase"];
 
@@ -88,7 +88,7 @@ pub struct ExhaustiveCaseOtherwisePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_case(
+pub fn examine_case(
     view: &ExpressionView,
     path: &Path,
     case_form_count: &mut usize,

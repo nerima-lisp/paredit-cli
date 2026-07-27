@@ -4,10 +4,10 @@
 //! a later clause repeating an earlier test can never run — dead code, and
 //! the analog of the well-known `ifs_same_cond` lint.
 //!
-//! Unlike [`crate::domain::duplicate_case_key_report`], whose clause heads are
+//! Unlike [`crate::duplicate_case_keys::domain`], whose clause heads are
 //! `eql` literal keys, a `cond` test is an arbitrary expression, so this
 //! report compares tests with the reader-aware structural equality from
-//! [`crate::domain::expression_equality`] — `(= x 1)` and `(= X 1)` are the
+//! [`paredit_core_syntax::expression_equality`] — `(= x 1)` and `(= X 1)` are the
 //! same test, `(foo)` and `(bar)` are not. It walks the whole expression
 //! tree, since a `cond` can appear anywhere in a body.
 //!
@@ -20,10 +20,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::{expressions_structurally_equal, render_expression};
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateCondTestItem {
@@ -67,7 +67,7 @@ pub struct DuplicateCondTestPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_cond(
+pub fn examine_cond(
     view: &ExpressionView,
     path: &Path,
     cond_form_count: &mut usize,

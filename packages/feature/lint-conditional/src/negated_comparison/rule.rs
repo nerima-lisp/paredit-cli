@@ -1,18 +1,18 @@
 //! `negated-comparison`: a not/null of a two-argument numeric comparison ((not (= a b)) is (/= a b)).
 //!
-//! The analysis lives in [`crate::domain::negated_comparison_report`], which also backs the
+//! The analysis lives in [`crate::negated_comparison::domain`], which also backs the
 //! standalone `inspect negated-comparison` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::negated_comparison::domain::examine_negation;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::negated_comparison_report::examine_negation;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "negated-comparison",

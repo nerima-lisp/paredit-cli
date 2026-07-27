@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::identical_if_branch_report::{
+use crate::identical_if_branches::cli::args::IdenticalIfBranchReportArgs;
+use crate::identical_if_branches::cli::render::print_identical_if_branch_report;
+use crate::identical_if_branches::usecase::{
     IdenticalIfBranchPolicyOptions, collect_identical_if_branches,
     evaluate_identical_if_branch_policy, summarize_identical_if_branches,
 };
-use crate::presentation::cli::identical_if_branch_report::args::IdenticalIfBranchReportArgs;
-use crate::presentation::cli::identical_if_branch_report::render::print_identical_if_branch_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn identical_if_branch_report(
-    args: IdenticalIfBranchReportArgs,
-) -> Result<()> {
+pub fn identical_if_branch_report(args: IdenticalIfBranchReportArgs) -> Result<()> {
     let mut if_form_count = 0;
     let mut identical = Vec::new();
 
@@ -33,7 +31,7 @@ pub(in crate::presentation::cli) fn identical_if_branch_report(
     print_identical_if_branch_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "identical-if-branch-report policy failed: {policy_message}"
         )));
     }

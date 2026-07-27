@@ -1,18 +1,18 @@
 //! `duplicate-case-keys`: a case/ecase/ccase key repeated across more than one clause.
 //!
-//! The analysis lives in [`crate::domain::duplicate_case_key_report`], which also backs the
+//! The analysis lives in [`crate::duplicate_case_keys::domain`], which also backs the
 //! standalone `inspect duplicate-case-keys` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::duplicate_case_key_report::examine_case;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::duplicate_case_keys::domain::examine_case;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "duplicate-case-keys",

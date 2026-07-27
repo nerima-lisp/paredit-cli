@@ -1,20 +1,20 @@
 //! `constant-if-test`: an if whose test is the literal t or nil ((if t a b) is a; (if nil a b) is b).
 //!
-//! The analysis lives in [`crate::domain::constant_if_test_report`], which also backs the
+//! The analysis lives in [`crate::constant_if_test::domain`], which also backs the
 //! standalone `inspect constant-if-test` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::constant_if_test_report::examine_if;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::NormalizedHead;
-use crate::domain::lint::model::{
+use crate::constant_if_test::domain::examine_if;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::NormalizedHead;
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::semantics::value::evaluate_constant;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_semantics::semantics::value::evaluate_constant;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "constant-if-test",

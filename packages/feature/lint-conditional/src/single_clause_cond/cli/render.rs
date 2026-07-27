@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::single_clause_cond_report::{
-    SingleClauseCondPolicy, SingleClauseCondSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::single_clause_cond::usecase::{SingleClauseCondPolicy, SingleClauseCondSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_single_clause_cond_report(
+pub fn print_single_clause_cond_report(
     summary: &SingleClauseCondSummary,
     policy: &SingleClauseCondPolicy,
     output: OutputFormat,

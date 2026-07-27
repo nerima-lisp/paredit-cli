@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::redundant_boolean_identity_report::{
+use crate::redundant_boolean_identity::cli::args::RedundantBooleanIdentityReportArgs;
+use crate::redundant_boolean_identity::cli::render::print_redundant_boolean_identity_report;
+use crate::redundant_boolean_identity::usecase::{
     RedundantBooleanIdentityPolicyOptions, collect_redundant_boolean_identities,
     evaluate_redundant_boolean_identity_policy, summarize_redundant_boolean_identities,
 };
-use crate::presentation::cli::redundant_boolean_identity_report::args::RedundantBooleanIdentityReportArgs;
-use crate::presentation::cli::redundant_boolean_identity_report::render::print_redundant_boolean_identity_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn redundant_boolean_identity_report(
-    args: RedundantBooleanIdentityReportArgs,
-) -> Result<()> {
+pub fn redundant_boolean_identity_report(args: RedundantBooleanIdentityReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut boolean_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn redundant_boolean_identity_report(
     print_redundant_boolean_identity_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "redundant-boolean-identity-report policy failed: {policy_message}"
         )));
     }

@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nested_unless_report::{NestedUnlessPolicy, NestedUnlessSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::nested_unless::usecase::{NestedUnlessPolicy, NestedUnlessSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nested_unless_report(
+pub fn print_nested_unless_report(
     summary: &NestedUnlessSummary,
     policy: &NestedUnlessPolicy,
     output: OutputFormat,

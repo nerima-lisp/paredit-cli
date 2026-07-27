@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::if_not_report::{IfNotPolicy, IfNotSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::if_not::usecase::{IfNotPolicy, IfNotSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_if_not_report(
+pub fn print_if_not_report(
     summary: &IfNotSummary,
     policy: &IfNotPolicy,
     output: OutputFormat,

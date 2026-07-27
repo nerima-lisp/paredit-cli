@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::one_armed_if_report::{
+use crate::one_armed_if::cli::args::OneArmedIfReportArgs;
+use crate::one_armed_if::cli::render::print_one_armed_if_report;
+use crate::one_armed_if::usecase::{
     OneArmedIfPolicyOptions, collect_one_armed_ifs, evaluate_one_armed_if_policy,
     summarize_one_armed_ifs,
 };
-use crate::presentation::cli::one_armed_if_report::args::OneArmedIfReportArgs;
-use crate::presentation::cli::one_armed_if_report::render::print_one_armed_if_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn one_armed_if_report(args: OneArmedIfReportArgs) -> Result<()> {
+pub fn one_armed_if_report(args: OneArmedIfReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;
@@ -32,7 +32,7 @@ pub(in crate::presentation::cli) fn one_armed_if_report(args: OneArmedIfReportAr
     print_one_armed_if_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "one-armed-if-report policy failed: {policy_message}"
         )));
     }

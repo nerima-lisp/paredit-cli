@@ -1,18 +1,18 @@
 //! `typecase-nil-key`: a typecase/etypecase/ctypecase clause with a bare nil type, which is the empty type and never matches (use null).
 //!
-//! The analysis lives in [`crate::domain::typecase_nil_key_report`], which also backs the
+//! The analysis lives in [`crate::typecase_nil_key::domain`], which also backs the
 //! standalone `inspect typecase-nil-key` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::typecase_nil_key::domain::examine_case;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::typecase_nil_key_report::examine_case;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "typecase-nil-key",

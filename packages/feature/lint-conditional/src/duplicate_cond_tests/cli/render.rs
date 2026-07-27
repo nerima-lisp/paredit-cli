@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::duplicate_cond_test_report::{
-    DuplicateCondTestPolicy, DuplicateCondTestSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::duplicate_cond_tests::usecase::{DuplicateCondTestPolicy, DuplicateCondTestSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_duplicate_cond_test_report(
+pub fn print_duplicate_cond_test_report(
     summary: &DuplicateCondTestSummary,
     policy: &DuplicateCondTestPolicy,
     output: OutputFormat,

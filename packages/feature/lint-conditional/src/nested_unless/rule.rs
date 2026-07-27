@@ -1,18 +1,18 @@
 //! `nested-unless`: an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c)).
 //!
-//! The analysis lives in [`crate::domain::nested_unless_report`], which also backs the
+//! The analysis lives in [`crate::nested_unless::domain`], which also backs the
 //! standalone `inspect nested-unless` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::nested_unless::domain::examine_unless;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::nested_unless_report::examine_unless;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "nested-unless",

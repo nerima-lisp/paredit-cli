@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::negated_if_report::{NegatedIfPolicy, NegatedIfSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::negated_if::usecase::{NegatedIfPolicy, NegatedIfSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_negated_if_report(
+pub fn print_negated_if_report(
     summary: &NegatedIfSummary,
     policy: &NegatedIfPolicy,
     output: OutputFormat,

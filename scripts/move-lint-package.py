@@ -32,9 +32,13 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+# A handful of rules name their report module in the singular, so the
+# report is not simply `<rule>_report`.
+REPORT_ALIAS = {'duplicate_cond_tests': 'duplicate_cond_test', 'identical_if_branches': 'identical_if_branch', 'duplicate_boolean_operands': 'duplicate_boolean_operand', 'duplicate_case_keys': 'duplicate_case_key'}
+
 # rule name -> (source path, destination name inside the slice)
 def parts_for(rule: str) -> list[tuple[pathlib.Path, str]]:
-    report = f"{rule}_report"
+    report = f"{REPORT_ALIAS.get(rule, rule)}_report"
     candidates = [
         (ROOT / "src/domain/lint/rules" / f"{rule}.rs", "rule.rs"),
         (ROOT / "src/domain" / f"{report}.rs", "domain.rs"),
@@ -65,7 +69,7 @@ def check(rules: list[str], extracted: set[str]) -> bool:
         print(f"  ERROR: no files for {', '.join(missing)}")
         return False
 
-    own = set(rules) | {f"{r}_report" for r in rules}
+    own = set(rules) | {f"{REPORT_ALIAS.get(r, r)}_report" for r in rules}
     outbound: collections.Counter = collections.Counter()
     for path in files:
         for line in path.read_text().splitlines():
