@@ -1,25 +1,25 @@
 use super::syntax::{expression_source, is_threadable_call, list_head};
 use super::types::{ThreadExpressionParts, ThreadExpressionStep, ThreadStyle};
-use anyhow::{Context, Result};
+use crate::error::{FormTransformResult, TransformTargetError};
 use paredit_core_syntax::sexpr::ExpressionView;
 
 pub fn thread_expression_parts(
     input: &str,
     view: &ExpressionView,
     style: ThreadStyle,
-) -> Result<ThreadExpressionParts> {
+) -> FormTransformResult<ThreadExpressionParts> {
     if !is_threadable_call(view) {
-        anyhow::bail!("thread-expression target must be a parenthesized call with arguments");
+        return Err(TransformTargetError::ThreadTargetNotACall.into());
     }
 
     let head = list_head(view)
-        .context("thread-expression target must start with an atom head")?
+        .ok_or(TransformTargetError::ThreadTargetHeadNotAnAtom)?
         .to_owned();
     let threaded_child_index = style.threaded_child_index(view.children.len());
     let threaded_child = view
         .children
         .get(threaded_child_index)
-        .context("thread-expression target is missing the threaded argument")?;
+        .ok_or(TransformTargetError::ThreadTargetMissingArgument)?;
 
     let mut parts = if is_threadable_call(threaded_child) {
         thread_expression_parts(input, threaded_child, style)?

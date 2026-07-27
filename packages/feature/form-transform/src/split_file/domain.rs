@@ -1,6 +1,6 @@
 //! Use case for splitting selected top-level definitions into another file.
 
-use anyhow::{Context, Result};
+use crate::error::{FormTransformError, FormTransformResult, TransformSelectorError};
 
 use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use paredit_core_syntax::definition::definition_shape;
@@ -18,31 +18,40 @@ use rewrite::{append_top_level_definitions, ensure_non_overlapping_spans, replac
 use syntax::list_head;
 pub use types::{SplitFileDefinition, SplitFileItem, SplitFilePlan, SplitFileRequest};
 
-pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
+pub fn plan_split_file(request: SplitFileRequest<'_>) -> FormTransformResult<SplitFilePlan> {
     if request.paths.is_empty() && request.names.is_empty() && request.categories.is_empty() {
-        anyhow::bail!("split-file requires at least one --path, --name, or --kind selector");
+        return Err(TransformSelectorError::SplitFileNeedsSelector.into());
     }
 
     let from_tree = SyntaxTree::parse_with_dialect(request.from_input, request.from_dialect)
-        .with_context(|| format!("failed to parse {}", request.from_file.display()))?;
-    let to_tree = SyntaxTree::parse_with_dialect(request.to_input, request.to_dialect)
-        .with_context(|| {
-            format!(
-                "destination file is not a valid S-expression document: {}",
-                request.to_file.display()
-            )
+        .map_err(|source| FormTransformError::ParseFailed {
+            path: request.from_file.display().to_string(),
+            source,
+        })?;
+    let to_tree =
+        SyntaxTree::parse_with_dialect(request.to_input, request.to_dialect).map_err(|source| {
+            FormTransformError::DestinationNotAnSexprDocument {
+                path: request.to_file.display().to_string(),
+                source,
+            }
         })?;
 
     let mut seen_paths = std::collections::BTreeSet::new();
     let mut selected_paths = std::collections::BTreeMap::new();
     for path in &request.paths {
         if !seen_paths.insert(path.to_string()) {
-            anyhow::bail!("duplicate split-file path: {path}");
+            return Err(TransformSelectorError::DuplicateSplitPath {
+                path: path.to_string(),
+            }
+            .into());
         }
 
         let target_index = top_level_path_index(path, "split-file")?;
         if target_index >= from_tree.root_children().len() {
-            anyhow::bail!("top-level path {path} is out of range");
+            return Err(TransformSelectorError::TopLevelPathOutOfRange {
+                path: path.to_string(),
+            }
+            .into());
         }
 
         selected_paths.insert(target_index, path.clone());
@@ -90,15 +99,18 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
 
     for name in &requested_names {
         if !matched_names.contains(name) {
-            anyhow::bail!("split-file --name did not match a top-level definition: {name}");
+            return Err(TransformSelectorError::NameDidNotMatch {
+                name: name.to_string(),
+            }
+            .into());
         }
     }
     for category in &requested_categories {
         if !matched_categories.contains(category) {
-            anyhow::bail!(
-                "split-file --kind did not match any top-level definitions: {}",
-                category.label()
-            );
+            return Err(TransformSelectorError::KindDidNotMatch {
+                kinds: category.label().to_owned(),
+            }
+            .into());
         }
     }
 
@@ -115,7 +127,7 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
     }
 
     if items.is_empty() {
-        anyhow::bail!("split-file selectors did not match any top-level definitions");
+        return Err(TransformSelectorError::NothingSelected.into());
     }
 
     items.sort_by_key(|item| item.span.start().get());
@@ -162,17 +174,21 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
     }
     let to_rewritten = append_top_level_definitions(request.to_input, &definition_texts);
 
-    SyntaxTree::parse_with_dialect(&from_rewritten, request.from_dialect).with_context(|| {
-        format!(
-            "source file would become invalid after splitting definitions: {}",
-            request.from_file.display()
-        )
+    SyntaxTree::parse_with_dialect(&from_rewritten, request.from_dialect).map_err(|source| {
+        FormTransformError::WouldBecomeInvalid {
+            side: "source",
+            action: "splitting",
+            path: request.from_file.display().to_string(),
+            source,
+        }
     })?;
-    SyntaxTree::parse_with_dialect(&to_rewritten, request.to_dialect).with_context(|| {
-        format!(
-            "destination file would become invalid after receiving definitions: {}",
-            request.to_file.display()
-        )
+    SyntaxTree::parse_with_dialect(&to_rewritten, request.to_dialect).map_err(|source| {
+        FormTransformError::WouldBecomeInvalid {
+            side: "destination",
+            action: "receiving",
+            path: request.to_file.display().to_string(),
+            source,
+        }
     })?;
 
     let changed = from_rewritten != request.from_input || to_rewritten != request.to_input;
@@ -193,9 +209,9 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
     })
 }
 
-fn top_level_path_index(path: &Path, command: &str) -> Result<usize> {
+fn top_level_path_index(path: &Path, command: &'static str) -> FormTransformResult<usize> {
     match path.indexes() {
         [index] => Ok(index.get()),
-        _ => anyhow::bail!("{command} requires a top-level path, for example --path 2"),
+        _ => Err(TransformSelectorError::NotATopLevelPath { command }.into()),
     }
 }

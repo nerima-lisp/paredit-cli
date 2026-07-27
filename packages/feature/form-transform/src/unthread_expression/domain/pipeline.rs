@@ -1,13 +1,12 @@
 use super::syntax::{atom_child, atom_text, expression_source};
 use super::types::PipelineStep;
-use anyhow::{Context, Result};
+use crate::error::{FormTransformResult, TransformTargetError};
 use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub fn pipeline_step(input: &str, view: &ExpressionView) -> Result<PipelineStep> {
+pub fn pipeline_step(input: &str, view: &ExpressionView) -> FormTransformResult<PipelineStep> {
     match view.kind {
         ExpressionKind::Atom => {
-            let head =
-                atom_text(view).context("unthread-expression atom step must have symbol text")?;
+            let head = atom_text(view).ok_or(TransformTargetError::UnthreadAtomStepHasNoText)?;
             Ok(PipelineStep {
                 head: head.to_owned(),
                 arguments: Vec::new(),
@@ -17,7 +16,7 @@ pub fn pipeline_step(input: &str, view: &ExpressionView) -> Result<PipelineStep>
         }
         ExpressionKind::List if view.delimiter == Some(Delimiter::Paren) => {
             let head = atom_child(view, 0)
-                .context("unthread-expression list step must start with an atom head")?
+                .ok_or(TransformTargetError::UnthreadListStepHeadNotAnAtom)?
                 .to_owned();
             let arguments = view
                 .children
@@ -32,10 +31,10 @@ pub fn pipeline_step(input: &str, view: &ExpressionView) -> Result<PipelineStep>
                 form: expression_source(input, view),
             })
         }
-        _ => anyhow::bail!(
-            "unthread-expression step must be an atom or parenthesized call at {}..{}",
-            view.span.start().get(),
-            view.span.end().get()
-        ),
+        _ => Err(TransformTargetError::UnthreadStepNotAtomOrCall {
+            start: view.span.start().get(),
+            end: view.span.end().get(),
+        }
+        .into()),
     }
 }

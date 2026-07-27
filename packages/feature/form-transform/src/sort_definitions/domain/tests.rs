@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::path::PathBuf;
 
 use proptest::{prelude::*, test_runner::TestCaseError};

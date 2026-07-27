@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::FormTransformResult;
 
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
@@ -12,7 +12,7 @@ pub fn collect_sortable_blocks(
     input: &str,
     tree: &SyntaxTree,
     dialect: Dialect,
-) -> Result<Vec<DefinitionBlock>> {
+) -> FormTransformResult<Vec<DefinitionBlock>> {
     let mut blocks = Vec::new();
     let mut current = Vec::new();
 

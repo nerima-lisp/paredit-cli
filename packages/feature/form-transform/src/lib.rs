@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod error;
 pub mod replace_forms;
 pub mod sort_definitions;
 pub mod split_file;
@@ -13,3 +14,8 @@ pub use replace_forms::cli::{ReplaceFormsArgs, replace_forms};
 pub use thread_expression::cli::{ThreadExpressionArgs, thread_expression};
 pub use unthread_expression::cli::{UnthreadExpressionArgs, unthread_expression};
 pub use unwrap_call::cli::{UnwrapCallArgs, unwrap_call};
+
+pub use error::{
+    CommentWouldBeDiscardedError, FormTransformError, FormTransformResult, TransformSelectorError,
+    TransformTargetError,
+};

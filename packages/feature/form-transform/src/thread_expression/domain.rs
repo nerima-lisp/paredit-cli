@@ -10,7 +10,11 @@ mod types;
 
 pub use types::{ThreadExpressionPlan, ThreadExpressionRequest, ThreadExpressionStep, ThreadStyle};
 
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{
+    CommentWouldBeDiscardedError, FormTransformResult, TransformDialectError, TransformTargetError,
+};
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -21,7 +25,7 @@ use syntax::list_head;
 
 pub fn plan_thread_expression(
     request: ThreadExpressionRequest<'_>,
-) -> Result<ThreadExpressionPlan> {
+) -> FormTransformResult<ThreadExpressionPlan> {
     match request.dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -34,7 +38,10 @@ pub fn plan_thread_expression(
         | Dialect::Janet
         | Dialect::Fennel => {}
         Dialect::Unknown => {
-            anyhow::bail!("thread-expression does not support dialect unknown");
+            return Err(TransformDialectError::Unknown {
+                operation: "thread-expression",
+            }
+            .into());
         }
     }
 
@@ -54,31 +61,36 @@ pub fn plan_thread_expression(
         Dialect::Unknown => false,
     });
     if already_threaded {
-        anyhow::bail!(
-            "thread-expression selection is already threaded with {}",
-            request.operator
-        );
+        return Err(TransformTargetError::AlreadyThreaded {
+            operator: request.operator.to_string(),
+        }
+        .into());
     }
     // Threading rebuilds the nested calls as a flat pipeline from parsed
     // parts; a comment anywhere inside the selection lives outside the tree
     // and has no slot in the rebuilt text, so it would be silently dropped.
     if request.tree.has_comment_in(request.target.span) {
-        anyhow::bail!(
-            "thread-expression target contains a comment, which would be discarded by \
-             flattening into a pipeline; remove or relocate the comment before threading"
-        );
+        return Err(CommentWouldBeDiscardedError::Threading.into());
     }
 
     let parts = thread_expression_parts(request.input, &request.target, request.style)?;
     if parts.steps.is_empty() {
-        anyhow::bail!("thread-expression target did not produce any pipeline steps");
+        return Err(TransformTargetError::ThreadProducedNoSteps.into());
     }
     let replacement = thread_expression_replacement(&request.operator, &parts.base, &parts.steps);
-    SyntaxTree::parse_with_dialect(&replacement, request.dialect)
-        .context("thread-expression replacement does not parse")?;
+    SyntaxTree::parse_with_dialect(&replacement, request.dialect).map_err(|source| {
+        DocumentRefusal::ReplacementDoesNotParse {
+            operation: "thread-expression",
+            source,
+        }
+    })?;
     let rewritten = replace_span(request.input, request.target.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("thread-expression rewritten output does not parse")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::RewrittenDoesNotParse {
+            operation: "thread-expression",
+            source,
+        }
+    })?;
     let changed = rewritten != request.input;
 
     Ok(ThreadExpressionPlan {

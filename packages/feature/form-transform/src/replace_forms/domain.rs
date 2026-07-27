@@ -1,4 +1,6 @@
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{FormTransformResult, TransformDialectError, TransformSelectorError};
 
 use paredit_core_edit::mutation_safety::{
     reject_common_lisp_reader_conditionals, reject_overlapping_common_lisp_reader_time_forms,
@@ -19,25 +21,33 @@ use validation::{
     collect_replace_targets, ensure_same_shape_when_required, original_shape_for_targets,
 };
 
-pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFormsPlan> {
+pub fn plan_replace_forms(
+    request: ReplaceFormsRequest<'_>,
+) -> FormTransformResult<ReplaceFormsPlan> {
     ensure_supported_dialect(request.dialect)?;
 
-    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("replace-forms input is not a valid S-expression document")?;
-    anyhow::ensure!(
-        &input_tree == request.tree,
-        "replace-forms input does not match the source used to build the syntax tree"
-    );
+    let input_tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "replace-forms",
+                source,
+            }
+        })?;
+    if &input_tree != request.tree {
+        return Err(TransformSelectorError::InputDoesNotMatchTree.into());
+    }
 
     let replacement_tree = SyntaxTree::parse_with_dialect(request.replacement, request.dialect)
-        .context("--with must be a valid S-expression document")?;
+        .map_err(|source| DocumentRefusal::InputNotAnSexprDocument {
+            operation: "--with",
+            source,
+        })?;
     // The replacement becomes source code in the rewritten document, so it
     // must satisfy the same reader-time safety contract as the input tree.
     reject_common_lisp_reader_conditionals(&replacement_tree, request.dialect)?;
-    anyhow::ensure!(
-        replacement_tree.root_children().len() == 1,
-        "--with must contain exactly one top-level S-expression"
-    );
+    if replacement_tree.root_children().len() != 1 {
+        return Err(TransformSelectorError::WithNotOneForm.into());
+    }
     let replacement_view = replacement_tree.select_path(&Path::root_child(0))?.view();
     let replacement_shape = duplicate_shape(&replacement_view, true);
 
@@ -55,8 +65,12 @@ pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFor
     )?;
 
     let rewritten = rewrite_replace_targets(request.input, &targets, request.replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("replace-forms output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "replace-forms",
+            source,
+        }
+    })?;
 
     let changed = rewritten != request.input;
     Ok(ReplaceFormsPlan {
@@ -70,7 +84,7 @@ pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFor
     })
 }
 
-fn ensure_supported_dialect(dialect: Dialect) -> Result<()> {
+fn ensure_supported_dialect(dialect: Dialect) -> FormTransformResult<()> {
     match dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -82,6 +96,9 @@ fn ensure_supported_dialect(dialect: Dialect) -> Result<()> {
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => Ok(()),
-        Dialect::Unknown => bail!("replace-forms requires a known dialect"),
+        Dialect::Unknown => Err(TransformDialectError::RequiresKnown {
+            operation: "replace-forms",
+        }
+        .into()),
     }
 }

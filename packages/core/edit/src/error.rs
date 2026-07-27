@@ -103,6 +103,34 @@ pub enum DocumentRefusal {
         #[source]
         source: ParseError,
     },
+
+    #[error("{operation} replacement does not parse")]
+    ReplacementDoesNotParse {
+        operation: &'static str,
+        #[source]
+        source: ParseError,
+    },
+
+    #[error("{operation} rewritten output does not parse")]
+    RewrittenDoesNotParse {
+        operation: &'static str,
+        #[source]
+        source: ParseError,
+    },
+
+    #[error("{operation} replacement is not parseable")]
+    ReplacementNotParseable {
+        operation: &'static str,
+        #[source]
+        source: ParseError,
+    },
+
+    #[error("{operation} rewritten output is not parseable")]
+    RewrittenNotParseable {
+        operation: &'static str,
+        #[source]
+        source: ParseError,
+    },
 }
 
 /// The edit could run, but declines to, because the form carries something it

@@ -8,7 +8,7 @@ mod syntax;
 mod tests;
 mod types;
 
-use anyhow::Result;
+use crate::error::{FormTransformResult, TransformDialectError};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::{Path, SyntaxTree};
@@ -27,9 +27,11 @@ pub use types::{
 /// leading trivia of its own) is reordered away from the front.
 const DEFAULT_ENTRY_SEPARATOR: &str = "\n\n";
 
-pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<SortDefinitionsPlan> {
+pub fn plan_sort_definitions(
+    request: SortDefinitionsRequest<'_>,
+) -> FormTransformResult<SortDefinitionsPlan> {
     if request.dialect == paredit_core_syntax::dialect::Dialect::Unknown {
-        anyhow::bail!("sort-definitions does not support the unknown dialect");
+        return Err(TransformDialectError::SortDefinitionsUnknown.into());
     }
 
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;

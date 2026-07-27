@@ -1,6 +1,6 @@
 //! Application facade for the unwrap-call domain plan.
 
-use anyhow::Result;
+use crate::error::FormTransformResult;
 
 use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use paredit_core_syntax::dialect::Dialect;
@@ -30,7 +30,7 @@ pub struct UnwrapCallPlan {
     pub changed: bool,
 }
 
-pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> Result<UnwrapCallPlan> {
+pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> FormTransformResult<UnwrapCallPlan> {
     crate::unwrap_call::domain::validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_overlapping_common_lisp_reader_time_forms(

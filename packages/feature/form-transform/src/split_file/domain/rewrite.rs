@@ -1,15 +1,17 @@
-use anyhow::Result;
+use crate::error::{FormTransformResult, TransformSelectorError};
 
 use paredit_core_syntax::sexpr::ByteSpan;
 
-pub fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Result<()> {
+pub fn ensure_non_overlapping_spans(
+    spans: impl IntoIterator<Item = ByteSpan>,
+) -> FormTransformResult<()> {
     let mut previous_end = None;
     for span in spans {
         let start = span.start().get();
         let end = span.end().get();
         if let Some(previous_end) = previous_end {
             if start < previous_end {
-                anyhow::bail!("refusing overlapping rewrite spans");
+                return Err(TransformSelectorError::OverlappingRewriteSpans.into());
             }
         }
         previous_end = Some(end);

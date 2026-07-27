@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{FormTransformResult, TransformTargetError};
 
 use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
 use paredit_core_syntax::definition::definition_shape;
@@ -15,17 +15,22 @@ pub fn build_split_file_item(
     from_dialect: Dialect,
     path: Path,
     target_index: usize,
-) -> Result<SplitFileItem> {
+) -> FormTransformResult<SplitFileItem> {
     let selection = from_tree.select_path(&path)?;
     let view = selection.view();
     let span = selection.span();
     let Some(head) = list_head(&view) else {
-        anyhow::bail!("selected top-level form is not a list definition: {path}");
+        return Err(TransformTargetError::NotAListDefinition {
+            path: path.to_string(),
+        }
+        .into());
     };
     let Some(shape) = definition_shape(from_dialect, &view, head) else {
-        anyhow::bail!(
-            "selected top-level form is not recognized as a definition at {path}: {head}"
-        );
+        return Err(TransformTargetError::NotADefinition {
+            path: path.to_string(),
+            head: head.to_owned(),
+        }
+        .into());
     };
 
     // A leading own-line comment (or blank run) describing this definition
@@ -79,7 +84,7 @@ pub fn package_context_before_top_level(
     tree: &SyntaxTree,
     dialect: Dialect,
     target_index: usize,
-) -> Result<Option<String>> {
+) -> FormTransformResult<Option<String>> {
     let mut current_package = None;
     for index in 0..target_index {
         let path = Path::root_child(index);

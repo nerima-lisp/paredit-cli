@@ -1,6 +1,10 @@
 //! Domain planning for replacing a call with one of its arguments.
 
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{
+    FormTransformResult, TransformDialectError, TransformSelectorError, TransformTargetError,
+};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -32,7 +36,7 @@ pub struct Plan {
     pub changed: bool,
 }
 
-pub fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> FormTransformResult<()> {
     match dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -44,20 +48,27 @@ pub fn validate_dialect(dialect: Dialect) -> Result<()> {
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => Ok(()),
-        Dialect::Unknown => anyhow::bail!("unwrap-call requires a known dialect"),
+        Dialect::Unknown => Err(TransformDialectError::RequiresKnown {
+            operation: "unwrap-call",
+        }
+        .into()),
     }
 }
 
-pub fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> FormTransformResult<Plan> {
     validate_dialect(request.dialect)?;
 
-    SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("unwrap-call input does not parse")?;
+    SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+        DocumentRefusal::InputInvalid {
+            operation: "unwrap-call",
+            source,
+        }
+    })?;
 
     if request.target.kind != ExpressionKind::List
         || request.target.delimiter != Some(Delimiter::Paren)
     {
-        anyhow::bail!("unwrap-call target must be a parenthesized call");
+        return Err(TransformTargetError::UnwrapTargetNotACall.into());
     }
 
     let head = request
@@ -65,7 +76,7 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
         .children
         .first()
         .and_then(|child| child.text.as_deref())
-        .context("unwrap-call target must have an atom function head")?;
+        .ok_or(TransformTargetError::UnwrapTargetHeadNotAnAtom)?;
     let function = SymbolName::new(head)?;
 
     if let Some(expected) = &request.expected_function {
@@ -85,33 +96,40 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
             Dialect::Unknown => unreachable!("dialect was validated before parsing"),
         };
         if !matches {
-            anyhow::bail!(
-                "unwrap-call expected function {}, found {}",
-                expected.as_str(),
-                function.as_str()
-            );
+            return Err(TransformTargetError::UnwrapFunctionMismatch {
+                expected: expected.as_str().to_owned(),
+                found: function.as_str().to_owned(),
+            }
+            .into());
         }
     }
 
     let child_index = request
         .argument_index
         .checked_add(1)
-        .context("--argument-index is too large to address any call argument")?;
-    let argument = request.target.children.get(child_index).with_context(|| {
-        format!(
-            "argument index {} is out of range for {} argument(s)",
-            request.argument_index,
-            request.target.children.len().saturating_sub(1)
-        )
+        .ok_or(TransformTargetError::UnwrapArgumentIndexTooLarge)?;
+    let argument = request.target.children.get(child_index).ok_or_else(|| {
+        TransformSelectorError::ArgumentIndexOutOfRange {
+            index: request.argument_index,
+            count: request.target.children.len().saturating_sub(1),
+        }
     })?;
     let replacement = argument.span.slice(request.input).to_owned();
-    SyntaxTree::parse_with_dialect(&replacement, request.dialect)
-        .context("unwrap-call replacement is not parseable")?;
+    SyntaxTree::parse_with_dialect(&replacement, request.dialect).map_err(|source| {
+        DocumentRefusal::ReplacementNotParseable {
+            operation: "unwrap-call",
+            source,
+        }
+    })?;
 
     let mut rewritten = request.input.to_owned();
     rewritten.replace_range(request.target.span.as_range(), &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("unwrap-call rewritten output is not parseable")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::RewrittenNotParseable {
+            operation: "unwrap-call",
+            source,
+        }
+    })?;
 
     Ok(Plan {
         dialect: request.dialect,
