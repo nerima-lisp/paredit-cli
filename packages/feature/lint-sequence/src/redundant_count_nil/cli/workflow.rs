@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::redundant_count_nil_report::{
+use crate::redundant_count_nil::cli::args::RedundantCountNilReportArgs;
+use crate::redundant_count_nil::cli::render::print_redundant_count_nil_report;
+use crate::redundant_count_nil::usecase::{
     RedundantCountNilPolicyOptions, collect_redundant_count_nils,
     evaluate_redundant_count_nil_policy, summarize_redundant_count_nils,
 };
-use crate::presentation::cli::redundant_count_nil_report::args::RedundantCountNilReportArgs;
-use crate::presentation::cli::redundant_count_nil_report::render::print_redundant_count_nil_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn redundant_count_nil_report(
-    args: RedundantCountNilReportArgs,
-) -> Result<()> {
+pub fn redundant_count_nil_report(args: RedundantCountNilReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn redundant_count_nil_report(
     print_redundant_count_nil_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "redundant-count-nil-report policy failed: {policy_message}"
         )));
     }

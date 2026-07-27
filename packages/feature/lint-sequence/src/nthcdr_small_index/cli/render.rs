@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nthcdr_small_index_report::{
-    NthcdrSmallIndexPolicy, NthcdrSmallIndexSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::nthcdr_small_index::usecase::{NthcdrSmallIndexPolicy, NthcdrSmallIndexSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nthcdr_small_index_report(
+pub fn print_nthcdr_small_index_report(
     summary: &NthcdrSmallIndexSummary,
     policy: &NthcdrSmallIndexPolicy,
     output: OutputFormat,

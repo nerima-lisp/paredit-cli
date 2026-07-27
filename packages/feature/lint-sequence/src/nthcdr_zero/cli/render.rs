@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nthcdr_zero_report::{NthcdrZeroPolicy, NthcdrZeroSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::nthcdr_zero::usecase::{NthcdrZeroPolicy, NthcdrZeroSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nthcdr_zero_report(
+pub fn print_nthcdr_zero_report(
     summary: &NthcdrZeroSummary,
     policy: &NthcdrZeroPolicy,
     output: OutputFormat,

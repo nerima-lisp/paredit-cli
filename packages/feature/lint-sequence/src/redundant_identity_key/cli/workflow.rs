@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::redundant_identity_key_report::{
+use crate::redundant_identity_key::cli::args::RedundantIdentityKeyReportArgs;
+use crate::redundant_identity_key::cli::render::print_redundant_identity_key_report;
+use crate::redundant_identity_key::usecase::{
     RedundantIdentityKeyPolicyOptions, collect_redundant_identity_keys,
     evaluate_redundant_identity_key_policy, summarize_redundant_identity_keys,
 };
-use crate::presentation::cli::redundant_identity_key_report::args::RedundantIdentityKeyReportArgs;
-use crate::presentation::cli::redundant_identity_key_report::render::print_redundant_identity_key_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn redundant_identity_key_report(
-    args: RedundantIdentityKeyReportArgs,
-) -> Result<()> {
+pub fn redundant_identity_key_report(args: RedundantIdentityKeyReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn redundant_identity_key_report(
     print_redundant_identity_key_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "redundant-identity-key-report policy failed: {policy_message}"
         )));
     }

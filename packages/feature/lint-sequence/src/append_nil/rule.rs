@@ -1,18 +1,18 @@
 //! `append-nil`: a two-argument append with a nil tail, a fresh copy ((append x nil) is (copy-list x)).
 //!
-//! The analysis lives in [`crate::domain::append_nil_report`], which also backs the
+//! The analysis lives in [`crate::append_nil::domain`], which also backs the
 //! standalone `inspect append-nil` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::append_nil_report::examine;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::append_nil::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "append-nil",

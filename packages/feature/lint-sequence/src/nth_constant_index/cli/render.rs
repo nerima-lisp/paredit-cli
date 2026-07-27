@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nth_constant_index_report::{
-    NthConstantIndexPolicy, NthConstantIndexSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::nth_constant_index::usecase::{NthConstantIndexPolicy, NthConstantIndexSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nth_constant_index_report(
+pub fn print_nth_constant_index_report(
     summary: &NthConstantIndexSummary,
     policy: &NthConstantIndexPolicy,
     output: OutputFormat,

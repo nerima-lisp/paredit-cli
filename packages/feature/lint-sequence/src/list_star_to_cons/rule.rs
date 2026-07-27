@@ -1,18 +1,18 @@
 //! `list-star-to-cons`: a two-argument list*, which is just a cons ((list* a b) is (cons a b)).
 //!
-//! The analysis lives in [`crate::domain::list_star_to_cons_report`], which also backs the
+//! The analysis lives in [`crate::list_star_to_cons::domain`], which also backs the
 //! standalone `inspect list-star-to-cons` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::list_star_to_cons::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::list_star_to_cons_report::examine;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "list-star-to-cons",

@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::append_list_to_cons_report::{
+use crate::append_list_to_cons::cli::args::AppendListToConsReportArgs;
+use crate::append_list_to_cons::cli::render::print_append_list_to_cons_report;
+use crate::append_list_to_cons::usecase::{
     AppendListToConsPolicyOptions, collect_append_list_to_cons,
     evaluate_append_list_to_cons_policy, summarize_append_list_to_cons,
 };
-use crate::presentation::cli::append_list_to_cons_report::args::AppendListToConsReportArgs;
-use crate::presentation::cli::append_list_to_cons_report::render::print_append_list_to_cons_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn append_list_to_cons_report(
-    args: AppendListToConsReportArgs,
-) -> Result<()> {
+pub fn append_list_to_cons_report(args: AppendListToConsReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut append_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn append_list_to_cons_report(
     print_append_list_to_cons_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "append-list-to-cons-report policy failed: {policy_message}"
         )));
     }

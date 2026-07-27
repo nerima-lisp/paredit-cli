@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::subseq_zero_report::{SubseqZeroPolicy, SubseqZeroSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::subseq_zero::usecase::{SubseqZeroPolicy, SubseqZeroSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_subseq_zero_report(
+pub fn print_subseq_zero_report(
     summary: &SubseqZeroSummary,
     policy: &SubseqZeroPolicy,
     output: OutputFormat,

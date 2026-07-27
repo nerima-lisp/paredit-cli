@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::car_reverse_report::{CarReversePolicy, CarReverseSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::car_reverse::usecase::{CarReversePolicy, CarReverseSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_car_reverse_report(
+pub fn print_car_reverse_report(
     summary: &CarReverseSummary,
     policy: &CarReversePolicy,
     output: OutputFormat,

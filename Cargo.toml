@@ -44,6 +44,7 @@ paredit-feature-refactor-workflow = { path = "packages/feature/refactor-workflow
 paredit-feature-lint-string-char = { path = "packages/feature/lint-string-char" }
 paredit-feature-lint-control-flow = { path = "packages/feature/lint-control-flow" }
 paredit-feature-lint-numeric = { path = "packages/feature/lint-numeric" }
+paredit-feature-lint-sequence = { path = "packages/feature/lint-sequence" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"

@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::list_star_nil_report::{
+use crate::list_star_nil::cli::args::ListStarNilReportArgs;
+use crate::list_star_nil::cli::render::print_list_star_nil_report;
+use crate::list_star_nil::usecase::{
     ListStarNilPolicyOptions, collect_list_star_nils, evaluate_list_star_nil_policy,
     summarize_list_star_nils,
 };
-use crate::presentation::cli::list_star_nil_report::args::ListStarNilReportArgs;
-use crate::presentation::cli::list_star_nil_report::render::print_list_star_nil_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn list_star_nil_report(
-    args: ListStarNilReportArgs,
-) -> Result<()> {
+pub fn list_star_nil_report(args: ListStarNilReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn list_star_nil_report(
     print_list_star_nil_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "list-star-nil-report policy failed: {policy_message}"
         )));
     }

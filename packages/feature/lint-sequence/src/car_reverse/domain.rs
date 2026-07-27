@@ -15,7 +15,7 @@
 //! accessor), copying `x`'s source, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -23,9 +23,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled operand list.
@@ -78,7 +78,7 @@ pub struct CarReversePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine(
+pub fn examine(
     view: &ExpressionView,
     path: &Path,
     accessor_form_count: &mut usize,

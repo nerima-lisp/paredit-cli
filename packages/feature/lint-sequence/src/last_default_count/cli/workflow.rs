@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::last_default_count_report::{
+use crate::last_default_count::cli::args::LastDefaultCountReportArgs;
+use crate::last_default_count::cli::render::print_last_default_count_report;
+use crate::last_default_count::usecase::{
     LastDefaultCountPolicyOptions, collect_last_default_counts, evaluate_last_default_count_policy,
     summarize_last_default_counts,
 };
-use crate::presentation::cli::last_default_count_report::args::LastDefaultCountReportArgs;
-use crate::presentation::cli::last_default_count_report::render::print_last_default_count_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn last_default_count_report(
-    args: LastDefaultCountReportArgs,
-) -> Result<()> {
+pub fn last_default_count_report(args: LastDefaultCountReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn last_default_count_report(
     print_last_default_count_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "last-default-count-report policy failed: {policy_message}"
         )));
     }

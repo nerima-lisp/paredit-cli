@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::list_star_to_cons_report::{
-    ListStarToConsPolicy, ListStarToConsSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::list_star_to_cons::usecase::{ListStarToConsPolicy, ListStarToConsSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_list_star_to_cons_report(
+pub fn print_list_star_to_cons_report(
     summary: &ListStarToConsSummary,
     policy: &ListStarToConsPolicy,
     output: OutputFormat,

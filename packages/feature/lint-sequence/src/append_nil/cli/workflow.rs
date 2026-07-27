@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::append_nil_report::{
+use crate::append_nil::cli::args::AppendNilReportArgs;
+use crate::append_nil::cli::render::print_append_nil_report;
+use crate::append_nil::usecase::{
     AppendNilPolicyOptions, collect_append_nils, evaluate_append_nil_policy, summarize_append_nils,
 };
-use crate::presentation::cli::append_nil_report::args::AppendNilReportArgs;
-use crate::presentation::cli::append_nil_report::render::print_append_nil_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn append_nil_report(args: AppendNilReportArgs) -> Result<()> {
+pub fn append_nil_report(args: AppendNilReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut append_form_count = 0;
@@ -31,7 +31,7 @@ pub(in crate::presentation::cli) fn append_nil_report(args: AppendNilReportArgs)
     print_append_nil_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "append-nil-report policy failed: {policy_message}"
         )));
     }

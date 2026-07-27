@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::destructive_literal_report::{
-    DestructiveLiteralPolicy, DestructiveLiteralSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::destructive_literal::usecase::{DestructiveLiteralPolicy, DestructiveLiteralSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_destructive_literal_report(
+pub fn print_destructive_literal_report(
     summary: &DestructiveLiteralSummary,
     policy: &DestructiveLiteralPolicy,
     output: OutputFormat,

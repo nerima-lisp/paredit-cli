@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_from_end_nil_report::{
+use crate::redundant_from_end_nil::usecase::{
     RedundantFromEndNilPolicy, RedundantFromEndNilSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_from_end_nil_report(
+pub fn print_redundant_from_end_nil_report(
     summary: &RedundantFromEndNilSummary,
     policy: &RedundantFromEndNilPolicy,
     output: OutputFormat,

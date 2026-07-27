@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::eql_search_literal_report::{
-    EqlSearchLiteralPolicy, EqlSearchLiteralSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::eql_search_literal::usecase::{EqlSearchLiteralPolicy, EqlSearchLiteralSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_eql_search_literal_report(
+pub fn print_eql_search_literal_report(
     summary: &EqlSearchLiteralSummary,
     policy: &EqlSearchLiteralPolicy,
     output: OutputFormat,

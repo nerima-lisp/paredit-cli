@@ -44,8 +44,14 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_control_flow::explicit_nil_return::rule::META,
         &paredit_feature_lint_control_flow::explicit_nil_return::rule::RULE,
     ),
-    RuleEntry::new(&rules::cons_to_list::META, &rules::cons_to_list::RULE),
-    RuleEntry::new(&rules::double_reverse::META, &rules::double_reverse::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::cons_to_list::rule::META,
+        &paredit_feature_lint_sequence::cons_to_list::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::double_reverse::rule::META,
+        &paredit_feature_lint_sequence::double_reverse::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::modify_macro_arity::rule::META,
         &paredit_feature_lint_numeric::modify_macro_arity::rule::RULE,
@@ -76,13 +82,16 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(&rules::nested_boolean::META, &rules::nested_boolean::RULE),
     RuleEntry::new(&rules::nested_cxr::META, &rules::nested_cxr::RULE),
     RuleEntry::new(
-        &rules::nth_constant_index::META,
-        &rules::nth_constant_index::RULE,
+        &paredit_feature_lint_sequence::nth_constant_index::rule::META,
+        &paredit_feature_lint_sequence::nth_constant_index::rule::RULE,
     ),
-    RuleEntry::new(&rules::nthcdr_zero::META, &rules::nthcdr_zero::RULE),
     RuleEntry::new(
-        &rules::nthcdr_small_index::META,
-        &rules::nthcdr_small_index::RULE,
+        &paredit_feature_lint_sequence::nthcdr_zero::rule::META,
+        &paredit_feature_lint_sequence::nthcdr_zero::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::nthcdr_small_index::rule::META,
+        &paredit_feature_lint_sequence::nthcdr_small_index::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_control_flow::redundant_body_progn::rule::META,
@@ -113,12 +122,12 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     ),
     RuleEntry::new(&rules::redundant_apply::META, &rules::redundant_apply::RULE),
     RuleEntry::new(
-        &rules::redundant_eql_test::META,
-        &rules::redundant_eql_test::RULE,
+        &paredit_feature_lint_sequence::redundant_eql_test::rule::META,
+        &paredit_feature_lint_sequence::redundant_eql_test::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_identity_key::META,
-        &rules::redundant_identity_key::RULE,
+        &paredit_feature_lint_sequence::redundant_identity_key::rule::META,
+        &paredit_feature_lint_sequence::redundant_identity_key::rule::RULE,
     ),
     RuleEntry::new(
         &rules::negated_when_unless::META,
@@ -166,10 +175,13 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::equality_arity::rule::META,
         &paredit_feature_lint_numeric::equality_arity::rule::RULE,
     ),
-    RuleEntry::new(&rules::accessor_arity::META, &rules::accessor_arity::RULE),
     RuleEntry::new(
-        &rules::append_list_to_cons::META,
-        &rules::append_list_to_cons::RULE,
+        &paredit_feature_lint_sequence::accessor_arity::rule::META,
+        &paredit_feature_lint_sequence::accessor_arity::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::append_list_to_cons::rule::META,
+        &paredit_feature_lint_sequence::append_list_to_cons::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_string_char::format_to_string::rule::META,
@@ -255,8 +267,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::single_operand_boolean::RULE,
     ),
     RuleEntry::new(
-        &rules::single_operand_list_op::META,
-        &rules::single_operand_list_op::RULE,
+        &paredit_feature_lint_sequence::single_operand_list_op::rule::META,
+        &paredit_feature_lint_sequence::single_operand_list_op::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::single_operand_arithmetic::rule::META,
@@ -271,8 +283,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::eql_list_comparison::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::eql_search_literal::META,
-        &rules::eql_search_literal::RULE,
+        &paredit_feature_lint_sequence::eql_search_literal::rule::META,
+        &paredit_feature_lint_sequence::eql_search_literal::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::eq_number_comparison::rule::META,
@@ -308,8 +320,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::literal_place::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::destructive_literal::META,
-        &rules::destructive_literal::RULE,
+        &paredit_feature_lint_sequence::destructive_literal::rule::META,
+        &paredit_feature_lint_sequence::destructive_literal::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_string_char::char_op_string::rule::META,
@@ -325,8 +337,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::verbose_negation::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::list_star_to_cons::META,
-        &rules::list_star_to_cons::RULE,
+        &paredit_feature_lint_sequence::list_star_to_cons::rule::META,
+        &paredit_feature_lint_sequence::list_star_to_cons::rule::RULE,
     ),
     RuleEntry::new(
         &rules::values_list_of_list::META,
@@ -336,10 +348,22 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_control_flow::redundant_prog1::rule::META,
         &paredit_feature_lint_control_flow::redundant_prog1::rule::RULE,
     ),
-    RuleEntry::new(&rules::subseq_zero::META, &rules::subseq_zero::RULE),
-    RuleEntry::new(&rules::car_nthcdr::META, &rules::car_nthcdr::RULE),
-    RuleEntry::new(&rules::car_reverse::META, &rules::car_reverse::RULE),
-    RuleEntry::new(&rules::append_nil::META, &rules::append_nil::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::subseq_zero::rule::META,
+        &paredit_feature_lint_sequence::subseq_zero::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::car_nthcdr::rule::META,
+        &paredit_feature_lint_sequence::car_nthcdr::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::car_reverse::rule::META,
+        &paredit_feature_lint_sequence::car_reverse::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::append_nil::rule::META,
+        &paredit_feature_lint_sequence::append_nil::rule::RULE,
+    ),
     RuleEntry::new(
         &rules::multiple_value_list_of_values::META,
         &rules::multiple_value_list_of_values::RULE,
@@ -381,20 +405,20 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_control_flow::unwind_protect_no_cleanup::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_start_zero::META,
-        &rules::redundant_start_zero::RULE,
+        &paredit_feature_lint_sequence::redundant_start_zero::rule::META,
+        &paredit_feature_lint_sequence::redundant_start_zero::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_end_nil::META,
-        &rules::redundant_end_nil::RULE,
+        &paredit_feature_lint_sequence::redundant_end_nil::rule::META,
+        &paredit_feature_lint_sequence::redundant_end_nil::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_from_end_nil::META,
-        &rules::redundant_from_end_nil::RULE,
+        &paredit_feature_lint_sequence::redundant_from_end_nil::rule::META,
+        &paredit_feature_lint_sequence::redundant_from_end_nil::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_count_nil::META,
-        &rules::redundant_count_nil::RULE,
+        &paredit_feature_lint_sequence::redundant_count_nil::rule::META,
+        &paredit_feature_lint_sequence::redundant_count_nil::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_string_char::string_case_fold::rule::META,
@@ -413,8 +437,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_string_char::code_char_char_code::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::last_default_count::META,
-        &rules::last_default_count::RULE,
+        &paredit_feature_lint_sequence::last_default_count::rule::META,
+        &paredit_feature_lint_sequence::last_default_count::rule::RULE,
     ),
     RuleEntry::new(
         &rules::butlast_default_count::META,
@@ -440,5 +464,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::nested_char_case::META,
         &rules::nested_char_case::RULE,
     ),
-    RuleEntry::new(&rules::list_star_nil::META, &rules::list_star_nil::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::list_star_nil::rule::META,
+        &paredit_feature_lint_sequence::list_star_nil::rule::RULE,
+    ),
 ];

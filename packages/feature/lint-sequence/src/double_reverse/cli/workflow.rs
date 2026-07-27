@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::double_reverse_report::{
+use crate::double_reverse::cli::args::DoubleReverseReportArgs;
+use crate::double_reverse::cli::render::print_double_reverse_report;
+use crate::double_reverse::usecase::{
     DoubleReversePolicyOptions, collect_double_reverses, evaluate_double_reverse_policy,
     summarize_double_reverses,
 };
-use crate::presentation::cli::double_reverse_report::args::DoubleReverseReportArgs;
-use crate::presentation::cli::double_reverse_report::render::print_double_reverse_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn double_reverse_report(
-    args: DoubleReverseReportArgs,
-) -> Result<()> {
+pub fn double_reverse_report(args: DoubleReverseReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reverse_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn double_reverse_report(
     print_double_reverse_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "double-reverse-report policy failed: {policy_message}"
         )));
     }

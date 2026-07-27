@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_count_nil_report::{
-    RedundantCountNilPolicy, RedundantCountNilSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::redundant_count_nil::usecase::{RedundantCountNilPolicy, RedundantCountNilSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_count_nil_report(
+pub fn print_redundant_count_nil_report(
     summary: &RedundantCountNilSummary,
     policy: &RedundantCountNilPolicy,
     output: OutputFormat,

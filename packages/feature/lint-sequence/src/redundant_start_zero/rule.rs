@@ -1,18 +1,18 @@
 //! `redundant-start-zero`: a bounded-sequence call with an explicit :start 0, the default ((find x seq :start 0) is (find x seq)).
 //!
-//! The analysis lives in [`crate::domain::redundant_start_zero_report`], which also backs the
+//! The analysis lives in [`crate::redundant_start_zero::domain`], which also backs the
 //! standalone `inspect redundant-start-zero` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::redundant_start_zero::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, Replacement, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::redundant_start_zero_report::examine;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "redundant-start-zero",

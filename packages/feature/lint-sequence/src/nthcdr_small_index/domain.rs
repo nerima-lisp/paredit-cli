@@ -8,7 +8,7 @@
 //! bare count.
 //!
 //! Only the bare decimal literals `1`–`4` are matched. The count `0` is
-//! [`crate::domain::nthcdr_zero_report`]'s concern (it is the identity, not a
+//! [`crate::nthcdr_zero::domain`]'s concern (it is the identity, not a
 //! `cdr` chain), and there is no `cdddddr`, so `5` and up are left alone. A
 //! float `1.0`, a `#x1`/prefixed spelling, a variable count, and a
 //! reader-conditional operand are all left alone.
@@ -17,7 +17,7 @@
 //! operand's source verbatim, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -25,9 +25,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// The named `cdr` accessor for a literal count `1`–`4`, or `None` for any other
 /// spelling (`0`, `5`+, floats, prefixed, or non-numeric).
@@ -95,7 +95,7 @@ pub struct NthcdrSmallIndexPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine(
+pub fn examine(
     view: &ExpressionView,
     path: &Path,
     nthcdr_form_count: &mut usize,

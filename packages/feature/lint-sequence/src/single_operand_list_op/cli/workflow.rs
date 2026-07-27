@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::single_operand_list_op_report::{
+use crate::single_operand_list_op::cli::args::SingleOperandListOpReportArgs;
+use crate::single_operand_list_op::cli::render::print_single_operand_list_op_report;
+use crate::single_operand_list_op::usecase::{
     SingleOperandListOpPolicyOptions, collect_single_operand_list_ops,
     evaluate_single_operand_list_op_policy, summarize_single_operand_list_ops,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::single_operand_list_op_report::args::SingleOperandListOpReportArgs;
-use crate::presentation::cli::single_operand_list_op_report::render::print_single_operand_list_op_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn single_operand_list_op_report(
-    args: SingleOperandListOpReportArgs,
-) -> Result<()> {
+pub fn single_operand_list_op_report(args: SingleOperandListOpReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut list_op_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn single_operand_list_op_report(
     print_single_operand_list_op_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "single-operand-list-op-report policy failed: {policy_message}"
         )));
     }

@@ -8,14 +8,14 @@
 //! Only a bare `nil` final argument is matched, and only with at least one
 //! preceding element (`(list* a nil)` → `(list a)`). A single-argument
 //! `(list* nil)` (which is just `nil`) is
-//! [`crate::domain::single_operand_list_op_report`]'s concern, a non-`nil` final
+//! [`crate::single_operand_list_op::domain`]'s concern, a non-`nil` final
 //! argument is a genuine `list*`, and a reader-conditional operand is left alone.
 //!
 //! The fix rewrites the head `list*` to `list` and deletes the trailing ` nil`,
 //! leaving the kept elements byte-identical, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -23,9 +23,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// Whether `view` is the bare `nil` literal (no reader prefixes).
 fn is_nil_literal(view: &ExpressionView) -> bool {
@@ -78,7 +78,7 @@ pub struct ListStarNilPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine(
+pub fn examine(
     view: &ExpressionView,
     path: &Path,
     call_form_count: &mut usize,

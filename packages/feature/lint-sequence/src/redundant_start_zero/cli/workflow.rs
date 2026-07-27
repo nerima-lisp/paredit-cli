@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::redundant_start_zero_report::{
+use crate::redundant_start_zero::cli::args::RedundantStartZeroReportArgs;
+use crate::redundant_start_zero::cli::render::print_redundant_start_zero_report;
+use crate::redundant_start_zero::usecase::{
     RedundantStartZeroPolicyOptions, collect_redundant_start_zeros,
     evaluate_redundant_start_zero_policy, summarize_redundant_start_zeros,
 };
-use crate::presentation::cli::redundant_start_zero_report::args::RedundantStartZeroReportArgs;
-use crate::presentation::cli::redundant_start_zero_report::render::print_redundant_start_zero_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn redundant_start_zero_report(
-    args: RedundantStartZeroReportArgs,
-) -> Result<()> {
+pub fn redundant_start_zero_report(args: RedundantStartZeroReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn redundant_start_zero_report(
     print_redundant_start_zero_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "redundant-start-zero-report policy failed: {policy_message}"
         )));
     }

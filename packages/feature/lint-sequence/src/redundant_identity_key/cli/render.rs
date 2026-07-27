@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_identity_key_report::{
+use crate::redundant_identity_key::usecase::{
     RedundantIdentityKeyPolicy, RedundantIdentityKeySummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_identity_key_report(
+pub fn print_redundant_identity_key_report(
     summary: &RedundantIdentityKeySummary,
     policy: &RedundantIdentityKeyPolicy,
     output: OutputFormat,

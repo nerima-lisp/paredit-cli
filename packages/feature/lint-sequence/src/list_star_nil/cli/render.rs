@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::list_star_nil_report::{ListStarNilPolicy, ListStarNilSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::list_star_nil::usecase::{ListStarNilPolicy, ListStarNilSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_list_star_nil_report(
+pub fn print_list_star_nil_report(
     summary: &ListStarNilSummary,
     policy: &ListStarNilPolicy,
     output: OutputFormat,

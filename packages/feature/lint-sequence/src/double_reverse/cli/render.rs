@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::double_reverse_report::{
-    DoubleReversePolicy, DoubleReverseSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::double_reverse::usecase::{DoubleReversePolicy, DoubleReverseSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_double_reverse_report(
+pub fn print_double_reverse_report(
     summary: &DoubleReverseSummary,
     policy: &DoubleReversePolicy,
     output: OutputFormat,

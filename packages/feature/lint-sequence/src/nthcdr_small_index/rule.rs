@@ -1,18 +1,18 @@
 //! `nthcdr-small-index`: an nthcdr with a 1-4 count that has a named cdr accessor ((nthcdr 2 x) is (cddr x)).
 //!
-//! The analysis lives in [`crate::domain::nthcdr_small_index_report`], which also backs the
+//! The analysis lives in [`crate::nthcdr_small_index::domain`], which also backs the
 //! standalone `inspect nthcdr-small-index` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::nthcdr_small_index::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::nthcdr_small_index_report::examine;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "nthcdr-small-index",

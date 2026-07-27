@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::cons_to_list_report::{ConsToListPolicy, ConsToListSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::cons_to_list::usecase::{ConsToListPolicy, ConsToListSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_cons_to_list_report(
+pub fn print_cons_to_list_report(
     summary: &ConsToListSummary,
     policy: &ConsToListPolicy,
     output: OutputFormat,

@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_eql_test_report::{
-    RedundantEqlTestPolicy, RedundantEqlTestSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::redundant_eql_test::usecase::{RedundantEqlTestPolicy, RedundantEqlTestSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_eql_test_report(
+pub fn print_redundant_eql_test_report(
     summary: &RedundantEqlTestSummary,
     policy: &RedundantEqlTestPolicy,
     output: OutputFormat,

@@ -1,18 +1,18 @@
 //! `destructive-literal`: a destructive call (nreverse/sort/delete/nsubstitute/nconc/...) on a quoted list literal (undefined behavior).
 //!
-//! The analysis lives in [`crate::domain::destructive_literal_report`], which also backs the
+//! The analysis lives in [`crate::destructive_literal::domain`], which also backs the
 //! standalone `inspect destructive-literal` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::destructive_literal_report::examine_call;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::destructive_literal::domain::examine_call;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "destructive-literal",
@@ -23,7 +23,7 @@ pub const META: RuleMeta = RuleMeta::new(
 );
 
 /// Every destructive function `examine_call` recognizes as covered by
-/// [`crate::domain::destructive_literal_report::sequence_indices`].
+/// [`crate::destructive_literal::domain::sequence_indices`].
 const HEADS: [NormalizedHead; 23] = [
     NormalizedHead::new("nreverse"),
     NormalizedHead::new("nreconc"),

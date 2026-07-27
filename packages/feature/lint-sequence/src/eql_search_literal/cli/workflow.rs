@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::eql_search_literal_report::{
+use crate::eql_search_literal::cli::args::EqlSearchLiteralReportArgs;
+use crate::eql_search_literal::cli::render::print_eql_search_literal_report;
+use crate::eql_search_literal::usecase::{
     EqlSearchLiteralPolicyOptions, collect_eql_search_literals, evaluate_eql_search_literal_policy,
     summarize_eql_search_literals,
 };
-use crate::presentation::cli::eql_search_literal_report::args::EqlSearchLiteralReportArgs;
-use crate::presentation::cli::eql_search_literal_report::render::print_eql_search_literal_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn eql_search_literal_report(
-    args: EqlSearchLiteralReportArgs,
-) -> Result<()> {
+pub fn eql_search_literal_report(args: EqlSearchLiteralReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut search_call_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn eql_search_literal_report(
     print_eql_search_literal_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "eql-search-literal-report policy failed: {policy_message}"
         )));
     }

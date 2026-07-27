@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::car_nthcdr_report::{
+use crate::car_nthcdr::cli::args::CarNthcdrReportArgs;
+use crate::car_nthcdr::cli::render::print_car_nthcdr_report;
+use crate::car_nthcdr::usecase::{
     CarNthcdrPolicyOptions, collect_car_nthcdrs, evaluate_car_nthcdr_policy, summarize_car_nthcdrs,
 };
-use crate::presentation::cli::car_nthcdr_report::args::CarNthcdrReportArgs;
-use crate::presentation::cli::car_nthcdr_report::render::print_car_nthcdr_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn car_nthcdr_report(args: CarNthcdrReportArgs) -> Result<()> {
+pub fn car_nthcdr_report(args: CarNthcdrReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut car_form_count = 0;
@@ -31,7 +31,7 @@ pub(in crate::presentation::cli) fn car_nthcdr_report(args: CarNthcdrReportArgs)
     print_car_nthcdr_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "car-nthcdr-report policy failed: {policy_message}"
         )));
     }

@@ -1,18 +1,18 @@
 //! `redundant-eql-test`: an eql-defaulting call with an explicit :test #'eql, the default ((find x l :test #'eql) is (find x l)).
 //!
-//! The analysis lives in [`crate::domain::redundant_eql_test_report`], which also backs the
+//! The analysis lives in [`crate::redundant_eql_test::domain`], which also backs the
 //! standalone `inspect redundant-eql-test` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::redundant_eql_test::domain::examine_call;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, Replacement, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::redundant_eql_test_report::examine_call;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "redundant-eql-test",

@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::car_nthcdr_report::{CarNthcdrPolicy, CarNthcdrSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::car_nthcdr::usecase::{CarNthcdrPolicy, CarNthcdrSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_car_nthcdr_report(
+pub fn print_car_nthcdr_report(
     summary: &CarNthcdrSummary,
     policy: &CarNthcdrPolicy,
     output: OutputFormat,

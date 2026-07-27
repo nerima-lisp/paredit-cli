@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::nth_constant_index_report::{
+use crate::nth_constant_index::cli::args::NthConstantIndexReportArgs;
+use crate::nth_constant_index::cli::render::print_nth_constant_index_report;
+use crate::nth_constant_index::usecase::{
     NthConstantIndexPolicyOptions, collect_nth_constant_indexes,
     evaluate_nth_constant_index_policy, summarize_nth_constant_indexes,
 };
-use crate::presentation::cli::nth_constant_index_report::args::NthConstantIndexReportArgs;
-use crate::presentation::cli::nth_constant_index_report::render::print_nth_constant_index_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn nth_constant_index_report(
-    args: NthConstantIndexReportArgs,
-) -> Result<()> {
+pub fn nth_constant_index_report(args: NthConstantIndexReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut nth_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn nth_constant_index_report(
     print_nth_constant_index_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "nth-constant-index-report policy failed: {policy_message}"
         )));
     }

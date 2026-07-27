@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::append_nil_report::{AppendNilPolicy, AppendNilSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::append_nil::usecase::{AppendNilPolicy, AppendNilSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_append_nil_report(
+pub fn print_append_nil_report(
     summary: &AppendNilSummary,
     policy: &AppendNilPolicy,
     output: OutputFormat,

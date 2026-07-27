@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::accessor_arity_report::{
+use crate::accessor_arity::usecase::{
     AccessorArityPolicy, AccessorAritySummary, expected_arity_phrase,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_accessor_arity_report(
+pub fn print_accessor_arity_report(
     summary: &AccessorAritySummary,
     policy: &AccessorArityPolicy,
     output: OutputFormat,
