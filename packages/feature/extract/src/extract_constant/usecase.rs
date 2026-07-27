@@ -38,7 +38,9 @@ pub struct ExtractConstantPlan {
 }
 
 pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
-    crate::extract_constant::domain::path_for_selection(tree, selection)
+    Ok(crate::extract_constant::domain::path_for_selection(
+        tree, selection,
+    )?)
 }
 
 pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<ExtractConstantPlan> {

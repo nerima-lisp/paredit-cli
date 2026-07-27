@@ -1,6 +1,8 @@
 //! Use-case helpers for extracting functions from selected expressions.
 
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{ExtractionResult, ExtractionTargetError};
 
 use paredit_core_edit::extract_shared::{insert_top_level_form, replace_span_checked};
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -17,14 +19,21 @@ use rewrite::{extracted_call, extracted_definition};
 
 pub use types::{ExtractFunctionInsert, ExtractFunctionPlan, ExtractFunctionRequest};
 
-pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<ExtractFunctionPlan> {
+pub fn plan_extract_function(
+    request: ExtractFunctionRequest<'_>,
+) -> ExtractionResult<ExtractFunctionPlan> {
     let semantic = request
         .dialect
         .verify_extract_function()
-        .context("extract-function is not supported for this dialect")?;
+        .map_err(|source| ExtractionTargetError::DialectDoesNotSupportExtractFunction { source })?;
     request.selection.validate_source(request.input)?;
-    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("extract-function input is not a valid S-expression document")?;
+    let input_tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "extract-function",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
 
     let span = request.selection.span();
@@ -47,8 +56,13 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
     let call = extracted_call(&request.name, &params);
     let definition = extracted_definition(request.dialect, &request.name, &params, &selected);
     let replaced = replace_span_checked(request.input, span, &call)?;
-    let replaced_tree = SyntaxTree::parse_with_dialect(&replaced, request.dialect)
-        .context("replacement output is not a valid S-expression document")?;
+    let replaced_tree =
+        SyntaxTree::parse_with_dialect(&replaced, request.dialect).map_err(|source| {
+            DocumentRefusal::OutputNotAnSexprDocument {
+                operation: "replacement",
+                source,
+            }
+        })?;
     let (rewritten, anchor_span) = insert_top_level_form(
         &replaced,
         &replaced_tree,
@@ -58,8 +72,12 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
         "extract-function --anchor-path",
     )?;
 
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("extracted output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "extracted",
+            source,
+        }
+    })?;
 
     Ok(ExtractFunctionPlan {
         dialect: request.dialect,

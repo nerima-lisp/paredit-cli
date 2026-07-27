@@ -21,25 +21,25 @@ pub fn plan_convert_when_to_if(
     request: ConditionalConversionRequest<'_>,
 ) -> Result<ConditionalConversionPlan> {
     safe(&request)?;
-    domain::plan_convert_when_to_if(request)
+    Ok(domain::plan_convert_when_to_if(request)?)
 }
 pub fn plan_convert_unless_to_if(
     request: ConditionalConversionRequest<'_>,
 ) -> Result<ConditionalConversionPlan> {
     safe(&request)?;
-    domain::plan_convert_unless_to_if(request)
+    Ok(domain::plan_convert_unless_to_if(request)?)
 }
 pub fn plan_convert_if_to_when(
     request: ConditionalConversionRequest<'_>,
 ) -> Result<ConditionalConversionPlan> {
     safe(&request)?;
-    domain::plan_convert_if_to_when(request)
+    Ok(domain::plan_convert_if_to_when(request)?)
 }
 pub fn plan_convert_if_to_unless(
     request: ConditionalConversionRequest<'_>,
 ) -> Result<ConditionalConversionPlan> {
     safe(&request)?;
-    domain::plan_convert_if_to_unless(request)
+    Ok(domain::plan_convert_if_to_unless(request)?)
 }
 
 #[cfg(test)]

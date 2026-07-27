@@ -1,6 +1,8 @@
 //! Use case for extracting an expression into an enclosing local function.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{DialectRefusal, DocumentRefusal};
+
+use crate::error::{ExtractionResult, ExtractionScopeError, ExtractionTargetError};
 
 use crate::extract_function::domain::{infer_extract_function_params, rewrite::extracted_call};
 use paredit_core_edit::extract_shared::replace_span;
@@ -46,30 +48,38 @@ pub struct ExtractLocalFunctionPlan {
     pub changed: bool,
 }
 
-fn ensure_common_lisp_dialect(dialect: Dialect) -> Result<()> {
+fn ensure_common_lisp_dialect(dialect: Dialect) -> ExtractionResult<()> {
     if dialect != Dialect::CommonLisp {
-        bail!("extract-local-function currently supports only Common Lisp");
+        return Err(DialectRefusal::CurrentlyCommonLispOnly {
+            operation: "extract-local-function",
+        }
+        .into());
     }
     Ok(())
 }
 
 pub fn plan_extract_local_function(
     request: ExtractLocalFunctionRequest<'_>,
-) -> Result<ExtractLocalFunctionPlan> {
+) -> ExtractionResult<ExtractLocalFunctionPlan> {
     request.selection.validate_source(request.input)?;
     request.enclosing.validate_source(request.input)?;
     ensure_common_lisp_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("extract-local-function input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "extract-local-function",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let path = request
         .path
         .as_ref()
-        .context("extract-local-function requires a path selection")?;
+        .ok_or(ExtractionTargetError::RequiresPathSelection)?;
     if tree.select_path(path)?.span() != request.selection.span()
         || tree.select_path(&request.enclosing_path)?.span() != request.enclosing.span()
     {
-        bail!("extract-local-function paths and selections must refer to the input tree");
+        return Err(ExtractionTargetError::SelectionFromAnotherTree.into());
     }
     reject_structural_position(&tree, path)?;
 
@@ -77,13 +87,13 @@ pub fn plan_extract_local_function(
     let enclosing_span = request.enclosing.span();
     let enclosing_view = request.enclosing.view();
     if enclosing_view.kind != ExpressionKind::List {
-        bail!("extract-local-function enclosing selection must be a list");
+        return Err(ExtractionTargetError::EnclosingNotAList.into());
     }
     if selected_span == enclosing_span
         || selected_span.start() < enclosing_span.start()
         || selected_span.end() > enclosing_span.end()
     {
-        bail!("extract-local-function target must be a proper descendant of the enclosing list");
+        return Err(ExtractionTargetError::NotAProperDescendant.into());
     }
     reject_existing_call_capture(
         &enclosing_view,
@@ -119,8 +129,12 @@ pub fn plan_extract_local_function(
         enclosed
     );
     let rewritten = replace_span(request.input, enclosing_span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("extracted local function output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "extracted local function",
+            source,
+        }
+    })?;
 
     Ok(ExtractLocalFunctionPlan {
         path: request.path,
@@ -392,15 +406,15 @@ fn selected_form_is_structural(view: &ExpressionView) -> bool {
     common_lisp_operator_head_eq(head, "declare") || common_lisp_operator_head_eq(head, "declaim")
 }
 
-fn reject_structural_position(tree: &SyntaxTree, path: &Path) -> Result<()> {
+fn reject_structural_position(tree: &SyntaxTree, path: &Path) -> ExtractionResult<()> {
     let indexes = path.to_raw_indexes();
     if selected_form_is_structural(&tree.select_path(path)?.view()) {
-        bail!("extract-local-function target cannot be inside a structural binding position");
+        return Err(ExtractionScopeError::StructuralBindingPosition.into());
     }
     for depth in 1..indexes.len() {
         let child_index = indexes[depth];
         if child_index == 0 && !is_executable_structural_container(tree, &indexes, depth)? {
-            bail!("extract-local-function target cannot be in a list head position");
+            return Err(ExtractionScopeError::ListHeadPosition.into());
         }
 
         let parent_path = Path::from_indexes(indexes[..depth].to_vec());
@@ -519,7 +533,7 @@ fn reject_structural_position(tree: &SyntaxTree, path: &Path) -> Result<()> {
             || structural_control_child
             || tagbody_label
         {
-            bail!("extract-local-function target cannot be inside a structural binding position");
+            return Err(ExtractionScopeError::StructuralBindingPosition.into());
         }
     }
     Ok(())
@@ -529,7 +543,7 @@ fn is_executable_structural_container(
     tree: &SyntaxTree,
     indexes: &[usize],
     depth: usize,
-) -> Result<bool> {
+) -> ExtractionResult<bool> {
     if depth < 2 {
         return Ok(false);
     }
@@ -570,7 +584,7 @@ fn reject_existing_call_capture(
     view: &ExpressionView,
     name: &str,
     selected: ByteSpan,
-) -> Result<()> {
+) -> ExtractionResult<()> {
     // Calls inside the extracted expression move into the definition body. In
     // `labels` they intentionally become recursive; in `flet` they retain the
     // surrounding function binding. Only calls left in the wrapped body can be
@@ -699,9 +713,10 @@ fn reject_existing_call_capture(
         if (!call_shadowed && direct_call)
             || (!function_shadowed && (reader_function_designator || function_form_designator))
         {
-            bail!(
-                "local function name '{name}' would capture an existing call or function designator in the enclosing list"
-            );
+            return Err(ExtractionScopeError::NameWouldCapture {
+                name: name.to_string(),
+            }
+            .into());
         }
         stack.extend(
             view.children
@@ -883,7 +898,7 @@ fn common_lisp_control_tag_eq(
     }
 }
 
-fn reject_non_local_control_transfer(view: &ExpressionView) -> Result<()> {
+fn reject_non_local_control_transfer(view: &ExpressionView) -> ExtractionResult<()> {
     let mut stack = vec![(
         view,
         0,
@@ -938,7 +953,10 @@ fn reject_non_local_control_transfer(view: &ExpressionView) -> Result<()> {
                         .iter()
                         .any(|bound| common_lisp_block_name_eq(bound, "nil"))
                 {
-                    bail!("extract-local-function cannot move {head} across a function boundary");
+                    return Err(ExtractionScopeError::CrossesFunctionBoundary {
+                        head: head.to_string(),
+                    }
+                    .into());
                 }
                 if common_lisp_operator_head_eq(head, "return-from") {
                     let local =
@@ -951,9 +969,10 @@ fn reject_non_local_control_transfer(view: &ExpressionView) -> Result<()> {
                                     .any(|bound| common_lisp_block_name_eq(name, bound))
                             });
                     if !local {
-                        bail!(
-                            "extract-local-function cannot move {head} across a function boundary"
-                        );
+                        return Err(ExtractionScopeError::CrossesFunctionBoundary {
+                            head: head.to_string(),
+                        }
+                        .into());
                     }
                 }
                 if common_lisp_operator_head_eq(head, "go") {
@@ -967,9 +986,10 @@ fn reject_non_local_control_transfer(view: &ExpressionView) -> Result<()> {
                                 .any(|bound| common_lisp_control_tag_eq(&name, bound))
                         });
                     if !local {
-                        bail!(
-                            "extract-local-function cannot move {head} across a function boundary"
-                        );
+                        return Err(ExtractionScopeError::CrossesFunctionBoundary {
+                            head: head.to_string(),
+                        }
+                        .into());
                     }
                 }
 
@@ -1131,7 +1151,7 @@ mod tests {
         target: &Path,
         enclosing: &Path,
         recursive: bool,
-    ) -> Result<ExtractLocalFunctionPlan> {
+    ) -> ExtractionResult<ExtractLocalFunctionPlan> {
         let tree = SyntaxTree::parse(input)?;
         plan_extract_local_function(ExtractLocalFunctionRequest {
             input,
@@ -1178,7 +1198,7 @@ mod tests {
     }
 
     #[test]
-    fn preserves_common_lisp_reader_character_literal() -> Result<()> {
+    fn preserves_common_lisp_reader_character_literal() -> ExtractionResult<()> {
         let input = r"(progn (print #\)) (finish))";
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)?;
         let path: Path = "0.1".parse()?;

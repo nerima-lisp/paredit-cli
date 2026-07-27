@@ -43,6 +43,12 @@ pub enum DialectRefusal {
 
     #[error("{operation} currently supports only Common Lisp and Emacs Lisp")]
     CurrentlyCommonLispAndEmacsLisp { operation: &'static str },
+
+    /// Same refusal, spelled with the dialect *identifiers* rather than their
+    /// English names. A separate variant because the wording is part of the
+    /// CLI's contract and unifying it would change output.
+    #[error("{operation} supports only common-lisp and emacs-lisp")]
+    LowercaseCommonLispAndEmacsLisp { operation: &'static str },
 }
 
 /// The source or the rewritten result is not a document this edit can use.
@@ -156,6 +162,11 @@ pub enum ShapeRefusal {
 
     #[error("{role} must be a plain {expected} form")]
     UnnamedRoleNotPlainForm { role: String, expected: String },
+
+    /// Same, without `plain`. The two wordings are a CLI contract, so they
+    /// stay distinct variants rather than one with a flag.
+    #[error("{role} must be a {expected} form")]
+    UnnamedRoleNotExpectedForm { role: String, expected: String },
 
     #[error("{operation} selected form must have a plain head")]
     HeadNotPlain { operation: &'static str },

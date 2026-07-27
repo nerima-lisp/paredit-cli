@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::{DialectRefusal, DocumentRefusal};
+
+use crate::error::{ExtractionResult, ExtractionScopeError, ExtractionTargetError};
 
 use paredit_core_edit::extract_shared::{
     TopLevelInsert, insert_top_level_form, replace_span_checked,
@@ -35,15 +37,15 @@ pub struct Plan {
     pub changed: bool,
 }
 
-pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
+pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> ExtractionResult<Path> {
     selection.validate_tree(tree)?;
     let target = selection.span();
     find_path(&tree.root_view(), target, &mut Vec::new())
         .map(Path::from_indexes)
-        .ok_or_else(|| anyhow::anyhow!("selected expression path could not be resolved"))
+        .ok_or_else(|| ExtractionTargetError::PathUnresolved.into())
 }
 
-pub fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> ExtractionResult<Plan> {
     request
         .selection
         .validate_context(request.input, request.tree)?;
@@ -55,8 +57,13 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     let replacement = request.name.as_str().to_owned();
     let definition = format!("({head} {} {selected})", request.name);
     let replaced = replace_span_checked(request.input, span, &replacement)?;
-    let replaced_tree = SyntaxTree::parse_with_dialect(&replaced, request.dialect)
-        .context("replacement output is not a valid S-expression document")?;
+    let replaced_tree =
+        SyntaxTree::parse_with_dialect(&replaced, request.dialect).map_err(|source| {
+            DocumentRefusal::OutputNotAnSexprDocument {
+                operation: "replacement",
+                source,
+            }
+        })?;
     let (rewritten, anchor_span) = insert_top_level_form(
         &replaced,
         &replaced_tree,
@@ -65,8 +72,12 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
         request.anchor_path.as_ref(),
         "extract-constant",
     )?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("extracted output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "extracted",
+            source,
+        }
+    })?;
 
     Ok(Plan {
         dialect: request.dialect,
@@ -83,27 +94,33 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     })
 }
 
-fn dialect_head(dialect: Dialect) -> Result<&'static str> {
+fn dialect_head(dialect: Dialect) -> ExtractionResult<&'static str> {
     match dialect {
         Dialect::CommonLisp => Ok("defconstant"),
         Dialect::EmacsLisp => Ok("defconst"),
-        _ => anyhow::bail!("extract-constant supports only common-lisp and emacs-lisp"),
+        _ => Err(DialectRefusal::LowercaseCommonLispAndEmacsLisp {
+            operation: "extract-constant",
+        }
+        .into()),
     }
 }
 
-fn validate_target(tree: &SyntaxTree, path: &Path, dialect: Dialect) -> Result<()> {
+fn validate_target(tree: &SyntaxTree, path: &Path, dialect: Dialect) -> ExtractionResult<()> {
     if path.indexes().len() < 2 {
-        anyhow::bail!("extract-constant cannot select an entire top-level form");
+        return Err(ExtractionScopeError::EntireTopLevelForm.into());
     }
     let indexes = path.to_raw_indexes();
     let root = tree.root_view();
     let mut current = &root;
     for (depth, index) in indexes.iter().copied().enumerate() {
         reject_quoted_context(current)?;
-        current = current
-            .children
-            .get(index)
-            .ok_or_else(|| anyhow::anyhow!("path {path} is out of range"))?;
+        current =
+            current
+                .children
+                .get(index)
+                .ok_or_else(|| ExtractionTargetError::PathOutOfRange {
+                    path: path.to_string(),
+                })?;
         if depth + 1 < indexes.len() {
             reject_quoted_context(current)?;
         }
@@ -111,29 +128,29 @@ fn validate_target(tree: &SyntaxTree, path: &Path, dialect: Dialect) -> Result<(
     reject_quoted_context(current)?;
     let parent_path = path
         .parent()
-        .ok_or_else(|| anyhow::anyhow!("extract-constant target path has no parent"))?;
+        .ok_or(ExtractionTargetError::TargetHasNoParent)?;
     let parent = tree.select_path(&parent_path)?.view();
     let selected_index = path
         .indexes()
         .last()
         .map(|index| index.get())
-        .ok_or_else(|| anyhow::anyhow!("extract-constant target path is empty"))?;
+        .ok_or(ExtractionTargetError::TargetPathEmpty)?;
     if selected_index == 0
         && list_head(&parent).is_some_and(|head| dialect.is_definition_head(head))
     {
-        anyhow::bail!("extract-constant cannot select a definition head");
+        return Err(ExtractionScopeError::DefinitionHead.into());
     }
     Ok(())
 }
 
-fn reject_quoted_context(view: &ExpressionView) -> Result<()> {
+fn reject_quoted_context(view: &ExpressionView) -> ExtractionResult<()> {
     if view
         .reader_prefixes
         .iter()
         .any(|prefix| matches!(prefix, ReaderPrefix::Quote | ReaderPrefix::Quasiquote))
         || list_head(view).is_some_and(is_quote_head)
     {
-        anyhow::bail!("extract-constant cannot select inside quote or quasiquote");
+        return Err(ExtractionScopeError::InsideQuote.into());
     }
     Ok(())
 }
@@ -171,7 +188,7 @@ mod tests {
 
     use super::*;
 
-    fn extraction_plan(input: &str, dialect: Dialect) -> Result<Plan> {
+    fn extraction_plan(input: &str, dialect: Dialect) -> ExtractionResult<Plan> {
         let tree = SyntaxTree::parse_with_dialect(input, dialect)?;
         let path: Path = "0.1".parse()?;
         let selection = tree.select_path(&path)?;

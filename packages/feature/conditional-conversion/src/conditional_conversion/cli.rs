@@ -1,4 +1,5 @@
 use crate::conditional_sugar::usecase::{ConditionalConversionPlan, ConditionalConversionRequest};
+use crate::error::ConditionalConversionResult;
 use anyhow::Result;
 use clap::Args;
 use paredit_core_cli::args::DialectArg;
@@ -27,7 +28,12 @@ pub struct ConditionalConversionArgs {
 
 pub fn run(
     args: ConditionalConversionArgs,
-    planner: fn(ConditionalConversionRequest<'_>) -> Result<ConditionalConversionPlan>,
+    // The four subcommands pass the domain planner directly, so the pointer
+    // carries the typed refusal; `?` widens it into this function's anyhow
+    // result alongside the CLI's own I/O failures.
+    planner: fn(
+        ConditionalConversionRequest<'_>,
+    ) -> ConditionalConversionResult<ConditionalConversionPlan>,
 ) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");

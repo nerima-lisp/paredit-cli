@@ -1,6 +1,8 @@
 //! Domain planning for Common Lisp conditional-sugar conversions.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{ConservativeRefusal, DialectRefusal, DocumentRefusal, ShapeRefusal};
+
+use crate::error::{ConditionalConversionResult, ConditionalShapeError};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -32,9 +34,12 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
-pub fn require_supported_dialect(dialect: Dialect) -> Result<()> {
+pub fn require_supported_dialect(dialect: Dialect) -> ConditionalConversionResult<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("conditional conversion supports only Common Lisp and Emacs Lisp");
+        return Err(DialectRefusal::CommonLispAndEmacsLisp {
+            operation: "conditional conversion",
+        }
+        .into());
     }
     Ok(())
 }
@@ -42,16 +47,28 @@ pub fn require_supported_dialect(dialect: Dialect) -> Result<()> {
 fn prepare<'a>(
     request: &ConditionalConversionRequest<'a>,
     head: &str,
-) -> Result<(SyntaxTree, ExpressionView)> {
+) -> ConditionalConversionResult<(SyntaxTree, ExpressionView)> {
     require_supported_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("conditional conversion input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "conditional conversion",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
-        bail!("conditional conversion cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments {
+            operation: "conditional conversion",
+        }
+        .into());
     }
     if form.kind != ExpressionKind::List || !form.reader_prefixes.is_empty() {
-        bail!("selected form must be a plain {head} form");
+        return Err(ShapeRefusal::UnnamedRoleNotPlainForm {
+            role: "selected form".to_owned(),
+            expected: head.to_owned(),
+        }
+        .into());
     }
     let matches = form
         .children
@@ -64,7 +81,11 @@ fn prepare<'a>(
             _ => false,
         });
     if !matches {
-        bail!("selected form must be a {head} form");
+        return Err(ShapeRefusal::UnnamedRoleNotExpectedForm {
+            role: "selected form".to_owned(),
+            expected: head.to_owned(),
+        }
+        .into());
     }
     Ok((tree, form))
 }
@@ -74,10 +95,14 @@ fn finish(
     form: &ExpressionView,
     body_count: usize,
     replacement: String,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("conditional conversion output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "conditional conversion",
+            source,
+        }
+    })?;
     Ok(ConditionalConversionPlan {
         dialect: request.dialect,
         path: request.path,
@@ -100,10 +125,10 @@ fn literal_nil(view: &ExpressionView, dialect: Dialect) -> bool {
 
 pub fn plan_convert_when_to_if(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     let (_tree, form) = prepare(&request, "when")?;
     if form.children.len() < 2 {
-        bail!("convert-when-to-if requires a test");
+        return Err(ConditionalShapeError::WhenHasNoTest.into());
     }
     let test = form.children[1].span.slice(request.input);
     let body = form.children[2..]
@@ -124,10 +149,10 @@ pub fn plan_convert_when_to_if(
 
 pub fn plan_convert_unless_to_if(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     let (_tree, form) = prepare(&request, "unless")?;
     if form.children.len() < 2 {
-        bail!("convert-unless-to-if requires a test");
+        return Err(ConditionalShapeError::UnlessHasNoTest.into());
     }
     let test = form.children[1].span.slice(request.input);
     let body = form.children[2..]
@@ -148,13 +173,13 @@ pub fn plan_convert_unless_to_if(
 
 pub fn plan_convert_if_to_when(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     let (_tree, form) = prepare(&request, "if")?;
     if !(3..=4).contains(&form.children.len()) {
-        bail!("convert-if-to-when requires (if test then [nil])");
+        return Err(ConditionalShapeError::IfIsNotWhenShaped.into());
     }
     if form.children.len() == 4 && !literal_nil(&form.children[3], request.dialect) {
-        bail!("convert-if-to-when requires no else form or a literal nil else");
+        return Err(ConditionalShapeError::IfHasNonNilElse.into());
     }
     let test = form.children[1].span.slice(request.input);
     let then = form.children[2].span.slice(request.input);
@@ -163,10 +188,10 @@ pub fn plan_convert_if_to_when(
 
 pub fn plan_convert_if_to_unless(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     let (_tree, form) = prepare(&request, "if")?;
     if form.children.len() != 4 || !literal_nil(&form.children[2], request.dialect) {
-        bail!("convert-if-to-unless requires (if test nil else)");
+        return Err(ConditionalShapeError::IfIsNotUnlessShaped.into());
     }
     let test = form.children[1].span.slice(request.input);
     let otherwise = form.children[3].span.slice(request.input);
