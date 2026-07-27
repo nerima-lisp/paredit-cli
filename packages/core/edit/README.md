@@ -36,7 +36,7 @@ The shared machinery every refactoring is built from — the vocabulary of
 | --- | --- |
 | `paredit-core-syntax` | 33 references: spans, trees and delimiter-preserving edits. |
 | `paredit-core-semantics` | 4 references: safety decisions need to know what a name binds. |
-| `anyhow` | Fallible plan and execute paths, pending §9.2. |
+| `thiserror` | Every refusal is an `EditRefusal`. |
 | `thiserror` | `ReaderConditionalSafetyError` and its siblings — the pattern §9.2 generalises. |
 | `proptest` (dev) | Properties over generated binding forms. |
 
@@ -72,3 +72,34 @@ their original declarations.
 | deciding an exit code | that is the composition root |
 
 Adding a dependency to `Cargo.toml` means adding a row to the table above.
+
+## Refusals
+
+The 107 refusal messages in this package normalise to 64 shapes, and 59% of
+the messages are the **same 20 shapes** repeated across seven edit families —
+`convert-*`, `merge-nested-*`, `split-let*`, `flatten-progn`,
+`eliminate-empty-binding-form` — differing only in the operation name pasted
+into the string.
+
+So the error types are organised by **reason**, not by operation:
+
+| Type | The edit refuses because |
+| --- | --- |
+| `DialectRefusal` | It is not defined for this dialect |
+| `DocumentRefusal` | The input, or its own output, does not parse |
+| `ConservativeRefusal` | The form carries comments, reader prefixes, or declarations it would have to move blindly |
+| `ShapeRefusal` | The selected form is not the shape it operates on |
+| `BindingRefusal` | The binding list, or a binding in it, is not rewritable — including the capture cases |
+| `LocalFunctionRefusal` | An `flet`/`labels` definition is not rewritable |
+| `InsertionRefusal` | The extracted form has nowhere to go |
+
+Every variant carries `operation`, so "this edit family is conservative about
+comments" is one match instead of six message prefixes. That is not new
+plumbing: the code already threaded `operation: &str` through shared helpers
+like `require_supported_dialect`. The parameter was there; only the type was
+missing.
+
+Shapes that differ only in wording (`rejects declarations` versus
+`conservatively rejects declarations`) stay separate variants. Unifying them
+would change CLI output, which is a behaviour change wearing a type change's
+clothes.

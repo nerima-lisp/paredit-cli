@@ -18,7 +18,10 @@ pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> Result<FlattenPro
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     reject_unsafe_context(&tree, &request.path)?;
-    domain::plan_flatten_progn(request)
+    // The use case unions three error types - the edit's EditRefusal, a
+    // ParseError, and ReaderConditionalSafetyError - so it stays anyhow until
+    // this package's own section 9.2 pass.
+    Ok(domain::plan_flatten_progn(request)?)
 }
 
 fn reject_unsafe_context(tree: &SyntaxTree, path: &Path) -> Result<()> {

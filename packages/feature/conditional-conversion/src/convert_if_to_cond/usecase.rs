@@ -12,7 +12,10 @@ pub fn plan_convert_if_to_cond(request: ConvertIfToCondRequest<'_>) -> Result<Co
     domain::require_supported_dialect(request.dialect, "convert-if-to-cond")?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
-    domain::plan_convert_if_to_cond(request)
+    // The use case unions three error types - the edit's EditRefusal, a
+    // ParseError, and ReaderConditionalSafetyError - so it stays anyhow until
+    // this package's own section 9.2 pass.
+    Ok(domain::plan_convert_if_to_cond(request)?)
 }
 
 #[cfg(test)]

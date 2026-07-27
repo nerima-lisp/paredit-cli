@@ -12,7 +12,9 @@ repository.workspace = true
 [dependencies]
 paredit-core-syntax = { path = "../syntax" }
 paredit-core-semantics = { path = "../semantics" }
-anyhow.workspace = true
+# No anyhow. The 107 refusals here normalise to 64 shapes, 59% of them
+# repeated across seven edit families with only the operation name differing;
+# EditRefusal carries `operation` instead. See src/error.rs.
 thiserror.workspace = true
 
 [dev-dependencies]

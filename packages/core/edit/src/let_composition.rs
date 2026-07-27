@@ -1,6 +1,8 @@
 //! Semantics-preserving composition and decomposition of parallel/sequential `let` forms.
 
-use anyhow::{Context, Result, bail};
+use crate::error::{
+    BindingRefusal, ConservativeRefusal, DialectRefusal, DocumentRefusal, EditResult, ShapeRefusal,
+};
 
 use paredit_core_semantics::binding_index::BindingIndex;
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
@@ -54,7 +56,7 @@ pub struct SplitLetPlan {
     pub changed: bool,
 }
 
-pub fn plan_merge_nested_let(request: MergeNestedLetRequest<'_>) -> Result<LetCompositionPlan> {
+pub fn plan_merge_nested_let(request: MergeNestedLetRequest<'_>) -> EditResult<LetCompositionPlan> {
     let (tree, outer) = select(
         request.input,
         request.dialect,
@@ -69,13 +71,20 @@ pub fn plan_merge_nested_let(request: MergeNestedLetRequest<'_>) -> Result<LetCo
     )?;
     reject_unsafe(&tree, request.dialect, &outer, "merge-nested-let")?;
     if outer.children.len() != 3 {
-        bail!("merge-nested-let requires the outer body to contain only one form");
+        return Err(BindingRefusal::OuterBodyNotSingleForm {
+            operation: "merge-nested-let",
+        }
+        .into());
     }
     let outer_bindings = binding_list(&outer.children[1], "merge-nested-let outer")?;
     let inner = &outer.children[2];
     require_form(request.dialect, inner, "let", "merge-nested-let outer body")?;
     if inner.children.len() < 3 {
-        bail!("merge-nested-let requires the inner let to have a body");
+        return Err(BindingRefusal::InnerHasNoBody {
+            operation: "merge-nested-let",
+            inner: "let",
+        }
+        .into());
     }
     let inner_bindings = binding_list(&inner.children[1], "merge-nested-let inner")?;
     let outer_parsed = parse_bindings(outer_bindings, "merge-nested-let")?;
@@ -88,7 +97,10 @@ pub fn plan_merge_nested_let(request: MergeNestedLetRequest<'_>) -> Result<LetCo
             .iter()
             .any(|old| equal(request.dialect, old.as_str(), name.as_str()))
         {
-            bail!("merge-nested-let requires unique binding names");
+            return Err(BindingRefusal::DuplicateBindingNames {
+                operation: "merge-nested-let",
+            }
+            .into());
         }
         if let Some(initializer) = initializer {
             for outer_name in &outer_names {
@@ -101,7 +113,11 @@ pub fn plan_merge_nested_let(request: MergeNestedLetRequest<'_>) -> Result<LetCo
                     &mut refs,
                 );
                 if !refs.is_empty() {
-                    bail!("inner initializer for '{name}' references outer binding '{outer_name}'");
+                    return Err(BindingRefusal::InnerReferencesOuterBinding {
+                        name: name.to_string(),
+                        outer_name: outer_name.to_string(),
+                    }
+                    .into());
                 }
             }
         }
@@ -123,7 +139,7 @@ pub fn plan_merge_nested_let(request: MergeNestedLetRequest<'_>) -> Result<LetCo
 
 pub fn plan_merge_nested_let_star(
     request: MergeNestedLetStarRequest<'_>,
-) -> Result<LetCompositionPlan> {
+) -> EditResult<LetCompositionPlan> {
     let (tree, outer) = select(
         request.input,
         request.dialect,
@@ -138,7 +154,10 @@ pub fn plan_merge_nested_let_star(
     )?;
     reject_unsafe(&tree, request.dialect, &outer, "merge-nested-let-star")?;
     if outer.children.len() != 3 {
-        bail!("merge-nested-let-star requires the outer body to contain only one form");
+        return Err(BindingRefusal::OuterBodyNotSingleForm {
+            operation: "merge-nested-let-star",
+        }
+        .into());
     }
     let outer_bindings = binding_list(&outer.children[1], "merge-nested-let-star outer")?;
     let inner = &outer.children[2];
@@ -149,7 +168,11 @@ pub fn plan_merge_nested_let_star(
         "merge-nested-let-star outer body",
     )?;
     if inner.children.len() < 3 {
-        bail!("merge-nested-let-star requires the inner let* to have a body");
+        return Err(BindingRefusal::InnerHasNoBody {
+            operation: "merge-nested-let-star",
+            inner: "let*",
+        }
+        .into());
     }
     let inner_bindings = binding_list(&inner.children[1], "merge-nested-let-star inner")?;
     let replacement =
@@ -166,20 +189,24 @@ pub fn plan_merge_nested_let_star(
     )
 }
 
-pub fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
+pub fn plan_split_let(request: SplitLetRequest<'_>) -> EditResult<SplitLetPlan> {
     let (tree, form) = select(request.input, request.dialect, &request.path, "split-let")?;
     require_form(request.dialect, &form, "let", "split-let selected form")?;
     reject_unsafe(&tree, request.dialect, &form, "split-let")?;
     if form.children.len() < 3 {
-        bail!("split-let requires a body");
+        return Err(BindingRefusal::MissingBody {
+            operation: "split-let",
+        }
+        .into());
     }
     let bindings = binding_list(&form.children[1], "split-let")?;
     let binding_index = request.binding_index.get();
     if binding_index >= bindings.children.len() {
-        bail!(
-            "split-let --binding-index must be between 1 and {}",
-            bindings.children.len().saturating_sub(1)
-        );
+        return Err(BindingRefusal::BindingIndexOutOfRange {
+            operation: "split-let",
+            maximum: bindings.children.len().saturating_sub(1),
+        }
+        .into());
     }
     let parsed = parse_bindings(bindings, "split-let")?;
     let outer_names: Vec<_> = parsed[..binding_index]
@@ -198,9 +225,11 @@ pub fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
                     &mut refs,
                 );
                 if !refs.is_empty() {
-                    bail!(
-                        "splitting would capture reference to '{outer_name}' in initializer for '{name}'"
-                    );
+                    return Err(BindingRefusal::SplitWouldCapture {
+                        outer_name: outer_name.to_string(),
+                        name: name.to_string(),
+                    }
+                    .into());
                 }
             }
         }
@@ -235,18 +264,18 @@ fn select(
     input: &str,
     dialect: Dialect,
     path: &Path,
-    operation: &str,
-) -> Result<(SyntaxTree, ExpressionView)> {
+    operation: &'static str,
+) -> EditResult<(SyntaxTree, ExpressionView)> {
     validate_dialect(dialect, operation)?;
     let tree = SyntaxTree::parse_with_dialect(input, dialect)
-        .context("input is not a valid S-expression document")?;
+        .map_err(|source| DocumentRefusal::UnnamedInputNotAnSexprDocument { source })?;
     let view = tree.select_path(path)?.view();
     Ok((tree, view))
 }
 
-pub fn validate_dialect(dialect: Dialect, operation: &str) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect, operation: &'static str) -> EditResult<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("{operation} supports only Common Lisp and Emacs Lisp");
+        return Err(DialectRefusal::CommonLispAndEmacsLisp { operation }.into());
     }
     Ok(())
 }
@@ -255,7 +284,7 @@ fn require_form(
     view: &ExpressionView,
     expected: &str,
     message: &str,
-) -> Result<()> {
+) -> EditResult<()> {
     if view.kind != ExpressionKind::List
         || !view.reader_prefixes.is_empty()
         || !view
@@ -264,20 +293,27 @@ fn require_form(
             .and_then(atom_symbol_text)
             .is_some_and(|head| equal(dialect, head, expected))
     {
-        bail!("{message} must be a plain {expected} form");
+        return Err(ShapeRefusal::UnnamedRoleNotPlainForm {
+            role: message.to_owned(),
+            expected: expected.to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
-fn binding_list<'a>(view: &'a ExpressionView, operation: &str) -> Result<&'a ExpressionView> {
+fn binding_list<'a>(
+    view: &'a ExpressionView,
+    operation: &'static str,
+) -> EditResult<&'a ExpressionView> {
     if view.kind != ExpressionKind::List || !view.reader_prefixes.is_empty() {
-        bail!("{operation} requires a plain binding list");
+        return Err(BindingRefusal::NotPlainBindingList { operation }.into());
     }
     Ok(view)
 }
 fn parse_bindings(
     bindings: &ExpressionView,
-    operation: &str,
-) -> Result<Vec<(SymbolName, Option<ExpressionView>)>> {
+    operation: &'static str,
+) -> EditResult<Vec<(SymbolName, Option<ExpressionView>)>> {
     bindings
         .children
         .iter()
@@ -294,24 +330,24 @@ fn parse_bindings(
                     binding.children.get(1).cloned(),
                 ));
             }
-            bail!("{operation} requires plain, non-destructuring bindings")
+            Err(BindingRefusal::Destructuring { operation }.into())
         })
         .collect()
 }
-fn plain_symbol(view: &ExpressionView, operation: &str) -> Result<SymbolName> {
+fn plain_symbol(view: &ExpressionView, operation: &'static str) -> EditResult<SymbolName> {
     if view.kind != ExpressionKind::Atom || !view.reader_prefixes.is_empty() {
-        bail!("{operation} requires a plain binding name");
+        return Err(BindingRefusal::NotPlainBindingName { operation }.into());
     }
-    SymbolName::new(atom_symbol_text(view).context("binding name is not a symbol")?)
-        .context("invalid binding name")
+    SymbolName::new(atom_symbol_text(view).ok_or(BindingRefusal::BindingNameNotASymbol)?)
+        .map_err(|source| BindingRefusal::InvalidBindingName { source }.into())
 }
-fn unique(dialect: Dialect, names: &[SymbolName], operation: &str) -> Result<()> {
+fn unique(dialect: Dialect, names: &[SymbolName], operation: &'static str) -> EditResult<()> {
     for (i, name) in names.iter().enumerate() {
         if names[..i]
             .iter()
             .any(|old| equal(dialect, old.as_str(), name.as_str()))
         {
-            bail!("{operation} requires unique binding names");
+            return Err(BindingRefusal::DuplicateBindingNames { operation }.into());
         }
     }
     Ok(())
@@ -324,16 +360,16 @@ fn reject_unsafe(
     tree: &SyntaxTree,
     dialect: Dialect,
     form: &ExpressionView,
-    operation: &str,
-) -> Result<()> {
+    operation: &'static str,
+) -> EditResult<()> {
     if tree.has_comment_in(form.span) {
-        bail!("{operation} cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments { operation }.into());
     }
     if contains_prefix(form) {
-        bail!("{operation} conservatively rejects reader prefixes");
+        return Err(ConservativeRefusal::ReaderPrefixes { operation }.into());
     }
     if contains_headed(dialect, form, "declare") {
-        bail!("{operation} conservatively rejects declarations");
+        return Err(ConservativeRefusal::Declarations { operation }.into());
     }
     Ok(())
 }
@@ -382,11 +418,11 @@ fn finish(
     outer_count: usize,
     inner_count: usize,
     replacement: String,
-    operation: &str,
-) -> Result<LetCompositionPlan> {
+    operation: &'static str,
+) -> EditResult<LetCompositionPlan> {
     let rewritten = replace_span(input, span, &replacement);
     SyntaxTree::parse_with_dialect(&rewritten, dialect)
-        .with_context(|| format!("{operation} output is not valid"))?;
+        .map_err(|source| DocumentRefusal::OutputInvalid { operation, source })?;
     Ok(LetCompositionPlan {
         dialect,
         path,
@@ -408,8 +444,8 @@ fn finish_split(
     inner_count: usize,
     binding_index: BindingIndex,
     replacement: String,
-    operation: &str,
-) -> Result<SplitLetPlan> {
+    operation: &'static str,
+) -> EditResult<SplitLetPlan> {
     let plan = finish(
         input,
         dialect,

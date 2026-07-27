@@ -1,6 +1,9 @@
 //! Scope-safe composition of nested Common Lisp `flet` forms.
 
-use anyhow::{Context, Result, bail};
+use crate::error::{
+    BindingRefusal, ConservativeRefusal, DialectRefusal, DocumentRefusal, EditResult,
+    LocalFunctionRefusal, ShapeRefusal,
+};
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
@@ -23,21 +26,33 @@ pub struct Plan {
     pub changed: bool,
 }
 
-pub fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> EditResult<Plan> {
     validate_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("merge-nested-flet input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "merge-nested-flet",
+                source,
+            }
+        })?;
     let outer = tree.select_path(&request.path)?.view();
     require_flet(&outer, "selected form")?;
     reject_unsafe(&tree, &outer)?;
     if outer.children.len() != 3 {
-        bail!("merge-nested-flet requires the outer body to contain only one form");
+        return Err(BindingRefusal::OuterBodyNotSingleForm {
+            operation: "merge-nested-flet",
+        }
+        .into());
     }
     let outer_defs = definitions(&outer.children[1], "outer")?;
     let inner = &outer.children[2];
     require_flet(inner, "outer body")?;
     if inner.children.len() < 3 {
-        bail!("merge-nested-flet requires the inner flet to have a body");
+        return Err(BindingRefusal::InnerHasNoBody {
+            operation: "merge-nested-flet",
+            inner: "flet",
+        }
+        .into());
     }
     let inner_defs = definitions(&inner.children[1], "inner")?;
     let outer_names = names(outer_defs)?;
@@ -48,16 +63,20 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
             .iter()
             .any(|old: &&str| common_lisp_symbol_reference_eq(old, name))
         {
-            bail!("merge-nested-flet requires unique local function names");
+            return Err(LocalFunctionRefusal::DuplicateNames {
+                operation: "merge-nested-flet",
+            }
+            .into());
         }
         all.push(name);
     }
     for definition in &inner_defs.children {
         for body in definition.children.iter().skip(2) {
             if references_local(body, &outer_names) {
-                bail!(
-                    "merge-nested-flet cannot move an inner definition outside the scope of an outer local function"
-                );
+                return Err(LocalFunctionRefusal::WouldEscapeOuterScope {
+                    operation: "merge-nested-flet",
+                }
+                .into());
             }
         }
     }
@@ -72,8 +91,12 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     let body = &request.input[inner_defs.span.end().get()..inner.span.end().get() - 1];
     let replacement = format!("({head} ({left}{separator}{right}){body})");
     let rewritten = replace_span(request.input, outer.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("merge-nested-flet output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputInvalid {
+            operation: "merge-nested-flet",
+            source,
+        }
+    })?;
     Ok(Plan {
         dialect: request.dialect,
         path: request.path,
@@ -85,13 +108,16 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     })
 }
 
-pub fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> EditResult<()> {
     if dialect != Dialect::CommonLisp {
-        bail!("merge-nested-flet supports only Common Lisp");
+        return Err(DialectRefusal::CommonLispOnly {
+            operation: "merge-nested-flet",
+        }
+        .into());
     }
     Ok(())
 }
-fn require_flet(view: &ExpressionView, role: &str) -> Result<()> {
+fn require_flet(view: &ExpressionView, role: &str) -> EditResult<()> {
     if view.kind != ExpressionKind::List
         || !view.reader_prefixes.is_empty()
         || !view
@@ -100,13 +126,21 @@ fn require_flet(view: &ExpressionView, role: &str) -> Result<()> {
             .and_then(atom_symbol_text)
             .is_some_and(|head| common_lisp_symbol_reference_eq(head, "flet"))
     {
-        bail!("merge-nested-flet {role} must be a plain flet form");
+        return Err(ShapeRefusal::RoleNotPlainFlet {
+            operation: "merge-nested-flet",
+            role: role.to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
-fn definitions<'a>(view: &'a ExpressionView, role: &str) -> Result<&'a ExpressionView> {
+fn definitions<'a>(view: &'a ExpressionView, role: &str) -> EditResult<&'a ExpressionView> {
     if view.kind != ExpressionKind::List || !view.reader_prefixes.is_empty() {
-        bail!("merge-nested-flet requires a plain {role} definition list");
+        return Err(LocalFunctionRefusal::NotPlainDefinitionList {
+            operation: "merge-nested-flet",
+            role: role.to_owned(),
+        }
+        .into());
     }
     for definition in &view.children {
         if definition.kind != ExpressionKind::List
@@ -116,16 +150,20 @@ fn definitions<'a>(view: &'a ExpressionView, role: &str) -> Result<&'a Expressio
             || definition.children[1].kind != ExpressionKind::List
             || !definition.children[1].reader_prefixes.is_empty()
         {
-            bail!("merge-nested-flet requires plain local function definitions");
+            return Err(LocalFunctionRefusal::NotPlainDefinitions {
+                operation: "merge-nested-flet",
+            }
+            .into());
         }
     }
     Ok(view)
 }
-fn names(view: &ExpressionView) -> Result<Vec<&str>> {
+fn names(view: &ExpressionView) -> EditResult<Vec<&str>> {
     view.children
         .iter()
         .map(|definition| {
-            plain_atom(&definition.children[0]).context("local function name is not plain")
+            plain_atom(&definition.children[0])
+                .ok_or_else(|| LocalFunctionRefusal::NameNotPlain.into())
         })
         .collect()
 }
@@ -134,15 +172,24 @@ fn plain_atom(view: &ExpressionView) -> Option<&str> {
         .then(|| atom_symbol_text(view))
         .flatten()
 }
-fn reject_unsafe(tree: &SyntaxTree, form: &ExpressionView) -> Result<()> {
+fn reject_unsafe(tree: &SyntaxTree, form: &ExpressionView) -> EditResult<()> {
     if tree.has_comment_in(form.span) {
-        bail!("merge-nested-flet cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments {
+            operation: "merge-nested-flet",
+        }
+        .into());
     }
     if contains_prefix(form) {
-        bail!("merge-nested-flet conservatively rejects reader prefixes");
+        return Err(ConservativeRefusal::ReaderPrefixes {
+            operation: "merge-nested-flet",
+        }
+        .into());
     }
     if contains_headed(form, "declare") {
-        bail!("merge-nested-flet conservatively rejects declarations");
+        return Err(ConservativeRefusal::Declarations {
+            operation: "merge-nested-flet",
+        }
+        .into());
     }
     Ok(())
 }

@@ -19,7 +19,10 @@ pub fn plan_eliminate_empty_binding_form(
         .context("input is not valid")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     require_known_expression_context(&tree, &request.path, request.dialect)?;
-    domain::plan_eliminate_empty_binding_form(request)
+    // The use case unions three error types - the edit's EditRefusal, a
+    // ParseError, and ReaderConditionalSafetyError - so it stays anyhow until
+    // this package's own section 9.2 pass.
+    Ok(domain::plan_eliminate_empty_binding_form(request)?)
 }
 
 fn require_known_expression_context(

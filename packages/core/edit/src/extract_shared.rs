@@ -1,6 +1,6 @@
-use anyhow::Result;
-
 use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
+
+use crate::error::{EditResult, InsertionRefusal};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TopLevelInsert {
@@ -29,14 +29,14 @@ pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
-pub fn replace_span_checked(input: &str, span: ByteSpan, replacement: &str) -> Result<String> {
+pub fn replace_span_checked(input: &str, span: ByteSpan, replacement: &str) -> EditResult<String> {
     span.validate_against(input)
-        .map_err(|error| anyhow::anyhow!("replacement span is invalid: {error}"))?;
+        .map_err(|source| InsertionRefusal::InvalidReplacementSpan { source })?;
     input
         .len()
         .checked_sub(span.len())
         .and_then(|retained| retained.checked_add(replacement.len()))
-        .ok_or_else(|| anyhow::anyhow!("replacement output size overflow"))?;
+        .ok_or(InsertionRefusal::ReplacementSizeOverflow)?;
     Ok(replace_span(input, span, replacement))
 }
 
@@ -46,16 +46,18 @@ pub fn insert_top_level_form(
     form: &str,
     insert: TopLevelInsert,
     anchor_path: Option<&Path>,
-    command: &str,
-) -> Result<(String, Option<ByteSpan>)> {
+    command: &'static str,
+) -> EditResult<(String, Option<ByteSpan>)> {
     match insert {
         TopLevelInsert::Append => Ok((append_top_level_form(input, form), None)),
         TopLevelInsert::Before | TopLevelInsert::After => {
-            let anchor_path = anchor_path
-                .ok_or_else(|| anyhow::anyhow!("--insert before/after requires --anchor-path"))?;
+            let anchor_path = anchor_path.ok_or(InsertionRefusal::MissingAnchorPath)?;
             let anchor_index = top_level_path_index(anchor_path, command)?;
             if anchor_index >= tree.root_children().len() {
-                anyhow::bail!("anchor top-level path {anchor_path} is out of range");
+                return Err(InsertionRefusal::AnchorOutOfRange {
+                    anchor_path: anchor_path.to_string(),
+                }
+                .into());
             }
             let anchor = tree.select_path(anchor_path)?;
             let anchor_span = anchor.span();
@@ -65,7 +67,7 @@ pub fn insert_top_level_form(
                 }
                 TopLevelInsert::After => (anchor_span.end().get(), format!("\n\n{}", form.trim())),
                 TopLevelInsert::Append => {
-                    anyhow::bail!("append insertion does not use an anchor")
+                    return Err(InsertionRefusal::AppendTakesNoAnchor.into());
                 }
             };
             let mut output = String::with_capacity(input.len() + inserted.len());
@@ -85,9 +87,9 @@ fn append_top_level_form(input: &str, form: &str) -> String {
     }
 }
 
-fn top_level_path_index(path: &Path, command: &str) -> Result<usize> {
+fn top_level_path_index(path: &Path, command: &'static str) -> EditResult<usize> {
     match path.indexes() {
         [index] => Ok(index.get()),
-        _ => anyhow::bail!("{command} requires a top-level path, for example --path 2"),
+        _ => Err(InsertionRefusal::NotTopLevelPath { command }.into()),
     }
 }

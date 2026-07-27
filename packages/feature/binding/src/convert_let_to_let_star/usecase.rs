@@ -13,7 +13,10 @@ pub fn plan_convert_let_to_let_star(
     domain::validate_convert_let_to_let_star_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
-    domain::plan_convert_let_to_let_star(request)
+    // The use case unions three error types - the edit's EditRefusal, a
+    // ParseError, and ReaderConditionalSafetyError - so it stays anyhow until
+    // this package's own section 9.2 pass.
+    Ok(domain::plan_convert_let_to_let_star(request)?)
 }
 
 #[cfg(test)]

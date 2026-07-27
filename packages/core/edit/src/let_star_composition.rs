@@ -1,6 +1,8 @@
 //! Pure planning rules for splitting sequential `let*` bindings.
 
-use anyhow::{Context, Result, bail};
+use crate::error::{
+    BindingRefusal, ConservativeRefusal, DialectRefusal, DocumentRefusal, EditResult, ShapeRefusal,
+};
 use paredit_core_semantics::binding_index::BindingIndex;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -26,34 +28,54 @@ pub struct Plan {
     pub changed: bool,
 }
 
-pub fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> EditResult<Plan> {
     validate_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("split-let-star input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "split-let-star",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     require_let_star(request.dialect, &form)?;
     if tree.has_comment_in(form.span) || contains_reader_prefix(&form) {
-        bail!("split-let-star conservatively rejects comments or reader prefixes");
+        return Err(ConservativeRefusal::ConservativeCommentsOrReaderPrefixes {
+            operation: "split-let-star",
+        }
+        .into());
     }
     if contains_headed_form(request.dialect, &form, "declare") {
-        bail!("split-let-star conservatively rejects declarations");
+        return Err(ConservativeRefusal::Declarations {
+            operation: "split-let-star",
+        }
+        .into());
     }
     if form.children.len() < 3 {
-        bail!("split-let-star requires a body");
+        return Err(BindingRefusal::MissingBody {
+            operation: "split-let-star",
+        }
+        .into());
     }
     let bindings = form
         .children
         .get(1)
-        .context("split-let-star requires a binding list")?;
+        .ok_or(BindingRefusal::MissingBindingList {
+            operation: "split-let-star",
+        })?;
     if bindings.kind != ExpressionKind::List || !bindings.reader_prefixes.is_empty() {
-        bail!("split-let-star requires a plain binding list");
+        return Err(BindingRefusal::NotPlainBindingList {
+            operation: "split-let-star",
+        }
+        .into());
     }
     let binding_index = request.binding_index.get();
     if binding_index >= bindings.children.len() {
-        bail!(
-            "split-let-star --binding-index must be between 1 and {}",
-            bindings.children.len().saturating_sub(1)
-        );
+        return Err(BindingRefusal::BindingIndexOutOfRange {
+            operation: "split-let-star",
+            maximum: bindings.children.len().saturating_sub(1),
+        }
+        .into());
     }
     let head = form.children[0].span.slice(request.input);
     let outer = bindings.children[..binding_index]
@@ -69,8 +91,12 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     let body = &request.input[bindings.span.end().get()..form.span.end().get() - 1];
     let replacement = format!("({head} ({outer}) ({head} ({inner}){body}))");
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("split-let-star output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputInvalid {
+            operation: "split-let-star",
+            source,
+        }
+    })?;
     Ok(Plan {
         dialect: request.dialect,
         path: request.path,
@@ -83,9 +109,12 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     })
 }
 
-pub fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> EditResult<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("split-let-star supports only Common Lisp and Emacs Lisp");
+        return Err(DialectRefusal::CommonLispAndEmacsLisp {
+            operation: "split-let-star",
+        }
+        .into());
     }
     Ok(())
 }
@@ -98,7 +127,7 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
         &input[span.end().get()..]
     )
 }
-fn require_let_star(dialect: Dialect, form: &ExpressionView) -> Result<()> {
+fn require_let_star(dialect: Dialect, form: &ExpressionView) -> EditResult<()> {
     let matches = form.kind == ExpressionKind::List
         && form.reader_prefixes.is_empty()
         && form
@@ -113,7 +142,11 @@ fn require_let_star(dialect: Dialect, form: &ExpressionView) -> Result<()> {
                 }
             });
     if !matches {
-        bail!("split-let-star selected form must be a plain let* form");
+        return Err(ShapeRefusal::NotPlainExpectedForm {
+            operation: "split-let-star",
+            expected: "let*".to_owned(),
+        }
+        .into());
     }
     Ok(())
 }

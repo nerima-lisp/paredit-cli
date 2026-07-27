@@ -1,6 +1,9 @@
 //! Common Lisp local function binding conversions.
 
-use anyhow::{Context, Result, bail};
+use crate::error::{
+    BindingRefusal, ConservativeRefusal, DialectRefusal, DocumentRefusal, EditResult,
+    LocalFunctionRefusal, ShapeRefusal,
+};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -24,32 +27,33 @@ pub struct ConvertFletToLabelsPlan {
     pub changed: bool,
 }
 
-pub fn validate_convert_flet_to_labels_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_flet_to_labels_dialect(dialect: Dialect) -> EditResult<()> {
     validate_common_lisp_dialect(dialect, "convert-flet-to-labels")
 }
 
-pub fn validate_convert_labels_to_flet_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_labels_to_flet_dialect(dialect: Dialect) -> EditResult<()> {
     validate_common_lisp_dialect(dialect, "convert-labels-to-flet")
 }
 
-fn validate_common_lisp_dialect(dialect: Dialect, operation: &str) -> Result<()> {
+fn validate_common_lisp_dialect(dialect: Dialect, operation: &'static str) -> EditResult<()> {
     if dialect != Dialect::CommonLisp {
-        bail!("{operation} supports only Common Lisp");
+        return Err(DialectRefusal::CommonLispOnly { operation }.into());
     }
     Ok(())
 }
 
 pub fn plan_convert_flet_to_labels(
     request: ConvertFletToLabelsRequest<'_>,
-) -> Result<ConvertFletToLabelsPlan> {
+) -> EditResult<ConvertFletToLabelsPlan> {
     let BindingAnalysis { form, head, names } =
         analyze_bindings(&request, "flet", "convert-flet-to-labels")?;
     for definition in form.children[1].children.iter() {
         for body in definition.children.iter().skip(2) {
             if contains_local_function_reference(body, &names) {
-                bail!(
-                    "convert-flet-to-labels cannot capture local function references in definition bodies"
-                );
+                return Err(LocalFunctionRefusal::WouldCaptureReferences {
+                    operation: "convert-flet-to-labels",
+                }
+                .into());
             }
         }
     }
@@ -84,15 +88,16 @@ pub struct ConvertLabelsToFletPlan {
 
 pub fn plan_convert_labels_to_flet(
     request: ConvertLabelsToFletRequest<'_>,
-) -> Result<ConvertLabelsToFletPlan> {
+) -> EditResult<ConvertLabelsToFletPlan> {
     let BindingAnalysis { form, head, names } =
         analyze_bindings(&request, "labels", "convert-labels-to-flet")?;
     for definition in form.children[1].children.iter() {
         for body in definition.children.iter().skip(2) {
             if contains_local_function_reference(body, &names) {
-                bail!(
-                    "convert-labels-to-flet cannot convert recursive or mutually recursive definitions"
-                );
+                return Err(LocalFunctionRefusal::Recursive {
+                    operation: "convert-labels-to-flet",
+                }
+                .into());
             }
         }
     }
@@ -117,49 +122,57 @@ struct BindingAnalysis {
 fn analyze_bindings<'a, R>(
     request: &'a R,
     expected_head: &str,
-    operation: &str,
-) -> Result<BindingAnalysis>
+    operation: &'static str,
+) -> EditResult<BindingAnalysis>
 where
     R: BindingRequest<'a> + ?Sized,
 {
     validate_common_lisp_dialect(request.dialect(), operation)?;
     let tree = SyntaxTree::parse_with_dialect(request.input(), request.dialect())
-        .with_context(|| format!("{operation} input is not a valid S-expression document"))?;
+        .map_err(|source| DocumentRefusal::InputNotAnSexprDocument { operation, source })?;
     let form = tree.select_path(request.path())?.view();
     if tree.has_comment_in(form.span) {
-        bail!("{operation} cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments { operation }.into());
     }
     if contains_reader_prefix(&form) {
-        bail!("{operation} requires a form without reader prefixes");
+        return Err(ConservativeRefusal::RequiresNoReaderPrefixes { operation }.into());
     }
     if form.kind != ExpressionKind::List || form.children.len() < 2 {
-        bail!("{operation} selected form must be a {expected_head} form");
+        return Err(ShapeRefusal::NotExpectedForm {
+            operation,
+            expected: expected_head.to_owned(),
+        }
+        .into());
     }
     let head = plain_atom(&form.children[0])
-        .with_context(|| format!("{operation} selected form must have a plain head"))?
+        .ok_or(ShapeRefusal::HeadNotPlain { operation })?
         .to_owned();
     if !common_lisp_symbol_reference_eq(&head, expected_head) {
-        bail!("{operation} selected form must be a {expected_head} form");
+        return Err(ShapeRefusal::NotExpectedForm {
+            operation,
+            expected: expected_head.to_owned(),
+        }
+        .into());
     }
     let bindings = &form.children[1];
     if bindings.kind != ExpressionKind::List {
-        bail!("{operation} requires a plain binding list");
+        return Err(BindingRefusal::NotPlainBindingList { operation }.into());
     }
     let mut names: Vec<String> = Vec::with_capacity(bindings.children.len());
     for definition in &bindings.children {
         if definition.kind != ExpressionKind::List || definition.children.len() < 2 {
-            bail!("{operation} requires plain local function definitions");
+            return Err(LocalFunctionRefusal::NotPlainDefinitions { operation }.into());
         }
         let name = plain_atom(&definition.children[0])
-            .with_context(|| format!("{operation} requires a plain local function name"))?;
+            .ok_or(LocalFunctionRefusal::NotPlainName { operation })?;
         if definition.children[1].kind != ExpressionKind::List {
-            bail!("{operation} requires a plain lambda list");
+            return Err(LocalFunctionRefusal::NotPlainLambdaList { operation }.into());
         }
         if names
             .iter()
             .any(|existing| common_lisp_symbol_reference_eq(existing, name))
         {
-            bail!("{operation} requires unique local function names");
+            return Err(LocalFunctionRefusal::DuplicateNames { operation }.into());
         }
         names.push(name.to_owned());
     }
@@ -258,9 +271,9 @@ fn replace_head(input: &str, form: &ExpressionView, replacement: String) -> Stri
     output
 }
 
-fn parse_output(rewritten: &str, dialect: Dialect, operation: &str) -> Result<()> {
+fn parse_output(rewritten: &str, dialect: Dialect, operation: &'static str) -> EditResult<()> {
     SyntaxTree::parse_with_dialect(rewritten, dialect)
-        .with_context(|| format!("{operation} output is not a valid S-expression document"))?;
+        .map_err(|source| DocumentRefusal::OutputNotAnSexprDocument { operation, source })?;
     Ok(())
 }
 
@@ -294,7 +307,7 @@ mod tests {
         }
     }
 
-    fn assert_support_error<T>(result: Result<T>, operation: &str) {
+    fn assert_support_error<T>(result: EditResult<T>, operation: &str) {
         let error = result.err().expect("unsupported dialect must fail");
         assert_eq!(
             error.to_string(),

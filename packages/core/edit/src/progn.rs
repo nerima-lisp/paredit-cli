@@ -1,6 +1,8 @@
 //! Pure `progn` transformations used by the application safety facade.
 
-use anyhow::{Context, Result, bail};
+use crate::error::{
+    BindingRefusal, ConservativeRefusal, DialectRefusal, DocumentRefusal, EditResult, ShapeRefusal,
+};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -25,17 +27,28 @@ pub struct FlattenPrognPlan {
     pub changed: bool,
 }
 
-pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> Result<FlattenPrognPlan> {
+pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> EditResult<FlattenPrognPlan> {
     require_supported(request.dialect, "flatten-progn")?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("flatten-progn input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "flatten-progn",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     require_head(request.dialect, &form, "progn", "flatten-progn")?;
     if tree.has_comment_in(form.span) || contains_prefix(&form) {
-        bail!("flatten-progn cannot rewrite comments or reader prefixes");
+        return Err(ConservativeRefusal::CommentsOrReaderPrefixes {
+            operation: "flatten-progn",
+        }
+        .into());
     }
     if contains_headed(request.dialect, &form, "declare") {
-        bail!("flatten-progn rejects declarations");
+        return Err(ConservativeRefusal::PlainDeclarations {
+            operation: "flatten-progn",
+        }
+        .into());
     }
     let body = &form.children[1..];
     let nested_count = body
@@ -66,8 +79,12 @@ pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> Result<FlattenPro
         ),
     };
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("flatten-progn output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputInvalid {
+            operation: "flatten-progn",
+            source,
+        }
+    })?;
     Ok(FlattenPrognPlan {
         dialect: request.dialect,
         path: request.path,
@@ -99,33 +116,44 @@ pub struct EliminateEmptyBindingFormPlan {
 
 pub fn plan_eliminate_empty_binding_form(
     request: EliminateEmptyBindingFormRequest<'_>,
-) -> Result<EliminateEmptyBindingFormPlan> {
+) -> EditResult<EliminateEmptyBindingFormPlan> {
     require_supported(request.dialect, "eliminate-empty-binding-form")?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("eliminate-empty-binding-form input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "eliminate-empty-binding-form",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     if form.kind != ExpressionKind::List
         || !form.reader_prefixes.is_empty()
         || form.children.len() < 2
     {
-        bail!("eliminate-empty-binding-form requires a plain let or let* form");
+        return Err(ShapeRefusal::NotPlainLetOrLetStar {
+            operation: "eliminate-empty-binding-form",
+        }
+        .into());
     }
     let head = form
         .children
         .first()
         .and_then(atom_symbol_text)
-        .context("missing binding form head")?;
+        .ok_or(ShapeRefusal::MissingBindingFormHead)?;
     if !symbol_eq(request.dialect, head, "let") && !symbol_eq(request.dialect, head, "let*") {
-        bail!("selected form is not let or let*");
+        return Err(ShapeRefusal::NotLetOrLetStar.into());
     }
     if form.children[1].kind != ExpressionKind::List || !form.children[1].children.is_empty() {
-        bail!("binding list must be empty");
+        return Err(BindingRefusal::BindingListNotEmpty.into());
     }
     if tree.has_comment_in(form.span)
         || contains_prefix(&form)
         || contains_headed(request.dialect, &form, "declare")
     {
-        bail!("eliminate-empty-binding-form rejects comments, prefixes, or declarations");
+        return Err(ConservativeRefusal::CommentsPrefixesOrDeclarations {
+            operation: "eliminate-empty-binding-form",
+        }
+        .into());
     }
     let body = &form.children[2..];
     let replacement = match body {
@@ -140,8 +168,12 @@ pub fn plan_eliminate_empty_binding_form(
         ),
     };
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("eliminate-empty-binding-form output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputInvalid {
+            operation: "eliminate-empty-binding-form",
+            source,
+        }
+    })?;
     Ok(EliminateEmptyBindingFormPlan {
         dialect: request.dialect,
         path: request.path,
@@ -153,11 +185,11 @@ pub fn plan_eliminate_empty_binding_form(
     })
 }
 
-pub fn require_supported(dialect: Dialect, operation: &str) -> Result<()> {
+pub fn require_supported(dialect: Dialect, operation: &'static str) -> EditResult<()> {
     if matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         Ok(())
     } else {
-        bail!("{operation} supports only Common Lisp and Emacs Lisp")
+        Err(DialectRefusal::CommonLispAndEmacsLisp { operation }.into())
     }
 }
 fn symbol_eq(dialect: Dialect, left: &str, right: &str) -> bool {
@@ -177,12 +209,16 @@ fn require_head(
     dialect: Dialect,
     view: &ExpressionView,
     expected: &str,
-    operation: &str,
-) -> Result<()> {
+    operation: &'static str,
+) -> EditResult<()> {
     if is_head(dialect, view, expected) {
         Ok(())
     } else {
-        bail!("{operation} selected form must be a plain {expected}")
+        Err(ShapeRefusal::NotPlainExpected {
+            operation,
+            expected: expected.to_owned(),
+        }
+        .into())
     }
 }
 fn contains_prefix(view: &ExpressionView) -> bool {

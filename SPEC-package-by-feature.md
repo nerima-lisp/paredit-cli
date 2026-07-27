@@ -1498,6 +1498,100 @@ pub enum WorkspaceDiscoveryError {
   `inspect capabilities` のゴールデンが全て落ちる。§9.2 の目的は
   メッセージの改善ではなく**型による区別**である。
 
+---
+
+### 9.2.2 【実施後の追記】3 パッケージを変換して分かったこと
+
+`core/workspace` / `core/syntax` / `core/lint-engine` を変換した実測。
+**§9.2.1 の見積もりは 2 点で外れていた。**
+
+#### 外れ 1: ファイル数はコストの指標にならない
+
+§9.2.1 は「本番コードで `anyhow` を使うファイル数」で作業量を見積もった。
+実際に効くのは**失敗箇所の数**と、それが**何種類に割れるか**である。
+
+| パッケージ | ファイル数（§9.2.1 の見積もり） | 実際の失敗箇所 | 比 |
+| --- | ---: | ---: | ---: |
+| `core/workspace` | 2 | 52 | 26x |
+| `core/syntax` | 5 | 58 | 12x |
+| `core/lint-engine` | 3 | 5 + トレイト 1 | 2x |
+| `core/edit` | 8 | **100** | 12x |
+| `core/cli` | 3 | 46 | 15x |
+
+`core/edit` は「8 ファイル」だが実際は 100 メッセージで、最大の core パッケージ
+である。ファイル数で並べた §9.2.1 の表は**順序が誤っている**。
+
+#### 外れ 2: lint パッケージ 6 個は 1 行の変更で終わる
+
+`feature/lint-*` は 536 ファイルが `anyhow` に触れており、§9.2.1 の表では
+最大の作業に見える。**実測すると、536 ファイル全部が `use anyhow::Result;` の
+1 行だけ**で、`bail!` も `context()` も `anyhow!` も 1 箇所もない。理由は
+`LintRule::check` の戻り値型が `anyhow::Result<()>` だったからで、
+**トレイトのシグネチャ 1 個が 536 ファイルを汚染していた。**
+
+| 種類 | ファイル数 | `Result<` の出現 | 変換 |
+| --- | ---: | ---: | --- |
+| `rule.rs` | 134 | 各 1 | トレイトと同時に `LintResult` へ |
+| `domain.rs` | 134 | 各 1 | 同上 |
+| `cli/**` | 268 | 各 1 | `core/cli` の変換待ち |
+
+268 ファイルを機械置換し、**壊れた呼び出し側は 2 箇所**（ルート façade の
+ラッパ 2 個）だけだった。
+
+#### 実測: `LintRule::check` は 134 ルール中 4 個しか失敗しない
+
+`anyhow::Result<()>` は「何でも起こりうる」と言う型なので、
+**本当は何も起きないという事実を隠していた**。134 ルールの `check` 本体を
+走査すると、`?` を含むものは 4 個のみで、4 個とも失敗の原因は同じ
+（木全体を見るルールがパスを解決し、解決できない）。
+
+これは「バリアントが少なすぎて型にする価値がない」ではなく、逆である。
+**集合が小さいことを型で言えるのが利益**であり、`LintError` は 1 バリアントでも
+「ルールは I/O もリソース制限も報告しない」と述べている。
+
+#### 実測: メッセージの反復は型の設計を教える
+
+`core/edit` の 100 メッセージを正規化すると、**59% が 20 個の同じ形**に潰れる:
+
+| 回数 | 形 |
+| ---: | --- |
+| 6 | `<op> cannot rewrite a form containing comments` |
+| 4 | `<op> conservatively rejects declarations` |
+| 4 | `<op> supports only Common Lisp and Emacs Lisp` |
+| 4 | `<op> requires a plain binding list` |
+| 4 | `<op> input is not valid` |
+
+7 つの編集ファミリ（`convert-*` / `merge-nested-*` / `split-let*` / `flatten-progn` …）
+が**同じ 7 種類の拒否理由**を、操作名だけ変えて書き直している。
+`core/edit` の変換は「ファイルごとに enum を作る」のではなく、
+**`operation: &'static str` を持つ 1 個の `EditRefusal`** にすべきである。
+
+#### 実測: 型消去された payload を持つ typed error が既にあった
+
+`SimilarityCandidateCollectionError` は `thiserror` の enum でありながら
+`Selection(#[from] anyhow::Error)` を持っていた。**§9.2 が消そうとしている形が、
+既に「変換済み」に見えるコードの中にいた。** 変換の対象を探すときは
+`use anyhow` だけでなく `anyhow::Error` を payload に持つ enum も探すこと。
+
+#### 実測: 文字列の前方一致が制御フローになっていた
+
+`core/syntax` の `validate_edit_context` は、失敗メッセージに操作名を前置するか
+どうかを `error.to_string().starts_with("input ")` で決めていた。
+**人間向けの文章への前方一致が分岐条件になっており**、誰かがメッセージを
+書き直せばテストが落ちないまま挙動が変わる状態だった。これが §9.2 の
+「exit code の分岐を文字列から再導出している」の最も具体的な実例である。
+
+#### 変換順序（クレート依存順、実測）
+
+```text
+core/syntax ✅ → core/semantics (11) → core/lint-engine ✅ → core/edit (100)
+     └→ core/workspace ✅                                        └→ core/cli (46)
+                                                                      └→ feature/* (18 個)
+```
+
+`core/semantics` と `core/edit` は `core/lint-engine` と独立なので順不同。
+`feature/*` は全て `core/cli` の後。
+
 ### 9.5 順序が結果を決める
 
 **機械的な修正を分割の前にやるか後にやるかで、総コストが大きく変わる。**

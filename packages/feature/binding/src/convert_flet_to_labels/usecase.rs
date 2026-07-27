@@ -14,7 +14,10 @@ pub fn plan_convert_flet_to_labels(
     domain::validate_convert_flet_to_labels_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
-    domain::plan_convert_flet_to_labels(request)
+    // The use case unions three error types - the edit's EditRefusal, a
+    // ParseError, and ReaderConditionalSafetyError - so it stays anyhow until
+    // this package's own section 9.2 pass.
+    Ok(domain::plan_convert_flet_to_labels(request)?)
 }
 
 #[cfg(test)]

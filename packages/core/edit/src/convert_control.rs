@@ -1,6 +1,8 @@
 //! Dialect-aware conversion between `if` and `cond` forms.
 
-use anyhow::{Context, Result, anyhow, bail};
+use crate::error::{
+    ConservativeRefusal, DialectRefusal, DocumentRefusal, EditResult, ShapeRefusal,
+};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -24,17 +26,30 @@ pub struct ConvertIfToCondPlan {
     pub changed: bool,
 }
 
-pub fn plan_convert_if_to_cond(request: ConvertIfToCondRequest<'_>) -> Result<ConvertIfToCondPlan> {
+pub fn plan_convert_if_to_cond(
+    request: ConvertIfToCondRequest<'_>,
+) -> EditResult<ConvertIfToCondPlan> {
     require_supported_dialect(request.dialect, "convert-if-to-cond")?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("convert-if-to-cond input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "convert-if-to-cond",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
-        bail!("convert-if-to-cond cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments {
+            operation: "convert-if-to-cond",
+        }
+        .into());
     }
     require_named_form(&form, request.dialect, "if", "convert-if-to-cond")?;
     if !(3..=4).contains(&form.children.len()) {
-        bail!("convert-if-to-cond requires (if test then [else])");
+        return Err(ShapeRefusal::NotIfForm {
+            operation: "convert-if-to-cond",
+        }
+        .into());
     }
 
     let test = form.children[1].span.slice(request.input);
@@ -76,25 +91,41 @@ pub struct ConvertCondToIfPlan {
     pub changed: bool,
 }
 
-pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<ConvertCondToIfPlan> {
+pub fn plan_convert_cond_to_if(
+    request: ConvertCondToIfRequest<'_>,
+) -> EditResult<ConvertCondToIfPlan> {
     require_supported_dialect(request.dialect, "convert-cond-to-if")?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("convert-cond-to-if input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "convert-cond-to-if",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
-        bail!("convert-cond-to-if cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments {
+            operation: "convert-cond-to-if",
+        }
+        .into());
     }
     require_named_form(&form, request.dialect, "cond", "convert-cond-to-if")?;
     let clauses = &form.children[1..];
     if clauses.is_empty() {
-        bail!("convert-cond-to-if requires at least one clause");
+        return Err(ShapeRefusal::NoClauses {
+            operation: "convert-cond-to-if",
+        }
+        .into());
     }
     for clause in clauses {
         if clause.kind != ExpressionKind::List
             || !clause.reader_prefixes.is_empty()
             || clause.children.len() != 2
         {
-            bail!("convert-cond-to-if requires each clause to contain exactly test and consequent");
+            return Err(ShapeRefusal::ClauseNotTestAndConsequent {
+                operation: "convert-cond-to-if",
+            }
+            .into());
         }
     }
 
@@ -107,7 +138,9 @@ pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<Co
             None => format!("(if {test} {consequent})"),
         });
     }
-    let replacement = replacement.ok_or_else(|| anyhow!("convert-cond-to-if has no clauses"))?;
+    let replacement = replacement.ok_or(ShapeRefusal::ClausesEmpty {
+        operation: "convert-cond-to-if",
+    })?;
     let rewritten = replace_span(request.input, form.span, &replacement);
     parse_output(&rewritten, request.dialect, "convert-cond-to-if")?;
 
@@ -121,9 +154,9 @@ pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<Co
     })
 }
 
-pub fn require_supported_dialect(dialect: Dialect, operation: &str) -> Result<()> {
+pub fn require_supported_dialect(dialect: Dialect, operation: &'static str) -> EditResult<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("{operation} currently supports only Common Lisp and Emacs Lisp");
+        return Err(DialectRefusal::CurrentlyCommonLispAndEmacsLisp { operation }.into());
     }
     Ok(())
 }
@@ -132,10 +165,14 @@ fn require_named_form(
     form: &ExpressionView,
     dialect: Dialect,
     name: &str,
-    operation: &str,
-) -> Result<()> {
+    operation: &'static str,
+) -> EditResult<()> {
     if form.kind != ExpressionKind::List || !form.reader_prefixes.is_empty() {
-        bail!("{operation} selected form must be a plain {name} form");
+        return Err(ShapeRefusal::NotPlainExpectedForm {
+            operation,
+            expected: name.to_owned(),
+        }
+        .into());
     }
     let matches = form
         .children
@@ -148,7 +185,11 @@ fn require_named_form(
             _ => false,
         });
     if !matches {
-        bail!("{operation} selected form must be a {name} form");
+        return Err(ShapeRefusal::NotExpectedForm {
+            operation,
+            expected: name.to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
@@ -161,9 +202,9 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     rewritten
 }
 
-fn parse_output(rewritten: &str, dialect: Dialect, operation: &str) -> Result<()> {
+fn parse_output(rewritten: &str, dialect: Dialect, operation: &'static str) -> EditResult<()> {
     SyntaxTree::parse_with_dialect(rewritten, dialect)
-        .with_context(|| format!("{operation} output is not a valid S-expression document"))?;
+        .map_err(|source| DocumentRefusal::OutputNotAnSexprDocument { operation, source })?;
     Ok(())
 }
 

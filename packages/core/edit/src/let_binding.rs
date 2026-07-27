@@ -1,6 +1,8 @@
 //! Dependency-preserving conversions between Common Lisp `let` forms.
 
-use anyhow::{Context, Result, bail};
+use crate::error::{
+    BindingRefusal, ConservativeRefusal, DialectRefusal, DocumentRefusal, EditResult, ShapeRefusal,
+};
 
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
@@ -26,26 +28,37 @@ pub struct ConvertLetToLetStarPlan {
     pub changed: bool,
 }
 
-pub fn validate_convert_let_to_let_star_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_let_to_let_star_dialect(dialect: Dialect) -> EditResult<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("convert-let-to-let-star supports only Common Lisp and Emacs Lisp");
+        return Err(DialectRefusal::CommonLispAndEmacsLisp {
+            operation: "convert-let-to-let-star",
+        }
+        .into());
     }
     Ok(())
 }
 
-pub fn validate_convert_let_star_to_let_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_convert_let_star_to_let_dialect(dialect: Dialect) -> EditResult<()> {
     if dialect != Dialect::CommonLisp {
-        bail!("convert-let-star-to-let currently supports only Common Lisp");
+        return Err(DialectRefusal::CurrentlyCommonLispOnly {
+            operation: "convert-let-star-to-let",
+        }
+        .into());
     }
     Ok(())
 }
 
 pub fn plan_convert_let_to_let_star(
     request: ConvertLetToLetStarRequest<'_>,
-) -> Result<ConvertLetToLetStarPlan> {
+) -> EditResult<ConvertLetToLetStarPlan> {
     validate_convert_let_to_let_star_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("convert-let-to-let-star input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "convert-let-to-let-star",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     validate_form(
         &form,
@@ -87,10 +100,15 @@ pub struct ConvertLetStarToLetPlan {
 
 pub fn plan_convert_let_star_to_let(
     request: ConvertLetStarToLetRequest<'_>,
-) -> Result<ConvertLetStarToLetPlan> {
+) -> EditResult<ConvertLetStarToLetPlan> {
     validate_convert_let_star_to_let_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("convert-let-star-to-let input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "convert-let-star-to-let",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     validate_form(
         &form,
@@ -119,10 +137,10 @@ fn validate_form(
     tree: &SyntaxTree,
     dialect: Dialect,
     expected: &str,
-    operation: &str,
-) -> Result<()> {
+    operation: &'static str,
+) -> EditResult<()> {
     if tree.has_comment_in(form.span) {
-        bail!("{operation} cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments { operation }.into());
     }
     if form.kind != ExpressionKind::List
         || !form.reader_prefixes.is_empty()
@@ -132,17 +150,21 @@ fn validate_form(
             .and_then(atom_symbol_text)
             .is_some_and(|head| symbol_eq(dialect, head, expected))
     {
-        bail!("{operation} selected form must be a plain {expected} form");
+        return Err(ShapeRefusal::NotPlainExpectedForm {
+            operation,
+            expected: expected.to_owned(),
+        }
+        .into());
     }
     if contains_headed_form(dialect, form, "declare") {
-        bail!("{operation} conservatively rejects declarations");
+        return Err(ConservativeRefusal::Declarations { operation }.into());
     }
     let bindings = form
         .children
         .get(1)
-        .context(format!("{operation} requires a binding list"))?;
+        .ok_or(BindingRefusal::MissingBindingList { operation })?;
     if bindings.kind != ExpressionKind::List || !bindings.reader_prefixes.is_empty() {
-        bail!("{operation} requires a plain binding list");
+        return Err(BindingRefusal::NotPlainBindingList { operation }.into());
     }
     Ok(())
 }
@@ -150,8 +172,8 @@ fn validate_form(
 fn analyze_bindings(
     form: &ExpressionView,
     dialect: Dialect,
-    operation: &str,
-) -> Result<(Vec<SymbolName>, Vec<Option<ExpressionView>>)> {
+    operation: &'static str,
+) -> EditResult<(Vec<SymbolName>, Vec<Option<ExpressionView>>)> {
     let bindings = &form.children[1];
     let mut names = Vec::with_capacity(bindings.children.len());
     let mut initializers = Vec::with_capacity(bindings.children.len());
@@ -161,7 +183,7 @@ fn analyze_bindings(
             .iter()
             .any(|old: &SymbolName| symbol_eq(dialect, old.as_str(), name.as_str()))
         {
-            bail!("{operation} requires unique binding names");
+            return Err(BindingRefusal::DuplicateBindingNames { operation }.into());
         }
         names.push(name);
         initializers.push(initializer);
@@ -171,8 +193,8 @@ fn analyze_bindings(
 
 fn parse_binding(
     binding: &ExpressionView,
-    operation: &str,
-) -> Result<(SymbolName, Option<ExpressionView>)> {
+    operation: &'static str,
+) -> EditResult<(SymbolName, Option<ExpressionView>)> {
     if binding.kind == ExpressionKind::Atom {
         return Ok((plain_symbol(binding, operation)?, None));
     }
@@ -180,7 +202,7 @@ fn parse_binding(
         || !binding.reader_prefixes.is_empty()
         || !(1..=2).contains(&binding.children.len())
     {
-        bail!("{operation} requires plain, non-destructuring bindings");
+        return Err(BindingRefusal::Destructuring { operation }.into());
     }
     Ok((
         plain_symbol(&binding.children[0], operation)?,
@@ -188,19 +210,20 @@ fn parse_binding(
     ))
 }
 
-fn plain_symbol(view: &ExpressionView, operation: &str) -> Result<SymbolName> {
+fn plain_symbol(view: &ExpressionView, operation: &'static str) -> EditResult<SymbolName> {
     if view.kind != ExpressionKind::Atom || !view.reader_prefixes.is_empty() {
-        bail!("{operation} requires a plain binding name");
+        return Err(BindingRefusal::NotPlainBindingName { operation }.into());
     }
-    SymbolName::new(atom_symbol_text(view).context("binding name")?).context("invalid binding name")
+    SymbolName::new(atom_symbol_text(view).ok_or(BindingRefusal::BindingName)?)
+        .map_err(|source| BindingRefusal::InvalidBindingName { source }.into())
 }
 
 fn reject_dependencies<R>(
     names: &[SymbolName],
     initializers: &[Option<ExpressionView>],
     request: &R,
-    operation: &str,
-) -> Result<()>
+    operation: &'static str,
+) -> EditResult<()>
 where
     R: LetRequest + ?Sized,
 {
@@ -218,7 +241,11 @@ where
                 &mut references,
             );
             if !references.is_empty() {
-                bail!("{operation} initializer references earlier binding '{earlier}'");
+                return Err(BindingRefusal::ReferencesEarlierBinding {
+                    operation,
+                    earlier: earlier.to_string(),
+                }
+                .into());
             }
         }
     }
@@ -270,9 +297,9 @@ fn replace_head(input: &str, span: ByteSpan, replacement: &str) -> String {
     output.push_str(&input[span.end().get()..]);
     output
 }
-fn parse_output(output: &str, dialect: Dialect, operation: &str) -> Result<()> {
+fn parse_output(output: &str, dialect: Dialect, operation: &'static str) -> EditResult<()> {
     SyntaxTree::parse_with_dialect(output, dialect)
-        .with_context(|| format!("{operation} output is not valid"))?;
+        .map_err(|source| DocumentRefusal::OutputInvalid { operation, source })?;
     Ok(())
 }
 
