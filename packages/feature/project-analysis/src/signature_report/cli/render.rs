@@ -1,13 +1,14 @@
+use paredit_core_cli::safe_text;
 use std::collections::BTreeMap;
 
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::usecase::signature_report::{
+use crate::signature_report::usecase::{
     SignatureCallStatus, SignatureReportFile, SignatureReportPolicy,
 };
-use crate::domain::sexpr::SymbolName;
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_syntax::sexpr::SymbolName;
 
 fn format_arity((min, max): (usize, Option<usize>)) -> String {
     match max {
@@ -17,7 +18,7 @@ fn format_arity((min, max): (usize, Option<usize>)) -> String {
     }
 }
 
-pub(super) fn print_signature_report(
+pub fn print_signature_report(
     reports: &[SignatureReportFile],
     symbol: Option<&SymbolName>,
     policy: &SignatureReportPolicy,

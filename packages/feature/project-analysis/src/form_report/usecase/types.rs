@@ -1,1 +1,1 @@
-pub use crate::domain::form_report::{FormKind, FormReport, FormReportRequest, FormSymbolReport};
+pub use crate::form_report::domain::{FormKind, FormReport, FormReportRequest, FormSymbolReport};

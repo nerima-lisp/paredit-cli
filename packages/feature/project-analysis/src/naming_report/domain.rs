@@ -12,10 +12,12 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree,
+};
 
 fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)

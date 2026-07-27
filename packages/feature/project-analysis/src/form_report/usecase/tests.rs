@@ -1,7 +1,7 @@
-use crate::application::usecase::form_report::types::{FormKind, FormReport, FormReportRequest};
-use crate::application::usecase::form_report::workflow::build_form_report;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SyntaxTree};
+use crate::form_report::usecase::types::{FormKind, FormReport, FormReportRequest};
+use crate::form_report::usecase::workflow::build_form_report;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
 fn report_for(input: &str, path: &str, dialect: Dialect) -> FormReport {
     let tree = SyntaxTree::parse(input).expect("valid input");

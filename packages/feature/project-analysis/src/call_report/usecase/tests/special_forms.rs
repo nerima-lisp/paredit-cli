@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn skips_common_lisp_macrolet_local_macro_calls() {

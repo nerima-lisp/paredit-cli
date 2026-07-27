@@ -1,10 +1,10 @@
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::ExpressionView;
 
-pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
     view.children.first().and_then(atom_text)
 }
 
-pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 

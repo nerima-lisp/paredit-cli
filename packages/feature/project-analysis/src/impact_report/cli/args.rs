@@ -1,37 +1,42 @@
-use super::super::*;
-use crate::application::usecase::impact_report::ImpactRiskLevel as ApplicationImpactRiskLevel;
-use crate::domain::refactor_plan::RefactorRiskLevel;
+use crate::impact_report::usecase::ImpactRiskLevel as ApplicationImpactRiskLevel;
+use clap::Args;
+use clap::ValueEnum;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_edit::refactor_plan::RefactorRiskLevel;
+use paredit_core_syntax::sexpr::SymbolName;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct ImpactReportArgs {
+pub struct ImpactReportArgs {
     /// Files to scan.
     #[arg(required = true)]
-    pub(super) files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Exact symbol to evaluate before rename, move, remove, or signature refactors.
     #[arg(long)]
-    pub(super) symbol: SymbolName,
+    pub symbol: SymbolName,
     /// Exit with failure when the report risk reaches this level or higher.
     #[arg(long, value_enum)]
-    pub(super) fail_on_risk_level: Option<ImpactRiskLevel>,
+    pub fail_on_risk_level: Option<ImpactRiskLevel>,
     /// Require at least this many matching definitions.
     #[arg(long)]
-    pub(super) require_definitions: Option<usize>,
+    pub require_definitions: Option<usize>,
     /// Require at least this many matching references.
     #[arg(long)]
-    pub(super) require_references: Option<usize>,
+    pub require_references: Option<usize>,
     /// Require at least this many matching call sites.
     #[arg(long)]
-    pub(super) require_calls: Option<usize>,
+    pub require_calls: Option<usize>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
-pub(in crate::presentation::cli) enum ImpactRiskLevel {
+pub enum ImpactRiskLevel {
     Info,
     Warning,
     Error,

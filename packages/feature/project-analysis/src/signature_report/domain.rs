@@ -3,14 +3,14 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::domain::call_report::{CallReportItem, build_call_report};
-use crate::domain::common_lisp::{
+use crate::call_report::domain::{CallReportItem, build_call_report};
+use paredit_core_syntax::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
     common_lisp_symbol_reference_needle,
 };
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 

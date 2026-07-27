@@ -1,12 +1,17 @@
-use super::super::*;
 use super::args::ImpactReportArgs;
 use super::render::print_impact_report;
-use crate::application::usecase::impact_report::{
+use crate::impact_report::usecase::ImpactRiskLevel as ApplicationImpactRiskLevel;
+use crate::impact_report::usecase::{
     ImpactReportFile, ImpactReportPolicyOptions, ImpactReportSource, build_impact_reports,
     evaluate_impact_report_policy, impact_risks, impact_status_counts, summarize_impact_reports,
 };
+use anyhow::Result;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_syntax::sexpr::SymbolName;
+use std::path::PathBuf;
 
-pub(in crate::presentation::cli) fn impact_report(args: ImpactReportArgs) -> Result<()> {
+pub fn impact_report(args: ImpactReportArgs) -> Result<()> {
     let reports = collect_impact_reports(&args.files, args.dialect, &args.symbol)?;
     let summary = summarize_impact_reports(&reports);
     let by_status = impact_status_counts(&reports);
@@ -36,14 +41,14 @@ pub(in crate::presentation::cli) fn impact_report(args: ImpactReportArgs) -> Res
     print_impact_report(&reports, &args.symbol, &policy, args.output)?;
     if !policy.passed {
         let policy_message = policy.violations.join("; ");
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "impact-report policy failed: {policy_message}"
         )));
     }
     Ok(())
 }
 
-pub(in crate::presentation::cli) fn collect_impact_reports(
+pub fn collect_impact_reports(
     files: &[PathBuf],
     dialect_override: Option<DialectArg>,
     symbol: &SymbolName,

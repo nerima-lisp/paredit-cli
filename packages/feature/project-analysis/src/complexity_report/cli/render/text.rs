@@ -1,6 +1,7 @@
 use super::*;
+use paredit_core_cli::safe_text;
 
-pub(super) fn print_complexity_report(
+pub fn print_complexity_report(
     reports: &[ComplexityReportFile],
     policy: &ComplexityReportPolicy,
     ranked: &[RankedComplexityEntry<'_>],

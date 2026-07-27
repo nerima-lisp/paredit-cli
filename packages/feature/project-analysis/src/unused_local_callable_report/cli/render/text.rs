@@ -1,6 +1,7 @@
 use super::*;
+use paredit_core_cli::safe_text;
 
-pub(super) fn print_unused_local_callable_report(
+pub fn print_unused_local_callable_report(
     reports: &[UnusedLocalCallableReportFile],
     policy: &UnusedLocalCallablePolicy,
 ) {

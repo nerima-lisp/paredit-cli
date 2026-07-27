@@ -1,16 +1,16 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispPackageDeclarationForm, common_lisp_symbol_reference_eq,
 };
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
 
 use super::syntax::{atom_child, list_head};
 use super::types::ImpactDefinitionItem;
 
-pub(super) fn collect_impact_definitions(
+pub fn collect_impact_definitions(
     tree: &SyntaxTree,
     dialect: Dialect,
 ) -> Result<(Option<String>, Vec<ImpactDefinitionItem>)> {
@@ -53,7 +53,7 @@ pub(super) fn collect_impact_definitions(
     Ok((current_package, definitions))
 }
 
-pub(super) fn impact_definition_matches_signature(
+pub fn impact_definition_matches_signature(
     definition: &ImpactDefinitionItem,
     symbol: Option<&SymbolName>,
 ) -> bool {

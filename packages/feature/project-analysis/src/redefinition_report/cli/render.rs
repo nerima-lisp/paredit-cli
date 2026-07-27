@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redefinition_report::{RedefinitionPolicy, RedefinitionSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::redefinition_report::usecase::{RedefinitionPolicy, RedefinitionSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redefinition_report(
+pub fn print_redefinition_report(
     summary: &RedefinitionSummary,
     policy: &RedefinitionPolicy,
     output: OutputFormat,

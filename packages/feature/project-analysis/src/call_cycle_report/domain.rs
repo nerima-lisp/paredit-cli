@@ -2,7 +2,7 @@
 //! distinct callable definitions in the internal call graph.
 //!
 //! This is a different question from
-//! [`crate::domain::reachability_report`], which asks "can any entry point
+//! [`crate::reachability_report::domain`], which asks "can any entry point
 //! reach this definition at all." A cycle can exist entirely among
 //! definitions that *are* reachable — mutual recursion is not dead code —
 //! but an unexpected cycle is still worth surfacing: it can indicate an
@@ -12,20 +12,20 @@
 //! (ordinary self-recursion) is not reported: that pattern is the normal,
 //! expected shape of a recursive function, not a cross-definition cycle.
 //!
-//! Built on the same [`crate::domain::call_graph_report::CallGraphFile`]
+//! Built on the same [`crate::call_graph_report::domain::CallGraphFile`]
 //! edge data `inspect call-graph` and `inspect reachability` already use, so
 //! this report's notion of "a call edge" never drifts from theirs. Cycle
-//! detection itself is [`crate::domain::graph::tarjan_scc`], the same
+//! detection itself is [`paredit_core_syntax::graph::tarjan_scc`], the same
 //! generic strongly-connected-components search
-//! [`crate::domain::package_cycle_report`] uses over a different graph, so
+//! [`crate::package_cycle_report::domain`] uses over a different graph, so
 //! there is exactly one proven cycle-detection implementation in the
 //! codebase rather than one per report.
 
 use std::collections::BTreeMap;
 
-use crate::domain::call_graph_report::CallGraphFile;
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::graph::tarjan_scc;
+use crate::call_graph_report::domain::CallGraphFile;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::graph::tarjan_scc;
 
 #[derive(Debug, Clone)]
 pub struct CallCycleItem {
@@ -149,9 +149,9 @@ pub fn evaluate_call_cycle_policy(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::call_graph_report::{CallGraphReportSource, build_call_graph_report};
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::SyntaxTree;
+    use crate::call_graph_report::domain::{CallGraphReportSource, build_call_graph_report};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use std::path::PathBuf;
 
     fn analyze(sources: Vec<(&str, &str)>) -> CallCycleSummary {

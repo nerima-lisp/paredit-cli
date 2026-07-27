@@ -2,20 +2,20 @@
 //! whose `:depends-on` clauses form a loop.
 //!
 //! This is the file/system-level analog of
-//! [`crate::domain::package_cycle_report`]'s package `:use` cycle check —
+//! [`crate::package_cycle_report::domain`]'s package `:use` cycle check —
 //! same underlying problem (a load-order dependency that cannot be
 //! satisfied by any ordering), a different declaration form. A circular
 //! ASDF dependency typically surfaces as a confusing build failure only
 //! once a project grows past a handful of systems; catching it here is
 //! cheaper than debugging it from an ASDF error message.
 //!
-//! Built on [`crate::domain::dependency_report::build_system_dependency_edges`]
+//! Built on [`paredit_feature_package::dependency_report::domain::build_system_dependency_edges`]
 //! (which already knows how to flatten a `:depends-on` clause's designators —
 //! a bare name, a nested list of names, or a `(:version name "1.0")` triple —
 //! since it reuses the exact same designator collector `inspect dependencies`
-//! relies on) and the same [`crate::domain::graph::tarjan_scc`] cycle search
-//! used by [`crate::domain::call_cycle_report`] and
-//! [`crate::domain::package_cycle_report`].
+//! relies on) and the same [`paredit_core_syntax::graph::tarjan_scc`] cycle search
+//! used by [`crate::call_cycle_report::domain`] and
+//! [`crate::package_cycle_report::domain`].
 //!
 //! Scope: a `:depends-on` entry written as a bare keyword (`:lib`, with no
 //! surrounding quotes or `#:`) is not collected, because the shared
@@ -25,8 +25,8 @@
 //! (`"lib"`) and uninterned-symbol (`#:lib`) designators, by far the more
 //! common ASDF idioms, are fully supported.
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::graph::string_edge_cycles;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::graph::string_edge_cycles;
 
 #[derive(Debug, Clone)]
 pub struct SystemCycleItem {
@@ -100,9 +100,9 @@ pub fn evaluate_system_cycle_policy(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dependency_report::build_system_dependency_edges;
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
+    use paredit_feature_package::dependency_report::domain::build_system_dependency_edges;
 
     fn edges(input: &str) -> Vec<(String, String)> {
         let tree = SyntaxTree::parse(input).expect("parse input");

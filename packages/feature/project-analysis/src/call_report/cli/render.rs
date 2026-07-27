@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::sexpr::SymbolName;
-use crate::presentation::cli::args::OutputFormat;
-use crate::presentation::cli::call_report::types::CallReportFile;
+use crate::call_report::cli::types::CallReportFile;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::sexpr::SymbolName;
 
-pub(super) fn print_call_report(
+pub fn print_call_report(
     reports: &[CallReportFile],
     symbol: Option<&SymbolName>,
     include_definitions: bool,

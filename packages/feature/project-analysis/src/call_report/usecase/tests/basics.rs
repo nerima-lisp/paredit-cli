@@ -1,4 +1,7 @@
 use super::*;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn reports_calls_without_definition_forms_by_default() {

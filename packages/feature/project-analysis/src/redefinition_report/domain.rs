@@ -4,15 +4,15 @@
 //! FOO in DEFUN" surprises at load time, and often a straightforward
 //! copy-paste or merge-conflict bug rather than an intentional one.
 //!
-//! Built on the same [`crate::domain::definition_report::collect_definition_forms`]
-//! extraction [`crate::domain::definition_report`]'s own unused-definition
+//! Built on the same [`paredit_feature_remove_unused::definition_report::domain::collect_definition_forms`]
+//! extraction [`paredit_feature_remove_unused::definition_report::domain`]'s own unused-definition
 //! check reuses, read across files instead of within one.
 //!
 //! Scope: Common Lisp only — grouping by "declaring package" requires the
 //! `in-package`-tracked package this codebase already collects for CL;
 //! other dialects have no equivalent namespace tracking here, so treating
 //! same-named definitions from unrelated modules as a collision would be a
-//! false positive. [`crate::domain::definition::DefinitionCategory::Method`]
+//! false positive. [`paredit_core_syntax::definition::DefinitionCategory::Method`]
 //! is excluded: CLOS generic functions are expected to gather several
 //! `defmethod` forms under the same name with different specializers —
 //! that's normal dispatch, not a redefinition bug.
@@ -22,13 +22,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::definition_report::collect_definition_forms;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
+use paredit_feature_remove_unused::definition_report::domain::collect_definition_forms;
 
 #[derive(Debug, Clone)]
 pub struct DeclaredDefinition {

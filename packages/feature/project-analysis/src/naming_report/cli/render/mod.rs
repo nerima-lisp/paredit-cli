@@ -1,10 +1,11 @@
-use super::super::*;
-use crate::application::usecase::naming_report::{NamingReportFile, NamingReportPolicy};
+use crate::naming_report::usecase::{NamingReportFile, NamingReportPolicy};
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
 
 mod json;
 mod text;
 
-pub(in crate::presentation::cli) fn print_naming_report(
+pub fn print_naming_report(
     reports: &[NamingReportFile],
     policy: &NamingReportPolicy,
     output: OutputFormat,

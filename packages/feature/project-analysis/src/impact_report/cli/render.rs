@@ -1,10 +1,15 @@
-use super::super::*;
-use crate::application::usecase::call_graph_report::CallGraphEdge;
-use crate::application::usecase::impact_report::{
+use crate::call_graph_report::usecase::CallGraphEdge;
+use crate::impact_report::usecase::ImpactRiskLevel as ApplicationImpactRiskLevel;
+use crate::impact_report::usecase::{
     ImpactReportFile, ImpactReportPolicy, impact_risks, impact_status_counts,
 };
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_syntax::sexpr::SymbolName;
+use serde_json::json;
 
-pub(in crate::presentation::cli) fn print_impact_report(
+pub fn print_impact_report(
     reports: &[ImpactReportFile],
     symbol: &SymbolName,
     policy: &ImpactReportPolicy,

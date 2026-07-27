@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::system_cycle_report::{SystemCyclePolicy, SystemCycleSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::system_cycle_report::usecase::{SystemCyclePolicy, SystemCycleSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_system_cycle_report(
+pub fn print_system_cycle_report(
     summary: &SystemCycleSummary,
     policy: &SystemCyclePolicy,
     output: OutputFormat,

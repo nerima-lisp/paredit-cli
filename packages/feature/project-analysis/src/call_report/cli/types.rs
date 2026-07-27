@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use crate::application::usecase::call_report::CallReportItem;
-use crate::domain::dialect::Dialect;
+use crate::call_report::usecase::CallReportItem;
+use paredit_core_syntax::dialect::Dialect;
 
 #[derive(Debug)]
-pub(in crate::presentation::cli::call_report) struct CallReportFile {
-    pub(in crate::presentation::cli::call_report) path: PathBuf,
-    pub(in crate::presentation::cli::call_report) dialect: Dialect,
-    pub(in crate::presentation::cli::call_report) calls: Vec<CallReportItem>,
+pub struct CallReportFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub calls: Vec<CallReportItem>,
 }

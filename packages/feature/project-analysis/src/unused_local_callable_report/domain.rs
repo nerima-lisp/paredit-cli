@@ -5,7 +5,7 @@
 //! cannot see each other); `labels` bindings can additionally call each
 //! other and themselves, since `labels` is the mutually-recursive variant.
 //! That visibility difference is reused verbatim from
-//! [`crate::domain::callable_scope::local_callable_names`] and the
+//! [`paredit_core_semantics::callable_scope::local_callable_names`] and the
 //! `CommonLispLocalCallableForm` distinction the codebase already relies on
 //! for the `convert-flet-to-labels`/`convert-labels-to-flet` refactors, so
 //! this report's notion of "where a binding is visible" never drifts from
@@ -22,11 +22,13 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::domain::callable_scope::{common_lisp_local_callable_form, local_callable_names};
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{
+use paredit_core_semantics::callable_scope::{
+    common_lisp_local_callable_form, local_callable_names,
+};
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName, SyntaxTree,
 };
 

@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-pub use crate::domain::signature_report::{
+pub use crate::signature_report::domain::{
     SignatureCallItem, SignatureCallStatus, SignatureDefinitionItem, SignatureReportFile,
     SignatureReportPolicy, SignatureReportSource, build_signature_reports, classify_signature_call,
 };
@@ -25,7 +25,7 @@ pub fn evaluate_signature_report_policy(
         .map(|item| item.status)
         .collect::<Vec<SignatureCallStatus>>();
 
-    crate::domain::signature_report::evaluate_signature_report_policy(
+    crate::signature_report::domain::evaluate_signature_report_policy(
         definition_count,
         &statuses,
         fail_on_mismatch,

@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-pub use crate::domain::call_graph_report::{
+pub use crate::call_graph_report::domain::{
     CallGraphDefinitionItem, CallGraphEdge, CallGraphFile, CallGraphNode, CallGraphNodeIndex,
     CallGraphPolicy, CallGraphPolicyOptions, CallGraphReport, CallGraphReportSource,
     build_call_graph_edge, build_call_graph_report, call_graph_edge_matches,

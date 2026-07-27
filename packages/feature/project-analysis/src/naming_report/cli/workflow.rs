@@ -1,16 +1,17 @@
+use anyhow::Result;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
-use super::super::*;
 use super::args::NamingReportArgs;
 use super::render::print_naming_report;
-use crate::application::usecase::naming_report::{
+use crate::naming_report::usecase::{
     NamingReportPolicyOptions, build_naming_report, evaluate_naming_report_policy,
 };
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-pub(in crate::presentation::cli) fn naming_report(args: NamingReportArgs) -> Result<()> {
+pub fn naming_report(args: NamingReportArgs) -> Result<()> {
     let files = expand_naming_report_inputs(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -30,7 +31,7 @@ pub(in crate::presentation::cli) fn naming_report(args: NamingReportArgs) -> Res
     print_naming_report(&reports, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "naming-report policy failed: {policy_message}"
         )));
     }
@@ -40,7 +41,7 @@ pub(in crate::presentation::cli) fn naming_report(args: NamingReportArgs) -> Res
 
 fn expand_naming_report_inputs(
     files: &[PathBuf],
-    dialect: Option<super::super::DialectArg>,
+    dialect: Option<paredit_core_cli::args::DialectArg>,
 ) -> Result<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();

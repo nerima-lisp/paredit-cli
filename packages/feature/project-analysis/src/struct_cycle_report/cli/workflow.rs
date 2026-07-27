@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::struct_cycle_report::{
+use crate::struct_cycle_report::cli::args::StructCycleReportArgs;
+use crate::struct_cycle_report::cli::render::print_struct_cycle_report;
+use crate::struct_cycle_report::usecase::{
     StructCyclePolicyOptions, analyze_struct_cycles, collect_struct_inheritance_edges,
     evaluate_struct_cycle_policy,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
-use crate::presentation::cli::struct_cycle_report::args::StructCycleReportArgs;
-use crate::presentation::cli::struct_cycle_report::render::print_struct_cycle_report;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn struct_cycle_report(args: StructCycleReportArgs) -> Result<()> {
+pub fn struct_cycle_report(args: StructCycleReportArgs) -> Result<()> {
     let mut edges = Vec::new();
 
     for file in &args.files {
@@ -25,7 +25,7 @@ pub(in crate::presentation::cli) fn struct_cycle_report(args: StructCycleReportA
     print_struct_cycle_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "struct-cycle-report policy failed: {policy_message}"
         )));
     }

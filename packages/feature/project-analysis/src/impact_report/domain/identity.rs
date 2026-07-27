@@ -1,12 +1,12 @@
 //! Whether an occurrence names the symbol the report is about.
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::project::QualifiedSymbol;
-use crate::domain::semantics::project::service::{
+use paredit_core_semantics::semantics::project::QualifiedSymbol;
+use paredit_core_semantics::semantics::project::service::{
     FilePackages, resolve_file_packages, resolve_symbol,
 };
-use crate::domain::sexpr::{SymbolName, SyntaxTree};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
 
 /// The queried symbol, plus the package regions of one file.
 ///
@@ -15,14 +15,14 @@ use crate::domain::sexpr::{SymbolName, SyntaxTree};
 /// affecting callers of the other. This narrows that comparison with the
 /// package each side resolves to, without ever widening it.
 #[derive(Debug)]
-pub(super) struct SymbolIdentity {
+pub struct SymbolIdentity {
     symbol: SymbolName,
     target: Option<QualifiedSymbol>,
     packages: FilePackages,
 }
 
 impl SymbolIdentity {
-    pub(super) fn new(dialect: Dialect, tree: &SyntaxTree, symbol: &SymbolName) -> Self {
+    pub fn new(dialect: Dialect, tree: &SyntaxTree, symbol: &SymbolName) -> Self {
         Self {
             symbol: symbol.clone(),
             target: resolve_target(dialect, symbol),
@@ -30,7 +30,7 @@ impl SymbolIdentity {
         }
     }
 
-    pub(super) const fn symbol(&self) -> &SymbolName {
+    pub const fn symbol(&self) -> &SymbolName {
         &self.symbol
     }
 
@@ -38,7 +38,7 @@ impl SymbolIdentity {
     ///
     /// The name comparison stays the gate, so this can only ever drop a match
     /// the report used to make -- never add one.
-    pub(super) fn matches(&self, text: &str, offset: usize) -> bool {
+    pub fn matches(&self, text: &str, offset: usize) -> bool {
         common_lisp_symbol_reference_eq(text, self.symbol.as_str())
             && self.packages_agree(text, offset)
     }

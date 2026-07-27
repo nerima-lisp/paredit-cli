@@ -1,1 +1,1 @@
-pub use crate::domain::impact_report::evaluate_impact_report_policy;
+pub use crate::impact_report::domain::evaluate_impact_report_policy;

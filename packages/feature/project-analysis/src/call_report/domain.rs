@@ -1,19 +1,19 @@
 use anyhow::Result;
 use std::rc::Rc;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispLocalCallableForm,
     CommonLispOperator, CommonLispSlotBindingForm, common_lisp_symbol_reference_eq,
     is_common_lisp_declaration_form,
 };
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
     local_callable_body_scope,
 };
-use crate::domain::definition::{DefinitionShape, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{
+use paredit_core_syntax::definition::{DefinitionShape, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::apply_reader_prefix_context;
+use paredit_core_syntax::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -23,7 +23,7 @@ pub struct CallReportItem {
     pub span: ByteSpan,
     pub head: String,
     pub argument_count: usize,
-    pub category: Option<crate::domain::definition::DefinitionCategory>,
+    pub category: Option<paredit_core_syntax::definition::DefinitionCategory>,
     pub enclosing_definition: Option<String>,
 }
 

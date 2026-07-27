@@ -141,7 +141,7 @@ fn classifies_unqualified_call_against_package_qualified_common_lisp_definition(
         vec![source(
             "(defun cl-user:target (x y) target)\n(defun caller () (target 1 2))",
         )],
-        Some(&crate::domain::sexpr::SymbolName::new("target").unwrap()),
+        Some(&paredit_core_syntax::sexpr::SymbolName::new("target").unwrap()),
     )
     .unwrap();
 
@@ -166,7 +166,7 @@ fn classifies_common_lisp_symbol_macrolet_expansion_and_body_calls_without_bindi
         vec![source(
             "(defun helper (x) (+ x 10))\n(defun target (x) x)\n(defun render () (symbol-macrolet ((helper (target 1))) (list helper (target 2))))",
         )],
-        Some(&crate::domain::sexpr::SymbolName::new("target").unwrap()),
+        Some(&paredit_core_syntax::sexpr::SymbolName::new("target").unwrap()),
     )
     .unwrap();
 

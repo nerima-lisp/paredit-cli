@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use crate::domain::call_graph_report::CallGraphEdge;
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
-use crate::domain::signature_report::SignatureCallItem;
+use crate::call_graph_report::domain::CallGraphEdge;
+use crate::signature_report::domain::SignatureCallItem;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
 #[derive(Debug)]
 pub struct ImpactReportSource {

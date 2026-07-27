@@ -2,19 +2,19 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::application::usecase::workspace_report::types::{
+use crate::workspace_report::usecase::types::{
     LoadedWorkspaceFile, WorkspaceInventory, WorkspaceReportRequest, WorkspaceReportSourcePort,
 };
-use crate::application::usecase::workspace_report::workflow::build_workspace_report;
-use crate::domain::dialect::Dialect;
-use crate::infrastructure::workspace::{
+use crate::workspace_report::usecase::workflow::build_workspace_report;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_workspace::workspace::{
     WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
 };
 
 use super::args::WorkspaceReportArgs;
 use super::render::print_workspace_report;
 
-pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) -> Result<()> {
+pub fn workspace_report(args: WorkspaceReportArgs) -> Result<()> {
     let output = args.output;
     let request = WorkspaceReportRequest {
         roots: args.roots,

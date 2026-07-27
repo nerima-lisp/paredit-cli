@@ -1,3 +1,3 @@
 #[cfg(test)]
 mod tests;
-pub use crate::domain::impact_report::*;
+pub use crate::impact_report::domain::*;

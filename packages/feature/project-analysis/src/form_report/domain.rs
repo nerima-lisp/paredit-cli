@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormReportRequest<'a> {
@@ -174,7 +174,7 @@ fn expression_head(view: &ExpressionView) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::{ByteOffset, Path, SyntaxTree};
+    use paredit_core_syntax::sexpr::{ByteOffset, Path, SyntaxTree};
 
     fn report(input: &str, path: Path, include_source: bool) -> FormReport {
         let tree = SyntaxTree::parse(input).expect("parse input");

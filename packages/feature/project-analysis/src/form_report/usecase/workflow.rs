@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::application::usecase::form_report::types::{FormReport, FormReportRequest};
+use crate::form_report::usecase::types::{FormReport, FormReportRequest};
 
 pub fn build_form_report(request: FormReportRequest<'_>) -> Result<FormReport> {
-    Ok(crate::domain::form_report::build_form_report(request))
+    Ok(crate::form_report::domain::build_form_report(request))
 }

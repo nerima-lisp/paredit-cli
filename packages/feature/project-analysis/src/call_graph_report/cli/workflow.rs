@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::call_graph_report::{
+use crate::call_graph_report::cli::args::CallGraphArgs;
+use crate::call_graph_report::cli::render::print_call_graph_report;
+use crate::call_graph_report::usecase::{
     CallGraphPolicyOptions, CallGraphReportSource, build_call_graph_report,
     evaluate_call_graph_policy,
 };
-use crate::presentation::cli::call_graph_report::args::CallGraphArgs;
-use crate::presentation::cli::call_graph_report::render::print_call_graph_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn call_graph(args: CallGraphArgs) -> Result<()> {
+pub fn call_graph(args: CallGraphArgs) -> Result<()> {
     let symbol = args.symbol.as_ref();
     let mut sources = Vec::with_capacity(args.files.len());
 
@@ -42,7 +42,7 @@ pub(in crate::presentation::cli) fn call_graph(args: CallGraphArgs) -> Result<()
         args.output,
     )?;
     if !policy.passed {
-        return Err(crate::presentation::cli::gate::gate_failure(
+        return Err(paredit_core_cli::gate::gate_failure(
             "call-graph policy failed",
         ));
     }

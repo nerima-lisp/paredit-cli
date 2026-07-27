@@ -1,6 +1,8 @@
 use super::*;
+use anyhow::Result;
+use serde_json::json;
 
-pub(super) fn print_naming_report(
+pub fn print_naming_report(
     reports: &[NamingReportFile],
     policy: &NamingReportPolicy,
 ) -> Result<()> {

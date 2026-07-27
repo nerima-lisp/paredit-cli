@@ -1,6 +1,8 @@
 use super::*;
+use anyhow::Result;
+use serde_json::json;
 
-pub(super) fn print_complexity_report(
+pub fn print_complexity_report(
     reports: &[ComplexityReportFile],
     policy: &ComplexityReportPolicy,
     ranked: &[RankedComplexityEntry<'_>],

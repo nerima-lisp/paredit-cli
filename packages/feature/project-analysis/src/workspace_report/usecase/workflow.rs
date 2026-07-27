@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 
-use crate::application::usecase::call_report::build_call_report;
-use crate::application::usecase::complexity_report::build_complexity_report;
-use crate::application::usecase::definition_report::collect_definition_forms;
-use crate::domain::sexpr::SyntaxTree;
-pub use crate::domain::workspace_report::summarize_workspace_report;
+use crate::call_report::usecase::build_call_report;
+use crate::complexity_report::usecase::build_complexity_report;
+pub use crate::workspace_report::domain::summarize_workspace_report;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_feature_remove_unused::definition_report::usecase::collect_definition_forms;
 
 use super::types::{
     WorkspaceFileMetrics, WorkspaceFileReport, WorkspaceFileStatus, WorkspaceReportPlan,
@@ -95,7 +95,7 @@ pub fn build_workspace_report(
 
 fn parse_error_report(
     path: std::path::PathBuf,
-    dialect: crate::domain::dialect::Dialect,
+    dialect: paredit_core_syntax::dialect::Dialect,
     byte_count: usize,
     error: impl std::fmt::Display,
 ) -> WorkspaceFileReport {

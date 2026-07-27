@@ -1,7 +1,7 @@
-use super::super::*;
-use crate::application::usecase::complexity_report::{
-    ComplexityReportFile, ComplexityReportPolicy,
-};
+use crate::complexity_report::usecase::{ComplexityReportFile, ComplexityReportPolicy};
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_syntax::dialect::Dialect;
 
 mod json;
 mod text;
@@ -9,10 +9,13 @@ mod text;
 /// One entry in the cross-file complexity leaderboard: a definition together
 /// with the file it came from, so agents can jump straight to the worst
 /// offenders without re-deriving file/definition pairing from separate lists.
-pub(super) struct RankedComplexityEntry<'a> {
-    pub(super) file: &'a std::path::Path,
-    pub(super) dialect: Dialect,
-    pub(super) item: &'a crate::application::usecase::complexity_report::ComplexityReportItem,
+// Public since the extraction: crate-internal visibility cannot cross a
+// crate boundary, so this lint applies for the first time.
+#[derive(Debug)]
+pub struct RankedComplexityEntry<'a> {
+    pub file: &'a std::path::Path,
+    pub dialect: Dialect,
+    pub item: &'a crate::complexity_report::usecase::ComplexityReportItem,
 }
 
 fn ranked_entries(
@@ -49,7 +52,7 @@ fn ranked_entries(
     entries
 }
 
-pub(in crate::presentation::cli) fn print_complexity_report(
+pub fn print_complexity_report(
     reports: &[ComplexityReportFile],
     policy: &ComplexityReportPolicy,
     top: Option<usize>,

@@ -15,9 +15,9 @@
 //! namespace, so folding both declaration forms into one graph does not
 //! risk conflating unrelated identifiers.
 //!
-//! Same graph algorithm as [`crate::domain::call_cycle_report`],
-//! [`crate::domain::package_cycle_report`], and
-//! [`crate::domain::system_cycle_report`]: [`crate::domain::graph::tarjan_scc`]
+//! Same graph algorithm as [`crate::call_cycle_report::domain`],
+//! [`crate::package_cycle_report::domain`], and
+//! [`crate::system_cycle_report::domain`]: [`paredit_core_syntax::graph::tarjan_scc`]
 //! over an edge list built for these two declaration forms.
 //!
 //! Scope: Common Lisp only. Only literal, unqualified superclass/parent
@@ -28,11 +28,11 @@
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::dialect::Dialect;
-use crate::domain::graph::string_edge_cycles;
-use crate::domain::sexpr::{ExpressionKind, Path, SyntaxTree};
-use crate::domain::view_query::{atom_child, atom_text, list_head};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::graph::string_edge_cycles;
+use paredit_core_syntax::sexpr::{ExpressionKind, Path, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_child, atom_text, list_head};
 
 #[derive(Debug, Clone)]
 pub struct ClassCycleItem {
@@ -76,7 +76,7 @@ pub struct ClassCyclePolicy {
 /// `defclass` or `define-condition` form in one file. Only Common Lisp
 /// declares classes this way, so non-Common-Lisp files contribute no edges
 /// (a documented no-op, mirroring how
-/// [`crate::domain::package_cycle_report`] scopes itself).
+/// [`crate::package_cycle_report::domain`] scopes itself).
 pub fn collect_class_inheritance_edges(
     dialect: Dialect,
     tree: &SyntaxTree,

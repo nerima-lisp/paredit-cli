@@ -1,16 +1,17 @@
+use anyhow::Result;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
-use super::super::*;
 use super::args::ComplexityReportArgs;
 use super::render::print_complexity_report;
-use crate::application::usecase::complexity_report::{
+use crate::complexity_report::usecase::{
     ComplexityReportPolicyOptions, build_complexity_report, evaluate_complexity_report_policy,
 };
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-pub(in crate::presentation::cli) fn complexity_report(args: ComplexityReportArgs) -> Result<()> {
+pub fn complexity_report(args: ComplexityReportArgs) -> Result<()> {
     let files = expand_complexity_report_inputs(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -30,7 +31,7 @@ pub(in crate::presentation::cli) fn complexity_report(args: ComplexityReportArgs
     print_complexity_report(&reports, &policy, args.top, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "complexity-report policy failed: {policy_message}"
         )));
     }
@@ -40,7 +41,7 @@ pub(in crate::presentation::cli) fn complexity_report(args: ComplexityReportArgs
 
 fn expand_complexity_report_inputs(
     files: &[PathBuf],
-    dialect: Option<super::super::DialectArg>,
+    dialect: Option<paredit_core_cli::args::DialectArg>,
 ) -> Result<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();

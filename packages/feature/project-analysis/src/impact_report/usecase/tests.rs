@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use proptest::prelude::*;
 
-use crate::application::usecase::signature_report::SignatureCallStatus;
-use crate::domain::dialect::Dialect;
-use crate::domain::refactor_plan::RefactorPlanSummary;
-use crate::domain::sexpr::{SymbolName, SyntaxTree};
+use crate::signature_report::usecase::SignatureCallStatus;
+use paredit_core_edit::refactor_plan::RefactorPlanSummary;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
 
 use super::*;
 
@@ -130,7 +130,7 @@ fn tracks_common_lisp_symbol_macro_without_signature_mismatch() {
     assert_eq!(reports[0].definitions.len(), 1);
     assert_eq!(
         reports[0].definitions[0].category,
-        crate::domain::definition::DefinitionCategory::Variable
+        paredit_core_syntax::definition::DefinitionCategory::Variable
     );
     assert_eq!(reports[0].definitions[0].parameter_count, None);
 }

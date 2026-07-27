@@ -1,6 +1,8 @@
 use super::*;
+use anyhow::Result;
+use serde_json::json;
 
-pub(super) fn print_unused_local_callable_report(
+pub fn print_unused_local_callable_report(
     reports: &[UnusedLocalCallableReportFile],
     policy: &UnusedLocalCallablePolicy,
 ) -> Result<()> {

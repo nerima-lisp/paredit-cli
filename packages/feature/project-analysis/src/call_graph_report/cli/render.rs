@@ -1,15 +1,14 @@
+use paredit_core_cli::safe_text;
 use std::collections::BTreeMap;
 
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::usecase::call_graph_report::{
-    CallGraphFile, CallGraphNode, CallGraphPolicy,
-};
-use crate::domain::sexpr::SymbolName;
-use crate::presentation::cli::OutputFormat;
+use crate::call_graph_report::usecase::{CallGraphFile, CallGraphNode, CallGraphPolicy};
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_syntax::sexpr::SymbolName;
 
-pub(super) fn print_call_graph_report(
+pub fn print_call_graph_report(
     reports: &[CallGraphFile],
     nodes_by_name: &BTreeMap<String, CallGraphNode>,
     symbol: Option<&SymbolName>,

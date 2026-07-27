@@ -1,9 +1,7 @@
 use proptest::prelude::*;
 
-use crate::application::usecase::call_report::build_call_report;
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{SymbolName, SyntaxTree};
+use crate::call_report::usecase::build_call_report;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 fn parse(input: &str) -> SyntaxTree {
     SyntaxTree::parse(input).expect("test input should parse")

@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn skips_common_lisp_local_callable_edges_to_shadowed_global_definitions() {

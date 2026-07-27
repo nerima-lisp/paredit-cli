@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::call_cycle_report::{CallCyclePolicy, CallCycleSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::call_cycle_report::usecase::{CallCyclePolicy, CallCycleSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_call_cycle_report(
+pub fn print_call_cycle_report(
     summary: &CallCycleSummary,
     policy: &CallCyclePolicy,
     output: OutputFormat,

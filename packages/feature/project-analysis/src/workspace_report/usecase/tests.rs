@@ -1,14 +1,15 @@
+use anyhow::Result;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use crate::application::usecase::workspace_report::types::{
+use crate::workspace_report::usecase::types::{
     LoadedWorkspaceFile, WorkspaceFileMetrics, WorkspaceFileStatus, WorkspaceInventory,
     WorkspaceReportRequest, WorkspaceReportSourcePort,
 };
-use crate::application::usecase::workspace_report::workflow::{
+use crate::workspace_report::usecase::workflow::{
     build_workspace_report, summarize_workspace_report,
 };
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 struct FakeSource {
     inventory: Option<WorkspaceInventory>,

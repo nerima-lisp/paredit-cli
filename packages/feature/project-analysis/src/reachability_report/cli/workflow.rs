@@ -1,18 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::call_graph_report::{
-    CallGraphReportSource, build_call_graph_report,
-};
-use crate::application::usecase::reachability_report::{
+use crate::call_graph_report::usecase::{CallGraphReportSource, build_call_graph_report};
+use crate::reachability_report::cli::args::ReachabilityReportArgs;
+use crate::reachability_report::cli::render::print_reachability_report;
+use crate::reachability_report::usecase::{
     ReachabilityReportPolicyOptions, analyze_reachability, evaluate_reachability_policy,
 };
-use crate::presentation::cli::reachability_report::args::ReachabilityReportArgs;
-use crate::presentation::cli::reachability_report::render::print_reachability_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn reachability_report(
-    args: ReachabilityReportArgs,
-) -> Result<()> {
+pub fn reachability_report(args: ReachabilityReportArgs) -> Result<()> {
     let mut sources = Vec::with_capacity(args.files.len());
 
     for file in &args.files {
@@ -36,7 +32,7 @@ pub(in crate::presentation::cli) fn reachability_report(
     print_reachability_report(&report.files, &summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "reachability-report policy failed: {policy_message}"
         )));
     }

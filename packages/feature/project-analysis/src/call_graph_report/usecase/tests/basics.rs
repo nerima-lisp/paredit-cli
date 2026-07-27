@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn builds_internal_edges_across_definitions() {

@@ -1,9 +1,10 @@
+use anyhow::Result;
 use std::path::PathBuf;
 
-use crate::domain::dialect::Dialect;
-pub use crate::domain::workspace_report::{
+pub use crate::workspace_report::domain::{
     WorkspaceFileMetrics, WorkspaceFileStatus, WorkspaceReportSummary,
 };
+use paredit_core_syntax::dialect::Dialect;
 
 #[derive(Debug)]
 pub struct WorkspaceReportRequest {

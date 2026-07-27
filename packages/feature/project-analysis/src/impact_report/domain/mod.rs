@@ -4,15 +4,15 @@ use std::str::FromStr;
 
 use anyhow::Result;
 
-use crate::domain::call_graph_report::{
+use crate::call_graph_report::domain::{
     CallGraphNode, CallGraphNodeIndex, build_call_graph_edge, call_graph_edge_matches,
     insert_call_graph_node,
 };
-use crate::domain::call_report::{CallReportItem, build_call_report};
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SymbolName;
-use crate::domain::signature_report::{SignatureCallItem, classify_signature_call};
+use crate::call_report::domain::{CallReportItem, build_call_report};
+use crate::signature_report::domain::{SignatureCallItem, classify_signature_call};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
 
 mod definitions;
 mod identity;
@@ -33,7 +33,7 @@ pub use types::{
     ImpactSymbolOccurrenceContext,
 };
 
-use crate::domain::refactor_plan::{RefactorPlanSummary, RefactorRiskLevel};
+use paredit_core_edit::refactor_plan::{RefactorPlanSummary, RefactorRiskLevel};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ImpactRiskLevel {
@@ -382,7 +382,7 @@ pub fn build_impact_reports(
 mod tests {
     use super::*;
 
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::sexpr::SyntaxTree;
 
     const APP: &str = "(in-package :app)\n(defun run () 1)\n(defun app-caller () (run))";
     const TEST: &str = "(in-package :test)\n(defun run () 2)\n(defun test-caller () (run))";

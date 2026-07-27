@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::system_cycle_report::{
+use crate::system_cycle_report::cli::args::SystemCycleReportArgs;
+use crate::system_cycle_report::cli::render::print_system_cycle_report;
+use crate::system_cycle_report::usecase::{
     SystemCyclePolicyOptions, analyze_system_cycles, build_system_dependency_edges,
     evaluate_system_cycle_policy,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
-use crate::presentation::cli::system_cycle_report::args::SystemCycleReportArgs;
-use crate::presentation::cli::system_cycle_report::render::print_system_cycle_report;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn system_cycle_report(args: SystemCycleReportArgs) -> Result<()> {
+pub fn system_cycle_report(args: SystemCycleReportArgs) -> Result<()> {
     let mut edges = Vec::new();
 
     for file in &args.files {
@@ -25,7 +25,7 @@ pub(in crate::presentation::cli) fn system_cycle_report(args: SystemCycleReportA
     print_system_cycle_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "system-cycle-report policy failed: {policy_message}"
         )));
     }

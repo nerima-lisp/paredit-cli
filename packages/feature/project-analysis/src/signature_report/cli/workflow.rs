@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::signature_report::{
+use crate::signature_report::cli::args::SignatureReportArgs;
+use crate::signature_report::cli::render::print_signature_report;
+use crate::signature_report::usecase::{
     SignatureReportSource, build_signature_reports, evaluate_signature_report_policy,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
-use crate::presentation::cli::signature_report::args::SignatureReportArgs;
-use crate::presentation::cli::signature_report::render::print_signature_report;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn signature_report(args: SignatureReportArgs) -> Result<()> {
+pub fn signature_report(args: SignatureReportArgs) -> Result<()> {
     let symbol = args.symbol.as_ref();
     let mut sources = Vec::with_capacity(args.files.len());
 
@@ -29,7 +29,7 @@ pub(in crate::presentation::cli) fn signature_report(args: SignatureReportArgs) 
     );
     print_signature_report(&reports, symbol, &policy, args.output)?;
     if !policy.passed {
-        return Err(crate::presentation::cli::gate::gate_failure(
+        return Err(paredit_core_cli::gate::gate_failure(
             "signature-report policy failed",
         ));
     }

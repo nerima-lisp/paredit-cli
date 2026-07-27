@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::sexpr::SymbolName;
 
 #[test]
 fn counts_common_lisp_macro_and_method_lambda_lists() {

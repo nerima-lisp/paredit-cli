@@ -8,23 +8,23 @@
 //! `:use` clauses cannot be satisfied by *any* load order and typically
 //! fails to compile as soon as the second package in the cycle is loaded.
 //!
-//! Built on the same [`crate::domain::dependency_report::build_dependency_report`]
+//! Built on the same [`paredit_feature_package::dependency_report::domain::build_dependency_report`]
 //! extraction `inspect dependencies` already uses for `DefpackageUse` and
 //! `DefpackageImportFrom` items (each carries the declaring package as
 //! `source` and the used/imported-from package as `target`), and the same
-//! [`crate::domain::graph::tarjan_scc`] cycle search
-//! [`crate::domain::call_cycle_report`] uses over the call graph — a
+//! [`paredit_core_syntax::graph::tarjan_scc`] cycle search
+//! [`crate::call_cycle_report::domain`] uses over the call graph — a
 //! different graph, the same proven algorithm.
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::dependency_report::{DependencyKind, build_dependency_report};
-use crate::domain::dialect::Dialect;
-use crate::domain::graph::string_edge_cycles;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::graph::string_edge_cycles;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_feature_package::dependency_report::domain::{DependencyKind, build_dependency_report};
 
 #[derive(Debug, Clone)]
 pub struct PackageCycleItem {

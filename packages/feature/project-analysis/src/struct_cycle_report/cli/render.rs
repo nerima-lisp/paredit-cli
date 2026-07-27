@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::struct_cycle_report::{StructCyclePolicy, StructCycleSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::struct_cycle_report::usecase::{StructCyclePolicy, StructCycleSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_struct_cycle_report(
+pub fn print_struct_cycle_report(
     summary: &StructCycleSummary,
     policy: &StructCyclePolicy,
     output: OutputFormat,

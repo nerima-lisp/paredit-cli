@@ -14,10 +14,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use crate::domain::call_graph_report::CallGraphFile;
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::sexpr::ByteSpan;
+use crate::call_graph_report::domain::CallGraphFile;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 #[derive(Debug, Clone)]
 pub struct ReachabilityReportItem {
@@ -69,7 +69,7 @@ pub struct ReachabilityReportPolicy {
 /// Builds the reachability summary across every scanned file's call graph.
 ///
 /// `files` and their definitions/edges come from
-/// [`crate::domain::call_graph_report::build_call_graph_report`] with
+/// [`crate::call_graph_report::domain::build_call_graph_report`] with
 /// `include_external: false`, so every edge in the input already targets a
 /// definition known within the scanned file set.
 #[must_use]
@@ -200,9 +200,9 @@ pub fn evaluate_reachability_policy(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::call_graph_report::{CallGraphReportSource, build_call_graph_report};
-    use crate::domain::dialect::Dialect;
-    use crate::domain::sexpr::SyntaxTree;
+    use crate::call_graph_report::domain::{CallGraphReportSource, build_call_graph_report};
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use std::path::PathBuf;
 
     fn analyze(sources: Vec<(&str, &str)>) -> ReachabilityReportSummary {

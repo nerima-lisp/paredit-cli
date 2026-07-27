@@ -18,7 +18,7 @@
 //! reference's grounds for matching: a designator the layer cannot
 //! canonicalize keeps the bare-name comparison it always had.
 //!
-//! [`crate::domain::unused_package_report`]'s own caveat applies here in
+//! [`paredit_feature_package::unused_package_report::domain`]'s own caveat applies here in
 //! reverse: a package whose `defpackage` lives in a file outside the
 //! analyzed fileset is indistinguishable, from a purely syntactic view,
 //! from a genuine typo — pass the whole project, not a subset, for a
@@ -30,13 +30,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_semantics::semantics::project::service::canonical_package_id;
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::build_package_report;
-use crate::domain::semantics::project::service::canonical_package_id;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
+use paredit_feature_package::package_report::domain::build_package_report;
 
 /// Packages every Common Lisp image provides without a `defpackage` form.
 /// [`common_lisp_symbol_reference_needle`] upcases, so these must already

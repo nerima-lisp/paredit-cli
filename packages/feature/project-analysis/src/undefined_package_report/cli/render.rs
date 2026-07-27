@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::undefined_package_report::{
-    UndefinedPackagePolicy, UndefinedPackageSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::undefined_package_report::usecase::{UndefinedPackagePolicy, UndefinedPackageSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_undefined_package_report(
+pub fn print_undefined_package_report(
     summary: &UndefinedPackageSummary,
     policy: &UndefinedPackagePolicy,
     output: OutputFormat,

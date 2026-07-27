@@ -31,11 +31,11 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::dependency_report::build_system_dependency_edges;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
-use crate::domain::system_cycle_report::analyze_system_cycles;
+use crate::system_cycle_report::domain::analyze_system_cycles;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_feature_package::dependency_report::domain::build_system_dependency_edges;
 
 /// A dependency loop, which no ordering can satisfy.
 #[derive(Debug, Clone, PartialEq, Eq)]

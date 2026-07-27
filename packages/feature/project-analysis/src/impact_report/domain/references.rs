@@ -1,15 +1,15 @@
 use std::collections::BTreeSet;
 use std::path::Path as FsPath;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{AtomOccurrence, ByteSpan, SyntaxTree};
-use crate::domain::signature_report::SignatureCallItem;
+use crate::signature_report::domain::SignatureCallItem;
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{AtomOccurrence, ByteSpan, SyntaxTree};
 
 use super::identity::SymbolIdentity;
 use super::types::{ImpactDefinitionItem, ImpactSymbolOccurrence};
 
-pub(super) fn count_non_call_references(
+pub fn count_non_call_references(
     path: &FsPath,
     references: &[ImpactSymbolOccurrence],
     definitions: &[ImpactDefinitionItem],
@@ -48,7 +48,7 @@ fn symbol_occurrence_key(path: &FsPath, span: ByteSpan) -> (String, usize, usize
     )
 }
 
-pub(super) fn matching_symbol_occurrences(
+pub fn matching_symbol_occurrences(
     dialect: Dialect,
     tree: &SyntaxTree,
     identity: &SymbolIdentity,

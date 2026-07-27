@@ -10,9 +10,9 @@
 //! `(:include parent-name slot-override*)` — this collector reads exactly
 //! that second shape.
 //!
-//! Same graph algorithm as [`crate::domain::call_cycle_report`],
-//! [`crate::domain::package_cycle_report`], [`crate::domain::system_cycle_report`],
-//! and [`crate::domain::class_cycle_report`]: [`crate::domain::graph::tarjan_scc`]
+//! Same graph algorithm as [`crate::call_cycle_report::domain`],
+//! [`crate::package_cycle_report::domain`], [`crate::system_cycle_report::domain`],
+//! and [`crate::class_cycle_report::domain`]: [`paredit_core_syntax::graph::tarjan_scc`]
 //! over an edge list built for this declaration form.
 //!
 //! Scope: Common Lisp only. An `:include` target defined outside the
@@ -21,11 +21,11 @@
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::dialect::Dialect;
-use crate::domain::graph::string_edge_cycles;
-use crate::domain::sexpr::{ExpressionKind, Path, SyntaxTree};
-use crate::domain::view_query::{atom_child, atom_text, list_head};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::graph::string_edge_cycles;
+use paredit_core_syntax::sexpr::{ExpressionKind, Path, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_child, atom_text, list_head};
 
 #[derive(Debug, Clone)]
 pub struct StructCycleItem {
@@ -68,7 +68,7 @@ pub struct StructCyclePolicy {
 /// Collects `(struct, included_struct)` edges from every top-level
 /// `defstruct` form in one file. Only Common Lisp declares structs this
 /// way, so non-Common-Lisp files contribute no edges (a documented no-op,
-/// mirroring how [`crate::domain::class_cycle_report`] scopes itself).
+/// mirroring how [`crate::class_cycle_report::domain`] scopes itself).
 pub fn collect_struct_inheritance_edges(
     dialect: Dialect,
     tree: &SyntaxTree,

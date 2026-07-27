@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 fn call_heads(input: &str, dialect: Dialect) -> Vec<String> {
     build_call_report(&parse(input), dialect, None, false)

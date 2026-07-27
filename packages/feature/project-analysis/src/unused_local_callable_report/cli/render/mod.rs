@@ -1,12 +1,13 @@
-use super::super::*;
-use crate::application::usecase::unused_local_callable_report::{
+use crate::unused_local_callable_report::usecase::{
     UnusedLocalCallablePolicy, UnusedLocalCallableReportFile,
 };
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
 
 mod json;
 mod text;
 
-pub(in crate::presentation::cli) fn print_unused_local_callable_report(
+pub fn print_unused_local_callable_report(
     reports: &[UnusedLocalCallableReportFile],
     policy: &UnusedLocalCallablePolicy,
     output: OutputFormat,

@@ -1,6 +1,7 @@
 use super::*;
+use paredit_core_cli::safe_text;
 
-pub(super) fn print_naming_report(reports: &[NamingReportFile], policy: &NamingReportPolicy) {
+pub fn print_naming_report(reports: &[NamingReportFile], policy: &NamingReportPolicy) {
     println!("files\t{}", reports.len());
     println!("named_definition_count\t{}", policy.named_definition_count);
     println!("non_idiomatic_count\t{}", policy.non_idiomatic_count);

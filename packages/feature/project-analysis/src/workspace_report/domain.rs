@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkspaceFileStatus {
@@ -34,7 +34,7 @@ pub struct WorkspaceFileMetrics<'a> {
     pub call_count: usize,
     /// Highest per-definition complexity score in this file, or `0` when the
     /// file has no definition-like top-level forms. See
-    /// `crate::domain::complexity_report` for the scoring formula.
+    /// `crate::complexity_report::domain` for the scoring formula.
     pub max_complexity_score: usize,
 }
 

@@ -1,13 +1,12 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::call_graph_report::CallGraphFile;
-use crate::application::usecase::reachability_report::{
-    ReachabilityReportPolicy, ReachabilityReportSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::call_graph_report::usecase::CallGraphFile;
+use crate::reachability_report::usecase::{ReachabilityReportPolicy, ReachabilityReportSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_reachability_report(
+pub fn print_reachability_report(
     files: &[CallGraphFile],
     summary: &ReachabilityReportSummary,
     policy: &ReachabilityReportPolicy,
