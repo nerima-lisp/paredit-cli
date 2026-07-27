@@ -1,11 +1,11 @@
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{ExpressionView, Path};
+use paredit_core_syntax::common_lisp::common_lisp_symbol_name_eq;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{ExpressionView, Path};
 
-use crate::domain::dependency_report::syntax::package_qualified_dependency_target;
-use crate::domain::dependency_report::types::{DependencyKind, DependencyReportItem};
+use crate::dependency_report::domain::syntax::package_qualified_dependency_target;
+use crate::dependency_report::domain::types::{DependencyKind, DependencyReportItem};
 
-pub(super) fn collect_qualified_symbol_dependency(
+pub fn collect_qualified_symbol_dependency(
     view: &ExpressionView,
     path: &Path,
     local_bindings: &[String],

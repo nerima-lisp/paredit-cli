@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use super::{OptionMerge, OptionReplacement, OptionSlot};
-use crate::domain::package::syntax::normalize_package_atom;
-use crate::domain::sexpr::SyntaxTree;
+use crate::package::domain::syntax::normalize_package_atom;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
-pub(super) fn merge_slots(
+pub fn merge_slots(
     slots: &[OptionSlot],
     tree: &SyntaxTree,
 ) -> (Vec<OptionMerge>, Vec<OptionReplacement>) {
@@ -60,7 +60,7 @@ pub(super) fn merge_slots(
     (merges, replacements)
 }
 
-pub(super) fn merge_key(name: &str, body_atoms: &[String]) -> Option<Option<String>> {
+pub fn merge_key(name: &str, body_atoms: &[String]) -> Option<Option<String>> {
     match name {
         "export" | "intern" | "nicknames" | "shadow" | "use" => Some(None),
         "import-from" | "shadowing-import-from" => {

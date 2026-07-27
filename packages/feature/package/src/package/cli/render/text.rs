@@ -1,13 +1,14 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::super::types::{
     AddExportPlan, MergePackageOptionsPlan, PackageReportFile, RenamePackageFilePlan,
     SortPackageExportsPlan, SortPackageOptionsPlan,
 };
 
-pub(super) fn print_merge_package_options_plan(plan: &MergePackageOptionsPlan) -> Result<()> {
+pub fn print_merge_package_options_plan(plan: &MergePackageOptionsPlan) -> Result<()> {
     let merge_count = plan.merges.len();
     let changed_merge_count = plan.merges.iter().filter(|merge| merge.changed).count();
 
@@ -39,7 +40,7 @@ pub(super) fn print_merge_package_options_plan(plan: &MergePackageOptionsPlan) -
     Ok(())
 }
 
-pub(super) fn print_sort_package_options_plan(plan: &SortPackageOptionsPlan) -> Result<()> {
+pub fn print_sort_package_options_plan(plan: &SortPackageOptionsPlan) -> Result<()> {
     let package_count = plan.packages.len();
     let changed_package_count = plan
         .packages
@@ -69,7 +70,7 @@ pub(super) fn print_sort_package_options_plan(plan: &SortPackageOptionsPlan) -> 
     Ok(())
 }
 
-pub(super) fn print_sort_package_exports_plan(plan: &SortPackageExportsPlan) -> Result<()> {
+pub fn print_sort_package_exports_plan(plan: &SortPackageExportsPlan) -> Result<()> {
     let export_count = plan.exports.len();
     let changed_export_count = plan.exports.iter().filter(|export| export.changed).count();
 
@@ -95,7 +96,7 @@ pub(super) fn print_sort_package_exports_plan(plan: &SortPackageExportsPlan) -> 
     Ok(())
 }
 
-pub(super) fn print_package_report(reports: &[PackageReportFile]) -> Result<()> {
+pub fn print_package_report(reports: &[PackageReportFile]) -> Result<()> {
     let defpackage_count = reports
         .iter()
         .map(|report| report.report.defpackages.len())
@@ -138,7 +139,7 @@ pub(super) fn print_package_report(reports: &[PackageReportFile]) -> Result<()> 
     Ok(())
 }
 
-pub(super) fn print_rename_package_plan(
+pub fn print_rename_package_plan(
     plans: &[RenamePackageFilePlan],
     from: &SymbolName,
     to: &SymbolName,
@@ -182,7 +183,7 @@ pub(super) fn print_rename_package_plan(
     Ok(())
 }
 
-pub(super) fn print_add_export_plan(plan: &AddExportPlan) -> Result<()> {
+pub fn print_add_export_plan(plan: &AddExportPlan) -> Result<()> {
     println!("file\t{}", safe_text!(plan.path.display()));
     println!("dialect\t{}", plan.dialect.label());
     println!("package\t{}", safe_text!(plan.package));

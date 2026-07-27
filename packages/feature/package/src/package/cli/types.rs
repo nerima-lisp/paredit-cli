@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 
-use crate::application::usecase::package::{self as package_usecase, PackageRenameOccurrence};
-use crate::application::usecase::package_report::PackageReport as ApplicationPackageReport;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, SymbolName};
-use crate::presentation::cli::args::{DialectArg, OutputFormat};
+use crate::package::usecase::{self as package_usecase, PackageRenameOccurrence};
+use crate::package_report::usecase::PackageReport as ApplicationPackageReport;
+use paredit_core_cli::args::{DialectArg, OutputFormat};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SymbolName};
 
 use clap::{Args, ValueEnum};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-pub(super) enum PackageOptionOrderArg {
+pub enum PackageOptionOrderArg {
     Canonical,
     Name,
 }
@@ -24,180 +24,180 @@ impl From<PackageOptionOrderArg> for package_usecase::PackageOptionSortOrder {
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct PackageReportArgs {
+pub struct PackageReportArgs {
     /// Files to scan.
     #[arg(required = true)]
-    pub(super) files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct AddExportArgs {
+pub struct AddExportArgs {
     /// Package definition file to scan and optionally rewrite.
     #[arg(short, long)]
-    pub(super) file: PathBuf,
+    pub file: PathBuf,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Package name to update. Required when the file contains multiple defpackage forms.
     #[arg(long)]
-    pub(super) package: Option<SymbolName>,
+    pub package: Option<SymbolName>,
     /// Symbol atom to add to the :export option.
     #[arg(long)]
-    pub(super) symbol: SymbolName,
+    pub symbol: SymbolName,
     /// Rewrite the input file in place. Without this flag, only prints a plan.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct RenamePackageArgs {
+pub struct RenamePackageArgs {
     /// Files to scan and optionally rewrite.
     #[arg(required = true)]
-    pub(super) files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Source package name or designator, for example old.pkg or #:old.pkg.
     #[arg(long)]
-    pub(super) from: SymbolName,
+    pub from: SymbolName,
     /// Replacement package name. Prefix edits use the normalized package name.
     #[arg(long)]
-    pub(super) to: SymbolName,
+    pub to: SymbolName,
     /// Rewrite changed input files in place. Without this flag, only prints a plan.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct SortPackageExportsArgs {
+pub struct SortPackageExportsArgs {
     /// Package definition file to scan and optionally rewrite.
     #[arg(short, long)]
-    pub(super) file: PathBuf,
+    pub file: PathBuf,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Package name to update. Without this flag, all defpackage :export options are sorted.
     #[arg(long)]
-    pub(super) package: Option<SymbolName>,
+    pub package: Option<SymbolName>,
     /// Rewrite the input file in place. Without this flag, only prints a plan.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct SortPackageOptionsArgs {
+pub struct SortPackageOptionsArgs {
     /// Package definition file to scan and optionally rewrite.
     #[arg(short, long)]
-    pub(super) file: PathBuf,
+    pub file: PathBuf,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Package name to update. Without this flag, all defpackage option forms are sorted.
     #[arg(long)]
-    pub(super) package: Option<SymbolName>,
+    pub package: Option<SymbolName>,
     /// Option ordering strategy.
     #[arg(long, value_enum, default_value_t = PackageOptionOrderArg::Canonical)]
-    pub(super) order: PackageOptionOrderArg,
+    pub order: PackageOptionOrderArg,
     /// Rewrite the input file in place. Without this flag, only prints a plan.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct MergePackageOptionsArgs {
+pub struct MergePackageOptionsArgs {
     /// Package definition file to scan and optionally rewrite.
     #[arg(short, long)]
-    pub(super) file: PathBuf,
+    pub file: PathBuf,
     /// Override extension-based dialect detection.
     #[arg(long)]
-    pub(super) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Package name to update. Without this flag, all defpackage option forms are merged.
     #[arg(long)]
-    pub(super) package: Option<SymbolName>,
+    pub package: Option<SymbolName>,
     /// Rewrite the input file in place. Without this flag, only prints a plan.
     #[arg(long)]
-    pub(super) write: bool,
+    pub write: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(super) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug)]
-pub(super) struct PackageReportFile {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) report: ApplicationPackageReport,
+pub struct PackageReportFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub report: ApplicationPackageReport,
 }
 
 #[derive(Debug)]
-pub(super) struct AddExportPlan {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) package: String,
-    pub(super) symbol: SymbolName,
-    pub(super) defpackage_path: String,
-    pub(super) defpackage_span: ByteSpan,
-    pub(super) export_span: Option<ByteSpan>,
-    pub(super) insertion_span: ByteSpan,
-    pub(super) already_exported: bool,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct AddExportPlan {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub package: String,
+    pub symbol: SymbolName,
+    pub defpackage_path: String,
+    pub defpackage_span: ByteSpan,
+    pub export_span: Option<ByteSpan>,
+    pub insertion_span: ByteSpan,
+    pub already_exported: bool,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 #[derive(Debug)]
-pub(super) struct RenamePackageFilePlan {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) occurrences: Vec<PackageRenameOccurrence>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
+pub struct RenamePackageFilePlan {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub occurrences: Vec<PackageRenameOccurrence>,
+    pub changed: bool,
+    pub written: bool,
 }
 
 #[derive(Debug)]
-pub(super) struct SortPackageExportsPlan {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) exports: Vec<package_usecase::PackageExportSort>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct SortPackageExportsPlan {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub exports: Vec<package_usecase::PackageExportSort>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 #[derive(Debug)]
-pub(super) struct SortPackageOptionsPlan {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) packages: Vec<package_usecase::PackageOptionSort>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct SortPackageOptionsPlan {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub packages: Vec<package_usecase::PackageOptionSort>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }
 
 #[derive(Debug)]
-pub(super) struct MergePackageOptionsPlan {
-    pub(super) path: PathBuf,
-    pub(super) dialect: Dialect,
-    pub(super) merges: Vec<package_usecase::PackageOptionMerge>,
-    pub(super) changed: bool,
-    pub(super) written: bool,
-    pub(super) rewritten: String,
+pub struct MergePackageOptionsPlan {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub merges: Vec<package_usecase::PackageOptionMerge>,
+    pub changed: bool,
+    pub written: bool,
+    pub rewritten: String,
 }

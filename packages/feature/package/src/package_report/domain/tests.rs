@@ -1,7 +1,8 @@
 use proptest::prelude::*;
 
 use super::*;
-use crate::domain::{dialect::Dialect, sexpr::SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 fn report_for(input: &str) -> PackageReport {
     let tree = SyntaxTree::parse(input).expect("input should parse");

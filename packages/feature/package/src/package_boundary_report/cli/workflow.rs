@@ -1,14 +1,13 @@
-use super::super::*;
 use super::args::PackageBoundaryReportArgs;
 use super::render::print_package_boundary_report;
-use crate::application::usecase::package_boundary_report::{
+use crate::package_boundary_report::usecase::{
     PackageBoundaryPolicyOptions, build_package_boundary_report, evaluate_package_boundary_policy,
 };
-use crate::presentation::cli::shared::expand_input_files;
+use anyhow::Result;
+use paredit_core_cli::shared::expand_input_files;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn package_boundary_report(
-    args: PackageBoundaryReportArgs,
-) -> Result<()> {
+pub fn package_boundary_report(args: PackageBoundaryReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -28,7 +27,7 @@ pub(in crate::presentation::cli) fn package_boundary_report(
     print_package_boundary_report(&reports, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "package-boundary-report policy failed: {policy_message}"
         )));
     }

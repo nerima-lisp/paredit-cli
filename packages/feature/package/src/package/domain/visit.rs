@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
 
-use crate::domain::{
-    common_lisp::CommonLispPackageDeclarationForm,
-    dialect::Dialect,
-    sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree},
+use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
+    Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
 use super::syntax::{atom_text, is_package_head, package_atoms_match};
 
-pub(super) fn visit_defpackage_forms(
+pub fn visit_defpackage_forms(
     tree: &SyntaxTree,
     dialect: Dialect,
     package: Option<&SymbolName>,

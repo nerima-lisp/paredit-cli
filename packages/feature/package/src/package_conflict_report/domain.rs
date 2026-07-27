@@ -9,28 +9,28 @@
 //! the same name. A genuine collision here is a load-order-dependent bug —
 //! whichever `defpackage` form runs last silently redefines (or steals the
 //! identity of) the other — not a mere style nit like an unused nickname
-//! ([`crate::domain::unused_nickname_report`]).
+//! ([`crate::unused_nickname_report::domain`]).
 //!
 //! Scope: a package declaring its own primary name as one of its own
 //! nicknames (`(defpackage :app (:nicknames :app))`, redundant but
 //! harmless) is not a conflict — only identifiers contributed by *distinct*
 //! `defpackage` occurrences collide.
 //!
-//! Built on the same [`crate::domain::package_report::build_package_report`]
-//! extraction [`crate::domain::unused_package_report`] and
-//! [`crate::domain::unused_nickname_report`] already reuse.
+//! Built on the same [`crate::package_report::domain::build_package_report`]
+//! extraction [`crate::unused_package_report::domain`] and
+//! [`crate::unused_nickname_report::domain`] already reuse.
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use std::collections::BTreeMap;
 
-use crate::domain::common_lisp::{
+use crate::package_report::domain::build_package_report;
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::build_package_report;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct DeclaredPackageIdentifier {

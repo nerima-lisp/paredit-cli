@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::system_conflict_report::{
+use crate::system_conflict_report::cli::args::SystemConflictReportArgs;
+use crate::system_conflict_report::cli::render::print_system_conflict_report;
+use crate::system_conflict_report::usecase::{
     SystemConflictPolicyOptions, analyze_system_conflicts, collect_declared_systems,
     evaluate_system_conflict_policy,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
-use crate::presentation::cli::system_conflict_report::args::SystemConflictReportArgs;
-use crate::presentation::cli::system_conflict_report::render::print_system_conflict_report;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn system_conflict_report(
-    args: SystemConflictReportArgs,
-) -> Result<()> {
+pub fn system_conflict_report(args: SystemConflictReportArgs) -> Result<()> {
     let mut declared = Vec::new();
 
     for file in &args.files {
@@ -29,7 +27,7 @@ pub(in crate::presentation::cli) fn system_conflict_report(
     print_system_conflict_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "system-conflict-report policy failed: {policy_message}"
         )));
     }

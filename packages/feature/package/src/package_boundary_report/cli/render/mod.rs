@@ -1,12 +1,11 @@
-use super::super::*;
-use crate::application::usecase::package_boundary_report::{
-    PackageBoundaryPolicy, PackageBoundaryReportFile,
-};
+use crate::package_boundary_report::usecase::{PackageBoundaryPolicy, PackageBoundaryReportFile};
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
 
 mod json;
 mod text;
 
-pub(in crate::presentation::cli) fn print_package_boundary_report(
+pub fn print_package_boundary_report(
     reports: &[PackageBoundaryReportFile],
     policy: &PackageBoundaryPolicy,
     output: OutputFormat,

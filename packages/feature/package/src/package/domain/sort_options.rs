@@ -3,10 +3,8 @@ use anyhow::Result;
 mod ordering;
 mod slots;
 
-use crate::domain::{
-    dialect::Dialect,
-    sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree},
-};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 use super::visit::visit_defpackage_forms;
 
@@ -17,19 +15,19 @@ pub enum PackageOptionSortOrder {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct OptionSortEdit {
-    pub(super) defpackage_path: String,
-    pub(super) defpackage_span: ByteSpan,
-    pub(super) package_name: String,
-    pub(super) old_options: Vec<String>,
-    pub(super) new_options: Vec<String>,
-    pub(super) replacements: Vec<OptionReplacement>,
+pub struct OptionSortEdit {
+    pub defpackage_path: String,
+    pub defpackage_span: ByteSpan,
+    pub package_name: String,
+    pub old_options: Vec<String>,
+    pub new_options: Vec<String>,
+    pub replacements: Vec<OptionReplacement>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct OptionReplacement {
-    pub(super) span: ByteSpan,
-    pub(super) replacement: String,
+pub struct OptionReplacement {
+    pub span: ByteSpan,
+    pub replacement: String,
 }
 
 /// `full_span`/`full_text` span from the newline that ends the previous
@@ -39,15 +37,15 @@ pub(super) struct OptionReplacement {
 /// trivia from, so its slot starts right after the package name and
 /// `has_leading_trivia` is `false`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::domain::package) struct OptionSlot {
-    pub(in crate::domain::package) full_span: ByteSpan,
-    pub(in crate::domain::package) full_text: String,
-    pub(in crate::domain::package) has_leading_trivia: bool,
-    pub(in crate::domain::package) label: String,
-    pub(in crate::domain::package) sort_key: ordering::OptionSortKey,
+pub struct OptionSlot {
+    pub full_span: ByteSpan,
+    pub full_text: String,
+    pub has_leading_trivia: bool,
+    pub label: String,
+    pub sort_key: ordering::OptionSortKey,
 }
 
-pub(super) fn defpackage_option_sort_edits(
+pub fn defpackage_option_sort_edits(
     input: &str,
     tree: &SyntaxTree,
     dialect: Dialect,

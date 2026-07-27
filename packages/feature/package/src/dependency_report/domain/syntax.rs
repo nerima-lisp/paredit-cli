@@ -1,11 +1,11 @@
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub(super) fn dependency_designator_text(view: &ExpressionView) -> Option<String> {
+pub fn dependency_designator_text(view: &ExpressionView) -> Option<String> {
     atom_symbol_text(view).map(ToOwned::to_owned)
 }
 
-pub(super) fn package_qualified_dependency_target(atom: &str) -> Option<String> {
+pub fn package_qualified_dependency_target(atom: &str) -> Option<String> {
     if atom.starts_with(':')
         || atom.starts_with("#:")
         || atom.starts_with('"')
@@ -25,17 +25,17 @@ pub(super) fn package_qualified_dependency_target(atom: &str) -> Option<String> 
     (!target.is_empty()).then(|| target.to_owned())
 }
 
-pub(super) fn atom_text(view: &ExpressionView) -> Option<&str> {
+pub fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
         .then_some(view.text.as_deref())
         .flatten()
 }
 
-pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
-pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return None;
     }

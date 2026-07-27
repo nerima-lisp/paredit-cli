@@ -1,4 +1,7 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 #[test]
 fn rename_package_updates_designators_and_qualified_prefixes() {

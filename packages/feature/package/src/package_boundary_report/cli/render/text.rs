@@ -1,6 +1,7 @@
 use super::*;
+use paredit_core_cli::safe_text;
 
-pub(super) fn print_package_boundary_report(
+pub fn print_package_boundary_report(
     reports: &[PackageBoundaryReportFile],
     policy: &PackageBoundaryPolicy,
 ) {

@@ -1,8 +1,8 @@
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::super::syntax::normalize_package_atom;
 
-pub(super) fn package_designator_replacement(text: &str, to: &SymbolName) -> String {
+pub fn package_designator_replacement(text: &str, to: &SymbolName) -> String {
     let target = normalize_package_atom(to.as_str());
     if text.starts_with("#:") {
         format!("#:{target}")
@@ -13,7 +13,7 @@ pub(super) fn package_designator_replacement(text: &str, to: &SymbolName) -> Str
     }
 }
 
-pub(super) fn package_qualified_replacement(
+pub fn package_qualified_replacement(
     text: &str,
     from: &SymbolName,
     to: &SymbolName,

@@ -1,11 +1,11 @@
-use crate::domain::sexpr::{ByteOffset, ByteSpan};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 
 use super::PackageRenameOccurrence;
 
 /// Grows a to-be-blanked span leftward over its leading indentation and the
 /// single preceding newline so deleting an option collapses its whole line
 /// instead of leaving a dangling blank line behind.
-pub(super) fn expand_blanked_line_span(input: &str, span: ByteSpan) -> ByteSpan {
+pub fn expand_blanked_line_span(input: &str, span: ByteSpan) -> ByteSpan {
     let bytes = input.as_bytes();
     let mut start = span.start().get();
     while start > 0 && matches!(bytes[start - 1], b' ' | b'\t') {
@@ -21,15 +21,12 @@ pub(super) fn expand_blanked_line_span(input: &str, span: ByteSpan) -> ByteSpan 
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct SpanReplacement {
-    pub(super) span: ByteSpan,
-    pub(super) replacement: String,
+pub struct SpanReplacement {
+    pub span: ByteSpan,
+    pub replacement: String,
 }
 
-pub(super) fn rewrite_package_occurrences(
-    input: &str,
-    occurrences: &[PackageRenameOccurrence],
-) -> String {
+pub fn rewrite_package_occurrences(input: &str, occurrences: &[PackageRenameOccurrence]) -> String {
     let mut rewritten = input.to_owned();
     let mut edits = occurrences.to_vec();
     edits.sort_by_key(|occurrence| occurrence.span.start());
@@ -39,13 +36,13 @@ pub(super) fn rewrite_package_occurrences(
     rewritten
 }
 
-pub(super) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut rewritten = input.to_owned();
     rewritten.replace_range(span.as_range(), replacement);
     rewritten
 }
 
-pub(super) fn rewrite_spans(input: &str, replacements: &[SpanReplacement]) -> String {
+pub fn rewrite_spans(input: &str, replacements: &[SpanReplacement]) -> String {
     let mut rewritten = input.to_owned();
     let mut edits = replacements.to_vec();
     edits.sort_by_key(|replacement| replacement.span.start());

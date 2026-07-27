@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::SymbolName;
-use crate::presentation::cli::args::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::types::{
     AddExportPlan, MergePackageOptionsPlan, PackageReportFile, RenamePackageFilePlan,
@@ -11,7 +11,7 @@ use super::types::{
 mod json;
 mod text;
 
-pub(super) fn print_merge_package_options_plan(
+pub fn print_merge_package_options_plan(
     plan: &MergePackageOptionsPlan,
     output: OutputFormat,
 ) -> Result<()> {
@@ -21,7 +21,7 @@ pub(super) fn print_merge_package_options_plan(
     }
 }
 
-pub(super) fn print_sort_package_options_plan(
+pub fn print_sort_package_options_plan(
     plan: &SortPackageOptionsPlan,
     output: OutputFormat,
 ) -> Result<()> {
@@ -31,7 +31,7 @@ pub(super) fn print_sort_package_options_plan(
     }
 }
 
-pub(super) fn print_sort_package_exports_plan(
+pub fn print_sort_package_exports_plan(
     plan: &SortPackageExportsPlan,
     output: OutputFormat,
 ) -> Result<()> {
@@ -41,17 +41,14 @@ pub(super) fn print_sort_package_exports_plan(
     }
 }
 
-pub(super) fn print_package_report(
-    reports: &[PackageReportFile],
-    output: OutputFormat,
-) -> Result<()> {
+pub fn print_package_report(reports: &[PackageReportFile], output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_package_report(reports),
         OutputFormat::Json => json::report::print_package_report(reports),
     }
 }
 
-pub(super) fn print_rename_package_plan(
+pub fn print_rename_package_plan(
     plans: &[RenamePackageFilePlan],
     from: &SymbolName,
     to: &SymbolName,
@@ -64,7 +61,7 @@ pub(super) fn print_rename_package_plan(
     }
 }
 
-pub(super) fn print_add_export_plan(plan: &AddExportPlan, output: OutputFormat) -> Result<()> {
+pub fn print_add_export_plan(plan: &AddExportPlan, output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_add_export_plan(plan),
         OutputFormat::Json => json::refactor::print_add_export_plan(plan),

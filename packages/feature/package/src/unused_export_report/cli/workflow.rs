@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::unused_export_report::{
+use crate::unused_export_report::cli::args::UnusedExportReportArgs;
+use crate::unused_export_report::cli::render::print_unused_export_report;
+use crate::unused_export_report::usecase::{
     UnusedExportPolicyOptions, analyze_unused_exports, collect_declared_exports,
     collect_referenced_symbols, evaluate_unused_export_policy,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
-use crate::presentation::cli::unused_export_report::args::UnusedExportReportArgs;
-use crate::presentation::cli::unused_export_report::render::print_unused_export_report;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn unused_export_report(
-    args: UnusedExportReportArgs,
-) -> Result<()> {
+pub fn unused_export_report(args: UnusedExportReportArgs) -> Result<()> {
     let mut declared = Vec::new();
     let mut referenced = Vec::new();
 
@@ -31,7 +29,7 @@ pub(in crate::presentation::cli) fn unused_export_report(
     print_unused_export_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "unused-export-report policy failed: {policy_message}"
         )));
     }

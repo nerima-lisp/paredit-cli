@@ -2,10 +2,8 @@ use anyhow::Result;
 
 use super::analyze::{analyze_defpackage_form, analyze_in_package_form};
 use super::types::{InPackageReport, PackageDefinitionReport, PackageReport};
-use crate::domain::{
-    dialect::Dialect,
-    sexpr::{ExpressionView, Path, SyntaxTree},
-};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path, SyntaxTree};
 
 pub fn build_package_report(tree: &SyntaxTree, dialect: Dialect) -> Result<PackageReport> {
     let mut defpackages = Vec::new();

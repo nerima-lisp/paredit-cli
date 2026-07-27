@@ -1,7 +1,7 @@
 //! Common Lisp "unused export" detection: a symbol named in a `defpackage`
 //! `:export` clause that is never reached by a qualified symbol reference
 //! (`pkg:sym`) anywhere in the analyzed fileset — the per-symbol analog of
-//! [`crate::domain::unused_package_report`]'s whole-package check, one
+//! [`crate::unused_package_report::domain`]'s whole-package check, one
 //! level more precise: a package can be genuinely used (via some *other*
 //! export) while still carrying an export nobody actually reads.
 //!
@@ -11,11 +11,11 @@
 //! purely syntactic view, from a genuinely dead export — `--fail-on-unused`
 //! stays an opt-in gate for exactly that reason.
 //!
-//! Built on [`crate::domain::package_report::build_package_report`] for the
+//! Built on [`crate::package_report::domain::build_package_report`] for the
 //! declared `:export` lists and
-//! [`crate::domain::dependency_report::build_dependency_report`]'s
+//! [`crate::dependency_report::domain::build_dependency_report`]'s
 //! `QualifiedSymbol` items for references — the same two primitives
-//! [`crate::domain::unused_package_report`] already reuses, read one level
+//! [`crate::unused_package_report::domain`] already reuses, read one level
 //! deeper: each qualified reference's raw text (`pkg:sym`/`pkg::sym`) is
 //! split into its package and symbol parts so exports can be matched by
 //! *symbol name*, not just by declaring package.
@@ -31,13 +31,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use crate::dependency_report::domain::{DependencyKind, build_dependency_report};
+use crate::package_report::domain::build_package_report;
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::dependency_report::{DependencyKind, build_dependency_report};
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::build_package_report;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct DeclaredExport {

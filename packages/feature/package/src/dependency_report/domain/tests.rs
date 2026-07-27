@@ -1,7 +1,8 @@
+use paredit_core_syntax::sexpr::SyntaxTree;
 use proptest::prelude::*;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 
 use super::*;
 

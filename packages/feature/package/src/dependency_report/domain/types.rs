@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 #[derive(Debug, Clone)]
 pub struct DependencyReport {

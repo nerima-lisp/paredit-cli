@@ -1,11 +1,11 @@
-use crate::domain::common_lisp::CommonLispRuntimeDependencyForm;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path};
+use paredit_core_syntax::common_lisp::CommonLispRuntimeDependencyForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, Path};
 
-use crate::domain::dependency_report::syntax::{dependency_designator_text, list_head};
-use crate::domain::dependency_report::types::{DependencyKind, DependencyReportItem};
+use crate::dependency_report::domain::syntax::{dependency_designator_text, list_head};
+use crate::dependency_report::domain::types::{DependencyKind, DependencyReportItem};
 
-pub(super) fn collect_list_dependency_items(
+pub fn collect_list_dependency_items(
     view: &ExpressionView,
     dialect: Dialect,
     path: &Path,

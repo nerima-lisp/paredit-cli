@@ -1,3 +1,3 @@
 //! Application facade for package declaration analysis.
 
-pub use crate::domain::package_report::*;
+pub use crate::package_report::domain::*;

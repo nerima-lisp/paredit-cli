@@ -5,9 +5,9 @@ use crate::application::usecase::dependency_report::build_dependency_report;
 use crate::presentation::cli::dependency_report::{
     args::DependencyReportArgs, render::print_dependency_report, types::DependencyReportFile,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use crate::presentation::cli::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn dependency_report(args: DependencyReportArgs) -> Result<()> {
+pub fn dependency_report(args: DependencyReportArgs) -> Result<()> {
     let mut reports = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

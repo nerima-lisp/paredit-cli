@@ -1,7 +1,5 @@
-use crate::domain::{
-    dialect::Dialect,
-    sexpr::{ByteSpan, SymbolName},
-};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SymbolName};
 
 use super::PackageOptionSortOrder;
 

@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
 
-use crate::application::usecase::package as package_usecase;
+use crate::package::usecase as package_usecase;
 
-use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::{
     render::print_add_export_plan,
     types::{AddExportArgs, AddExportPlan},
 };
+use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub(in crate::presentation::cli) fn add_export(args: AddExportArgs) -> Result<()> {
+pub fn add_export(args: AddExportArgs) -> Result<()> {
     let (input, dialect) = read_input_and_dialect(Some(args.file.clone()), args.dialect)?;
     let usecase_plan = package_usecase::plan_add_export(package_usecase::AddExportRequest {
         input: &input.text,

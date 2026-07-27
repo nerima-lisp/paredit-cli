@@ -1,6 +1,8 @@
 use super::*;
+use anyhow::Result;
+use serde_json::json;
 
-pub(super) fn print_package_boundary_report(
+pub fn print_package_boundary_report(
     reports: &[PackageBoundaryReportFile],
     policy: &PackageBoundaryPolicy,
 ) -> Result<()> {

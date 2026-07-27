@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path};
 
 use super::{OptionSlot, PackageOptionSortOrder, ordering};
-use crate::domain::leading_trivia::first_newline_or;
-use crate::domain::package::syntax::{atom_text, package_option_name};
+use crate::package::domain::syntax::{atom_text, package_option_name};
+use paredit_core_syntax::leading_trivia::first_newline_or;
 
-pub(super) fn collect_option_slots(
+pub fn collect_option_slots(
     input: &str,
     view: &ExpressionView,
     defpackage_path: &Path,

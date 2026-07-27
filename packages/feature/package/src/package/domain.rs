@@ -2,9 +2,9 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 mod export;
 mod merge_options;
@@ -238,7 +238,7 @@ mod dialect_tests {
     use anyhow::Result;
 
     use super::*;
-    use crate::domain::sexpr::SymbolName;
+    use paredit_core_syntax::sexpr::SymbolName;
 
     const VALID_INPUT: &str =
         "(defpackage demo (:use cl) (:export z) (:export a))\n(in-package demo)\n";

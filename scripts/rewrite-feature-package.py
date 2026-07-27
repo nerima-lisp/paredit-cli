@@ -49,6 +49,20 @@ for _m in "args shared gate".split():
 
 # Names a feature's cli/ files used without importing, because cli.rs had them
 # in scope. `safe_text` is a macro, so it needs a `use` to be callable bare.
+ARGS_ITEMS = [
+    "DialectArg", "OutputFormat", "MoveInsert", "ParameterInsert", "ThreadStyleArg",
+    "SourceInput", "EditTargetArgs", "TargetArgs", "AnalyzeArgs", "FormatArgs",
+    "RepairArgs", "ReplaceArgs", "WrapArgs", "WrapDelimiter",
+]
+SHARED_ITEMS = [
+    "MAX_SOURCE_INPUT_BYTES", "apply_byte_span_edits", "bounded_preview",
+    "matching_symbol_occurrences", "read_input_and_dialect", "read_input_dialect_and_tree",
+    "read_text_file_with_limit", "read_text_with_limit", "require_output_file",
+    "resolve_target", "stable_text_hash", "terminal_safe", "terminal_safe_error_chain",
+    "unified_diff", "write_artifact_with_rollback", "write_file_with_rollback",
+    "write_files_with_rollback",
+]
+
 AMBIENT = [
     (r"\bResult<", "use anyhow::Result;", "Result"),
     (r"#\[derive\([^)]*\bArgs\b", "use clap::Args;", "Args"),
@@ -113,15 +127,19 @@ def split_grouped_layer_imports(text: str, slices: list[str]) -> tuple[str, int]
     line, so a grouped import survives them intact and then fails to resolve.
     Splitting first lets every other rule apply normally.
     """
+    # Both the multi-line form and the single-line one; neither puts a module
+    # name on the same line as `crate::<layer>::` in a way the other rules see.
     pattern = re.compile(
-        r"^use crate::(domain|application::usecase|presentation::cli)::\{\n(.*?)^\};\n",
+        r"^use crate::(domain|application::usecase|presentation::cli)::\{\n(.*?)^\};\n"
+        r"|^use crate::(domain|application::usecase|presentation::cli)::\{([^}\n]*)\};\n",
         re.M | re.S,
     )
     count = 0
 
     def expand(match: re.Match[str]) -> str:
         nonlocal count
-        layer, body = match.group(1), match.group(2)
+        layer = match.group(1) or match.group(3)
+        body = match.group(2) if match.group(1) else match.group(4)
         entries, depth, current = [], 0, ""
         for ch in body:
             if ch == "{":
@@ -193,9 +211,39 @@ def rewrite(name: str, slices: list[str]) -> int:
                                   text, flags=re.M)
                 counts["self_alias"] += n
 
-        # 3. Anything still addressing the old cli root is a shared helper.
+        # 3. Anything still addressing the old cli root is a shared helper...
         text, n = re.subn(r"\bcrate::presentation::cli\b", "paredit_core_cli::shared", text)
         counts["cli_root"] += n
+        # ...but cli.rs re-exported from BOTH args and shared, so the value
+        # enums have to be sent to args instead.
+        def split_shared_group(match: re.Match[str]) -> str:
+            names = [n.strip() for n in match.group(1).split(",") if n.strip()]
+            args = [n for n in names if n.split(" as ")[0].strip() in ARGS_ITEMS]
+            rest = [n for n in names if n not in args]
+            out = []
+            if rest:
+                out.append(f"use paredit_core_cli::shared::{{{', '.join(rest)}}};")
+            if args:
+                out.append(f"use paredit_core_cli::args::{{{', '.join(args)}}};")
+            return "\n".join(out)
+
+        text, n = re.subn(r"use paredit_core_cli::shared::\{([^}]*)\};",
+                          split_shared_group, text)
+        counts["cli_args"] += n
+        for name in ARGS_ITEMS:
+            text, n = re.subn(rf"\bparedit_core_cli::shared::{name}\b",
+                              f"paredit_core_cli::args::{name}", text)
+            counts["cli_args"] += n
+        # A file inside a cli subdirectory reached those same helpers through
+        # `super::super::`, which names the old cli module and no longer exists.
+        text, n = re.subn(r"use super::super::\{([^}]*)\};",
+                          lambda m: "use paredit_core_cli::shared::{" + m.group(1) + "};",
+                          text)
+        counts["cli_super"] += n
+        for name in SHARED_ITEMS:
+            text, n = re.subn(rf"\bsuper::super::{name}\b",
+                              f"paredit_core_cli::shared::{name}", text)
+            counts["cli_super"] += n
         # ...but a visibility cannot name another crate, so undo it there.
         text, n = re.subn(r"pub\(in paredit_core_cli::shared\)", "pub", text)
         counts["visibility_fix"] += n
@@ -226,6 +274,17 @@ def rewrite(name: str, slices: list[str]) -> int:
         # 5. Doctests can only import the crate they compile into.
         text, n = re.subn(r"\bparedit_cli::", f"{crate}::", text)
         counts["doctests"] += n
+
+        # Several rules can converge on the same import; keep the first.
+        seen, kept = set(), []
+        for line in text.splitlines(keepends=True):
+            if line.startswith("use ") and line.rstrip("\n").endswith(";"):
+                if line in seen:
+                    counts["deduped"] += 1
+                    continue
+                seen.add(line)
+            kept.append(line)
+        text = "".join(kept)
 
         if text != original:
             path.write_text(text)

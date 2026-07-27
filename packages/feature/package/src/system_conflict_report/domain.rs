@@ -3,15 +3,15 @@
 //! the same system name.
 //!
 //! Unlike Common Lisp packages, ASDF systems have no `:nicknames` option,
-//! so this check has only the one shape [`crate::domain::package_conflict_report`]
+//! so this check has only the one shape [`crate::package_conflict_report::domain`]
 //! covers as its "duplicated primary name" case: whichever `defsystem` form
 //! is loaded last silently redefines the system ASDF already knows by that
 //! name — a load-order-dependent bug, not a style nit.
 //!
 //! Scope: Common Lisp only, since ASDF `defsystem` is CL-specific. Reuses
-//! the same [`crate::domain::common_lisp::normalize_common_lisp_package_designator`]
+//! the same [`paredit_core_syntax::common_lisp::normalize_common_lisp_package_designator`]
 //! designator normalization [`crate::domain::system_cycle_report`] and
-//! [`crate::domain::dependency_report`] already rely on for system-name
+//! [`crate::dependency_report::domain`] already rely on for system-name
 //! designators (`"my-system"`, `#:my-system`, or a bare symbol all name the
 //! same system).
 
@@ -20,12 +20,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_child, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_child, list_head};
 
 #[derive(Debug, Clone)]
 pub struct DeclaredSystem {
@@ -90,7 +90,7 @@ pub struct SystemConflictPolicy {
 
 /// Collects every `asdf:defsystem` form's own (normalized) name in one
 /// file, regardless of whether it declares any `:depends-on` — unlike
-/// [`crate::domain::dependency_report::build_system_dependency_edges`],
+/// [`crate::dependency_report::domain::build_system_dependency_edges`],
 /// which only emits a `(system, target)` pair when a `:depends-on` option
 /// exists, every `defsystem` form is a candidate here.
 pub fn collect_declared_systems(

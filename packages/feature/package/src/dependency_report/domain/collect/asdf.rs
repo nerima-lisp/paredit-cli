@@ -1,11 +1,11 @@
-use crate::domain::common_lisp::normalize_common_lisp_package_designator;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};
+use paredit_core_syntax::common_lisp::normalize_common_lisp_package_designator;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};
 
-use crate::domain::dependency_report::syntax::{
+use crate::dependency_report::domain::syntax::{
     atom_child, atom_text, dependency_designator_text, list_head,
 };
-use crate::domain::dependency_report::types::{DependencyKind, DependencyReportItem};
+use crate::dependency_report::domain::types::{DependencyKind, DependencyReportItem};
 
 /// Collects `(declaring_system, depended_on_system)` edges from one
 /// top-level `defsystem` form, reusing [`collect_dependency_designators`]
@@ -14,7 +14,7 @@ use crate::domain::dependency_report::types::{DependencyKind, DependencyReportIt
 /// dependency-report items) rather than re-deriving how a depends-on value
 /// can be a bare designator, a nested list of designators, or a
 /// `(:version name "1.0")` triple whose designator sits at a fixed offset.
-pub(super) fn collect_system_definition_edges(
+pub fn collect_system_definition_edges(
     view: &ExpressionView,
     dialect: Dialect,
     edges: &mut Vec<(String, String)>,
@@ -58,7 +58,7 @@ pub(super) fn collect_system_definition_edges(
     }
 }
 
-pub(super) fn collect_system_dependency_items(
+pub fn collect_system_dependency_items(
     view: &ExpressionView,
     dialect: Dialect,
     path: &Path,

@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::package_conflict_report::{
-    PackageConflictPolicy, PackageConflictSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::package_conflict_report::usecase::{PackageConflictPolicy, PackageConflictSummary};
 
-pub(super) fn print_package_conflict_report(
+pub fn print_package_conflict_report(
     summary: &PackageConflictSummary,
     policy: &PackageConflictPolicy,
     output: OutputFormat,

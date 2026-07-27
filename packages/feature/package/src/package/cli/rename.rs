@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
 
-use crate::application::usecase::package as package_usecase;
+use crate::package::usecase as package_usecase;
 
-use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::{
     render::print_rename_package_plan,
     types::{RenamePackageArgs, RenamePackageFilePlan},
 };
+use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub(in crate::presentation::cli) fn rename_package(args: RenamePackageArgs) -> Result<()> {
+pub fn rename_package(args: RenamePackageArgs) -> Result<()> {
     let mut plans = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

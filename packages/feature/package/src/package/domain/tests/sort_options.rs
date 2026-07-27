@@ -1,4 +1,7 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 #[test]
 fn sorts_package_options_in_canonical_order_without_reformatting_bodies() {

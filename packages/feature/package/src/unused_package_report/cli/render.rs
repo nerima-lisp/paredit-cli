@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::unused_package_report::{
-    UnusedPackagePolicy, UnusedPackageSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::unused_package_report::usecase::{UnusedPackagePolicy, UnusedPackageSummary};
 
-pub(super) fn print_unused_package_report(
+pub fn print_unused_package_report(
     summary: &UnusedPackageSummary,
     policy: &UnusedPackagePolicy,
     output: OutputFormat,

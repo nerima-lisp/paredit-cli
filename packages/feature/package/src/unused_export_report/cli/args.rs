@@ -2,20 +2,20 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::presentation::cli::{DialectArg, OutputFormat};
+use paredit_core_cli::args::{DialectArg, OutputFormat};
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct UnusedExportReportArgs {
+pub struct UnusedExportReportArgs {
     /// Files to scan.
     #[arg(required = true)]
-    pub(in crate::presentation::cli::unused_export_report) files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
-    pub(in crate::presentation::cli::unused_export_report) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Exit with failure when any exported symbol is never referenced.
     #[arg(long)]
-    pub(in crate::presentation::cli::unused_export_report) fail_on_unused: bool,
+    pub fail_on_unused: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli::unused_export_report) output: OutputFormat,
+    pub output: OutputFormat,
 }

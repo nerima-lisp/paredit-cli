@@ -1,10 +1,10 @@
-use crate::domain::leading_trivia::strip_leading_blank_lines;
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::leading_trivia::strip_leading_blank_lines;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 use super::{OptionReplacement, OptionSlot, PackageOptionSortOrder};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(in crate::domain::package) struct OptionSortKey {
+pub struct OptionSortKey {
     rank: usize,
     name: String,
     payload: String,
@@ -15,7 +15,7 @@ pub(in crate::domain::package) struct OptionSortKey {
 /// leading trivia of its own) is reordered away from the front.
 const DEFAULT_OPTION_SEPARATOR: &str = "\n  ";
 
-pub(super) fn sort_slots(slots: &[OptionSlot]) -> (Vec<String>, Vec<OptionReplacement>) {
+pub fn sort_slots(slots: &[OptionSlot]) -> (Vec<String>, Vec<OptionReplacement>) {
     let mut order = (0..slots.len()).collect::<Vec<_>>();
     order.sort_by(|&left, &right| {
         slots[left]
@@ -74,7 +74,7 @@ fn is_identity(order: &[usize]) -> bool {
         .all(|(index, &value)| index == value)
 }
 
-pub(super) fn option_sort_key(
+pub fn option_sort_key(
     name: &str,
     payload: &str,
     text: &str,

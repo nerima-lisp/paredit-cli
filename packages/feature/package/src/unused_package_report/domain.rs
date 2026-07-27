@@ -9,10 +9,10 @@
 //! exactly that reason, the same caveat `unused-definitions` already
 //! carries.
 //!
-//! Built on the same [`crate::domain::dependency_report::build_dependency_report`]
+//! Built on the same [`crate::dependency_report::domain::build_dependency_report`]
 //! extraction used by [`crate::domain::package_cycle_report`] (for
 //! `DefpackageUse`/`DefpackageImportFrom` edges) and
-//! [`crate::domain::package_boundary_report`] (for `QualifiedSymbol`
+//! [`crate::package_boundary_report::domain`] (for `QualifiedSymbol`
 //! references) — every kind of package reference this report needs is
 //! already collected there; this module only decides which declared
 //! packages never appear as *any* of those references' target.
@@ -26,13 +26,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use crate::dependency_report::domain::{DependencyKind, build_dependency_report};
+use crate::package_report::domain::build_package_report;
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::dependency_report::{DependencyKind, build_dependency_report};
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::build_package_report;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct DeclaredPackage {

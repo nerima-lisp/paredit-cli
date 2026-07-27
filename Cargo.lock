@@ -661,6 +661,7 @@ dependencies = [
  "paredit-feature-form-transform",
  "paredit-feature-function-parameter",
  "paredit-feature-inline",
+ "paredit-feature-package",
  "paredit-feature-similarity",
  "predicates",
  "proptest",
@@ -814,6 +815,22 @@ dependencies = [
  "paredit-core-edit",
  "paredit-core-semantics",
  "paredit-core-syntax",
+ "proptest",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-package"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-edit",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "paredit-core-workspace",
  "proptest",
  "serde_json",
  "thiserror",

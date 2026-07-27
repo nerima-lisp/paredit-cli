@@ -1,1 +1,1 @@
-pub use crate::domain::package::*;
+pub use crate::package::domain::*;

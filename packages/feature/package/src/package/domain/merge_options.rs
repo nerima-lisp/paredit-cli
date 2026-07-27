@@ -3,51 +3,49 @@ use anyhow::Result;
 mod merge;
 mod slots;
 
-use crate::domain::{
-    dialect::Dialect,
-    sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree},
-};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 use super::visit::visit_defpackage_forms;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct OptionMergeEdit {
-    pub(super) defpackage_path: String,
-    pub(super) defpackage_span: ByteSpan,
-    pub(super) package_name: String,
-    pub(super) merges: Vec<OptionMerge>,
-    pub(super) replacements: Vec<OptionReplacement>,
+pub struct OptionMergeEdit {
+    pub defpackage_path: String,
+    pub defpackage_span: ByteSpan,
+    pub package_name: String,
+    pub merges: Vec<OptionMerge>,
+    pub replacements: Vec<OptionReplacement>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct OptionMerge {
-    pub(super) head: String,
-    pub(super) key: Option<String>,
-    pub(super) kept_path: String,
-    pub(super) kept_span: ByteSpan,
-    pub(super) removed_paths: Vec<String>,
-    pub(super) removed_spans: Vec<ByteSpan>,
-    pub(super) old_atoms: Vec<String>,
-    pub(super) new_atoms: Vec<String>,
+pub struct OptionMerge {
+    pub head: String,
+    pub key: Option<String>,
+    pub kept_path: String,
+    pub kept_span: ByteSpan,
+    pub removed_paths: Vec<String>,
+    pub removed_spans: Vec<ByteSpan>,
+    pub old_atoms: Vec<String>,
+    pub new_atoms: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct OptionReplacement {
-    pub(super) span: ByteSpan,
-    pub(super) replacement: String,
+pub struct OptionReplacement {
+    pub span: ByteSpan,
+    pub replacement: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::domain::package) struct OptionSlot {
-    pub(in crate::domain::package) path: String,
-    pub(in crate::domain::package) span: ByteSpan,
-    pub(in crate::domain::package) head_text: String,
-    pub(in crate::domain::package) name: String,
-    pub(in crate::domain::package) key: Option<String>,
-    pub(in crate::domain::package) body_atoms: Vec<String>,
+pub struct OptionSlot {
+    pub path: String,
+    pub span: ByteSpan,
+    pub head_text: String,
+    pub name: String,
+    pub key: Option<String>,
+    pub body_atoms: Vec<String>,
 }
 
-pub(super) fn defpackage_option_merge_edits(
+pub fn defpackage_option_merge_edits(
     input: &str,
     tree: &SyntaxTree,
     dialect: Dialect,

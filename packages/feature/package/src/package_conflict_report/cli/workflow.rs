@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::package_conflict_report::{
+use crate::package_conflict_report::cli::args::PackageConflictReportArgs;
+use crate::package_conflict_report::cli::render::print_package_conflict_report;
+use crate::package_conflict_report::usecase::{
     PackageConflictPolicyOptions, analyze_package_conflicts, collect_declared_package_identifiers,
     evaluate_package_conflict_policy,
 };
-use crate::presentation::cli::package_conflict_report::args::PackageConflictReportArgs;
-use crate::presentation::cli::package_conflict_report::render::print_package_conflict_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn package_conflict_report(
-    args: PackageConflictReportArgs,
-) -> Result<()> {
+pub fn package_conflict_report(args: PackageConflictReportArgs) -> Result<()> {
     let mut declared = Vec::new();
 
     for file in &args.files {
@@ -29,7 +27,7 @@ pub(in crate::presentation::cli) fn package_conflict_report(
     print_package_conflict_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "package-conflict-report policy failed: {policy_message}"
         )));
     }

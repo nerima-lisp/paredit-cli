@@ -31,6 +31,7 @@ mod cons_to_list_report;
 mod constant_if_test_report;
 mod constant_when_test_report;
 mod contract;
+mod dependency_report;
 
 // Phase 2 facade (section 4.1). args/shared/gate - and shared's io, diff and
 // macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
@@ -64,7 +65,6 @@ mod definition_movement;
 mod definition_removal;
 mod definition_report;
 mod defpackage_quoted_report;
-mod dependency_report;
 mod destructive_literal_report;
 mod dispatch;
 mod double_reverse_report;
@@ -143,9 +143,6 @@ mod nthcdr_small_index_report;
 mod nthcdr_zero_report;
 mod one_armed_if_report;
 mod one_step_arithmetic_report;
-mod package;
-mod package_boundary_report;
-mod package_conflict_report;
 mod package_cycle_report;
 mod parse_integer_default_radix_report;
 mod prog2_to_progn_report;
@@ -194,7 +191,6 @@ mod string_case_fold_report;
 mod struct_cycle_report;
 mod subseq_zero_report;
 mod symbol_report;
-mod system_conflict_report;
 mod system_cycle_report;
 mod t_comparison_report;
 mod the_arity_report;
@@ -203,10 +199,7 @@ mod typep_predicate_report;
 mod undefined_package_report;
 mod unreachable_case_clause_report;
 mod unreachable_cond_clause_report;
-mod unused_export_report;
 mod unused_local_callable_report;
-mod unused_nickname_report;
-mod unused_package_report;
 mod unused_parameter_report;
 mod unwind_protect_no_cleanup_report;
 mod values_list_of_list_report;
@@ -305,6 +298,13 @@ use paredit_feature_binding::merge_nested_let_star::cli as merge_nested_let_star
 use paredit_feature_binding::split_let::cli as split_let;
 use paredit_feature_binding::split_let_star::cli as split_let_star;
 use paredit_feature_function_parameter::function_parameter::cli as function_parameter;
+use paredit_feature_package::package::cli as package;
+use paredit_feature_package::package_boundary_report::cli as package_boundary_report;
+use paredit_feature_package::package_conflict_report::cli as package_conflict_report;
+use paredit_feature_package::system_conflict_report::cli as system_conflict_report;
+use paredit_feature_package::unused_export_report::cli as unused_export_report;
+use paredit_feature_package::unused_nickname_report::cli as unused_nickname_report;
+use paredit_feature_package::unused_package_report::cli as unused_package_report;
 
 #[cfg(test)]
 mod tests {

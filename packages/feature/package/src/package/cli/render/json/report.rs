@@ -1,12 +1,10 @@
 use anyhow::Result;
 
 use super::super::super::types::PackageReportFile;
-use crate::presentation::cli::package::render::json::shared::span_json;
+use crate::package::cli::render::json::shared::span_json;
 use serde_json::json;
 
-pub(in crate::presentation::cli::package::render) fn print_package_report(
-    reports: &[PackageReportFile],
-) -> Result<()> {
+pub fn print_package_report(reports: &[PackageReportFile]) -> Result<()> {
     let defpackage_count = reports
         .iter()
         .map(|report| report.report.defpackages.len())

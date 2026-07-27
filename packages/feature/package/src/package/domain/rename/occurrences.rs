@@ -1,15 +1,13 @@
-use crate::domain::{
-    common_lisp::CommonLispPackageDeclarationForm,
-    dialect::Dialect,
-    sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName},
-};
+use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName};
 
 use super::super::syntax::{atom_text, is_package_head, package_atoms_match, package_option_name};
-use super::super::{PackageRenameKind, PackageRenameOccurrence};
 use super::paths::{child_path, local_nickname_package_path, option_child_path};
 use super::replacement::{package_designator_replacement, package_qualified_replacement};
+use crate::package::domain::{PackageRenameKind, PackageRenameOccurrence};
 
-pub(super) fn collect_package_rename_occurrences(
+pub fn collect_package_rename_occurrences(
     view: &ExpressionView,
     path: Path,
     dialect: Dialect,

@@ -36,6 +36,7 @@ paredit-core-workspace = { path = "packages/core/workspace" }
 
 paredit-feature-binding = { path = "packages/feature/binding" }
 paredit-feature-function-parameter = { path = "packages/feature/function-parameter" }
+paredit-feature-package = { path = "packages/feature/package" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"

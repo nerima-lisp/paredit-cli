@@ -2,9 +2,9 @@
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::build_package_report;
-use crate::domain::sexpr::SyntaxTree;
+use crate::package_report::domain::build_package_report;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 mod collect;
 mod defpackage;

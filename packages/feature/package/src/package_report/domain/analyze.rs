@@ -2,13 +2,11 @@ use anyhow::Result;
 
 use super::syntax::{atom_text, is_package_head, package_option_atoms, package_option_name};
 use super::types::{InPackageReport, PackageDefinitionReport, PackageImportReport};
-use crate::domain::{
-    common_lisp::CommonLispPackageDeclarationForm,
-    dialect::Dialect,
-    sexpr::{Delimiter, ExpressionKind, ExpressionView, Path},
-};
+use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};
 
-pub(super) fn analyze_defpackage_form(
+pub fn analyze_defpackage_form(
     view: &ExpressionView,
     dialect: Dialect,
     path: &Path,
@@ -73,7 +71,7 @@ pub(super) fn analyze_defpackage_form(
     )))
 }
 
-pub(super) fn analyze_in_package_form(
+pub fn analyze_in_package_form(
     view: &ExpressionView,
     dialect: Dialect,
     path: &Path,

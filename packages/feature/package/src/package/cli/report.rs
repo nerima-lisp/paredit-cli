@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-use crate::application::usecase::package_report::build_package_report;
+use crate::package_report::usecase::build_package_report;
 
-use super::super::read_input_dialect_and_tree;
 use super::{
     render::print_package_report,
     types::{PackageReportArgs, PackageReportFile},
 };
 
-pub(in crate::presentation::cli) fn package_report(args: PackageReportArgs) -> Result<()> {
+pub fn package_report(args: PackageReportArgs) -> Result<()> {
     let mut reports = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

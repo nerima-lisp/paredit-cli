@@ -1,17 +1,15 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::super::super::types::{
     AddExportPlan, MergePackageOptionsPlan, RenamePackageFilePlan, SortPackageExportsPlan,
     SortPackageOptionsPlan,
 };
-use crate::presentation::cli::package::render::json::shared::span_json;
+use crate::package::cli::render::json::shared::span_json;
 use serde_json::json;
 
-pub(in crate::presentation::cli::package::render) fn print_merge_package_options_plan(
-    plan: &MergePackageOptionsPlan,
-) -> Result<()> {
+pub fn print_merge_package_options_plan(plan: &MergePackageOptionsPlan) -> Result<()> {
     let merge_count = plan.merges.len();
     let changed_merge_count = plan.merges.iter().filter(|merge| merge.changed).count();
 
@@ -60,9 +58,7 @@ pub(in crate::presentation::cli::package::render) fn print_merge_package_options
     Ok(())
 }
 
-pub(in crate::presentation::cli::package::render) fn print_sort_package_options_plan(
-    plan: &SortPackageOptionsPlan,
-) -> Result<()> {
+pub fn print_sort_package_options_plan(plan: &SortPackageOptionsPlan) -> Result<()> {
     let package_count = plan.packages.len();
     let changed_package_count = plan
         .packages
@@ -100,9 +96,7 @@ pub(in crate::presentation::cli::package::render) fn print_sort_package_options_
     Ok(())
 }
 
-pub(in crate::presentation::cli::package::render) fn print_sort_package_exports_plan(
-    plan: &SortPackageExportsPlan,
-) -> Result<()> {
+pub fn print_sort_package_exports_plan(plan: &SortPackageExportsPlan) -> Result<()> {
     let export_count = plan.exports.len();
     let changed_export_count = plan.exports.iter().filter(|export| export.changed).count();
 
@@ -140,7 +134,7 @@ pub(in crate::presentation::cli::package::render) fn print_sort_package_exports_
     Ok(())
 }
 
-pub(in crate::presentation::cli::package::render) fn print_rename_package_plan(
+pub fn print_rename_package_plan(
     plans: &[RenamePackageFilePlan],
     from: &SymbolName,
     to: &SymbolName,
@@ -190,9 +184,7 @@ pub(in crate::presentation::cli::package::render) fn print_rename_package_plan(
     Ok(())
 }
 
-pub(in crate::presentation::cli::package::render) fn print_add_export_plan(
-    plan: &AddExportPlan,
-) -> Result<()> {
+pub fn print_add_export_plan(plan: &AddExportPlan) -> Result<()> {
     let export_span = plan.export_span.map(span_json);
 
     println!(

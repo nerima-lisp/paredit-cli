@@ -2,7 +2,7 @@
 //! entry that is never used as a qualifier — not in a `:use`/`:import-from`
 //! clause, not in a qualified symbol (`nickname:sym`/`nickname::sym`) —
 //! anywhere in the analyzed fileset. A nickname is just another designator
-//! for the same package, so it shares [`crate::domain::unused_package_report`]'s
+//! for the same package, so it shares [`crate::unused_package_report::domain`]'s
 //! reference collector outright: anywhere a primary package name could be
 //! "used", a nickname could have been used instead, and this report asks
 //! whether it ever was.
@@ -19,14 +19,14 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use crate::package_report::domain::build_package_report;
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::package_report::build_package_report;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
-pub use crate::domain::unused_package_report::collect_referenced_package_names;
+pub use crate::unused_package_report::domain::collect_referenced_package_names;
 
 #[derive(Debug, Clone)]
 pub struct DeclaredNickname {

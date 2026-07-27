@@ -1,12 +1,9 @@
 use anyhow::Result;
 
-use crate::domain::{
-    common_lisp::CommonLispPackageDeclarationForm,
-    dialect::Dialect,
-    sexpr::{
-        ByteOffset, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName,
-        SyntaxTree,
-    },
+use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
+    ByteOffset, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
 use super::syntax::{
@@ -15,17 +12,17 @@ use super::syntax::{
 };
 
 #[derive(Debug)]
-pub(super) struct DefpackageExportEdit {
-    pub(super) defpackage_path: String,
-    pub(super) defpackage_span: ByteSpan,
-    pub(super) package_name: String,
-    pub(super) export_span: Option<ByteSpan>,
-    pub(super) insertion_span: ByteSpan,
-    pub(super) already_exported: bool,
-    pub(super) replacement: String,
+pub struct DefpackageExportEdit {
+    pub defpackage_path: String,
+    pub defpackage_span: ByteSpan,
+    pub package_name: String,
+    pub export_span: Option<ByteSpan>,
+    pub insertion_span: ByteSpan,
+    pub already_exported: bool,
+    pub replacement: String,
 }
 
-pub(super) fn find_defpackage_export_edit(
+pub fn find_defpackage_export_edit(
     tree: &SyntaxTree,
     dialect: Dialect,
     package: Option<&SymbolName>,

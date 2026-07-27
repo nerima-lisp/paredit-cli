@@ -1,8 +1,8 @@
-use crate::domain::package_report::PackageDefinitionReport;
+use crate::package_report::domain::PackageDefinitionReport;
 
 use super::types::{DependencyKind, DependencyReportItem};
 
-pub(super) fn defpackage_dependency_items(
+pub fn defpackage_dependency_items(
     defpackages: &[PackageDefinitionReport],
 ) -> Vec<DependencyReportItem> {
     let mut dependencies = Vec::new();

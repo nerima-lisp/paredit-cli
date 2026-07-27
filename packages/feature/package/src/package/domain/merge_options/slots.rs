@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, Path};
 
 use super::OptionSlot;
-use crate::domain::package::syntax::{atom_text, package_option_name};
+use crate::package::domain::syntax::{atom_text, package_option_name};
 
-pub(super) fn collect_option_slots(
+pub fn collect_option_slots(
     view: &ExpressionView,
     defpackage_path: &Path,
 ) -> Result<Vec<OptionSlot>> {

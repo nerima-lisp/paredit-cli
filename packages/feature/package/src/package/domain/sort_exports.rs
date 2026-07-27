@@ -1,35 +1,35 @@
 use anyhow::Result;
 
-use crate::domain::{
-    dialect::Dialect,
-    sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree},
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
+    ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
 use super::{
     syntax::{atom_text, package_option_name},
     visit::visit_defpackage_forms,
 };
-use crate::domain::leading_trivia::first_newline_or;
+use paredit_core_syntax::leading_trivia::first_newline_or;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ExportSortEdit {
-    pub(super) defpackage_path: String,
-    pub(super) defpackage_span: ByteSpan,
-    pub(super) package_name: String,
-    pub(super) export_path: String,
-    pub(super) export_span: ByteSpan,
-    pub(super) old_symbols: Vec<String>,
-    pub(super) new_symbols: Vec<String>,
-    pub(super) replacements: Vec<ExportSymbolReplacement>,
+pub struct ExportSortEdit {
+    pub defpackage_path: String,
+    pub defpackage_span: ByteSpan,
+    pub package_name: String,
+    pub export_path: String,
+    pub export_span: ByteSpan,
+    pub old_symbols: Vec<String>,
+    pub new_symbols: Vec<String>,
+    pub replacements: Vec<ExportSymbolReplacement>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ExportSymbolReplacement {
-    pub(super) span: ByteSpan,
-    pub(super) replacement: String,
+pub struct ExportSymbolReplacement {
+    pub span: ByteSpan,
+    pub replacement: String,
 }
 
-pub(super) fn defpackage_export_sort_edits(
+pub fn defpackage_export_sort_edits(
     input: &str,
     tree: &SyntaxTree,
     dialect: Dialect,

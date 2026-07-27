@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispOperator, common_lisp_local_callable_form, local_callable_binding_body_scope,
     local_callable_body_scope,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::apply_reader_prefix_context;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::types::DependencyReportItem;
 
@@ -14,7 +14,7 @@ mod asdf;
 mod forms;
 mod qualified;
 
-pub(super) fn collect_dependency_items(
+pub fn collect_dependency_items(
     tree: &SyntaxTree,
     dialect: Dialect,
 ) -> Result<Vec<DependencyReportItem>> {
@@ -34,7 +34,7 @@ pub(super) fn collect_dependency_items(
 /// only looks at top-level forms — real `.asd` files always declare
 /// `defsystem` there — so it does not need the full quasiquote/local-binding
 /// aware recursive walk that general dependency collection requires.
-pub(super) fn collect_system_dependency_edges(
+pub fn collect_system_dependency_edges(
     tree: &SyntaxTree,
     dialect: Dialect,
 ) -> Result<Vec<(String, String)>> {

@@ -1,9 +1,7 @@
 use anyhow::Result;
 
-use crate::domain::{
-    dialect::Dialect,
-    sexpr::{Path, SymbolName, SyntaxTree},
-};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
 
 use super::PackageRenameOccurrence;
 
@@ -13,7 +11,7 @@ mod replacement;
 
 use occurrences::collect_package_rename_occurrences;
 
-pub(super) fn package_rename_occurrences(
+pub fn package_rename_occurrences(
     tree: &SyntaxTree,
     dialect: Dialect,
     from: &SymbolName,
