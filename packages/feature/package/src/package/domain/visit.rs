@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{DefpackageSelectionError, DefpackageShapeError, PackageRefactorResult};
 
 use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
 use paredit_core_syntax::dialect::Dialect;
@@ -12,8 +12,8 @@ pub fn visit_defpackage_forms(
     tree: &SyntaxTree,
     dialect: Dialect,
     package: Option<&SymbolName>,
-    mut visitor: impl FnMut(&ExpressionView, &Path, &str) -> Result<()>,
-) -> Result<()> {
+    mut visitor: impl FnMut(&ExpressionView, &Path, &str) -> PackageRefactorResult<()>,
+) -> PackageRefactorResult<()> {
     let mut matched_defpackages = 0usize;
 
     for index in 0..tree.root_children().len() {
@@ -27,12 +27,18 @@ pub fn visit_defpackage_forms(
             &mut matched_defpackages,
             &mut visitor,
         )
-        .with_context(|| format!("failed to inspect package form at {path}"))?;
+        .map_err(|source| DefpackageShapeError::InspectFailed {
+            path: path.to_string(),
+            source: Box::new(source),
+        })?;
     }
 
     if matched_defpackages == 0 {
         if let Some(target) = package {
-            anyhow::bail!("no matching defpackage form found for {target}");
+            return Err(DefpackageSelectionError::NoMatch {
+                target: target.to_string(),
+            }
+            .into());
         }
     }
 
@@ -45,8 +51,8 @@ fn visit_form(
     dialect: Dialect,
     package: Option<&SymbolName>,
     matched_defpackages: &mut usize,
-    visitor: &mut impl FnMut(&ExpressionView, &Path, &str) -> Result<()>,
-) -> Result<()> {
+    visitor: &mut impl FnMut(&ExpressionView, &Path, &str) -> PackageRefactorResult<()>,
+) -> PackageRefactorResult<()> {
     if view.kind == ExpressionKind::List
         && view.delimiter == Some(Delimiter::Paren)
         && view.children.len() >= 2

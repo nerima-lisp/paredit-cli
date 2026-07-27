@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{DefpackageSelectionError, PackageRefactorResult};
 
 use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
 use paredit_core_syntax::dialect::Dialect;
@@ -27,7 +27,7 @@ pub fn find_defpackage_export_edit(
     dialect: Dialect,
     package: Option<&SymbolName>,
     symbol: &SymbolName,
-) -> Result<DefpackageExportEdit> {
+) -> PackageRefactorResult<DefpackageExportEdit> {
     let mut matches = Vec::new();
 
     for index in 0..tree.root_children().len() {
@@ -38,12 +38,10 @@ pub fn find_defpackage_export_edit(
 
     if matches.is_empty() {
         let target = package.map_or("any package".to_owned(), |package| package.to_string());
-        anyhow::bail!("no matching defpackage form found for {target}");
+        return Err(DefpackageSelectionError::NoMatch { target }.into());
     }
     if matches.len() > 1 {
-        anyhow::bail!(
-            "multiple matching defpackage forms found; pass --package to choose one unambiguously"
-        );
+        return Err(DefpackageSelectionError::Ambiguous.into());
     }
 
     Ok(matches.remove(0))

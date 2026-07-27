@@ -1,6 +1,8 @@
 //! Use-case helpers for Common Lisp package refactorings.
 
-use anyhow::{Context, Result};
+use paredit_core_edit::{DialectRefusal, DocumentRefusal};
+
+use crate::error::PackageRefactorResult;
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::dialect::Dialect;
@@ -29,18 +31,20 @@ use sort_options::defpackage_option_sort_edits;
 pub use sort_options::PackageOptionSortOrder;
 pub use types::*;
 
-fn ensure_common_lisp_package_refactoring(dialect: Dialect) -> Result<()> {
-    anyhow::ensure!(
-        dialect == Dialect::CommonLisp,
-        "package refactoring currently supports only Common Lisp"
-    );
+fn ensure_common_lisp_package_refactoring(dialect: Dialect) -> PackageRefactorResult<()> {
+    if dialect != Dialect::CommonLisp {
+        return Err(DialectRefusal::CurrentlyCommonLispOnly {
+            operation: "package refactoring",
+        }
+        .into());
+    }
     Ok(())
 }
 
-pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
+pub fn plan_add_export(request: AddExportRequest<'_>) -> PackageRefactorResult<AddExportPlan> {
     ensure_common_lisp_package_refactoring(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edit =
         find_defpackage_export_edit(&tree, request.dialect, request.package, request.symbol)?;
@@ -49,8 +53,12 @@ pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
     } else {
         replace_span(request.input, edit.insertion_span, &edit.replacement)
     };
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("add-export output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "add-export",
+            source,
+        }
+    })?;
 
     Ok(AddExportPlan {
         package: edit.package_name,
@@ -65,15 +73,21 @@ pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
     })
 }
 
-pub fn plan_rename_package(request: RenamePackageRequest<'_>) -> Result<RenamePackagePlan> {
+pub fn plan_rename_package(
+    request: RenamePackageRequest<'_>,
+) -> PackageRefactorResult<RenamePackagePlan> {
     ensure_common_lisp_package_refactoring(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let occurrences = package_rename_occurrences(&tree, request.dialect, request.from, request.to)?;
     let rewritten = rewrite_package_occurrences(request.input, &occurrences);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("rename-package output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "rename-package",
+            source,
+        }
+    })?;
 
     Ok(RenamePackagePlan {
         changed: rewritten != request.input,
@@ -84,10 +98,10 @@ pub fn plan_rename_package(request: RenamePackageRequest<'_>) -> Result<RenamePa
 
 pub fn plan_sort_package_exports(
     request: SortPackageExportsRequest<'_>,
-) -> Result<SortPackageExportsPlan> {
+) -> PackageRefactorResult<SortPackageExportsPlan> {
     ensure_common_lisp_package_refactoring(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits =
         defpackage_export_sort_edits(request.input, &tree, request.dialect, request.package)?;
@@ -101,8 +115,12 @@ pub fn plan_sort_package_exports(
         })
         .collect::<Vec<_>>();
     let rewritten = rewrite_spans(request.input, &replacements);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("sort-package-exports output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "sort-package-exports",
+            source,
+        }
+    })?;
 
     let exports = edits
         .into_iter()
@@ -127,10 +145,10 @@ pub fn plan_sort_package_exports(
 
 pub fn plan_sort_package_options(
     request: SortPackageOptionsRequest<'_>,
-) -> Result<SortPackageOptionsPlan> {
+) -> PackageRefactorResult<SortPackageOptionsPlan> {
     ensure_common_lisp_package_refactoring(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits = defpackage_option_sort_edits(
         request.input,
@@ -149,8 +167,12 @@ pub fn plan_sort_package_options(
         })
         .collect::<Vec<_>>();
     let rewritten = rewrite_spans(request.input, &replacements);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("sort-package-options output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "sort-package-options",
+            source,
+        }
+    })?;
 
     let packages = edits
         .into_iter()
@@ -173,10 +195,10 @@ pub fn plan_sort_package_options(
 
 pub fn plan_merge_package_options(
     request: MergePackageOptionsRequest<'_>,
-) -> Result<MergePackageOptionsPlan> {
+) -> PackageRefactorResult<MergePackageOptionsPlan> {
     ensure_common_lisp_package_refactoring(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits =
         defpackage_option_merge_edits(request.input, &tree, request.dialect, request.package)?;
@@ -197,8 +219,12 @@ pub fn plan_merge_package_options(
         })
         .collect::<Vec<_>>();
     let rewritten = rewrite_spans(request.input, &replacements);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("merge-package-options output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "merge-package-options",
+            source,
+        }
+    })?;
 
     let merges = edits
         .into_iter()
@@ -235,7 +261,7 @@ mod tests;
 
 #[cfg(test)]
 mod dialect_tests {
-    use anyhow::Result;
+    use crate::error::{PackageRefactorError, PackageRefactorResult};
 
     use super::*;
     use paredit_core_syntax::sexpr::SymbolName;
@@ -262,7 +288,7 @@ mod dialect_tests {
     }
 
     impl PackageOperation {
-        fn run(self, input: &str, dialect: Dialect) -> Result<String> {
+        fn run(self, input: &str, dialect: Dialect) -> PackageRefactorResult<String> {
             let package = SymbolName::new("demo").expect("valid package name");
 
             match self {
@@ -320,11 +346,18 @@ mod dialect_tests {
     fn assert_common_lisp_support_error(
         operation: PackageOperation,
         dialect: Dialect,
-        error: anyhow::Error,
+        error: PackageRefactorError,
     ) {
+        // Typed now: the dialect refusal is a variant, so the assertion no
+        // longer depends on the wording it happens to use.
         assert!(
-            error.to_string().contains("supports only Common Lisp"),
-            "{operation:?} returned the wrong error for {dialect:?}: {error:#}"
+            matches!(
+                error,
+                PackageRefactorError::Edit(paredit_core_edit::EditRefusal::Dialect(
+                    DialectRefusal::CurrentlyCommonLispOnly { .. }
+                ))
+            ),
+            "{operation:?} returned the wrong error for {dialect:?}: {error:?}"
         );
     }
 

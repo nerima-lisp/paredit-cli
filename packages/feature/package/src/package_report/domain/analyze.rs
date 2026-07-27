@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use super::syntax::{atom_text, is_package_head, package_option_atoms, package_option_name};
 use super::types::{InPackageReport, PackageDefinitionReport, PackageImportReport};
@@ -10,7 +10,7 @@ pub fn analyze_defpackage_form(
     view: &ExpressionView,
     dialect: Dialect,
     path: &Path,
-) -> Result<Option<PackageDefinitionReport>> {
+) -> PackageRefactorResult<Option<PackageDefinitionReport>> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return Ok(None);
     }
@@ -75,7 +75,7 @@ pub fn analyze_in_package_form(
     view: &ExpressionView,
     dialect: Dialect,
     path: &Path,
-) -> Result<Option<InPackageReport>> {
+) -> PackageRefactorResult<Option<InPackageReport>> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return Ok(None);
     }

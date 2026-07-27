@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{DefpackageShapeError, PackageRefactorResult};
 
 use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path};
 
@@ -11,7 +11,7 @@ pub fn collect_option_slots(
     view: &ExpressionView,
     defpackage_path: &Path,
     order: PackageOptionSortOrder,
-) -> Result<Vec<OptionSlot>> {
+) -> PackageRefactorResult<Vec<OptionSlot>> {
     let options = view.children.iter().skip(2).collect::<Vec<_>>();
     let head_end = view.children[1].span.end().get();
     let slot_spans = build_option_slot_spans(input, head_end, &options);
@@ -76,17 +76,18 @@ fn analyze_option_slot(
     defpackage_path: &Path,
     option_index: usize,
     order: PackageOptionSortOrder,
-) -> Result<OptionSlot> {
+) -> PackageRefactorResult<OptionSlot> {
     if option.kind != ExpressionKind::List || option.children.is_empty() {
-        anyhow::bail!(
-            "cannot sort defpackage options at {defpackage_path}; only direct option lists are supported"
-        );
+        return Err(DefpackageShapeError::SortOptionsNotDirectLists {
+            path: defpackage_path.to_string(),
+        }
+        .into());
     }
     let Some(option_head) = atom_text(&option.children[0]) else {
-        anyhow::bail!(
-            "cannot sort defpackage option at {}; option head must be an atom",
-            defpackage_path.child(option_index)
-        );
+        return Err(DefpackageShapeError::SortOptionHeadNotAtom {
+            path: defpackage_path.child(option_index).to_string(),
+        }
+        .into());
     };
 
     let name = package_option_name(option_head);

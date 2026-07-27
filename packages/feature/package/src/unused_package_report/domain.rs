@@ -24,7 +24,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use crate::dependency_report::domain::{DependencyKind, build_dependency_report};
 use crate::package_report::domain::build_package_report;
@@ -97,7 +97,7 @@ pub fn collect_declared_packages(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<DeclaredPackage>> {
+) -> PackageRefactorResult<Vec<DeclaredPackage>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }
@@ -122,7 +122,7 @@ pub fn collect_declared_packages(
 pub fn collect_referenced_package_names(
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<String>> {
+) -> PackageRefactorResult<Vec<String>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

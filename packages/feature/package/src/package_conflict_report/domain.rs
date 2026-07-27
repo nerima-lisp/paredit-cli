@@ -22,7 +22,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 use std::collections::BTreeMap;
 
 use crate::package_report::domain::build_package_report;
@@ -113,7 +113,7 @@ pub fn collect_declared_package_identifiers(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<DeclaredPackageIdentifier>> {
+) -> PackageRefactorResult<Vec<DeclaredPackageIdentifier>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

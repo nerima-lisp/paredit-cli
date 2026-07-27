@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{DefpackageShapeError, PackageRefactorResult};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
@@ -34,7 +34,7 @@ pub fn defpackage_export_sort_edits(
     tree: &SyntaxTree,
     dialect: Dialect,
     package: Option<&SymbolName>,
-) -> Result<Vec<ExportSortEdit>> {
+) -> PackageRefactorResult<Vec<ExportSortEdit>> {
     let mut edits = Vec::new();
     visit_defpackage_forms(tree, dialect, package, |view, path, package_name| {
         analyze_defpackage_exports(input, view, path, package_name, &mut edits)
@@ -49,7 +49,7 @@ fn analyze_defpackage_exports(
     path: &Path,
     package_name: &str,
     edits: &mut Vec<ExportSortEdit>,
-) -> Result<()> {
+) -> PackageRefactorResult<()> {
     for (option_index, option) in view.children.iter().enumerate().skip(2) {
         if option.kind != ExpressionKind::List || option.children.is_empty() {
             continue;
@@ -81,14 +81,15 @@ fn analyze_export_option(
     option_path: &Path,
     package_name: &str,
     defpackage_span: ByteSpan,
-) -> Result<ExportSortEdit> {
+) -> PackageRefactorResult<ExportSortEdit> {
     let mut symbols = Vec::new();
 
     for child in option.children.iter().skip(1) {
         let Some(symbol) = atom_text(child) else {
-            anyhow::bail!(
-                "cannot sort :export option at {option_path}; only atom symbol designators are supported"
-            );
+            return Err(DefpackageShapeError::ExportDesignatorNotAnAtom {
+                path: option_path.to_string(),
+            }
+            .into());
         };
         symbols.push((child.span, symbol.to_owned()));
     }

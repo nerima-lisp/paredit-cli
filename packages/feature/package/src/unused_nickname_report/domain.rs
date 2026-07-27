@@ -17,7 +17,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use crate::package_report::domain::build_package_report;
 use paredit_core_syntax::common_lisp::{
@@ -98,7 +98,7 @@ pub fn collect_declared_nicknames(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<DeclaredNickname>> {
+) -> PackageRefactorResult<Vec<DeclaredNickname>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

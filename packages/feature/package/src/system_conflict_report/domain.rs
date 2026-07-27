@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
@@ -97,7 +97,7 @@ pub fn collect_declared_systems(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<DeclaredSystem>> {
+) -> PackageRefactorResult<Vec<DeclaredSystem>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

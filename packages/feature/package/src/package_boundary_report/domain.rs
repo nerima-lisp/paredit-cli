@@ -21,7 +21,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use crate::dependency_report::domain::{DependencyKind, build_dependency_report};
 use paredit_core_syntax::common_lisp::{
@@ -102,7 +102,10 @@ pub struct PackageBoundaryPolicy {
 /// (via the nearest preceding `in-package`) *when that form itself runs*,
 /// i.e. an `in-package` form updates the active package for every form
 /// *after* it, not for itself.
-fn package_by_root_index(dialect: Dialect, tree: &SyntaxTree) -> Result<Vec<Option<String>>> {
+fn package_by_root_index(
+    dialect: Dialect,
+    tree: &SyntaxTree,
+) -> PackageRefactorResult<Vec<Option<String>>> {
     let mut current_package = None;
     let mut by_index = Vec::with_capacity(tree.root_children().len());
 
@@ -128,7 +131,7 @@ pub fn build_package_boundary_report(
     path: PathBuf,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<PackageBoundaryReportFile> {
+) -> PackageRefactorResult<PackageBoundaryReportFile> {
     if dialect != Dialect::CommonLisp {
         return Ok(PackageBoundaryReportFile {
             path,

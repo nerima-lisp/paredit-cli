@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use paredit_core_syntax::common_lisp::{
     CommonLispOperator, common_lisp_local_callable_form, local_callable_binding_body_scope,
@@ -17,7 +17,7 @@ mod qualified;
 pub fn collect_dependency_items(
     tree: &SyntaxTree,
     dialect: Dialect,
-) -> Result<Vec<DependencyReportItem>> {
+) -> PackageRefactorResult<Vec<DependencyReportItem>> {
     let mut dependencies = Vec::new();
 
     for index in 0..tree.root_children().len() {
@@ -37,7 +37,7 @@ pub fn collect_dependency_items(
 pub fn collect_system_dependency_edges(
     tree: &SyntaxTree,
     dialect: Dialect,
-) -> Result<Vec<(String, String)>> {
+) -> PackageRefactorResult<Vec<(String, String)>> {
     let mut edges = Vec::new();
 
     for index in 0..tree.root_children().len() {

@@ -1,6 +1,6 @@
 //! Dependency inventory analysis for Lisp source forms and package declarations.
 
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use crate::package_report::domain::build_package_report;
 use paredit_core_syntax::dialect::Dialect;
@@ -18,7 +18,10 @@ pub use types::{DependencyKind, DependencyReport, DependencyReportItem};
 use collect::{collect_dependency_items, collect_system_dependency_edges};
 use defpackage::defpackage_dependency_items;
 
-pub fn build_dependency_report(tree: &SyntaxTree, dialect: Dialect) -> Result<DependencyReport> {
+pub fn build_dependency_report(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+) -> PackageRefactorResult<DependencyReport> {
     let package_report = build_package_report(tree, dialect)?;
     let mut dependencies = collect_dependency_items(tree, dialect)?;
     dependencies.extend(defpackage_dependency_items(&package_report.defpackages));
@@ -33,6 +36,6 @@ pub fn build_dependency_report(tree: &SyntaxTree, dialect: Dialect) -> Result<De
 pub fn build_system_dependency_edges(
     tree: &SyntaxTree,
     dialect: Dialect,
-) -> Result<Vec<(String, String)>> {
+) -> PackageRefactorResult<Vec<(String, String)>> {
     collect_system_dependency_edges(tree, dialect)
 }

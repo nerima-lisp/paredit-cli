@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 mod merge;
 mod slots;
@@ -50,7 +50,7 @@ pub fn defpackage_option_merge_edits(
     tree: &SyntaxTree,
     dialect: Dialect,
     package: Option<&SymbolName>,
-) -> Result<Vec<OptionMergeEdit>> {
+) -> PackageRefactorResult<Vec<OptionMergeEdit>> {
     let mut edits = Vec::new();
     visit_defpackage_forms(tree, dialect, package, |view, path, package_name| {
         analyze_defpackage_options(tree, view, path, package_name, &mut edits)
@@ -66,7 +66,7 @@ fn analyze_defpackage_options(
     path: &Path,
     package_name: &str,
     edits: &mut Vec<OptionMergeEdit>,
-) -> Result<()> {
+) -> PackageRefactorResult<()> {
     if view.children.len() <= 3 {
         return Ok(());
     }

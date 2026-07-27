@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod dependency_report;
+pub mod error;
 pub mod package;
 pub mod package_boundary_report;
 pub mod package_conflict_report;
@@ -25,3 +26,7 @@ pub use system_conflict_report::cli::{SystemConflictReportArgs, system_conflict_
 pub use unused_export_report::cli::{UnusedExportReportArgs, unused_export_report};
 pub use unused_nickname_report::cli::{UnusedNicknameReportArgs, unused_nickname_report};
 pub use unused_package_report::cli::{UnusedPackageReportArgs, unused_package_report};
+
+pub use error::{
+    DefpackageSelectionError, DefpackageShapeError, PackageRefactorError, PackageRefactorResult,
+};

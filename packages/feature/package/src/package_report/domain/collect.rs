@@ -1,11 +1,14 @@
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use super::analyze::{analyze_defpackage_form, analyze_in_package_form};
 use super::types::{InPackageReport, PackageDefinitionReport, PackageReport};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ExpressionView, Path, SyntaxTree};
 
-pub fn build_package_report(tree: &SyntaxTree, dialect: Dialect) -> Result<PackageReport> {
+pub fn build_package_report(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+) -> PackageRefactorResult<PackageReport> {
     let mut defpackages = Vec::new();
     let mut in_packages = Vec::new();
 
@@ -24,7 +27,7 @@ fn collect_package_forms_from_view(
     dialect: Dialect,
     defpackages: &mut Vec<PackageDefinitionReport>,
     in_packages: &mut Vec<InPackageReport>,
-) -> Result<()> {
+) -> PackageRefactorResult<()> {
     if let Some(defpackage) = analyze_defpackage_form(view, dialect, &path)? {
         defpackages.push(defpackage);
     }

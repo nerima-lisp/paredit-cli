@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 mod ordering;
 mod slots;
@@ -51,7 +51,7 @@ pub fn defpackage_option_sort_edits(
     dialect: Dialect,
     package: Option<&SymbolName>,
     order: PackageOptionSortOrder,
-) -> Result<Vec<OptionSortEdit>> {
+) -> PackageRefactorResult<Vec<OptionSortEdit>> {
     let mut traversal = OptionSortTraversal {
         input,
         order,
@@ -76,7 +76,7 @@ fn analyze_defpackage_options(
     view: &ExpressionView,
     path: &Path,
     package_name: &str,
-) -> Result<()> {
+) -> PackageRefactorResult<()> {
     if view.children.len() <= 3 {
         return Ok(());
     }

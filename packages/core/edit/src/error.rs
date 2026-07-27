@@ -82,6 +82,14 @@ pub enum DocumentRefusal {
         source: ParseError,
     },
 
+    /// The shortest of the input-parse wordings, used where the operation name
+    /// is already obvious from the command.
+    #[error("failed to parse input")]
+    InputParseFailed {
+        #[source]
+        source: ParseError,
+    },
+
     #[error("{operation} output is not valid")]
     OutputInvalid {
         operation: &'static str,

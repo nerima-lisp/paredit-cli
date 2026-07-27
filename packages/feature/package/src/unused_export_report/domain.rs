@@ -29,7 +29,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use crate::dependency_report::domain::{DependencyKind, build_dependency_report};
 use crate::package_report::domain::build_package_report;
@@ -115,7 +115,7 @@ pub fn collect_declared_exports(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<DeclaredExport>> {
+) -> PackageRefactorResult<Vec<DeclaredExport>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }
@@ -154,7 +154,7 @@ fn qualified_symbol_name<'a>(source: &'a str, target: &str) -> Option<&'a str> {
 pub fn collect_referenced_symbols(
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<ReferencedSymbol>> {
+) -> PackageRefactorResult<Vec<ReferencedSymbol>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

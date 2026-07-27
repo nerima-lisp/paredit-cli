@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::PackageRefactorResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
@@ -16,7 +16,7 @@ pub fn package_rename_occurrences(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<PackageRenameOccurrence>> {
+) -> PackageRefactorResult<Vec<PackageRenameOccurrence>> {
     let mut occurrences = Vec::new();
 
     for index in 0..tree.root_children().len() {
