@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::literal_place_report::{LiteralPlacePolicy, LiteralPlaceSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::literal_place::usecase::{LiteralPlacePolicy, LiteralPlaceSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_literal_place_report(
+pub fn print_literal_place_report(
     summary: &LiteralPlaceSummary,
     policy: &LiteralPlacePolicy,
     output: OutputFormat,

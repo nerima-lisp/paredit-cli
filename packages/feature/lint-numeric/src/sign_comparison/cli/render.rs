@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::sign_comparison_report::{
-    SignComparisonPolicy, SignComparisonSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::sign_comparison::usecase::{SignComparisonPolicy, SignComparisonSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_sign_comparison_report(
+pub fn print_sign_comparison_report(
     summary: &SignComparisonSummary,
     policy: &SignComparisonPolicy,
     output: OutputFormat,

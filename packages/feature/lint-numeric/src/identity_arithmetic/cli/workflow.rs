@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::identity_arithmetic_report::{
+use crate::identity_arithmetic::cli::args::IdentityArithmeticReportArgs;
+use crate::identity_arithmetic::cli::render::print_identity_arithmetic_report;
+use crate::identity_arithmetic::usecase::{
     IdentityArithmeticPolicyOptions, collect_identity_arithmetic,
     evaluate_identity_arithmetic_policy, summarize_identity_arithmetic,
 };
-use crate::presentation::cli::identity_arithmetic_report::args::IdentityArithmeticReportArgs;
-use crate::presentation::cli::identity_arithmetic_report::render::print_identity_arithmetic_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn identity_arithmetic_report(
-    args: IdentityArithmeticReportArgs,
-) -> Result<()> {
+pub fn identity_arithmetic_report(args: IdentityArithmeticReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut arithmetic_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn identity_arithmetic_report(
     print_identity_arithmetic_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "identity-arithmetic-report policy failed: {policy_message}"
         )));
     }

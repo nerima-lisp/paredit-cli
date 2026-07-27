@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::identity_arithmetic_report::{
-    IdentityArithmeticPolicy, IdentityArithmeticSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::identity_arithmetic::usecase::{IdentityArithmeticPolicy, IdentityArithmeticSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_identity_arithmetic_report(
+pub fn print_identity_arithmetic_report(
     summary: &IdentityArithmeticSummary,
     policy: &IdentityArithmeticPolicy,
     output: OutputFormat,

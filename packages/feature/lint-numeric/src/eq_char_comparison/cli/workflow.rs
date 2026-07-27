@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::eq_char_comparison_report::{
+use crate::eq_char_comparison::cli::args::EqCharComparisonReportArgs;
+use crate::eq_char_comparison::cli::render::print_eq_char_comparison_report;
+use crate::eq_char_comparison::usecase::{
     EqCharComparisonPolicyOptions, collect_eq_char_comparisons, evaluate_eq_char_comparison_policy,
     summarize_eq_char_comparisons,
 };
-use crate::presentation::cli::eq_char_comparison_report::args::EqCharComparisonReportArgs;
-use crate::presentation::cli::eq_char_comparison_report::render::print_eq_char_comparison_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn eq_char_comparison_report(
-    args: EqCharComparisonReportArgs,
-) -> Result<()> {
+pub fn eq_char_comparison_report(args: EqCharComparisonReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut comparison_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn eq_char_comparison_report(
     print_eq_char_comparison_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "eq-char-comparison-report policy failed: {policy_message}"
         )));
     }

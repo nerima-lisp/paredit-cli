@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::step_zero_report::{
+use crate::step_zero::cli::args::StepZeroReportArgs;
+use crate::step_zero::cli::render::print_step_zero_report;
+use crate::step_zero::usecase::{
     StepZeroPolicyOptions, collect_step_zeros, evaluate_step_zero_policy, summarize_step_zeros,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::step_zero_report::args::StepZeroReportArgs;
-use crate::presentation::cli::step_zero_report::render::print_step_zero_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn step_zero_report(args: StepZeroReportArgs) -> Result<()> {
+pub fn step_zero_report(args: StepZeroReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut step_form_count = 0;
@@ -29,7 +29,7 @@ pub(in crate::presentation::cli) fn step_zero_report(args: StepZeroReportArgs) -
     print_step_zero_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "step-zero-report policy failed: {policy_message}"
         )));
     }

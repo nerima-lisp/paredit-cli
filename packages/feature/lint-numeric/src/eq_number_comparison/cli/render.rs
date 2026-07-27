@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::eq_number_comparison_report::{
-    EqNumberComparisonPolicy, EqNumberComparisonSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::eq_number_comparison::usecase::{EqNumberComparisonPolicy, EqNumberComparisonSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_eq_number_comparison_report(
+pub fn print_eq_number_comparison_report(
     summary: &EqNumberComparisonSummary,
     policy: &EqNumberComparisonPolicy,
     output: OutputFormat,

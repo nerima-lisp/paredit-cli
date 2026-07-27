@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::zero_divisor_report::{ZeroDivisorPolicy, ZeroDivisorSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::zero_divisor::usecase::{ZeroDivisorPolicy, ZeroDivisorSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_zero_divisor_report(
+pub fn print_zero_divisor_report(
     summary: &ZeroDivisorSummary,
     policy: &ZeroDivisorPolicy,
     output: OutputFormat,

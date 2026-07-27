@@ -33,12 +33,12 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(&rules::manual_push::META, &rules::manual_push::RULE),
     RuleEntry::new(&rules::manual_pushnew::META, &rules::manual_pushnew::RULE),
     RuleEntry::new(
-        &rules::explicit_step_delta::META,
-        &rules::explicit_step_delta::RULE,
+        &paredit_feature_lint_numeric::explicit_step_delta::rule::META,
+        &paredit_feature_lint_numeric::explicit_step_delta::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::negated_step_delta::META,
-        &rules::negated_step_delta::RULE,
+        &paredit_feature_lint_numeric::negated_step_delta::rule::META,
+        &paredit_feature_lint_numeric::negated_step_delta::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_control_flow::explicit_nil_return::rule::META,
@@ -47,8 +47,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(&rules::cons_to_list::META, &rules::cons_to_list::RULE),
     RuleEntry::new(&rules::double_reverse::META, &rules::double_reverse::RULE),
     RuleEntry::new(
-        &rules::modify_macro_arity::META,
-        &rules::modify_macro_arity::RULE,
+        &paredit_feature_lint_numeric::modify_macro_arity::rule::META,
+        &paredit_feature_lint_numeric::modify_macro_arity::rule::RULE,
     ),
     RuleEntry::new(
         &rules::duplicate_parameters::META,
@@ -132,13 +132,22 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(&rules::if_to_or::META, &rules::if_to_or::RULE),
     RuleEntry::new(&rules::if_not::META, &rules::if_not::RULE),
     RuleEntry::new(
-        &rules::one_step_arithmetic::META,
-        &rules::one_step_arithmetic::RULE,
+        &paredit_feature_lint_numeric::one_step_arithmetic::rule::META,
+        &paredit_feature_lint_numeric::one_step_arithmetic::rule::RULE,
     ),
     RuleEntry::new(&rules::one_armed_if::META, &rules::one_armed_if::RULE),
-    RuleEntry::new(&rules::self_comparison::META, &rules::self_comparison::RULE),
-    RuleEntry::new(&rules::nil_comparison::META, &rules::nil_comparison::RULE),
-    RuleEntry::new(&rules::t_comparison::META, &rules::t_comparison::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::self_comparison::rule::META,
+        &paredit_feature_lint_numeric::self_comparison::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::nil_comparison::rule::META,
+        &paredit_feature_lint_numeric::nil_comparison::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::t_comparison::rule::META,
+        &paredit_feature_lint_numeric::t_comparison::rule::RULE,
+    ),
     RuleEntry::new(
         &rules::identical_if_branches::META,
         &rules::identical_if_branches::RULE,
@@ -153,7 +162,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     ),
     RuleEntry::new(&rules::if_arity::META, &rules::if_arity::RULE),
     RuleEntry::new(&rules::the_arity::META, &rules::the_arity::RULE),
-    RuleEntry::new(&rules::equality_arity::META, &rules::equality_arity::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::equality_arity::rule::META,
+        &paredit_feature_lint_numeric::equality_arity::rule::RULE,
+    ),
     RuleEntry::new(&rules::accessor_arity::META, &rules::accessor_arity::RULE),
     RuleEntry::new(
         &rules::append_list_to_cons::META,
@@ -168,8 +180,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_string_char::format_newline::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_divisor::META,
-        &rules::redundant_divisor::RULE,
+        &paredit_feature_lint_numeric::redundant_divisor::rule::META,
+        &paredit_feature_lint_numeric::redundant_divisor::rule::RULE,
     ),
     RuleEntry::new(
         &rules::duplicate_case_keys::META,
@@ -247,34 +259,37 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::single_operand_list_op::RULE,
     ),
     RuleEntry::new(
-        &rules::single_operand_arithmetic::META,
-        &rules::single_operand_arithmetic::RULE,
+        &paredit_feature_lint_numeric::single_operand_arithmetic::rule::META,
+        &paredit_feature_lint_numeric::single_operand_arithmetic::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::eql_string_comparison::META,
-        &rules::eql_string_comparison::RULE,
+        &paredit_feature_lint_numeric::eql_string_comparison::rule::META,
+        &paredit_feature_lint_numeric::eql_string_comparison::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::eql_list_comparison::META,
-        &rules::eql_list_comparison::RULE,
+        &paredit_feature_lint_numeric::eql_list_comparison::rule::META,
+        &paredit_feature_lint_numeric::eql_list_comparison::rule::RULE,
     ),
     RuleEntry::new(
         &rules::eql_search_literal::META,
         &rules::eql_search_literal::RULE,
     ),
     RuleEntry::new(
-        &rules::eq_number_comparison::META,
-        &rules::eq_number_comparison::RULE,
+        &paredit_feature_lint_numeric::eq_number_comparison::rule::META,
+        &paredit_feature_lint_numeric::eq_number_comparison::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::eq_char_comparison::META,
-        &rules::eq_char_comparison::RULE,
+        &paredit_feature_lint_numeric::eq_char_comparison::rule::META,
+        &paredit_feature_lint_numeric::eq_char_comparison::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::single_arg_comparison::META,
-        &rules::single_arg_comparison::RULE,
+        &paredit_feature_lint_numeric::single_arg_comparison::rule::META,
+        &paredit_feature_lint_numeric::single_arg_comparison::rule::RULE,
     ),
-    RuleEntry::new(&rules::sign_comparison::META, &rules::sign_comparison::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::sign_comparison::rule::META,
+        &paredit_feature_lint_numeric::sign_comparison::rule::RULE,
+    ),
     RuleEntry::new(
         &rules::single_clause_cond::META,
         &rules::single_clause_cond::RULE,
@@ -288,7 +303,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_string_char::format_missing_destination::rule::META,
         &paredit_feature_lint_string_char::format_missing_destination::rule::RULE,
     ),
-    RuleEntry::new(&rules::literal_place::META, &rules::literal_place::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::literal_place::rule::META,
+        &paredit_feature_lint_numeric::literal_place::rule::RULE,
+    ),
     RuleEntry::new(
         &rules::destructive_literal::META,
         &rules::destructive_literal::RULE,
@@ -299,12 +317,12 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     ),
     RuleEntry::new(&rules::empty_body::META, &rules::empty_body::RULE),
     RuleEntry::new(
-        &rules::identity_arithmetic::META,
-        &rules::identity_arithmetic::RULE,
+        &paredit_feature_lint_numeric::identity_arithmetic::rule::META,
+        &paredit_feature_lint_numeric::identity_arithmetic::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::verbose_negation::META,
-        &rules::verbose_negation::RULE,
+        &paredit_feature_lint_numeric::verbose_negation::rule::META,
+        &paredit_feature_lint_numeric::verbose_negation::rule::RULE,
     ),
     RuleEntry::new(
         &rules::list_star_to_cons::META,
@@ -333,7 +351,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::make_hash_table_test::META,
         &rules::make_hash_table_test::RULE,
     ),
-    RuleEntry::new(&rules::zero_divisor::META, &rules::zero_divisor::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::zero_divisor::rule::META,
+        &paredit_feature_lint_numeric::zero_divisor::rule::RULE,
+    ),
     RuleEntry::new(
         &rules::duplicate_keyword::META,
         &rules::duplicate_keyword::RULE,
@@ -342,7 +363,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &rules::defpackage_quoted::META,
         &rules::defpackage_quoted::RULE,
     ),
-    RuleEntry::new(&rules::step_zero::META, &rules::step_zero::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::step_zero::rule::META,
+        &paredit_feature_lint_numeric::step_zero::rule::RULE,
+    ),
     RuleEntry::new(&rules::if_to_unless::META, &rules::if_to_unless::RULE),
     RuleEntry::new(
         &paredit_feature_lint_control_flow::prog2_to_progn::rule::META,

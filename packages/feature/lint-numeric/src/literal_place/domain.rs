@@ -20,7 +20,7 @@
 //! place (variable or constant) and an accessor-form place are left alone.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -28,9 +28,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_child, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_child, for_each_subview, list_head};
 
 /// The 0-based indices of the place arguments for a modify macro, or `None` if
 /// the head is not one of them. `setf`/`psetf` place a slot at each odd index
@@ -120,7 +120,7 @@ pub struct LiteralPlacePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_modify(
+pub fn examine_modify(
     view: &ExpressionView,
     path: &Path,
     modify_form_count: &mut usize,

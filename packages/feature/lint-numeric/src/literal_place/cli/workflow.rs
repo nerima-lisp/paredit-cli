@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::literal_place_report::{
+use crate::literal_place::cli::args::LiteralPlaceReportArgs;
+use crate::literal_place::cli::render::print_literal_place_report;
+use crate::literal_place::usecase::{
     LiteralPlacePolicyOptions, collect_literal_places, evaluate_literal_place_policy,
     summarize_literal_places,
 };
-use crate::presentation::cli::literal_place_report::args::LiteralPlaceReportArgs;
-use crate::presentation::cli::literal_place_report::render::print_literal_place_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn literal_place_report(
-    args: LiteralPlaceReportArgs,
-) -> Result<()> {
+pub fn literal_place_report(args: LiteralPlaceReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut modify_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn literal_place_report(
     print_literal_place_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "literal-place-report policy failed: {policy_message}"
         )));
     }

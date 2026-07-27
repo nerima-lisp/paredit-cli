@@ -1,18 +1,18 @@
 //! `self-comparison`: a comparison whose two operands are structurally identical.
 //!
-//! The analysis lives in [`crate::domain::self_comparison_report`], which also backs the
+//! The analysis lives in [`crate::self_comparison::domain`], which also backs the
 //! standalone `inspect self-comparison` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::self_comparison::domain::examine_comparison;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::self_comparison_report::examine_comparison;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "self-comparison",

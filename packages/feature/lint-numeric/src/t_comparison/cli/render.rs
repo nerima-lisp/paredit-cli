@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::t_comparison_report::{TComparisonPolicy, TComparisonSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::t_comparison::usecase::{TComparisonPolicy, TComparisonSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_t_comparison_report(
+pub fn print_t_comparison_report(
     summary: &TComparisonSummary,
     policy: &TComparisonPolicy,
     output: OutputFormat,

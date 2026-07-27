@@ -13,8 +13,8 @@
 //! form.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`] and the display rendering
-//! from [`crate::domain::expression_equality`].
+//! [`paredit_core_syntax::view_query::for_each_subview`] and the display rendering
+//! from [`paredit_core_syntax::expression_equality`].
 //!
 //! Scope: Common Lisp only.
 
@@ -22,10 +22,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::render_expression;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::render_expression;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
+};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 
 const EQ_HEADS: [&str; 2] = ["eq", "eql"];
 
@@ -90,7 +92,7 @@ pub struct EqlListComparisonPolicy {
     pub violations: Vec<String>,
 }
 
-pub(crate) fn examine_comparison(
+pub fn examine_comparison(
     view: &ExpressionView,
     path: &Path,
     comparison_form_count: &mut usize,

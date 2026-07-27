@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::step_zero_report::{StepZeroPolicy, StepZeroSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::step_zero::usecase::{StepZeroPolicy, StepZeroSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_step_zero_report(
+pub fn print_step_zero_report(
     summary: &StepZeroSummary,
     policy: &StepZeroPolicy,
     output: OutputFormat,

@@ -100,9 +100,9 @@ mod tests {
 #[cfg(test)]
 mod eq_char_comparison_tests {
     use crate::domain::dialect::Dialect;
-    use crate::domain::lint::rules::eq_char_comparison::META;
     use crate::domain::lint_report::collect_lint_findings;
     use crate::domain::sexpr::SyntaxTree;
+    use paredit_feature_lint_numeric::eq_char_comparison::rule::META;
     use std::path::Path;
 
     fn findings_for(input: &str, dialect: Dialect) -> Vec<String> {
@@ -383,9 +383,9 @@ mod redundant_the_tests {
 #[cfg(test)]
 mod eq_number_comparison_tests {
     use crate::domain::dialect::Dialect;
-    use crate::domain::lint::rules::eq_number_comparison::META;
     use crate::domain::lint_report::collect_lint_findings;
     use crate::domain::sexpr::SyntaxTree;
+    use paredit_feature_lint_numeric::eq_number_comparison::rule::META;
     use std::path::Path;
 
     fn findings_for(input: &str, dialect: Dialect) -> Vec<String> {
@@ -472,9 +472,9 @@ mod eq_number_comparison_tests {
 mod zero_divisor_tests {
     use crate::domain::dialect::Dialect;
     use crate::domain::lint::policy::RuleSelection;
-    use crate::domain::lint::rules::zero_divisor::META;
     use crate::domain::lint_report::collect_lint_findings;
     use crate::domain::sexpr::SyntaxTree;
+    use paredit_feature_lint_numeric::zero_divisor::rule::META;
     use std::path::Path;
 
     fn findings(input: &str) -> Vec<String> {

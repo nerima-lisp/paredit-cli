@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::verbose_negation_report::{
-    VerboseNegationPolicy, VerboseNegationSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::verbose_negation::usecase::{VerboseNegationPolicy, VerboseNegationSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_verbose_negation_report(
+pub fn print_verbose_negation_report(
     summary: &VerboseNegationSummary,
     policy: &VerboseNegationPolicy,
     output: OutputFormat,

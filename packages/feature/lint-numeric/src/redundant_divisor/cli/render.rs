@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_divisor_report::{
-    RedundantDivisorPolicy, RedundantDivisorSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::redundant_divisor::usecase::{RedundantDivisorPolicy, RedundantDivisorSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_divisor_report(
+pub fn print_redundant_divisor_report(
     summary: &RedundantDivisorSummary,
     policy: &RedundantDivisorPolicy,
     output: OutputFormat,

@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::one_step_arithmetic_report::{
+use crate::one_step_arithmetic::cli::args::OneStepArithmeticReportArgs;
+use crate::one_step_arithmetic::cli::render::print_one_step_arithmetic_report;
+use crate::one_step_arithmetic::usecase::{
     OneStepArithmeticPolicyOptions, collect_one_step_arithmetic,
     evaluate_one_step_arithmetic_policy, summarize_one_step_arithmetic,
 };
-use crate::presentation::cli::one_step_arithmetic_report::args::OneStepArithmeticReportArgs;
-use crate::presentation::cli::one_step_arithmetic_report::render::print_one_step_arithmetic_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn one_step_arithmetic_report(
-    args: OneStepArithmeticReportArgs,
-) -> Result<()> {
+pub fn one_step_arithmetic_report(args: OneStepArithmeticReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut arithmetic_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn one_step_arithmetic_report(
     print_one_step_arithmetic_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "one-step-arithmetic-report policy failed: {policy_message}"
         )));
     }

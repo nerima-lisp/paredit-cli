@@ -11,7 +11,7 @@
 //! `(/ 1 x)` is a reciprocal, so a leading `0`/`1` is not redundant).
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -19,9 +19,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// For an arithmetic head, the identity literal that is redundant and the first
 /// operand index at which it may appear (1 for the commutative `+`/`*`, 2 for
@@ -80,7 +80,7 @@ pub struct IdentityArithmeticPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_form(
+pub fn examine_form(
     view: &ExpressionView,
     path: &Path,
     arithmetic_form_count: &mut usize,

@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::eql_list_comparison_report::{
+use crate::eql_list_comparison::cli::args::EqlListComparisonReportArgs;
+use crate::eql_list_comparison::cli::render::print_eql_list_comparison_report;
+use crate::eql_list_comparison::usecase::{
     EqlListComparisonPolicyOptions, collect_eql_list_comparisons,
     evaluate_eql_list_comparison_policy, summarize_eql_list_comparisons,
 };
-use crate::presentation::cli::eql_list_comparison_report::args::EqlListComparisonReportArgs;
-use crate::presentation::cli::eql_list_comparison_report::render::print_eql_list_comparison_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn eql_list_comparison_report(
-    args: EqlListComparisonReportArgs,
-) -> Result<()> {
+pub fn eql_list_comparison_report(args: EqlListComparisonReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut comparison_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn eql_list_comparison_report(
     print_eql_list_comparison_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "eql-list-comparison-report policy failed: {policy_message}"
         )));
     }

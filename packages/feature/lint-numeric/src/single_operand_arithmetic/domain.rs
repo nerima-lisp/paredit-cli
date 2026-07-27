@@ -17,11 +17,11 @@
 //! Because the fix simply unwraps to the sole operand (an already-present
 //! subexpression, copied verbatim), this rule is auto-fixable — the same fix
 //! shape as [`crate::domain::single_operand_boolean_report`]. Contrast
-//! [`crate::domain::identity_arithmetic_report`], which would have to *delete*
+//! [`crate::identity_arithmetic::domain`], which would have to *delete*
 //! an operand from a multi-argument form and is therefore report-only.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -29,9 +29,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// The canonical operator name for a `+`/`*` head, or `None` otherwise. Unlike
 /// the boolean operators these are punctuation, so an exact match is used (no
@@ -96,7 +96,7 @@ pub struct SingleOperandArithmeticPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_arithmetic(
+pub fn examine_arithmetic(
     view: &ExpressionView,
     path: &Path,
     arithmetic_form_count: &mut usize,

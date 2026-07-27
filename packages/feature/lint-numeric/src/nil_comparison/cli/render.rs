@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nil_comparison_report::{
-    NilComparisonPolicy, NilComparisonSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::nil_comparison::usecase::{NilComparisonPolicy, NilComparisonSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nil_comparison_report(
+pub fn print_nil_comparison_report(
     summary: &NilComparisonSummary,
     policy: &NilComparisonPolicy,
     output: OutputFormat,

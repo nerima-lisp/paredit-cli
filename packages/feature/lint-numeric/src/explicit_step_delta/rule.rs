@@ -1,18 +1,18 @@
 //! `explicit-step-delta`: an incf/decf with an explicit delta of 1, the default ((incf x 1) is (incf x)).
 //!
-//! The analysis lives in [`crate::domain::explicit_step_delta_report`], which also backs the
+//! The analysis lives in [`crate::explicit_step_delta::domain`], which also backs the
 //! standalone `inspect explicit-step-delta` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::explicit_step_delta_report::examine_step;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::explicit_step_delta::domain::examine_step;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "explicit-step-delta",

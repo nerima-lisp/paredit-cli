@@ -1,18 +1,18 @@
 //! `sign-comparison`: a =/</> comparison against 0 with a dedicated predicate ((= x 0) is (zerop x)).
 //!
-//! The analysis lives in [`crate::domain::sign_comparison_report`], which also backs the
+//! The analysis lives in [`crate::sign_comparison::domain`], which also backs the
 //! standalone `inspect sign-comparison` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::sign_comparison::domain::examine_comparison;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::sign_comparison_report::examine_comparison;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "sign-comparison",

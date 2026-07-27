@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::eql_list_comparison_report::{
-    EqlListComparisonPolicy, EqlListComparisonSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::eql_list_comparison::usecase::{EqlListComparisonPolicy, EqlListComparisonSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_eql_list_comparison_report(
+pub fn print_eql_list_comparison_report(
     summary: &EqlListComparisonSummary,
     policy: &EqlListComparisonPolicy,
     output: OutputFormat,

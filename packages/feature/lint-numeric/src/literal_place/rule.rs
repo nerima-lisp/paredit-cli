@@ -1,18 +1,18 @@
 //! `literal-place`: an incf/decf/push/pop/pushnew/setf/psetf whose place is a self-evaluating literal (cannot be modified).
 //!
-//! The analysis lives in [`crate::domain::literal_place_report`], which also backs the
+//! The analysis lives in [`crate::literal_place::domain`], which also backs the
 //! standalone `inspect literal-place` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::literal_place::domain::examine_modify;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::literal_place_report::examine_modify;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "literal-place",

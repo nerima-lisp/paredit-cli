@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::modify_macro_arity_report::{
+use crate::modify_macro_arity::cli::args::ModifyMacroArityReportArgs;
+use crate::modify_macro_arity::cli::render::print_modify_macro_arity_report;
+use crate::modify_macro_arity::usecase::{
     ModifyMacroArityPolicyOptions, collect_modify_macro_arity_violations,
     evaluate_modify_macro_arity_policy, summarize_modify_macro_arity,
 };
-use crate::presentation::cli::modify_macro_arity_report::args::ModifyMacroArityReportArgs;
-use crate::presentation::cli::modify_macro_arity_report::render::print_modify_macro_arity_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn modify_macro_arity_report(
-    args: ModifyMacroArityReportArgs,
-) -> Result<()> {
+pub fn modify_macro_arity_report(args: ModifyMacroArityReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn modify_macro_arity_report(
     print_modify_macro_arity_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "modify-macro-arity-report policy failed: {policy_message}"
         )));
     }

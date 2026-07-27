@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::eql_string_comparison_report::{
+use crate::eql_string_comparison::usecase::{
     EqlStringComparisonPolicy, EqlStringComparisonSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_eql_string_comparison_report(
+pub fn print_eql_string_comparison_report(
     summary: &EqlStringComparisonSummary,
     policy: &EqlStringComparisonPolicy,
     output: OutputFormat,

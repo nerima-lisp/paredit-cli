@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::negated_step_delta_report::{
-    NegatedStepDeltaPolicy, NegatedStepDeltaSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::negated_step_delta::usecase::{NegatedStepDeltaPolicy, NegatedStepDeltaSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_negated_step_delta_report(
+pub fn print_negated_step_delta_report(
     summary: &NegatedStepDeltaSummary,
     policy: &NegatedStepDeltaPolicy,
     output: OutputFormat,

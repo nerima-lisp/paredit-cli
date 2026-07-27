@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::verbose_negation_report::{
+use crate::verbose_negation::cli::args::VerboseNegationReportArgs;
+use crate::verbose_negation::cli::render::print_verbose_negation_report;
+use crate::verbose_negation::usecase::{
     VerboseNegationPolicyOptions, collect_verbose_negations, evaluate_verbose_negation_policy,
     summarize_verbose_negations,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::verbose_negation_report::args::VerboseNegationReportArgs;
-use crate::presentation::cli::verbose_negation_report::render::print_verbose_negation_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn verbose_negation_report(
-    args: VerboseNegationReportArgs,
-) -> Result<()> {
+pub fn verbose_negation_report(args: VerboseNegationReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut arithmetic_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn verbose_negation_report(
     print_verbose_negation_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "verbose-negation-report policy failed: {policy_message}"
         )));
     }

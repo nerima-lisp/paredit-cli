@@ -10,7 +10,7 @@
 //! left alone.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -18,9 +18,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// Whether `view` is the bare integer `0` literal (no reader prefixes; `0.0` is a
 /// different spelling, excluded).
@@ -77,7 +77,7 @@ pub struct StepZeroPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine(
+pub fn examine(
     view: &ExpressionView,
     path: &Path,
     step_form_count: &mut usize,

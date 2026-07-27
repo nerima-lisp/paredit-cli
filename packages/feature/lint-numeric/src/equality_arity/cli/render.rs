@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::equality_arity_report::{
-    EqualityArityPolicy, EqualityAritySummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::equality_arity::usecase::{EqualityArityPolicy, EqualityAritySummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_equality_arity_report(
+pub fn print_equality_arity_report(
     summary: &EqualityAritySummary,
     policy: &EqualityArityPolicy,
     output: OutputFormat,

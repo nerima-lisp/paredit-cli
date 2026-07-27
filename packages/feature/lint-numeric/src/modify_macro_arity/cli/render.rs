@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::modify_macro_arity_report::{
+use crate::modify_macro_arity::usecase::{
     ModifyMacroArityPolicy, ModifyMacroAritySummary, expected_arity_phrase,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_modify_macro_arity_report(
+pub fn print_modify_macro_arity_report(
     summary: &ModifyMacroAritySummary,
     policy: &ModifyMacroArityPolicy,
     output: OutputFormat,

@@ -1,18 +1,18 @@
 //! `verbose-negation`: negation written the long way ((- 0 x) and (* x -1) are (- x)).
 //!
-//! The analysis lives in [`crate::domain::verbose_negation_report`], which also backs the
+//! The analysis lives in [`crate::verbose_negation::domain`], which also backs the
 //! standalone `inspect verbose-negation` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::verbose_negation::domain::examine_form;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::verbose_negation_report::examine_form;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "verbose-negation",

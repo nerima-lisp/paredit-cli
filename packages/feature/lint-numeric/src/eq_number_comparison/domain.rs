@@ -21,7 +21,7 @@
 //! — which catches `(eq (length xs) n)` too.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`], since such a call can
+//! [`paredit_core_syntax::view_query::for_each_subview`], since such a call can
 //! appear anywhere in a body.
 //!
 //! Scope: Common Lisp only.
@@ -30,9 +30,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 fn is_number_literal(text: &str) -> bool {
     text.starts_with(|character: char| {
@@ -121,14 +121,14 @@ pub struct EqNumberComparisonPolicy {
 /// The lint suite passes a test backed by the type context, so it also sees
 /// `(eq (length xs) n)` — the same undefined comparison, spelled in a way the
 /// reader alone cannot recognize.
-pub(crate) type IsNumberArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
+pub type IsNumberArgument<'a> = &'a dyn Fn(&ExpressionView) -> bool;
 
 /// The [`IsNumberArgument`] of a caller with no type context.
 const fn never(_: &ExpressionView) -> bool {
     false
 }
 
-pub(crate) fn examine_comparison(
+pub fn examine_comparison(
     view: &ExpressionView,
     path: &Path,
     is_number: IsNumberArgument<'_>,

@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::single_operand_arithmetic_report::{
+use crate::single_operand_arithmetic::usecase::{
     SingleOperandArithmeticPolicy, SingleOperandArithmeticSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_single_operand_arithmetic_report(
+pub fn print_single_operand_arithmetic_report(
     summary: &SingleOperandArithmeticSummary,
     policy: &SingleOperandArithmeticPolicy,
     output: OutputFormat,

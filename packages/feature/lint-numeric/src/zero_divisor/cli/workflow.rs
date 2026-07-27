@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::zero_divisor_report::{
+use crate::zero_divisor::cli::args::ZeroDivisorReportArgs;
+use crate::zero_divisor::cli::render::print_zero_divisor_report;
+use crate::zero_divisor::usecase::{
     ZeroDivisorPolicyOptions, collect_zero_divisors, evaluate_zero_divisor_policy,
     summarize_zero_divisors,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::zero_divisor_report::args::ZeroDivisorReportArgs;
-use crate::presentation::cli::zero_divisor_report::render::print_zero_divisor_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn zero_divisor_report(args: ZeroDivisorReportArgs) -> Result<()> {
+pub fn zero_divisor_report(args: ZeroDivisorReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut division_form_count = 0;
@@ -32,7 +32,7 @@ pub(in crate::presentation::cli) fn zero_divisor_report(args: ZeroDivisorReportA
     print_zero_divisor_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "zero-divisor-report policy failed: {policy_message}"
         )));
     }

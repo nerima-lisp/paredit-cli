@@ -1,19 +1,19 @@
 //! `modify-macro-arity`: an incf/decf/push/pop call with the wrong number of arguments.
 //!
-//! The analysis lives in [`crate::domain::modify_macro_arity_report`], which also backs the
+//! The analysis lives in [`crate::modify_macro_arity::domain`], which also backs the
 //! standalone `inspect modify-macro-arity` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::modify_macro_arity::domain::examine_call;
+use crate::modify_macro_arity::domain::expected_arity_phrase;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::modify_macro_arity_report::examine_call;
-use crate::domain::modify_macro_arity_report::expected_arity_phrase;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "modify-macro-arity",

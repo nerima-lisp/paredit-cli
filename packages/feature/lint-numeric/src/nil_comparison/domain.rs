@@ -20,7 +20,7 @@
 //! bytes, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -28,9 +28,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// The canonical operator name for an object-equality predicate head, or `None`
 /// otherwise. `=` is intentionally excluded (numeric, and a type error on nil).
@@ -98,7 +98,7 @@ pub struct NilComparisonPolicy {
     pub violations: Vec<String>,
 }
 
-pub(crate) fn examine_comparison(
+pub fn examine_comparison(
     view: &ExpressionView,
     path: &Path,
     comparison_form_count: &mut usize,

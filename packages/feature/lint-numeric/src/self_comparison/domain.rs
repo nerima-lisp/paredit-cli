@@ -13,8 +13,8 @@
 //! is not `=` to itself, and flagging it would be a false positive.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`] and the reader-aware
-//! structural comparison from [`crate::domain::expression_equality`], so
+//! [`paredit_core_syntax::view_query::for_each_subview`] and the reader-aware
+//! structural comparison from [`paredit_core_syntax::expression_equality`], so
 //! `(eq x X)` counts (symbols fold case) while `(eq x y)` does not.
 //!
 //! Scope: Common Lisp only.
@@ -23,10 +23,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::{expressions_structurally_equal, render_expression};
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, list_head};
 
 const COMPARISON_HEADS: [&str; 14] = [
     "eq", "eql", "equal", "equalp", "string=", "char=", "<", ">", "<=", ">=", "string<", "string>",
@@ -73,7 +73,7 @@ pub struct SelfComparisonPolicy {
     pub violations: Vec<String>,
 }
 
-pub(crate) fn examine_comparison(
+pub fn examine_comparison(
     view: &ExpressionView,
     path: &Path,
     comparison_form_count: &mut usize,

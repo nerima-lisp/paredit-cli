@@ -1,19 +1,19 @@
 //! `zero-divisor`: a division-family form with a literal 0 divisor, a guaranteed division-by-zero ((/ x 0)).
 //!
-//! The analysis lives in [`crate::domain::zero_divisor_report`], which also backs the
+//! The analysis lives in [`crate::zero_divisor::domain`], which also backs the
 //! standalone `inspect zero-divisor` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::zero_divisor::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::semantics::value::evaluate_constant;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::zero_divisor_report::examine;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_semantics::semantics::value::evaluate_constant;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "zero-divisor",

@@ -17,7 +17,7 @@
 //! number operand from their exact source, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -25,9 +25,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// The quotient operators whose divisor defaults to `1`.
 const QUOTIENT_OPS: [&str; 8] = [
@@ -106,7 +106,7 @@ fn quotient_operator(head: &str) -> Option<&'static str> {
         .find(|op| head.eq_ignore_ascii_case(op))
 }
 
-pub(crate) fn examine(
+pub fn examine(
     view: &ExpressionView,
     path: &Path,
     quotient_form_count: &mut usize,

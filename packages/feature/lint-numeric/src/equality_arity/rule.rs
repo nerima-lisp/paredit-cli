@@ -1,18 +1,18 @@
 //! `equality-arity`: an eq/eql/equal/equalp call without exactly two arguments.
 //!
-//! The analysis lives in [`crate::domain::equality_arity_report`], which also backs the
+//! The analysis lives in [`crate::equality_arity::domain`], which also backs the
 //! standalone `inspect equality-arity` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::equality_arity_report::examine_call;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::equality_arity::domain::examine_call;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "equality-arity",

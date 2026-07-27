@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::eq_number_comparison_report::{
+use crate::eq_number_comparison::cli::args::EqNumberComparisonReportArgs;
+use crate::eq_number_comparison::cli::render::print_eq_number_comparison_report;
+use crate::eq_number_comparison::usecase::{
     EqNumberComparisonPolicyOptions, collect_eq_number_comparisons,
     evaluate_eq_number_comparison_policy, summarize_eq_number_comparisons,
 };
-use crate::presentation::cli::eq_number_comparison_report::args::EqNumberComparisonReportArgs;
-use crate::presentation::cli::eq_number_comparison_report::render::print_eq_number_comparison_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn eq_number_comparison_report(
-    args: EqNumberComparisonReportArgs,
-) -> Result<()> {
+pub fn eq_number_comparison_report(args: EqNumberComparisonReportArgs) -> Result<()> {
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
 
@@ -33,7 +31,7 @@ pub(in crate::presentation::cli) fn eq_number_comparison_report(
     print_eq_number_comparison_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "eq-number-comparison-report policy failed: {policy_message}"
         )));
     }

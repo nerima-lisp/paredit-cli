@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::one_step_arithmetic_report::{
-    OneStepArithmeticPolicy, OneStepArithmeticSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::one_step_arithmetic::usecase::{OneStepArithmeticPolicy, OneStepArithmeticSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_one_step_arithmetic_report(
+pub fn print_one_step_arithmetic_report(
     summary: &OneStepArithmeticSummary,
     policy: &OneStepArithmeticPolicy,
     output: OutputFormat,
