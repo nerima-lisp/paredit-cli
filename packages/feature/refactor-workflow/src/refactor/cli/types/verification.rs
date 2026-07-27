@@ -1,15 +1,18 @@
-use super::super::super::*;
-use crate::application::refactor::plan::RefactorPlanTargetKind;
+use crate::refactor::usecase::plan::RefactorPlanTargetKind;
+use crate::refactor::usecase::plan::{
+    RefactorOperation as ApplicationRefactorOperation, RefactorPlanSummary,
+    RefactorVerificationCheck, VerificationPhase as ApplicationVerificationPhase,
+};
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorVerification {
-    pub(in crate::presentation::cli) operation: ApplicationRefactorOperation,
-    pub(in crate::presentation::cli) phase: ApplicationVerificationPhase,
-    pub(in crate::presentation::cli) symbol: String,
-    pub(in crate::presentation::cli) new_symbol: Option<String>,
-    pub(in crate::presentation::cli) passed: bool,
-    pub(in crate::presentation::cli) target_kind: RefactorPlanTargetKind,
-    pub(in crate::presentation::cli) checks: Vec<RefactorVerificationCheck>,
-    pub(in crate::presentation::cli) before: RefactorPlanSummary,
-    pub(in crate::presentation::cli) after: Option<RefactorPlanSummary>,
+pub struct RefactorVerification {
+    pub operation: ApplicationRefactorOperation,
+    pub phase: ApplicationVerificationPhase,
+    pub symbol: String,
+    pub new_symbol: Option<String>,
+    pub passed: bool,
+    pub target_kind: RefactorPlanTargetKind,
+    pub checks: Vec<RefactorVerificationCheck>,
+    pub before: RefactorPlanSummary,
+    pub after: Option<RefactorPlanSummary>,
 }

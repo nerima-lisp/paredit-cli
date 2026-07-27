@@ -1,10 +1,10 @@
-use crate::application::refactor::plan::RefactorPlanTargetKind;
-use crate::application::usecase::impact_report::ImpactDefinitionItem;
-use crate::application::usecase::impact_report::ImpactReportFile;
-use crate::domain::common_lisp::{
+use crate::refactor::usecase::plan::RefactorPlanTargetKind;
+use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_eq, normalize_common_lisp_operator_head,
 };
-use crate::domain::definition::DefinitionCategory;
+use paredit_core_syntax::definition::DefinitionCategory;
+use paredit_feature_project_analysis::impact_report::usecase::ImpactDefinitionItem;
+use paredit_feature_project_analysis::impact_report::usecase::ImpactReportFile;
 
 struct TargetKindRule {
     target_kind: RefactorPlanTargetKind,
@@ -39,7 +39,8 @@ const TARGET_KIND_RULES: [TargetKindRule; 4] = [
     },
 ];
 
-pub(super) fn derive_refactor_target_kind(
+#[must_use]
+pub fn derive_refactor_target_kind(
     files: &[ImpactReportFile],
     symbol: &str,
 ) -> RefactorPlanTargetKind {

@@ -1,8 +1,9 @@
+use paredit_core_cli::safe_text;
 use serde_json::{Value, json};
 
-use crate::application::refactor::execute::{RefactorWritePlan, RefactorWriteRefusal};
+use crate::refactor::usecase::execute::{RefactorWritePlan, RefactorWriteRefusal};
 
-pub(super) fn print_refactor_write_plan(
+pub fn print_refactor_write_plan(
     write_plan: &RefactorWritePlan,
     writable_files: &[String],
     refused_files: &[String],
@@ -44,7 +45,7 @@ pub(super) fn print_refactor_write_plan(
     }
 }
 
-pub(super) fn refactor_write_plan_json(
+pub fn refactor_write_plan_json(
     write_plan: &RefactorWritePlan,
     writable_files: &[String],
     refused_files: &[String],

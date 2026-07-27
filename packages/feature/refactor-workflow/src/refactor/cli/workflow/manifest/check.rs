@@ -1,9 +1,9 @@
-use super::super::super::super::*;
 use super::super::super::args::RefactorCheckArgs;
 use super::super::super::manifest::check::build_refactor_check_result;
 use super::super::super::render::print_refactor_check_result;
+use anyhow::Result;
 
-pub(in crate::presentation::cli) fn refactor_check(args: RefactorCheckArgs) -> Result<()> {
+pub fn refactor_check(args: RefactorCheckArgs) -> Result<()> {
     let result = build_refactor_check_result(
         &args.manifest,
         args.root.as_deref(),

@@ -1,11 +1,12 @@
-use super::super::super::*;
 use super::super::types::preview::{RefactorPreview, RefactorPreviewDecision};
 use super::write_plan::{print_refactor_write_plan, refactor_write_plan_json};
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use serde_json::Value;
+use serde_json::json;
 
-pub(in crate::presentation::cli) fn print_refactor_preview(
-    preview: &RefactorPreview,
-    output: OutputFormat,
-) -> Result<()> {
+pub fn print_refactor_preview(preview: &RefactorPreview, output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => {
             let write_plan = preview.write_plan();
@@ -123,9 +124,8 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
 /// Builds the preview manifest exactly as `refactor preview --output json`
 /// prints it; `--manifest-out` persists these bytes so the file hash matches
 /// a shell redirect of the same run.
-pub(in crate::presentation::cli) fn refactor_preview_manifest_json(
-    preview: &RefactorPreview,
-) -> Value {
+#[must_use]
+pub fn refactor_preview_manifest_json(preview: &RefactorPreview) -> Value {
     let write_plan = preview.write_plan();
     let writable_files = preview.writable_paths_for_write_plan(&write_plan);
     let refused_files = preview.refused_paths_for_write_plan(&write_plan);

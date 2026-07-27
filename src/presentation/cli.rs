@@ -153,7 +153,6 @@ mod redundant_progn_report;
 mod redundant_quote_report;
 mod redundant_start_zero_report;
 mod redundant_the_report;
-mod refactor;
 mod self_assignment_report;
 mod self_comparison_report;
 mod setf_arity_report;
@@ -183,47 +182,19 @@ mod values_list_of_list_report;
 mod verbose_negation_report;
 mod zero_divisor_report;
 
-use std::fs;
-use std::path::{Path as FsPath, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use crate::application::refactor::execute::{
-    RefactorExecuteGateInputs, RefactorExecuteMode, RefactorExecuteOutputParseResult,
-    RefactorExecutePolicyResult, RefactorExecutePreVerificationResult,
-    RefactorExecutePreflightInputs, RefactorWriteRefusal, build_refactor_execute_decision,
-    build_refactor_execute_preflight_decision,
-};
-use crate::application::refactor::plan::{
-    RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
-    RefactorPlanPolicyOptions as DomainRefactorPlanPolicyOptions, RefactorPlanRequest,
-    RefactorPlanStep, RefactorPlanSummary, RefactorVerificationCheck, RefactorVerificationRequest,
-    VerificationPhase as ApplicationVerificationPhase, build_refactor_plan_decision,
-    refactor_plan_gates as application_refactor_plan_gates,
-    refactor_verification_checks as application_refactor_verification_checks,
-};
-use crate::application::refactor::preview::{
-    RefactorPreviewEdit, RefactorPreviewPolicy,
-    RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions, RefactorPreviewSummary,
-    evaluate_refactor_preview_policy, refactor_preview_edits,
-};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
-use anyhow::{Context, Result};
+use crate::domain::sexpr::Path;
+use anyhow::Result;
 use clap::{Args, Parser};
-use paredit_feature_project_analysis::impact_report::usecase::{
-    ImpactReportFile, raw_refactor_risks, summarize_impact_reports,
-};
-use serde_json::{Value, json};
+use serde_json::json;
 
 use args::*;
 use command::Command;
 pub(crate) use shared::{
-    MAX_SOURCE_INPUT_BYTES, apply_byte_span_edits, bounded_preview, matching_symbol_occurrences,
-    read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_limit,
-    read_text_with_limit, require_output_file, stable_text_hash, terminal_safe,
-    terminal_safe_error_chain, unified_diff, write_artifact_with_rollback,
-    write_file_with_rollback,
+    read_input_and_dialect, read_input_dialect_and_tree, require_output_file, terminal_safe,
+    terminal_safe_error_chain, write_file_with_rollback,
 };
 
 #[derive(Debug, Parser)]
@@ -295,6 +266,7 @@ use paredit_feature_project_analysis::system_cycle_report::cli as system_cycle_r
 use paredit_feature_project_analysis::undefined_package_report::cli as undefined_package_report;
 use paredit_feature_project_analysis::unused_local_callable_report::cli as unused_local_callable_report;
 use paredit_feature_project_analysis::workspace_report::cli as workspace_report;
+use paredit_feature_refactor_workflow::refactor::cli as refactor;
 use paredit_feature_remove_unused::definition_movement::cli as definition_movement;
 use paredit_feature_remove_unused::definition_removal::cli as definition_removal;
 use paredit_feature_remove_unused::definition_report::cli as definition_report;

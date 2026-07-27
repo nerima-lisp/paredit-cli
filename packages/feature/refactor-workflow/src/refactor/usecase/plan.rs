@@ -1,9 +1,9 @@
-mod steps;
+pub mod steps;
 #[cfg(test)]
-mod tests;
-mod types;
+pub mod tests;
+pub mod types;
 
-pub use crate::domain::refactor_plan::{
+pub use paredit_core_edit::refactor_plan::{
     RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
     RefactorPlanPolicyOptions, RefactorPlanRiskSummary, RefactorPlanSummary,
     RefactorPlanTargetKind, RefactorRiskLevel, RefactorVerificationCheck,

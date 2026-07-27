@@ -1,25 +1,38 @@
-use super::super::super::super::*;
 use super::super::super::args::RefactorPreviewMode;
 use super::super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::super::super::types::preview::{RefactorPreview, RefactorPreviewFile};
+use crate::refactor::usecase::preview::{
+    RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions, RefactorPreviewSummary,
+    evaluate_refactor_preview_policy, refactor_preview_edits,
+};
+use anyhow::Result;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::shared::apply_byte_span_edits;
+use paredit_core_cli::shared::bounded_preview;
+use paredit_core_cli::shared::matching_symbol_occurrences;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::stable_text_hash;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_feature_rename::rename::cli as rename;
+use std::path::PathBuf;
 
-pub(in crate::presentation::cli::refactor::workflow) struct BuildRefactorPreviewRequest<'a> {
-    pub(in crate::presentation::cli::refactor::workflow) paths: &'a [PathBuf],
-    pub(in crate::presentation::cli::refactor::workflow) dialect: Option<DialectArg>,
-    pub(in crate::presentation::cli::refactor::workflow) from: &'a SymbolName,
-    pub(in crate::presentation::cli::refactor::workflow) to: &'a SymbolName,
-    pub(in crate::presentation::cli::refactor::workflow) mode: RefactorPreviewMode,
-    pub(in crate::presentation::cli::refactor::workflow) max_preview_bytes: usize,
-    pub(in crate::presentation::cli::refactor::workflow) write: bool,
-    pub(in crate::presentation::cli::refactor::workflow) policy_options:
-        DomainRefactorPreviewPolicyOptions,
-    pub(in crate::presentation::cli::refactor::workflow) workspace:
-        Option<WorkspaceRefactorPlanDiscovery>,
+// Public since the extraction: crate-internal visibility cannot cross a
+// crate boundary, so this lint applies for the first time.
+#[derive(Debug)]
+pub struct BuildRefactorPreviewRequest<'a> {
+    pub paths: &'a [PathBuf],
+    pub dialect: Option<DialectArg>,
+    pub from: &'a SymbolName,
+    pub to: &'a SymbolName,
+    pub mode: RefactorPreviewMode,
+    pub max_preview_bytes: usize,
+    pub write: bool,
+    pub policy_options: DomainRefactorPreviewPolicyOptions,
+    pub workspace: Option<WorkspaceRefactorPlanDiscovery>,
 }
 
-pub(in crate::presentation::cli::refactor::workflow) fn build_refactor_preview(
-    request: BuildRefactorPreviewRequest<'_>,
-) -> Result<RefactorPreview> {
+pub fn build_refactor_preview(request: BuildRefactorPreviewRequest<'_>) -> Result<RefactorPreview> {
     let mut files = Vec::with_capacity(request.paths.len());
     let mut total_definitions = 0usize;
     let mut total_target_occurrences = 0usize;

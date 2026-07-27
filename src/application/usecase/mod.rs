@@ -218,6 +218,7 @@ pub use paredit_feature_project_analysis::system_cycle_report::usecase as system
 pub use paredit_feature_project_analysis::undefined_package_report::usecase as undefined_package_report;
 pub use paredit_feature_project_analysis::unused_local_callable_report::usecase as unused_local_callable_report;
 pub use paredit_feature_project_analysis::workspace_report::usecase as workspace_report;
+pub use paredit_feature_refactor_workflow::refactor::usecase as refactor;
 pub use paredit_feature_remove_unused::definition_report::usecase as definition_report;
 pub use paredit_feature_remove_unused::remove_definition::usecase as remove_definition;
 pub use paredit_feature_remove_unused::remove_unused_binding::usecase as remove_unused_binding;

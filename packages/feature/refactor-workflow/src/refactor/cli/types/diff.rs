@@ -1,45 +1,45 @@
-use super::super::super::*;
 use super::manifest::RefactorApplyManifestHeader;
 use super::root::RefactorRootReport;
+use std::path::PathBuf;
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorDiffResult {
-    pub(in crate::presentation::cli) manifest: RefactorApplyManifestHeader,
-    pub(in crate::presentation::cli) root: RefactorRootReport,
-    pub(in crate::presentation::cli) manifest_policy_passed: bool,
-    pub(in crate::presentation::cli) manifest_outputs_parse: bool,
-    pub(in crate::presentation::cli) files: Vec<RefactorDiffFileResult>,
-    pub(in crate::presentation::cli) summary: RefactorDiffSummary,
+pub struct RefactorDiffResult {
+    pub manifest: RefactorApplyManifestHeader,
+    pub root: RefactorRootReport,
+    pub manifest_policy_passed: bool,
+    pub manifest_outputs_parse: bool,
+    pub files: Vec<RefactorDiffFileResult>,
+    pub summary: RefactorDiffSummary,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorDiffFileResult {
-    pub(in crate::presentation::cli) path: PathBuf,
-    pub(in crate::presentation::cli) changed: bool,
-    pub(in crate::presentation::cli) expected_changed: bool,
-    pub(in crate::presentation::cli) edit_count: usize,
-    pub(in crate::presentation::cli) input_hash: String,
-    pub(in crate::presentation::cli) output_hash: String,
-    pub(in crate::presentation::cli) expected_input_hash: String,
-    pub(in crate::presentation::cli) expected_output_hash: String,
-    pub(in crate::presentation::cli) input_hash_matches: bool,
-    pub(in crate::presentation::cli) output_hash_matches: bool,
-    pub(in crate::presentation::cli) output_parse_ok: bool,
-    pub(in crate::presentation::cli) expected_output_parse_ok: bool,
-    pub(in crate::presentation::cli) manifest_flags_match: bool,
-    pub(in crate::presentation::cli) stale: bool,
-    pub(in crate::presentation::cli) diff: String,
+pub struct RefactorDiffFileResult {
+    pub path: PathBuf,
+    pub changed: bool,
+    pub expected_changed: bool,
+    pub edit_count: usize,
+    pub input_hash: String,
+    pub output_hash: String,
+    pub expected_input_hash: String,
+    pub expected_output_hash: String,
+    pub input_hash_matches: bool,
+    pub output_hash_matches: bool,
+    pub output_parse_ok: bool,
+    pub expected_output_parse_ok: bool,
+    pub manifest_flags_match: bool,
+    pub stale: bool,
+    pub diff: String,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorDiffSummary {
-    pub(in crate::presentation::cli) file_count: usize,
-    pub(in crate::presentation::cli) changed_file_count: usize,
-    pub(in crate::presentation::cli) changed_files: Vec<String>,
-    pub(in crate::presentation::cli) edit_count: usize,
-    pub(in crate::presentation::cli) stale_file_count: usize,
-    pub(in crate::presentation::cli) output_hash_mismatch_count: usize,
-    pub(in crate::presentation::cli) parse_error_count: usize,
-    pub(in crate::presentation::cli) manifest_flag_mismatch_count: usize,
-    pub(in crate::presentation::cli) can_apply: bool,
+pub struct RefactorDiffSummary {
+    pub file_count: usize,
+    pub changed_file_count: usize,
+    pub changed_files: Vec<String>,
+    pub edit_count: usize,
+    pub stale_file_count: usize,
+    pub output_hash_mismatch_count: usize,
+    pub parse_error_count: usize,
+    pub manifest_flag_mismatch_count: usize,
+    pub can_apply: bool,
 }

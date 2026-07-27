@@ -1,27 +1,28 @@
 use super::preview::RefactorPreview;
 use super::verification::RefactorVerification;
-use crate::application::refactor::execute::{
+use crate::refactor::usecase::execute::{
     RefactorExecuteDecision, RefactorExecuteOutcome, RefactorExecutePostVerificationResult,
     RefactorExecuteStep, RefactorExecuteStepStatus,
 };
+use anyhow::Result;
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct WorkspaceRefactorExecute {
-    pub(in crate::presentation::cli) preview: RefactorPreview,
-    pub(in crate::presentation::cli) preflight_decision: RefactorExecuteDecision,
-    pub(in crate::presentation::cli) execute_decision: RefactorExecuteDecision,
-    pub(in crate::presentation::cli) outcome: WorkspaceRefactorExecuteOutcome,
-    pub(in crate::presentation::cli) pre_verification: Option<RefactorVerification>,
-    pub(in crate::presentation::cli) post_verification: Option<RefactorVerification>,
+pub struct WorkspaceRefactorExecute {
+    pub preview: RefactorPreview,
+    pub preflight_decision: RefactorExecuteDecision,
+    pub execute_decision: RefactorExecuteDecision,
+    pub outcome: WorkspaceRefactorExecuteOutcome,
+    pub pre_verification: Option<RefactorVerification>,
+    pub post_verification: Option<RefactorVerification>,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct WorkspaceRefactorExecuteOutcome {
+pub struct WorkspaceRefactorExecuteOutcome {
     status: WorkspaceRefactorExecuteOutcomeStatus,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::presentation::cli) struct WorkspaceRefactorExecuteOutcomeSummary {
+pub struct WorkspaceRefactorExecuteOutcomeSummary {
     passed_step_count: usize,
     failed_step_count: usize,
     skipped_step_count: usize,
@@ -31,7 +32,7 @@ pub(in crate::presentation::cli) struct WorkspaceRefactorExecuteOutcomeSummary {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::presentation::cli) enum WorkspaceRefactorExecuteOutcomeStatus {
+pub enum WorkspaceRefactorExecuteOutcomeStatus {
     BlockedByPolicy,
     RefusedUnparsableOutput,
     BlockedByPreVerification,
@@ -41,7 +42,7 @@ pub(in crate::presentation::cli) enum WorkspaceRefactorExecuteOutcomeStatus {
 }
 
 impl WorkspaceRefactorExecuteOutcome {
-    pub(in crate::presentation::cli) fn from_decision(
+    pub fn from_decision(
         decision: RefactorExecuteDecision,
         post_verification: Option<RefactorExecutePostVerificationResult>,
     ) -> Result<Self, &'static str> {
@@ -68,13 +69,13 @@ impl WorkspaceRefactorExecuteOutcome {
         Ok(Self { status })
     }
 
-    pub(in crate::presentation::cli) const fn status(
-        &self,
-    ) -> WorkspaceRefactorExecuteOutcomeStatus {
+    #[must_use]
+    pub const fn status(&self) -> WorkspaceRefactorExecuteOutcomeStatus {
         self.status
     }
 
-    pub(in crate::presentation::cli) const fn write_applied(&self) -> bool {
+    #[must_use]
+    pub const fn write_applied(&self) -> bool {
         matches!(
             self.status,
             WorkspaceRefactorExecuteOutcomeStatus::WriteApplied
@@ -82,7 +83,8 @@ impl WorkspaceRefactorExecuteOutcome {
         )
     }
 
-    pub(in crate::presentation::cli) const fn post_verification_passed(&self) -> Option<bool> {
+    #[must_use]
+    pub const fn post_verification_passed(&self) -> Option<bool> {
         match self.status {
             WorkspaceRefactorExecuteOutcomeStatus::WriteApplied => Some(true),
             WorkspaceRefactorExecuteOutcomeStatus::PostVerificationFailed => Some(false),
@@ -90,7 +92,8 @@ impl WorkspaceRefactorExecuteOutcome {
         }
     }
 
-    pub(in crate::presentation::cli) fn steps(&self) -> Vec<RefactorExecuteStep> {
+    #[must_use]
+    pub fn steps(&self) -> Vec<RefactorExecuteStep> {
         use RefactorExecuteStepStatus::{Failed, Passed, Scheduled, Skipped};
         use WorkspaceRefactorExecuteOutcomeStatus::{
             BlockedByPolicy, BlockedByPreVerification, DryRunReady, PostVerificationFailed,
@@ -152,7 +155,8 @@ impl WorkspaceRefactorExecuteOutcome {
         ]
     }
 
-    pub(in crate::presentation::cli) fn summary(&self) -> WorkspaceRefactorExecuteOutcomeSummary {
+    #[must_use]
+    pub fn summary(&self) -> WorkspaceRefactorExecuteOutcomeSummary {
         let mut summary = WorkspaceRefactorExecuteOutcomeSummary {
             passed_step_count: 0,
             failed_step_count: 0,
@@ -176,28 +180,35 @@ impl WorkspaceRefactorExecuteOutcome {
 }
 
 impl WorkspaceRefactorExecuteOutcomeSummary {
-    pub(in crate::presentation::cli) const fn passed_step_count(self) -> usize {
+    #[must_use]
+    pub const fn passed_step_count(self) -> usize {
         self.passed_step_count
     }
-    pub(in crate::presentation::cli) const fn failed_step_count(self) -> usize {
+    #[must_use]
+    pub const fn failed_step_count(self) -> usize {
         self.failed_step_count
     }
-    pub(in crate::presentation::cli) const fn skipped_step_count(self) -> usize {
+    #[must_use]
+    pub const fn skipped_step_count(self) -> usize {
         self.skipped_step_count
     }
-    pub(in crate::presentation::cli) const fn scheduled_step_count(self) -> usize {
+    #[must_use]
+    pub const fn scheduled_step_count(self) -> usize {
         self.scheduled_step_count
     }
-    pub(in crate::presentation::cli) const fn write_applied(self) -> bool {
+    #[must_use]
+    pub const fn write_applied(self) -> bool {
         self.write_applied
     }
-    pub(in crate::presentation::cli) const fn post_verification_passed(self) -> Option<bool> {
+    #[must_use]
+    pub const fn post_verification_passed(self) -> Option<bool> {
         self.post_verification_passed
     }
 }
 
 impl WorkspaceRefactorExecuteOutcomeStatus {
-    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "blocked-by-policy",
             Self::RefusedUnparsableOutput => "refused-unparsable-output",
@@ -208,7 +219,8 @@ impl WorkspaceRefactorExecuteOutcomeStatus {
         }
     }
 
-    pub(in crate::presentation::cli) const fn reason(self) -> &'static str {
+    #[must_use]
+    pub const fn reason(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "preview-policy-failed",
             Self::RefusedUnparsableOutput => "rewritten-output-did-not-parse",
@@ -219,7 +231,8 @@ impl WorkspaceRefactorExecuteOutcomeStatus {
         }
     }
 
-    pub(in crate::presentation::cli) const fn next_action(self) -> &'static str {
+    #[must_use]
+    pub const fn next_action(self) -> &'static str {
         match self {
             Self::BlockedByPolicy => "review-policy-violations",
             Self::RefusedUnparsableOutput => "inspect-preview-parse-errors",

@@ -1,7 +1,11 @@
-use super::super::super::*;
 use super::super::types::verification::RefactorVerification;
+use crate::refactor::usecase::plan::RefactorPlanSummary;
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use serde_json::json;
 
-pub(in crate::presentation::cli) fn print_refactor_verification(
+pub fn print_refactor_verification(
     verification: &RefactorVerification,
     output: OutputFormat,
 ) -> Result<()> {

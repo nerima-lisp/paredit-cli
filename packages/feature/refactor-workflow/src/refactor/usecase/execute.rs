@@ -1,8 +1,8 @@
-mod gates;
+pub mod gates;
 #[cfg(test)]
-mod tests;
-mod types;
-mod write;
+pub mod tests;
+pub mod types;
+pub mod write;
 
 pub use gates::{build_refactor_execute_decision, build_refactor_execute_preflight_decision};
 pub use types::{

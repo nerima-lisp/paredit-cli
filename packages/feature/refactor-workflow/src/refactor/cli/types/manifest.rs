@@ -1,43 +1,46 @@
-use super::super::super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteSpan;
+use serde_json::Value;
+use std::path::PathBuf;
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorApplyManifest {
-    pub(in crate::presentation::cli) mode: String,
-    pub(in crate::presentation::cli) from: String,
-    pub(in crate::presentation::cli) to: String,
-    pub(in crate::presentation::cli) policy_passed: bool,
-    pub(in crate::presentation::cli) all_outputs_parse: bool,
-    pub(in crate::presentation::cli) files: Vec<RefactorApplyManifestFile>,
+pub struct RefactorApplyManifest {
+    pub mode: String,
+    pub from: String,
+    pub to: String,
+    pub policy_passed: bool,
+    pub all_outputs_parse: bool,
+    pub files: Vec<RefactorApplyManifestFile>,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorApplyManifestFile {
-    pub(in crate::presentation::cli) path: PathBuf,
-    pub(in crate::presentation::cli) dialect: Dialect,
-    pub(in crate::presentation::cli) changed: bool,
-    pub(in crate::presentation::cli) output_parse_ok: bool,
-    pub(in crate::presentation::cli) input_hash: String,
-    pub(in crate::presentation::cli) output_hash: String,
-    pub(in crate::presentation::cli) edits: Vec<RefactorApplyManifestEdit>,
+pub struct RefactorApplyManifestFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub changed: bool,
+    pub output_parse_ok: bool,
+    pub input_hash: String,
+    pub output_hash: String,
+    pub edits: Vec<RefactorApplyManifestEdit>,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorApplyManifestEdit {
-    pub(in crate::presentation::cli) span: ByteSpan,
-    pub(in crate::presentation::cli) replacement: String,
+pub struct RefactorApplyManifestEdit {
+    pub span: ByteSpan,
+    pub replacement: String,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorApplyManifestHeader {
-    pub(in crate::presentation::cli) path: PathBuf,
-    pub(in crate::presentation::cli) hash: String,
-    pub(in crate::presentation::cli) mode: String,
-    pub(in crate::presentation::cli) from: String,
-    pub(in crate::presentation::cli) to: String,
+pub struct RefactorApplyManifestHeader {
+    pub path: PathBuf,
+    pub hash: String,
+    pub mode: String,
+    pub from: String,
+    pub to: String,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct LoadedRefactorManifest {
-    pub(in crate::presentation::cli) value: Value,
-    pub(in crate::presentation::cli) hash: String,
+pub struct LoadedRefactorManifest {
+    pub value: Value,
+    pub hash: String,
 }

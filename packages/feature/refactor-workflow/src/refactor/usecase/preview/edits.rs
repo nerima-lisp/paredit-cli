@@ -1,4 +1,4 @@
-use crate::domain::sexpr::ByteSpan;
+use paredit_core_syntax::sexpr::ByteSpan;
 
 use super::types::RefactorPreviewEdit;
 

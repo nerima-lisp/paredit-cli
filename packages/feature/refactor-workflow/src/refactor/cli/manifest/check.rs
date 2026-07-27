@@ -1,4 +1,3 @@
-use super::super::super::*;
 use super::super::types::check::{
     RefactorCheckFileResult, RefactorCheckResult, RefactorCheckSummary,
 };
@@ -8,8 +7,13 @@ use super::io::read_refactor_manifest_file;
 use super::parse::parse_refactor_apply_manifest;
 use super::root::{MAX_MANIFEST_SOURCE_TOTAL_BYTES, read_refactor_manifest_source};
 use super::validation::validate_manifest_edits;
+use anyhow::{Context, Result};
+use paredit_core_cli::shared::apply_byte_span_edits;
+use paredit_core_cli::shared::stable_text_hash;
+use paredit_core_syntax::sexpr::SyntaxTree;
+use std::path::Path as FsPath;
 
-pub(in crate::presentation::cli) fn build_refactor_check_result(
+pub fn build_refactor_check_result(
     manifest_path: &FsPath,
     root: Option<&FsPath>,
     expected_manifest_hash: Option<&str>,

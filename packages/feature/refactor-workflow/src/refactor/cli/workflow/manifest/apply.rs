@@ -1,4 +1,3 @@
-use super::super::super::super::*;
 use super::super::super::args::RefactorApplyArgs;
 use super::super::super::manifest::io::read_refactor_manifest_file;
 use super::super::super::manifest::parse::parse_refactor_apply_manifest;
@@ -12,9 +11,13 @@ use super::super::super::types::apply::{
 };
 use super::super::super::types::manifest::RefactorApplyManifestHeader;
 use super::super::super::types::root::{RefactorRootGuard, RefactorRootReport};
-use crate::presentation::cli::shared::{
+use anyhow::{Context, Result};
+use paredit_core_cli::shared::apply_byte_span_edits;
+use paredit_core_cli::shared::stable_text_hash;
+use paredit_core_cli::shared::{
     write_files_with_rollback_expected, write_files_with_rollback_expected_anchored,
 };
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 #[cfg(all(test, unix))]
 thread_local! {
@@ -38,7 +41,7 @@ fn run_before_manifest_write_hook() {
     }
 }
 
-pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
+pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
     let loaded_manifest =
         read_refactor_manifest_file(&args.manifest, args.expect_manifest_hash.as_deref())?;
     let manifest = parse_refactor_apply_manifest(&loaded_manifest.value)?;
@@ -206,6 +209,10 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    use paredit_core_cli::args::OutputFormat;
+    use serde_json::json;
+    use std::fs;
+    use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);

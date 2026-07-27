@@ -1,13 +1,12 @@
-use super::super::super::super::*;
 use super::super::super::types::execute::{
     WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome,
 };
 use super::super::write_plan::print_refactor_write_plan;
-use crate::application::refactor::execute::RefactorExecuteDecision;
+use crate::refactor::usecase::execute::RefactorExecuteDecision;
+use anyhow::Result;
+use paredit_core_cli::safe_text;
 
-pub(super) fn print_workspace_refactor_execute_text(
-    execution: &WorkspaceRefactorExecute,
-) -> Result<()> {
+pub fn print_workspace_refactor_execute_text(execution: &WorkspaceRefactorExecute) -> Result<()> {
     let preview = &execution.preview;
     let write_plan = preview.write_plan();
     let writable_files = preview.writable_paths_for_write_plan(&write_plan);

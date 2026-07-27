@@ -1,9 +1,13 @@
-use super::super::super::*;
 use super::super::types::manifest::LoadedRefactorManifest;
+use anyhow::{Context, Result};
+use paredit_core_cli::shared::read_text_file_with_limit;
+use paredit_core_cli::shared::stable_text_hash;
+use serde_json::Value;
+use std::path::Path as FsPath;
 
 const MAX_MANIFEST_BYTES: u64 = 16 * 1024 * 1024;
 
-pub(in crate::presentation::cli) fn read_refactor_manifest_file(
+pub fn read_refactor_manifest_file(
     manifest_path: &FsPath,
     expected_hash: Option<&str>,
 ) -> Result<LoadedRefactorManifest> {

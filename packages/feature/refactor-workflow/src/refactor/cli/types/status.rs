@@ -1,28 +1,30 @@
-use super::super::super::*;
 use super::check::{RefactorCheckFileResult, RefactorCheckSummary};
 use super::manifest::RefactorApplyManifestHeader;
 use super::root::RefactorRootReport;
+use std::path::PathBuf;
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorStatusResult {
-    pub(in crate::presentation::cli) manifest: RefactorApplyManifestHeader,
-    pub(in crate::presentation::cli) root: RefactorRootReport,
-    pub(in crate::presentation::cli) manifest_policy_passed: bool,
-    pub(in crate::presentation::cli) manifest_outputs_parse: bool,
-    pub(in crate::presentation::cli) status: RefactorStatusKind,
-    pub(in crate::presentation::cli) next_action: RefactorStatusNextAction,
-    pub(in crate::presentation::cli) blocked_reasons: Vec<RefactorStatusBlockedReason>,
-    pub(in crate::presentation::cli) write_plan: Vec<RefactorStatusWriteTarget>,
-    pub(in crate::presentation::cli) files: Vec<RefactorCheckFileResult>,
-    pub(in crate::presentation::cli) summary: RefactorCheckSummary,
+pub struct RefactorStatusResult {
+    pub manifest: RefactorApplyManifestHeader,
+    pub root: RefactorRootReport,
+    pub manifest_policy_passed: bool,
+    pub manifest_outputs_parse: bool,
+    pub status: RefactorStatusKind,
+    pub next_action: RefactorStatusNextAction,
+    pub blocked_reasons: Vec<RefactorStatusBlockedReason>,
+    pub write_plan: Vec<RefactorStatusWriteTarget>,
+    pub files: Vec<RefactorCheckFileResult>,
+    pub summary: RefactorCheckSummary,
 }
 
 impl RefactorStatusResult {
-    pub(in crate::presentation::cli) fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
+    #[must_use]
+    pub fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
         RefactorManifestDecision::steps_from_blocked_reasons(&self.blocked_reasons)
     }
 
-    pub(in crate::presentation::cli) fn decision_summary(&self) -> RefactorManifestDecisionSummary {
+    #[must_use]
+    pub fn decision_summary(&self) -> RefactorManifestDecisionSummary {
         RefactorManifestDecisionSummary::from_steps_and_blocked_reasons(
             self.steps(),
             self.blocked_reasons.len(),
@@ -31,13 +33,14 @@ impl RefactorStatusResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) enum RefactorStatusKind {
+pub enum RefactorStatusKind {
     Ready,
     Blocked,
 }
 
 impl RefactorStatusKind {
-    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Ready => "ready",
             Self::Blocked => "blocked",
@@ -46,18 +49,20 @@ impl RefactorStatusKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::presentation::cli) struct RefactorManifestDecision {
-    pub(in crate::presentation::cli) status: RefactorStatusKind,
-    pub(in crate::presentation::cli) next_action: RefactorStatusNextAction,
-    pub(in crate::presentation::cli) blocked_reasons: Vec<RefactorStatusBlockedReason>,
+pub struct RefactorManifestDecision {
+    pub status: RefactorStatusKind,
+    pub next_action: RefactorStatusNextAction,
+    pub blocked_reasons: Vec<RefactorStatusBlockedReason>,
 }
 
 impl RefactorManifestDecision {
-    pub(in crate::presentation::cli) fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
+    #[must_use]
+    pub fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
         Self::steps_from_blocked_reasons(&self.blocked_reasons)
     }
 
-    pub(in crate::presentation::cli) fn summary(&self) -> RefactorManifestDecisionSummary {
+    #[must_use]
+    pub fn summary(&self) -> RefactorManifestDecisionSummary {
         RefactorManifestDecisionSummary::from_steps_and_blocked_reasons(
             self.steps(),
             self.blocked_reasons.len(),
@@ -108,14 +113,15 @@ impl RefactorManifestDecision {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) enum RefactorStatusNextAction {
+pub enum RefactorStatusNextAction {
     RunDiffThenApplyWrite,
     RegeneratePreview,
     FixManifestOrParser,
 }
 
 impl RefactorStatusNextAction {
-    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::RunDiffThenApplyWrite => "run_refactor_diff_then_refactor_apply_write",
             Self::RegeneratePreview => "regenerate_refactor_preview",
@@ -125,14 +131,15 @@ impl RefactorStatusNextAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::presentation::cli) struct RefactorApplyDecision {
-    pub(in crate::presentation::cli) status: RefactorApplyDecisionStatus,
-    pub(in crate::presentation::cli) next_action: RefactorApplyNextAction,
-    pub(in crate::presentation::cli) blocked_reasons: Vec<RefactorStatusBlockedReason>,
+pub struct RefactorApplyDecision {
+    pub status: RefactorApplyDecisionStatus,
+    pub next_action: RefactorApplyNextAction,
+    pub blocked_reasons: Vec<RefactorStatusBlockedReason>,
 }
 
 impl RefactorApplyDecision {
-    pub(in crate::presentation::cli) fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
+    #[must_use]
+    pub fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
         let mut steps = RefactorManifestDecision::steps_from_blocked_reasons(&self.blocked_reasons);
         steps[4].status = match self.status {
             RefactorApplyDecisionStatus::Applied => RefactorManifestDecisionStepStatus::Passed,
@@ -144,7 +151,8 @@ impl RefactorApplyDecision {
         steps
     }
 
-    pub(in crate::presentation::cli) fn summary(&self) -> RefactorManifestDecisionSummary {
+    #[must_use]
+    pub fn summary(&self) -> RefactorManifestDecisionSummary {
         RefactorManifestDecisionSummary::from_steps_and_blocked_reasons(
             self.steps(),
             self.blocked_reasons.len(),
@@ -153,14 +161,15 @@ impl RefactorApplyDecision {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) enum RefactorApplyDecisionStatus {
+pub enum RefactorApplyDecisionStatus {
     Applied,
     DryRunReady,
     Blocked,
 }
 
 impl RefactorApplyDecisionStatus {
-    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Applied => "applied",
             Self::DryRunReady => "dry-run-ready",
@@ -170,7 +179,7 @@ impl RefactorApplyDecisionStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) enum RefactorApplyNextAction {
+pub enum RefactorApplyNextAction {
     RunVerificationOrReviewDiff,
     RerunWithWrite,
     RegeneratePreview,
@@ -178,7 +187,8 @@ pub(in crate::presentation::cli) enum RefactorApplyNextAction {
 }
 
 impl RefactorApplyNextAction {
-    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::RunVerificationOrReviewDiff => "run_verification_or_review_diff",
             Self::RerunWithWrite => "rerun_refactor_apply_with_write",
@@ -189,7 +199,7 @@ impl RefactorApplyNextAction {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) enum RefactorStatusBlockedReason {
+pub enum RefactorStatusBlockedReason {
     ManifestPolicyFailed,
     ManifestOutputsDoNotParse,
     StaleFiles,
@@ -199,7 +209,8 @@ pub(in crate::presentation::cli) enum RefactorStatusBlockedReason {
 }
 
 impl RefactorStatusBlockedReason {
-    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::ManifestPolicyFailed => "manifest_policy_failed",
             Self::ManifestOutputsDoNotParse => "manifest_outputs_do_not_parse",
@@ -212,7 +223,7 @@ impl RefactorStatusBlockedReason {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) enum RefactorManifestDecisionStepStatus {
+pub enum RefactorManifestDecisionStepStatus {
     Passed,
     Failed,
     Skipped,
@@ -220,7 +231,8 @@ pub(in crate::presentation::cli) enum RefactorManifestDecisionStepStatus {
 }
 
 impl RefactorManifestDecisionStepStatus {
-    pub(in crate::presentation::cli) const fn label(self) -> &'static str {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Passed => "passed",
             Self::Failed => "failed",
@@ -231,18 +243,18 @@ impl RefactorManifestDecisionStepStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) struct RefactorManifestDecisionStep {
-    pub(in crate::presentation::cli) name: &'static str,
-    pub(in crate::presentation::cli) status: RefactorManifestDecisionStepStatus,
+pub struct RefactorManifestDecisionStep {
+    pub name: &'static str,
+    pub status: RefactorManifestDecisionStepStatus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::presentation::cli) struct RefactorManifestDecisionSummary {
-    pub(in crate::presentation::cli) passed_step_count: usize,
-    pub(in crate::presentation::cli) failed_step_count: usize,
-    pub(in crate::presentation::cli) skipped_step_count: usize,
-    pub(in crate::presentation::cli) scheduled_step_count: usize,
-    pub(in crate::presentation::cli) blocked_reason_count: usize,
+pub struct RefactorManifestDecisionSummary {
+    pub passed_step_count: usize,
+    pub failed_step_count: usize,
+    pub skipped_step_count: usize,
+    pub scheduled_step_count: usize,
+    pub blocked_reason_count: usize,
 }
 
 impl RefactorManifestDecisionSummary {
@@ -300,9 +312,9 @@ fn output_validation_step_status(
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorStatusWriteTarget {
-    pub(in crate::presentation::cli) path: PathBuf,
-    pub(in crate::presentation::cli) edit_count: usize,
-    pub(in crate::presentation::cli) input_hash: String,
-    pub(in crate::presentation::cli) output_hash: String,
+pub struct RefactorStatusWriteTarget {
+    pub path: PathBuf,
+    pub edit_count: usize,
+    pub input_hash: String,
+    pub output_hash: String,
 }

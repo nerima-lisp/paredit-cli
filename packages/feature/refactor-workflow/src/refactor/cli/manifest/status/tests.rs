@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use proptest::prelude::*;
 
 use super::*;
-use crate::presentation::cli::refactor::types::check::RefactorCheckSummary;
-use crate::presentation::cli::refactor::types::manifest::RefactorApplyManifestHeader;
-use crate::presentation::cli::refactor::types::root::RefactorRootReport;
-use crate::presentation::cli::refactor::types::status::RefactorManifestDecisionStepStatus;
+use crate::refactor::cli::types::check::RefactorCheckSummary;
+use crate::refactor::cli::types::manifest::RefactorApplyManifestHeader;
+use crate::refactor::cli::types::root::RefactorRootReport;
+use crate::refactor::cli::types::status::RefactorManifestDecisionStepStatus;
 
 fn count_step_status(
-    steps: &[crate::presentation::cli::refactor::types::status::RefactorManifestDecisionStep],
+    steps: &[crate::refactor::cli::types::status::RefactorManifestDecisionStep],
     status: RefactorManifestDecisionStepStatus,
 ) -> usize {
     steps.iter().filter(|step| step.status == status).count()

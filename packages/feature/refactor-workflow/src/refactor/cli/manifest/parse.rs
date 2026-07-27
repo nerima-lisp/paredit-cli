@@ -1,11 +1,14 @@
-use super::super::super::*;
 use super::super::types::manifest::{
     RefactorApplyManifest, RefactorApplyManifestEdit, RefactorApplyManifestFile,
 };
+use anyhow::{Context, Result};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ByteOffset;
+use paredit_core_syntax::sexpr::ByteSpan;
+use serde_json::Value;
+use std::path::PathBuf;
 
-pub(in crate::presentation::cli) fn parse_refactor_apply_manifest(
-    value: &Value,
-) -> Result<RefactorApplyManifest> {
+pub fn parse_refactor_apply_manifest(value: &Value) -> Result<RefactorApplyManifest> {
     let object = value
         .as_object()
         .context("refactor manifest must be a JSON object")?;

@@ -1,11 +1,24 @@
-use super::super::super::*;
 use super::super::args::*;
 use super::super::render::print_refactor_verification;
 use super::super::types::verification::RefactorVerification;
 use super::shared::derive_refactor_target_kind;
-use crate::application::refactor::plan::RefactorPlanTargetKind;
+use crate::refactor::usecase::plan::RefactorPlanTargetKind;
+use crate::refactor::usecase::plan::{
+    RefactorOperation as ApplicationRefactorOperation, RefactorVerificationRequest,
+    VerificationPhase as ApplicationVerificationPhase,
+    refactor_plan_gates as application_refactor_plan_gates,
+    refactor_verification_checks as application_refactor_verification_checks,
+};
+use anyhow::Result;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_feature_project_analysis::impact_report::cli as impact_report;
+use paredit_feature_project_analysis::impact_report::usecase::{
+    raw_refactor_risks, summarize_impact_reports,
+};
+use std::path::PathBuf;
 
-pub(in crate::presentation::cli) fn verify_refactor(args: VerifyRefactorArgs) -> Result<()> {
+pub fn verify_refactor(args: VerifyRefactorArgs) -> Result<()> {
     let verification = build_refactor_verification(
         &args.files,
         args.dialect,
@@ -19,7 +32,7 @@ pub(in crate::presentation::cli) fn verify_refactor(args: VerifyRefactorArgs) ->
     print_refactor_verification(&verification, args.output)
 }
 
-pub(super) fn build_refactor_verification(
+pub fn build_refactor_verification(
     paths: &[PathBuf],
     dialect: Option<DialectArg>,
     symbol: &SymbolName,

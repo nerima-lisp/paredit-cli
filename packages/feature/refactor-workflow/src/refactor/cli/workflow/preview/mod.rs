@@ -1,20 +1,29 @@
-mod build;
-mod failure;
-mod write;
+pub mod build;
+pub mod failure;
+pub mod write;
 
-use super::super::super::*;
 use super::super::args::*;
 use super::super::render::{print_refactor_preview, refactor_preview_manifest_json};
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::workspace::discover_workspace_refactor_scope;
+use crate::refactor::usecase::preview::RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions;
+use anyhow::{Context, Result};
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::stable_text_hash;
+use paredit_core_cli::shared::write_artifact_with_rollback;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_workspace::workspace::WorkspaceDiscoveryOptions;
+use serde_json::json;
+use std::path::Path as FsPath;
+use std::path::PathBuf;
 
-pub(in crate::presentation::cli::refactor::workflow) use build::{
-    BuildRefactorPreviewRequest, build_refactor_preview,
-};
-pub(in crate::presentation::cli::refactor::workflow) use failure::finish_refactor_preview_failure;
-pub(in crate::presentation::cli::refactor::workflow) use write::write_refactor_preview;
+pub use build::{BuildRefactorPreviewRequest, build_refactor_preview};
+pub use failure::finish_refactor_preview_failure;
+pub use write::write_refactor_preview;
 
-pub(in crate::presentation::cli) fn refactor_preview(args: RefactorPreviewArgs) -> Result<()> {
+pub fn refactor_preview(args: RefactorPreviewArgs) -> Result<()> {
     emit_refactor_preview(RefactorPreviewEmission {
         paths: &args.files,
         dialect: args.dialect,
@@ -38,9 +47,7 @@ pub(in crate::presentation::cli) fn refactor_preview(args: RefactorPreviewArgs) 
     })
 }
 
-pub(in crate::presentation::cli) fn workspace_refactor_preview(
-    args: WorkspaceRefactorPreviewArgs,
-) -> Result<()> {
+pub fn workspace_refactor_preview(args: WorkspaceRefactorPreviewArgs) -> Result<()> {
     let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
         include_unknown: args.include_unknown,
@@ -154,7 +161,7 @@ fn emit_refactor_preview(request: RefactorPreviewEmission<'_>) -> Result<()> {
 }
 
 fn write_manifest_and_print_summary(
-    preview: &crate::presentation::cli::refactor::types::preview::RefactorPreview,
+    preview: &crate::refactor::cli::types::preview::RefactorPreview,
     manifest_path: &FsPath,
     output: OutputFormat,
 ) -> Result<()> {

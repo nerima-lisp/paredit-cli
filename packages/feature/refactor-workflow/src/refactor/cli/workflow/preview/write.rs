@@ -1,10 +1,9 @@
-use super::super::super::super::*;
 use super::super::super::types::preview::RefactorPreview;
-use crate::presentation::cli::shared::write_files_with_rollback;
+use crate::refactor::usecase::execute::RefactorWriteRefusal;
+use anyhow::Result;
+use paredit_core_cli::shared::write_files_with_rollback;
 
-pub(in crate::presentation::cli::refactor::workflow) fn write_refactor_preview(
-    preview: &mut RefactorPreview,
-) -> Result<()> {
+pub fn write_refactor_preview(preview: &mut RefactorPreview) -> Result<()> {
     let write_plan = preview.write_plan();
 
     if !write_plan.write_requested() {

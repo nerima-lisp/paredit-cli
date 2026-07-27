@@ -1,7 +1,8 @@
 use super::super::super::types::check::RefactorCheckResult;
 use super::{RefactorStatusBlockedReason, RefactorStatusNextAction};
 
-pub(in crate::presentation::cli) fn refactor_status_blocked_reasons(
+#[must_use]
+pub fn refactor_status_blocked_reasons(
     check: &RefactorCheckResult,
 ) -> Vec<RefactorStatusBlockedReason> {
     refactor_manifest_blocked_reasons(
@@ -14,7 +15,8 @@ pub(in crate::presentation::cli) fn refactor_status_blocked_reasons(
     )
 }
 
-pub(in crate::presentation::cli) fn refactor_manifest_blocked_reasons(
+#[must_use]
+pub fn refactor_manifest_blocked_reasons(
     manifest_policy_passed: bool,
     manifest_outputs_parse: bool,
     stale_file_count: usize,
@@ -46,7 +48,8 @@ pub(in crate::presentation::cli) fn refactor_manifest_blocked_reasons(
     reasons
 }
 
-pub(in crate::presentation::cli) fn refactor_status_next_action(
+#[must_use]
+pub fn refactor_status_next_action(
     reasons: &[RefactorStatusBlockedReason],
 ) -> RefactorStatusNextAction {
     if reasons.is_empty() {

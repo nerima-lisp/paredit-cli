@@ -1,13 +1,13 @@
-use super::super::super::super::*;
+use anyhow::Result;
 
-pub(in crate::presentation::cli::refactor::workflow) fn finish_refactor_preview_failure(
+pub fn finish_refactor_preview_failure(
     failure_label: &'static str,
     policy_passed: bool,
     policy_message: &str,
     write_parse_refused: bool,
 ) -> Result<()> {
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "{failure_label} policy failed: {policy_message}"
         )));
     }

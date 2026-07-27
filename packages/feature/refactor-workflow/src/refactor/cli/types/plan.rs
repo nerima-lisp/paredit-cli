@@ -1,35 +1,40 @@
-use super::super::super::*;
-use crate::application::refactor::plan::{
+use crate::refactor::usecase::plan::{
+    RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
+    RefactorPlanStep,
+};
+use crate::refactor::usecase::plan::{
     RefactorPlanAutomationDecision, RefactorPlanRiskSummary, RefactorPlanTargetKind,
 };
+use paredit_feature_project_analysis::impact_report::usecase::ImpactReportFile;
+use std::path::PathBuf;
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorPlan {
-    pub(in crate::presentation::cli) operation: ApplicationRefactorOperation,
-    pub(in crate::presentation::cli) symbol: String,
-    pub(in crate::presentation::cli) target_kind: RefactorPlanTargetKind,
-    pub(in crate::presentation::cli) workspace: Option<WorkspaceRefactorPlanDiscovery>,
-    pub(in crate::presentation::cli) files: Vec<ImpactReportFile>,
-    pub(in crate::presentation::cli) gates: Vec<RefactorPlanGate>,
-    pub(in crate::presentation::cli) risk_summary: RefactorPlanRiskSummary,
-    pub(in crate::presentation::cli) steps: Vec<RefactorPlanStep>,
-    pub(in crate::presentation::cli) policy: RefactorPlanPolicy,
-    pub(in crate::presentation::cli) automation: RefactorPlanAutomationDecision,
+pub struct RefactorPlan {
+    pub operation: ApplicationRefactorOperation,
+    pub symbol: String,
+    pub target_kind: RefactorPlanTargetKind,
+    pub workspace: Option<WorkspaceRefactorPlanDiscovery>,
+    pub files: Vec<ImpactReportFile>,
+    pub gates: Vec<RefactorPlanGate>,
+    pub risk_summary: RefactorPlanRiskSummary,
+    pub steps: Vec<RefactorPlanStep>,
+    pub policy: RefactorPlanPolicy,
+    pub automation: RefactorPlanAutomationDecision,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct WorkspaceRefactorPlanDiscovery {
-    pub(in crate::presentation::cli) roots: Vec<PathBuf>,
-    pub(in crate::presentation::cli) discovered_file_count: usize,
-    pub(in crate::presentation::cli) skipped_unknown_count: usize,
-    pub(in crate::presentation::cli) skipped_hidden_count: usize,
-    pub(in crate::presentation::cli) skipped_generated_count: usize,
-    pub(in crate::presentation::cli) skipped_symlink_count: usize,
+pub struct WorkspaceRefactorPlanDiscovery {
+    pub roots: Vec<PathBuf>,
+    pub discovered_file_count: usize,
+    pub skipped_unknown_count: usize,
+    pub skipped_hidden_count: usize,
+    pub skipped_generated_count: usize,
+    pub skipped_symlink_count: usize,
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorPlanPolicyOptions {
-    pub(in crate::presentation::cli) fail_on_blocking_gate: bool,
-    pub(in crate::presentation::cli) require_definitions: Option<usize>,
-    pub(in crate::presentation::cli) require_references: Option<usize>,
+pub struct RefactorPlanPolicyOptions {
+    pub fail_on_blocking_gate: bool,
+    pub require_definitions: Option<usize>,
+    pub require_references: Option<usize>,
 }

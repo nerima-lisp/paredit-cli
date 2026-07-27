@@ -1,4 +1,3 @@
-use super::super::super::super::*;
 use super::super::super::args::RefactorDiffArgs;
 use super::super::super::manifest::io::read_refactor_manifest_file;
 use super::super::super::manifest::parse::parse_refactor_apply_manifest;
@@ -12,8 +11,13 @@ use super::super::super::types::diff::{
 };
 use super::super::super::types::manifest::RefactorApplyManifestHeader;
 use super::super::super::types::root::{RefactorRootGuard, RefactorRootReport};
+use anyhow::{Context, Result};
+use paredit_core_cli::shared::apply_byte_span_edits;
+use paredit_core_cli::shared::stable_text_hash;
+use paredit_core_cli::shared::unified_diff;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
-pub(in crate::presentation::cli) fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
+pub fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
     let loaded_manifest =
         read_refactor_manifest_file(&args.manifest, args.expect_manifest_hash.as_deref())?;
     let manifest = parse_refactor_apply_manifest(&loaded_manifest.value)?;

@@ -1,0 +1,35 @@
+[package]
+name = "paredit-feature-refactor-workflow"
+description = "The manifest-driven refactor workflow: plan, preview, check, diff and apply"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-semantics = { path = "../../core/semantics" }
+paredit-core-edit = { path = "../../core/edit" }
+paredit-core-workspace = { path = "../../core/workspace" }
+paredit-core-cli = { path = "../../core/cli" }
+# One feature edge: impact_report, for the risk level a plan reports.
+paredit-feature-project-analysis = { path = "../project-analysis" }
+paredit-feature-rename = { path = "../rename" }
+anyhow.workspace = true
+blake3.workspace = true
+libc.workspace = true
+cap-std.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

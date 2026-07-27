@@ -1,9 +1,7 @@
-use super::super::super::*;
+use anyhow::Result;
+use paredit_core_syntax::sexpr::ByteSpan;
 
-pub(in crate::presentation::cli) fn validate_manifest_edits(
-    input: &str,
-    edits: &[(ByteSpan, String)],
-) -> Result<()> {
+pub fn validate_manifest_edits(input: &str, edits: &[(ByteSpan, String)]) -> Result<()> {
     for (span, _) in edits {
         let start = span.start().get();
         let end = span.end().get();
@@ -24,6 +22,7 @@ pub(in crate::presentation::cli) fn validate_manifest_edits(
 
 #[cfg(test)]
 mod tests {
+    use paredit_core_syntax::sexpr::ByteOffset;
     use proptest::prelude::*;
 
     use super::*;

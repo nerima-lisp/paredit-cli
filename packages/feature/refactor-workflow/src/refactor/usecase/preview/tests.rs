@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::sexpr::{ByteOffset, ByteSpan};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 use proptest::prelude::*;
 
 fn summary() -> RefactorPreviewSummary {

@@ -1,15 +1,15 @@
-use super::super::super::super::*;
 use super::super::super::manifest::status::refactor_manifest_decision;
 use super::super::super::types::diff::RefactorDiffResult;
 use super::{
     blocked_reason_labels, blocked_reason_text, decision_steps_json, decision_summary_json,
     print_decision_summary,
 };
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use serde_json::json;
 
-pub(in crate::presentation::cli) fn print_refactor_diff_result(
-    result: &RefactorDiffResult,
-    output: OutputFormat,
-) -> Result<()> {
+pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFormat) -> Result<()> {
     let decision = refactor_manifest_decision(
         result.manifest_policy_passed,
         result.manifest_outputs_parse,

@@ -1,4 +1,3 @@
-use super::super::super::*;
 use super::super::args::*;
 use super::super::render::print_refactor_plan;
 use super::super::types::plan::{
@@ -6,8 +5,23 @@ use super::super::types::plan::{
 };
 use super::shared::derive_refactor_target_kind;
 use super::workspace::discover_workspace_refactor_scope;
+use crate::refactor::usecase::plan::{
+    RefactorOperation as ApplicationRefactorOperation,
+    RefactorPlanPolicyOptions as DomainRefactorPlanPolicyOptions, RefactorPlanRequest,
+    build_refactor_plan_decision,
+};
+use anyhow::Result;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_syntax::sexpr::SymbolName;
+use paredit_core_workspace::workspace::WorkspaceDiscoveryOptions;
+use paredit_feature_project_analysis::impact_report::cli as impact_report;
+use paredit_feature_project_analysis::impact_report::usecase::{
+    raw_refactor_risks, summarize_impact_reports,
+};
+use std::path::PathBuf;
 
-pub(in crate::presentation::cli) fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
+pub fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
     emit_refactor_plan(RefactorPlanEmission {
         paths: &args.files,
         dialect: args.dialect,
@@ -24,9 +38,7 @@ pub(in crate::presentation::cli) fn refactor_plan(args: RefactorPlanArgs) -> Res
     })
 }
 
-pub(in crate::presentation::cli) fn workspace_refactor_plan(
-    args: WorkspaceRefactorPlanArgs,
-) -> Result<()> {
+pub fn workspace_refactor_plan(args: WorkspaceRefactorPlanArgs) -> Result<()> {
     let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
         include_unknown: args.include_unknown,
@@ -112,7 +124,7 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
     print_refactor_plan(&plan, output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "{failure_label} policy failed: {policy_message}"
         )));
     }

@@ -5,16 +5,16 @@ use super::super::types::status::{
     RefactorStatusNextAction,
 };
 
-mod apply;
-mod blocked;
+pub mod apply;
+pub mod blocked;
 
-pub(in crate::presentation::cli) fn refactor_status_decision(
-    check: &RefactorCheckResult,
-) -> RefactorManifestDecision {
+#[must_use]
+pub fn refactor_status_decision(check: &RefactorCheckResult) -> RefactorManifestDecision {
     refactor_manifest_decision_from_blocked_reasons(refactor_status_blocked_reasons(check))
 }
 
-pub(in crate::presentation::cli) fn refactor_manifest_decision(
+#[must_use]
+pub fn refactor_manifest_decision(
     manifest_policy_passed: bool,
     manifest_outputs_parse: bool,
     stale_file_count: usize,
@@ -50,7 +50,8 @@ fn refactor_manifest_decision_from_blocked_reasons(
     }
 }
 
-pub(in crate::presentation::cli) fn refactor_apply_decision(
+#[must_use]
+pub fn refactor_apply_decision(
     manifest_policy_passed: bool,
     manifest_outputs_parse: bool,
     stale_file_count: usize,
@@ -77,10 +78,10 @@ pub(in crate::presentation::cli) fn refactor_apply_decision(
     }
 }
 
-pub(in crate::presentation::cli) use apply::refactor_apply_status_and_action;
-pub(in crate::presentation::cli) use blocked::{
+pub use apply::refactor_apply_status_and_action;
+pub use blocked::{
     refactor_manifest_blocked_reasons, refactor_status_blocked_reasons, refactor_status_next_action,
 };
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

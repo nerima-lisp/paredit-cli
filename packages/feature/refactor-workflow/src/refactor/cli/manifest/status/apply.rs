@@ -3,7 +3,8 @@ use super::{
     RefactorStatusNextAction,
 };
 
-pub(in crate::presentation::cli) fn refactor_apply_status_and_action(
+#[must_use]
+pub fn refactor_apply_status_and_action(
     decision: &RefactorManifestDecision,
     applied: bool,
 ) -> (RefactorApplyDecisionStatus, RefactorApplyNextAction) {

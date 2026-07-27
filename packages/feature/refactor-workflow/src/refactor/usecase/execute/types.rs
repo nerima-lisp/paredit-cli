@@ -4,7 +4,7 @@ pub struct RefactorWriteCandidate {
     pub output_parse_ok: bool,
 }
 
-pub use crate::domain::refactor_execute::{
+pub use paredit_core_edit::refactor_execute::{
     RefactorExecuteDecision, RefactorExecuteDecisionStatus, RefactorExecuteGateInputs,
     RefactorExecuteMode, RefactorExecuteOutcome, RefactorExecuteOutputParseResult,
     RefactorExecutePolicyResult, RefactorExecutePostVerificationResult,
@@ -53,19 +53,22 @@ pub struct RefactorWritePlan {
 }
 
 impl RefactorWritePlan {
-    pub(super) const fn not_requested() -> Self {
+    #[must_use]
+    pub const fn not_requested() -> Self {
         Self {
             state: RefactorWritePlanState::NotRequested,
         }
     }
 
-    pub(super) const fn refused(refusal: RefactorWriteRefusal) -> Self {
+    #[must_use]
+    pub const fn refused(refusal: RefactorWriteRefusal) -> Self {
         Self {
             state: RefactorWritePlanState::Refused(refusal),
         }
     }
 
-    pub(super) const fn allowed(writable_indexes: Vec<usize>) -> Self {
+    #[must_use]
+    pub const fn allowed(writable_indexes: Vec<usize>) -> Self {
         Self {
             state: RefactorWritePlanState::Allowed { writable_indexes },
         }

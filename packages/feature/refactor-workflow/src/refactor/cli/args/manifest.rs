@@ -2,71 +2,71 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use super::super::super::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct RefactorApplyArgs {
+pub struct RefactorApplyArgs {
     /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
-    pub(in crate::presentation::cli) manifest: PathBuf,
+    pub manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.
     #[arg(long)]
-    pub(in crate::presentation::cli) expect_manifest_hash: Option<String>,
+    pub expect_manifest_hash: Option<String>,
     /// Restrict manifest file paths to this workspace root.
     #[arg(long)]
-    pub(in crate::presentation::cli) root: Option<PathBuf>,
+    pub root: Option<PathBuf>,
     /// Rewrite changed files after manifest, hash, and parse gates pass.
     #[arg(long)]
-    pub(in crate::presentation::cli) write: bool,
+    pub write: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct RefactorCheckArgs {
+pub struct RefactorCheckArgs {
     /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
-    pub(in crate::presentation::cli) manifest: PathBuf,
+    pub manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.
     #[arg(long)]
-    pub(in crate::presentation::cli) expect_manifest_hash: Option<String>,
+    pub expect_manifest_hash: Option<String>,
     /// Restrict manifest file paths to this workspace root.
     #[arg(long)]
-    pub(in crate::presentation::cli) root: Option<PathBuf>,
+    pub root: Option<PathBuf>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct RefactorDiffArgs {
+pub struct RefactorDiffArgs {
     /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
-    pub(in crate::presentation::cli) manifest: PathBuf,
+    pub manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.
     #[arg(long)]
-    pub(in crate::presentation::cli) expect_manifest_hash: Option<String>,
+    pub expect_manifest_hash: Option<String>,
     /// Restrict manifest file paths to this workspace root.
     #[arg(long)]
-    pub(in crate::presentation::cli) root: Option<PathBuf>,
+    pub root: Option<PathBuf>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct RefactorStatusArgs {
+pub struct RefactorStatusArgs {
     /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
-    pub(in crate::presentation::cli) manifest: PathBuf,
+    pub manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.
     #[arg(long)]
-    pub(in crate::presentation::cli) expect_manifest_hash: Option<String>,
+    pub expect_manifest_hash: Option<String>,
     /// Restrict manifest file paths to this workspace root.
     #[arg(long)]
-    pub(in crate::presentation::cli) root: Option<PathBuf>,
+    pub root: Option<PathBuf>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli) output: OutputFormat,
+    pub output: OutputFormat,
 }

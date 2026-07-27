@@ -1,6 +1,7 @@
 use super::*;
 
-pub(super) fn summary() -> RefactorPlanSummary {
+#[must_use]
+pub fn summary() -> RefactorPlanSummary {
     RefactorPlanSummary {
         file_count: 2,
         definition_count: 1,
@@ -14,10 +15,8 @@ pub(super) fn summary() -> RefactorPlanSummary {
     }
 }
 
-pub(super) fn gates(
-    blocking_gate_count: usize,
-    nonblocking_gate_count: usize,
-) -> Vec<RefactorPlanGate> {
+#[must_use]
+pub fn gates(blocking_gate_count: usize, nonblocking_gate_count: usize) -> Vec<RefactorPlanGate> {
     let mut gates = Vec::new();
     for index in 0..blocking_gate_count {
         gates.push(RefactorPlanGate {

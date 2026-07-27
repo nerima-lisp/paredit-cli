@@ -1,10 +1,11 @@
-mod json;
-mod text;
+pub mod json;
+pub mod text;
 
-use super::super::super::*;
 use super::super::types::execute::WorkspaceRefactorExecute;
+use anyhow::Result;
+use paredit_core_cli::args::OutputFormat;
 
-pub(in crate::presentation::cli) fn print_workspace_refactor_execute(
+pub fn print_workspace_refactor_execute(
     execution: &WorkspaceRefactorExecute,
     output: OutputFormat,
 ) -> Result<()> {

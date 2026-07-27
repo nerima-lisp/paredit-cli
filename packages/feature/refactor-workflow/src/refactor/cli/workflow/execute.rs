@@ -1,4 +1,3 @@
-use super::super::super::*;
 use super::super::args::*;
 use super::super::render::print_workspace_refactor_execute;
 use super::super::types::execute::{WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome};
@@ -8,11 +7,18 @@ use super::preview::{
 };
 use super::verification::build_refactor_verification;
 use super::workspace::discover_workspace_refactor_scope;
-use crate::application::refactor::execute::RefactorExecutePostVerificationResult;
+use crate::refactor::usecase::execute::RefactorExecutePostVerificationResult;
+use crate::refactor::usecase::execute::{
+    RefactorExecuteGateInputs, RefactorExecuteMode, RefactorExecuteOutputParseResult,
+    RefactorExecutePolicyResult, RefactorExecutePreVerificationResult,
+    RefactorExecutePreflightInputs, build_refactor_execute_decision,
+    build_refactor_execute_preflight_decision,
+};
+use crate::refactor::usecase::preview::RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions;
+use anyhow::Result;
+use paredit_core_workspace::workspace::WorkspaceDiscoveryOptions;
 
-pub(in crate::presentation::cli) fn workspace_refactor_execute(
-    args: WorkspaceRefactorExecuteArgs,
-) -> Result<()> {
+pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> Result<()> {
     let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
         include_unknown: args.include_unknown,

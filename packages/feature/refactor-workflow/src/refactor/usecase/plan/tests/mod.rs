@@ -1,8 +1,8 @@
 use super::*;
 
-mod fixtures;
-mod gates;
-mod pbt;
-mod policy;
-mod steps;
-mod verification;
+pub mod fixtures;
+pub mod gates;
+pub mod pbt;
+pub mod policy;
+pub mod steps;
+pub mod verification;

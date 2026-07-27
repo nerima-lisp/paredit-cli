@@ -2,84 +2,84 @@ use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
 
-use crate::application::refactor::plan::RefactorOperation as ApplicationRefactorOperation;
-use crate::domain::sexpr::SymbolName;
+use crate::refactor::usecase::plan::RefactorOperation as ApplicationRefactorOperation;
+use paredit_core_syntax::sexpr::SymbolName;
 
-use super::super::super::{DialectArg, OutputFormat};
+use paredit_core_cli::args::{DialectArg, OutputFormat};
 
 #[derive(Debug, Args)]
 #[command(
     after_help = "Examples:\n  paredit refactor plan --symbol old-name src/foo.lisp src/bar.lisp\n  paredit refactor workspace-plan --symbol old-name ."
 )]
-pub(in crate::presentation::cli) struct WorkspaceRefactorPlanArgs {
+pub struct WorkspaceRefactorPlanArgs {
     /// Files or directories to scan recursively.
     #[arg(required = true)]
-    pub(in crate::presentation::cli) roots: Vec<PathBuf>,
+    pub roots: Vec<PathBuf>,
     /// Include files whose extension does not identify a known Lisp dialect.
     #[arg(long)]
-    pub(in crate::presentation::cli) include_unknown: bool,
+    pub include_unknown: bool,
     /// Include hidden directories and files.
     #[arg(long)]
-    pub(in crate::presentation::cli) include_hidden: bool,
+    pub include_hidden: bool,
     /// Include generated or dependency directories such as target and node_modules.
     #[arg(long)]
-    pub(in crate::presentation::cli) include_generated: bool,
+    pub include_generated: bool,
     /// Maximum directory recursion depth from each root directory.
     #[arg(long)]
-    pub(in crate::presentation::cli) max_depth: Option<usize>,
+    pub max_depth: Option<usize>,
     /// Exact symbol to evaluate before generating a refactoring plan.
     #[arg(long)]
-    pub(in crate::presentation::cli) symbol: SymbolName,
+    pub symbol: SymbolName,
     /// Refactoring intent used to choose gates and recommended commands.
     #[arg(long, value_enum, default_value_t = RefactorOperation::Rename)]
-    pub(in crate::presentation::cli) operation: RefactorOperation,
+    pub operation: RefactorOperation,
     /// Fail after printing the plan when any gate blocks automated editing.
     #[arg(long)]
-    pub(in crate::presentation::cli) fail_on_blocking_gate: bool,
+    pub fail_on_blocking_gate: bool,
     /// Minimum number of discovered definitions required for the plan to pass.
     #[arg(long)]
-    pub(in crate::presentation::cli) require_definitions: Option<usize>,
+    pub require_definitions: Option<usize>,
     /// Minimum number of discovered references required for the plan to pass.
     #[arg(long)]
-    pub(in crate::presentation::cli) require_references: Option<usize>,
+    pub require_references: Option<usize>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
 #[command(
     after_help = "Examples:\n  paredit refactor plan --symbol old-name src/foo.lisp src/bar.lisp"
 )]
-pub(in crate::presentation::cli) struct RefactorPlanArgs {
+pub struct RefactorPlanArgs {
     /// Files to scan.
     #[arg(required = true)]
-    pub(in crate::presentation::cli) files: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
-    pub(in crate::presentation::cli) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     /// Exact symbol to evaluate before generating a refactoring plan.
     #[arg(long)]
-    pub(in crate::presentation::cli) symbol: SymbolName,
+    pub symbol: SymbolName,
     /// Refactoring intent used to choose gates and recommended commands.
     #[arg(long, value_enum, default_value_t = RefactorOperation::Rename)]
-    pub(in crate::presentation::cli) operation: RefactorOperation,
+    pub operation: RefactorOperation,
     /// Fail after printing the plan when any gate blocks automated editing.
     #[arg(long)]
-    pub(in crate::presentation::cli) fail_on_blocking_gate: bool,
+    pub fail_on_blocking_gate: bool,
     /// Minimum number of discovered definitions required for the plan to pass.
     #[arg(long)]
-    pub(in crate::presentation::cli) require_definitions: Option<usize>,
+    pub require_definitions: Option<usize>,
     /// Minimum number of discovered references required for the plan to pass.
     #[arg(long)]
-    pub(in crate::presentation::cli) require_references: Option<usize>,
+    pub require_references: Option<usize>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(in crate::presentation::cli) enum RefactorOperation {
+pub enum RefactorOperation {
     Rename,
     Remove,
     Move,

@@ -1,25 +1,30 @@
-use super::super::super::*;
 use super::super::args::RefactorPreviewMode;
 use super::plan::WorkspaceRefactorPlanDiscovery;
-use crate::application::refactor::execute::{
+use crate::refactor::usecase::execute::{
     RefactorWriteCandidate, RefactorWritePlan, build_refactor_write_plan,
 };
-use crate::domain::refactor_preview::{RefactorPreviewDecisionStatus, decide_refactor_preview};
+use crate::refactor::usecase::preview::{
+    RefactorPreviewEdit, RefactorPreviewPolicy, RefactorPreviewSummary,
+};
+use paredit_core_edit::refactor_preview::{RefactorPreviewDecisionStatus, decide_refactor_preview};
+use paredit_core_syntax::dialect::Dialect;
+use std::path::PathBuf;
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorPreview {
-    pub(in crate::presentation::cli) workspace: Option<WorkspaceRefactorPlanDiscovery>,
-    pub(in crate::presentation::cli) mode: RefactorPreviewMode,
-    pub(in crate::presentation::cli) from: String,
-    pub(in crate::presentation::cli) to: String,
-    pub(in crate::presentation::cli) write_requested: bool,
-    pub(in crate::presentation::cli) files: Vec<RefactorPreviewFile>,
-    pub(in crate::presentation::cli) summary: RefactorPreviewSummary,
-    pub(in crate::presentation::cli) policy: RefactorPreviewPolicy,
+pub struct RefactorPreview {
+    pub workspace: Option<WorkspaceRefactorPlanDiscovery>,
+    pub mode: RefactorPreviewMode,
+    pub from: String,
+    pub to: String,
+    pub write_requested: bool,
+    pub files: Vec<RefactorPreviewFile>,
+    pub summary: RefactorPreviewSummary,
+    pub policy: RefactorPreviewPolicy,
 }
 
 impl RefactorPreview {
-    pub(in crate::presentation::cli) fn write_plan(&self) -> RefactorWritePlan {
+    #[must_use]
+    pub fn write_plan(&self) -> RefactorWritePlan {
         let candidates = self
             .files
             .iter()
@@ -32,10 +37,8 @@ impl RefactorPreview {
         build_refactor_write_plan(self.write_requested, &candidates)
     }
 
-    pub(in crate::presentation::cli) fn writable_paths_for_write_plan(
-        &self,
-        write_plan: &RefactorWritePlan,
-    ) -> Vec<String> {
+    #[must_use]
+    pub fn writable_paths_for_write_plan(&self, write_plan: &RefactorWritePlan) -> Vec<String> {
         write_plan
             .writable_indexes()
             .iter()
@@ -44,10 +47,8 @@ impl RefactorPreview {
             .collect()
     }
 
-    pub(in crate::presentation::cli) fn refused_paths_for_write_plan(
-        &self,
-        write_plan: &RefactorWritePlan,
-    ) -> Vec<String> {
+    #[must_use]
+    pub fn refused_paths_for_write_plan(&self, write_plan: &RefactorWritePlan) -> Vec<String> {
         if write_plan.refusal().is_none() {
             return Vec::new();
         }
@@ -59,7 +60,8 @@ impl RefactorPreview {
             .collect()
     }
 
-    pub(in crate::presentation::cli) fn decision_for_write_plan(
+    #[must_use]
+    pub fn decision_for_write_plan(
         &self,
         write_plan: &RefactorWritePlan,
     ) -> RefactorPreviewDecision {
@@ -74,23 +76,26 @@ impl RefactorPreview {
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorPreviewDecision {
-    pub(in crate::presentation::cli) status: RefactorPreviewDecisionStatus,
+pub struct RefactorPreviewDecision {
+    pub status: RefactorPreviewDecisionStatus,
 }
 
 impl RefactorPreviewDecision {
-    pub(in crate::presentation::cli) const fn write_parse_refused(&self) -> bool {
+    #[must_use]
+    pub const fn write_parse_refused(&self) -> bool {
         matches!(
             self.status,
             RefactorPreviewDecisionStatus::RefusedUnparsableOutput
         )
     }
 
-    pub(in crate::presentation::cli) const fn apply_preview(&self) -> bool {
+    #[must_use]
+    pub const fn apply_preview(&self) -> bool {
         matches!(self.status, RefactorPreviewDecisionStatus::WriteApplied)
     }
 
-    pub(in crate::presentation::cli) const fn steps(&self) -> [RefactorPreviewDecisionStep; 3] {
+    #[must_use]
+    pub const fn steps(&self) -> [RefactorPreviewDecisionStep; 3] {
         [
             RefactorPreviewDecisionStep {
                 name: "preview-policy",
@@ -133,13 +138,13 @@ impl RefactorPreviewDecision {
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorPreviewDecisionStep {
-    pub(in crate::presentation::cli) name: &'static str,
-    pub(in crate::presentation::cli) status: RefactorPreviewDecisionStepStatus,
+pub struct RefactorPreviewDecisionStep {
+    pub name: &'static str,
+    pub status: RefactorPreviewDecisionStepStatus,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(in crate::presentation::cli) enum RefactorPreviewDecisionStepStatus {
+pub enum RefactorPreviewDecisionStepStatus {
     Passed,
     Failed,
     Skipped,
@@ -147,7 +152,8 @@ pub(in crate::presentation::cli) enum RefactorPreviewDecisionStepStatus {
 }
 
 impl RefactorPreviewDecisionStepStatus {
-    pub(in crate::presentation::cli) const fn label(&self) -> &'static str {
+    #[must_use]
+    pub const fn label(&self) -> &'static str {
         match self {
             Self::Passed => "passed",
             Self::Failed => "failed",
@@ -158,25 +164,27 @@ impl RefactorPreviewDecisionStepStatus {
 }
 
 #[derive(Debug)]
-pub(in crate::presentation::cli) struct RefactorPreviewFile {
-    pub(in crate::presentation::cli) path: PathBuf,
-    pub(in crate::presentation::cli) dialect: Dialect,
-    pub(in crate::presentation::cli) changed: bool,
-    pub(in crate::presentation::cli) written: bool,
-    pub(in crate::presentation::cli) edit_count: usize,
-    pub(in crate::presentation::cli) edits: Vec<RefactorPreviewEdit>,
-    pub(in crate::presentation::cli) input_bytes: usize,
-    pub(in crate::presentation::cli) output_bytes: usize,
-    pub(in crate::presentation::cli) output_parse_ok: bool,
-    pub(in crate::presentation::cli) input_hash: String,
-    pub(in crate::presentation::cli) output_hash: String,
-    pub(in crate::presentation::cli) preview: String,
-    pub(in crate::presentation::cli) rewritten: String,
+pub struct RefactorPreviewFile {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub changed: bool,
+    pub written: bool,
+    pub edit_count: usize,
+    pub edits: Vec<RefactorPreviewEdit>,
+    pub input_bytes: usize,
+    pub output_bytes: usize,
+    pub output_parse_ok: bool,
+    pub input_hash: String,
+    pub output_hash: String,
+    pub preview: String,
+    pub rewritten: String,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::refactor::usecase::preview::RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions;
+    use crate::refactor::usecase::preview::evaluate_refactor_preview_policy;
 
     fn preview_file(path: &str, changed: bool, output_parse_ok: bool) -> RefactorPreviewFile {
         RefactorPreviewFile {

@@ -1,12 +1,18 @@
-use super::super::super::*;
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
+use anyhow::Result;
+use paredit_core_workspace::workspace::WorkspaceDiscoveryOptions;
+use paredit_core_workspace::workspace::discover_workspace_files;
+use std::path::PathBuf;
 
-pub(super) struct WorkspaceRefactorScope {
-    pub(super) paths: Vec<PathBuf>,
-    pub(super) workspace: WorkspaceRefactorPlanDiscovery,
+// Public since the extraction: crate-internal visibility cannot cross a
+// crate boundary, so this lint applies for the first time.
+#[derive(Debug)]
+pub struct WorkspaceRefactorScope {
+    pub paths: Vec<PathBuf>,
+    pub workspace: WorkspaceRefactorPlanDiscovery,
 }
 
-pub(super) fn discover_workspace_refactor_scope(
+pub fn discover_workspace_refactor_scope(
     options: WorkspaceDiscoveryOptions,
 ) -> Result<WorkspaceRefactorScope> {
     let discovery = discover_workspace_files(&options)?;

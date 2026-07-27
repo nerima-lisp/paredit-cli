@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::domain::refactor_plan::{
+use paredit_core_edit::refactor_plan::{
     RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
     RefactorPlanPolicyOptions, RefactorPlanRiskSummary, RefactorPlanSummary,
     RefactorPlanTargetKind,
@@ -80,7 +80,8 @@ pub struct RefactorPlanAutomationDecision {
 }
 
 impl RefactorPlanAutomationDecision {
-    pub(super) const fn policy_failed(reason: String, blocking_gate_count: usize) -> Self {
+    #[must_use]
+    pub const fn policy_failed(reason: String, blocking_gate_count: usize) -> Self {
         Self {
             state: RefactorPlanAutomationState::PolicyFailed {
                 reason,
@@ -89,7 +90,8 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
-    pub(super) const fn manual_review(
+    #[must_use]
+    pub const fn manual_review(
         reason: String,
         next_action: &'static str,
         blocking_gate_count: usize,
@@ -103,7 +105,8 @@ impl RefactorPlanAutomationDecision {
         }
     }
 
-    pub(super) const fn ready(next_action: &'static str) -> Self {
+    #[must_use]
+    pub const fn ready(next_action: &'static str) -> Self {
         Self {
             state: RefactorPlanAutomationState::Ready { next_action },
         }

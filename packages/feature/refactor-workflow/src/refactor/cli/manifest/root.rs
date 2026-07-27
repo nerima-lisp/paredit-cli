@@ -1,15 +1,20 @@
-use super::super::super::*;
 use super::super::types::root::{RefactorRootGuard, RefactorRootReport};
-use crate::infrastructure::fs_identity::FilesystemIdentity;
-use crate::presentation::cli::shared::{
+use anyhow::{Context, Result};
+use cap_std::ambient_authority;
+use paredit_core_cli::shared::MAX_SOURCE_INPUT_BYTES;
+use paredit_core_cli::shared::read_text_with_limit;
+use paredit_core_cli::shared::{
     AnchoredExpectedWrite, ExpectedWriteTarget, read_text_file_with_expected_target,
 };
-use cap_std::ambient_authority;
+use paredit_core_workspace::fs_identity::FilesystemIdentity;
+use std::fs;
+use std::path::Path as FsPath;
+use std::path::PathBuf;
 
-pub(in crate::presentation::cli) const MAX_MANIFEST_SOURCE_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+pub const MAX_MANIFEST_SOURCE_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
 
 impl RefactorRootGuard {
-    pub(in crate::presentation::cli) fn new(root: &FsPath) -> Result<Self> {
+    pub fn new(root: &FsPath) -> Result<Self> {
         let canonical_root = fs::canonicalize(root)
             .with_context(|| format!("failed to canonicalize refactor root {}", root.display()))?;
         if !canonical_root.is_dir() {
@@ -75,10 +80,7 @@ impl RefactorRootGuard {
         Ok(())
     }
 
-    pub(in crate::presentation::cli) fn resolve_manifest_path(
-        &self,
-        path: &FsPath,
-    ) -> Result<PathBuf> {
+    pub fn resolve_manifest_path(&self, path: &FsPath) -> Result<PathBuf> {
         self.validate_root_identity()?;
         let resolved = if path.is_absolute() {
             path.to_path_buf()
@@ -98,7 +100,7 @@ impl RefactorRootGuard {
         Ok(canonical_path)
     }
 
-    pub(in crate::presentation::cli) fn read_manifest_source(
+    pub fn read_manifest_source(
         &self,
         path: &FsPath,
     ) -> Result<(PathBuf, String, ExpectedWriteTarget)> {
@@ -149,7 +151,7 @@ impl RefactorRootGuard {
         Ok((canonical_path, text, expected))
     }
 
-    pub(in crate::presentation::cli) fn anchored_manifest_write(
+    pub fn anchored_manifest_write(
         &self,
         display_path: PathBuf,
         content: String,
@@ -215,7 +217,8 @@ fn open_manifest_source(
 }
 
 impl RefactorRootReport {
-    pub(in crate::presentation::cli) fn from_guard(root_guard: Option<&RefactorRootGuard>) -> Self {
+    #[must_use]
+    pub fn from_guard(root_guard: Option<&RefactorRootGuard>) -> Self {
         match root_guard {
             Some(root_guard) => Self {
                 enforced: true,
@@ -229,7 +232,7 @@ impl RefactorRootReport {
     }
 }
 
-pub(in crate::presentation::cli) fn read_refactor_manifest_source(
+pub fn read_refactor_manifest_source(
     path: &FsPath,
     root_guard: Option<&RefactorRootGuard>,
 ) -> Result<(PathBuf, String, ExpectedWriteTarget)> {
@@ -335,10 +338,8 @@ mod tests {
             .anchored_manifest_write(resolved_path, "(changed)\n".to_owned(), expected)
             .expect("retain A parent after root replacement");
         let error =
-            crate::presentation::cli::shared::write_files_with_rollback_expected_anchored(vec![
-                write,
-            ])
-            .expect_err("replaced ambient root must be rejected before writing");
+            paredit_core_cli::shared::write_files_with_rollback_expected_anchored(vec![write])
+                .expect_err("replaced ambient root must be rejected before writing");
 
         assert!(
             format!("{error:#}").contains("refusing replaced parent directory"),

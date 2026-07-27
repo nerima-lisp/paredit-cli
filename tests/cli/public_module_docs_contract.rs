@@ -10,7 +10,7 @@ fn top_level_public_modules_keep_docs_rs_responsibility_docs() {
             "//! Application use cases for Lisp-aware analysis, reporting, and refactor planning.",
         ),
         (
-            "src/application/refactor/mod.rs",
+            "packages/feature/refactor-workflow/src/refactor/usecase/mod.rs",
             "//! Refactor planning, preview, and guarded apply services.",
         ),
         (
