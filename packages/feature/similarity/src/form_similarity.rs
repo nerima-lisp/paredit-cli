@@ -43,6 +43,31 @@ pub const MAX_TREE_SIMILARITY_WORKSPACES: usize =
 const MAX_TREE_EDIT_OPERATIONS: usize = 64 * 1024 * 1024;
 pub const MAX_REPORT_TREE_EDIT_OPERATIONS: usize = MAX_TREE_EDIT_OPERATIONS;
 
+/// Every count this module converts to `f64` is exact, and this is the proof.
+///
+/// Section 9.4 lists the `usize as f64` casts here as a correctness problem, on
+/// the grounds that the conversion is lossy. It is not, for these inputs. An
+/// `f64` represents every integer up to 2^53 exactly, and every count reaching
+/// a cast below is bounded by one of the limits above - node counts and leaf
+/// counts by the 64 MiB input limit (a node costs at least one byte), edit
+/// operations by `MAX_TREE_EDIT_OPERATIONS`, matrix cells by
+/// `MAX_DISTANCE_MATRIX_CELLS`. All are 2^26 or smaller.
+///
+/// The alternative - a checked `TryFrom` on each cast - would put a branch in
+/// the inner loop of the distance computation to guard a case the limiter has
+/// already made unreachable. Proving the bound once is both cheaper and more
+/// honest: if someone raises a limit past 2^53, this assertion fails at compile
+/// time rather than the ratios quietly losing precision.
+const _: () = {
+    const F64_EXACT_INTEGER_LIMIT: usize = 1 << 53;
+    assert!(MAX_TREE_SIMILARITY_WORKSPACE_BYTES < F64_EXACT_INTEGER_LIMIT);
+    assert!(MAX_TOTAL_TREE_SIMILARITY_WORKSPACE_BYTES < F64_EXACT_INTEGER_LIMIT);
+    assert!(MAX_TREE_EDIT_OPERATIONS < F64_EXACT_INTEGER_LIMIT);
+    assert!(MAX_DISTANCE_MATRIX_CELLS < F64_EXACT_INTEGER_LIMIT);
+    assert!(EDIT_COST_SCALE * MAX_TREE_EDIT_OPERATIONS < F64_EXACT_INTEGER_LIMIT);
+    assert!(ATOM_RENAME_COST * MAX_TREE_EDIT_OPERATIONS < F64_EXACT_INTEGER_LIMIT);
+};
+
 #[derive(Debug)]
 struct TreeSimilarityWorkspaceLimiter {
     active: Mutex<usize>,
