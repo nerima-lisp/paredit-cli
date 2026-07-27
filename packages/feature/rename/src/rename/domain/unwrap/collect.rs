@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{CallSiteError, RenameResult};
 
 use crate::rename::domain::call_identity::is_local_call_bound;
 use crate::rename::domain::reader::{
@@ -24,7 +24,7 @@ pub fn collect_unwrap_all_call_sites(
     input: &str,
     function: &SymbolName,
     wrapper: &SymbolName,
-) -> Result<(
+) -> RenameResult<(
     Vec<UnwrapFunctionCallSite>,
     Vec<UnwrapFunctionCallSite>,
     Vec<UnwrapFunctionCallSite>,
@@ -48,7 +48,7 @@ pub fn collect_unwrap_explicit_call_sites(
     paths: &[Path],
     function: &SymbolName,
     wrapper: &SymbolName,
-) -> Result<(
+) -> RenameResult<(
     Vec<UnwrapFunctionCallSite>,
     Vec<UnwrapFunctionCallSite>,
     Vec<UnwrapFunctionCallSite>,
@@ -59,11 +59,18 @@ pub fn collect_unwrap_explicit_call_sites(
     for path in paths {
         let view = tree.select_path(path)?.view();
         if !executable_reader_context_at_path(tree, dialect, path)? {
-            anyhow::bail!("call-path {path} is not in an executable reader context");
+            return Err(CallSiteError::NotExecutable {
+                path: path.to_string(),
+            }
+            .into());
         }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
         if is_local_call_bound(dialect, &local_callables, function.as_str()) {
-            anyhow::bail!("call-path {path} is shadowed by a local callable named {function}");
+            return Err(CallSiteError::Shadowed {
+                path: path.to_string(),
+                name: function.to_string(),
+            }
+            .into());
         }
         match unwrap_call_site_from_view(
             &view,
@@ -76,7 +83,12 @@ pub fn collect_unwrap_explicit_call_sites(
             UnwrapCandidate::Selected(site) => calls.push(site),
             UnwrapCandidate::NonUnaryWrapper(site) => skipped_non_unary_wrapper.push(site),
             UnwrapCandidate::NotMatched => {
-                anyhow::bail!("call-path {path} is not a unary {wrapper} wrapper around {function}")
+                return Err(CallSiteError::NotAUnaryWrapper {
+                    path: path.to_string(),
+                    wrapper: wrapper.to_string(),
+                    function: function.to_string(),
+                }
+                .into());
             }
         }
     }

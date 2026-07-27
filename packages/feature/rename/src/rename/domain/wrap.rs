@@ -1,4 +1,6 @@
-use anyhow::{Context, Result, ensure};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{CallSiteError, RenameError, RenameResult};
 
 pub use crate::rename::domain::WrapFunctionCallsScope;
 use crate::rename::domain::call_identity::call_reference_eq;
@@ -56,29 +58,28 @@ pub struct WrapFunctionCallTemplate {
 }
 
 impl WrapFunctionCallTemplate {
-    fn parse(source: String, dialect: Dialect, wrapper: &SymbolName) -> Result<Self> {
+    fn parse(source: String, dialect: Dialect, wrapper: &SymbolName) -> RenameResult<Self> {
         let tree = SyntaxTree::parse_with_dialect(&source, dialect)
-            .context("failed to parse wrapper template")?;
-        ensure!(
-            tree.root_children().len() == 1,
-            "wrapper template must contain exactly one root form"
-        );
+            .map_err(|source| CallSiteError::WrapperTemplateDoesNotParse { source })?;
+        if tree.root_children().len() != 1 {
+            return Err(CallSiteError::WrapperTemplateNotOneForm.into());
+        }
 
         let root = tree.select_path(&Path::root_child(0))?.view();
         let head = crate::rename::domain::selection::list_head(&root)
-            .context("wrapper template root form must be a parenthesized list")?;
-        ensure!(
-            call_reference_eq(dialect, head, wrapper.as_str()),
-            "wrapper template head must match --wrapper ({})",
-            wrapper.as_str()
-        );
+            .ok_or(CallSiteError::WrapperTemplateNotAList)?;
+        if !call_reference_eq(dialect, head, wrapper.as_str()) {
+            return Err(CallSiteError::WrapperTemplateHeadMismatch {
+                wrapper: wrapper.as_str().to_owned(),
+            }
+            .into());
+        }
 
         let mut placeholders = Vec::new();
         collect_template_placeholders(&root, &mut placeholders);
-        ensure!(
-            placeholders.len() == 1,
-            "wrapper template must contain exactly one _ placeholder atom"
-        );
+        if placeholders.len() != 1 {
+            return Err(CallSiteError::WrapperTemplateNotOnePlaceholder.into());
+        }
 
         Ok(Self {
             source,
@@ -86,7 +87,7 @@ impl WrapFunctionCallTemplate {
         })
     }
 
-    pub fn apply(&self, call_text: &str) -> Result<String> {
+    pub fn apply(&self, call_text: &str) -> RenameResult<String> {
         apply_byte_span_edits(
             &self.source,
             vec![(self.placeholder_span, call_text.to_owned())],
@@ -106,7 +107,7 @@ fn collect_template_placeholders(view: &ExpressionView, output: &mut Vec<ByteSpa
 
 pub fn plan_wrap_function_calls(
     request: WrapFunctionCallsRequest<'_>,
-) -> Result<WrapFunctionCallsPlan> {
+) -> RenameResult<WrapFunctionCallsPlan> {
     match request.dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -118,11 +119,15 @@ pub fn plan_wrap_function_calls(
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => {}
-        Dialect::Unknown => anyhow::bail!("wrap-function-calls requires a known dialect"),
+        Dialect::Unknown => {
+            return Err(RenameError::RequiresKnownDialect {
+                operation: "wrap-function-calls",
+            });
+        }
     }
 
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let template = request
         .wrapper_template
         .map(|source| WrapFunctionCallTemplate::parse(source, request.dialect, &request.wrapper))
@@ -151,8 +156,12 @@ pub fn plan_wrap_function_calls(
         .map(|site| (site.span, site.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("wrapped output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "wrapped",
+            source,
+        }
+    })?;
 
     Ok(WrapFunctionCallsPlan {
         dialect: request.dialect,

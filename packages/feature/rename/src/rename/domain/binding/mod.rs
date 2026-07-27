@@ -9,7 +9,7 @@ mod semantic;
 mod types;
 mod value_like;
 
-use anyhow::{Context, Result};
+use crate::error::{BindingSelectionError, RenameResult};
 
 use paredit_core_syntax::common_lisp::CommonLispBindingRefactorForm;
 use paredit_core_syntax::dialect::{RenameBindingOperation, VerifiedSemanticPolicy};
@@ -47,10 +47,10 @@ pub fn binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
     input: &str,
-) -> Result<BindingRenameParts> {
+) -> RenameResult<BindingRenameParts> {
     let dialect = semantic.dialect();
     let form = super::selection::list_head(view)
-        .context("selected form is not a supported binding form")?
+        .ok_or(BindingSelectionError::UnsupportedForm)?
         .to_owned();
 
     if dialect != paredit_core_syntax::dialect::Dialect::CommonLisp
@@ -60,7 +60,7 @@ pub fn binding_rename_parts(
     }
 
     let Some(refactor_form) = dialect.common_lisp_binding_refactor_form_for_head(&form) else {
-        anyhow::bail!("selected form is not a supported binding form");
+        return Err(BindingSelectionError::UnsupportedForm.into());
     };
 
     match refactor_form {

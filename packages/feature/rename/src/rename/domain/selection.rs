@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{BindingSelectionError, RenameResult};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 pub use paredit_core_syntax::sexpr::reader::atom_text;
@@ -11,7 +11,7 @@ use super::RenameTarget;
 pub fn select_rename_target<'a>(
     tree: &'a SyntaxTree,
     target: &RenameTarget,
-) -> Result<Selection<'a>> {
+) -> RenameResult<Selection<'a>> {
     match target {
         RenameTarget::Path(path) => Ok(tree.select_path(path)?),
         RenameTarget::Offset(offset) => Ok(tree.select_at(*offset)?),
@@ -32,7 +32,10 @@ pub fn collect_symbol_atom_spans(
     }
 }
 
-pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) -> Result<String> {
+pub fn apply_byte_span_edits(
+    input: &str,
+    mut edits: Vec<(ByteSpan, String)>,
+) -> RenameResult<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 
@@ -43,18 +46,18 @@ pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) ->
     Ok(output)
 }
 
-fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Result<()> {
+fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> RenameResult<()> {
     let mut previous: Option<ByteSpan> = None;
     for span in spans {
         if let Some(previous) = previous {
             if previous.end().get() > span.start().get() {
-                anyhow::bail!(
-                    "overlapping edits at {}..{} and {}..{}",
-                    previous.start().get(),
-                    previous.end().get(),
-                    span.start().get(),
-                    span.end().get()
-                );
+                return Err(BindingSelectionError::OverlappingEdits {
+                    first_start: previous.start().get(),
+                    first_end: previous.end().get(),
+                    second_start: span.start().get(),
+                    second_end: span.end().get(),
+                }
+                .into());
             }
         }
         previous = Some(span);

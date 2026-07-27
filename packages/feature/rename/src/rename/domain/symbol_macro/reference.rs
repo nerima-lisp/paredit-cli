@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use paredit_core_syntax::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispOperator, common_lisp_binding_refactor_form_for_head,
@@ -92,7 +92,7 @@ pub fn collect_define_symbol_macro_reference_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     let mut renames = Vec::new();
 
     for (top_index, _) in tree.root_children().iter().enumerate() {

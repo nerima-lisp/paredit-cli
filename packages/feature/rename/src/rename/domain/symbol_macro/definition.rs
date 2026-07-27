@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use paredit_core_syntax::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
@@ -97,7 +97,7 @@ pub fn collect_define_symbol_macro_definition_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     let mut renames = Vec::new();
 
     for (top_index, _) in tree.root_children().iter().enumerate() {
@@ -121,7 +121,7 @@ fn collect_definition_renames_from_path(
     from: &SymbolName,
     to: &SymbolName,
     renames: &mut Vec<RenameFunctionOccurrence>,
-) -> Result<()> {
+) -> RenameResult<()> {
     let view = tree.select_path(&path)?.view();
     let _ = collect_definition_renames_from_view(&view, path, dialect, from, to, 0, renames);
     Ok(())

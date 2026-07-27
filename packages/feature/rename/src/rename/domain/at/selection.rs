@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use crate::error::{BindingSelectionError, RenameResult};
 
 use paredit_core_syntax::sexpr::{AtomOccurrenceIndex, ByteSpan, ExpressionView, Path};
 
@@ -30,17 +30,16 @@ pub fn is_common_lisp_value_position(atom_paths: AtomPathIndex<'_>, span: ByteSp
 pub fn ancestor_views<'a>(
     root: &'a ExpressionView,
     path: &Path,
-) -> Result<Vec<&'a ExpressionView>> {
+) -> RenameResult<Vec<&'a ExpressionView>> {
     let indexes = path.to_raw_indexes();
     let mut ancestors = Vec::with_capacity(indexes.len().saturating_sub(1));
     let mut view = root;
     for &index in indexes.iter().take(indexes.len().saturating_sub(1)) {
-        view = view.children.get(index).ok_or_else(|| {
-            anyhow!(
-                "path index {index} is out of bounds for {} children",
-                view.children.len()
-            )
-        })?;
+        let children = view.children.len();
+        view = view
+            .children
+            .get(index)
+            .ok_or(BindingSelectionError::PathIndexOutOfBounds { index, children })?;
         ancestors.push(view);
     }
     Ok(ancestors)

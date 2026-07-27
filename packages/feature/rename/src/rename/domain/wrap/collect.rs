@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{CallSiteError, RenameResult};
 
 use crate::rename::domain::call_identity::{call_reference_eq, is_local_call_bound};
 use crate::rename::domain::reader::{
@@ -25,7 +25,7 @@ pub fn collect_wrap_all_call_sites(
     function: &SymbolName,
     wrapper: &SymbolName,
     template: Option<&WrapFunctionCallTemplate>,
-) -> Result<(
+) -> RenameResult<(
     Vec<WrapFunctionCallSite>,
     Vec<WrapFunctionCallSite>,
     Vec<WrapFunctionCallSite>,
@@ -60,7 +60,7 @@ pub fn collect_wrap_explicit_call_sites(
     function: &SymbolName,
     wrapper: &SymbolName,
     template: Option<&WrapFunctionCallTemplate>,
-) -> Result<(
+) -> RenameResult<(
     Vec<WrapFunctionCallSite>,
     Vec<WrapFunctionCallSite>,
     Vec<WrapFunctionCallSite>,
@@ -71,11 +71,18 @@ pub fn collect_wrap_explicit_call_sites(
     for path in paths {
         let view = tree.select_path(path)?.view();
         if !executable_reader_context_at_path(tree, dialect, path)? {
-            anyhow::bail!("call-path {path} is not in an executable reader context");
+            return Err(CallSiteError::NotExecutable {
+                path: path.to_string(),
+            }
+            .into());
         }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
         if is_local_call_bound(dialect, &local_callables, function.as_str()) {
-            anyhow::bail!("call-path {path} is shadowed by a local callable named {function}");
+            return Err(CallSiteError::Shadowed {
+                path: path.to_string(),
+                name: function.to_string(),
+            }
+            .into());
         }
         let site = wrap_call_site_from_view(
             &view,
@@ -86,7 +93,10 @@ pub fn collect_wrap_explicit_call_sites(
             wrapper,
             template,
         )
-        .with_context(|| format!("call-path {path} is not a call to {function}"))?;
+        .ok_or_else(|| CallSiteError::NotACall {
+            path: path.to_string(),
+            function: function.to_string(),
+        })?;
         if call_site_is_already_wrapped(tree, dialect, path, wrapper)? {
             skipped_already_wrapped.push(site);
         } else {
@@ -243,7 +253,7 @@ fn call_site_is_already_wrapped(
     dialect: Dialect,
     path: &Path,
     wrapper: &SymbolName,
-) -> Result<bool> {
+) -> RenameResult<bool> {
     let Some(parent_path) = path.parent() else {
         return Ok(false);
     };

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use super::RenameAtError;
 use crate::rename::domain::{RenameFunctionOccurrence, binding_rename_parts};
@@ -11,7 +11,7 @@ pub fn ensure_binding_target_is_available(
     to: &SymbolName,
     binding_span: ByteSpan,
     input: &str,
-) -> Result<()> {
+) -> RenameResult<()> {
     let semantic = Dialect::CommonLisp
         .verify_rename_binding()
         .expect("Common Lisp rename-binding semantics are verified");
@@ -27,7 +27,7 @@ pub fn ensure_binding_target_is_available(
 pub fn ensure_function_occurrences_are_unqualified(
     definitions: &[RenameFunctionOccurrence],
     calls: &[RenameFunctionOccurrence],
-) -> Result<()> {
+) -> RenameResult<()> {
     if definitions
         .iter()
         .chain(calls)

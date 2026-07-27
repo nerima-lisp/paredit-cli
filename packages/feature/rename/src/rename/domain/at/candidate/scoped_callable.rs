@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use super::super::RenameAtNamespace;
 use super::scope::{enclosing_specialized_scope, occurrence_has_scope};
@@ -12,7 +12,7 @@ use paredit_core_syntax::sexpr::ByteSpan;
 pub fn add_local_function(
     output: &mut Vec<Candidate>,
     context: &SpecializedCandidateContext<'_>,
-) -> Result<()> {
+) -> RenameResult<()> {
     let plan = plan_rename_local_function(RenameLocalFunctionRequest {
         input: context.input,
         dialect: context.dialect,
@@ -31,7 +31,7 @@ pub fn add_local_function(
 pub fn add_macro(
     output: &mut Vec<Candidate>,
     context: &SpecializedCandidateContext<'_>,
-) -> Result<()> {
+) -> RenameResult<()> {
     let plan = plan_rename_macrolet(RenameMacroletRequest {
         input: context.input,
         dialect: context.dialect,
@@ -53,7 +53,7 @@ fn add_scoped(
     namespace: RenameAtNamespace,
     definitions: &[RenameFunctionOccurrence],
     calls: &[RenameFunctionOccurrence],
-) -> Result<()> {
+) -> RenameResult<()> {
     let scope = enclosing_specialized_scope(context.root_view, context.path, namespace)?;
     let occurrences: Vec<_> = definitions
         .iter()

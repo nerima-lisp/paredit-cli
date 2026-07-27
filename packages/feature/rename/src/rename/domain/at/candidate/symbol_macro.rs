@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use super::super::RenameAtNamespace;
 use super::scope::{enclosing_specialized_scope, occurrence_has_scope};
@@ -7,7 +7,10 @@ use crate::rename::domain::{
     RenameSymbolMacroRequest, plan_rename_symbol_macro, selection::apply_byte_span_edits,
 };
 
-pub fn add(output: &mut Vec<Candidate>, context: &SpecializedCandidateContext<'_>) -> Result<()> {
+pub fn add(
+    output: &mut Vec<Candidate>,
+    context: &SpecializedCandidateContext<'_>,
+) -> RenameResult<()> {
     let plan = plan_rename_symbol_macro(RenameSymbolMacroRequest {
         input: context.input,
         dialect: context.dialect,

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{BindingSelectionError, RenameResult};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
@@ -14,7 +14,7 @@ pub fn clause_binding_rename_parts(
     from: &SymbolName,
     form: String,
     input: &str,
-) -> Result<BindingRenameParts> {
+) -> RenameResult<BindingRenameParts> {
     let mut target = None;
     let mut duplicate_count = 0usize;
 
@@ -39,13 +39,19 @@ pub fn clause_binding_rename_parts(
     }
 
     if duplicate_count > 1 {
-        anyhow::bail!(
-            "binding '{from}' was found in multiple selected {form} clauses; select an unambiguous binding form"
-        );
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "clauses".to_owned(),
+        }
+        .into());
     }
 
-    let (target_clause, target_parameter) = target
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+    let (target_clause, target_parameter) =
+        target.ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: form.to_string(),
+        })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
@@ -74,7 +80,7 @@ pub fn loop_binding_rename_parts(
     from: &SymbolName,
     form: String,
     input: &str,
-) -> Result<BindingRenameParts> {
+) -> RenameResult<BindingRenameParts> {
     let mut target = None;
     let mut duplicate_count = 0usize;
 
@@ -87,13 +93,18 @@ pub fn loop_binding_rename_parts(
     }
 
     if duplicate_count > 1 {
-        anyhow::bail!(
-            "binding '{from}' was found in multiple selected {form} clauses; select an unambiguous binding form"
-        );
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "clauses".to_owned(),
+        }
+        .into());
     }
 
-    let target = target
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+    let target = target.ok_or_else(|| BindingSelectionError::NotFound {
+        from: from.to_string(),
+        form: form.to_string(),
+    })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
@@ -122,11 +133,14 @@ pub fn slot_binding_rename_parts(
     from: &SymbolName,
     form: String,
     input: &str,
-) -> Result<BindingRenameParts> {
-    let slot_specs = view
-        .children
-        .get(1)
-        .with_context(|| format!("selected {form} form must contain slot specs"))?;
+) -> RenameResult<BindingRenameParts> {
+    let slot_specs =
+        view.children
+            .get(1)
+            .ok_or_else(|| BindingSelectionError::FormMissingPart {
+                form: form.to_string(),
+                what: "slot specs".to_owned(),
+            })?;
     let mut target = None;
     let mut duplicate_count = 0usize;
 
@@ -142,13 +156,18 @@ pub fn slot_binding_rename_parts(
     }
 
     if duplicate_count > 1 {
-        anyhow::bail!(
-            "binding '{from}' was found in multiple selected {form} specs; select an unambiguous binding form"
-        );
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "specs".to_owned(),
+        }
+        .into());
     }
 
-    let (binding_span, binding_edit) = target
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+    let (binding_span, binding_edit) = target.ok_or_else(|| BindingSelectionError::NotFound {
+        from: from.to_string(),
+        form: form.to_string(),
+    })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;

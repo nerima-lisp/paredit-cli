@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
@@ -35,7 +35,7 @@ fn collect_renames(
     to: &SymbolName,
     kind: LocalCallableRenameKind,
     collect_from_view: RenameCollector,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     let mut renames = Vec::new();
 
     for (index, _) in tree.root_children().iter().enumerate() {
@@ -64,7 +64,7 @@ pub fn collect_macrolet_binding_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     collect_renames(
         tree,
         dialect,
@@ -80,7 +80,7 @@ pub fn collect_macrolet_call_head_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     collect_renames(
         tree,
         dialect,
@@ -96,7 +96,7 @@ pub fn collect_local_function_binding_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     collect_renames(
         tree,
         dialect,
@@ -112,7 +112,7 @@ pub fn collect_local_function_call_head_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     collect_renames(
         tree,
         dialect,

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use super::super::RenameAtNamespace;
 use super::super::safety::ensure_binding_target_is_available;
@@ -16,7 +16,7 @@ pub fn binding_candidates(
     path: &Path,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<Candidate>> {
+) -> RenameResult<Vec<Candidate>> {
     let semantic = Dialect::CommonLisp
         .verify_rename_binding()
         .expect("Common Lisp rename-binding semantics are verified");

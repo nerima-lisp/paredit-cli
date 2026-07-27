@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_eq, has_common_lisp_package_qualifier,
@@ -148,7 +148,7 @@ pub fn collect_function_call_head_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<RenameFunctionOccurrence>> {
     let context = TraversalContext { dialect, from, to };
     let mut renames = Vec::new();
 

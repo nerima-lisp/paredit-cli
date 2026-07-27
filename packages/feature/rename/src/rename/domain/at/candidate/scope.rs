@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use super::super::RenameAtNamespace;
 use super::super::selection::{AtomPathIndex, ancestor_views};
@@ -9,7 +9,7 @@ pub fn enclosing_specialized_scope(
     root_view: &ExpressionView,
     path: &Path,
     namespace: RenameAtNamespace,
-) -> Result<Option<ByteSpan>> {
+) -> RenameResult<Option<ByteSpan>> {
     let indexes = path.to_raw_indexes();
     for (end, view) in ancestor_views(root_view, path)?
         .into_iter()

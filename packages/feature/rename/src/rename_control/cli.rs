@@ -53,7 +53,10 @@ pub fn rename_tag(args: RenameTagArgs) -> Result<()> {
 
 fn run(
     args: RenameControlArgs,
-    planner: fn(RenameControlRequest<'_>) -> Result<RenameControlPlan>,
+    // The planner carries this package's typed refusal; `?` widens it into
+    // the anyhow result this presentation layer shares with the CLI's own
+    // I/O failures.
+    planner: fn(RenameControlRequest<'_>) -> crate::error::RenameResult<RenameControlPlan>,
 ) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");

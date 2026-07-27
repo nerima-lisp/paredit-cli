@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{RenameResult, SemanticShapeError};
 
 use paredit_core_syntax::dialect::{
     BinderShape, BindingVisibility, BodyShape, DefinitionShape, ParameterShape, RelativeNodePath,
@@ -17,7 +17,7 @@ pub fn semantic_binding_rename_parts(
     from: &SymbolName,
     form: String,
     input: &str,
-) -> Result<BindingRenameParts> {
+) -> RenameResult<BindingRenameParts> {
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0;
 
@@ -42,7 +42,7 @@ pub fn semantic_binding_rename_parts(
             &mut shadowed_scope_count,
         )?
     } else {
-        anyhow::bail!("selected form has no verified semantic binding shape");
+        return Err(SemanticShapeError::NoVerifiedShape.into());
     };
 
     Ok(build_binding_rename_parts(
@@ -63,7 +63,7 @@ fn select_scope_binding_and_collect(
     input: &str,
     output: &mut Vec<ByteSpan>,
     shadowed_scope_count: &mut usize,
-) -> Result<ParameterNameSpan> {
+) -> RenameResult<ParameterNameSpan> {
     match scope.binders() {
         BinderShape::BindingList {
             container,
@@ -77,7 +77,8 @@ fn select_scope_binding_and_collect(
         } => {
             let groups = binding_groups(
                 semantic.dialect(),
-                resolve_relative(view, container).context("binding container is missing")?,
+                resolve_relative(view, container)
+                    .ok_or(SemanticShapeError::BindingContainerMissing)?,
                 input,
             )?;
             let (binding, group_index) = select_group_binding(semantic, &groups, from)?;
@@ -102,12 +103,14 @@ fn select_scope_binding_and_collect(
             ..
         } => {
             let name = single_pattern_binding(
-                resolve_relative(view, scope_name).context("named scope name is missing")?,
+                resolve_relative(view, scope_name)
+                    .ok_or(SemanticShapeError::NamedScopeNameMissing)?,
                 input,
             )?;
             let groups = binding_groups(
                 semantic.dialect(),
-                resolve_relative(view, container).context("binding container is missing")?,
+                resolve_relative(view, container)
+                    .ok_or(SemanticShapeError::BindingContainerMissing)?,
                 input,
             )?;
             let mut candidates = matching_group_bindings(semantic, &groups, from);
@@ -159,7 +162,7 @@ fn select_scope_binding_and_collect(
         BinderShape::NamedParameters { name, parameters } => {
             let mut bindings = parameter_bindings(view, parameters, input)?;
             bindings.push(single_pattern_binding(
-                resolve_relative(view, name).context("named callable name is missing")?,
+                resolve_relative(view, name).ok_or(SemanticShapeError::NamedCallableNameMissing)?,
                 input,
             )?);
             let binding = select_unique_binding(semantic, bindings, from)?;
@@ -182,7 +185,7 @@ fn select_scope_binding_and_collect(
             let local_name = name
                 .map(|path| {
                     resolve_relative(view, path)
-                        .context("named callable name is missing")
+                        .ok_or_else(|| SemanticShapeError::NamedCallableNameMissing.into())
                         .and_then(|name| single_pattern_binding(name, input))
                 })
                 .transpose()?;
@@ -235,10 +238,10 @@ fn select_definition_binding_and_collect(
     input: &str,
     output: &mut Vec<ByteSpan>,
     shadowed_scope_count: &mut usize,
-) -> Result<ParameterNameSpan> {
+) -> RenameResult<ParameterNameSpan> {
     let parameters = definition
         .parameters()
-        .context("selected definition has no lexical parameters")?;
+        .ok_or(SemanticShapeError::NoLexicalParameters)?;
     let binding =
         select_unique_binding(semantic, parameter_bindings(view, parameters, input)?, from)?;
     collect_body_references(
@@ -296,15 +299,22 @@ fn select_group_binding(
     semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
     groups: &[BindingGroup],
     from: &SymbolName,
-) -> Result<(ParameterNameSpan, usize)> {
+) -> RenameResult<(ParameterNameSpan, usize)> {
     let candidates = matching_group_bindings(semantic, groups, from)
         .into_iter()
-        .map(|(binding, index)| Ok((binding, index.context("binding group index is missing")?)))
-        .collect::<Result<Vec<_>>>()?;
+        .map(|(binding, index)| {
+            Ok((
+                binding,
+                index.ok_or(SemanticShapeError::BindingGroupIndexMissing)?,
+            ))
+        })
+        .collect::<RenameResult<Vec<_>>>()?;
     let mut candidates = candidates.into_iter();
-    let candidate = candidates.next().context("binding name was not found")?;
+    let candidate = candidates
+        .next()
+        .ok_or(SemanticShapeError::BindingNameNotFound)?;
     if candidates.next().is_some() {
-        anyhow::bail!("binding name is ambiguous in the selected form");
+        return Err(SemanticShapeError::BindingNameAmbiguous.into());
     }
     Ok(candidate)
 }
@@ -332,24 +342,28 @@ fn select_unique_binding(
     semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
     bindings: Vec<ParameterNameSpan>,
     from: &SymbolName,
-) -> Result<ParameterNameSpan> {
+) -> RenameResult<ParameterNameSpan> {
     let mut matches = bindings
         .into_iter()
         .filter(|binding| identifiers_equal(semantic, &binding.name, from));
-    let binding = matches.next().context("binding name was not found")?;
+    let binding = matches
+        .next()
+        .ok_or(SemanticShapeError::BindingNameNotFound)?;
     if matches.next().is_some() {
-        anyhow::bail!("binding name is ambiguous in the selected form");
+        return Err(SemanticShapeError::BindingNameAmbiguous.into());
     }
     Ok(binding)
 }
 
 fn select_unique_indexed(
     candidates: Vec<(ParameterNameSpan, Option<usize>)>,
-) -> Result<(ParameterNameSpan, Option<usize>)> {
+) -> RenameResult<(ParameterNameSpan, Option<usize>)> {
     let mut candidates = candidates.into_iter();
-    let candidate = candidates.next().context("binding name was not found")?;
+    let candidate = candidates
+        .next()
+        .ok_or(SemanticShapeError::BindingNameNotFound)?;
     if candidates.next().is_some() {
-        anyhow::bail!("binding name is ambiguous in the selected form");
+        return Err(SemanticShapeError::BindingNameAmbiguous.into());
     }
     Ok(candidate)
 }
@@ -358,23 +372,25 @@ fn parameter_bindings(
     view: &ExpressionView,
     parameters: ParameterShape,
     input: &str,
-) -> Result<Vec<ParameterNameSpan>> {
+) -> RenameResult<Vec<ParameterNameSpan>> {
     let mut container = resolve_relative(view, parameters.container())
-        .context("parameter container is missing")?
+        .ok_or(SemanticShapeError::ParameterContainerMissing)?
         .clone();
     let first = parameters.first_parameter_index();
     if first > container.children.len() {
-        anyhow::bail!("parameter layout starts outside its container");
+        return Err(SemanticShapeError::ParameterLayoutOutsideContainer.into());
     }
     container.children.drain(..first);
     parameter_name_spans(&container, input)
 }
 
-fn single_pattern_binding(view: &ExpressionView, input: &str) -> Result<ParameterNameSpan> {
+fn single_pattern_binding(view: &ExpressionView, input: &str) -> RenameResult<ParameterNameSpan> {
     let mut bindings = binding_pattern_name_spans(view, input).into_iter();
-    let binding = bindings.next().context("binding pattern has no name")?;
+    let binding = bindings
+        .next()
+        .ok_or(SemanticShapeError::PatternHasNoName)?;
     if bindings.next().is_some() {
-        anyhow::bail!("binding pattern does not identify one name");
+        return Err(SemanticShapeError::PatternNotOneName.into());
     }
     Ok(binding)
 }
@@ -754,21 +770,21 @@ fn collect_clause_body_references(
     input: &str,
     output: &mut Vec<ByteSpan>,
     shadowed_scope_count: &mut usize,
-) -> Result<()> {
+) -> RenameResult<()> {
     let BodyShape::ClauseChildrenFrom {
         first_clause_index,
         body_child_index,
     } = body
     else {
-        anyhow::bail!("clause parameters require clause body metadata");
+        return Err(SemanticShapeError::ClauseBodyMetadataMissing.into());
     };
     if clause_index < first_clause_index {
-        anyhow::bail!("selected parameter is outside callable clauses");
+        return Err(SemanticShapeError::ParameterOutsideClauses.into());
     }
     let clause = view
         .children
         .get(clause_index)
-        .context("selected callable clause is missing")?;
+        .ok_or(SemanticShapeError::ClauseMissing)?;
     for child in clause.children.iter().skip(body_child_index) {
         collect_references(
             semantic,

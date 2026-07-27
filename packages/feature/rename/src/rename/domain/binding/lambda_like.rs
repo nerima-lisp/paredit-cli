@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{BindingSelectionError, RenameResult};
 
 use paredit_core_syntax::common_lisp::{
     CommonLispHandlerBindingForm, common_lisp_symbol_reference_eq,
@@ -21,16 +21,21 @@ pub fn parameter_binding_rename_parts(
     parameter_index: usize,
     body_start_index: usize,
     input: &str,
-) -> Result<BindingRenameParts> {
-    let parameter_form = view
-        .children
-        .get(parameter_index)
-        .with_context(|| format!("selected {form} form must contain parameters"))?;
+) -> RenameResult<BindingRenameParts> {
+    let parameter_form = view.children.get(parameter_index).ok_or_else(|| {
+        BindingSelectionError::FormMissingPart {
+            form: form.to_string(),
+            what: "parameters".to_owned(),
+        }
+    })?;
     let parameters = parameter_name_spans(parameter_form, input)?;
     let target = parameters
         .iter()
         .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+        .ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: form.to_string(),
+        })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
@@ -293,18 +298,28 @@ pub fn defmethod_binding_rename_parts(
     from: &SymbolName,
     form: String,
     input: &str,
-) -> Result<BindingRenameParts> {
+) -> RenameResult<BindingRenameParts> {
     let shape = definition_shape(dialect, view, &form)
         .filter(|shape| shape.category == DefinitionCategory::Method)
-        .with_context(|| format!("selected {form} form must be a method definition"))?;
-    let parameter_form = shape
-        .lambda_list(view)
-        .with_context(|| format!("selected {form} form must contain a specialized lambda list"))?;
+        .ok_or_else(|| BindingSelectionError::FormMissingPart {
+            form: form.to_string(),
+            what: "a method definition".to_owned(),
+        })?;
+    let parameter_form =
+        shape
+            .lambda_list(view)
+            .ok_or_else(|| BindingSelectionError::FormMissingPart {
+                form: form.to_string(),
+                what: "a specialized lambda list".to_owned(),
+            })?;
     let parameters = specialized_parameter_name_spans(parameter_form, input)?;
     let target = parameters
         .iter()
         .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+        .ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: form.to_string(),
+        })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
@@ -333,11 +348,14 @@ pub fn local_callable_lambda_binding_rename_parts(
     from: &SymbolName,
     form: String,
     input: &str,
-) -> Result<BindingRenameParts> {
-    let binding_form = view
-        .children
-        .get(1)
-        .with_context(|| format!("selected {form} form must contain local callable bindings"))?;
+) -> RenameResult<BindingRenameParts> {
+    let binding_form =
+        view.children
+            .get(1)
+            .ok_or_else(|| BindingSelectionError::FormMissingPart {
+                form: form.to_string(),
+                what: "local callable bindings".to_owned(),
+            })?;
     let mut target = None;
     let mut duplicate_count = 0usize;
 
@@ -362,16 +380,20 @@ pub fn local_callable_lambda_binding_rename_parts(
     }
 
     if duplicate_count > 1 {
-        anyhow::bail!(
-            "binding '{from}' was found in multiple selected {form} local callable lambda lists; select an unambiguous binding form"
-        );
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "local callable lambda lists".to_owned(),
+        }
+        .into());
     }
 
-    let (target_binding, target_parameter) = target.ok_or_else(|| {
-        anyhow::anyhow!(
-            "binding '{from}' was not found in selected {form} local callable lambda lists"
-        )
-    })?;
+    let (target_binding, target_parameter) =
+        target.ok_or_else(|| BindingSelectionError::NotFoundIn {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "local callable lambda lists".to_owned(),
+        })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
@@ -410,7 +432,7 @@ pub fn handler_bind_lambda_binding_rename_parts(
     form: String,
     handler_form: CommonLispHandlerBindingForm,
     input: &str,
-) -> Result<BindingRenameParts> {
+) -> RenameResult<BindingRenameParts> {
     let mut target = None;
     let mut duplicate_count = 0usize;
 
@@ -425,13 +447,19 @@ pub fn handler_bind_lambda_binding_rename_parts(
     }
 
     if duplicate_count > 1 {
-        anyhow::bail!(
-            "binding '{from}' was found in multiple selected {form} handler functions; select an unambiguous binding form"
-        );
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "handler functions".to_owned(),
+        }
+        .into());
     }
 
-    let (target_lambda, target_parameter) = target
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+    let (target_lambda, target_parameter) =
+        target.ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: form.to_string(),
+        })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;

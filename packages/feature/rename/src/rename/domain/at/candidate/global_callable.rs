@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use super::super::RenameAtNamespace;
 use super::super::safety::ensure_function_occurrences_are_unqualified;
@@ -13,7 +13,10 @@ use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::Path;
 
-pub fn add(output: &mut Vec<Candidate>, context: &SpecializedCandidateContext<'_>) -> Result<()> {
+pub fn add(
+    output: &mut Vec<Candidate>,
+    context: &SpecializedCandidateContext<'_>,
+) -> RenameResult<()> {
     if output
         .iter()
         .any(|candidate| candidate.namespace == RenameAtNamespace::Value)
@@ -53,7 +56,7 @@ fn executable_occurrences<'a>(
     context: &SpecializedCandidateContext<'_>,
     definitions: &'a [RenameFunctionOccurrence],
     calls: &'a [RenameFunctionOccurrence],
-) -> Result<Vec<&'a RenameFunctionOccurrence>> {
+) -> RenameResult<Vec<&'a RenameFunctionOccurrence>> {
     let mut executable = Vec::new();
     for occurrence in definitions.iter().chain(calls) {
         let Some(path) = context.atom_paths.path_for_span(occurrence.span) else {
@@ -80,7 +83,7 @@ fn is_global_macro_definition(dialect: Dialect, head: &str) -> bool {
 
 fn namespace_for_selected_definition(
     context: &SpecializedCandidateContext<'_>,
-) -> Result<RenameAtNamespace> {
+) -> RenameResult<RenameAtNamespace> {
     for (index, _) in context.tree.root_children().iter().enumerate() {
         let form_path = Path::root_child(index);
         let view = context.tree.select_path(&form_path)?.view();

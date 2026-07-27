@@ -1,6 +1,8 @@
 //! Scope-aware Common Lisp `block` and `tagbody` control-name renames.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{ConservativeRefusal, DialectRefusal, DocumentRefusal, ShapeRefusal};
+
+use crate::error::{RenameControlError, RenameResult};
 
 use paredit_core_edit::extract_shared::replace_span;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -30,11 +32,11 @@ pub struct RenameControlPlan {
     pub changed: bool,
 }
 
-pub fn plan_rename_block(request: RenameControlRequest<'_>) -> Result<RenameControlPlan> {
+pub fn plan_rename_block(request: RenameControlRequest<'_>) -> RenameResult<RenameControlPlan> {
     plan(request, ControlKind::Block)
 }
 
-pub fn plan_rename_tag(request: RenameControlRequest<'_>) -> Result<RenameControlPlan> {
+pub fn plan_rename_tag(request: RenameControlRequest<'_>) -> RenameResult<RenameControlPlan> {
     plan(request, ControlKind::Tag)
 }
 
@@ -44,25 +46,25 @@ enum ControlKind {
     Tag,
 }
 
-fn plan(request: RenameControlRequest<'_>, kind: ControlKind) -> Result<RenameControlPlan> {
+fn plan(request: RenameControlRequest<'_>, kind: ControlKind) -> RenameResult<RenameControlPlan> {
     let operation = match kind {
         ControlKind::Block => "rename-block",
         ControlKind::Tag => "rename-tag",
     };
     if request.dialect != Dialect::CommonLisp {
-        bail!("{operation} supports only Common Lisp");
+        return Err(DialectRefusal::CommonLispOnly { operation }.into());
     }
     require_unqualified(request.from.as_str(), operation)?;
     require_unqualified(request.to.as_str(), operation)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("input is not a valid S-expression document")?;
+        .map_err(|source| DocumentRefusal::UnnamedInputNotAnSexprDocument { source })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
-        bail!("{operation} cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments { operation }.into());
     }
     if contains_prefix(&form) || contains_quoted_form(&form) {
-        bail!("{operation} cannot safely analyze reader-prefixed or quoted forms");
+        return Err(ConservativeRefusal::CannotAnalyzeReaderPrefixedOrQuoted { operation }.into());
     }
 
     let mut edits = Vec::new();
@@ -86,8 +88,12 @@ fn plan(request: RenameControlRequest<'_>, kind: ControlKind) -> Result<RenameCo
     for span in edits {
         rewritten = replace_span(&rewritten, span, request.to.as_str());
     }
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
     Ok(RenameControlPlan {
         dialect: request.dialect,
         path: request.path,
@@ -103,16 +109,16 @@ fn collect_block(
     from: &str,
     to: &str,
     edits: &mut Vec<ByteSpan>,
-) -> Result<()> {
+) -> RenameResult<()> {
     require_head(form, "block", "rename-block")?;
     let name = form
         .children
         .get(1)
         .and_then(plain_atom)
-        .context("rename-block requires a plain block name")?;
+        .ok_or(RenameControlError::BlockNameNotPlain)?;
     require_unqualified(name, "rename-block")?;
     if !eq(name, from) {
-        bail!("selected block name does not match --from");
+        return Err(RenameControlError::BlockNameMismatch.into());
     }
     edits.push(form.children[1].span);
     for child in form.children.iter().skip(2) {
@@ -126,17 +132,17 @@ fn walk_block(
     from: &str,
     to: &str,
     edits: &mut Vec<ByteSpan>,
-) -> Result<()> {
+) -> RenameResult<()> {
     if view.kind == ExpressionKind::List {
         if head_is(view, "block") {
             let name = view
                 .children
                 .get(1)
                 .and_then(plain_atom)
-                .context("rename-block found malformed nested block")?;
+                .ok_or(RenameControlError::MalformedNestedBlock)?;
             require_unqualified(name, "rename-block")?;
             if eq(name, to) && !eq(from, to) {
-                bail!("rename-block target would collide with a nested block");
+                return Err(RenameControlError::BlockCollides.into());
             }
             if eq(name, from) {
                 return Ok(());
@@ -151,10 +157,10 @@ fn walk_block(
                 .children
                 .get(1)
                 .and_then(plain_atom)
-                .context("rename-block found malformed return-from")?;
+                .ok_or(RenameControlError::MalformedReturnFrom)?;
             require_unqualified(name, "rename-block")?;
             if eq(name, to) && !eq(from, to) {
-                bail!("rename-block target would capture an existing return-from");
+                return Err(RenameControlError::BlockCaptures.into());
             }
             if eq(name, from) {
                 edits.push(view.children[1].span);
@@ -172,7 +178,7 @@ fn collect_tagbody(
     from: &str,
     to: &str,
     edits: &mut Vec<ByteSpan>,
-) -> Result<()> {
+) -> RenameResult<()> {
     require_head(form, "tagbody", "rename-tag")?;
     let tags = direct_tags(form);
     let matches: Vec<_> = tags
@@ -180,14 +186,14 @@ fn collect_tagbody(
         .filter(|tag| plain_atom(tag).is_some_and(|name| eq(name, from)))
         .collect();
     if matches.len() != 1 {
-        bail!("rename-tag requires exactly one matching tag definition");
+        return Err(RenameControlError::TagNotUnique.into());
     }
     if !eq(from, to)
         && tags
             .iter()
             .any(|tag| plain_atom(tag).is_some_and(|name| eq(name, to)))
     {
-        bail!("rename-tag target duplicates an existing tag");
+        return Err(RenameControlError::TagDuplicates.into());
     }
     edits.push(matches[0].span);
     for child in form
@@ -207,7 +213,7 @@ fn walk_tag(
     to: &str,
     rename_enabled: bool,
     edits: &mut Vec<ByteSpan>,
-) -> Result<()> {
+) -> RenameResult<()> {
     if view.kind == ExpressionKind::List {
         if head_is(view, "tagbody") {
             let tags = direct_tags(view);
@@ -216,7 +222,7 @@ fn walk_tag(
                     .iter()
                     .any(|tag| plain_atom(tag).is_some_and(|name| eq(name, to)))
             {
-                bail!("rename-tag target collides with a nested tagbody");
+                return Err(RenameControlError::TagCollides.into());
             }
             let shadows = tags
                 .iter()
@@ -236,10 +242,10 @@ fn walk_tag(
                 .children
                 .get(1)
                 .and_then(plain_atom)
-                .context("rename-tag found malformed go")?;
+                .ok_or(RenameControlError::MalformedGo)?;
             require_unqualified(name, "rename-tag")?;
             if eq(name, to) && !eq(from, to) {
-                bail!("rename-tag target would capture an existing go");
+                return Err(RenameControlError::TagCaptures.into());
             }
             if rename_enabled && eq(name, from) {
                 edits.push(view.children[1].span);
@@ -259,18 +265,30 @@ fn direct_tags(form: &ExpressionView) -> Vec<&ExpressionView> {
         .filter(|v| plain_atom(v).is_some())
         .collect()
 }
-fn require_head<'a>(form: &'a ExpressionView, expected: &str, op: &str) -> Result<&'a str> {
+fn require_head<'a>(
+    form: &'a ExpressionView,
+    expected: &str,
+    op: &'static str,
+) -> RenameResult<&'a str> {
     if form.kind != ExpressionKind::List {
-        bail!("{op} selected form must be a {expected} form");
+        return Err(ShapeRefusal::NotExpectedForm {
+            operation: op,
+            expected: expected.to_owned(),
+        }
+        .into());
     }
     let head = form
         .children
         .first()
         .and_then(plain_atom)
-        .context("selected form requires a plain head")?;
+        .ok_or(RenameControlError::HeadNotPlain)?;
     require_unqualified(head, op)?;
     if !eq(head, expected) {
-        bail!("{op} selected form must be a {expected} form");
+        return Err(ShapeRefusal::NotExpectedForm {
+            operation: op,
+            expected: expected.to_owned(),
+        }
+        .into());
     }
     Ok(head)
 }
@@ -288,9 +306,9 @@ fn head_is(view: &ExpressionView, name: &str) -> bool {
 fn eq(left: &str, right: &str) -> bool {
     common_lisp_symbol_reference_eq(left, right)
 }
-fn require_unqualified(name: &str, op: &str) -> Result<()> {
+fn require_unqualified(name: &str, op: &'static str) -> RenameResult<()> {
     if name.contains(':') {
-        bail!("{op} requires unqualified symbols");
+        return Err(RenameControlError::NotUnqualified { operation: op }.into());
     }
     Ok(())
 }
@@ -340,7 +358,7 @@ mod tests {
         req_for_dialect(input, Dialect::CommonLisp, from, to)
     }
 
-    fn assert_support_error(result: Result<RenameControlPlan>, operation: &str) {
+    fn assert_support_error(result: RenameResult<RenameControlPlan>, operation: &'static str) {
         let error = result.expect_err("unsupported dialect must fail");
         assert_eq!(
             error.to_string(),

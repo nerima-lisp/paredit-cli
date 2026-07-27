@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use super::RenameAtNamespace;
 use super::selection::AtomPathIndex;
@@ -34,7 +34,7 @@ pub use lexical_value::binding_candidates;
 pub fn add_specialized_candidates(
     output: &mut Vec<Candidate>,
     context: SpecializedCandidateContext<'_>,
-) -> Result<()> {
+) -> RenameResult<()> {
     global_callable::add(output, &context)?;
     scoped_callable::add_local_function(output, &context)?;
     scoped_callable::add_macro(output, &context)?;

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{BindingSelectionError, RenameResult};
 
 use paredit_core_syntax::common_lisp::{
     CommonLispLetBindingForm, CommonLispVariableBindingForm, common_lisp_symbol_reference_eq,
@@ -19,16 +19,16 @@ pub fn let_binding_rename_parts(
     form: String,
     let_form: CommonLispLetBindingForm,
     input: &str,
-) -> Result<BindingRenameParts> {
+) -> RenameResult<BindingRenameParts> {
     let binding_form = view
         .children
         .get(1)
-        .context("selected let form must contain bindings")?;
+        .ok_or(BindingSelectionError::LetMissingBindings)?;
     let bindings = binding_groups(dialect, binding_form, input)?;
     if let_form == CommonLispLetBindingForm::SymbolMacro
         && bindings.iter().any(|binding| binding.value.is_none())
     {
-        anyhow::bail!("symbol-macrolet binding must contain a symbol and expansion");
+        return Err(BindingSelectionError::SymbolMacroletBindingIncomplete.into());
     }
     let (target_index, target) = bindings
         .iter()
@@ -40,7 +40,10 @@ pub fn let_binding_rename_parts(
                 .find(|name| common_lisp_symbol_reference_eq(&name.name, from.as_str()))
                 .map(|name| (index, name))
         })
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected let"))?;
+        .ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: "let".to_owned(),
+        })?;
 
     let sequential_scope =
         let_form.is_sequential() || binding_form.delimiter == Some(Delimiter::Bracket);
@@ -87,16 +90,22 @@ pub fn value_binding_rename_parts(
     binding_index: usize,
     body_start_index: usize,
     input: &str,
-) -> Result<BindingRenameParts> {
-    let binding_form = view
-        .children
-        .get(binding_index)
-        .with_context(|| format!("selected {form} form must contain bindings"))?;
+) -> RenameResult<BindingRenameParts> {
+    let binding_form =
+        view.children
+            .get(binding_index)
+            .ok_or_else(|| BindingSelectionError::FormMissingPart {
+                form: form.to_string(),
+                what: "bindings".to_owned(),
+            })?;
     let bindings = parameter_name_spans(binding_form, input)?;
     let target = bindings
         .iter()
         .find(|binding| common_lisp_symbol_reference_eq(&binding.name, from.as_str()))
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+        .ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: form.to_string(),
+        })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
@@ -125,11 +134,14 @@ pub fn iteration_binding_rename_parts(
     from: &SymbolName,
     form: String,
     input: &str,
-) -> Result<BindingRenameParts> {
-    let binding_form = view
-        .children
-        .get(1)
-        .with_context(|| format!("selected {form} form must contain an iteration binding"))?;
+) -> RenameResult<BindingRenameParts> {
+    let binding_form =
+        view.children
+            .get(1)
+            .ok_or_else(|| BindingSelectionError::FormMissingPart {
+                form: form.to_string(),
+                what: "an iteration binding".to_owned(),
+            })?;
     let target = binding_form
         .children
         .first()
@@ -137,7 +149,10 @@ pub fn iteration_binding_rename_parts(
             super::super::selection::atom_text(child)
                 .is_some_and(|name| common_lisp_symbol_reference_eq(name, from.as_str()))
         })
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+        .ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: form.to_string(),
+        })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
@@ -177,11 +192,14 @@ pub fn common_lisp_variable_binding_rename_parts(
     variable_form: CommonLispVariableBindingForm,
     has_step_forms: bool,
     input: &str,
-) -> Result<BindingRenameParts> {
-    let binding_form = view
-        .children
-        .get(1)
-        .with_context(|| format!("selected {form} form must contain variable specs"))?;
+) -> RenameResult<BindingRenameParts> {
+    let binding_form =
+        view.children
+            .get(1)
+            .ok_or_else(|| BindingSelectionError::FormMissingPart {
+                form: form.to_string(),
+                what: "variable specs".to_owned(),
+            })?;
     let mut target = None;
     let mut duplicate_count = 0usize;
 
@@ -197,13 +215,18 @@ pub fn common_lisp_variable_binding_rename_parts(
     }
 
     if duplicate_count > 1 {
-        anyhow::bail!(
-            "binding '{from}' was found in multiple selected {form} specs; select an unambiguous binding form"
-        );
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "specs".to_owned(),
+        }
+        .into());
     }
 
-    let (target_index, binding_span) = target
-        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+    let (target_index, binding_span) = target.ok_or_else(|| BindingSelectionError::NotFound {
+        from: from.to_string(),
+        form: form.to_string(),
+    })?;
 
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;

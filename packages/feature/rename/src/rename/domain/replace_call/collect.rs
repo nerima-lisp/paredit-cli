@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{CallSiteError, RenameResult};
 
 use crate::rename::domain::call_identity::is_local_call_bound;
 use crate::rename::domain::reader::{
@@ -23,7 +23,7 @@ pub fn collect_all_replace_call_sites(
     input: &str,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<ReplaceFunctionCallSite>> {
+) -> RenameResult<Vec<ReplaceFunctionCallSite>> {
     let mut calls = Vec::new();
     let ctx = ReplaceCallTraversal {
         dialect,
@@ -47,19 +47,29 @@ pub fn collect_explicit_replace_call_sites(
     paths: &[Path],
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<ReplaceFunctionCallSite>> {
+) -> RenameResult<Vec<ReplaceFunctionCallSite>> {
     let mut calls = Vec::new();
     for path in paths {
         let view = tree.select_path(path)?.view();
         if !executable_reader_context_at_path(tree, dialect, path)? {
-            anyhow::bail!("call-path {path} is not in an executable reader context");
+            return Err(CallSiteError::NotExecutable {
+                path: path.to_string(),
+            }
+            .into());
         }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
         if is_local_call_bound(dialect, &local_callables, from.as_str()) {
-            anyhow::bail!("call-path {path} is shadowed by a local callable named {from}");
+            return Err(CallSiteError::Shadowed {
+                path: path.to_string(),
+                name: from.to_string(),
+            }
+            .into());
         }
         let site = replace_call_site_from_view(&view, dialect, input, path.to_string(), from, to)
-            .with_context(|| format!("call-path {path} is not a call to {from}"))?;
+            .ok_or_else(|| CallSiteError::NotACall {
+            path: path.to_string(),
+            function: from.to_string(),
+        })?;
         calls.push(site);
     }
     calls.sort_by_key(|site| site.head_span.start());
@@ -81,7 +91,7 @@ fn collect_replace_call_sites_from_view(
     quasiquote_depth: usize,
     in_macro_expander: bool,
     calls: &mut Vec<ReplaceFunctionCallSite>,
-) -> Result<()> {
+) -> RenameResult<()> {
     let Some(quasiquote_depth) = apply_reader_prefix_context(view, quasiquote_depth) else {
         return Ok(());
     };
@@ -158,7 +168,7 @@ fn collect_local_callable_replace_call_sites(
     quasiquote_depth: usize,
     in_macro_expander: bool,
     calls: &mut Vec<ReplaceFunctionCallSite>,
-) -> Result<()> {
+) -> RenameResult<()> {
     let body_scope = local_callable_body_scope(local_callables, view);
 
     if let Some(bindings) = view.children.get(1) {

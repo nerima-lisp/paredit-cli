@@ -14,7 +14,7 @@ pub fn executable_reader_context_at_path(
     tree: &SyntaxTree,
     dialect: Dialect,
     path: &Path,
-) -> anyhow::Result<bool> {
+) -> crate::error::RenameResult<bool> {
     let mut quasiquote_depth = 0;
     let indexes = path.to_raw_indexes();
 

@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{BindingSelectionError, RenameResult};
 
 use super::reader::executable_reader_context_at_path;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -21,7 +23,7 @@ pub const fn supports_rename_at_dialect(dialect: Dialect) -> bool {
     matches!(dialect, Dialect::CommonLisp)
 }
 
-pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
+pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan> {
     if !supports_rename_at_dialect(request.dialect) {
         return Err(RenameAtError::UnsupportedDialect.into());
     }
@@ -31,7 +33,7 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
     }
 
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect).map_err(RenameAtError::from)?;
     let atom_occurrences = tree.atom_occurrence_index();
     let atom_paths = AtomPathIndex::new(&atom_occurrences);
@@ -50,7 +52,7 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
         return Err(RenameAtError::UnsupportedPackageSyntax.into());
     }
     let from =
-        SymbolName::new(selected.text.to_owned()).context("selected atom is not a symbol")?;
+        SymbolName::new(selected.text.to_owned()).map_err(|_| BindingSelectionError::NotASymbol)?;
     let root_view = tree.root_view();
     let mut candidates = binding_candidates(
         &tree,
@@ -78,13 +80,15 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
 
     let candidate = match candidates.len() {
         0 => return Err(RenameAtError::Unresolved.into()),
-        1 => candidates
-            .pop()
-            .ok_or_else(|| anyhow::anyhow!("one candidate"))?,
+        1 => candidates.pop().ok_or(RenameAtError::Unresolved)?,
         _ => return Err(RenameAtError::Ambiguous.into()),
     };
-    SyntaxTree::parse_with_dialect(&candidate.rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&candidate.rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
     Ok(RenameAtPlan {
         dialect: request.dialect,
         namespace: candidate.namespace,

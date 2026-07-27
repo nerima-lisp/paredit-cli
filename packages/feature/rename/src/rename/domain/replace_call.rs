@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{RenameError, RenameResult};
 
 pub use crate::rename::domain::ReplaceFunctionCallsScope;
 use paredit_core_syntax::dialect::Dialect;
@@ -39,7 +41,7 @@ pub struct ReplaceFunctionCallsPlan {
 
 pub fn plan_replace_function_calls(
     request: ReplaceFunctionCallsRequest<'_>,
-) -> Result<ReplaceFunctionCallsPlan> {
+) -> RenameResult<ReplaceFunctionCallsPlan> {
     match request.dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -52,12 +54,14 @@ pub fn plan_replace_function_calls(
         | Dialect::Janet
         | Dialect::Fennel => {}
         Dialect::Unknown => {
-            anyhow::bail!("replace-function-calls requires a known dialect");
+            return Err(RenameError::RequiresKnownDialect {
+                operation: "replace-function-calls",
+            });
         }
     }
 
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let calls = match &request.scope {
         ReplaceFunctionCallsScope::AllCalls => collect_all_replace_call_sites(
             &tree,
@@ -80,8 +84,12 @@ pub fn plan_replace_function_calls(
         .map(|site| (site.head_span, site.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("replace-function-calls output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "replace-function-calls",
+            source,
+        }
+    })?;
 
     Ok(ReplaceFunctionCallsPlan {
         dialect: request.dialect,

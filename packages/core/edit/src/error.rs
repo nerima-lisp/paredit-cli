@@ -160,6 +160,9 @@ pub enum ConservativeRefusal {
     #[error("{operation} conservatively rejects reader-prefixed or quoted forms")]
     ReaderPrefixedOrQuoted { operation: &'static str },
 
+    #[error("{operation} cannot safely analyze reader-prefixed or quoted forms")]
+    CannotAnalyzeReaderPrefixedOrQuoted { operation: &'static str },
+
     #[error("{operation} requires a form without reader prefixes")]
     RequiresNoReaderPrefixes { operation: &'static str },
 

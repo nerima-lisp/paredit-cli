@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{RenameError, RenameResult};
 
 pub use crate::rename::domain::UnwrapFunctionCallsScope;
 use paredit_core_syntax::dialect::Dialect;
@@ -47,7 +49,7 @@ pub struct UnwrapFunctionCallsPlan {
 
 pub fn plan_unwrap_function_calls(
     request: UnwrapFunctionCallsRequest<'_>,
-) -> Result<UnwrapFunctionCallsPlan> {
+) -> RenameResult<UnwrapFunctionCallsPlan> {
     match request.dialect {
         Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -59,11 +61,15 @@ pub fn plan_unwrap_function_calls(
         | Dialect::Clojure
         | Dialect::Janet
         | Dialect::Fennel => {}
-        Dialect::Unknown => anyhow::bail!("unwrap-function-calls requires a known dialect"),
+        Dialect::Unknown => {
+            return Err(RenameError::RequiresKnownDialect {
+                operation: "unwrap-function-calls",
+            });
+        }
     }
 
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let (calls, skipped_non_unary_wrapper, skipped_nested) = match &request.scope {
         UnwrapFunctionCallsScope::AllCalls => collect_unwrap_all_call_sites(
             &tree,
@@ -86,8 +92,12 @@ pub fn plan_unwrap_function_calls(
         .map(|site| (site.span, site.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("unwrapped output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "unwrapped",
+            source,
+        }
+    })?;
 
     Ok(UnwrapFunctionCallsPlan {
         dialect: request.dialect,

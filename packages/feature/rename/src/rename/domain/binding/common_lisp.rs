@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::RenameResult;
 
 use paredit_core_syntax::common_lisp::CommonLispHandlerBindingForm;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
@@ -108,7 +108,7 @@ pub fn collect_lambda_binding_targets<'a>(
     input: &str,
     target: &mut Option<(&'a ExpressionView, ParameterNameSpan)>,
     duplicate_count: &mut usize,
-) -> Result<()> {
+) -> RenameResult<()> {
     if view.kind == ExpressionKind::List
         && view.delimiter == Some(Delimiter::Paren)
         && atom_text(view.children.first().unwrap_or(view)) == Some("lambda")

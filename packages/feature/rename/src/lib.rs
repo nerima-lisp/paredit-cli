@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod error;
 pub mod rename;
 pub mod rename_control;
 pub mod rename_types;
@@ -21,3 +22,8 @@ pub use rename::cli::{UnwrapFunctionCallsArgs, unwrap_function_calls};
 pub use rename::cli::{WrapFunctionCallsArgs, wrap_function_calls};
 pub use rename_control::cli::{RenameBlockArgs, rename_block};
 pub use rename_control::cli::{RenameTagArgs, rename_tag};
+
+pub use error::{
+    BindingListError, BindingSelectionError, CallSiteError, RenameControlError, RenameError,
+    RenameResult, SemanticShapeError,
+};

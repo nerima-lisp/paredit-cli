@@ -19,7 +19,9 @@ pub fn collect_callable_definition_renames(
     from: &SymbolName,
     to: &SymbolName,
 ) -> Result<Vec<rename_usecase::RenameFunctionOccurrence>> {
-    rename_usecase::collect_callable_definition_renames(tree, dialect, from, to)
+    Ok(rename_usecase::collect_callable_definition_renames(
+        tree, dialect, from, to,
+    )?)
 }
 
 pub fn collect_function_call_head_renames(
@@ -28,7 +30,9 @@ pub fn collect_function_call_head_renames(
     from: &SymbolName,
     to: &SymbolName,
 ) -> Result<Vec<rename_usecase::RenameFunctionOccurrence>> {
-    rename_usecase::collect_function_call_head_renames(tree, dialect, from, to)
+    Ok(rename_usecase::collect_function_call_head_renames(
+        tree, dialect, from, to,
+    )?)
 }
 
 pub fn ensure_rename_changed(fail_on_no_change: bool, changed: bool, command: &str) -> Result<()> {

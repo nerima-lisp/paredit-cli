@@ -15,7 +15,9 @@ mod types;
 mod unwrap;
 mod wrap;
 
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{RenameError, RenameResult};
 
 use paredit_core_edit::mutation_safety::ReaderConditionalSafetyError;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -57,9 +59,11 @@ pub use wrap::{
     WrapFunctionCallSite, WrapFunctionCallsPlan, WrapFunctionCallsRequest, plan_wrap_function_calls,
 };
 
-pub fn plan_rename_function(request: RenameFunctionRequest<'_>) -> Result<RenameFunctionPlan> {
+pub fn plan_rename_function(
+    request: RenameFunctionRequest<'_>,
+) -> RenameResult<RenameFunctionPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let definitions =
         collect_callable_definition_renames(&tree, request.dialect, &request.from, &request.to)?;
     let calls =
@@ -70,8 +74,12 @@ pub fn plan_rename_function(request: RenameFunctionRequest<'_>) -> Result<Rename
         .map(|occurrence| (occurrence.span, occurrence.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
 
     Ok(RenameFunctionPlan {
         dialect: request.dialect,
@@ -82,9 +90,11 @@ pub fn plan_rename_function(request: RenameFunctionRequest<'_>) -> Result<Rename
     })
 }
 
-pub fn plan_rename_macrolet(request: RenameMacroletRequest<'_>) -> Result<RenameMacroletPlan> {
+pub fn plan_rename_macrolet(
+    request: RenameMacroletRequest<'_>,
+) -> RenameResult<RenameMacroletPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let definitions =
         collect_macrolet_binding_renames(&tree, request.dialect, &request.from, &request.to)?;
     let calls =
@@ -95,8 +105,12 @@ pub fn plan_rename_macrolet(request: RenameMacroletRequest<'_>) -> Result<Rename
         .map(|occurrence| (occurrence.span, occurrence.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
 
     Ok(RenameMacroletPlan {
         dialect: request.dialect,
@@ -109,9 +123,9 @@ pub fn plan_rename_macrolet(request: RenameMacroletRequest<'_>) -> Result<Rename
 
 pub fn plan_rename_symbol_macro(
     request: RenameSymbolMacroRequest<'_>,
-) -> Result<RenameSymbolMacroPlan> {
+) -> RenameResult<RenameSymbolMacroPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let definitions = collect_define_symbol_macro_definition_renames(
         &tree,
         request.dialect,
@@ -130,8 +144,12 @@ pub fn plan_rename_symbol_macro(
         .map(|occurrence| (occurrence.span, occurrence.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
 
     Ok(RenameSymbolMacroPlan {
         dialect: request.dialect,
@@ -144,9 +162,9 @@ pub fn plan_rename_symbol_macro(
 
 pub fn plan_rename_local_function(
     request: RenameLocalFunctionRequest<'_>,
-) -> Result<RenameLocalFunctionPlan> {
+) -> RenameResult<RenameLocalFunctionPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let definitions =
         collect_local_function_binding_renames(&tree, request.dialect, &request.from, &request.to)?;
     let calls = collect_local_function_call_head_renames(
@@ -161,8 +179,12 @@ pub fn plan_rename_local_function(
         .map(|occurrence| (occurrence.span, occurrence.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
 
     Ok(RenameLocalFunctionPlan {
         dialect: request.dialect,
@@ -173,9 +195,9 @@ pub fn plan_rename_local_function(
     })
 }
 
-pub fn plan_rename_in_form(request: RenameInFormRequest<'_>) -> Result<RenameInFormPlan> {
+pub fn plan_rename_in_form(request: RenameInFormRequest<'_>) -> RenameResult<RenameInFormPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let path = match &request.target {
         RenameTarget::Path(path) => Some(path.clone()),
         RenameTarget::Offset(_) => None,
@@ -190,8 +212,12 @@ pub fn plan_rename_in_form(request: RenameInFormRequest<'_>) -> Result<RenameInF
         .map(|span| (*span, request.to.as_str().to_owned()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
 
     Ok(RenameInFormPlan {
         dialect: request.dialect,
@@ -205,13 +231,13 @@ pub fn plan_rename_in_form(request: RenameInFormRequest<'_>) -> Result<RenameInF
     })
 }
 
-pub fn plan_rename_binding(request: RenameBindingRequest<'_>) -> Result<RenameBindingPlan> {
+pub fn plan_rename_binding(request: RenameBindingRequest<'_>) -> RenameResult<RenameBindingPlan> {
     let semantic = request
         .dialect
         .verify_rename_binding()
-        .context("rename-binding is not supported for this dialect")?;
+        .map_err(|source| RenameError::BindingRenameUnsupportedDialect { source })?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse input")?;
+        .map_err(|source| DocumentRefusal::InputParseFailed { source })?;
     let path = match &request.target {
         RenameTarget::Path(path) => Some(path.clone()),
         RenameTarget::Offset(_) => None,
@@ -231,8 +257,12 @@ pub fn plan_rename_binding(request: RenameBindingRequest<'_>) -> Result<RenameBi
             .map(|span| (*span, request.to.as_str().to_owned())),
     );
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "renamed",
+            source,
+        }
+    })?;
 
     Ok(RenameBindingPlan {
         dialect: request.dialect,

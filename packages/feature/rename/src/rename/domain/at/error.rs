@@ -46,3 +46,12 @@ impl From<ReaderConditionalSafetyError> for RenameAtError {
         Self::ReaderConditional(error)
     }
 }
+
+/// A `rename-at` candidate walk can reach the package-wide error through the
+/// shared reader and binding helpers. Folding it back into `Unresolved` keeps
+/// this slice's own error surface unchanged for its callers.
+impl From<crate::error::RenameError> for RenameAtError {
+    fn from(_: crate::error::RenameError) -> Self {
+        Self::Unresolved
+    }
+}

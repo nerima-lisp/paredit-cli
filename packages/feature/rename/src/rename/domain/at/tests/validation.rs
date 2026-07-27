@@ -1,3 +1,4 @@
+use crate::error::RenameError;
 use crate::rename::domain::RenameReaderSafetyError;
 use paredit_core_syntax::common_lisp::CommonLispReaderConditionalKind;
 use paredit_core_syntax::dialect::Dialect;
@@ -15,8 +16,10 @@ fn rejects_common_lisp_reader_conditionals_without_changing_input() {
 
         let error = plan_rename_at(request(&input, "value 1", "count")).unwrap_err();
 
-        match error.downcast_ref::<RenameAtError>() {
-            Some(RenameAtError::ReaderConditional(
+        // `downcast_ref` was the anyhow escape hatch; the typed error is
+        // matchable directly, and nested to the exact reader-conditional kind.
+        match &error {
+            RenameError::RenameAt(RenameAtError::ReaderConditional(
                 RenameReaderSafetyError::CommonLispReaderConditional { kind, .. },
             )) => assert_eq!(*kind, expected_kind),
             other => panic!("expected reader conditional error, got {other:?}"),
@@ -29,7 +32,7 @@ fn rejects_common_lisp_reader_conditionals_without_changing_input() {
 fn rejects_quoted_occurrence_without_fallback() {
     let input = "(let ((value 1)) 'value)";
     let error = plan_rename_at(request(input, "'value", "count")).unwrap_err();
-    assert!(error.downcast_ref::<RenameAtError>().is_some());
+    assert!(matches!(error, RenameError::RenameAt(_)), "{error:?}");
 }
 
 #[test]
@@ -44,8 +47,8 @@ fn rejects_read_eval_before_selection() {
     .unwrap_err();
 
     assert!(matches!(
-        error.downcast_ref::<RenameAtError>(),
-        Some(RenameAtError::ReaderConditional(
+        &error,
+        RenameError::RenameAt(RenameAtError::ReaderConditional(
             RenameReaderSafetyError::CommonLispReadTimeEvaluation { .. }
         ))
     ));
@@ -62,9 +65,12 @@ fn rejects_nested_quasiquote_occurrences() {
     })
     .unwrap_err();
 
-    assert_eq!(
-        error.downcast_ref::<RenameAtError>(),
-        Some(&RenameAtError::InertReaderContext)
+    assert!(
+        matches!(
+            &error,
+            RenameError::RenameAt(RenameAtError::InertReaderContext)
+        ),
+        "{error:?}"
     );
 }
 
@@ -79,9 +85,12 @@ fn rejects_utf8_mid_byte_offset() {
         to: SymbolName::new("coffee").unwrap(),
     })
     .unwrap_err();
-    assert_eq!(
-        error.downcast_ref::<RenameAtError>(),
-        Some(&RenameAtError::InvalidSelection)
+    assert!(
+        matches!(
+            &error,
+            RenameError::RenameAt(RenameAtError::InvalidSelection)
+        ),
+        "{error:?}"
     );
 }
 
@@ -96,9 +105,12 @@ fn rejects_atom_end_and_out_of_range() {
             to: SymbolName::new("count").unwrap(),
         })
         .unwrap_err();
-        assert_eq!(
-            error.downcast_ref::<RenameAtError>(),
-            Some(&RenameAtError::InvalidSelection)
+        assert!(
+            matches!(
+                &error,
+                RenameError::RenameAt(RenameAtError::InvalidSelection)
+            ),
+            "{error:?}"
         );
     }
 }
@@ -115,9 +127,11 @@ fn rejects_package_qualified_keyword_and_uninterned_symbols() {
         })
         .unwrap_err();
 
-        assert_eq!(
-            error.downcast_ref::<RenameAtError>(),
-            Some(&RenameAtError::UnsupportedPackageSyntax),
+        assert!(
+            matches!(
+                &error,
+                RenameError::RenameAt(RenameAtError::UnsupportedPackageSyntax)
+            ),
             "symbol: {symbol}"
         );
     }
@@ -128,9 +142,12 @@ fn rejects_package_syntax_in_replacement_symbol() {
     let input = "(defun foo () (foo))";
     let error = plan_rename_at(request(input, "foo", "pkg:bar")).unwrap_err();
 
-    assert_eq!(
-        error.downcast_ref::<RenameAtError>(),
-        Some(&RenameAtError::UnsupportedPackageSyntax)
+    assert!(
+        matches!(
+            &error,
+            RenameError::RenameAt(RenameAtError::UnsupportedPackageSyntax)
+        ),
+        "{error:?}"
     );
 }
 
@@ -170,9 +187,12 @@ fn rejects_unsupported_dialects_before_parsing_malformed_input() {
         })
         .unwrap_err();
 
-        assert_eq!(
-            error.downcast_ref::<RenameAtError>(),
-            Some(&RenameAtError::UnsupportedDialect)
+        assert!(
+            matches!(
+                &error,
+                RenameError::RenameAt(RenameAtError::UnsupportedDialect)
+            ),
+            "{error:?}"
         );
     }
 }
