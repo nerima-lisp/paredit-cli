@@ -1,8 +1,6 @@
-use anyhow::{Result, anyhow};
-
 use crate::definition::macro_expander_body_range;
 use crate::dialect::Dialect;
-use crate::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
+use crate::sexpr::{ExpressionKind, ExpressionView, Path, SelectionError, SexprResult, SyntaxTree};
 
 use super::CommonLispLocalCallableForm;
 use super::common_lisp_operator_head_eq;
@@ -23,7 +21,7 @@ pub fn common_lisp_macro_expander_path(
     tree: &SyntaxTree,
     dialect: Dialect,
     path: &Path,
-) -> Result<bool> {
+) -> SexprResult<bool> {
     let indexes = path.to_raw_indexes();
 
     for ancestor_end in 1..indexes.len() {
@@ -114,15 +112,19 @@ pub fn local_callable_scope_at_path(
     tree: &SyntaxTree,
     dialect: Dialect,
     path: &Path,
-) -> Result<Vec<String>> {
+) -> SexprResult<Vec<String>> {
     let indexes = path.to_raw_indexes();
     let Some((&root_index, descendants)) = indexes.split_first() else {
         return Ok(Vec::new());
     };
     let root_path = Path::root_child(root_index);
     let view = tree.select_path(&root_path)?.view();
-    local_callable_scope_in_view(&view, dialect, descendants, &[])
-        .ok_or_else(|| anyhow!("path {path} is not reachable"))
+    local_callable_scope_in_view(&view, dialect, descendants, &[]).ok_or_else(|| {
+        SelectionError::PathNotReachable {
+            path: path.to_string(),
+        }
+        .into()
+    })
 }
 
 fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {

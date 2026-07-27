@@ -128,7 +128,7 @@ fn file_unused_definition_candidates(
         .filter_map(|(definition, name)| match SymbolName::new(name.clone()) {
             Ok(symbol) => Some(Ok((definition, symbol))),
             Err(_) if !definition.category.is_bulk_removable() => None,
-            Err(error) => Some(Err(error.context(format!(
+            Err(error) => Some(Err(anyhow::Error::new(error).context(format!(
                 "remove-unused-definition found invalid symbol '{name}' in {}",
                 file.path.display()
             )))),

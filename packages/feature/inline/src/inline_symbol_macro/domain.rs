@@ -123,10 +123,9 @@ fn plain_symbol(view: &ExpressionView) -> Result<SymbolName> {
     if view.kind != ExpressionKind::Atom {
         bail!("inline-symbol-macro binding name must be a plain symbol");
     }
-    SymbolName::new(
-        atom_symbol_text(view)
-            .context("inline-symbol-macro binding name must be a plain symbol")?,
-    )
+    Ok(SymbolName::new(atom_symbol_text(view).context(
+        "inline-symbol-macro binding name must be a plain symbol",
+    )?)?)
 }
 
 fn contains_reader_prefix(view: &ExpressionView) -> bool {

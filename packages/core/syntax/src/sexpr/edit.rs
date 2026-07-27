@@ -1,5 +1,4 @@
-use anyhow::{Result, anyhow};
-
+use super::error::{SelectionError, SexprError, SexprResult, StructureError};
 use super::tree::{Node, NodeKind, Selection, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
 
@@ -11,7 +10,7 @@ impl Edit {
         input: &str,
         rewritten: String,
         dialect: crate::dialect::Dialect,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         if input == rewritten {
             return Ok(rewritten);
         }
@@ -58,12 +57,16 @@ impl Edit {
         Ok(normalized)
     }
 
-    pub fn replace(input: &str, selection: Selection<'_>, replacement: &str) -> Result<String> {
+    pub fn replace(
+        input: &str,
+        selection: Selection<'_>,
+        replacement: &str,
+    ) -> SexprResult<String> {
         validate_selection_input(input, selection)?;
         Ok(replace_span(input, selection.span(), replacement))
     }
 
-    pub fn kill(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn kill(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let span = expand_removal(input, tree, selection.span());
         Ok(replace_span(input, span, ""))
@@ -74,7 +77,7 @@ impl Edit {
         tree: &SyntaxTree,
         selection: Selection<'_>,
         delimiter: Delimiter,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         Ok(replace_span(
             input,
@@ -88,7 +91,7 @@ impl Edit {
         ))
     }
 
-    pub fn splice(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn splice(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
@@ -100,15 +103,13 @@ impl Edit {
         Ok(output)
     }
 
-    pub fn raise(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn raise(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
-        let parent_id = node
-            .parent
-            .ok_or_else(|| anyhow!("selected node has no parent"))?;
+        let parent_id = node.parent.ok_or(StructureError::NoParent)?;
         let parent = selection.tree.node(parent_id);
         if parent.kind == NodeKind::Root {
-            anyhow::bail!("cannot raise a top-level expression");
+            return Err(StructureError::RaiseTopLevel.into());
         }
         Ok(replace_span(input, parent.span, selection.text()))
     }
@@ -117,10 +118,10 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let sibling = next_sibling(tree, selection.node_id)
-            .ok_or_else(|| anyhow!("selected expression has no next sibling to transpose"))?;
+            .ok_or(StructureError::NoNextSiblingToTranspose)?;
         Ok(swap_node_text(
             input,
             selection.node().span,
@@ -132,10 +133,10 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let sibling = previous_sibling(tree, selection.node_id)
-            .ok_or_else(|| anyhow!("selected expression has no previous sibling to transpose"))?;
+            .ok_or(StructureError::NoPreviousSiblingToTranspose)?;
         Ok(swap_node_text(
             input,
             tree.node(sibling).span,
@@ -147,12 +148,12 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
-        let sibling = next_sibling(tree, selection.node_id)
-            .ok_or_else(|| anyhow!("selected list has no next sibling to slurp"))?;
+        let sibling =
+            next_sibling(tree, selection.node_id).ok_or(StructureError::NoNextSiblingToSlurp)?;
         let (_, close) = list_delimiter_offsets(node)?;
         let insertion = format!(" {}", tree.node(sibling).span.slice(input));
         // The sibling sits after the list, so the gap to remove is the
@@ -172,12 +173,12 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let sibling = previous_sibling(tree, selection.node_id)
-            .ok_or_else(|| anyhow!("selected list has no previous sibling to slurp"))?;
+            .ok_or(StructureError::NoPreviousSiblingToSlurp)?;
         let (open, _) = list_delimiter_offsets(node)?;
         let open = open + 1;
         let insertion = format!("{} ", tree.node(sibling).span.slice(input));
@@ -194,14 +195,14 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let child = *node
             .children
             .last()
-            .ok_or_else(|| anyhow!("cannot barf from an empty list"))?;
+            .ok_or(StructureError::BarfFromEmptyList)?;
         let (_, close) = list_delimiter_offsets(node)?;
         let child_span = tree.node(child).span;
         let insertion = format!(" {}", child_span.slice(input));
@@ -218,17 +219,15 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let child = *node
             .children
             .first()
-            .ok_or_else(|| anyhow!("cannot barf from an empty list"))?;
-        let open = node
-            .open
-            .ok_or_else(|| anyhow!("selected list is missing an opening delimiter"))?;
+            .ok_or(StructureError::BarfFromEmptyList)?;
+        let open = node.open.ok_or(StructureError::MissingOpenDelimiter)?;
         let child_span = tree.node(child).span;
         let insertion = format!("{} ", child_span.slice(input));
         let removal = expand_removal(input, tree, child_span);
@@ -244,24 +243,22 @@ impl Edit {
     /// The gap between the split point's neighbours is preserved verbatim so
     /// interleaved comments survive; the caller's trivia normalization then
     /// trims any whitespace stranded on the changed lines.
-    pub fn split(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn split(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
-        let parent_id = node
-            .parent
-            .ok_or_else(|| anyhow!("selected expression has no enclosing list to split"))?;
+        let parent_id = node.parent.ok_or(StructureError::NoEnclosingListToSplit)?;
         let parent = tree.node(parent_id);
         if parent.kind != NodeKind::List {
-            anyhow::bail!("split requires an expression directly inside a list");
+            return Err(StructureError::SplitNotDirectlyInList.into());
         }
         if !parent.reader_prefixes.is_empty() {
-            anyhow::bail!("cannot split a list carrying a reader prefix");
+            return Err(StructureError::SplitReaderPrefix.into());
         }
         let delimiter = parent
             .delimiter
-            .ok_or_else(|| anyhow!("enclosing list is missing a delimiter"))?;
+            .ok_or(StructureError::EnclosingListMissingDelimiter)?;
         let previous = previous_sibling(tree, selection.node_id)
-            .ok_or_else(|| anyhow!("cannot split before the first element of a list"))?;
+            .ok_or(StructureError::SplitBeforeFirstElement)?;
         let prev_end = tree.node(previous).span.end().get();
         let selection_start = node.span.start().get();
 
@@ -281,11 +278,11 @@ impl Edit {
     ///
     /// `(foo bar) (baz qux)` selecting the first list yields `(foo bar baz qux)`.
     /// `"foo" "bar"` selecting the first string yields `"foobar"`.
-    pub fn join(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn join(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
-        let sibling_id = next_sibling(tree, selection.node_id)
-            .ok_or_else(|| anyhow!("selected expression has no next sibling to join"))?;
+        let sibling_id =
+            next_sibling(tree, selection.node_id).ok_or(StructureError::NoNextSiblingToJoin)?;
         let sibling = tree.node(sibling_id);
 
         if node.kind == NodeKind::Atom {
@@ -294,16 +291,16 @@ impl Edit {
 
         ensure_list(node)?;
         if !node.reader_prefixes.is_empty() {
-            anyhow::bail!("cannot join a list carrying a reader prefix");
+            return Err(StructureError::JoinReaderPrefix.into());
         }
         if sibling.kind != NodeKind::List {
-            anyhow::bail!("join requires the next sibling to also be a list");
+            return Err(StructureError::JoinSiblingNotList.into());
         }
         if !sibling.reader_prefixes.is_empty() {
-            anyhow::bail!("cannot join into a list carrying a reader prefix");
+            return Err(StructureError::JoinIntoReaderPrefix.into());
         }
         if node.delimiter != sibling.delimiter {
-            anyhow::bail!("cannot join lists that use different delimiters");
+            return Err(StructureError::JoinDelimiterMismatch.into());
         }
         let (_, first_close) = list_delimiter_offsets(node)?;
         let (second_open, _) = list_delimiter_offsets(sibling)?;
@@ -331,14 +328,14 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         let parent = enclosing_list(tree, node)?;
         let last = *parent
             .children
             .last()
-            .ok_or_else(|| anyhow!("enclosing list has no children to keep"))?;
+            .ok_or(StructureError::EnclosingListHasNoChildren)?;
         let start = node.span.start().get();
         let end = tree.node(last).span.end().get();
         Ok(replace_span(input, parent.span, &input[start..end]))
@@ -353,16 +350,16 @@ impl Edit {
         input: &str,
         tree: &SyntaxTree,
         selection: Selection<'_>,
-    ) -> Result<String> {
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         let parent = enclosing_list(tree, node)?;
         let previous = previous_sibling(tree, selection.node_id)
-            .ok_or_else(|| anyhow!("nothing precedes the selection to keep"))?;
+            .ok_or(StructureError::NothingPrecedesSelection)?;
         let first = *parent
             .children
             .first()
-            .ok_or_else(|| anyhow!("enclosing list has no children to keep"))?;
+            .ok_or(StructureError::EnclosingListHasNoChildren)?;
         let start = tree.node(first).span.start().get();
         let end = tree.node(previous).span.end().get();
         Ok(replace_span(input, parent.span, &input[start..end]))
@@ -379,33 +376,35 @@ impl Edit {
     /// verbatim. To avoid silently dropping a comment that sits between the
     /// reshuffled forms, the operation refuses any comment inside the outer
     /// list that is not inside the selected list.
-    pub fn convolute(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn convolute(
+        input: &str,
+        tree: &SyntaxTree,
+        selection: Selection<'_>,
+    ) -> SexprResult<String> {
         validate_edit_context(input, tree, selection)?;
         let inner = selection.node();
         ensure_list(inner)?;
         let middle_id = inner
             .parent
-            .ok_or_else(|| anyhow!("selected list has no enclosing list to convolute"))?;
+            .ok_or(StructureError::NoEnclosingListToConvolute)?;
         let middle = tree.node(middle_id);
         if middle.kind != NodeKind::List {
-            anyhow::bail!("convolute requires the selected list to be nested inside a list");
+            return Err(StructureError::ConvoluteNotNested.into());
         }
-        let outer_id = middle
-            .parent
-            .ok_or_else(|| anyhow!("convolute requires the selected list to be two lists deep"))?;
+        let outer_id = middle.parent.ok_or(StructureError::ConvoluteNotTwoDeep)?;
         let outer = tree.node(outer_id);
         if outer.kind != NodeKind::List {
-            anyhow::bail!("convolute requires the selected list to be two lists deep");
+            return Err(StructureError::ConvoluteNotTwoDeep.into());
         }
         if !middle.reader_prefixes.is_empty() || !outer.reader_prefixes.is_empty() {
-            anyhow::bail!("cannot convolute lists carrying a reader prefix");
+            return Err(StructureError::ConvoluteReaderPrefix.into());
         }
         let middle_delimiter = middle
             .delimiter
-            .ok_or_else(|| anyhow!("enclosing list is missing a delimiter"))?;
+            .ok_or(StructureError::EnclosingListMissingDelimiter)?;
         let outer_delimiter = outer
             .delimiter
-            .ok_or_else(|| anyhow!("outer list is missing a delimiter"))?;
+            .ok_or(StructureError::OuterListMissingDelimiter)?;
 
         let inner_span = inner.span;
         let outer_span = outer.span;
@@ -416,19 +415,19 @@ impl Edit {
                 && comment.span.end().get() <= inner_span.end().get();
             within_outer && !within_inner
         }) {
-            anyhow::bail!("cannot convolute a form with comments outside the selected list");
+            return Err(StructureError::ConvoluteCommentsOutside.into());
         }
 
         let inner_position = middle
             .children
             .iter()
             .position(|child| *child == selection.node_id)
-            .ok_or_else(|| anyhow!("selected list is not a direct child of its enclosing list"))?;
+            .ok_or(StructureError::NotDirectChildOfEnclosing)?;
         let middle_position = outer
             .children
             .iter()
             .position(|child| *child == middle_id)
-            .ok_or_else(|| anyhow!("enclosing list is not a direct child of the outer list"))?;
+            .ok_or(StructureError::EnclosingNotDirectChildOfOuter)?;
 
         let middle_before = &middle.children[..inner_position];
         let middle_after = &middle.children[inner_position + 1..];
@@ -470,14 +469,14 @@ impl Edit {
 /// Merges two adjacent string-literal atoms into one string by concatenating
 /// their contents and dropping the interior delimiters and the gap between
 /// them. Refuses non-string atoms so symbols are never silently fused.
-fn join_strings(input: &str, node: &Node, sibling: &Node) -> Result<String> {
+fn join_strings(input: &str, node: &Node, sibling: &Node) -> SexprResult<String> {
     if !node.reader_prefixes.is_empty() || !sibling.reader_prefixes.is_empty() {
-        anyhow::bail!("cannot join strings carrying a reader prefix");
+        return Err(StructureError::JoinStringReaderPrefix.into());
     }
     let first = node.span.slice(input);
     let second = sibling.span.slice(input);
     if !is_string_literal(first) || sibling.kind != NodeKind::Atom || !is_string_literal(second) {
-        anyhow::bail!("join only merges two adjacent lists or two adjacent strings");
+        return Err(StructureError::JoinUnsupportedPair.into());
     }
 
     // Drop the first string's closing quote and the second's opening quote so
@@ -497,13 +496,13 @@ fn is_string_literal(text: &str) -> bool {
 
 /// Returns the selected node's enclosing list, or an error when the node is at
 /// the top level or otherwise not directly inside a list.
-fn enclosing_list<'a>(tree: &'a SyntaxTree, node: &Node) -> Result<&'a Node> {
+fn enclosing_list<'a>(tree: &'a SyntaxTree, node: &Node) -> SexprResult<&'a Node> {
     let parent_id = node
         .parent
-        .ok_or_else(|| anyhow!("selected expression has no enclosing list"))?;
+        .ok_or(StructureError::NoEnclosingListForSelection)?;
     let parent = tree.node(parent_id);
     if parent.kind != NodeKind::List {
-        anyhow::bail!("selected expression is not inside a list");
+        return Err(StructureError::NotInsideList.into());
     }
     Ok(parent)
 }
@@ -523,20 +522,29 @@ fn push_space_joined(out: &mut String, parts: &[&str]) {
     }
 }
 
-fn validate_selection_input(input: &str, selection: Selection<'_>) -> Result<()> {
-    selection
-        .validate_source(input)
-        .map_err(|error| anyhow!("edit {error}"))
+fn validate_selection_input(input: &str, selection: Selection<'_>) -> SexprResult<()> {
+    selection.validate_source(input).map_err(prefix_with_edit)
 }
 
-fn validate_edit_context(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<()> {
+fn validate_edit_context(
+    input: &str,
+    tree: &SyntaxTree,
+    selection: Selection<'_>,
+) -> SexprResult<()> {
     selection.validate_context(input, tree).map_err(|error| {
-        if error.to_string().starts_with("input ") {
-            anyhow!("edit {error}")
-        } else {
-            error
+        // Only a source mismatch names the operation. This used to be
+        // `error.to_string().starts_with("input ")` - a prefix match on a
+        // human message deciding control flow.
+        match error {
+            SelectionError::SourceMismatch => prefix_with_edit(SelectionError::SourceMismatch),
+            other => SexprError::Selection(other),
         }
     })
+}
+
+/// Names the operation in a selection failure, as the CLI's messages expect.
+const fn prefix_with_edit(source: SelectionError) -> SexprError {
+    SexprError::EditSelection { source }
 }
 
 fn common_prefix_len(left: &str, right: &str) -> usize {
@@ -580,20 +588,16 @@ fn trailing_trivia_is_opaque(tree: &SyntaxTree, start: usize, end: usize) -> boo
     })
 }
 
-fn ensure_list(node: &Node) -> Result<()> {
+fn ensure_list(node: &Node) -> SexprResult<()> {
     if node.kind != NodeKind::List {
-        anyhow::bail!("operation requires a list expression");
+        return Err(StructureError::NotAList.into());
     }
     Ok(())
 }
 
-fn list_delimiter_offsets(node: &Node) -> Result<(usize, usize)> {
-    let open = node
-        .open
-        .ok_or_else(|| anyhow!("selected list is missing an opening delimiter"))?;
-    let close = node
-        .close
-        .ok_or_else(|| anyhow!("selected list is missing a closing delimiter"))?;
+fn list_delimiter_offsets(node: &Node) -> SexprResult<(usize, usize)> {
+    let open = node.open.ok_or(StructureError::MissingOpenDelimiter)?;
+    let close = node.close.ok_or(StructureError::MissingCloseDelimiter)?;
     Ok((open.get(), close.get()))
 }
 

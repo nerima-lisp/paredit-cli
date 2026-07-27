@@ -13,8 +13,8 @@ pub fn select_rename_target<'a>(
     target: &RenameTarget,
 ) -> Result<Selection<'a>> {
     match target {
-        RenameTarget::Path(path) => tree.select_path(path),
-        RenameTarget::Offset(offset) => tree.select_at(*offset),
+        RenameTarget::Path(path) => Ok(tree.select_path(path)?),
+        RenameTarget::Offset(offset) => Ok(tree.select_at(*offset)?),
     }
 }
 

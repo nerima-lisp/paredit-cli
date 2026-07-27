@@ -2,14 +2,13 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path as FsPath;
 use std::sync::Arc;
 
-use anyhow::Error as AnyhowError;
 use thiserror::Error;
 
 use crate::form_similarity::StructuralTree;
 use paredit_core_syntax::common_lisp::normalize_common_lisp_operator_head;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
-    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree,
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SexprError, SyntaxTree,
 };
 
 use super::SimilarityReportOptionsError;
@@ -26,7 +25,7 @@ pub enum SimilarityCandidateCollectionError {
     #[error(transparent)]
     InvalidOptions(#[from] SimilarityReportOptionsError),
     #[error("failed to select an expression while collecting similarity candidates: {0}")]
-    Selection(#[from] AnyhowError),
+    Selection(#[from] SexprError),
 }
 
 pub fn collect_similarity_candidates(

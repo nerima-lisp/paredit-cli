@@ -1,10 +1,9 @@
 use std::fmt;
 
-use anyhow::{Result, anyhow};
-
 use crate::common_lisp::common_lisp_symbol_reference_eq;
 use crate::dialect::Dialect;
 
+use super::error::{SelectionError, SexprError, SexprResult, StructureError};
 use super::parser::{ParseError, Parser};
 use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, SymbolName};
 
@@ -607,7 +606,7 @@ impl SyntaxTree {
     }
 
     /// Resolves a zero-based expression path into a non-root selection.
-    pub fn select_path(&self, path: &ExpressionPath) -> Result<Selection<'_>> {
+    pub fn select_path(&self, path: &ExpressionPath) -> SexprResult<Selection<'_>> {
         let mut node_id = NodeId::ROOT;
         for (depth, index) in path.indexes().iter().enumerate() {
             let node = self.node(node_id);
@@ -629,11 +628,14 @@ impl SyntaxTree {
                         len.saturating_sub(1)
                     ),
                 };
-                anyhow!("path segment {} is out of range: {arity}", index.get())
+                SelectionError::PathSegmentOutOfRange {
+                    segment: index.get(),
+                    detail: arity,
+                }
             })?;
         }
         if node_id == NodeId::ROOT {
-            anyhow::bail!("root document cannot be edited directly");
+            return Err(StructureError::RootNotEditable.into());
         }
         Ok(Selection {
             tree: self,
@@ -642,7 +644,7 @@ impl SyntaxTree {
     }
 
     /// Selects the smallest expression that contains the given byte offset.
-    pub fn select_at(&self, offset: usize) -> Result<Selection<'_>> {
+    pub fn select_at(&self, offset: usize) -> SexprResult<Selection<'_>> {
         let offset = ByteOffset::new(offset);
         let mut best = None;
         for id in 1..self.nodes.len() {
@@ -662,7 +664,11 @@ impl SyntaxTree {
             tree: self,
             node_id,
         })
-        .ok_or_else(|| anyhow!("no expression contains byte offset {}", offset.get()))
+        .ok_or_else(|| {
+            SexprError::from(SelectionError::NoExpressionAtOffset {
+                offset: offset.get(),
+            })
+        })
     }
 
     // A full `ExpressionPath` is only built when an atom is found. Enter/leave
@@ -798,23 +804,23 @@ impl SyntaxTree {
 }
 
 impl<'a> Selection<'a> {
-    pub fn validate_source(self, input: &str) -> Result<()> {
+    pub fn validate_source(self, input: &str) -> Result<(), SelectionError> {
         if self.tree.source != input {
-            anyhow::bail!("input does not match the source used to build the selection");
+            return Err(SelectionError::SourceMismatch);
         }
         self.span()
             .validate_against(input)
-            .map_err(|error| anyhow!("selected span is invalid: {error}"))
+            .map_err(|source| SelectionError::InvalidSpan { source })
     }
 
-    pub fn validate_context(self, input: &str, tree: &SyntaxTree) -> Result<()> {
+    pub fn validate_context(self, input: &str, tree: &SyntaxTree) -> Result<(), SelectionError> {
         self.validate_tree(tree)?;
         self.validate_source(input)
     }
 
-    pub fn validate_tree(self, tree: &SyntaxTree) -> Result<()> {
+    pub fn validate_tree(self, tree: &SyntaxTree) -> Result<(), SelectionError> {
         if !std::ptr::eq(tree, self.tree) {
-            anyhow::bail!("selection belongs to a different syntax tree");
+            return Err(SelectionError::TreeMismatch);
         }
         Ok(())
     }
@@ -842,14 +848,11 @@ impl<'a> Selection<'a> {
     }
 
     /// Returns the enclosing list span when the parent node is a list.
-    pub fn enclosing_list_span(self) -> Result<ByteSpan> {
-        let parent_id = self
-            .node()
-            .parent
-            .ok_or_else(|| anyhow!("selection has no enclosing list"))?;
+    pub fn enclosing_list_span(self) -> SexprResult<ByteSpan> {
+        let parent_id = self.node().parent.ok_or(StructureError::NoEnclosingList)?;
         let parent = self.tree.node(parent_id);
         if parent.kind != NodeKind::List {
-            anyhow::bail!("selection has no enclosing list");
+            return Err(StructureError::NoEnclosingList.into());
         }
         Ok(parent.span)
     }

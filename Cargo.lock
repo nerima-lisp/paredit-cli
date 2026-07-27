@@ -737,7 +737,6 @@ dependencies = [
 name = "paredit-core-syntax"
 version = "1.1.0"
 dependencies = [
- "anyhow",
  "proptest",
  "thiserror",
 ]

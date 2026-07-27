@@ -8,7 +8,7 @@ use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
-    SymbolName, SyntaxTree,
+    SexprResult, SymbolName, SyntaxTree,
 };
 use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
@@ -199,7 +199,7 @@ pub fn matching_symbol_occurrences(tree: &SyntaxTree, symbol: &SymbolName) -> Ve
 
 pub fn edit_target(
     args: EditTargetArgs,
-    f: fn(&str, &SyntaxTree, Selection<'_>) -> Result<String>,
+    f: fn(&str, &SyntaxTree, Selection<'_>) -> SexprResult<String>,
 ) -> Result<()> {
     let target = args.target;
     let (input, dialect) = read_input_and_dialect(target.file, target.dialect)?;
@@ -246,8 +246,8 @@ pub fn resolve_target<'a>(
     at: Option<usize>,
 ) -> Result<Selection<'a>> {
     match (path, at) {
-        (Some(path), None) => tree.select_path(path),
-        (None, Some(offset)) => tree.select_at(offset),
+        (Some(path), None) => Ok(tree.select_path(path)?),
+        (None, Some(offset)) => Ok(tree.select_at(offset)?),
         (None, None) => anyhow::bail!("target required: pass --path or --at"),
         (Some(_), Some(_)) => anyhow::bail!("pass only one of --path or --at"),
     }

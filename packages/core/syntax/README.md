@@ -49,12 +49,32 @@ Lisp knowledge, not just s-expressions.
 
 | Crate | Why |
 | --- | --- |
-| `anyhow` | Fallible parse and edit paths still return `anyhow::Result`. This is a carry-over, not a design choice: §9.2 of the migration spec replaces it with `thiserror` enums so callers can match on failures instead of reading strings. Until then it stays, to keep the move reviewable. |
-| `thiserror` | The typed errors that already exist, and the target shape for the rest. |
+| `thiserror` | Every fallible entry point here returns a typed enum. |
 | `proptest` (dev) | Round-trip and re-parse properties over generated source. |
 
 No `clap`, no `cap-std`, no `serde_json`: a dependency here that implies
-delivery or I/O means something has been put in the wrong package.
+delivery or I/O means something has been put in the wrong package. **No
+`anyhow` either** — §9.2 of the migration spec finished in this package, so a
+caller matches on a variant rather than reading a message. Re-adding it would
+undo that; if a new failure does not fit an existing enum, add a variant.
+
+## Errors
+
+`sexpr::error` splits the failures by what a caller can do about them:
+
+| Type | Means | A caller can |
+| --- | --- | --- |
+| `StructureError` | The edit does not fit the shape that is there | Suggest a different selection |
+| `SelectionError` | The selection is for another tree, or another source | Nothing — the handle is stale or wrong |
+| `SpanError` | A byte span cannot index this source | Nothing — it is a bug |
+| `PathError`, `SymbolError` | A `FromStr` input is malformed | Report it as bad user input |
+| `ParseError` | The source did not parse | Point at the byte offset |
+
+`SexprError` unions them, and `Edit`'s entry points additionally wrap a
+`SelectionError` in `SexprError::EditSelection` to name the operation. That
+last variant exists only because the wording is part of the CLI's contract: it
+replaced `error.to_string().starts_with("input ")`, which is what deciding
+control flow on a message text looks like when the error type is erased.
 
 ## Public API
 

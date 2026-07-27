@@ -3,6 +3,8 @@
 
 mod capability;
 mod parse;
+
+pub use parse::UnsupportedDialect;
 mod semantic;
 
 pub use semantic::{

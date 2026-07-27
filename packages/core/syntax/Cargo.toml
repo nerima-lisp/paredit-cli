@@ -10,9 +10,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-# Fallible parsing and edit paths still surface anyhow::Result. Section 9.2
-# replaces these with thiserror enums; see the README's "責務" note.
-anyhow.workspace = true
+# No anyhow. Section 9.2 finished here: every fallible entry point returns a
+# thiserror enum, so a caller matches on a variant instead of a message.
 thiserror.workspace = true
 
 [dev-dependencies]

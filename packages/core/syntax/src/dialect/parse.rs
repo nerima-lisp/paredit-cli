@@ -1,12 +1,22 @@
 use std::fmt;
 use std::str::FromStr;
 
-use anyhow::anyhow;
+use thiserror::Error;
 
 use super::Dialect;
 
+/// The dialect name is not one this build knows.
+///
+/// Typed rather than `anyhow`, because `clap` renders it as a value-parser
+/// failure and a caller that offers a suggestion needs the rejected text.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("unsupported dialect: {name}")]
+pub struct UnsupportedDialect {
+    pub name: String,
+}
+
 impl FromStr for Dialect {
-    type Err = anyhow::Error;
+    type Err = UnsupportedDialect;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -21,7 +31,7 @@ impl FromStr for Dialect {
             "carp" => Ok(Self::Carp),
             "janet" => Ok(Self::Janet),
             "fennel" | "fnl" => Ok(Self::Fennel),
-            _ => Err(anyhow!("unsupported dialect: {s}")),
+            _ => Err(UnsupportedDialect { name: s.to_owned() }),
         }
     }
 }

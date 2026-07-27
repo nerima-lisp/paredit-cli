@@ -2,6 +2,7 @@
 //! primitives that back both the CLI and downstream Rust automation.
 
 mod edit;
+pub mod error;
 mod formatter;
 mod parser;
 pub mod reader;
@@ -13,6 +14,9 @@ mod tree;
 mod types;
 
 pub use edit::Edit;
+pub use error::{
+    PathError, SelectionError, SexprError, SexprResult, SpanError, StructureError, SymbolError,
+};
 pub use formatter::Formatter;
 pub use parser::ParseError;
 pub use tree::AtomOccurrenceIndex;

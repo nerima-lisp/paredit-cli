@@ -1,8 +1,7 @@
+use super::error::{PathError, SpanError, SymbolError};
 use std::fmt;
 use std::ops::Range;
 use std::str::FromStr;
-
-use anyhow::{Result, anyhow};
 
 /// A byte offset into the original source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -92,20 +91,20 @@ impl ByteSpan {
     }
 
     /// Validates that this span can safely index `input`.
-    pub fn validate_against(&self, input: &str) -> Result<()> {
+    pub fn validate_against(&self, input: &str) -> Result<(), SpanError> {
         let start = self.start.get();
         let end = self.end.get();
         if start > end {
-            return Err(anyhow!("span start {start} exceeds end {end}"));
+            return Err(SpanError::StartExceedsEnd { start, end });
         }
         if end > input.len() {
-            return Err(anyhow!(
-                "span end {end} exceeds input length {}",
-                input.len()
-            ));
+            return Err(SpanError::EndExceedsInput {
+                end,
+                length: input.len(),
+            });
         }
         if !input.is_char_boundary(start) || !input.is_char_boundary(end) {
-            return Err(anyhow!("span is not aligned to UTF-8 character boundaries"));
+            return Err(SpanError::NotCharBoundary);
         }
         Ok(())
     }
@@ -285,18 +284,19 @@ impl ExpressionPath {
 }
 
 impl FromStr for ExpressionPath {
-    type Err = anyhow::Error;
+    type Err = PathError;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.trim().is_empty() {
             return Ok(Self(Vec::new()));
         }
         let mut indexes = Vec::new();
         for part in s.split('.') {
-            indexes.push(ChildIndex::new(
-                part.parse::<usize>()
-                    .map_err(|_| anyhow!("invalid path segment: {part}"))?,
-            ));
+            indexes.push(ChildIndex::new(part.parse::<usize>().map_err(|_| {
+                PathError::InvalidSegment {
+                    segment: part.to_owned(),
+                }
+            })?));
         }
         Ok(Self(indexes))
     }
@@ -320,13 +320,13 @@ pub struct SymbolName(String);
 
 impl SymbolName {
     /// Validates and stores a symbol name for rename and selection APIs.
-    pub fn new(value: impl Into<String>) -> Result<Self> {
+    pub fn new(value: impl Into<String>) -> Result<Self, SymbolError> {
         let value = value.into();
         if value.is_empty() {
-            anyhow::bail!("symbol must not be empty");
+            return Err(SymbolError::Empty);
         }
         if value.bytes().any(is_symbol_boundary) || value.contains('"') {
-            anyhow::bail!("symbol contains reader delimiter or whitespace: {value}");
+            return Err(SymbolError::ReaderDelimiterOrWhitespace { value });
         }
         Ok(Self(value))
     }
@@ -339,9 +339,9 @@ impl SymbolName {
 }
 
 impl FromStr for SymbolName {
-    type Err = anyhow::Error;
+    type Err = SymbolError;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::new(s)
     }
 }
