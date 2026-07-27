@@ -4,7 +4,7 @@
 //! standalone `inspect char-op-string` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::char_op_string::domain::{CharacterMismatch, examine_call};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -68,7 +68,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         // The type context turns "spelled as a string" into "cannot be a
         // character". The question is asked in the negative on purpose:
         // `is_definitely(Ty::String)` would miss `(char= (length xs) c)`,

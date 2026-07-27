@@ -22,7 +22,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
@@ -132,7 +132,7 @@ pub fn collect_equality_arity_violations(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<EqualityArityItem>)> {
+) -> LintResult<(usize, Vec<EqualityArityItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

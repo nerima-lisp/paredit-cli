@@ -4,7 +4,7 @@
 //! standalone `inspect zero-divisor` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::zero_divisor::domain::examine;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -53,7 +53,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         // The value layer sees through a binding and through folded
         // arithmetic, so `(let ((z 0)) (/ x z))` and `(/ x (- 1 1))` are the
         // same bug as `(/ x 0)`. `Unknown` reads as "not provably zero", which

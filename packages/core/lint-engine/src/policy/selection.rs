@@ -1,7 +1,6 @@
 //! Choosing which rules a run applies.
 
-use anyhow::Result;
-
+use crate::error::RuleSelectionError;
 use crate::model::{RuleCategory, RuleName};
 use crate::rule::RuleCatalog;
 
@@ -43,23 +42,23 @@ pub fn resolve_active_rules(
     only: &[String],
     exclude: &[String],
     categories: &[String],
-) -> Result<Vec<&'static str>> {
+) -> Result<Vec<&'static str>, RuleSelectionError> {
     let rules: Vec<&'static str> = catalog.names().collect();
     let category_names = catalog.categories();
     for name in only.iter().chain(exclude) {
         if !rules.contains(&name.as_str()) {
-            anyhow::bail!(
-                "unknown lint rule {name:?}; valid rules: {}",
-                rules.join(", ")
-            );
+            return Err(RuleSelectionError::UnknownRule {
+                name: name.clone(),
+                valid: rules.join(", "),
+            });
         }
     }
     for name in categories {
         if !category_names.contains(&name.as_str()) {
-            anyhow::bail!(
-                "unknown lint category {name:?}; valid categories: {}",
-                category_names.join(", ")
-            );
+            return Err(RuleSelectionError::UnknownCategory {
+                name: name.clone(),
+                valid: category_names.join(", "),
+            });
         }
     }
 

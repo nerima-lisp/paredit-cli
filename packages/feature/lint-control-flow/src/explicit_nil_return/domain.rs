@@ -27,7 +27,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
@@ -154,7 +154,7 @@ pub fn collect_explicit_nil_returns(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<ExplicitNilReturnItem>)> {
+) -> LintResult<(usize, Vec<ExplicitNilReturnItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

@@ -18,7 +18,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
@@ -117,7 +117,7 @@ pub fn collect_unreachable_cond_clauses(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<UnreachableCondClauseItem>)> {
+) -> LintResult<(usize, Vec<UnreachableCondClauseItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

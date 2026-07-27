@@ -23,7 +23,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
@@ -116,7 +116,7 @@ pub fn collect_if_nots(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<IfNotItem>)> {
+) -> LintResult<(usize, Vec<IfNotItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

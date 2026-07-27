@@ -19,7 +19,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
@@ -122,7 +122,7 @@ pub fn collect_malformed_cond_clauses(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<MalformedCondClauseItem>)> {
+) -> LintResult<(usize, Vec<MalformedCondClauseItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

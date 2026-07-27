@@ -4,7 +4,7 @@
 //! standalone `inspect lambda-list-keyword-order` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::lambda_list_keyword_order::domain::collect_lambda_list_keyword_order;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -35,7 +35,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         _view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let (_, items) =
             collect_lambda_list_keyword_order(context.path(), context.dialect(), context.tree())?;
         for item in items {

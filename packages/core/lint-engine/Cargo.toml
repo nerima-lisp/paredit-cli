@@ -12,7 +12,8 @@ repository.workspace = true
 [dependencies]
 paredit-core-syntax = { path = "../syntax" }
 paredit-core-semantics = { path = "../semantics" }
-anyhow.workspace = true
+# No anyhow. A lint rule's only legitimate failure is a path that does not
+# resolve, and LintError says so; see src/error.rs.
 thiserror.workspace = true
 
 [dev-dependencies]

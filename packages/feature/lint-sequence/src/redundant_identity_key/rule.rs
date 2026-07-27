@@ -4,7 +4,7 @@
 //! standalone `inspect redundant-identity-key` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::redundant_identity_key::domain::examine_call;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -79,7 +79,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let mut call_form_count = 0;
         let mut items = Vec::new();
         examine_call(view, context.path(), &mut call_form_count, &mut items);

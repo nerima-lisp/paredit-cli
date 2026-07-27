@@ -4,7 +4,7 @@
 //! standalone `inspect if-not` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::if_not::domain::examine_if;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -39,7 +39,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let context_slice = |span| context.slice(span).to_owned();
         let mut if_form_count = 0;
         let mut items = Vec::new();

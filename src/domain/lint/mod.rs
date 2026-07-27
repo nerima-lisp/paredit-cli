@@ -16,7 +16,7 @@
 // `paredit-core-lint-engine`; `registry` and `rules` stay here, because a
 // registry naming every rule while every rule depends on the engine is a cycle
 // (section 4.2).
-pub use paredit_core_lint_engine::{engine, model, policy, rule};
+pub use paredit_core_lint_engine::{LintResult, RuleSelectionError, engine, model, policy, rule};
 
 #[cfg(test)]
 mod engine_dispatch_tests;
@@ -26,8 +26,6 @@ mod rule_registry_tests;
 
 use std::path::Path;
 use std::sync::OnceLock;
-
-use anyhow::Result;
 
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
@@ -59,7 +57,7 @@ pub fn collect_lint_outcomes(
     tree: &SyntaxTree,
     source: &str,
     selection: RuleSelection<'_>,
-) -> Result<Vec<LintOutcome>> {
+) -> LintResult<Vec<LintOutcome>> {
     engine::collect_lint_outcomes(
         CATALOG,
         head_index(),
@@ -76,7 +74,7 @@ pub fn resolve_active_rules(
     only: &[String],
     exclude: &[String],
     categories: &[String],
-) -> Result<Vec<&'static str>> {
+) -> std::result::Result<Vec<&'static str>, RuleSelectionError> {
     policy::resolve_active_rules(CATALOG, only, exclude, categories)
 }
 

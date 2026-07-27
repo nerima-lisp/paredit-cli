@@ -4,7 +4,7 @@
 //! standalone `inspect eq-char-comparison` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::eq_char_comparison::domain::{CharacterEvidence, examine_comparison};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -41,7 +41,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         // The type context turns "spelled as a character" into "is a
         // character". `Unknown` says nothing, which is what keeps this silent
         // on an argument the layer could not settle; `Bottom` is excluded

@@ -20,7 +20,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
@@ -74,7 +74,7 @@ pub fn collect_duplicate_lambda_list_keywords(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<DuplicateLambdaListKeywordItem>)> {
+) -> LintResult<(usize, Vec<DuplicateLambdaListKeywordItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

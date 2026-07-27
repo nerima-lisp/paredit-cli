@@ -2,11 +2,10 @@
 
 use std::fmt;
 
-use anyhow::Result;
-
 use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::engine::{RuleContext, RuleSink};
+use super::error::LintResult;
 use super::model::{HeadFilter, RuleCategory, RuleMeta, Severity};
 use super::policy::RuleDialectScope;
 
@@ -36,13 +35,16 @@ pub trait LintRule: Sync + fmt::Debug {
     ///
     /// Fallible because the handful of rules that still consult the whole tree
     /// resolve paths, and a resolution failure must surface rather than be
-    /// silently read as "no findings".
+    /// silently read as "no findings". The handful is four; [`LintError`] names
+    /// the only thing they can fail with.
+    ///
+    /// [`LintError`]: crate::error::LintError
     fn check(
         &self,
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()>;
+    ) -> LintResult;
 }
 
 /// One registered rule: its compile-time description and its behaviour.

@@ -2,8 +2,6 @@
 
 use std::path::Path;
 
-use anyhow::Result;
-
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::list_head;
@@ -12,6 +10,7 @@ use super::context::RuleContext;
 use super::head_index::{HeadIndex, head_key};
 use super::ordering::{RuleIndex, VisitIndex};
 use super::sink::FindingSink;
+use crate::error::LintResult;
 use crate::model::LintOutcome;
 use crate::policy::RuleSelection;
 use crate::rule::RuleCatalog;
@@ -69,7 +68,7 @@ pub fn collect_lint_outcomes(
     tree: &SyntaxTree,
     source: &str,
     selection: RuleSelection<'_>,
-) -> Result<Vec<LintOutcome>> {
+) -> LintResult<Vec<LintOutcome>> {
     let active = ActiveRules::resolve(catalog, dialect, selection);
     if !active.any {
         return Ok(Vec::new());
@@ -107,7 +106,7 @@ fn walk(
     root: &ExpressionView,
     visit: &mut VisitIndex,
     sink: &mut FindingSink<'_>,
-) -> Result<()> {
+) -> LintResult {
     let mut stack = vec![root];
 
     while let Some(view) = stack.pop() {
@@ -142,7 +141,7 @@ fn check(
     visit: VisitIndex,
     view: &ExpressionView,
     sink: &mut FindingSink<'_>,
-) -> Result<()> {
+) -> LintResult {
     let entry = &catalog.entries()[rule.get()];
     let mut scoped = sink.visiting(rule, entry.meta().name(), visit);
     entry.rule().check(context, view, &mut scoped)

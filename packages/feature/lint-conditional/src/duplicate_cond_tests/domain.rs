@@ -18,7 +18,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
@@ -121,7 +121,7 @@ pub fn collect_duplicate_cond_tests(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<DuplicateCondTestItem>)> {
+) -> LintResult<(usize, Vec<DuplicateCondTestItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

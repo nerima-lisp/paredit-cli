@@ -19,7 +19,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
 use paredit_core_syntax::definition::definition_shape;
@@ -75,7 +75,7 @@ pub fn collect_duplicate_parameters(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<DuplicateParameterItem>)> {
+) -> LintResult<(usize, Vec<DuplicateParameterItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

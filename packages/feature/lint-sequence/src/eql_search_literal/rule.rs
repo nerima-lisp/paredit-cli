@@ -4,7 +4,7 @@
 //! standalone `inspect eql-search-literal` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::eql_search_literal::domain::examine_call;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -56,7 +56,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let mut search_call_count = 0;
         let mut items = Vec::new();
         examine_call(view, context.path(), &mut search_call_count, &mut items);

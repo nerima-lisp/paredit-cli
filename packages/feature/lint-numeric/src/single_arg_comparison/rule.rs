@@ -4,7 +4,7 @@
 //! standalone `inspect single-arg-comparison` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::single_arg_comparison::domain::examine_comparison;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -47,7 +47,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let mut comparison_form_count = 0;
         let mut items = Vec::new();
         examine_comparison(view, context.path(), &mut comparison_form_count, &mut items);

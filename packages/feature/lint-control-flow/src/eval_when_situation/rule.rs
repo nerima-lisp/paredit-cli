@@ -4,7 +4,7 @@
 //! standalone `inspect eval-when-situation` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::eval_when_situation::domain::examine_eval_when;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -39,7 +39,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let mut eval_when_form_count = 0;
         let mut items = Vec::new();
         examine_eval_when(view, context.path(), &mut eval_when_form_count, &mut items);

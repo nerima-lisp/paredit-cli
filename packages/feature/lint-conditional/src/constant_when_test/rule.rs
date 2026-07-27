@@ -4,7 +4,7 @@
 //! standalone `inspect constant-when-test` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::constant_when_test::domain::examine_when;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -39,7 +39,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let mut when_form_count = 0;
         let mut items = Vec::new();
         examine_when(view, context.path(), &mut when_form_count, &mut items);

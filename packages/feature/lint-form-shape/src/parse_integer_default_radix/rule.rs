@@ -4,7 +4,7 @@
 //! standalone `inspect parse-integer-default-radix` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::parse_integer_default_radix::domain::examine;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -42,7 +42,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         // `#xA` and a constant bound to ten are the same redundant argument as
         // a literal `10`; `Unknown` reads as "not provably ten", so a radix
         // computed at run time is left alone.

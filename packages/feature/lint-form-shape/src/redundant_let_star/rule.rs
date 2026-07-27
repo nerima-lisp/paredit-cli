@@ -4,7 +4,7 @@
 //! standalone `inspect redundant-let-star` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use crate::redundant_let_star::domain::examine_let_star;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
@@ -40,7 +40,7 @@ impl LintRule for Rule {
         context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
-    ) -> Result<()> {
+    ) -> LintResult<()> {
         let mut let_star_form_count = 0;
         let mut items = Vec::new();
         examine_let_star(view, context.path(), &mut let_star_form_count, &mut items);

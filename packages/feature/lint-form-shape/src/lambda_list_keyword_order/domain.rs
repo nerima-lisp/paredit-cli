@@ -23,7 +23,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
@@ -91,7 +91,7 @@ pub fn collect_lambda_list_keyword_order(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<LambdaListKeywordOrderItem>)> {
+) -> LintResult<(usize, Vec<LambdaListKeywordOrderItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

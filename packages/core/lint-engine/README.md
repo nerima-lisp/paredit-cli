@@ -46,8 +46,7 @@ Also not here:
 | --- | --- |
 | `paredit-core-syntax` | The pass walks a `SyntaxTree`; `RuleContext` hands rules views, spans and dialect. |
 | `paredit-core-semantics` | A rule that needs the binding or value table reads it from the context instead of rebuilding it — that seam is why the engine knows about semantics at all. |
-| `anyhow` | `LintRule::check` is fallible, so a path-resolution failure surfaces rather than being read as "no findings". |
-| `thiserror` | Typed errors in the model. |
+| `thiserror` | Typed errors in the model, and `LintError` for the pass. Of the 134 registered rules, **four** are fallible, and all four fail the same way: they consult the whole tree, resolve an expression path, and it does not resolve. `anyhow::Result` said "this can fail for any reason", which is what hid that. See `src/error.rs`. |
 | `proptest` (dev) | Properties over generated documents. |
 
 ## Public API
