@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{BindingFormError, BindingFormResult};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
@@ -11,22 +11,26 @@ pub(super) struct BindingGroup {
     pub(super) value: Option<ExpressionView>,
 }
 
-pub(super) fn generic_binding_groups(binding_form: &ExpressionView) -> Result<Vec<BindingGroup>> {
+pub(super) fn generic_binding_groups(
+    binding_form: &ExpressionView,
+) -> BindingFormResult<Vec<BindingGroup>> {
     match binding_form.delimiter {
         Some(Delimiter::Bracket) => vector_let_binding_groups(binding_form),
         Some(Delimiter::Paren) => list_pair_let_binding_groups(binding_form),
-        _ => anyhow::bail!("unknown binding form delimiter"),
+        _ => Err(BindingFormError::UnknownDelimiter),
     }
 }
 
-fn vector_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<BindingGroup>> {
+fn vector_let_binding_groups(
+    binding_form: &ExpressionView,
+) -> BindingFormResult<Vec<BindingGroup>> {
     if binding_form.kind != ExpressionKind::List
         || binding_form.delimiter != Some(Delimiter::Bracket)
     {
-        anyhow::bail!("dialect expects vector let bindings: [name value ...]");
+        return Err(BindingFormError::ExpectedVectorBindings);
     }
     if binding_form.children.len() % 2 != 0 {
-        anyhow::bail!("vector let binding form must contain name/value pairs");
+        return Err(BindingFormError::VectorBindingsNotPaired);
     }
 
     binding_form
@@ -35,7 +39,7 @@ fn vector_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<Bindin
         .map(|pair| {
             let names = binding_pattern_names(&pair[0]);
             if names.is_empty() {
-                anyhow::bail!("let binding pattern must contain at least one binding name");
+                return Err(BindingFormError::PatternBindsNothing);
             }
             Ok(BindingGroup {
                 names,
@@ -45,10 +49,12 @@ fn vector_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<Bindin
         .collect()
 }
 
-fn list_pair_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<BindingGroup>> {
+fn list_pair_let_binding_groups(
+    binding_form: &ExpressionView,
+) -> BindingFormResult<Vec<BindingGroup>> {
     if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
     {
-        anyhow::bail!("dialect expects list-pair let bindings: ((name value) ...)");
+        return Err(BindingFormError::ExpectedListPairBindings);
     }
 
     binding_form
@@ -57,20 +63,20 @@ fn list_pair_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<Bin
         .map(|pair| {
             if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
                 if pair.kind != ExpressionKind::Atom {
-                    anyhow::bail!("let binding must be a name, (name), or (name value)");
+                    return Err(BindingFormError::BindingNotANameOrPair);
                 }
                 let names = binding_pattern_names(pair);
                 if names.len() != 1 {
-                    anyhow::bail!("bare let binding must contain one binding name");
+                    return Err(BindingFormError::BareBindingNotSingle);
                 }
                 return Ok(BindingGroup { names, value: None });
             }
             if pair.children.is_empty() || pair.children.len() > 2 {
-                anyhow::bail!("let binding pair must be (name) or (name value)");
+                return Err(BindingFormError::BindingPairWrongArity);
             }
             let names = binding_pattern_names(&pair.children[0]);
             if names.is_empty() {
-                anyhow::bail!("let binding pattern must contain at least one binding name");
+                return Err(BindingFormError::PatternBindsNothing);
             }
             Ok(BindingGroup {
                 names,

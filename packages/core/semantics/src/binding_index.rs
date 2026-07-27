@@ -1,14 +1,14 @@
 //! Validated one-based binding boundaries used by binding composition plans.
 
-use anyhow::{Result, bail};
+use crate::error::BindingIndexError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BindingIndex(usize);
 
 impl BindingIndex {
-    pub fn new(value: usize) -> Result<Self> {
+    pub const fn new(value: usize) -> std::result::Result<Self, BindingIndexError> {
         if value == 0 {
-            bail!("binding index must be greater than zero");
+            return Err(BindingIndexError);
         }
         Ok(Self(value))
     }

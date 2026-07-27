@@ -36,8 +36,7 @@ the same thing:
 | Crate | Why |
 | --- | --- |
 | `paredit-core-syntax` | The single largest inbound edge in the workspace: 140 references. Every scope and binding is expressed in terms of `SyntaxTree`, `ExpressionView`, `ByteSpan` and Common Lisp form knowledge. |
-| `anyhow` | Fallible resolution paths, pending the `thiserror` conversion in §9.2. |
-| `thiserror` | The typed errors that already exist here. |
+| `thiserror` | Every typed error here, including `BindingFormError`, which distinguishes a dialect mismatch (the form is well-formed, just not for *this* dialect) from a malformed form no dialect would accept. A caller must not read either as "no bindings here": the source already parsed, so a failure means the dialect tables disagree with the document. |
 | `proptest` (dev) | Properties over generated scope shapes. |
 
 ## Public API

@@ -11,7 +11,9 @@ repository.workspace = true
 
 [dependencies]
 paredit-core-syntax = { path = "../syntax" }
-anyhow.workspace = true
+# No anyhow. Everything this package refuses is one refusal - "this is not a
+# binding form I can read" - and BindingFormError says which shape assumption
+# failed; see src/error.rs.
 thiserror.workspace = true
 
 [dev-dependencies]
