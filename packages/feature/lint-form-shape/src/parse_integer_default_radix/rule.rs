@@ -1,20 +1,20 @@
 //! `parse-integer-default-radix`: a parse-integer call with an explicit :radix 10, the default ((parse-integer s :radix 10) is (parse-integer s)).
 //!
-//! The analysis lives in [`crate::domain::parse_integer_default_radix_report`], which also backs the
+//! The analysis lives in [`crate::parse_integer_default_radix::domain`], which also backs the
 //! standalone `inspect parse-integer-default-radix` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::NormalizedHead;
-use crate::domain::lint::model::{
+use crate::parse_integer_default_radix::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::NormalizedHead;
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, Replacement, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::parse_integer_default_radix_report::examine;
-use crate::domain::semantics::value::evaluate_constant;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_semantics::semantics::value::evaluate_constant;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "parse-integer-default-radix",

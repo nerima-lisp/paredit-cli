@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::values_list_of_list_report::{
-    ValuesListOfListPolicy, ValuesListOfListSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::values_list_of_list::usecase::{ValuesListOfListPolicy, ValuesListOfListSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_values_list_of_list_report(
+pub fn print_values_list_of_list_report(
     summary: &ValuesListOfListSummary,
     policy: &ValuesListOfListPolicy,
     output: OutputFormat,

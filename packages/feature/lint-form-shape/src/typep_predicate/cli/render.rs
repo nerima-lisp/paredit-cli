@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::typep_predicate_report::{
-    TypepPredicatePolicy, TypepPredicateSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::typep_predicate::usecase::{TypepPredicatePolicy, TypepPredicateSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_typep_predicate_report(
+pub fn print_typep_predicate_report(
     summary: &TypepPredicateSummary,
     policy: &TypepPredicatePolicy,
     output: OutputFormat,

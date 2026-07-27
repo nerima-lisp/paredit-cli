@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::duplicate_parameter_report::{
-    DuplicateParameterPolicy, DuplicateParameterSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::duplicate_parameters::usecase::{DuplicateParameterPolicy, DuplicateParameterSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_duplicate_parameter_report(
+pub fn print_duplicate_parameter_report(
     summary: &DuplicateParameterSummary,
     policy: &DuplicateParameterPolicy,
     output: OutputFormat,

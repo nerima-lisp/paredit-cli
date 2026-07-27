@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::funcall_lambda_report::{
-    FuncallLambdaPolicy, FuncallLambdaSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::funcall_lambda::usecase::{FuncallLambdaPolicy, FuncallLambdaSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_funcall_lambda_report(
+pub fn print_funcall_lambda_report(
     summary: &FuncallLambdaSummary,
     policy: &FuncallLambdaPolicy,
     output: OutputFormat,

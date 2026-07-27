@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::lambda_list_keyword_order_report::{
+use crate::lambda_list_keyword_order::usecase::{
     LambdaListKeywordOrderPolicy, LambdaListKeywordOrderSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_lambda_list_keyword_order_report(
+pub fn print_lambda_list_keyword_order_report(
     summary: &LambdaListKeywordOrderSummary,
     policy: &LambdaListKeywordOrderPolicy,
     output: OutputFormat,

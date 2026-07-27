@@ -23,7 +23,6 @@ mod engine_dispatch_tests;
 pub mod registry;
 #[cfg(test)]
 mod rule_registry_tests;
-pub mod rules;
 
 use std::path::Path;
 use std::sync::OnceLock;

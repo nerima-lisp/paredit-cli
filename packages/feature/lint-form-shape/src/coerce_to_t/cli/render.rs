@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::coerce_to_t_report::{CoerceToTPolicy, CoerceToTSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::coerce_to_t::usecase::{CoerceToTPolicy, CoerceToTSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_coerce_to_t_report(
+pub fn print_coerce_to_t_report(
     summary: &CoerceToTSummary,
     policy: &CoerceToTPolicy,
     output: OutputFormat,

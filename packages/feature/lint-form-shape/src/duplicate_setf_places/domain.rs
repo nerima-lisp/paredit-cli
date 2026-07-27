@@ -12,7 +12,7 @@
 //! argument (a malformed, odd-arity form) is left to `setf-arity`.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -21,9 +21,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 const ASSIGNMENT_HEADS: [&str; 4] = ["setq", "psetq", "setf", "psetf"];
 
@@ -81,7 +81,7 @@ pub struct DuplicateSetfPlacePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_assignment(
+pub fn examine_assignment(
     view: &ExpressionView,
     path: &Path,
     assignment_form_count: &mut usize,

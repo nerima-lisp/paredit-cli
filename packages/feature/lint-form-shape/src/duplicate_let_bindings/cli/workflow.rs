@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::duplicate_let_binding_report::{
+use crate::duplicate_let_bindings::cli::args::DuplicateLetBindingReportArgs;
+use crate::duplicate_let_bindings::cli::render::print_duplicate_let_binding_report;
+use crate::duplicate_let_bindings::usecase::{
     DuplicateLetBindingPolicyOptions, collect_duplicate_let_bindings,
     evaluate_duplicate_let_binding_policy, summarize_duplicate_let_bindings,
 };
-use crate::presentation::cli::duplicate_let_binding_report::args::DuplicateLetBindingReportArgs;
-use crate::presentation::cli::duplicate_let_binding_report::render::print_duplicate_let_binding_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn duplicate_let_binding_report(
-    args: DuplicateLetBindingReportArgs,
-) -> Result<()> {
+pub fn duplicate_let_binding_report(args: DuplicateLetBindingReportArgs) -> Result<()> {
     let mut let_form_count = 0;
     let mut duplicates = Vec::new();
 
@@ -33,7 +31,7 @@ pub(in crate::presentation::cli) fn duplicate_let_binding_report(
     print_duplicate_let_binding_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "duplicate-let-binding-report policy failed: {policy_message}"
         )));
     }

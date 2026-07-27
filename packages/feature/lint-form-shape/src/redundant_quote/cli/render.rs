@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_quote_report::{
-    RedundantQuotePolicy, RedundantQuoteSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::redundant_quote::usecase::{RedundantQuotePolicy, RedundantQuoteSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_quote_report(
+pub fn print_redundant_quote_report(
     summary: &RedundantQuoteSummary,
     policy: &RedundantQuotePolicy,
     output: OutputFormat,

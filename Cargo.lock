@@ -663,6 +663,7 @@ dependencies = [
  "paredit-feature-inline",
  "paredit-feature-lint-conditional",
  "paredit-feature-lint-control-flow",
+ "paredit-feature-lint-form-shape",
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
@@ -856,6 +857,23 @@ dependencies = [
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",
+ "proptest",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-form-shape"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "paredit-core-workspace",
+ "paredit-feature-function-parameter",
  "proptest",
  "serde_json",
  "thiserror",

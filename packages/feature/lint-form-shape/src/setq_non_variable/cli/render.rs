@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::setq_non_variable_report::{
-    SetqNonVariablePolicy, SetqNonVariableSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::setq_non_variable::usecase::{SetqNonVariablePolicy, SetqNonVariableSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_setq_non_variable_report(
+pub fn print_setq_non_variable_report(
     summary: &SetqNonVariableSummary,
     policy: &SetqNonVariablePolicy,
     output: OutputFormat,

@@ -1,18 +1,18 @@
 //! `setf-arity`: a setq/setf/psetq/psetf with an odd argument count.
 //!
-//! The analysis lives in [`crate::domain::setf_arity_report`], which also backs the
+//! The analysis lives in [`crate::setf_arity::domain`], which also backs the
 //! standalone `inspect setf-arity` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::setf_arity::domain::examine_assignment;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::setf_arity_report::examine_assignment;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "setf-arity",

@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::empty_let_report::{
+use crate::empty_let::cli::args::EmptyLetReportArgs;
+use crate::empty_let::cli::render::print_empty_let_report;
+use crate::empty_let::usecase::{
     EmptyLetPolicyOptions, collect_empty_lets, evaluate_empty_let_policy, summarize_empty_lets,
 };
-use crate::presentation::cli::empty_let_report::args::EmptyLetReportArgs;
-use crate::presentation::cli::empty_let_report::render::print_empty_let_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn empty_let_report(args: EmptyLetReportArgs) -> Result<()> {
+pub fn empty_let_report(args: EmptyLetReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut let_form_count = 0;
@@ -29,7 +29,7 @@ pub(in crate::presentation::cli) fn empty_let_report(args: EmptyLetReportArgs) -
     print_empty_let_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "empty-let-report policy failed: {policy_message}"
         )));
     }

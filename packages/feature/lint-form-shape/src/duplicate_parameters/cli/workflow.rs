@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::duplicate_parameter_report::{
+use crate::duplicate_parameters::cli::args::DuplicateParameterReportArgs;
+use crate::duplicate_parameters::cli::render::print_duplicate_parameter_report;
+use crate::duplicate_parameters::usecase::{
     DuplicateParameterPolicyOptions, collect_duplicate_parameters,
     evaluate_duplicate_parameter_policy, summarize_duplicate_parameters,
 };
-use crate::presentation::cli::duplicate_parameter_report::args::DuplicateParameterReportArgs;
-use crate::presentation::cli::duplicate_parameter_report::render::print_duplicate_parameter_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn duplicate_parameter_report(
-    args: DuplicateParameterReportArgs,
-) -> Result<()> {
+pub fn duplicate_parameter_report(args: DuplicateParameterReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut definition_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn duplicate_parameter_report(
     print_duplicate_parameter_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "duplicate-parameter-report policy failed: {policy_message}"
         )));
     }

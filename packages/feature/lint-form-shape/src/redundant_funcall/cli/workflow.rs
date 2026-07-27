@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::redundant_funcall_report::{
+use crate::redundant_funcall::cli::args::RedundantFuncallReportArgs;
+use crate::redundant_funcall::cli::render::print_redundant_funcall_report;
+use crate::redundant_funcall::usecase::{
     RedundantFuncallPolicyOptions, collect_redundant_funcalls, evaluate_redundant_funcall_policy,
     summarize_redundant_funcalls,
 };
-use crate::presentation::cli::redundant_funcall_report::args::RedundantFuncallReportArgs;
-use crate::presentation::cli::redundant_funcall_report::render::print_redundant_funcall_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn redundant_funcall_report(
-    args: RedundantFuncallReportArgs,
-) -> Result<()> {
+pub fn redundant_funcall_report(args: RedundantFuncallReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut funcall_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn redundant_funcall_report(
     print_redundant_funcall_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "redundant-funcall-report policy failed: {policy_message}"
         )));
     }

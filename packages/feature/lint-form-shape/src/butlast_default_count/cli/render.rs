@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::butlast_default_count_report::{
+use crate::butlast_default_count::usecase::{
     ButlastDefaultCountPolicy, ButlastDefaultCountSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_butlast_default_count_report(
+pub fn print_butlast_default_count_report(
     summary: &ButlastDefaultCountSummary,
     policy: &ButlastDefaultCountPolicy,
     output: OutputFormat,

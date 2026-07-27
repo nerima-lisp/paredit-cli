@@ -1,16 +1,16 @@
 //! `duplicate-lambda-list-keyword`: a lambda list that repeats a lambda-list keyword (&optional, &key, ...).
 //!
-//! The analysis lives in [`crate::domain::duplicate_lambda_list_keyword_report`], which also backs the
+//! The analysis lives in [`crate::duplicate_lambda_list_keyword::domain`], which also backs the
 //! standalone `inspect duplicate-lambda-list-keyword` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::duplicate_lambda_list_keyword_report::collect_duplicate_lambda_list_keywords;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use crate::duplicate_lambda_list_keyword::domain::collect_duplicate_lambda_list_keywords;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "duplicate-lambda-list-keyword",

@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::single_value_bind_report::{
-    SingleValueBindPolicy, SingleValueBindSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::single_value_bind::usecase::{SingleValueBindPolicy, SingleValueBindSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_single_value_bind_report(
+pub fn print_single_value_bind_report(
     summary: &SingleValueBindSummary,
     policy: &SingleValueBindPolicy,
     output: OutputFormat,

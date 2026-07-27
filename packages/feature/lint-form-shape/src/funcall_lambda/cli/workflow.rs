@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::funcall_lambda_report::{
+use crate::funcall_lambda::cli::args::FuncallLambdaReportArgs;
+use crate::funcall_lambda::cli::render::print_funcall_lambda_report;
+use crate::funcall_lambda::usecase::{
     FuncallLambdaPolicyOptions, collect_funcall_lambdas, evaluate_funcall_lambda_policy,
     summarize_funcall_lambdas,
 };
-use crate::presentation::cli::funcall_lambda_report::args::FuncallLambdaReportArgs;
-use crate::presentation::cli::funcall_lambda_report::render::print_funcall_lambda_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn funcall_lambda_report(
-    args: FuncallLambdaReportArgs,
-) -> Result<()> {
+pub fn funcall_lambda_report(args: FuncallLambdaReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut funcall_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn funcall_lambda_report(
     print_funcall_lambda_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "funcall-lambda-report policy failed: {policy_message}"
         )));
     }

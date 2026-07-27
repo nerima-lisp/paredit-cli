@@ -25,7 +25,7 @@
 //! auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -33,9 +33,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// Whether `view` is the bare `t` type specifier (no reader prefixes).
 fn is_t_type(view: &ExpressionView) -> bool {
@@ -114,8 +114,7 @@ pub struct RedundantThePolicy {
 /// passes a test backed by the type context, so it also sees
 /// `(the integer (length xs))` — an assertion just as empty, spelled in a way
 /// the reader alone cannot recognize.
-pub(crate) type IsAssertedTypeAlreadyKnown<'a> =
-    &'a dyn Fn(&ExpressionView, &ExpressionView) -> bool;
+pub type IsAssertedTypeAlreadyKnown<'a> = &'a dyn Fn(&ExpressionView, &ExpressionView) -> bool;
 
 /// The [`IsAssertedTypeAlreadyKnown`] of a caller with no type context.
 const fn never(_: &ExpressionView, _: &ExpressionView) -> bool {
@@ -124,7 +123,7 @@ const fn never(_: &ExpressionView, _: &ExpressionView) -> bool {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_the(
+pub fn examine_the(
     view: &ExpressionView,
     path: &Path,
     already_known: IsAssertedTypeAlreadyKnown<'_>,

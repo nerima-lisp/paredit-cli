@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::malformed_let_binding_report::{
+use crate::malformed_let_binding::cli::args::MalformedLetBindingReportArgs;
+use crate::malformed_let_binding::cli::render::print_malformed_let_binding_report;
+use crate::malformed_let_binding::usecase::{
     MalformedLetBindingPolicyOptions, collect_malformed_let_bindings,
     evaluate_malformed_let_binding_policy, summarize_malformed_let_bindings,
 };
-use crate::presentation::cli::malformed_let_binding_report::args::MalformedLetBindingReportArgs;
-use crate::presentation::cli::malformed_let_binding_report::render::print_malformed_let_binding_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn malformed_let_binding_report(
-    args: MalformedLetBindingReportArgs,
-) -> Result<()> {
+pub fn malformed_let_binding_report(args: MalformedLetBindingReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut let_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn malformed_let_binding_report(
     print_malformed_let_binding_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "malformed-let-binding-report policy failed: {policy_message}"
         )));
     }

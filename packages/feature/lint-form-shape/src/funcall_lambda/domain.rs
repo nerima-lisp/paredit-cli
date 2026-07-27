@@ -13,7 +13,7 @@
 //! so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -21,9 +21,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
 
 /// Whether `view` is a bare `(lambda …)` form (no reader prefix, so a
 /// `#'(lambda …)` is excluded — its prefix would be illegal in operator
@@ -80,7 +80,7 @@ pub struct FuncallLambdaPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_funcall(
+pub fn examine_funcall(
     view: &ExpressionView,
     path: &Path,
     funcall_form_count: &mut usize,

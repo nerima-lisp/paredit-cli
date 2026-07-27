@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::manual_incf_report::{ManualIncfPolicy, ManualIncfSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::manual_incf::usecase::{ManualIncfPolicy, ManualIncfSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_manual_incf_report(
+pub fn print_manual_incf_report(
     summary: &ManualIncfSummary,
     policy: &ManualIncfPolicy,
     output: OutputFormat,

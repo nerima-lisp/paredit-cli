@@ -8,7 +8,7 @@
 //! Scoped to `let` on purpose: `let*` binds sequentially, where re-binding a
 //! name is legal, intentional shadowing (each later init sees the earlier
 //! binding), so it is excluded here. This report walks the whole tree via the
-//! shared [`crate::domain::view_query::for_each_subview`], since a `let` can
+//! shared [`paredit_core_syntax::view_query::for_each_subview`], since a `let` can
 //! appear anywhere in a body.
 //!
 //! Scope: Common Lisp only. A binding is read as either a bare symbol
@@ -20,9 +20,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 /// The bound variable name of one `let` binding: a bare symbol, or the head
 /// of a `(name init)` list.
@@ -76,7 +76,7 @@ pub struct DuplicateLetBindingPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_let(
+pub fn examine_let(
     view: &ExpressionView,
     path: &Path,
     let_form_count: &mut usize,

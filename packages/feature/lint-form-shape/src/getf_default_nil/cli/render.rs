@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::getf_default_nil_report::{
-    GetfDefaultNilPolicy, GetfDefaultNilSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::getf_default_nil::usecase::{GetfDefaultNilPolicy, GetfDefaultNilSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_getf_default_nil_report(
+pub fn print_getf_default_nil_report(
     summary: &GetfDefaultNilSummary,
     policy: &GetfDefaultNilPolicy,
     output: OutputFormat,

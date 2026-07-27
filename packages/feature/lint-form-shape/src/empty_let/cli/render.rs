@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::empty_let_report::{EmptyLetPolicy, EmptyLetSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::empty_let::usecase::{EmptyLetPolicy, EmptyLetSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_empty_let_report(
+pub fn print_empty_let_report(
     summary: &EmptyLetSummary,
     policy: &EmptyLetPolicy,
     output: OutputFormat,

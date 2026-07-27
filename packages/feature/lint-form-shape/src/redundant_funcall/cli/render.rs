@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_funcall_report::{
-    RedundantFuncallPolicy, RedundantFuncallSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::redundant_funcall::usecase::{RedundantFuncallPolicy, RedundantFuncallSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_funcall_report(
+pub fn print_redundant_funcall_report(
     summary: &RedundantFuncallSummary,
     policy: &RedundantFuncallPolicy,
     output: OutputFormat,

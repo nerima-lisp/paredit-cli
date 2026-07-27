@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::sharp_quoted_lambda_report::{
+use crate::sharp_quoted_lambda::cli::args::SharpQuotedLambdaReportArgs;
+use crate::sharp_quoted_lambda::cli::render::print_sharp_quoted_lambda_report;
+use crate::sharp_quoted_lambda::usecase::{
     SharpQuotedLambdaPolicyOptions, collect_sharp_quoted_lambdas,
     evaluate_sharp_quoted_lambda_policy, summarize_sharp_quoted_lambdas,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::sharp_quoted_lambda_report::args::SharpQuotedLambdaReportArgs;
-use crate::presentation::cli::sharp_quoted_lambda_report::render::print_sharp_quoted_lambda_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn sharp_quoted_lambda_report(
-    args: SharpQuotedLambdaReportArgs,
-) -> Result<()> {
+pub fn sharp_quoted_lambda_report(args: SharpQuotedLambdaReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut lambda_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn sharp_quoted_lambda_report(
     print_sharp_quoted_lambda_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "sharp-quoted-lambda-report policy failed: {policy_message}"
         )));
     }

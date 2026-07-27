@@ -1,18 +1,18 @@
 //! `single-value-bind`: a multiple-value-bind of one variable ((multiple-value-bind (x) f body) is (let ((x f)) body)).
 //!
-//! The analysis lives in [`crate::domain::single_value_bind_report`], which also backs the
+//! The analysis lives in [`crate::single_value_bind::domain`], which also backs the
 //! standalone `inspect single-value-bind` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::single_value_bind::domain::examine_bind;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::single_value_bind_report::examine_bind;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "single-value-bind",

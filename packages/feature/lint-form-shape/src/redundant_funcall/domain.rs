@@ -23,7 +23,7 @@
 //! and every argument byte-identical. That makes the rule auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -31,12 +31,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path as SexprPath, ReaderPrefix,
     SyntaxTree,
 };
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 /// The sharp-quoted symbol name of `view` (`#'foo` → `foo`), or `None` when
 /// `view` is not an atom carrying exactly the `#'` function prefix over a
@@ -100,7 +100,7 @@ pub struct RedundantFuncallPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_funcall(
+pub fn examine_funcall(
     view: &ExpressionView,
     path: &Path,
     funcall_form_count: &mut usize,

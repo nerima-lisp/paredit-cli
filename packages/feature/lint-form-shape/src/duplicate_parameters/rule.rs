@@ -1,16 +1,16 @@
 //! `duplicate-parameters`: a lambda list that names the same parameter more than once.
 //!
-//! The analysis lives in [`crate::domain::duplicate_parameter_report`], which also backs the
+//! The analysis lives in [`crate::duplicate_parameters::domain`], which also backs the
 //! standalone `inspect duplicate-parameters` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::duplicate_parameter_report::collect_duplicate_parameters;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use crate::duplicate_parameters::domain::collect_duplicate_parameters;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "duplicate-parameters",

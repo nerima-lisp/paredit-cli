@@ -11,8 +11,8 @@
 //! its own keywords) is not confused with a top-level repeat.
 //!
 //! Reuses the callable-definition recognizer
-//! [`crate::domain::definition::definition_shape`] — the same one
-//! [`crate::domain::duplicate_parameter_report`] uses — so `defun`,
+//! [`paredit_core_syntax::definition::definition_shape`] — the same one
+//! [`crate::duplicate_parameters::domain`] uses — so `defun`,
 //! `defmacro`, `defmethod`, and the other callable definers are all covered.
 //!
 //! Scope: Common Lisp only.
@@ -22,10 +22,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, list_head};
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, list_head};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateLambdaListKeywordItem {

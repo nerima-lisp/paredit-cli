@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::sharp_quoted_lambda_report::{
-    SharpQuotedLambdaPolicy, SharpQuotedLambdaSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::sharp_quoted_lambda::usecase::{SharpQuotedLambdaPolicy, SharpQuotedLambdaSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_sharp_quoted_lambda_report(
+pub fn print_sharp_quoted_lambda_report(
     summary: &SharpQuotedLambdaSummary,
     policy: &SharpQuotedLambdaPolicy,
     output: OutputFormat,

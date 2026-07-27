@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::gethash_default_report::{
-    GethashDefaultPolicy, GethashDefaultSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::gethash_default::usecase::{GethashDefaultPolicy, GethashDefaultSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_gethash_default_report(
+pub fn print_gethash_default_report(
     summary: &GethashDefaultSummary,
     policy: &GethashDefaultPolicy,
     output: OutputFormat,

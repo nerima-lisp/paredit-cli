@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::parse_integer_default_radix_report::{
+use crate::parse_integer_default_radix::usecase::{
     ParseIntegerDefaultRadixPolicy, ParseIntegerDefaultRadixSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_parse_integer_default_radix_report(
+pub fn print_parse_integer_default_radix_report(
     summary: &ParseIntegerDefaultRadixSummary,
     policy: &ParseIntegerDefaultRadixPolicy,
     output: OutputFormat,

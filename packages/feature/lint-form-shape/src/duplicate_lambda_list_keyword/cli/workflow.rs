@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::duplicate_lambda_list_keyword_report::{
+use crate::duplicate_lambda_list_keyword::cli::args::DuplicateLambdaListKeywordReportArgs;
+use crate::duplicate_lambda_list_keyword::cli::render::print_duplicate_lambda_list_keyword_report;
+use crate::duplicate_lambda_list_keyword::usecase::{
     DuplicateLambdaListKeywordPolicyOptions, collect_duplicate_lambda_list_keywords,
     evaluate_duplicate_lambda_list_keyword_policy, summarize_duplicate_lambda_list_keywords,
 };
-use crate::presentation::cli::duplicate_lambda_list_keyword_report::args::DuplicateLambdaListKeywordReportArgs;
-use crate::presentation::cli::duplicate_lambda_list_keyword_report::render::print_duplicate_lambda_list_keyword_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn duplicate_lambda_list_keyword_report(
+pub fn duplicate_lambda_list_keyword_report(
     args: DuplicateLambdaListKeywordReportArgs,
 ) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
@@ -35,7 +35,7 @@ pub(in crate::presentation::cli) fn duplicate_lambda_list_keyword_report(
     print_duplicate_lambda_list_keyword_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "duplicate-lambda-list-keyword-report policy failed: {policy_message}"
         )));
     }

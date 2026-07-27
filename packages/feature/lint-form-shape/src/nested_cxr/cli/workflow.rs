@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::application::usecase::nested_cxr_report::{
+use crate::nested_cxr::cli::args::NestedCxrReportArgs;
+use crate::nested_cxr::cli::render::print_nested_cxr_report;
+use crate::nested_cxr::usecase::{
     NestedCxrPolicyOptions, collect_nested_cxrs, evaluate_nested_cxr_policy, summarize_nested_cxrs,
 };
-use crate::presentation::cli::nested_cxr_report::args::NestedCxrReportArgs;
-use crate::presentation::cli::nested_cxr_report::render::print_nested_cxr_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn nested_cxr_report(args: NestedCxrReportArgs) -> Result<()> {
+pub fn nested_cxr_report(args: NestedCxrReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut accessor_form_count = 0;
@@ -31,7 +31,7 @@ pub(in crate::presentation::cli) fn nested_cxr_report(args: NestedCxrReportArgs)
     print_nested_cxr_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "nested-cxr-report policy failed: {policy_message}"
         )));
     }

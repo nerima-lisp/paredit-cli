@@ -1,18 +1,18 @@
 //! `values-list-of-list`: a values-list of a list constructor ((values-list (list a b)) is (values a b)).
 //!
-//! The analysis lives in [`crate::domain::values_list_of_list_report`], which also backs the
+//! The analysis lives in [`crate::values_list_of_list::domain`], which also backs the
 //! standalone `inspect values-list-of-list` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::values_list_of_list::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::values_list_of_list_report::examine;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "values-list-of-list",

@@ -1,18 +1,18 @@
 //! `typep-predicate`: a typep against a type with a dedicated predicate ((typep x 'string) is (stringp x)).
 //!
-//! The analysis lives in [`crate::domain::typep_predicate_report`], which also backs the
+//! The analysis lives in [`crate::typep_predicate::domain`], which also backs the
 //! standalone `inspect typep-predicate` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::typep_predicate::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::typep_predicate_report::examine;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "typep-predicate",

@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::defpackage_quoted_report::{
-    DefpackageQuotedPolicy, DefpackageQuotedSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::defpackage_quoted::usecase::{DefpackageQuotedPolicy, DefpackageQuotedSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_defpackage_quoted_report(
+pub fn print_defpackage_quoted_report(
     summary: &DefpackageQuotedSummary,
     policy: &DefpackageQuotedPolicy,
     output: OutputFormat,

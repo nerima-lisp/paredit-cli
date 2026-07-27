@@ -6,7 +6,7 @@
 //! the `list` wrapper are all ceremony.
 //!
 //! Only the reducible shape is flagged, mirroring
-//! [`crate::domain::redundant_funcall_report`]:
+//! [`crate::redundant_funcall::domain`]:
 //!
 //!   - `#'FN` reads as an atom carrying [`ReaderPrefix::Function`]; a direct
 //!     `(FN …)` uses the identical lexical resolution. Equivalent.
@@ -22,7 +22,7 @@
 //! element source verbatim, so the rule is auto-fixable.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -30,11 +30,11 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
-use crate::domain::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 
 /// The sharp-quoted symbol name of `view` (`#'foo` → `foo`), or `None` when
 /// `view` is not an atom carrying exactly the `#'` function prefix over a
@@ -96,7 +96,7 @@ pub struct RedundantApplyPolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_apply(
+pub fn examine_apply(
     view: &ExpressionView,
     path: &Path,
     apply_form_count: &mut usize,

@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::multiple_value_list_of_values_report::{
+use crate::multiple_value_list_of_values::usecase::{
     MultipleValueListOfValuesPolicy, MultipleValueListOfValuesSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_multiple_value_list_of_values_report(
+pub fn print_multiple_value_list_of_values_report(
     summary: &MultipleValueListOfValuesSummary,
     policy: &MultipleValueListOfValuesPolicy,
     output: OutputFormat,

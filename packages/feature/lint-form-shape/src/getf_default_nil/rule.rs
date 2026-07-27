@@ -1,18 +1,18 @@
 //! `getf-default-nil`: a getf call with an explicit nil default, the default ((getf p k nil) is (getf p k)).
 //!
-//! The analysis lives in [`crate::domain::getf_default_nil_report`], which also backs the
+//! The analysis lives in [`crate::getf_default_nil::domain`], which also backs the
 //! standalone `inspect getf-default-nil` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::getf_default_nil_report::examine;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::getf_default_nil::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, Replacement, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "getf-default-nil",

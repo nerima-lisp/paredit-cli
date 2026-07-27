@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::make_hash_table_test_report::{
-    MakeHashTableTestPolicy, MakeHashTableTestSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::make_hash_table_test::usecase::{MakeHashTableTestPolicy, MakeHashTableTestSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_make_hash_table_test_report(
+pub fn print_make_hash_table_test_report(
     summary: &MakeHashTableTestSummary,
     policy: &MakeHashTableTestPolicy,
     output: OutputFormat,

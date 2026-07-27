@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::getf_default_nil_report::{
+use crate::getf_default_nil::cli::args::GetfDefaultNilReportArgs;
+use crate::getf_default_nil::cli::render::print_getf_default_nil_report;
+use crate::getf_default_nil::usecase::{
     GetfDefaultNilPolicyOptions, collect_getf_default_nils, evaluate_getf_default_nil_policy,
     summarize_getf_default_nils,
 };
-use crate::presentation::cli::getf_default_nil_report::args::GetfDefaultNilReportArgs;
-use crate::presentation::cli::getf_default_nil_report::render::print_getf_default_nil_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn getf_default_nil_report(
-    args: GetfDefaultNilReportArgs,
-) -> Result<()> {
+pub fn getf_default_nil_report(args: GetfDefaultNilReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn getf_default_nil_report(
     print_getf_default_nil_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "getf-default-nil-report policy failed: {policy_message}"
         )));
     }

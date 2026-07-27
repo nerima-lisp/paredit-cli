@@ -7,13 +7,13 @@
 //!
 //! Reuses the same lambda-list extraction the parameter refactors and
 //! [`crate::domain::unused_parameter_report`] rely on
-//! ([`crate::domain::function_parameter::list_lambda_list_parameter_names`]),
+//! ([`paredit_feature_function_parameter::function_parameter::domain::list_lambda_list_parameter_names`]),
 //! so it inherits their handling of lambda-list keywords (`&optional`,
 //! `&rest`, `&key`, `&aux`), default-value forms, and `&key`-with-supplied-p
 //! triples — a name is compared once, however it is declared.
 //!
 //! Scope: Common Lisp only, and the top-level callable definitions
-//! [`crate::domain::definition::definition_shape`] recognizes (matching
+//! [`paredit_core_syntax::definition::definition_shape`] recognizes (matching
 //! `unused-parameters`' scope).
 
 use std::collections::BTreeMap;
@@ -21,12 +21,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::function_parameter::list_lambda_list_parameter_names;
-use crate::domain::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::list_head;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::list_head;
+use paredit_feature_function_parameter::function_parameter::domain::list_lambda_list_parameter_names;
 
 #[derive(Debug, Clone)]
 pub struct DuplicateParameterItem {

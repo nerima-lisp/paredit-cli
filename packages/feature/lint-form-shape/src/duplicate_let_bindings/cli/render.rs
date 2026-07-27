@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::duplicate_let_binding_report::{
+use crate::duplicate_let_bindings::usecase::{
     DuplicateLetBindingPolicy, DuplicateLetBindingSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_duplicate_let_binding_report(
+pub fn print_duplicate_let_binding_report(
     summary: &DuplicateLetBindingSummary,
     policy: &DuplicateLetBindingPolicy,
     output: OutputFormat,

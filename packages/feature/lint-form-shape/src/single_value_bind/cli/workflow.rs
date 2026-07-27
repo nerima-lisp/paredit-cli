@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::single_value_bind_report::{
+use crate::single_value_bind::cli::args::SingleValueBindReportArgs;
+use crate::single_value_bind::cli::render::print_single_value_bind_report;
+use crate::single_value_bind::usecase::{
     SingleValueBindPolicyOptions, collect_single_value_binds, evaluate_single_value_bind_policy,
     summarize_single_value_binds,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::single_value_bind_report::args::SingleValueBindReportArgs;
-use crate::presentation::cli::single_value_bind_report::render::print_single_value_bind_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn single_value_bind_report(
-    args: SingleValueBindReportArgs,
-) -> Result<()> {
+pub fn single_value_bind_report(args: SingleValueBindReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut bind_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn single_value_bind_report(
     print_single_value_bind_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "single-value-bind-report policy failed: {policy_message}"
         )));
     }

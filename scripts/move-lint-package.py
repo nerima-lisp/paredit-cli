@@ -34,7 +34,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # A handful of rules name their report module in the singular, so the
 # report is not simply `<rule>_report`.
-REPORT_ALIAS = {'duplicate_cond_tests': 'duplicate_cond_test', 'identical_if_branches': 'identical_if_branch', 'duplicate_boolean_operands': 'duplicate_boolean_operand', 'duplicate_case_keys': 'duplicate_case_key'}
+REPORT_ALIAS = {'duplicate_cond_tests': 'duplicate_cond_test', 'identical_if_branches': 'identical_if_branch', 'duplicate_boolean_operands': 'duplicate_boolean_operand', 'duplicate_case_keys': 'duplicate_case_key', 'duplicate_let_bindings': 'duplicate_let_binding', 'duplicate_parameters': 'duplicate_parameter', 'duplicate_setf_places': 'duplicate_setf_place'}
 
 # rule name -> (source path, destination name inside the slice)
 def parts_for(rule: str) -> list[tuple[pathlib.Path, str]]:

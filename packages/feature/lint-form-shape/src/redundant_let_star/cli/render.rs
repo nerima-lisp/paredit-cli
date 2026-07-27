@@ -1,12 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::redundant_let_star_report::{
-    RedundantLetStarPolicy, RedundantLetStarSummary,
-};
-use crate::presentation::cli::OutputFormat;
+use crate::redundant_let_star::usecase::{RedundantLetStarPolicy, RedundantLetStarSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_redundant_let_star_report(
+pub fn print_redundant_let_star_report(
     summary: &RedundantLetStarSummary,
     policy: &RedundantLetStarPolicy,
     output: OutputFormat,

@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::defpackage_quoted_report::{
+use crate::defpackage_quoted::cli::args::DefpackageQuotedReportArgs;
+use crate::defpackage_quoted::cli::render::print_defpackage_quoted_report;
+use crate::defpackage_quoted::usecase::{
     DefpackageQuotedPolicyOptions, collect_defpackage_quoted, evaluate_defpackage_quoted_policy,
     summarize_defpackage_quoted,
 };
-use crate::presentation::cli::defpackage_quoted_report::args::DefpackageQuotedReportArgs;
-use crate::presentation::cli::defpackage_quoted_report::render::print_defpackage_quoted_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn defpackage_quoted_report(
-    args: DefpackageQuotedReportArgs,
-) -> Result<()> {
+pub fn defpackage_quoted_report(args: DefpackageQuotedReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut defpackage_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn defpackage_quoted_report(
     print_defpackage_quoted_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "defpackage-quoted-report policy failed: {policy_message}"
         )));
     }

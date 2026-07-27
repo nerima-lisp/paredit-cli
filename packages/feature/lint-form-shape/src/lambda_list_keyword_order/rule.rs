@@ -1,16 +1,16 @@
 //! `lambda-list-keyword-order`: lambda-list keywords out of the canonical &optional/&rest/&key/&aux order.
 //!
-//! The analysis lives in [`crate::domain::lambda_list_keyword_order_report`], which also backs the
+//! The analysis lives in [`crate::lambda_list_keyword_order::domain`], which also backs the
 //! standalone `inspect lambda-list-keyword-order` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lambda_list_keyword_order_report::collect_lambda_list_keyword_order;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use crate::lambda_list_keyword_order::domain::collect_lambda_list_keyword_order;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "lambda-list-keyword-order",

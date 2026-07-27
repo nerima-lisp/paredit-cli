@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::self_assignment_report::{
+use crate::self_assignment::cli::args::SelfAssignmentReportArgs;
+use crate::self_assignment::cli::render::print_self_assignment_report;
+use crate::self_assignment::usecase::{
     SelfAssignmentPolicyOptions, collect_self_assignments, evaluate_self_assignment_policy,
     summarize_self_assignments,
 };
-use crate::presentation::cli::self_assignment_report::args::SelfAssignmentReportArgs;
-use crate::presentation::cli::self_assignment_report::render::print_self_assignment_report;
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub(in crate::presentation::cli) fn self_assignment_report(
-    args: SelfAssignmentReportArgs,
-) -> Result<()> {
+pub fn self_assignment_report(args: SelfAssignmentReportArgs) -> Result<()> {
     let mut assignment_form_count = 0;
     let mut self_assignments = Vec::new();
 
@@ -33,7 +31,7 @@ pub(in crate::presentation::cli) fn self_assignment_report(
     print_self_assignment_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "self-assignment-report policy failed: {policy_message}"
         )));
     }

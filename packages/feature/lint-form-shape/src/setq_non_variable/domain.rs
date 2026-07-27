@@ -11,11 +11,11 @@
 //! false positives: a quoted/quasiquoted `setq`, and any form with a `#+`/`#-`
 //! reader conditional or `,@` splice argument, which shifts the pairing.
 //!
-//! Complements [`crate::domain::setf_arity_report`] (which checks the argument
+//! Complements [`crate::setf_arity::domain`] (which checks the argument
 //! *count*) by checking each place's *validity*.
 //!
 //! Reuses the shared whole-tree walk from
-//! [`crate::domain::view_query::for_each_subview`].
+//! [`paredit_core_syntax::view_query::for_each_subview`].
 //!
 //! Scope: Common Lisp only.
 
@@ -23,10 +23,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::expression_equality::render_expression;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree};
-use crate::domain::view_query::{atom_text, for_each_subview, list_head};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::expression_equality::render_expression;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
+};
+use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
 
 const SETQ_HEADS: [&str; 2] = ["setq", "psetq"];
 
@@ -113,7 +115,7 @@ pub struct SetqNonVariablePolicy {
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
-pub(crate) fn examine_setq(
+pub fn examine_setq(
     view: &ExpressionView,
     path: &Path,
     assignment_form_count: &mut usize,

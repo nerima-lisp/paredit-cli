@@ -1,7 +1,7 @@
 //! Duplicate-lambda-list-keyword (a lambda list repeating `&optional`/`&key`/…)
 //! detection across explicit files.
 
-pub use crate::domain::duplicate_lambda_list_keyword_report::{
+pub use crate::duplicate_lambda_list_keyword::domain::{
     DuplicateLambdaListKeywordItem, DuplicateLambdaListKeywordPolicy,
     DuplicateLambdaListKeywordPolicyOptions, DuplicateLambdaListKeywordSummary,
     collect_duplicate_lambda_list_keywords, evaluate_duplicate_lambda_list_keyword_policy,

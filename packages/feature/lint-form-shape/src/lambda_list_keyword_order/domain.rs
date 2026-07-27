@@ -8,7 +8,7 @@
 //!
 //! Only a strict order *decrease* is reported (a keyword whose rank is lower
 //! than one already seen). A repeated keyword — equal rank — is left to
-//! [`crate::domain::duplicate_lambda_list_keyword_report`] so the two rules do
+//! [`crate::duplicate_lambda_list_keyword::domain`] so the two rules do
 //! not both flag the same span.
 //!
 //! Any lambda list containing a keyword this rule does not rank — `&whole`,
@@ -17,7 +17,7 @@
 //! ordinary keywords.
 //!
 //! Reuses the callable-definition recognizer
-//! [`crate::domain::definition::definition_shape`].
+//! [`paredit_core_syntax::definition::definition_shape`].
 //!
 //! Scope: Common Lisp only.
 
@@ -25,10 +25,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
-use crate::domain::view_query::{atom_text, list_head};
+use paredit_core_syntax::definition::definition_shape;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::view_query::{atom_text, list_head};
 
 /// The canonical rank of an ordinary lambda-list keyword, or `None` for a
 /// keyword whose position this rule does not rank (`&whole`, `&environment`,

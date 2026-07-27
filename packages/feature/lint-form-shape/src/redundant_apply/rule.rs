@@ -1,18 +1,18 @@
 //! `redundant-apply`: an apply of a sharp-quoted symbol to a literal list ((apply #'foo (list a b)) is (foo a b)).
 //!
-//! The analysis lives in [`crate::domain::redundant_apply_report`], which also backs the
+//! The analysis lives in [`crate::redundant_apply::domain`], which also backs the
 //! standalone `inspect redundant-apply` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::redundant_apply::domain::examine_apply;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::redundant_apply_report::examine_apply;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "redundant-apply",

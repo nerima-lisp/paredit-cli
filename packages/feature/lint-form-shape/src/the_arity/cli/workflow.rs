@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::the_arity_report::{
+use crate::the_arity::cli::args::TheArityReportArgs;
+use crate::the_arity::cli::render::print_the_arity_report;
+use crate::the_arity::usecase::{
     TheArityPolicyOptions, collect_the_arity_violations, evaluate_the_arity_policy,
     summarize_the_arity,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::the_arity_report::args::TheArityReportArgs;
-use crate::presentation::cli::the_arity_report::render::print_the_arity_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn the_arity_report(args: TheArityReportArgs) -> Result<()> {
+pub fn the_arity_report(args: TheArityReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut the_form_count = 0;
@@ -31,7 +31,7 @@ pub(in crate::presentation::cli) fn the_arity_report(args: TheArityReportArgs) -
     print_the_arity_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "the-arity-report policy failed: {policy_message}"
         )));
     }

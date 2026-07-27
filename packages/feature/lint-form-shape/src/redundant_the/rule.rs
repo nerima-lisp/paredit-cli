@@ -1,21 +1,21 @@
 //! `redundant-the`: a (the t form) type declaration, which is vacuous and is just form (t matches every object).
 //!
-//! The analysis lives in [`crate::domain::redundant_the_report`], which also backs the
+//! The analysis lives in [`crate::redundant_the::domain`], which also backs the
 //! standalone `inspect redundant-the` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::redundant_the::domain::{TheRedundancy, examine_the};
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::redundant_the_report::{TheRedundancy, examine_the};
-use crate::domain::semantics::NodeKey;
-use crate::domain::semantics::typing::Ty;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::sexpr::reader::atom_symbol_text;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_semantics::semantics::NodeKey;
+use paredit_core_semantics::semantics::typing::Ty;
+use paredit_core_syntax::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
 
 pub const META: RuleMeta = RuleMeta::new(
     "redundant-the",

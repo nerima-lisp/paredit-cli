@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::nested_cxr_report::{NestedCxrPolicy, NestedCxrSummary};
-use crate::presentation::cli::OutputFormat;
+use crate::nested_cxr::usecase::{NestedCxrPolicy, NestedCxrSummary};
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_nested_cxr_report(
+pub fn print_nested_cxr_report(
     summary: &NestedCxrSummary,
     policy: &NestedCxrPolicy,
     output: OutputFormat,

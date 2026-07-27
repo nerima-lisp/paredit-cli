@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::make_array_default_keyword_report::{
+use crate::make_array_default_keyword::cli::args::MakeArrayDefaultKeywordReportArgs;
+use crate::make_array_default_keyword::cli::render::print_make_array_default_keyword_report;
+use crate::make_array_default_keyword::usecase::{
     MakeArrayDefaultKeywordPolicyOptions, collect_make_array_default_keywords,
     evaluate_make_array_default_keyword_policy, summarize_make_array_default_keywords,
 };
-use crate::presentation::cli::make_array_default_keyword_report::args::MakeArrayDefaultKeywordReportArgs;
-use crate::presentation::cli::make_array_default_keyword_report::render::print_make_array_default_keyword_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn make_array_default_keyword_report(
-    args: MakeArrayDefaultKeywordReportArgs,
-) -> Result<()> {
+pub fn make_array_default_keyword_report(args: MakeArrayDefaultKeywordReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn make_array_default_keyword_report(
     print_make_array_default_keyword_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "make-array-default-keyword-report policy failed: {policy_message}"
         )));
     }

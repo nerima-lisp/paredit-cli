@@ -10,7 +10,6 @@
 pub mod catalog;
 
 use super::rule::RuleEntry;
-use super::rules;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
@@ -19,19 +18,34 @@ pub const RULE_COUNT: usize = 134;
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
 pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
-    RuleEntry::new(&rules::self_assignment::META, &rules::self_assignment::RULE),
     RuleEntry::new(
-        &rules::duplicate_setf_places::META,
-        &rules::duplicate_setf_places::RULE,
+        &paredit_feature_lint_form_shape::self_assignment::rule::META,
+        &paredit_feature_lint_form_shape::self_assignment::rule::RULE,
     ),
-    RuleEntry::new(&rules::setf_arity::META, &rules::setf_arity::RULE),
     RuleEntry::new(
-        &rules::setq_non_variable::META,
-        &rules::setq_non_variable::RULE,
+        &paredit_feature_lint_form_shape::duplicate_setf_places::rule::META,
+        &paredit_feature_lint_form_shape::duplicate_setf_places::rule::RULE,
     ),
-    RuleEntry::new(&rules::manual_incf::META, &rules::manual_incf::RULE),
-    RuleEntry::new(&rules::manual_push::META, &rules::manual_push::RULE),
-    RuleEntry::new(&rules::manual_pushnew::META, &rules::manual_pushnew::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::setf_arity::rule::META,
+        &paredit_feature_lint_form_shape::setf_arity::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::setq_non_variable::rule::META,
+        &paredit_feature_lint_form_shape::setq_non_variable::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::manual_incf::rule::META,
+        &paredit_feature_lint_form_shape::manual_incf::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::manual_push::rule::META,
+        &paredit_feature_lint_form_shape::manual_push::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::manual_pushnew::rule::META,
+        &paredit_feature_lint_form_shape::manual_pushnew::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::explicit_step_delta::rule::META,
         &paredit_feature_lint_numeric::explicit_step_delta::rule::RULE,
@@ -57,18 +71,21 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_numeric::modify_macro_arity::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::duplicate_parameters::META,
-        &rules::duplicate_parameters::RULE,
+        &paredit_feature_lint_form_shape::duplicate_parameters::rule::META,
+        &paredit_feature_lint_form_shape::duplicate_parameters::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::duplicate_lambda_list_keyword::META,
-        &rules::duplicate_lambda_list_keyword::RULE,
+        &paredit_feature_lint_form_shape::duplicate_lambda_list_keyword::rule::META,
+        &paredit_feature_lint_form_shape::duplicate_lambda_list_keyword::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::lambda_list_keyword_order::META,
-        &rules::lambda_list_keyword_order::RULE,
+        &paredit_feature_lint_form_shape::lambda_list_keyword_order::rule::META,
+        &paredit_feature_lint_form_shape::lambda_list_keyword_order::rule::RULE,
     ),
-    RuleEntry::new(&rules::redundant_quote::META, &rules::redundant_quote::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::redundant_quote::rule::META,
+        &paredit_feature_lint_form_shape::redundant_quote::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_control_flow::redundant_progn::rule::META,
         &paredit_feature_lint_control_flow::redundant_progn::rule::RULE,
@@ -89,7 +106,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_conditional::nested_boolean::rule::META,
         &paredit_feature_lint_conditional::nested_boolean::rule::RULE,
     ),
-    RuleEntry::new(&rules::nested_cxr::META, &rules::nested_cxr::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::nested_cxr::rule::META,
+        &paredit_feature_lint_form_shape::nested_cxr::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_sequence::nth_constant_index::rule::META,
         &paredit_feature_lint_sequence::nth_constant_index::rule::RULE,
@@ -106,30 +126,42 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_control_flow::redundant_body_progn::rule::META,
         &paredit_feature_lint_control_flow::redundant_body_progn::rule::RULE,
     ),
-    RuleEntry::new(&rules::empty_let::META, &rules::empty_let::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::empty_let::rule::META,
+        &paredit_feature_lint_form_shape::empty_let::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_conditional::redundant_if_nil::rule::META,
         &paredit_feature_lint_conditional::redundant_if_nil::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_let_star::META,
-        &rules::redundant_let_star::RULE,
+        &paredit_feature_lint_form_shape::redundant_let_star::rule::META,
+        &paredit_feature_lint_form_shape::redundant_let_star::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_funcall::META,
-        &rules::redundant_funcall::RULE,
-    ),
-    RuleEntry::new(&rules::redundant_the::META, &rules::redundant_the::RULE),
-    RuleEntry::new(&rules::funcall_lambda::META, &rules::funcall_lambda::RULE),
-    RuleEntry::new(
-        &rules::sharp_quoted_lambda::META,
-        &rules::sharp_quoted_lambda::RULE,
+        &paredit_feature_lint_form_shape::redundant_funcall::rule::META,
+        &paredit_feature_lint_form_shape::redundant_funcall::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::redundant_identity::META,
-        &rules::redundant_identity::RULE,
+        &paredit_feature_lint_form_shape::redundant_the::rule::META,
+        &paredit_feature_lint_form_shape::redundant_the::rule::RULE,
     ),
-    RuleEntry::new(&rules::redundant_apply::META, &rules::redundant_apply::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::funcall_lambda::rule::META,
+        &paredit_feature_lint_form_shape::funcall_lambda::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::sharp_quoted_lambda::rule::META,
+        &paredit_feature_lint_form_shape::sharp_quoted_lambda::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::redundant_identity::rule::META,
+        &paredit_feature_lint_form_shape::redundant_identity::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::redundant_apply::rule::META,
+        &paredit_feature_lint_form_shape::redundant_apply::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_sequence::redundant_eql_test::rule::META,
         &paredit_feature_lint_sequence::redundant_eql_test::rule::RULE,
@@ -194,7 +226,10 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_conditional::if_arity::rule::META,
         &paredit_feature_lint_conditional::if_arity::rule::RULE,
     ),
-    RuleEntry::new(&rules::the_arity::META, &rules::the_arity::RULE),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::the_arity::rule::META,
+        &paredit_feature_lint_form_shape::the_arity::rule::RULE,
+    ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::equality_arity::rule::META,
         &paredit_feature_lint_numeric::equality_arity::rule::RULE,
@@ -260,12 +295,12 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_conditional::malformed_cond_clause::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::duplicate_let_bindings::META,
-        &rules::duplicate_let_bindings::RULE,
+        &paredit_feature_lint_form_shape::duplicate_let_bindings::rule::META,
+        &paredit_feature_lint_form_shape::duplicate_let_bindings::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::malformed_let_binding::META,
-        &rules::malformed_let_binding::RULE,
+        &paredit_feature_lint_form_shape::malformed_let_binding::rule::META,
+        &paredit_feature_lint_form_shape::malformed_let_binding::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_control_flow::binds_constant::rule::META,
@@ -344,8 +379,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_conditional::cond_t_clause::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::single_value_bind::META,
-        &rules::single_value_bind::RULE,
+        &paredit_feature_lint_form_shape::single_value_bind::rule::META,
+        &paredit_feature_lint_form_shape::single_value_bind::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_string_char::format_missing_destination::rule::META,
@@ -380,8 +415,8 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_sequence::list_star_to_cons::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::values_list_of_list::META,
-        &rules::values_list_of_list::RULE,
+        &paredit_feature_lint_form_shape::values_list_of_list::rule::META,
+        &paredit_feature_lint_form_shape::values_list_of_list::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_control_flow::redundant_prog1::rule::META,
@@ -404,27 +439,36 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_sequence::append_nil::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::multiple_value_list_of_values::META,
-        &rules::multiple_value_list_of_values::RULE,
+        &paredit_feature_lint_form_shape::multiple_value_list_of_values::rule::META,
+        &paredit_feature_lint_form_shape::multiple_value_list_of_values::rule::RULE,
     ),
-    RuleEntry::new(&rules::typep_predicate::META, &rules::typep_predicate::RULE),
-    RuleEntry::new(&rules::coerce_to_t::META, &rules::coerce_to_t::RULE),
-    RuleEntry::new(&rules::gethash_default::META, &rules::gethash_default::RULE),
     RuleEntry::new(
-        &rules::make_hash_table_test::META,
-        &rules::make_hash_table_test::RULE,
+        &paredit_feature_lint_form_shape::typep_predicate::rule::META,
+        &paredit_feature_lint_form_shape::typep_predicate::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::coerce_to_t::rule::META,
+        &paredit_feature_lint_form_shape::coerce_to_t::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::gethash_default::rule::META,
+        &paredit_feature_lint_form_shape::gethash_default::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::make_hash_table_test::rule::META,
+        &paredit_feature_lint_form_shape::make_hash_table_test::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::zero_divisor::rule::META,
         &paredit_feature_lint_numeric::zero_divisor::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::duplicate_keyword::META,
-        &rules::duplicate_keyword::RULE,
+        &paredit_feature_lint_form_shape::duplicate_keyword::rule::META,
+        &paredit_feature_lint_form_shape::duplicate_keyword::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::defpackage_quoted::META,
-        &rules::defpackage_quoted::RULE,
+        &paredit_feature_lint_form_shape::defpackage_quoted::rule::META,
+        &paredit_feature_lint_form_shape::defpackage_quoted::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_numeric::step_zero::rule::META,
@@ -483,28 +527,28 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_sequence::last_default_count::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::butlast_default_count::META,
-        &rules::butlast_default_count::RULE,
+        &paredit_feature_lint_form_shape::butlast_default_count::rule::META,
+        &paredit_feature_lint_form_shape::butlast_default_count::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::make_list_default_element::META,
-        &rules::make_list_default_element::RULE,
+        &paredit_feature_lint_form_shape::make_list_default_element::rule::META,
+        &paredit_feature_lint_form_shape::make_list_default_element::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::parse_integer_default_radix::META,
-        &rules::parse_integer_default_radix::RULE,
+        &paredit_feature_lint_form_shape::parse_integer_default_radix::rule::META,
+        &paredit_feature_lint_form_shape::parse_integer_default_radix::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::getf_default_nil::META,
-        &rules::getf_default_nil::RULE,
+        &paredit_feature_lint_form_shape::getf_default_nil::rule::META,
+        &paredit_feature_lint_form_shape::getf_default_nil::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::make_array_default_keyword::META,
-        &rules::make_array_default_keyword::RULE,
+        &paredit_feature_lint_form_shape::make_array_default_keyword::rule::META,
+        &paredit_feature_lint_form_shape::make_array_default_keyword::rule::RULE,
     ),
     RuleEntry::new(
-        &rules::nested_char_case::META,
-        &rules::nested_char_case::RULE,
+        &paredit_feature_lint_form_shape::nested_char_case::rule::META,
+        &paredit_feature_lint_form_shape::nested_char_case::rule::RULE,
     ),
     RuleEntry::new(
         &paredit_feature_lint_sequence::list_star_nil::rule::META,

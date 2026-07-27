@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::gethash_default_report::{
+use crate::gethash_default::cli::args::GethashDefaultReportArgs;
+use crate::gethash_default::cli::render::print_gethash_default_report;
+use crate::gethash_default::usecase::{
     GethashDefaultPolicyOptions, collect_gethash_defaults, evaluate_gethash_default_policy,
     summarize_gethash_defaults,
 };
-use crate::presentation::cli::gethash_default_report::args::GethashDefaultReportArgs;
-use crate::presentation::cli::gethash_default_report::render::print_gethash_default_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn gethash_default_report(
-    args: GethashDefaultReportArgs,
-) -> Result<()> {
+pub fn gethash_default_report(args: GethashDefaultReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut gethash_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn gethash_default_report(
     print_gethash_default_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "gethash-default-report policy failed: {policy_message}"
         )));
     }

@@ -291,9 +291,9 @@ mod constant_if_test_tests {
 #[cfg(test)]
 mod redundant_the_tests {
     use crate::domain::dialect::Dialect;
-    use crate::domain::lint::rules::redundant_the::META;
     use crate::domain::lint_report::collect_lint_findings;
     use crate::domain::sexpr::SyntaxTree;
+    use paredit_feature_lint_form_shape::redundant_the::rule::META;
     use std::path::Path;
 
     fn findings_for(input: &str, dialect: Dialect) -> Vec<String> {

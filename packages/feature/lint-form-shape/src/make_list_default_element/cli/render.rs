@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::make_list_default_element_report::{
+use crate::make_list_default_element::usecase::{
     MakeListDefaultElementPolicy, MakeListDefaultElementSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_make_list_default_element_report(
+pub fn print_make_list_default_element_report(
     summary: &MakeListDefaultElementSummary,
     policy: &MakeListDefaultElementPolicy,
     output: OutputFormat,

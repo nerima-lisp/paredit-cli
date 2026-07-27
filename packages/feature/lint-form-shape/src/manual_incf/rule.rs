@@ -1,18 +1,18 @@
 //! `manual-incf`: a setf/setq that manually increments a variable ((setf x (1+ x)) is (incf x)).
 //!
-//! The analysis lives in [`crate::domain::manual_incf_report`], which also backs the
+//! The analysis lives in [`crate::manual_incf::domain`], which also backs the
 //! standalone `inspect manual-incf` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::manual_incf::domain::examine_assignment;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::manual_incf_report::examine_assignment;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "manual-incf",

@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::coerce_to_t_report::{
+use crate::coerce_to_t::cli::args::CoerceToTReportArgs;
+use crate::coerce_to_t::cli::render::print_coerce_to_t_report;
+use crate::coerce_to_t::usecase::{
     CoerceToTPolicyOptions, collect_coerce_to_ts, evaluate_coerce_to_t_policy,
     summarize_coerce_to_ts,
 };
-use crate::presentation::cli::coerce_to_t_report::args::CoerceToTReportArgs;
-use crate::presentation::cli::coerce_to_t_report::render::print_coerce_to_t_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn coerce_to_t_report(args: CoerceToTReportArgs) -> Result<()> {
+pub fn coerce_to_t_report(args: CoerceToTReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut coerce_form_count = 0;
@@ -32,7 +32,7 @@ pub(in crate::presentation::cli) fn coerce_to_t_report(args: CoerceToTReportArgs
     print_coerce_to_t_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "coerce-to-t-report policy failed: {policy_message}"
         )));
     }

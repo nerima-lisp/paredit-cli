@@ -1,18 +1,18 @@
 //! `duplicate-let-bindings`: a parallel let that binds the same variable more than once.
 //!
-//! The analysis lives in [`crate::domain::duplicate_let_binding_report`], which also backs the
+//! The analysis lives in [`crate::duplicate_let_bindings::domain`], which also backs the
 //! standalone `inspect duplicate-let-bindings` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::duplicate_let_binding_report::examine_let;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::duplicate_let_bindings::domain::examine_let;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "duplicate-let-bindings",

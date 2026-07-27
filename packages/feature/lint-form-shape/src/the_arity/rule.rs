@@ -1,18 +1,18 @@
 //! `the-arity`: a the special form without exactly two arguments (a type and a form).
 //!
-//! The analysis lives in [`crate::domain::the_arity_report`], which also backs the
+//! The analysis lives in [`crate::the_arity::domain`], which also backs the
 //! standalone `inspect the-arity` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::the_arity::domain::examine_the;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::the_arity_report::examine_the;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "the-arity",

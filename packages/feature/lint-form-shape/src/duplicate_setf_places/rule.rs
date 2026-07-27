@@ -1,18 +1,18 @@
 //! `duplicate-setf-places`: a setf/setq/psetf/psetq that assigns the same variable more than once ((setf a 1 a 2)).
 //!
-//! The analysis lives in [`crate::domain::duplicate_setf_place_report`], which also backs the
+//! The analysis lives in [`crate::duplicate_setf_places::domain`], which also backs the
 //! standalone `inspect duplicate-setf-places` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::duplicate_setf_place_report::examine_assignment;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::duplicate_setf_places::domain::examine_assignment;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "duplicate-setf-places",

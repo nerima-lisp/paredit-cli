@@ -1,18 +1,18 @@
 //! `butlast-default-count`: a butlast/nbutlast call with an explicit count of 1, the default ((butlast x 1) is (butlast x)).
 //!
-//! The analysis lives in [`crate::domain::butlast_default_count_report`], which also backs the
+//! The analysis lives in [`crate::butlast_default_count::domain`], which also backs the
 //! standalone `inspect butlast-default-count` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::butlast_default_count_report::examine;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::butlast_default_count::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, Replacement, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "butlast-default-count",

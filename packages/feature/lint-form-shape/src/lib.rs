@@ -1,8 +1,4 @@
-//! One module per lint rule.
-//!
-//! A rule module owns its metadata, the nodes it wants to see, and how it
-//! phrases and repairs what it finds. Adding a rule is this file plus one
-//! line in [`super::registry`].
+#![doc = include_str!("../README.md")]
 
 pub mod butlast_default_count;
 pub mod coerce_to_t;
@@ -42,3 +38,6 @@ pub mod single_value_bind;
 pub mod the_arity;
 pub mod typep_predicate;
 pub mod values_list_of_list;
+
+// The root's REGISTRY names each rule's META and RULE across this crate
+// boundary (section 4.2), and each slice's cli owns its own subcommand.

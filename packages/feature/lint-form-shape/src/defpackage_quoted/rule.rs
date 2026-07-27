@@ -1,18 +1,18 @@
 //! `defpackage-quoted`: a quoted designator in a defpackage clause, which defpackage does not evaluate ((:export 'foo)).
 //!
-//! The analysis lives in [`crate::domain::defpackage_quoted_report`], which also backs the
+//! The analysis lives in [`crate::defpackage_quoted::domain`], which also backs the
 //! standalone `inspect defpackage-quoted` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::defpackage_quoted_report::examine;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::defpackage_quoted::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "defpackage-quoted",

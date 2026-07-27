@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::lambda_list_keyword_order_report::{
+use crate::lambda_list_keyword_order::cli::args::LambdaListKeywordOrderReportArgs;
+use crate::lambda_list_keyword_order::cli::render::print_lambda_list_keyword_order_report;
+use crate::lambda_list_keyword_order::usecase::{
     LambdaListKeywordOrderPolicyOptions, collect_lambda_list_keyword_order,
     evaluate_lambda_list_keyword_order_policy, summarize_lambda_list_keyword_order,
 };
-use crate::presentation::cli::lambda_list_keyword_order_report::args::LambdaListKeywordOrderReportArgs;
-use crate::presentation::cli::lambda_list_keyword_order_report::render::print_lambda_list_keyword_order_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn lambda_list_keyword_order_report(
-    args: LambdaListKeywordOrderReportArgs,
-) -> Result<()> {
+pub fn lambda_list_keyword_order_report(args: LambdaListKeywordOrderReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut definition_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn lambda_list_keyword_order_report(
     print_lambda_list_keyword_order_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "lambda-list-keyword-order-report policy failed: {policy_message}"
         )));
     }

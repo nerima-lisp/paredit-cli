@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::typep_predicate_report::{
+use crate::typep_predicate::cli::args::TypepPredicateReportArgs;
+use crate::typep_predicate::cli::render::print_typep_predicate_report;
+use crate::typep_predicate::usecase::{
     TypepPredicatePolicyOptions, collect_typep_predicates, evaluate_typep_predicate_policy,
     summarize_typep_predicates,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::typep_predicate_report::args::TypepPredicateReportArgs;
-use crate::presentation::cli::typep_predicate_report::render::print_typep_predicate_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn typep_predicate_report(
-    args: TypepPredicateReportArgs,
-) -> Result<()> {
+pub fn typep_predicate_report(args: TypepPredicateReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut typep_form_count = 0;
@@ -34,7 +32,7 @@ pub(in crate::presentation::cli) fn typep_predicate_report(
     print_typep_predicate_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "typep-predicate-report policy failed: {policy_message}"
         )));
     }

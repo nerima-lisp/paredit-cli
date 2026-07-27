@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::values_list_of_list_report::{
+use crate::values_list_of_list::cli::args::ValuesListOfListReportArgs;
+use crate::values_list_of_list::cli::render::print_values_list_of_list_report;
+use crate::values_list_of_list::usecase::{
     ValuesListOfListPolicyOptions, collect_values_list_of_lists,
     evaluate_values_list_of_list_policy, summarize_values_list_of_lists,
 };
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
-use crate::presentation::cli::values_list_of_list_report::args::ValuesListOfListReportArgs;
-use crate::presentation::cli::values_list_of_list_report::render::print_values_list_of_list_report;
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn values_list_of_list_report(
-    args: ValuesListOfListReportArgs,
-) -> Result<()> {
+pub fn values_list_of_list_report(args: ValuesListOfListReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut values_list_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn values_list_of_list_report(
     print_values_list_of_list_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "values-list-of-list-report policy failed: {policy_message}"
         )));
     }

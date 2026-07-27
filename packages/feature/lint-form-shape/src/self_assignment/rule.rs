@@ -1,18 +1,18 @@
 //! `self-assignment`: a setq/setf/psetq/psetf that assigns a place to itself.
 //!
-//! The analysis lives in [`crate::domain::self_assignment_report`], which also backs the
+//! The analysis lives in [`crate::self_assignment::domain`], which also backs the
 //! standalone `inspect self-assignment` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::self_assignment::domain::examine_assignment;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::self_assignment_report::examine_assignment;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "self-assignment",

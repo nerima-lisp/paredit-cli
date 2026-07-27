@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::parse_integer_default_radix_report::{
+use crate::parse_integer_default_radix::cli::args::ParseIntegerDefaultRadixReportArgs;
+use crate::parse_integer_default_radix::cli::render::print_parse_integer_default_radix_report;
+use crate::parse_integer_default_radix::usecase::{
     ParseIntegerDefaultRadixPolicyOptions, collect_parse_integer_default_radixes,
     evaluate_parse_integer_default_radix_policy, summarize_parse_integer_default_radixes,
 };
-use crate::presentation::cli::parse_integer_default_radix_report::args::ParseIntegerDefaultRadixReportArgs;
-use crate::presentation::cli::parse_integer_default_radix_report::render::print_parse_integer_default_radix_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn parse_integer_default_radix_report(
-    args: ParseIntegerDefaultRadixReportArgs,
-) -> Result<()> {
+pub fn parse_integer_default_radix_report(args: ParseIntegerDefaultRadixReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn parse_integer_default_radix_report(
     print_parse_integer_default_radix_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "parse-integer-default-radix-report policy failed: {policy_message}"
         )));
     }

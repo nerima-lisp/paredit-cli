@@ -1,18 +1,18 @@
 //! `setq-non-variable`: a setq/psetq place that is not a variable (a list, literal, or constant).
 //!
-//! The analysis lives in [`crate::domain::setq_non_variable_report`], which also backs the
+//! The analysis lives in [`crate::setq_non_variable::domain`], which also backs the
 //! standalone `inspect setq-non-variable` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::setq_non_variable::domain::examine_setq;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::setq_non_variable_report::examine_setq;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "setq-non-variable",

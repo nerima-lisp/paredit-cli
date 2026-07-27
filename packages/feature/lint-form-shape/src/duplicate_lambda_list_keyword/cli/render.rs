@@ -1,12 +1,13 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::duplicate_lambda_list_keyword_report::{
+use crate::duplicate_lambda_list_keyword::usecase::{
     DuplicateLambdaListKeywordPolicy, DuplicateLambdaListKeywordSummary,
 };
-use crate::presentation::cli::OutputFormat;
+use paredit_core_cli::args::OutputFormat;
 
-pub(super) fn print_duplicate_lambda_list_keyword_report(
+pub fn print_duplicate_lambda_list_keyword_report(
     summary: &DuplicateLambdaListKeywordSummary,
     policy: &DuplicateLambdaListKeywordPolicy,
     output: OutputFormat,

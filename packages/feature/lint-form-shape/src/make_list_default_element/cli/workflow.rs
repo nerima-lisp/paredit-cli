@@ -1,16 +1,14 @@
 use anyhow::Result;
 
-use crate::application::usecase::make_list_default_element_report::{
+use crate::make_list_default_element::cli::args::MakeListDefaultElementReportArgs;
+use crate::make_list_default_element::cli::render::print_make_list_default_element_report;
+use crate::make_list_default_element::usecase::{
     MakeListDefaultElementPolicyOptions, collect_make_list_default_elements,
     evaluate_make_list_default_element_policy, summarize_make_list_default_elements,
 };
-use crate::presentation::cli::make_list_default_element_report::args::MakeListDefaultElementReportArgs;
-use crate::presentation::cli::make_list_default_element_report::render::print_make_list_default_element_report;
-use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub(in crate::presentation::cli) fn make_list_default_element_report(
-    args: MakeListDefaultElementReportArgs,
-) -> Result<()> {
+pub fn make_list_default_element_report(args: MakeListDefaultElementReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;
@@ -35,7 +33,7 @@ pub(in crate::presentation::cli) fn make_list_default_element_report(
     print_make_list_default_element_report(&summary, &policy, args.output)?;
 
     if !policy_passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "make-list-default-element-report policy failed: {policy_message}"
         )));
     }

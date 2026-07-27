@@ -1,18 +1,18 @@
 //! `multiple-value-list-of-values`: a multiple-value-list of a values form ((multiple-value-list (values a b)) is (list a b)).
 //!
-//! The analysis lives in [`crate::domain::multiple_value_list_of_values_report`], which also backs the
+//! The analysis lives in [`crate::multiple_value_list_of_values::domain`], which also backs the
 //! standalone `inspect multiple-value-list-of-values` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::multiple_value_list_of_values::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleFix, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::multiple_value_list_of_values_report::examine;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "multiple-value-list-of-values",

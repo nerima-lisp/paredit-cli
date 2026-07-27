@@ -1,18 +1,18 @@
 //! `duplicate-keyword`: a make-* call passing the same keyword argument twice ((make-instance 'c :x 1 :x 2)).
 //!
-//! The analysis lives in [`crate::domain::duplicate_keyword_report`], which also backs the
+//! The analysis lives in [`crate::duplicate_keyword::domain`], which also backs the
 //! standalone `inspect duplicate-keyword` command; this module only registers it with
 //! the lint suite and phrases its findings.
 
 use anyhow::Result;
 
-use crate::domain::duplicate_keyword_report::examine;
-use crate::domain::lint::engine::{RuleContext, RuleSink};
-use crate::domain::lint::model::{
+use crate::duplicate_keyword::domain::examine;
+use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
+use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, NormalizedHead, RuleCategory, RuleMeta, Severity,
 };
-use crate::domain::lint::rule::LintRule;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_lint_engine::rule::LintRule;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 pub const META: RuleMeta = RuleMeta::new(
     "duplicate-keyword",
@@ -23,7 +23,7 @@ pub const META: RuleMeta = RuleMeta::new(
 );
 
 /// Every operator `examine` recognizes as having a fixed positional-argument
-/// prefix (see [`crate::domain::duplicate_keyword_report::KEY_OPERATORS`]).
+/// prefix (see [`crate::duplicate_keyword::domain::KEY_OPERATORS`]).
 const HEADS: [NormalizedHead; 7] = [
     NormalizedHead::new("make-instance"),
     NormalizedHead::new("make-hash-table"),
