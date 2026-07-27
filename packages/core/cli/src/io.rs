@@ -14,7 +14,7 @@ use std::sync::Arc;
 #[cfg(any(unix, test))]
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use anyhow::{Context, Result};
+use crate::error::{ArgumentError, CliError, CliResult, IoRefusal, WriteTargetError};
 
 use super::{DialectArg, SourceInput};
 use paredit_core_syntax::dialect::Dialect;
@@ -280,33 +280,45 @@ fn run_after_artifact_validation_hook(path: &FsPath) {
     }
 }
 
-pub fn read_text_with_limit(reader: impl Read, limit: u64, description: &str) -> Result<String> {
+pub fn read_text_with_limit(reader: impl Read, limit: u64, description: &str) -> CliResult<String> {
     let mut bytes = Vec::new();
     reader
         .take(limit.saturating_add(1))
         .read_to_end(&mut bytes)
-        .with_context(|| format!("failed to read {description}"))?;
+        .map_err(CliError::io(format!("failed to read {description}")))?;
     if bytes.len() as u64 > limit {
-        anyhow::bail!("refusing to read {description}: input exceeds {limit} bytes");
+        return Err(IoRefusal::InputTooLarge {
+            description: description.to_owned(),
+            limit,
+        }
+        .into());
     }
-    String::from_utf8(bytes).with_context(|| format!("{description} is not valid UTF-8"))
+    String::from_utf8(bytes).map_err(|source| CliError::NotUtf8 {
+        description: description.to_owned(),
+        source,
+    })
 }
 
-pub fn read_text_file_with_limit(path: &FsPath, limit: u64) -> Result<String> {
-    let file = open_regular_input_file(path)
-        .with_context(|| format!("failed to open or inspect {}", path.display()))?;
+pub fn read_text_file_with_limit(path: &FsPath, limit: u64) -> CliResult<String> {
+    let file = open_regular_input_file(path).map_err(CliError::io(format!(
+        "failed to open or inspect {}",
+        path.display()
+    )))?;
     read_text_with_limit(file, limit, &path.display().to_string())
 }
 
 pub fn read_text_file_with_expected_target(
     path: &FsPath,
     limit: u64,
-) -> Result<(String, ExpectedWriteTarget)> {
-    let file = open_regular_input_file(path)
-        .with_context(|| format!("failed to open or inspect {}", path.display()))?;
-    let metadata = file
-        .metadata()
-        .with_context(|| format!("failed to inspect open input {}", path.display()))?;
+) -> CliResult<(String, ExpectedWriteTarget)> {
+    let file = open_regular_input_file(path).map_err(CliError::io(format!(
+        "failed to open or inspect {}",
+        path.display()
+    )))?;
+    let metadata = file.metadata().map_err(CliError::io(format!(
+        "failed to inspect open input {}",
+        path.display()
+    )))?;
     let text = read_text_with_limit(file, limit, &path.display().to_string())?;
     let expected = ExpectedWriteTarget::from_metadata_and_content(&metadata, &text)?;
     Ok((text, expected))
@@ -353,7 +365,7 @@ fn describe_refused_input_link(path: &FsPath, error: io::Error) -> io::Error {
     error
 }
 
-pub fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
+pub fn read_input(file: Option<PathBuf>) -> CliResult<SourceInput> {
     match file {
         Some(path) => {
             let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES)?;
@@ -365,10 +377,7 @@ pub fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
         None => {
             let mut stdin = io::stdin();
             if stdin.is_terminal() {
-                anyhow::bail!(
-                    "no input: pass --file <path> or pipe source into stdin \
-                     (refusing to wait on an interactive terminal)"
-                );
+                return Err(ArgumentError::NoInput.into());
             }
             let text = read_text_with_limit(&mut stdin, MAX_SOURCE_INPUT_BYTES, "stdin")?;
             Ok(SourceInput { text, file: None })
@@ -379,7 +388,7 @@ pub fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
 pub fn read_input_and_dialect(
     file: Option<PathBuf>,
     explicit: Option<DialectArg>,
-) -> Result<(SourceInput, Dialect)> {
+) -> CliResult<(SourceInput, Dialect)> {
     let input = read_input(file)?;
     let dialect = crate::shared::detect_dialect(&input, explicit);
     Ok((input, dialect))
@@ -388,7 +397,7 @@ pub fn read_input_and_dialect(
 pub fn read_input_dialect_and_tree(
     file: Option<PathBuf>,
     explicit: Option<DialectArg>,
-) -> Result<(SourceInput, Dialect, SyntaxTree)> {
+) -> CliResult<(SourceInput, Dialect, SyntaxTree)> {
     let (input, dialect) = read_input_and_dialect(file, explicit)?;
     let tree = parse_document(&input, dialect)?;
     Ok((input, dialect, tree))
@@ -397,14 +406,18 @@ pub fn read_input_dialect_and_tree(
 /// Parses a source document with its resolved dialect, naming the input and
 /// the error's line/column in the context. The underlying [`ParseError`] keeps
 /// the raw byte offset, which feeds directly into `--at`.
-pub fn parse_document(input: &SourceInput, dialect: Dialect) -> Result<SyntaxTree> {
+pub fn parse_document(input: &SourceInput, dialect: Dialect) -> CliResult<SyntaxTree> {
     SyntaxTree::parse_with_dialect(&input.text, dialect).map_err(|error| {
         let location = parse_error_line_column(&input.text, &error);
         let source = match input.file.as_deref() {
             Some(path) => path.display().to_string(),
             None => "stdin".to_owned(),
         };
-        anyhow::Error::new(error).context(format!("failed to parse {source} ({location})"))
+        CliError::Parse {
+            origin: source,
+            location,
+            source: error,
+        }
     })
 }
 
@@ -434,7 +447,7 @@ fn parse_error_line_column(text: &str, error: &ParseError) -> String {
     format!("line {line}, column {column}")
 }
 
-pub fn read_file_or_empty(path: &FsPath) -> Result<(SourceInput, bool)> {
+pub fn read_file_or_empty(path: &FsPath) -> CliResult<(SourceInput, bool)> {
     match open_regular_input_file(path) {
         Ok(file) => Ok((
             SourceInput {
@@ -454,11 +467,13 @@ pub fn read_file_or_empty(path: &FsPath) -> Result<(SourceInput, bool)> {
             },
             false,
         )),
-        Err(error) => Err(error).with_context(|| format!("failed to read {}", path.display())),
+        Err(error) => {
+            Err(error).map_err(CliError::io(format!("failed to read {}", path.display())))
+        }
     }
 }
 
-pub fn write_files_with_rollback<I>(files: I) -> Result<()>
+pub fn write_files_with_rollback<I>(files: I) -> CliResult<()>
 where
     I: IntoIterator<Item = (PathBuf, String)>,
 {
@@ -485,7 +500,7 @@ impl ExpectedWriteTarget {
     }
 }
 
-pub fn write_files_with_rollback_expected<I>(files: I) -> Result<()>
+pub fn write_files_with_rollback_expected<I>(files: I) -> CliResult<()>
 where
     I: IntoIterator<Item = (PathBuf, String, ExpectedWriteTarget)>,
 {
@@ -510,7 +525,7 @@ pub struct AnchoredExpectedWrite {
 
 pub fn write_files_with_rollback_expected_anchored(
     files: Vec<AnchoredExpectedWrite>,
-) -> Result<()> {
+) -> CliResult<()> {
     #[cfg(unix)]
     {
         validate_write_inputs(files.iter().map(|file| (&file.display_path, &file.content)))?;
@@ -551,7 +566,7 @@ pub fn write_files_with_rollback_expected_anchored(
 
 fn write_files_with_rollback_inner(
     files: Vec<(PathBuf, String, Option<ExpectedWriteTarget>)>,
-) -> Result<()> {
+) -> CliResult<()> {
     #[cfg(unix)]
     validate_write_inputs(files.iter().map(|(path, content, _)| (path, content)))?;
     write_files_transactionally(files)
@@ -559,7 +574,7 @@ fn write_files_with_rollback_inner(
 
 fn write_files_transactionally(
     files: Vec<(PathBuf, String, Option<ExpectedWriteTarget>)>,
-) -> Result<()> {
+) -> CliResult<()> {
     #[cfg(not(unix))]
     {
         let _ = files;
@@ -580,17 +595,14 @@ fn write_files_transactionally(
 #[cfg(unix)]
 fn validate_write_inputs<'a>(
     files: impl IntoIterator<Item = (&'a PathBuf, &'a String)>,
-) -> Result<()> {
+) -> CliResult<()> {
     let files = files.into_iter().collect::<Vec<_>>();
     reject_duplicate_write_targets(files.iter().map(|(path, _)| *path))?;
     // Central invariant: paredit never persists an unbalanced document, no
     // matter which command produced the rewrite.
     for (path, content) in files {
-        SyntaxTree::parse(content).with_context(|| {
-            format!(
-                "refusing to write {}: rewritten source does not reparse",
-                path.display()
-            )
+        SyntaxTree::parse(content).map_err(|_| IoRefusal::NamedRewriteDoesNotReparse {
+            path: path.display().to_string(),
         })?;
     }
     Ok(())
@@ -599,8 +611,8 @@ fn validate_write_inputs<'a>(
 #[cfg(unix)]
 fn stage_and_apply<T>(
     files: Vec<T>,
-    mut stage: impl FnMut(T) -> Result<StagedWriteTarget>,
-) -> Result<()> {
+    mut stage: impl FnMut(T) -> CliResult<StagedWriteTarget>,
+) -> CliResult<()> {
     let mut staged = Vec::with_capacity(files.len());
     for file in files {
         match stage(file) {
@@ -610,7 +622,7 @@ fn stage_and_apply<T>(
                 if cleanup_errors.is_empty() {
                     return Err(error);
                 }
-                return Err(error.context(format!(
+                return Err(error.with_cleanup_failure(format!(
                     "staging cleanup also failed: {}",
                     cleanup_errors.join("; ")
                 )));
@@ -621,16 +633,18 @@ fn stage_and_apply<T>(
 }
 
 #[cfg(unix)]
-fn apply_staged_writes(staged: Vec<StagedWriteTarget>) -> Result<()> {
+fn apply_staged_writes(staged: Vec<StagedWriteTarget>) -> CliResult<()> {
     for (index, target) in staged.iter().enumerate() {
         if let Err(error) = apply_staged_write(target) {
             let cleanup_errors = rollback_failed_write(&staged, index);
-            let apply_error = anyhow::Error::new(error)
-                .context(format!("failed to write {}", target.path.display()));
+            let apply_error = CliError::Io {
+                context: format!("failed to write {}", target.path.display()),
+                source: error,
+            };
             if cleanup_errors.is_empty() {
                 return Err(apply_error);
             }
-            return Err(apply_error.context(format!(
+            return Err(apply_error.with_cleanup_failure(format!(
                 "rollback/cleanup also failed: {}",
                 cleanup_errors.join("; ")
             )));
@@ -645,20 +659,19 @@ fn apply_staged_writes(staged: Vec<StagedWriteTarget>) -> Result<()> {
     }
 
     if !cleanup_errors.is_empty() {
-        anyhow::bail!(
-            "writes committed successfully, but backup cleanup failed: {}",
-            cleanup_errors.join("; ")
-        );
+        return Err(CliError::BackupCleanupAfterCommit {
+            details: cleanup_errors.join("; "),
+        });
     }
 
     Ok(())
 }
 
-pub fn write_file_with_rollback(path: PathBuf, content: String) -> Result<()> {
+pub fn write_file_with_rollback(path: PathBuf, content: String) -> CliResult<()> {
     write_files_with_rollback([(path, content)])
 }
 
-pub fn write_artifact_with_rollback(path: PathBuf, content: String) -> Result<()> {
+pub fn write_artifact_with_rollback(path: PathBuf, content: String) -> CliResult<()> {
     write_files_transactionally(vec![(path, content, None)])
 }
 
@@ -750,7 +763,7 @@ struct SecurityMetadata {
 type FileIdentity = FilesystemIdentity;
 
 #[cfg(all(test, unix))]
-fn stage_write_target(path: PathBuf, content: String) -> Result<StagedWriteTarget> {
+fn stage_write_target(path: PathBuf, content: String) -> CliResult<StagedWriteTarget> {
     stage_write_target_expected(path, content, None)
 }
 
@@ -759,7 +772,7 @@ fn stage_write_target_expected(
     path: PathBuf,
     content: String,
     expected_original: Option<ExpectedWriteTarget>,
-) -> Result<StagedWriteTarget> {
+) -> CliResult<StagedWriteTarget> {
     #[cfg(unix)]
     {
         let (parent, target_name) = open_anchored_parent(&path)?;
@@ -783,7 +796,7 @@ fn stage_write_target_expected_inner(
     expected_original: Option<ExpectedWriteTarget>,
     #[cfg(unix)] parent: AnchoredDirectory,
     #[cfg(unix)] target_name: OsString,
-) -> Result<StagedWriteTarget> {
+) -> CliResult<StagedWriteTarget> {
     let staged_digest = *blake3::hash(content.as_bytes()).as_bytes();
     let metadata = match target_symlink_metadata(
         #[cfg(unix)]
@@ -793,15 +806,21 @@ fn stage_write_target_expected_inner(
         &path,
     ) {
         Ok(metadata) if metadata.file_type().is_symlink() => {
-            anyhow::bail!("refusing to write symlink {}", path.display());
+            return Err(IoRefusal::WriteSymlink {
+                path: path.display().to_string(),
+            }
+            .into());
         }
         Ok(metadata) if !metadata.file_type().is_file() => {
-            anyhow::bail!("refusing to write non-regular file {}", path.display());
+            return Err(IoRefusal::WriteNonRegularFile {
+                path: path.display().to_string(),
+            }
+            .into());
         }
         Ok(metadata) => Some(metadata),
         Err(error) if error.kind() == ErrorKind::NotFound => None,
         Err(error) => {
-            return Err(error).with_context(|| format!("failed to stat {}", path.display()));
+            return Err(error).map_err(CliError::io(format!("failed to stat {}", path.display())));
         }
     };
     let existed = metadata.is_some();
@@ -815,67 +834,87 @@ fn stage_write_target_expected_inner(
             &target_name,
             &path,
         )
-        .with_context(|| format!("failed to open existing target {}", path.display()))?;
-        let opened_metadata = file
-            .metadata()
-            .with_context(|| format!("failed to inspect open target {}", path.display()))?;
-        anyhow::ensure!(
-            opened_metadata.file_type().is_file(),
-            "refusing to write non-regular file {}",
+        .map_err(CliError::io(format!(
+            "failed to open existing target {}",
             path.display()
-        );
+        )))?;
+        let opened_metadata = file.metadata().map_err(CliError::io(format!(
+            "failed to inspect open target {}",
+            path.display()
+        )))?;
+        if !opened_metadata.file_type().is_file() {
+            return Err(IoRefusal::WriteNonRegularFile {
+                path: path.display().to_string(),
+            }
+            .into());
+        }
         let path_identity = snapshot_identity(expected)?;
         let opened_identity = file_identity(&opened_metadata)?;
-        anyhow::ensure!(
-            path_identity == opened_identity,
-            "refusing replaced target {}",
-            path.display()
-        );
+        if path_identity != opened_identity {
+            return Err(IoRefusal::ReplacedTarget {
+                path: path.display().to_string(),
+            }
+            .into());
+        }
         #[cfg(unix)]
         {
             use std::os::unix::fs::MetadataExt;
-            anyhow::ensure!(
-                opened_metadata.nlink() == 1,
-                "refusing to replace hard-linked target {}",
-                path.display()
-            );
+            if opened_metadata.nlink() != 1 {
+                return Err(IoRefusal::HardLinkedTarget {
+                    path: path.display().to_string(),
+                }
+                .into());
+            }
         }
         if let Some(expected_original) = expected_original {
-            anyhow::ensure!(
-                opened_identity == expected_original.identity,
-                "refusing target replaced since parsing {}",
+            if opened_identity != expected_original.identity {
+                return Err(IoRefusal::TargetReplacedSinceParsing {
+                    path: path.display().to_string(),
+                }
+                .into());
+            }
+            let digest = digest_reader(&mut file).map_err(CliError::io(format!(
+                "failed to verify parsed target {}",
                 path.display()
-            );
-            let digest = digest_reader(&mut file)
-                .with_context(|| format!("failed to verify parsed target {}", path.display()))?;
-            anyhow::ensure!(
-                digest == expected_original.digest,
-                "refusing target changed since parsing {}",
+            )))?;
+            if digest != expected_original.digest {
+                return Err(IoRefusal::TargetChangedSinceParsing {
+                    path: path.display().to_string(),
+                }
+                .into());
+            }
+            file.seek(SeekFrom::Start(0)).map_err(CliError::io(format!(
+                "failed to rewind parsed target {}",
                 path.display()
-            );
-            file.seek(SeekFrom::Start(0))
-                .with_context(|| format!("failed to rewind parsed target {}", path.display()))?;
+            )))?;
         }
         Some(file)
     } else {
-        anyhow::ensure!(
-            expected_original.is_none(),
-            "refusing target removed since parsing {}",
-            path.display()
-        );
+        if expected_original.is_some() {
+            return Err(IoRefusal::TargetRemovedSinceParsing {
+                path: path.display().to_string(),
+            }
+            .into());
+        }
         None
     };
     let permissions = original
         .as_ref()
         .map(|file| file.metadata().map(|metadata| metadata.permissions()))
         .transpose()
-        .with_context(|| format!("failed to inspect open target {}", path.display()))?;
+        .map_err(CliError::io(format!(
+            "failed to inspect open target {}",
+            path.display()
+        )))?;
     #[cfg(unix)]
     let original_security = original
         .as_ref()
         .map(read_security_metadata)
         .transpose()
-        .with_context(|| format!("failed to read security metadata for {}", path.display()))?;
+        .map_err(CliError::io(format!(
+            "failed to read security metadata for {}",
+            path.display()
+        )))?;
 
     let CreatedSibling {
         path: staged_path,
@@ -887,10 +926,15 @@ fn stage_write_target_expected_inner(
         &path,
         "tmp",
     )
-    .with_context(|| format!("failed to create staging file for {}", path.display()))?;
+    .map_err(CliError::io(format!(
+        "failed to create staging file for {}",
+        path.display()
+    )))?;
     if let Err(error) = staged_file.write_all(content.as_bytes()) {
-        let error =
-            anyhow::Error::new(error).context(format!("failed to stage {}", staged_path.display()));
+        let error = CliError::Io {
+            context: format!("failed to stage {}", staged_path.display()),
+            source: error,
+        };
         return Err(with_open_artifact_cleanup(
             error,
             &parent,
@@ -903,10 +947,10 @@ fn stage_write_target_expected_inner(
 
     if let Some(permissions) = permissions.as_ref() {
         if let Err(error) = staged_file.set_permissions(permissions.clone()) {
-            let error = anyhow::Error::new(error).context(format!(
-                "failed to copy permissions to {}",
-                staged_path.display()
-            ));
+            let error = CliError::Io {
+                context: format!("failed to copy permissions to {}", staged_path.display()),
+                source: error,
+            };
             return Err(with_open_artifact_cleanup(
                 error,
                 &parent,
@@ -920,10 +964,13 @@ fn stage_write_target_expected_inner(
     #[cfg(unix)]
     if let Some(security) = original_security.as_ref() {
         if let Err(error) = apply_security_metadata(&staged_file, permissions.as_ref(), security) {
-            let error = anyhow::Error::new(error).context(format!(
-                "failed to preserve security metadata on {}",
-                staged_path.display()
-            ));
+            let error = CliError::Io {
+                context: format!(
+                    "failed to preserve security metadata on {}",
+                    staged_path.display()
+                ),
+                source: error,
+            };
             return Err(with_open_artifact_cleanup(
                 error,
                 &parent,
@@ -935,8 +982,10 @@ fn stage_write_target_expected_inner(
         }
     }
     if let Err(error) = staged_file.sync_all() {
-        let error =
-            anyhow::Error::new(error).context(format!("failed to sync {}", staged_path.display()));
+        let error = CliError::Io {
+            context: format!("failed to sync {}", staged_path.display()),
+            source: error,
+        };
         return Err(with_open_artifact_cleanup(
             error,
             &parent,
@@ -950,10 +999,13 @@ fn stage_write_target_expected_inner(
         Ok(metadata) => match file_identity(&metadata) {
             Ok(identity) => identity,
             Err(error) => {
-                let error = anyhow::Error::new(error).context(format!(
-                    "stable filesystem identity is unavailable for {}",
-                    staged_path.display()
-                ));
+                let error = CliError::Io {
+                    context: format!(
+                        "stable filesystem identity is unavailable for {}",
+                        staged_path.display()
+                    ),
+                    source: error,
+                };
                 return Err(with_open_artifact_cleanup(
                     error,
                     &parent,
@@ -965,10 +1017,10 @@ fn stage_write_target_expected_inner(
             }
         },
         Err(error) => {
-            let error = anyhow::Error::new(error).context(format!(
-                "failed to inspect staging file {}",
-                staged_path.display()
-            ));
+            let error = CliError::Io {
+                context: format!("failed to inspect staging file {}", staged_path.display()),
+                source: error,
+            };
             return Err(with_open_artifact_cleanup(
                 error,
                 &parent,
@@ -1000,8 +1052,10 @@ fn stage_write_target_expected_inner(
                     Some(digest),
                 ),
                 Err(error) => {
-                    let error = anyhow::Error::new(error)
-                        .context(format!("failed to create backup for {}", path.display()));
+                    let error = CliError::Io {
+                        context: format!("failed to create backup for {}", path.display()),
+                        source: error,
+                    };
                     return Err(with_snapshot_cleanup(
                         error,
                         &parent,
@@ -1056,14 +1110,14 @@ fn stage_write_target_expected_inner(
     ) {
         let mut cleanup_errors = Vec::new();
         cleanup_unapplied_write(&target, &mut cleanup_errors);
-        let sync_error = anyhow::Error::new(error).context(format!(
-            "failed to sync staged write for {}",
-            target.path.display()
-        ));
+        let sync_error = CliError::Io {
+            context: format!("failed to sync staged write for {}", target.path.display()),
+            source: error,
+        };
         if cleanup_errors.is_empty() {
             return Err(sync_error);
         }
-        return Err(sync_error.context(format!(
+        return Err(sync_error.with_cleanup_failure(format!(
             "staging cleanup also failed: {}",
             cleanup_errors.join("; ")
         )));
@@ -1640,14 +1694,14 @@ fn remove_file_for_cleanup(
 
 #[cfg(unix)]
 fn with_snapshot_cleanup(
-    error: anyhow::Error,
+    error: CliError,
     parent: &AnchoredDirectory,
     name: &OsStr,
     path: &FsPath,
     expected_identity: FileIdentity,
     expected_digest: [u8; 32],
     description: &str,
-) -> anyhow::Error {
+) -> CliError {
     let mut cleanup_errors = Vec::new();
     remove_file_snapshot_for_cleanup(
         parent,
@@ -1661,7 +1715,7 @@ fn with_snapshot_cleanup(
     if cleanup_errors.is_empty() {
         error
     } else {
-        error.context(format!(
+        error.with_cleanup_failure(format!(
             "staging cleanup also failed: {}",
             cleanup_errors.join("; ")
         ))
@@ -1670,13 +1724,13 @@ fn with_snapshot_cleanup(
 
 #[cfg(unix)]
 fn with_open_artifact_cleanup(
-    error: anyhow::Error,
+    error: CliError,
     parent: &AnchoredDirectory,
     name: &OsStr,
     path: &FsPath,
     description: &str,
     mut file: fs::File,
-) -> anyhow::Error {
+) -> CliError {
     let snapshot = snapshot_open_artifact_for_cleanup(&mut file);
     drop(file);
     match snapshot {
@@ -1689,24 +1743,29 @@ fn with_open_artifact_cleanup(
 
 #[cfg(unix)]
 fn with_partial_cleanup(
-    error: anyhow::Error,
+    error: CliError,
     path: &FsPath,
     description: &str,
     snapshot_error: &io::Error,
-) -> anyhow::Error {
-    error.context(format!(
+) -> CliError {
+    error.with_cleanup_failure(format!(
         "retained partial {description} {} because stable cleanup identity could not be established: {snapshot_error}",
         path.display()
     ))
 }
 
 #[cfg(unix)]
-fn reject_duplicate_write_targets<'a>(files: impl IntoIterator<Item = &'a PathBuf>) -> Result<()> {
+fn reject_duplicate_write_targets<'a>(
+    files: impl IntoIterator<Item = &'a PathBuf>,
+) -> CliResult<()> {
     let mut seen = BTreeSet::new();
     for path in files {
         let identity = write_target_identity(path);
         if !seen.insert(identity) {
-            anyhow::bail!("duplicate write target {}", path.display());
+            return Err(IoRefusal::DuplicateWriteTarget {
+                path: path.display().to_string(),
+            }
+            .into());
         }
     }
     Ok(())
@@ -1750,35 +1809,40 @@ fn cleanup_unapplied_writes(targets: &[StagedWriteTarget]) -> Vec<String> {
 }
 
 #[cfg(unix)]
-fn open_anchored_parent(path: &FsPath) -> Result<(AnchoredDirectory, OsString)> {
+fn open_anchored_parent(path: &FsPath) -> CliResult<(AnchoredDirectory, OsString)> {
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
     let target_name = path
         .file_name()
-        .ok_or_else(|| anyhow::anyhow!("write target has no file name: {}", path.display()))?
+        .ok_or_else(|| IoRefusal::WriteTargetHasNoFileName {
+            path: path.display().to_string(),
+        })?
         .to_os_string();
     let display_path = write_target_parent(path).to_path_buf();
     let handle = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(&display_path)
-        .with_context(|| format!("failed to open parent directory {}", display_path.display()))?;
-    let metadata = handle.metadata().with_context(|| {
-        format!(
-            "failed to inspect parent directory {}",
+        .map_err(CliError::io(format!(
+            "failed to open parent directory {}",
             display_path.display()
-        )
-    })?;
-    anyhow::ensure!(
-        metadata.is_dir(),
-        "write target parent is not a directory: {}",
+        )))?;
+    let metadata = handle.metadata().map_err(CliError::io(format!(
+        "failed to inspect parent directory {}",
         display_path.display()
-    );
-    anyhow::ensure!(
-        metadata.permissions().mode() & 0o022 == 0,
-        "refusing writable parent directory {}",
-        display_path.display()
-    );
+    )))?;
+    if !metadata.is_dir() {
+        return Err(WriteTargetError::ParentNotADirectory {
+            path: display_path.display().to_string(),
+        }
+        .into());
+    }
+    if metadata.permissions().mode() & 0o022 != 0 {
+        return Err(IoRefusal::WritableParentDirectory {
+            path: display_path.display().to_string(),
+        }
+        .into());
+    }
     let identity = file_identity(&metadata)?;
     Ok((
         AnchoredDirectory {
@@ -1795,56 +1859,55 @@ fn anchored_directory_from_retained(
     display_path: &FsPath,
     parent_dir: &Arc<cap_std::fs::Dir>,
     file_name: &OsStr,
-) -> Result<AnchoredDirectory> {
+) -> CliResult<AnchoredDirectory> {
     use cap_std::fs::PermissionsExt;
 
-    let expected_name = display_path.file_name().ok_or_else(|| {
-        anyhow::anyhow!("write target has no file name: {}", display_path.display())
-    })?;
-    anyhow::ensure!(
-        expected_name == file_name,
-        "anchored target name does not match display path {}",
-        display_path.display()
-    );
+    let expected_name =
+        display_path
+            .file_name()
+            .ok_or_else(|| IoRefusal::WriteTargetHasNoFileName {
+                path: display_path.display().to_string(),
+            })?;
+    if expected_name != file_name {
+        return Err(WriteTargetError::AnchoredNameMismatch {
+            path: display_path.display().to_string(),
+        }
+        .into());
+    }
     let parent_display_path = write_target_parent(display_path).to_path_buf();
-    let metadata = parent_dir.dir_metadata().with_context(|| {
-        format!(
-            "failed to inspect retained parent directory {}",
-            parent_display_path.display()
-        )
-    })?;
-    anyhow::ensure!(
-        metadata.is_dir(),
-        "write target parent is not a directory: {}",
+    let metadata = parent_dir.dir_metadata().map_err(CliError::io(format!(
+        "failed to inspect retained parent directory {}",
         parent_display_path.display()
-    );
-    anyhow::ensure!(
-        metadata.permissions().mode() & 0o022 == 0,
-        "refusing writable parent directory {}",
-        parent_display_path.display()
-    );
+    )))?;
+    if !metadata.is_dir() {
+        return Err(WriteTargetError::ParentNotADirectory {
+            path: parent_display_path.display().to_string(),
+        }
+        .into());
+    }
+    if metadata.permissions().mode() & 0o022 != 0 {
+        return Err(IoRefusal::WritableParentDirectory {
+            path: parent_display_path.display().to_string(),
+        }
+        .into());
+    }
     let identity = FilesystemIdentity::from_cap(&metadata).ok_or_else(|| {
-        anyhow::anyhow!(
-            "stable filesystem identity is unavailable for retained parent directory {}",
-            parent_display_path.display()
-        )
+        WriteTargetError::ParentIdentityUnavailable {
+            path: parent_display_path.display().to_string(),
+        }
     })?;
     let parent = AnchoredDirectory {
-        handle: parent_dir.try_clone().with_context(|| {
-            format!(
-                "failed to retain parent directory {}",
-                parent_display_path.display()
-            )
-        })?,
+        handle: parent_dir.try_clone().map_err(CliError::io(format!(
+            "failed to retain parent directory {}",
+            parent_display_path.display()
+        )))?,
         display_path: parent_display_path,
         identity,
     };
-    validate_parent_anchor(&parent).with_context(|| {
-        format!(
-            "retained parent no longer matches {}",
-            parent.display_path.display()
-        )
-    })?;
+    validate_parent_anchor(&parent).map_err(CliError::io(format!(
+        "retained parent no longer matches {}",
+        parent.display_path.display()
+    )))?;
     Ok(parent)
 }
 
@@ -3069,7 +3132,7 @@ mod tests {
         let error = read_text_with_limit(&b"12345"[..], 4, "test input")
             .expect_err("oversized input must be rejected");
 
-        assert!(format!("{error:#}").contains("input exceeds 4 bytes"));
+        assert!(error.chain().contains("input exceeds 4 bytes"));
     }
 
     #[test]
@@ -3077,7 +3140,7 @@ mod tests {
         let error = read_text_with_limit(&[0xff][..], 4, "test input")
             .expect_err("invalid UTF-8 must be rejected");
 
-        assert!(format!("{error:#}").contains("not valid UTF-8"));
+        assert!(error.chain().contains("not valid UTF-8"));
     }
 
     #[cfg(unix)]
@@ -3094,7 +3157,7 @@ mod tests {
         let error = read_text_file_with_limit(&fifo, MAX_SOURCE_INPUT_BYTES)
             .expect_err("FIFO must be rejected without waiting for a writer");
 
-        assert!(format!("{error:#}").contains("refusing non-regular input file"));
+        assert!(error.chain().contains("refusing non-regular input file"));
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 
@@ -3139,7 +3202,7 @@ mod tests {
         let error = read_file_or_empty(&fifo)
             .expect_err("FIFO must be rejected without waiting for a writer");
 
-        assert!(format!("{error:#}").contains("refusing non-regular input file"));
+        assert!(error.chain().contains("refusing non-regular input file"));
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 
@@ -3161,7 +3224,7 @@ mod tests {
                 });
             stage_write_target(operation_target, "(paredit)".to_owned())
                 .map(|_| ())
-                .map_err(|error| format!("{error:#}"))
+                .map_err(|error| error.chain())
         });
 
         assert!(result.is_err(), "FIFO replacement must be rejected");
@@ -3190,7 +3253,7 @@ mod tests {
             let _guard = install_before_existing_file_open_hook(operation_target, move || {
                 replace_regular_file_with_fifo(&hook_target, &hook_preserved);
             });
-            apply_staged_writes(vec![staged]).map_err(|error| format!("{error:#}"))
+            apply_staged_writes(vec![staged]).map_err(|error| error.chain())
         });
 
         assert!(result.is_err(), "FIFO replacement must be rejected");
@@ -3294,7 +3357,7 @@ mod tests {
             write_files_with_rollback_expected([(target.clone(), "(new)".to_owned(), expected)])
                 .expect_err("different inode must be rejected");
 
-        assert!(format!("{error:#}").contains("replaced since parsing"));
+        assert!(error.chain().contains("replaced since parsing"));
         assert_eq!(
             fs::read_to_string(&target).expect("read replacement target"),
             "(old)"
@@ -3361,7 +3424,7 @@ mod tests {
         }])
         .expect_err("replaced ambient parent must be rejected");
 
-        assert!(format!("{error:#}").contains("refusing replaced parent directory"));
+        assert!(error.chain().contains("refusing replaced parent directory"));
         assert_eq!(
             fs::read_to_string(retained_directory.join("target.lisp"))
                 .expect("read retained target"),
@@ -3474,7 +3537,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged])
             .expect_err("changed recovery artifact must fail closed");
-        let report = format!("{error:#}");
+        let report = error.chain();
 
         assert!(report.contains("published target"), "{report}");
         assert!(report.contains("recovery artifact"), "{report}");
@@ -3552,7 +3615,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged])
             .expect_err("final-boundary replacement must fail closed");
-        let report = format!("{error:#}");
+        let report = error.chain();
         let quarantine = directory.join(CLEANUP_QUARANTINE_NAME);
         let quarantined_entries = fs::read_dir(&quarantine)
             .expect("read cleanup quarantine")
@@ -3677,7 +3740,7 @@ mod tests {
         let error =
             apply_staged_writes(vec![staged]).expect_err("replaced parent must be rejected");
 
-        assert!(format!("{error:#}").contains("replaced parent directory"));
+        assert!(error.chain().contains("replaced parent directory"));
         assert_eq!(
             fs::read_to_string(&target).expect("read replacement target"),
             "(third-party)"
@@ -3848,7 +3911,7 @@ mod tests {
         // The replacement is rejected either by filesystem-identity mismatch
         // ("replaced target") or, on filesystems that reuse the freed inode
         // number (e.g. tmpfs), by the content digest ("changed content").
-        let report = format!("{error:#}");
+        let report = error.chain();
         assert!(
             report.contains("replaced target") || report.contains("target with changed content"),
             "{report}"
@@ -3880,7 +3943,9 @@ mod tests {
             .expect_err("concurrent replacement after final validation must be rejected");
 
         assert!(
-            format!("{error:#}").contains("target changed during atomic publication"),
+            error
+                .chain()
+                .contains("target changed during atomic publication"),
             "{error:#}"
         );
         assert_eq!(
@@ -3923,7 +3988,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged])
             .expect_err("failed exchange restoration must fail closed");
-        let report = format!("{error:#}");
+        let report = error.chain();
 
         assert!(report.contains("failed to restore exchange"), "{report}");
         assert!(report.contains("rollback skipped"), "{report}");
@@ -4163,7 +4228,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged])
             .expect_err("deleted target must fail validation and roll back");
-        let report = format!("{error:#}");
+        let report = error.chain();
 
         assert!(!report.contains("rollback/cleanup also failed"), "{report}");
         assert_eq!(
@@ -4188,7 +4253,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged]).expect_err("replacement must be rejected");
 
-        let report = format!("{error:#}");
+        let report = error.chain();
         assert!(
             report.contains("replaced staging file")
                 || report.contains("staging file with changed content"),
@@ -4211,7 +4276,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged]).expect_err("replacement must be rejected");
 
-        let report = format!("{error:#}");
+        let report = error.chain();
         assert!(
             report.contains("replaced backup") || report.contains("backup with changed content"),
             "{report}"
@@ -4237,7 +4302,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged]).expect_err("content change must be rejected");
 
-        assert!(format!("{error:#}").contains("target with changed content"));
+        assert!(error.chain().contains("target with changed content"));
         assert_eq!(fs::read_to_string(&target).expect("read target"), "(bad)");
         fs::remove_dir_all(directory).expect("remove test directory");
     }
@@ -4259,7 +4324,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged]).expect_err("content change must be rejected");
 
-        assert!(format!("{error:#}").contains("staging file with changed content"));
+        assert!(error.chain().contains("staging file with changed content"));
         assert_eq!(fs::read_to_string(&target).expect("read target"), "(old)");
         fs::remove_dir_all(directory).expect("remove test directory");
     }
@@ -4281,7 +4346,7 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged]).expect_err("content change must be rejected");
 
-        assert!(format!("{error:#}").contains("backup with changed content"));
+        assert!(error.chain().contains("backup with changed content"));
         assert_eq!(fs::read_to_string(&target).expect("read target"), "(old)");
         fs::remove_dir_all(directory).expect("remove test directory");
     }
@@ -4530,7 +4595,11 @@ mod tests {
 
         let error = apply_staged_writes(vec![staged]).expect_err("ACL change must be rejected");
 
-        assert!(format!("{error:#}").contains("target with changed security metadata"));
+        assert!(
+            error
+                .chain()
+                .contains("target with changed security metadata")
+        );
         assert_eq!(fs::read_to_string(&target).expect("read target"), "(old)");
         fs::remove_dir_all(directory).expect("remove test directory");
     }
@@ -4616,7 +4685,7 @@ mod tests {
         let error =
             apply_staged_writes(vec![staged]).expect_err("metadata change must be rejected");
 
-        assert!(format!("{error:#}").contains("changed security metadata"));
+        assert!(error.chain().contains("changed security metadata"));
         assert_eq!(fs::read_to_string(&target).expect("read target"), "(old)");
         fs::remove_dir_all(directory).expect("remove test directory");
     }
@@ -4634,7 +4703,7 @@ mod tests {
         let backup_path = staged.backup_path.display().to_string();
 
         let error = apply_staged_writes(vec![staged]).expect_err("replacement must be rejected");
-        let report = format!("{error:#}");
+        let report = error.chain();
 
         assert!(report.contains("replaced backup"));
         assert!(report.contains(&backup_path));
@@ -4660,7 +4729,7 @@ mod tests {
 
         let error = apply_staged_writes(staged).expect_err("second apply must fail");
 
-        assert!(format!("{error:#}").contains("failed to write"));
+        assert!(error.chain().contains("failed to write"));
         for path in &paths {
             assert_eq!(
                 fs::read_to_string(path).expect("read restored target"),
@@ -4696,7 +4765,7 @@ mod tests {
         fs::remove_file(&staged[1].staged_path).expect("force second apply to fail");
 
         let error = apply_staged_writes(staged).expect_err("second apply must fail");
-        let report = format!("{error:#}");
+        let report = error.chain();
 
         assert!(report.contains(&format!("failed to write {}", failed_path.display())));
         assert!(!report.contains("rollback/cleanup also failed"));
@@ -4732,7 +4801,7 @@ mod tests {
         let backup_path = staged[1].backup_path.display().to_string();
 
         let error = apply_staged_writes(staged).expect_err("first apply must fail");
-        let report = format!("{error:#}");
+        let report = error.chain();
 
         assert!(report.contains(&format!("failed to write {}", failed_path.display())));
         assert!(report.contains(&staged_path));
@@ -4761,7 +4830,7 @@ mod tests {
         let replaced_path = staged[1].staged_path.clone();
 
         let error = apply_staged_writes(staged).expect_err("first apply must fail");
-        let report = format!("{error:#}");
+        let report = error.chain();
 
         assert!(
             report.contains("refusing replaced staging file")

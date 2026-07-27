@@ -40,6 +40,9 @@ impl DefinitionSourcePort for CliDefinitionSource {
     }
 
     fn write(&mut self, file: &Path, content: &str) -> Result<()> {
-        write_file_with_rollback(file.to_path_buf(), content.to_owned())
+        Ok(write_file_with_rollback(
+            file.to_path_buf(),
+            content.to_owned(),
+        )?)
     }
 }

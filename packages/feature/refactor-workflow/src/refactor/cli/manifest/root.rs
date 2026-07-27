@@ -342,7 +342,7 @@ mod tests {
                 .expect_err("replaced ambient root must be rejected before writing");
 
         assert!(
-            format!("{error:#}").contains("refusing replaced parent directory"),
+            error.chain().contains("refusing replaced parent directory"),
             "unexpected error: {error:#}"
         );
         assert_eq!(

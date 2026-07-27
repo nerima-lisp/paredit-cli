@@ -11,7 +11,9 @@ use crate::presentation::cli::shared::{
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let rendered = Formatter::new(args.indent).format(&tree);
-    emit_document(&input, dialect, args.write, args.diff, rendered)
+    Ok(emit_document(
+        &input, dialect, args.write, args.diff, rendered,
+    )?)
 }
 
 pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> Result<()> {
@@ -21,7 +23,9 @@ pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> R
     if repaired == input.text {
         bail!("input is already balanced");
     }
-    emit_document(&input, dialect, args.write, args.diff, repaired)
+    Ok(emit_document(
+        &input, dialect, args.write, args.diff, repaired,
+    )?)
 }
 
 pub(in crate::presentation::cli) fn select(args: TargetArgs) -> Result<()> {
@@ -38,11 +42,13 @@ pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> Result<()> {
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let rewritten = Edit::replace(&input.text, selection, &args.with)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    emit_document(&input, dialect, args.write, args.diff, rewritten)
+    Ok(emit_document(
+        &input, dialect, args.write, args.diff, rewritten,
+    )?)
 }
 
 pub(in crate::presentation::cli) fn kill(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::kill)
+    Ok(edit_target(args, Edit::kill)?)
 }
 
 pub(in crate::presentation::cli) fn wrap(args: WrapArgs) -> Result<()> {
@@ -51,57 +57,59 @@ pub(in crate::presentation::cli) fn wrap(args: WrapArgs) -> Result<()> {
     let selection = resolve_target(&tree, args.target.path.as_ref(), args.target.at)?;
     let rewritten = Edit::wrap(&input.text, &tree, selection, args.delimiter.into())?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    emit_document(&input, dialect, args.write, args.diff, rewritten)
+    Ok(emit_document(
+        &input, dialect, args.write, args.diff, rewritten,
+    )?)
 }
 
 pub(in crate::presentation::cli) fn splice(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::splice)
+    Ok(edit_target(args, Edit::splice)?)
 }
 
 pub(in crate::presentation::cli) fn split(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::split)
+    Ok(edit_target(args, Edit::split)?)
 }
 
 pub(in crate::presentation::cli) fn join(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::join)
+    Ok(edit_target(args, Edit::join)?)
 }
 
 pub(in crate::presentation::cli) fn splice_killing_backward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::splice_killing_backward)
+    Ok(edit_target(args, Edit::splice_killing_backward)?)
 }
 
 pub(in crate::presentation::cli) fn splice_killing_forward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::splice_killing_forward)
+    Ok(edit_target(args, Edit::splice_killing_forward)?)
 }
 
 pub(in crate::presentation::cli) fn convolute(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::convolute)
+    Ok(edit_target(args, Edit::convolute)?)
 }
 
 pub(in crate::presentation::cli) fn raise(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::raise)
+    Ok(edit_target(args, Edit::raise)?)
 }
 
 pub(in crate::presentation::cli) fn transpose_forward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::transpose_forward)
+    Ok(edit_target(args, Edit::transpose_forward)?)
 }
 
 pub(in crate::presentation::cli) fn transpose_backward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::transpose_backward)
+    Ok(edit_target(args, Edit::transpose_backward)?)
 }
 
 pub(in crate::presentation::cli) fn slurp_forward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::slurp_forward)
+    Ok(edit_target(args, Edit::slurp_forward)?)
 }
 
 pub(in crate::presentation::cli) fn slurp_backward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::slurp_backward)
+    Ok(edit_target(args, Edit::slurp_backward)?)
 }
 
 pub(in crate::presentation::cli) fn barf_forward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::barf_forward)
+    Ok(edit_target(args, Edit::barf_forward)?)
 }
 
 pub(in crate::presentation::cli) fn barf_backward(args: EditTargetArgs) -> Result<()> {
-    edit_target(args, Edit::barf_backward)
+    Ok(edit_target(args, Edit::barf_backward)?)
 }

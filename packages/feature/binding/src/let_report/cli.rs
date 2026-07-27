@@ -62,8 +62,13 @@ pub fn let_report(args: LetReportArgs) -> Result<()> {
                             .skip(worker)
                             .step_by(worker_count)
                             .map(|(index, file)| {
+                                // read_input_dialect_and_tree now returns
+                                // CliError while build_let_report returns
+                                // anyhow; anyhow::Error is the union until
+                                // this package's own section 9.2 pass.
                                 let report =
                                     read_input_dialect_and_tree(Some(file.clone()), explicit)
+                                        .map_err(anyhow::Error::from)
                                         .and_then(|(input, dialect, tree)| {
                                             Ok((
                                                 file.clone(),

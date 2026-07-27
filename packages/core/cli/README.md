@@ -53,7 +53,8 @@ one implementation.
 | `cap-std`, `libc`, `xattr` | Atomic writes that preserve permissions, extended attributes and macOS ACLs. |
 | `blake3` | Content hashing for expected-write preconditions. |
 | `serde_json` | JSON output shared across commands. |
-| `anyhow`, `thiserror` | Fallible I/O; `thiserror` is the target shape per §9.2. |
+| `thiserror` | Every I/O entry point returns `CliResult`. See "Errors" below. |
+| `anyhow` | Two boundary helpers only: `gate_failure`, whose marker the dispatch layer downcasts, and `terminal_safe_error_chain`, which renders an `anyhow` chain for the terminal. Both exist because `main` returns `anyhow::Result`. |
 
 ## Public API
 
@@ -87,3 +88,22 @@ flattening them would change every import in the tree for no gain.
 | enumerating what features support | that is composition root |
 
 Adding a dependency to `Cargo.toml` means adding a row to the table above.
+
+## Errors
+
+`CliError` splits the failures by what a caller can do, which the messages
+alone could not express:
+
+| Type | Means |
+| --- | --- |
+| `CliError::Io` | An `std::io::Error` with the operation and path that produced it. A `String` context rather than a variant per call site — there are 34 of them and one variant each would name the call site, not the failure. |
+| `IoRefusal` | The CLI *decided* not to proceed: input over the size limit, a symlink or non-regular write target, overlapping rewrite spans, output that does not reparse, and the six time-of-check-to-time-of-use guards on the write path. |
+| `WriteTargetError` | The path is structurally unusable as a target — no permission or retry changes that. |
+| `ArgumentError` | A usage problem, raised before any I/O happens. |
+| `CleanupFailure` | A write failed and then undoing it failed too. |
+| `CliError::BackupCleanupAfterCommit` | The writes **landed**; only tidying up after them did not. The one failure a caller must not read as "the operation did not happen". |
+
+`CliError::chain()` renders the message chain the way `anyhow`'s `{:#}` does —
+`thiserror` prints only the outermost message. Users still see the `anyhow`
+rendering because `main` converts at the boundary; `chain()` exists so a caller
+inside the workspace can assert on the whole chain without that conversion.

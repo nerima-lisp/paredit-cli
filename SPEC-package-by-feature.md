@@ -1592,6 +1592,90 @@ core/syntax ✅ → core/semantics (11) → core/lint-engine ✅ → core/edit (
 `core/semantics` と `core/edit` は `core/lint-engine` と独立なので順不同。
 `feature/*` は全て `core/cli` の後。
 
+---
+
+### 9.2.3 【実施後の追記】core 6 パッケージ完了時点の実測
+
+#### `{:#}` は anyhow の機能であり、型付きエラーには無い
+
+**16 個のテストが `format!("{error:#}")` で落ちた。** `anyhow` の `{:#}` は
+`source()` を辿って `": "` で連結するが、`thiserror` の `Display` は
+**最外殻のメッセージしか出さない**。
+
+CLI 出力は変わらない（`main` が `anyhow::Error` に変換するため）が、
+**ワークスペース内のテストは変換を経ずに直接アサートしている**ので落ちる。
+対策は `chain()` を型に生やし、テストをそれに向けること:
+
+```rust
+pub fn chain(&self) -> String {
+    let mut rendered = self.to_string();
+    let mut source = std::error::Error::source(self);
+    while let Some(error) = source {
+        rendered.push_str(": ");
+        rendered.push_str(&error.to_string());
+        source = error.source();
+    }
+    rendered
+}
+```
+
+**変換前に `grep -rn 'format!("{[a-z_]*:#}")'` を実行して件数を数えること。**
+これは §9.2.1 の「罠」リストに無かった最大の落とし穴である。
+
+#### `.context()` を残すべき箇所と、変えるべき箇所の判定基準
+
+`core/cli` の 54 箇所は 2 つに割れた:
+
+| 種類 | 件数 | 変換先 |
+| --- | ---: | --- |
+| `io::Error` に**パスと操作名**を足すだけ | 34 | `CliError::Io { context: String, #[source] source }` |
+| CLI が**判断して拒否**している | 20 | `IoRefusal` / `WriteTargetError` / `ArgumentError` の各バリアント |
+
+判定基準は「**そのメッセージは呼び出し側が分岐に使えるか**」。
+`failed to open or inspect {path}` は使えない（`io::Error` の種類で分岐する）。
+`refusing target changed since parsing {path}` は使える（再読み込みして再試行）。
+
+#### 型付けが明らかにした設計上の疑問: cleanup が primary error を隠している
+
+`write_files_with_rollback` は書き込み失敗のあと後始末に失敗すると
+`error.context("rollback/cleanup also failed: ...")` としていた。
+`anyhow` では **context が最外殻**になるので、ユーザーに最初に見えるのは
+「後始末に失敗した」であり、**本当の原因である書き込み失敗は原因欄に埋もれる**。
+
+型にすると `CleanupFailure { summary, cause: Box<CliError> }` となり、
+この入れ子が明示される。**出力は変えていない**（変えれば挙動変更）が、
+2 つの失敗が別々に到達可能になった。
+
+同じ理由で `BackupCleanupAfterCommit` を独立バリアントにした。これは
+**「書き込みは成功した」失敗**であり、呼び出し側が「操作は起きなかった」と
+読んではいけない唯一のケースである。型が無ければこの区別は
+メッセージの読解に委ねられていた。
+
+#### core 完了時点の波及実測
+
+| パッケージ | 失敗箇所 | 波及した呼び出し側 |
+| --- | ---: | ---: |
+| `core/workspace` | 52 | 0 |
+| `core/syntax` | 58 | 7 |
+| `core/lint-engine` | 5 + トレイト | 2 |
+| `core/semantics` | 11 | 0 |
+| `core/edit` | 107 | 8 |
+| `core/cli` | 54 | 20（うち 18 は 1 ファイル） |
+
+**合計 287 箇所の変換に対して波及は 37 箇所。** §9.2.1 の
+「呼び出し側は `?` で素通し」は正しかった。波及したものは全て
+`?` を使っていない箇所（末尾式・関数ポインタ型・`#[from] anyhow::Error`）である。
+
+#### `core/cli` は `anyhow` を落とせない（そして落とすべきでない）
+
+2 箇所だけ残る:
+
+- `gate_failure` — 型消去されたマーカーを作り、dispatch 層が `downcast` する
+- `terminal_safe_error_chain` — `anyhow` のチェーンを端末向けに描画する
+
+どちらも `main` が `anyhow::Result` を返すことに由来する**境界のヘルパ**であり、
+§9.2 が追放しようとしている「domain / application の型消去」ではない。
+
 ### 9.5 順序が結果を決める
 
 **機械的な修正を分割の前にやるか後にやるかで、総コストが大きく変わる。**

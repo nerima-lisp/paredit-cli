@@ -15,6 +15,10 @@ paredit-core-semantics = { path = "../semantics" }
 paredit-core-edit = { path = "../edit" }
 paredit-core-workspace = { path = "../workspace" }
 paredit-core-lint-engine = { path = "../lint-engine" }
+# anyhow stays, for two things only: gate_failure builds a type-erased marker
+# that the dispatch layer downcasts, and terminal_safe_error_chain renders an
+# anyhow chain for the terminal. Both are boundary helpers for a `main` that
+# returns anyhow::Result. Everything else here is CliError - see src/error.rs.
 anyhow.workspace = true
 blake3.workspace = true
 cap-std.workspace = true
