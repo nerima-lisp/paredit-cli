@@ -1435,6 +1435,69 @@ src/domain/refactor_execute.rs
   既に存在するので、比較もその型のメソッドに寄せる
 - 残りの `as` は `TryFrom` + 明示的なエラー処理に置き換える
 
+### 9.2.1 【実装時の追記】パッケージ境界ができた後の §9.2 実施計画
+
+Phase 6 完了時点での実測。**§9.2 はパッケージ単位で独立に実施できる状態になった。**
+
+#### 呼び出し側は `?` で素通しするだけなので、戻り値型だけ変えればよい
+
+最重要の実測結果: `discover_workspace_files` の呼び出し側は**どこも失敗の種類で
+分岐していない**。そして `anyhow::Result<T>` の `?` は
+`E: std::error::Error + Send + Sync + 'static` を吸収するため、
+**関数の戻り値を具体的なエラー型に変えても呼び出し側は 1 行も変わらない。**
+
+これが「1 パッケージ = 1 PR」を可能にする。24 パッケージを一斉に変換する必要はない。
+
+#### パッケージ別の作業量（本番コードで `anyhow` を使うファイル数）
+
+| パッケージ | 該当ファイル | 備考 |
+| --- | ---: | --- |
+| `core/workspace` | 2 / 7 | 最小。ただし失敗 19 箇所 |
+| `core/cli` | 3 / 7 | I/O 規約そのものなので context が多い |
+| `core/lint-engine` | 3 / 22 | |
+| `core/syntax` | 5 / 63 | |
+| `core/edit` | 8 / 14 | `ReaderConditionalSafetyError` が既にある |
+| `feature/*` | 7〜35 / 各 | |
+
+#### バリアントの切り方 — `core/workspace` の実測例
+
+19 の失敗箇所は、**呼び出し側が別々に扱いたい 2 種類**に割れる:
+
+| 種類 | 箇所 | 呼び出し側にとっての意味 |
+| --- | ---: | --- |
+| 上限超過 | 8 | 入力が大きすぎる。`--include` を絞れ |
+| 安全性拒否 | 11 | ファイルが走査中に置き換わった / 正規パス外 / 非通常ファイル |
+
+この 2 つは**別の exit code に値する**。§9.2 が「exit code の分岐が本来なら型で
+決まるはずのものを文字列から再導出している」と述べているのは、まさにこの区別が
+今は文字列にしか存在しないという意味である。
+
+```rust
+#[derive(Debug, Error)]
+pub enum WorkspaceDiscoveryError {
+    #[error("{0}")]
+    LimitExceeded(#[from] WorkspaceLimitExceeded),
+    #[error("{0}")]
+    Refused(#[from] WorkspaceRefusal),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+```
+
+`WorkspaceLimitExceeded` / `WorkspaceRefusal` の各バリアントが
+**現在のメッセージ文字列をそのまま `#[error("...")]` に持つ**。
+これで CLI 出力はバイト一致のまま、種類が `match` 可能になる。
+
+#### やってはいけないこと（実測で確認した罠）
+
+- **`.context(...)` を機械的にバリアント化しない。** `core/cli` の I/O 経路は
+  context でパスや操作名を足しており、これを 1 バリアント 1 context に展開すると
+  バリアントが爆発する。I/O は `#[error(transparent)] Io(#[from] std::io::Error)`
+  に集約し、context は呼び出し側の `anyhow` 層で足す。
+- **メッセージを「整理」しない。** `tests/cli/**` の文字列アサーションと
+  `inspect capabilities` のゴールデンが全て落ちる。§9.2 の目的は
+  メッセージの改善ではなく**型による区別**である。
+
 ### 9.5 順序が結果を決める
 
 **機械的な修正を分割の前にやるか後にやるかで、総コストが大きく変わる。**
