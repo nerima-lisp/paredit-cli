@@ -20,6 +20,8 @@ pub use paredit_core_lint_engine::{engine, model, policy, rule};
 
 #[cfg(test)]
 mod engine_dispatch_tests;
+#[cfg(test)]
+mod rule_registry_tests;
 pub mod registry;
 pub mod rules;
 
