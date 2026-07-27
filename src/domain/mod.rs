@@ -30,15 +30,10 @@ pub use paredit_feature_similarity::form_similarity;
 pub use paredit_feature_similarity::similarity_report::domain as similarity_report;
 
 // Phase 2 facade (section 4.1), visibility mirroring the original `mod` lines.
-pub(crate) use paredit_core_edit::{
-    convert_control, extract_shared, flet_composition, let_binding, let_composition,
-    let_star_composition, local_function_binding, mutation_safety, progn,
-};
+pub(crate) use paredit_core_edit::{convert_control, extract_shared, mutation_safety};
 pub use paredit_core_edit::{refactor_execute, refactor_plan, refactor_preview};
 pub use paredit_core_semantics::lexical_scope;
-pub(crate) use paredit_core_semantics::{
-    binding_index, callable_scope, definition_reference, semantics,
-};
+pub(crate) use paredit_core_semantics::{callable_scope, definition_reference, semantics};
 
 pub mod accessor_arity_report;
 pub mod append_list_to_cons_report;
@@ -62,7 +57,6 @@ pub(crate) mod conditional_sugar;
 pub mod cons_to_list_report;
 pub mod constant_if_test_report;
 pub mod constant_when_test_report;
-pub(crate) mod convert_sequential_binding;
 pub mod de_morgan_report;
 pub mod dead_boolean_operand_report;
 pub mod definition_report;
@@ -110,10 +104,8 @@ pub mod if_to_or_report;
 pub mod if_to_unless_report;
 pub mod impact_report;
 pub(crate) mod inline_literal_constant;
-pub(crate) mod introduce_let;
 pub mod lambda_list_keyword_order_report;
 pub mod last_default_count_report;
-pub mod let_report;
 pub(crate) mod lint;
 pub mod lint_report;
 pub mod lint_suppression;
@@ -223,3 +215,8 @@ pub mod values_list_of_list_report;
 pub mod verbose_negation_report;
 pub mod workspace_report;
 pub mod zero_divisor_report;
+
+// Facade re-exports for extracted feature packages (section 4.1).
+pub use paredit_feature_binding::convert_sequential_binding::domain as convert_sequential_binding;
+pub use paredit_feature_binding::introduce_let::domain as introduce_let;
+pub use paredit_feature_binding::let_report::domain as let_report;

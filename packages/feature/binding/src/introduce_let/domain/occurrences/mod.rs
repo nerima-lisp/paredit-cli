@@ -3,10 +3,8 @@ mod let_star;
 mod local_callable;
 mod variable;
 
-use crate::domain::{
-    dialect::{IntroduceLetOperation, VerifiedSemanticPolicy},
-    sexpr::{ByteOffset, ByteSpan, ChildIndex, ExpressionView},
-};
+use paredit_core_syntax::dialect::{IntroduceLetOperation, VerifiedSemanticPolicy};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, ChildIndex, ExpressionView};
 
 use super::syntax::{
     child_shadowed_by_binding, iteration_bindings_child_index, let_star_bindings_child_index,
@@ -31,12 +29,12 @@ use variable::{
 };
 
 #[derive(Debug, Default)]
-pub(super) struct EquivalentExpressionSpans {
-    pub(super) replacement_spans: Vec<ByteSpan>,
-    pub(super) skipped_shadowed_spans: Vec<ByteSpan>,
+pub struct EquivalentExpressionSpans {
+    pub replacement_spans: Vec<ByteSpan>,
+    pub skipped_shadowed_spans: Vec<ByteSpan>,
 }
 
-pub(super) fn collect_equivalent_expression_spans(
+pub fn collect_equivalent_expression_spans(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     target: &ExpressionView,
@@ -117,7 +115,7 @@ pub(super) fn collect_equivalent_expression_spans(
     }
 }
 
-pub(super) fn is_span_shadowed_by_binding(
+pub fn is_span_shadowed_by_binding(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     target_span: ByteSpan,
@@ -178,7 +176,7 @@ pub(super) fn is_span_shadowed_by_binding(
     })
 }
 
-pub(super) fn is_path_shadowed_by_binding(
+pub fn is_path_shadowed_by_binding(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     target_path: &[ChildIndex],
@@ -245,7 +243,7 @@ pub(super) fn is_path_shadowed_by_binding(
     }
 }
 
-pub(super) fn rebase_spans(mut spans: Vec<ByteSpan>, base: ByteOffset) -> Vec<ByteSpan> {
+pub fn rebase_spans(mut spans: Vec<ByteSpan>, base: ByteOffset) -> Vec<ByteSpan> {
     spans.sort_by_key(|span| span.start());
     spans.dedup();
     spans

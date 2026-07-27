@@ -2,9 +2,9 @@
 
 use anyhow::Result;
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::local_function_binding as domain;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_edit::local_function_binding as domain;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConvertFletToLabelsPlan, ConvertFletToLabelsRequest};
 
@@ -20,7 +20,7 @@ pub fn plan_convert_flet_to_labels(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
 
     #[test]
     fn accepts_common_lisp_reader_literal() {

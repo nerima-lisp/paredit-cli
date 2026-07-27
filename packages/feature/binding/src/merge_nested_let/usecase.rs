@@ -1,10 +1,10 @@
 //! Application facade for merging directly nested parallel `let` forms.
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::dialect::Dialect;
-use crate::domain::let_composition::{self, MergeNestedLetRequest as DomainRequest};
-use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
 use anyhow::Result;
+use paredit_core_edit::let_composition::{self, MergeNestedLetRequest as DomainRequest};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct MergeNestedLetRequest<'a> {

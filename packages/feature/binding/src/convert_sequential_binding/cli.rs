@@ -1,14 +1,24 @@
-use super::*;
-use crate::application::usecase::convert_sequential_binding::{
+use crate::convert_sequential_binding::usecase::{
     ConvertSequentialBindingPlan, ConvertSequentialBindingRequest, plan_convert_do_star_to_do,
     plan_convert_prog_star_to_prog,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use serde_json::json;
+use std::path::PathBuf;
 
 macro_rules! conversion_args {
     ($name:ident) => {
         #[derive(Debug, Args)]
-        pub(super) struct $name {
+        pub struct $name {
             #[arg(short, long)]
             file: Option<PathBuf>,
             #[arg(long)]
@@ -26,7 +36,7 @@ macro_rules! conversion_args {
 conversion_args!(ConvertDoStarToDoArgs);
 conversion_args!(ConvertProgStarToProgArgs);
 
-pub(super) fn convert_do_star_to_do(args: ConvertDoStarToDoArgs) -> Result<()> {
+pub fn convert_do_star_to_do(args: ConvertDoStarToDoArgs) -> Result<()> {
     run_conversion(
         args.file,
         args.dialect,
@@ -37,7 +47,7 @@ pub(super) fn convert_do_star_to_do(args: ConvertDoStarToDoArgs) -> Result<()> {
     )
 }
 
-pub(super) fn convert_prog_star_to_prog(args: ConvertProgStarToProgArgs) -> Result<()> {
+pub fn convert_prog_star_to_prog(args: ConvertProgStarToProgArgs) -> Result<()> {
     run_conversion(
         args.file,
         args.dialect,

@@ -1,14 +1,14 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionView, SymbolName};
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionView, SymbolName};
 
 use super::super::syntax::{atom_text, list_head, view_at_span};
 use super::bindings::LetBindingCandidate;
 
-pub(super) fn let_binding_reference_spans(
+pub fn let_binding_reference_spans(
     dialect: Dialect,
     input: &str,
     view: &ExpressionView,
@@ -49,7 +49,7 @@ pub(super) fn let_binding_reference_spans(
     Ok(reference_spans)
 }
 
-pub(super) fn fallback_reference_count(view: &ExpressionView, symbol: &str) -> usize {
+pub fn fallback_reference_count(view: &ExpressionView, symbol: &str) -> usize {
     usize::from(atom_text(view).is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol)))
         + view
             .children

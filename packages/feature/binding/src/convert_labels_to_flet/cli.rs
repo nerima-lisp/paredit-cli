@@ -1,11 +1,20 @@
-use super::*;
-use crate::application::usecase::convert_labels_to_flet::{
+use crate::convert_labels_to_flet::usecase::{
     ConvertLabelsToFletPlan, ConvertLabelsToFletRequest, plan_convert_labels_to_flet,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct ConvertLabelsToFletArgs {
+pub struct ConvertLabelsToFletArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -18,7 +27,7 @@ pub(super) struct ConvertLabelsToFletArgs {
     output: OutputFormat,
 }
 
-pub(super) fn convert_labels_to_flet(args: ConvertLabelsToFletArgs) -> Result<()> {
+pub fn convert_labels_to_flet(args: ConvertLabelsToFletArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

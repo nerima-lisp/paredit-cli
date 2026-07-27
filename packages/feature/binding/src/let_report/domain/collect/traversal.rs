@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{ExpressionView, Path};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::apply_reader_prefix_context;
+use paredit_core_syntax::sexpr::{ExpressionView, Path};
 
 use super::super::LetFormReport;
 use super::report::analyze_let_form;
 
-pub(in crate::domain::let_report) fn collect_let_reports_from_view(
+pub fn collect_let_reports_from_view(
     dialect: Dialect,
     input: &str,
     view: &ExpressionView,

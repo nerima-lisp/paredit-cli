@@ -1,6 +1,6 @@
 use super::*;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
 
 mod basic;
 mod property;

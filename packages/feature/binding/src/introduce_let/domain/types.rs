@@ -1,5 +1,5 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path, SymbolName};
 
 #[derive(Debug)]
 pub struct IntroduceLetRequest<'a> {

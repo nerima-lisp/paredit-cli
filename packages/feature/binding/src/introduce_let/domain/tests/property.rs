@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::sexpr::SyntaxTree;
 use proptest::prelude::*;
 
 fn repeated_products(count: usize) -> String {

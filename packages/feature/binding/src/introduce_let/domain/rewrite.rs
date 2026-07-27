@@ -1,12 +1,7 @@
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SymbolName};
 
-pub(super) fn introduced_let(
-    dialect: Dialect,
-    name: &SymbolName,
-    value: &str,
-    body: &str,
-) -> String {
+pub fn introduced_let(dialect: Dialect, name: &SymbolName, value: &str, body: &str) -> String {
     match dialect {
         Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel => {
             format!("(let [{} {}] {})", name.as_str(), value, body)
@@ -22,7 +17,7 @@ pub(super) fn introduced_let(
     }
 }
 
-pub(super) fn replace_spans_within_span(
+pub fn replace_spans_within_span(
     input: &str,
     container_span: ByteSpan,
     spans: &[ByteSpan],
@@ -40,7 +35,7 @@ pub(super) fn replace_spans_within_span(
     output
 }
 
-pub(super) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+pub fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut output = String::with_capacity(input.len() - span.len() + replacement.len());
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);

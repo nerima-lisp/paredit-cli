@@ -1,15 +1,15 @@
-use crate::domain::common_lisp::{CommonLispValueScopeForm, common_lisp_symbol_reference_eq};
-use crate::domain::dialect::{
+use paredit_core_syntax::common_lisp::{CommonLispValueScopeForm, common_lisp_symbol_reference_eq};
+use paredit_core_syntax::dialect::{
     BinderShape, BodyShape, Dialect, IntroduceLetOperation, ParameterShape, RelativeNodePath,
     ScopeShape, VerifiedSemanticPolicy,
 };
-use crate::domain::sexpr::{Delimiter, ExpressionView};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionView};
 
 mod special;
 
 use special::special_declaration_shadows_child;
 
-pub(super) fn binding_form_binds_name(
+pub fn binding_form_binds_name(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     name: &str,
@@ -63,7 +63,7 @@ pub(super) fn binding_form_binds_name(
     }
 }
 
-pub(super) fn child_shadowed_by_binding(
+pub fn child_shadowed_by_binding(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     name: &str,
@@ -287,7 +287,7 @@ const fn body_contains_child(body: BodyShape, child_index: usize) -> bool {
     }
 }
 
-pub(super) fn local_callable_bindings_child_index(
+pub fn local_callable_bindings_child_index(
     dialect: Dialect,
     view: &ExpressionView,
 ) -> Option<usize> {
@@ -298,10 +298,7 @@ pub(super) fn local_callable_bindings_child_index(
     .then_some(1)
 }
 
-pub(super) fn let_star_bindings_child_index(
-    dialect: Dialect,
-    view: &ExpressionView,
-) -> Option<usize> {
+pub fn let_star_bindings_child_index(dialect: Dialect, view: &ExpressionView) -> Option<usize> {
     matches!(
         dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
         Some(CommonLispValueScopeForm::Let(form)) if form.is_sequential()
@@ -309,10 +306,7 @@ pub(super) fn let_star_bindings_child_index(
     .then_some(1)
 }
 
-pub(super) fn iteration_bindings_child_index(
-    dialect: Dialect,
-    view: &ExpressionView,
-) -> Option<usize> {
+pub fn iteration_bindings_child_index(dialect: Dialect, view: &ExpressionView) -> Option<usize> {
     matches!(
         dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
         Some(CommonLispValueScopeForm::Iteration)
@@ -320,10 +314,7 @@ pub(super) fn iteration_bindings_child_index(
     .then_some(1)
 }
 
-pub(super) fn variable_bindings_child_index(
-    dialect: Dialect,
-    view: &ExpressionView,
-) -> Option<usize> {
+pub fn variable_bindings_child_index(dialect: Dialect, view: &ExpressionView) -> Option<usize> {
     matches!(
         dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
         Some(CommonLispValueScopeForm::Variable(_))
@@ -331,29 +322,26 @@ pub(super) fn variable_bindings_child_index(
     .then_some(1)
 }
 
-pub(super) fn variable_binding_form_is_sequential(dialect: Dialect, view: &ExpressionView) -> bool {
+pub fn variable_binding_form_is_sequential(dialect: Dialect, view: &ExpressionView) -> bool {
     matches!(
         list_head(view).and_then(|head| dialect.common_lisp_value_scope_form_for_head(head)),
         Some(CommonLispValueScopeForm::Variable(form)) if form.is_sequential()
     )
 }
 
-pub(super) fn variable_binding_form_has_step_forms(
-    dialect: Dialect,
-    view: &ExpressionView,
-) -> bool {
+pub fn variable_binding_form_has_step_forms(dialect: Dialect, view: &ExpressionView) -> bool {
     list_head(view)
         .is_some_and(|head| dialect.common_lisp_variable_binding_has_step_forms_for_head(head))
 }
 
-pub(super) fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> bool {
+pub fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> bool {
     binding
         .children
         .first()
         .is_some_and(|pattern| pattern_contains_name(pattern, name))
 }
 
-pub(super) fn variable_spec_binds_name(binding: &ExpressionView, name: &str) -> bool {
+pub fn variable_spec_binds_name(binding: &ExpressionView, name: &str) -> bool {
     if atom_text(binding)
         .is_some_and(|binding_name| common_lisp_symbol_reference_eq(binding_name, name))
     {
@@ -366,7 +354,7 @@ pub(super) fn variable_spec_binds_name(binding: &ExpressionView, name: &str) -> 
         .is_some_and(|pattern| pattern_contains_name(pattern, name))
 }
 
-pub(super) fn iteration_binding_child_shadowed(
+pub fn iteration_binding_child_shadowed(
     binding_form: &ExpressionView,
     name: &str,
     child_index: usize,
@@ -374,7 +362,7 @@ pub(super) fn iteration_binding_child_shadowed(
     child_index >= 2 && iteration_binding_binds_name(binding_form, name)
 }
 
-pub(super) fn local_callable_binding_child_shadowed(
+pub fn local_callable_binding_child_shadowed(
     binding: &ExpressionView,
     name: &str,
     child_index: usize,

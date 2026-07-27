@@ -1,11 +1,18 @@
-use super::*;
-use crate::application::usecase::flatten_progn::{
-    FlattenPrognPlan, FlattenPrognRequest, plan_flatten_progn,
-};
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use crate::flatten_progn::usecase::{FlattenPrognPlan, FlattenPrognRequest, plan_flatten_progn};
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct FlattenPrognArgs {
+pub struct FlattenPrognArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -18,7 +25,7 @@ pub(super) struct FlattenPrognArgs {
     output: OutputFormat,
 }
 
-pub(super) fn flatten_progn(args: FlattenPrognArgs) -> Result<()> {
+pub fn flatten_progn(args: FlattenPrognArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

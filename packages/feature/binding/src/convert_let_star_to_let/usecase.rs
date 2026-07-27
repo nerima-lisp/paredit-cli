@@ -1,9 +1,9 @@
 //! Application facade for converting independent `let*` into `let`.
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::let_binding as domain;
-use crate::domain::sexpr::SyntaxTree;
 use anyhow::Result;
+use paredit_core_edit::let_binding as domain;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConvertLetStarToLetPlan, ConvertLetStarToLetRequest};
 
@@ -19,7 +19,7 @@ pub fn plan_convert_let_star_to_let(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
 
     #[test]
     fn accepts_common_lisp_reader_literal() {

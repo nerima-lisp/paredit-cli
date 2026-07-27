@@ -1,1 +1,1 @@
-pub use crate::domain::introduce_let::{IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let};
+pub use crate::introduce_let::domain::{IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let};

@@ -1,12 +1,21 @@
-use super::*;
-use crate::application::usecase::let_report::{
+use crate::let_report::usecase::{
     LetFormReport, LetReportPolicy, LetReportPolicyOptions, build_let_report,
     evaluate_let_report_policy,
 };
+use anyhow::Result;
 use anyhow::anyhow;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_syntax::dialect::Dialect;
+use serde_json::Value;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct LetReportArgs {
+pub struct LetReportArgs {
     /// Files to scan. Omit to read a single snippet from stdin; pass two or
     /// more to get a per-file breakdown with an aggregated policy.
     files: Vec<PathBuf>,
@@ -22,13 +31,13 @@ pub(super) struct LetReportArgs {
     output: OutputFormat,
 }
 
-pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
+pub fn let_report(args: LetReportArgs) -> Result<()> {
     let options = LetReportPolicyOptions::new(
         args.fail_on_duplicate_evaluation,
         args.fail_on_unused_binding,
         args.require_inlineable_bindings,
     )
-    .map_err(crate::presentation::cli::gate::gate_failure)?;
+    .map_err(paredit_core_cli::gate::gate_failure)?;
 
     if args.files.len() > 1 {
         type FileLetReport = (PathBuf, Dialect, Vec<LetFormReport>);
@@ -88,7 +97,7 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
         let policy = evaluate_let_report_policy(&all_reports, &options);
         print_multi_file_let_report(&per_file, &policy, args.output)?;
         if !policy.passed {
-            return Err(crate::presentation::cli::gate::gate_failure(format!(
+            return Err(paredit_core_cli::gate::gate_failure(format!(
                 "let-report policy failed: {}",
                 policy.violations.join("; ")
             )));
@@ -102,7 +111,7 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
     let policy = evaluate_let_report_policy(&reports, &options);
     print_let_report(dialect, &reports, &policy, args.output)?;
     if !policy.passed {
-        return Err(crate::presentation::cli::gate::gate_failure(format!(
+        return Err(paredit_core_cli::gate::gate_failure(format!(
             "let-report policy failed: {}",
             policy.violations.join("; ")
         )));

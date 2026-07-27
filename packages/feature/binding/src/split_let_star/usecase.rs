@@ -1,11 +1,11 @@
 //! Application facade for splitting sequential `let*` bindings.
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::binding_index::BindingIndex;
-use crate::domain::dialect::Dialect;
-use crate::domain::let_star_composition::{self, Request as DomainRequest};
-use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
 use anyhow::Result;
+use paredit_core_edit::let_star_composition::{self, Request as DomainRequest};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_semantics::binding_index::BindingIndex;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct SplitLetStarRequest<'a> {

@@ -1,11 +1,20 @@
-use super::*;
-use crate::application::usecase::merge_nested_let::{
+use crate::merge_nested_let::usecase::{
     MergeNestedLetPlan, MergeNestedLetRequest, plan_merge_nested_let,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct MergeNestedLetArgs {
+pub struct MergeNestedLetArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -18,7 +27,7 @@ pub(super) struct MergeNestedLetArgs {
     output: OutputFormat,
 }
 
-pub(super) fn merge_nested_let(args: MergeNestedLetArgs) -> Result<()> {
+pub fn merge_nested_let(args: MergeNestedLetArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

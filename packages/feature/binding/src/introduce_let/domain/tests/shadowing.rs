@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn skips_all_occurrences_inside_shadowing_binding_forms() {

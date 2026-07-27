@@ -1,23 +1,21 @@
-use crate::domain::{
-    dialect::{IntroduceLetOperation, VerifiedSemanticPolicy},
-    sexpr::{ByteSpan, ChildIndex, ExpressionView},
-};
+use paredit_core_syntax::dialect::{IntroduceLetOperation, VerifiedSemanticPolicy};
+use paredit_core_syntax::sexpr::{ByteSpan, ChildIndex, ExpressionView};
 
 use super::{
     EquivalentExpressionSpans, collect_equivalent_expression_spans, expressions_equivalent,
     is_path_shadowed_by_binding, is_span_shadowed_by_binding, record_equivalent_span,
 };
-use crate::domain::introduce_let::syntax::variable_spec_binds_name;
+use crate::introduce_let::domain::syntax::variable_spec_binds_name;
 
-pub(super) struct VariableBindingContext<'a> {
-    pub(super) semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
-    pub(super) target: &'a ExpressionView,
-    pub(super) binding_name: &'a str,
-    pub(super) has_step_forms: bool,
-    pub(super) output: &'a mut EquivalentExpressionSpans,
+pub struct VariableBindingContext<'a> {
+    pub semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    pub target: &'a ExpressionView,
+    pub binding_name: &'a str,
+    pub has_step_forms: bool,
+    pub output: &'a mut EquivalentExpressionSpans,
 }
 
-pub(super) fn collect_variable_binding_spans(
+pub fn collect_variable_binding_spans(
     ctx: &mut VariableBindingContext<'_>,
     binding_form: &ExpressionView,
     shadowed_by_binding: bool,
@@ -81,7 +79,7 @@ fn collect_variable_binding_spec_spans(
     }
 }
 
-pub(super) fn is_span_shadowed_by_variable_bindings(
+pub fn is_span_shadowed_by_variable_bindings(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_span: ByteSpan,
@@ -145,7 +143,7 @@ fn is_span_shadowed_by_variable_binding_spec(
     })
 }
 
-pub(super) fn is_path_shadowed_by_variable_bindings(
+pub fn is_path_shadowed_by_variable_bindings(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_path: &[ChildIndex],

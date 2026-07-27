@@ -1,11 +1,20 @@
-use super::*;
-use crate::application::usecase::introduce_let::{
-    IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let,
-};
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use crate::introduce_let::usecase::{IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let};
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct IntroduceLetArgs {
+pub struct IntroduceLetArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -24,7 +33,7 @@ pub(super) struct IntroduceLetArgs {
     output: OutputFormat,
 }
 
-pub(super) fn introduce_let(args: IntroduceLetArgs) -> Result<()> {
+pub fn introduce_let(args: IntroduceLetArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

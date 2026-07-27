@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn rejects_unknown_dialect_before_introduce_let_planning() {

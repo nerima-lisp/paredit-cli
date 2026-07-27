@@ -2,11 +2,11 @@
 
 use anyhow::{Result, bail};
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::progn as domain;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{Path, SyntaxTree};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_edit::progn as domain;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{Path, SyntaxTree};
 
 pub use domain::{FlattenPrognPlan, FlattenPrognRequest};
 
@@ -50,7 +50,7 @@ fn reject_unsafe_context(tree: &SyntaxTree, path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
 
     const DIALECTS: [Dialect; 7] = [
         Dialect::CommonLisp,

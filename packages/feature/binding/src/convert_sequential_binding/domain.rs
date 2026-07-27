@@ -2,11 +2,11 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::reader::atom_symbol_text;
-use crate::domain::sexpr::{
+use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::atom_symbol_text;
+use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -35,7 +35,7 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
-pub(crate) fn require_supported_dialect(dialect: Dialect, command: &str) -> Result<()> {
+pub fn require_supported_dialect(dialect: Dialect, command: &str) -> Result<()> {
     if dialect != Dialect::CommonLisp {
         bail!("{command} currently supports only Common Lisp");
     }

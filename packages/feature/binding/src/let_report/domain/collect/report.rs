@@ -1,16 +1,16 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::is_common_lisp_earmuffed_special_variable_name;
-use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::value_capture;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName};
+use paredit_core_semantics::lexical_scope::value_capture;
+use paredit_core_syntax::common_lisp::is_common_lisp_earmuffed_special_variable_name;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName};
 
 use super::super::syntax::{atom_text, view_at_span};
 use super::super::{LetBindingReport, LetFormReport};
 use super::bindings::let_binding_candidates;
 use super::references::{fallback_reference_count, let_binding_reference_spans};
 
-pub(super) fn analyze_let_form(
+pub fn analyze_let_form(
     dialect: Dialect,
     input: &str,
     view: &ExpressionView,

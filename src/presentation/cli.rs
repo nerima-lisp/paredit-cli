@@ -53,14 +53,9 @@ use paredit_feature_inline::inline_symbol_macro::cli as inline_symbol_macro;
 use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
 use paredit_feature_similarity::similarity_report::cli as similarity_report;
 mod convert_cond_to_if;
-mod convert_flet_to_labels;
 mod convert_if_to_cond;
 mod convert_if_to_unless;
 mod convert_if_to_when;
-mod convert_labels_to_flet;
-mod convert_let_star_to_let;
-mod convert_let_to_let_star;
-mod convert_sequential_binding;
 mod convert_unless_to_if;
 mod convert_when_to_if;
 mod de_morgan_report;
@@ -84,7 +79,6 @@ mod duplicate_method_report;
 mod duplicate_parameter_report;
 mod duplicate_setf_place_report;
 mod duplicate_slot_report;
-mod eliminate_empty_binding_form;
 mod empty_body_report;
 mod empty_let_report;
 mod eq_char_comparison_report;
@@ -97,7 +91,6 @@ mod eval_when_situation_report;
 mod exhaustive_case_otherwise_report;
 mod explicit_nil_return_report;
 mod explicit_step_delta_report;
-mod flatten_progn;
 mod form_report;
 mod format_missing_destination_report;
 mod format_newline_report;
@@ -115,10 +108,8 @@ mod if_to_or_report;
 mod if_to_unless_report;
 mod impact_report;
 mod inline_literal_constant;
-mod introduce_let;
 mod lambda_list_keyword_order_report;
 mod last_default_count_report;
-mod let_report;
 mod lint_report;
 mod list_star_nil_report;
 mod list_star_to_cons_report;
@@ -133,9 +124,6 @@ mod malformed_let_binding_report;
 mod manual_incf_report;
 mod manual_push_report;
 mod manual_pushnew_report;
-mod merge_nested_flet;
-mod merge_nested_let;
-mod merge_nested_let_star;
 mod modify_macro_arity_report;
 mod multiple_value_list_of_values_report;
 mod naming_report;
@@ -202,8 +190,6 @@ mod single_operand_arithmetic_report;
 mod single_operand_boolean_report;
 mod single_operand_list_op_report;
 mod single_value_bind_report;
-mod split_let;
-mod split_let_star;
 mod step_zero_report;
 mod string_case_fold_report;
 mod struct_cycle_report;
@@ -303,6 +289,22 @@ pub fn run() -> ExitCode {
         }
     }
 }
+
+// Facade re-exports for extracted feature packages (section 4.1).
+use paredit_feature_binding::convert_flet_to_labels::cli as convert_flet_to_labels;
+use paredit_feature_binding::convert_labels_to_flet::cli as convert_labels_to_flet;
+use paredit_feature_binding::convert_let_star_to_let::cli as convert_let_star_to_let;
+use paredit_feature_binding::convert_let_to_let_star::cli as convert_let_to_let_star;
+use paredit_feature_binding::convert_sequential_binding::cli as convert_sequential_binding;
+use paredit_feature_binding::eliminate_empty_binding_form::cli as eliminate_empty_binding_form;
+use paredit_feature_binding::flatten_progn::cli as flatten_progn;
+use paredit_feature_binding::introduce_let::cli as introduce_let;
+use paredit_feature_binding::let_report::cli as let_report;
+use paredit_feature_binding::merge_nested_flet::cli as merge_nested_flet;
+use paredit_feature_binding::merge_nested_let::cli as merge_nested_let;
+use paredit_feature_binding::merge_nested_let_star::cli as merge_nested_let_star;
+use paredit_feature_binding::split_let::cli as split_let;
+use paredit_feature_binding::split_let_star::cli as split_let_star;
 
 #[cfg(test)]
 mod tests {

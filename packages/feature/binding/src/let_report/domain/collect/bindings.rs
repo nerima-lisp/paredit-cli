@@ -1,18 +1,18 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::syntax::atom_text;
 
 #[derive(Debug, Clone)]
-pub(super) struct LetBindingCandidate {
-    pub(super) index: usize,
-    pub(super) name: String,
-    pub(super) value_span: ByteSpan,
+pub struct LetBindingCandidate {
+    pub index: usize,
+    pub name: String,
+    pub value_span: ByteSpan,
 }
 
-pub(super) fn let_binding_candidates(
+pub fn let_binding_candidates(
     dialect: Dialect,
     binding_form: &ExpressionView,
 ) -> Result<(&'static str, Vec<LetBindingCandidate>)> {

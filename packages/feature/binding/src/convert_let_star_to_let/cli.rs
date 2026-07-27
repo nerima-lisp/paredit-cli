@@ -1,11 +1,21 @@
-use super::*;
-use crate::application::usecase::convert_let_star_to_let::{
+use crate::convert_let_star_to_let::usecase::{
     ConvertLetStarToLetPlan, ConvertLetStarToLetRequest, plan_convert_let_star_to_let,
 };
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use paredit_core_syntax::sexpr::SymbolName;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct ConvertLetStarToLetArgs {
+pub struct ConvertLetStarToLetArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -18,7 +28,7 @@ pub(super) struct ConvertLetStarToLetArgs {
     output: OutputFormat,
 }
 
-pub(super) fn convert_let_star_to_let(args: ConvertLetStarToLetArgs) -> Result<()> {
+pub fn convert_let_star_to_let(args: ConvertLetStarToLetArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

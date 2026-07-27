@@ -34,6 +34,7 @@ paredit-feature-inline = { path = "packages/feature/inline" }
 paredit-feature-form-transform = { path = "packages/feature/form-transform" }
 paredit-core-workspace = { path = "packages/core/workspace" }
 
+paredit-feature-binding = { path = "packages/feature/binding" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"

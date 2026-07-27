@@ -1,9 +1,18 @@
-use super::*;
-use crate::application::usecase::split_let::{SplitLetPlan, SplitLetRequest, plan_split_let};
-use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use crate::split_let::usecase::{SplitLetPlan, SplitLetRequest, plan_split_let};
+use anyhow::Result;
+use clap::Args;
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::safe_text;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
-pub(super) struct SplitLetArgs {
+pub struct SplitLetArgs {
     #[arg(short, long)]
     file: Option<PathBuf>,
     #[arg(long)]
@@ -18,7 +27,7 @@ pub(super) struct SplitLetArgs {
     output: OutputFormat,
 }
 
-pub(super) fn split_let(args: SplitLetArgs) -> Result<()> {
+pub fn split_let(args: SplitLetArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

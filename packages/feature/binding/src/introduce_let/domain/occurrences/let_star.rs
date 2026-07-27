@@ -1,15 +1,13 @@
-use crate::domain::{
-    dialect::{IntroduceLetOperation, VerifiedSemanticPolicy},
-    sexpr::{ByteSpan, ChildIndex, ExpressionView},
-};
+use paredit_core_syntax::dialect::{IntroduceLetOperation, VerifiedSemanticPolicy};
+use paredit_core_syntax::sexpr::{ByteSpan, ChildIndex, ExpressionView};
 
 use super::{
     EquivalentExpressionSpans, collect_equivalent_expression_spans, expressions_equivalent,
     is_path_shadowed_by_binding, is_span_shadowed_by_binding, record_equivalent_span,
 };
-use crate::domain::introduce_let::syntax::binding_pair_binds_name;
+use crate::introduce_let::domain::syntax::binding_pair_binds_name;
 
-pub(super) fn collect_let_star_binding_spans(
+pub fn collect_let_star_binding_spans(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target: &ExpressionView,
@@ -63,7 +61,7 @@ fn collect_let_star_binding_spec_spans(
     }
 }
 
-pub(super) fn is_span_shadowed_by_let_star_bindings(
+pub fn is_span_shadowed_by_let_star_bindings(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_span: ByteSpan,
@@ -93,7 +91,7 @@ pub(super) fn is_span_shadowed_by_let_star_bindings(
     false
 }
 
-pub(super) fn is_path_shadowed_by_let_star_bindings(
+pub fn is_path_shadowed_by_let_star_bindings(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_path: &[ChildIndex],

@@ -1,13 +1,13 @@
-use crate::domain::common_lisp::{
+use paredit_core_syntax::common_lisp::{
     CommonLispDeclarationScope, CommonLispValueScopeForm, common_lisp_operator_head_eq,
     common_lisp_special_declaration_body_start,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::ExpressionView;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::ExpressionView;
 
 use super::list_head;
 
-pub(super) fn special_declaration_shadows_child(
+pub fn special_declaration_shadows_child(
     dialect: Dialect,
     view: &ExpressionView,
     form: Option<CommonLispValueScopeForm>,

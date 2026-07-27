@@ -105,6 +105,47 @@ AMBIENT = [
 ]
 
 
+
+def split_grouped_layer_imports(text: str, slices: list[str]) -> tuple[str, int]:
+    """Expand `use crate::<layer>::{a::.., b::..};` into one `use` per entry.
+
+    The single-line rewrites cannot see a module name that sits on a later
+    line, so a grouped import survives them intact and then fails to resolve.
+    Splitting first lets every other rule apply normally.
+    """
+    pattern = re.compile(
+        r"^use crate::(domain|application::usecase|presentation::cli)::\{\n(.*?)^\};\n",
+        re.M | re.S,
+    )
+    count = 0
+
+    def expand(match: re.Match[str]) -> str:
+        nonlocal count
+        layer, body = match.group(1), match.group(2)
+        entries, depth, current = [], 0, ""
+        for ch in body:
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+            if ch == "," and depth == 0:
+                entries.append(current.strip())
+                current = ""
+            else:
+                current += ch
+        if current.strip():
+            entries.append(current.strip())
+        out = []
+        for entry in entries:
+            if not entry:
+                continue
+            count += 1
+            out.append(f"use crate::{layer}::{entry};")
+        return "\n".join(out) + "\n"
+
+    return pattern.sub(expand, text), count
+
+
 def rewrite(name: str, slices: list[str]) -> int:
     src = ROOT / "packages" / "feature" / name / "src"
     if not src.is_dir():
@@ -115,6 +156,12 @@ def rewrite(name: str, slices: list[str]) -> int:
 
     for path in src.rglob("*.rs"):
         text = original = path.read_text()
+
+        # 0. Grouped multi-line imports first: every rule below matches a module
+        #    name on the same line as `crate::<layer>::`, which a grouped import
+        #    does not have.
+        text, n = split_grouped_layer_imports(text, slices)
+        counts["grouped_imports"] += n
 
         # 1. Cross-package paths FIRST. The layer-collapsing rules below would
         #    otherwise claim a module this package does not own.
@@ -158,6 +205,10 @@ def rewrite(name: str, slices: list[str]) -> int:
         counts["pub_crate"] += n
         text, n = re.subn(r"\bpub\(super\)", "pub", text)
         counts["pub_super"] += n
+        # A `pub use` cannot re-export an item that is `pub(in ...)`. Those
+        # paths also no longer name anything after the layer collapse.
+        text, n = re.subn(r"\bpub\(in crate::[a-z_0-9:]+\)", "pub", text)
+        counts["pub_in"] += n
 
         # 5. Doctests can only import the crate they compile into.
         text, n = re.subn(r"\bparedit_cli::", f"{crate}::", text)

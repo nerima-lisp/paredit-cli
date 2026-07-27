@@ -1,8 +1,8 @@
 use proptest::prelude::*;
 
 use super::*;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 fn reports_for(input: &str, dialect: Dialect) -> Vec<LetFormReport> {
     let tree = SyntaxTree::parse(input).expect("valid test input");

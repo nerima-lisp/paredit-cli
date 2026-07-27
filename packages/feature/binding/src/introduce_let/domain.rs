@@ -9,9 +9,9 @@ mod types;
 
 use anyhow::{Context, Result, bail};
 
-use super::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::dialect::{IntroduceLetOperation, VerifiedSemanticPolicy};
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::dialect::{IntroduceLetOperation, VerifiedSemanticPolicy};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use occurrences::{
     EquivalentExpressionSpans, collect_equivalent_expression_spans, is_path_shadowed_by_binding,
