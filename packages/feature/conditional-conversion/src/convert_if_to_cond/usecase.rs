@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 
-use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_edit::convert_control as domain;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConvertIfToCondPlan, ConvertIfToCondRequest};

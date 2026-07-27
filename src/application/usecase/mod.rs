@@ -35,14 +35,6 @@ pub use paredit_feature_form_transform::unthread_expression::usecase as unthread
 pub use paredit_feature_form_transform::unwrap_call::usecase as unwrap_call;
 
 // Facade re-exports for extracted feature packages (section 4.1).
-pub use paredit_feature_inline::inline_literal_constant::usecase as inline_literal_constant;
-pub use paredit_feature_conditional_conversion::conditional_sugar::usecase as conditional_sugar;
-pub use paredit_feature_conditional_conversion::convert_cond_to_if::usecase as convert_cond_to_if;
-pub use paredit_feature_conditional_conversion::convert_if_to_cond::usecase as convert_if_to_cond;
-pub use paredit_feature_conditional_conversion::convert_if_to_unless::usecase as convert_if_to_unless;
-pub use paredit_feature_conditional_conversion::convert_if_to_when::usecase as convert_if_to_when;
-pub use paredit_feature_conditional_conversion::convert_unless_to_if::usecase as convert_unless_to_if;
-pub use paredit_feature_conditional_conversion::convert_when_to_if::usecase as convert_when_to_if;
 pub use paredit_feature_binding::convert_flet_to_labels::usecase as convert_flet_to_labels;
 pub use paredit_feature_binding::convert_labels_to_flet::usecase as convert_labels_to_flet;
 pub use paredit_feature_binding::convert_let_star_to_let::usecase as convert_let_star_to_let;
@@ -57,7 +49,15 @@ pub use paredit_feature_binding::merge_nested_let::usecase as merge_nested_let;
 pub use paredit_feature_binding::merge_nested_let_star::usecase as merge_nested_let_star;
 pub use paredit_feature_binding::split_let::usecase as split_let;
 pub use paredit_feature_binding::split_let_star::usecase as split_let_star;
+pub use paredit_feature_conditional_conversion::conditional_sugar::usecase as conditional_sugar;
+pub use paredit_feature_conditional_conversion::convert_cond_to_if::usecase as convert_cond_to_if;
+pub use paredit_feature_conditional_conversion::convert_if_to_cond::usecase as convert_if_to_cond;
+pub use paredit_feature_conditional_conversion::convert_if_to_unless::usecase as convert_if_to_unless;
+pub use paredit_feature_conditional_conversion::convert_if_to_when::usecase as convert_if_to_when;
+pub use paredit_feature_conditional_conversion::convert_unless_to_if::usecase as convert_unless_to_if;
+pub use paredit_feature_conditional_conversion::convert_when_to_if::usecase as convert_when_to_if;
 pub use paredit_feature_function_parameter::function_parameter::usecase as function_parameter;
+pub use paredit_feature_inline::inline_literal_constant::usecase as inline_literal_constant;
 pub use paredit_feature_lint_conditional::case_nil_key::usecase as case_nil_key_report;
 pub use paredit_feature_lint_conditional::cond_t_clause::usecase as cond_t_clause_report;
 pub use paredit_feature_lint_conditional::constant_if_test::usecase as constant_if_test_report;

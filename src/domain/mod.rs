@@ -45,12 +45,12 @@ pub mod shadowed_binding_report;
 pub mod unused_parameter_report;
 
 // Facade re-exports for extracted feature packages (section 4.1).
-pub use paredit_feature_inline::inline_literal_constant::domain as inline_literal_constant;
-pub use paredit_feature_conditional_conversion::conditional_sugar::domain as conditional_sugar;
 pub use paredit_feature_binding::convert_sequential_binding::domain as convert_sequential_binding;
 pub use paredit_feature_binding::introduce_let::domain as introduce_let;
 pub use paredit_feature_binding::let_report::domain as let_report;
+pub use paredit_feature_conditional_conversion::conditional_sugar::domain as conditional_sugar;
 pub use paredit_feature_function_parameter::function_parameter::domain as function_parameter;
+pub use paredit_feature_inline::inline_literal_constant::domain as inline_literal_constant;
 pub use paredit_feature_lint_conditional::case_nil_key::domain as case_nil_key_report;
 pub use paredit_feature_lint_conditional::cond_t_clause::domain as cond_t_clause_report;
 pub use paredit_feature_lint_conditional::constant_if_test::domain as constant_if_test_report;

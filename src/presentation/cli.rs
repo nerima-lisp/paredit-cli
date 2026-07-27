@@ -49,10 +49,7 @@ use serde_json::json;
 
 use args::*;
 use command::Command;
-pub(crate) use shared::{
-    read_input_dialect_and_tree, terminal_safe,
-    terminal_safe_error_chain,
-};
+pub(crate) use shared::{read_input_dialect_and_tree, terminal_safe, terminal_safe_error_chain};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -84,13 +81,6 @@ pub fn run() -> ExitCode {
 }
 
 // Facade re-exports for extracted feature packages (section 4.1).
-use paredit_feature_inline::inline_literal_constant::cli as inline_literal_constant;
-use paredit_feature_conditional_conversion::convert_cond_to_if::cli as convert_cond_to_if;
-use paredit_feature_conditional_conversion::convert_if_to_cond::cli as convert_if_to_cond;
-use paredit_feature_conditional_conversion::convert_if_to_unless::cli as convert_if_to_unless;
-use paredit_feature_conditional_conversion::convert_if_to_when::cli as convert_if_to_when;
-use paredit_feature_conditional_conversion::convert_unless_to_if::cli as convert_unless_to_if;
-use paredit_feature_conditional_conversion::convert_when_to_if::cli as convert_when_to_if;
 use paredit_feature_binding::convert_flet_to_labels::cli as convert_flet_to_labels;
 use paredit_feature_binding::convert_labels_to_flet::cli as convert_labels_to_flet;
 use paredit_feature_binding::convert_let_star_to_let::cli as convert_let_star_to_let;
@@ -105,7 +95,14 @@ use paredit_feature_binding::merge_nested_let::cli as merge_nested_let;
 use paredit_feature_binding::merge_nested_let_star::cli as merge_nested_let_star;
 use paredit_feature_binding::split_let::cli as split_let;
 use paredit_feature_binding::split_let_star::cli as split_let_star;
+use paredit_feature_conditional_conversion::convert_cond_to_if::cli as convert_cond_to_if;
+use paredit_feature_conditional_conversion::convert_if_to_cond::cli as convert_if_to_cond;
+use paredit_feature_conditional_conversion::convert_if_to_unless::cli as convert_if_to_unless;
+use paredit_feature_conditional_conversion::convert_if_to_when::cli as convert_if_to_when;
+use paredit_feature_conditional_conversion::convert_unless_to_if::cli as convert_unless_to_if;
+use paredit_feature_conditional_conversion::convert_when_to_if::cli as convert_when_to_if;
 use paredit_feature_function_parameter::function_parameter::cli as function_parameter;
+use paredit_feature_inline::inline_literal_constant::cli as inline_literal_constant;
 use paredit_feature_lint_conditional::case_nil_key::cli as case_nil_key_report;
 use paredit_feature_lint_conditional::cond_t_clause::cli as cond_t_clause_report;
 use paredit_feature_lint_conditional::constant_if_test::cli as constant_if_test_report;

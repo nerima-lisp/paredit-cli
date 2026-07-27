@@ -1,17 +1,15 @@
-use paredit_core_syntax::sexpr::Path;
+use crate::conditional_sugar::usecase::{ConditionalConversionPlan, ConditionalConversionRequest};
 use anyhow::Result;
 use clap::Args;
-use serde_json::json;
-use std::path::PathBuf;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_cli::shared::require_output_file;
 use paredit_core_cli::shared::write_file_with_rollback;
-use crate::conditional_sugar::usecase::{
-    ConditionalConversionPlan, ConditionalConversionRequest,
-};
+use paredit_core_syntax::sexpr::Path;
+use serde_json::json;
+use std::path::PathBuf;
 
 #[derive(Debug, Args)]
 pub struct ConditionalConversionArgs {

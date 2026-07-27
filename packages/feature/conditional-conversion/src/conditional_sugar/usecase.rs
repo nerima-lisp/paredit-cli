@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 
+use crate::conditional_sugar::domain;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::conditional_sugar::domain as domain;
 use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConditionalConversionPlan, ConditionalConversionRequest};

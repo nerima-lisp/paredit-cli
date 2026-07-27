@@ -11,14 +11,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod accessor_arity_report;
 #[path = "cli/action_contract.rs"]
 mod action_contract;
-#[path = "cli/architecture_contract.rs"]
-mod architecture_contract;
 #[path = "cli/analysis_report.rs"]
 mod analysis_report;
 #[path = "cli/append_list_to_cons_report.rs"]
 mod append_list_to_cons_report;
 #[path = "cli/append_nil_report.rs"]
 mod append_nil_report;
+#[path = "cli/architecture_contract.rs"]
+mod architecture_contract;
 #[path = "cli/basic_edit_write.rs"]
 mod basic_edit_write;
 #[path = "cli/binds_constant_report.rs"]
