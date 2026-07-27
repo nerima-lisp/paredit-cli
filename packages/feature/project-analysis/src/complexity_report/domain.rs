@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use crate::form_report::domain::collect_structural_stats;
 use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
@@ -97,7 +97,7 @@ pub fn build_complexity_report(
     path: PathBuf,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<ComplexityReportFile> {
+) -> ProjectAnalysisResult<ComplexityReportFile> {
     let mut definitions = Vec::new();
 
     for index in 0..tree.root_children().len() {

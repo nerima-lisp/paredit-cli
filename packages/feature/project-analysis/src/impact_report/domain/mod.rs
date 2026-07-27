@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use crate::call_graph_report::domain::{
     CallGraphNode, CallGraphNodeIndex, build_call_graph_edge, call_graph_edge_matches,
@@ -237,7 +237,7 @@ struct ParsedSource {
 pub fn build_impact_reports(
     sources: Vec<ImpactReportSource>,
     symbol: &SymbolName,
-) -> Result<Vec<ImpactReportFile>> {
+) -> ProjectAnalysisResult<Vec<ImpactReportFile>> {
     let mut parsed = Vec::with_capacity(sources.len());
     let mut nodes_by_name = BTreeMap::<String, CallGraphNode>::new();
     let mut node_index = CallGraphNodeIndex::new();

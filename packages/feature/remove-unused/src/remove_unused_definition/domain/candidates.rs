@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use crate::error::{AnalysisWorkerError, RemoveUnusedError, RemoveUnusedResult};
 
 use crate::remove_unused_definition::domain::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
@@ -26,24 +26,29 @@ pub struct DefinitionReference;
 
 pub fn collect_unused_definition_candidates(
     files: &[RemoveUnusedDefinitionInputFile],
-) -> Result<Vec<UnusedDefinitionFile>> {
+) -> RemoveUnusedResult<Vec<UnusedDefinitionFile>> {
     for file in files {
         if file.dialect == Dialect::Unknown {
-            anyhow::bail!(
-                "remove-unused-definition does not support dialect unknown: {}",
-                file.path.display()
-            );
+            return Err(RemoveUnusedError::UnsupportedDialect {
+                operation: "remove-unused-definition",
+                dialect: format!("unknown: {}", file.path.display()),
+            });
         }
     }
 
     let parsed_files = files
         .iter()
-        .map(|file| -> Result<_> {
-            let tree = SyntaxTree::parse_with_dialect(&file.text, file.dialect)
-                .with_context(|| format!("failed to parse {}", file.path.display()))?;
+        .map(|file| -> RemoveUnusedResult<_> {
+            let tree =
+                SyntaxTree::parse_with_dialect(&file.text, file.dialect).map_err(|source| {
+                    RemoveUnusedError::ParseFailed {
+                        path: file.path.display().to_string(),
+                        source,
+                    }
+                })?;
             Ok((file, tree.root_view()))
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<RemoveUnusedResult<Vec<_>>>()?;
 
     let package_form_spans: Vec<Vec<ByteSpan>> = parsed_files
         .iter()
@@ -66,9 +71,9 @@ pub fn collect_unused_definition_candidates(
         .map(|parallelism| parallelism.get())
         .unwrap_or(1)
         .clamp(1, files.len().max(1));
-    let mut ordered: Vec<Option<Result<UnusedDefinitionFile>>> =
+    let mut ordered: Vec<Option<RemoveUnusedResult<UnusedDefinitionFile>>> =
         (0..files.len()).map(|_| None).collect();
-    std::thread::scope(|scope| -> Result<()> {
+    std::thread::scope(|scope| -> RemoveUnusedResult<()> {
         let parsed_files = &parsed_files;
         let package_form_spans = &package_form_spans;
         let atom_needles = &atom_needles;
@@ -100,7 +105,7 @@ pub fn collect_unused_definition_candidates(
         for handle in handles {
             for (file_index, report) in handle
                 .join()
-                .map_err(|_| anyhow!("unused-definition candidate worker thread panicked"))?
+                .map_err(|_| AnalysisWorkerError::CandidateWorkerPanicked)?
             {
                 ordered[file_index] = Some(report);
             }
@@ -117,7 +122,7 @@ fn file_unused_definition_candidates(
     atom_needles: &[std::collections::HashSet<String>],
     file_index: usize,
     file: &RemoveUnusedDefinitionInputFile,
-) -> Result<UnusedDefinitionFile> {
+) -> RemoveUnusedResult<UnusedDefinitionFile> {
     let named_definitions = file
         .definitions
         .iter()
@@ -128,12 +133,14 @@ fn file_unused_definition_candidates(
         .filter_map(|(definition, name)| match SymbolName::new(name.clone()) {
             Ok(symbol) => Some(Ok((definition, symbol))),
             Err(_) if !definition.category.is_bulk_removable() => None,
-            Err(error) => Some(Err(anyhow::Error::new(error).context(format!(
-                "remove-unused-definition found invalid symbol '{name}' in {}",
-                file.path.display()
-            )))),
+            Err(source) => Some(Err(RemoveUnusedError::InvalidSymbol {
+                operation: "remove-unused-definition",
+                name: name.clone(),
+                path: file.path.display().to_string(),
+                source,
+            })),
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<RemoveUnusedResult<Vec<_>>>()?;
 
     let definitions = named_definitions
         .into_iter()

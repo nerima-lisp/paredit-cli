@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
+
+use crate::error::WorkspaceAnalysisError;
 
 use crate::call_report::usecase::build_call_report;
 use crate::complexity_report::usecase::build_complexity_report;
@@ -39,15 +41,24 @@ pub fn build_workspace_report(
         match SyntaxTree::parse_with_dialect(&text, loaded.dialect) {
             Ok(tree) => {
                 let (package, definitions) = collect_definition_forms(&tree, loaded.dialect)
-                    .with_context(|| format!("failed to analyze {}", file.display()))?;
-                let calls = build_call_report(&tree, loaded.dialect, None, false)
-                    .with_context(|| format!("failed to collect calls in {}", file.display()))?;
+                    .map_err(|source| WorkspaceAnalysisError::Definitions {
+                        path: file.display().to_string(),
+                        source: Box::new(source.into()),
+                    })?;
+                let calls =
+                    build_call_report(&tree, loaded.dialect, None, false).map_err(|source| {
+                        WorkspaceAnalysisError::Calls {
+                            path: file.display().to_string(),
+                            source: Box::new(source),
+                        }
+                    })?;
                 // `definitions` is sorted by descending complexity score, so
                 // the first entry (if any) is the file's highest score.
                 let max_complexity_score =
                     build_complexity_report(file.clone(), loaded.dialect, &tree)
-                        .with_context(|| {
-                            format!("failed to score complexity in {}", file.display())
+                        .map_err(|source| WorkspaceAnalysisError::Complexity {
+                            path: file.display().to_string(),
+                            source: Box::new(source),
                         })?
                         .definitions
                         .first()

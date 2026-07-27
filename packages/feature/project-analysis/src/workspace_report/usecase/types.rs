@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::path::PathBuf;
 
 pub use crate::workspace_report::domain::{

@@ -3,6 +3,7 @@
 pub mod definition_movement;
 pub mod definition_removal;
 pub mod definition_report;
+pub mod error;
 pub mod remove_definition;
 pub mod remove_unused_binding;
 pub mod remove_unused_control;
@@ -25,3 +26,8 @@ pub use definition_report::cli::{UnusedDefinitionReportArgs, unused_definition_r
 pub use remove_unused_binding::cli::{RemoveUnusedBindingArgs, remove_unused_binding};
 pub use remove_unused_control::cli::{RemoveUnusedBlockArgs, remove_unused_block};
 pub use remove_unused_control::cli::{RemoveUnusedTagArgs, remove_unused_tag};
+
+pub use error::{
+    AnalysisWorkerError, BindingListError, RemoveControlError, RemoveRequestError,
+    RemoveSelectionError, RemoveUnusedError, RemoveUnusedResult,
+};

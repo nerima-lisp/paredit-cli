@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use crate::call_report::domain::{CallReportItem, build_call_report};
 use paredit_core_syntax::common_lisp::{
@@ -216,7 +216,7 @@ pub fn classify_signature_call(
 pub fn build_signature_reports(
     sources: Vec<SignatureReportSource>,
     symbol: Option<&SymbolName>,
-) -> Result<Vec<SignatureReportFile>> {
+) -> ProjectAnalysisResult<Vec<SignatureReportFile>> {
     let mut parsed = Vec::with_capacity(sources.len());
     let mut definitions_by_name = BTreeMap::<String, Vec<(usize, Option<usize>)>>::new();
 
@@ -264,7 +264,7 @@ fn collect_signature_definitions(
     tree: &SyntaxTree,
     dialect: Dialect,
     symbol: Option<&SymbolName>,
-) -> Result<Vec<SignatureDefinitionItem>> {
+) -> ProjectAnalysisResult<Vec<SignatureDefinitionItem>> {
     let mut definitions = Vec::new();
 
     for index in 0..tree.root_children().len() {

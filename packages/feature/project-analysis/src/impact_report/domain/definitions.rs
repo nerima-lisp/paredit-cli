@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use paredit_core_syntax::common_lisp::{
     CommonLispPackageDeclarationForm, common_lisp_symbol_reference_eq,
@@ -13,7 +13,7 @@ use super::types::ImpactDefinitionItem;
 pub fn collect_impact_definitions(
     tree: &SyntaxTree,
     dialect: Dialect,
-) -> Result<(Option<String>, Vec<ImpactDefinitionItem>)> {
+) -> ProjectAnalysisResult<(Option<String>, Vec<ImpactDefinitionItem>)> {
     let mut current_package = None;
     let mut definitions = Vec::new();
 

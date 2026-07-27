@@ -47,7 +47,12 @@ pub fn remove_unused_tag(args: RemoveUnusedTagArgs) -> Result<()> {
 }
 fn run(
     args: RemoveUnusedControlArgs,
-    planner: fn(RemoveUnusedControlRequest<'_>) -> Result<RemoveUnusedControlPlan>,
+    // The planner carries this package's typed refusal; `?` widens it into
+    // the anyhow result this presentation layer shares with the CLI's own
+    // I/O failures and the gate marker.
+    planner: fn(
+        RemoveUnusedControlRequest<'_>,
+    ) -> crate::error::RemoveUnusedResult<RemoveUnusedControlPlan>,
 ) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");

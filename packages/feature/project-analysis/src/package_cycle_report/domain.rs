@@ -16,7 +16,7 @@
 //! [`crate::call_cycle_report::domain`] uses over the call graph — a
 //! different graph, the same proven algorithm.
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use paredit_core_syntax::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
@@ -71,7 +71,7 @@ pub struct PackageCyclePolicy {
 pub fn collect_package_dependency_edges(
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<(String, String)>> {
+) -> ProjectAnalysisResult<Vec<(String, String)>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

@@ -218,7 +218,7 @@ fn reject_dependencies(
                 &mut references,
             );
             if !references.is_empty() {
-                return Err(BindingCaptureError {
+                return Err(BindingCaptureError::ReferencesEarlier {
                     role: role.to_owned(),
                     name: names[index].to_string(),
                     earlier: earlier.to_string(),

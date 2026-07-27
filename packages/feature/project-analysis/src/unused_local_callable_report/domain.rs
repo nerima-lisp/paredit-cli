@@ -20,7 +20,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use paredit_core_semantics::callable_scope::{
     common_lisp_local_callable_form, local_callable_names,
@@ -96,7 +96,7 @@ pub fn build_unused_local_callable_report(
     dialect: Dialect,
     input: &str,
     tree: &SyntaxTree,
-) -> Result<UnusedLocalCallableReportFile> {
+) -> ProjectAnalysisResult<UnusedLocalCallableReportFile> {
     let mut unused = Vec::new();
     let mut checked_binding_count = 0;
 

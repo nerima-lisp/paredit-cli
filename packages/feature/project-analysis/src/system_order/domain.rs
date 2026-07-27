@@ -29,7 +29,7 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use crate::system_cycle_report::domain::analyze_system_cycles;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
@@ -53,7 +53,7 @@ pub struct SystemOrderCycle {
 pub fn system_dependency_edges(
     trees: &[&SyntaxTree],
     dialect: Dialect,
-) -> Result<Vec<(String, String)>> {
+) -> ProjectAnalysisResult<Vec<(String, String)>> {
     let mut edges = Vec::new();
     for tree in trees {
         edges.extend(build_system_dependency_edges(tree, dialect)?);

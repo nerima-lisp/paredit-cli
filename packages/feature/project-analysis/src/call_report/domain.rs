@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 use std::rc::Rc;
 
 use paredit_core_syntax::common_lisp::{
@@ -46,7 +46,7 @@ pub fn build_call_report(
     dialect: Dialect,
     symbol: Option<&SymbolName>,
     include_definitions: bool,
-) -> Result<Vec<CallReportItem>> {
+) -> ProjectAnalysisResult<Vec<CallReportItem>> {
     let mut calls = Vec::new();
     let ctx = CallReportTraversal {
         dialect,

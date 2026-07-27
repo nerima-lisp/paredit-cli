@@ -1,0 +1,64 @@
+//! Why a project-wide analysis fails.
+//!
+//! Section 9.2. Almost nothing here can fail: these reports walk a parsed tree
+//! and count things. What failures exist come from *below* — a path that does
+//! not resolve, or one of the two packages this one reads through
+//! (`paredit-feature-package` for dependency graphs,
+//! `paredit-feature-remove-unused` for definition inventories).
+//!
+//! So [`ProjectAnalysisError`] is mostly a union, and that is the honest
+//! shape: this package's own contribution to the failure set is nearly empty,
+//! and saying so is more useful than inventing variants it never raises.
+//!
+//! [`WorkspaceAnalysisError`] is the exception, and it exists for a reason
+//! specific to workspace-scale reports: it names *which file* and *which pass*
+//! gave up. Over a thousand-file run, "something failed" is not actionable and
+//! "failed to score complexity in src/foo.lisp" is.
+
+use thiserror::Error;
+
+use paredit_core_syntax::sexpr::SexprError;
+
+/// One file's analysis could not complete.
+#[derive(Debug, Error)]
+pub enum WorkspaceAnalysisError {
+    #[error("failed to analyze {path}")]
+    Definitions {
+        path: String,
+        #[source]
+        source: Box<ProjectAnalysisError>,
+    },
+
+    #[error("failed to collect calls in {path}")]
+    Calls {
+        path: String,
+        #[source]
+        source: Box<ProjectAnalysisError>,
+    },
+
+    #[error("failed to score complexity in {path}")]
+    Complexity {
+        path: String,
+        #[source]
+        source: Box<ProjectAnalysisError>,
+    },
+}
+
+/// Anything a project-wide analysis can fail with.
+#[derive(Debug, Error)]
+pub enum ProjectAnalysisError {
+    #[error(transparent)]
+    Selection(#[from] SexprError),
+
+    #[error(transparent)]
+    Package(#[from] paredit_feature_package::PackageRefactorError),
+
+    #[error(transparent)]
+    Definitions(#[from] paredit_feature_remove_unused::RemoveUnusedError),
+
+    #[error(transparent)]
+    Workspace(#[from] WorkspaceAnalysisError),
+}
+
+/// The result type the project-analysis passes return.
+pub type ProjectAnalysisResult<T> = std::result::Result<T, ProjectAnalysisError>;

@@ -26,7 +26,7 @@
 //! a class from an unanalyzed library) never contributes an edge back into
 //! the graph and so cannot itself form or hide a cycle.
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
 use paredit_core_syntax::dialect::Dialect;
@@ -80,7 +80,7 @@ pub struct ClassCyclePolicy {
 pub fn collect_class_inheritance_edges(
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<(String, String)>> {
+) -> ProjectAnalysisResult<Vec<(String, String)>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

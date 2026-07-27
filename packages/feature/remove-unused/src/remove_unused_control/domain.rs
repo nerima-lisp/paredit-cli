@@ -1,6 +1,8 @@
 //! Remove unused Common Lisp `block` names and `tagbody` tags.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{ConservativeRefusal, DialectRefusal, DocumentRefusal, ShapeRefusal};
+
+use crate::error::{RemoveControlError, RemoveUnusedResult};
 
 use paredit_core_edit::extract_shared::replace_span;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -29,10 +31,15 @@ pub struct RemoveUnusedControlPlan {
 
 pub fn plan_remove_unused_block(
     request: RemoveUnusedControlRequest<'_>,
-) -> Result<RemoveUnusedControlPlan> {
+) -> RemoveUnusedResult<RemoveUnusedControlPlan> {
     prepare(&request, "remove-unused-block")?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "remove-unused-block",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     require_known_expression_context(&tree, &request.path)?;
     let form = tree.select_path(&request.path)?.view();
@@ -42,17 +49,17 @@ pub fn plan_remove_unused_block(
         .children
         .get(1)
         .and_then(plain_atom)
-        .context("remove-unused-block requires a plain symbol block name")?;
+        .ok_or(RemoveControlError::BlockNameNotPlain)?;
     require_symbol(name, "remove-unused-block")?;
     if !symbol_eq(name, &request.name) {
-        bail!("selected block name does not match --name");
+        return Err(RemoveControlError::BlockNameMismatch.into());
     }
     let mut references = 0;
     for child in form.children.iter().skip(2) {
         count_block_references(child, &request.name, true, &mut references)?;
     }
     if references != 0 {
-        bail!("remove-unused-block found {references} matching return-from reference(s)");
+        return Err(RemoveControlError::BlockHasReferences { count: references }.into());
     }
     let replacement = body_replacement(request.input, &form.children[2..]);
     finish(request, form.span, references, &replacement)
@@ -60,10 +67,15 @@ pub fn plan_remove_unused_block(
 
 pub fn plan_remove_unused_tag(
     request: RemoveUnusedControlRequest<'_>,
-) -> Result<RemoveUnusedControlPlan> {
+) -> RemoveUnusedResult<RemoveUnusedControlPlan> {
     prepare(&request, "remove-unused-tag")?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "remove-unused-block",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let form = tree.select_path(&request.path)?.view();
     reject_unsafe(&tree, &form, "remove-unused-tag")?;
@@ -74,7 +86,7 @@ pub fn plan_remove_unused_tag(
         .filter(|tag| plain_atom(tag).is_some_and(|name| tag_eq(name, &request.name)))
         .collect::<Vec<_>>();
     if matches.len() != 1 {
-        bail!("remove-unused-tag requires exactly one matching tag definition");
+        return Err(RemoveControlError::TagNotUnique.into());
     }
     let mut references = 0;
     for child in form
@@ -86,17 +98,20 @@ pub fn plan_remove_unused_tag(
         count_tag_references(child, &request.name, true, &mut references)?;
     }
     if references != 0 {
-        bail!("remove-unused-tag found {references} matching go reference(s)");
+        return Err(RemoveControlError::TagHasReferences { count: references }.into());
     }
     finish(request, matches[0].span, references, "")
 }
 
-fn prepare(request: &RemoveUnusedControlRequest<'_>, operation: &str) -> Result<()> {
+fn prepare(
+    request: &RemoveUnusedControlRequest<'_>,
+    operation: &'static str,
+) -> RemoveUnusedResult<()> {
     if request.dialect != Dialect::CommonLisp {
-        bail!("{operation} supports only Common Lisp");
+        return Err(DialectRefusal::CommonLispOnly { operation }.into());
     }
     if request.name.contains(':') {
-        bail!("{operation} requires an unqualified symbol or integer tag");
+        return Err(RemoveControlError::TagNotUnqualified { operation }.into());
     }
     Ok(())
 }
@@ -106,10 +121,14 @@ fn finish(
     span: ByteSpan,
     reference_count: usize,
     replacement: &str,
-) -> Result<RemoveUnusedControlPlan> {
+) -> RemoveUnusedResult<RemoveUnusedControlPlan> {
     let rewritten = replace_span(request.input, span, replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("rewritten output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputInvalid {
+            operation: "rewritten",
+            source,
+        }
+    })?;
     Ok(RemoveUnusedControlPlan {
         dialect: request.dialect,
         path: request.path,
@@ -125,14 +144,14 @@ fn count_block_references(
     target: &str,
     enabled: bool,
     count: &mut usize,
-) -> Result<()> {
+) -> RemoveUnusedResult<()> {
     if view.kind == ExpressionKind::List {
         if head_is(view, "block") {
             let name = view
                 .children
                 .get(1)
                 .and_then(plain_atom)
-                .context("remove-unused-block found malformed nested block")?;
+                .ok_or(RemoveControlError::MalformedNestedBlock)?;
             require_symbol(name, "remove-unused-block")?;
             for child in view.children.iter().skip(2) {
                 count_block_references(child, target, enabled && !symbol_eq(name, target), count)?;
@@ -144,7 +163,7 @@ fn count_block_references(
                 .children
                 .get(1)
                 .and_then(plain_atom)
-                .context("remove-unused-block found malformed return-from")?;
+                .ok_or(RemoveControlError::MalformedReturnFrom)?;
             require_symbol(name, "remove-unused-block")?;
             if enabled && symbol_eq(name, target) {
                 *count += 1;
@@ -162,7 +181,7 @@ fn count_tag_references(
     target: &str,
     enabled: bool,
     count: &mut usize,
-) -> Result<()> {
+) -> RemoveUnusedResult<()> {
     if view.kind == ExpressionKind::List {
         if head_is(view, "tagbody") {
             let shadows = direct_tags(view)
@@ -183,7 +202,7 @@ fn count_tag_references(
                 .children
                 .get(1)
                 .and_then(plain_atom)
-                .context("remove-unused-tag found malformed go")?;
+                .ok_or(RemoveControlError::MalformedGo)?;
             if enabled && tag_eq(name, target) {
                 *count += 1;
             }
@@ -195,22 +214,20 @@ fn count_tag_references(
     Ok(())
 }
 
-fn require_known_expression_context(tree: &SyntaxTree, path: &Path) -> Result<()> {
+fn require_known_expression_context(tree: &SyntaxTree, path: &Path) -> RemoveUnusedResult<()> {
     let indexes = path.to_raw_indexes();
     if indexes.len() < 2 {
-        bail!("remove-unused-block refuses top-level or unknown contexts");
+        return Err(RemoveControlError::TopLevelOrUnknownContext.into());
     }
     for depth in 1..indexes.len() {
         let ancestor = tree
             .select_path(&Path::from_indexes(indexes[..depth].to_vec()))?
             .view();
         if !ancestor.reader_prefixes.is_empty() {
-            bail!("remove-unused-block refuses reader-prefixed contexts");
+            return Err(RemoveControlError::ReaderPrefixedContext.into());
         }
     }
-    let index = *indexes
-        .last()
-        .context("remove-unused-block requires a non-empty path")?;
+    let index = *indexes.last().ok_or(RemoveControlError::EmptyPath)?;
     let parent = tree
         .select_path(&Path::from_indexes(indexes[..indexes.len() - 1].to_vec()))?
         .view();
@@ -218,7 +235,7 @@ fn require_known_expression_context(tree: &SyntaxTree, path: &Path) -> Result<()
         .children
         .first()
         .and_then(plain_atom)
-        .context("remove-unused-block requires a known expression context")?;
+        .ok_or(RemoveControlError::UnknownContext)?;
     let known = (symbol_eq(head, "progn") && index >= 1)
         || (symbol_eq(head, "if") && (1..=3).contains(&index))
         || ((symbol_eq(head, "when") || symbol_eq(head, "unless")) && index >= 1)
@@ -226,20 +243,24 @@ fn require_known_expression_context(tree: &SyntaxTree, path: &Path) -> Result<()
         || (symbol_eq(head, "lambda") && index >= 2)
         || (symbol_eq(head, "defun") && index >= 3);
     if !known {
-        bail!("remove-unused-block requires a known expression position");
+        return Err(RemoveControlError::UnknownPosition.into());
     }
     Ok(())
 }
 
-fn reject_unsafe(tree: &SyntaxTree, form: &ExpressionView, operation: &str) -> Result<()> {
+fn reject_unsafe(
+    tree: &SyntaxTree,
+    form: &ExpressionView,
+    operation: &'static str,
+) -> RemoveUnusedResult<()> {
     if tree.has_comment_in(form.span) {
-        bail!("{operation} cannot rewrite a form containing comments");
+        return Err(ConservativeRefusal::Comments { operation }.into());
     }
     if contains_prefix(form) || contains_head(form, "quote") || contains_head(form, "quasiquote") {
-        bail!("{operation} conservatively rejects reader-prefixed or quoted forms");
+        return Err(ConservativeRefusal::ReaderPrefixedOrQuoted { operation }.into());
     }
     if contains_head(form, "declare") {
-        bail!("{operation} conservatively rejects declarations");
+        return Err(ConservativeRefusal::Declarations { operation }.into());
     }
     Ok(())
 }
@@ -265,7 +286,11 @@ fn direct_tags(form: &ExpressionView) -> Vec<&ExpressionView> {
         .filter(|view| plain_atom(view).is_some())
         .collect()
 }
-fn require_head(form: &ExpressionView, expected: &str, operation: &str) -> Result<()> {
+fn require_head(
+    form: &ExpressionView,
+    expected: &str,
+    operation: &'static str,
+) -> RemoveUnusedResult<()> {
     if form.kind != ExpressionKind::List
         || form
             .children
@@ -273,7 +298,11 @@ fn require_head(form: &ExpressionView, expected: &str, operation: &str) -> Resul
             .and_then(plain_atom)
             .is_none_or(|head| !symbol_eq(head, expected))
     {
-        bail!("{operation} selected form must be a {expected} form");
+        return Err(ShapeRefusal::NotExpectedForm {
+            operation,
+            expected: expected.to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
@@ -298,9 +327,9 @@ fn tag_eq(left: &str, right: &str) -> bool {
         _ => false,
     }
 }
-fn require_symbol(name: &str, operation: &str) -> Result<()> {
+fn require_symbol(name: &str, operation: &'static str) -> RemoveUnusedResult<()> {
     if name.contains(':') || name.parse::<i128>().is_ok() {
-        bail!("{operation} requires an unqualified symbol name");
+        return Err(RemoveControlError::NameNotUnqualified { operation }.into());
     }
     Ok(())
 }

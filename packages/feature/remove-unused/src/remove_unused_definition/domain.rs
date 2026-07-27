@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{RemoveUnusedError, RemoveUnusedResult};
 
 use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use paredit_core_syntax::dialect::Dialect;
@@ -23,13 +23,13 @@ pub use types::{
 
 pub fn plan_remove_unused_definitions(
     request: RemoveUnusedDefinitionsRequest,
-) -> Result<RemoveUnusedDefinitionsPlan> {
+) -> RemoveUnusedResult<RemoveUnusedDefinitionsPlan> {
     for file in &request.files {
         if file.dialect == Dialect::Unknown {
-            anyhow::bail!(
-                "remove-unused-definition does not support dialect unknown: {}",
-                file.path.display()
-            );
+            return Err(RemoveUnusedError::UnsupportedDialect {
+                operation: "remove-unused-definition",
+                dialect: format!("unknown: {}", file.path.display()),
+            });
         }
     }
 
@@ -69,7 +69,7 @@ fn plan_file_removals(
     report: &candidates::UnusedDefinitionFile,
     request: &RemoveUnusedDefinitionsRequest,
     exported_symbols: &std::collections::HashMap<String, std::collections::HashSet<String>>,
-) -> Result<RemoveUnusedDefinitionsFilePlan> {
+) -> RemoveUnusedResult<RemoveUnusedDefinitionsFilePlan> {
     let mut removals = Vec::new();
     let mut skipped = Vec::new();
     let empty_exported_symbols = std::collections::HashMap::new();
@@ -139,7 +139,7 @@ fn classify_definition_action(
 fn rewrite_file_without_unused_definitions(
     file: &RemoveUnusedDefinitionInputFile,
     removals: &mut [PlannedDefinitionRemoval],
-) -> Result<String> {
+) -> RemoveUnusedResult<String> {
     removals.sort_by(|left, right| {
         right
             .definition
@@ -153,21 +153,25 @@ fn rewrite_file_without_unused_definitions(
     for removal in removals {
         let expanded = expand_definition_removal(&rewritten, removal.definition.span);
         removal.removal_span = expanded;
-        let tree = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).with_context(|| {
-            format!(
-                "file would become invalid before removing unused definitions: {}",
-                file.path.display()
-            )
+        let tree = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).map_err(|source| {
+            RemoveUnusedError::WouldBecomeInvalid {
+                stage: "before",
+                what: "unused definitions",
+                path: file.path.display().to_string(),
+                source,
+            }
         })?;
         reject_overlapping_common_lisp_reader_time_forms(&tree, file.dialect, [expanded])?;
         rewritten = replace_span(&rewritten, expanded, "");
     }
 
-    SyntaxTree::parse_with_dialect(&rewritten, file.dialect).with_context(|| {
-        format!(
-            "file would become invalid after removing unused definitions: {}",
-            file.path.display()
-        )
+    SyntaxTree::parse_with_dialect(&rewritten, file.dialect).map_err(|source| {
+        RemoveUnusedError::WouldBecomeInvalid {
+            stage: "after",
+            what: "unused definitions",
+            path: file.path.display().to_string(),
+            source,
+        }
     })?;
 
     Ok(rewritten)

@@ -1,6 +1,10 @@
 //! Use-case helpers for removing unused let bindings.
 
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{
+    RemoveRequestError, RemoveSelectionError, RemoveUnusedError, RemoveUnusedResult,
+};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::common_lisp::{
@@ -27,27 +31,34 @@ pub use types::{RemoveUnusedBindingPlan, RemoveUnusedBindingRequest, RemovedBind
 
 pub fn plan_remove_unused_binding(
     request: RemoveUnusedBindingRequest<'_>,
-) -> Result<RemoveUnusedBindingPlan> {
+) -> RemoveUnusedResult<RemoveUnusedBindingPlan> {
     if request.name.is_some() && request.all_bindings {
-        anyhow::bail!("remove-unused-binding accepts either --name or --all-bindings, not both");
+        return Err(RemoveRequestError::NameAndAllBindings.into());
     }
     if request.name.is_none() && !request.all_bindings {
-        anyhow::bail!("remove-unused-binding requires --name or --all-bindings");
+        return Err(RemoveRequestError::NeitherNameNorAllBindings.into());
     }
     if request.dialect == Dialect::Unknown {
-        anyhow::bail!("remove-unused-binding does not support dialect unknown");
+        return Err(RemoveUnusedError::UnsupportedDialect {
+            operation: "remove-unused-binding",
+            dialect: "unknown".to_owned(),
+        });
     }
 
-    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("remove-unused-binding input is not a valid S-expression document")?;
+    let input_tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "remove-unused-binding",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
     let parsed_target = input_tree
         .select_at(request.target.span.start().get())
-        .context("remove-unused-binding target span is not present in the input")?;
-    anyhow::ensure!(
-        parsed_target.view() == request.target,
-        "remove-unused-binding target does not match the input"
-    );
+        .map_err(|_| RemoveSelectionError::TargetSpanNotInInput)?;
+    if parsed_target.view() != request.target {
+        return Err(RemoveSelectionError::TargetDoesNotMatchInput.into());
+    }
 
     let parts = remove_unused_binding_parts(
         request.dialect,
@@ -57,8 +68,12 @@ pub fn plan_remove_unused_binding(
         request.all_bindings,
     )?;
     let rewritten = replace_span(request.input, parts.form_span, &parts.replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("remove-unused-binding output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "remove-unused-binding",
+            source,
+        }
+    })?;
 
     let bindings = parts
         .bindings
@@ -95,46 +110,37 @@ fn remove_unused_binding_parts(
     target: &ExpressionView,
     name: Option<&SymbolName>,
     all_bindings: bool,
-) -> Result<RemoveUnusedBindingParts> {
+) -> RemoveUnusedResult<RemoveUnusedBindingParts> {
     if target.kind != ExpressionKind::List || target.delimiter != Some(Delimiter::Paren) {
-        anyhow::bail!(
-            "remove-unused-binding selection must be a let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, with-accessors, do, do*, prog, or prog* list"
-        );
+        return Err(RemoveSelectionError::NotABindingFormList.into());
     }
     if target.children.len() < 3 {
-        anyhow::bail!(
-            "remove-unused-binding requires a supported binding form with bindings and a body"
-        );
+        return Err(RemoveSelectionError::MissingBindingsOrBody.into());
     }
-    let head = atom_text(&target.children[0])
-        .context("remove-unused-binding form must start with an atom")?;
+    let head = atom_text(&target.children[0]).ok_or(RemoveSelectionError::HeadNotAnAtom)?;
     let Some(refactor_form) = dialect.common_lisp_binding_refactor_form_for_head(head) else {
-        anyhow::bail!(
-            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, with-accessors, do, do*, prog, or prog*"
-        );
+        return Err(RemoveSelectionError::UnsupportedHead.into());
     };
     if !refactor_form.supports_remove_unused_binding() {
-        anyhow::bail!(
-            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, with-accessors, do, do*, prog, or prog*"
-        );
+        return Err(RemoveSelectionError::UnsupportedHead.into());
     }
     if matches!(refactor_form, CommonLispBindingRefactorForm::Slot(_)) && target.children.len() < 4
     {
-        anyhow::bail!(
-            "remove-unused-binding requires a with-slots or with-accessors form with bindings, an instance expression, and a body"
-        );
+        return Err(RemoveSelectionError::SlotFormIncomplete.into());
     }
     if matches!(refactor_form, CommonLispBindingRefactorForm::Do(_)) && target.children.len() < 3 {
-        anyhow::bail!(
-            "remove-unused-binding requires a do or do* form with bindings and an end clause"
-        );
+        return Err(RemoveSelectionError::DoFormIncomplete.into());
     }
     ensure_variable_binding_form_consistency(dialect, head, refactor_form)?;
 
     let binding_form = &target.children[1];
     let candidates = binding_removal_candidates(dialect, refactor_form, binding_form)?;
-    let input_tree = SyntaxTree::parse_with_dialect(input, dialect)
-        .context("remove-unused-binding input is not a valid S-expression document")?;
+    let input_tree = SyntaxTree::parse_with_dialect(input, dialect).map_err(|source| {
+        DocumentRefusal::InputNotAnSexprDocument {
+            operation: "remove-unused-binding",
+            source,
+        }
+    })?;
     let selected = if all_bindings {
         let mut unused = Vec::new();
         for candidate in &candidates {
@@ -185,21 +191,16 @@ fn remove_unused_binding_parts(
             }
         }
         if unused.is_empty() {
-            anyhow::bail!("remove-unused-binding --all-bindings found no unused bindings");
+            return Err(RemoveRequestError::NoUnusedBindings.into());
         }
         unused
     } else {
-        let name = name.ok_or_else(|| {
-            anyhow::anyhow!("remove-unused-binding requires --name or --all-bindings")
-        })?;
+        let name = name.ok_or(RemoveRequestError::NeitherNameNorAllBindings)?;
         let candidate = candidates
             .iter()
             .find(|candidate| binding_name_matches(dialect, &candidate.name, name.as_str()))
-            .with_context(|| {
-                format!(
-                    "binding {} was not found in selected binding form",
-                    name.as_str()
-                )
+            .ok_or_else(|| RemoveRequestError::BindingNotFound {
+                name: name.as_str().to_owned(),
             })?;
         let reference_spans = binding_reference_spans(
             dialect,
@@ -213,9 +214,10 @@ fn remove_unused_binding_parts(
         )?;
         let reference_count = reference_spans.len();
         if reference_count != 0 {
-            anyhow::bail!(
-                "remove-unused-binding requires zero in-scope references; found {reference_count}"
-            );
+            return Err(RemoveSelectionError::HasReferences {
+                count: reference_count,
+            }
+            .into());
         }
         vec![RemovedBindingParts {
             name: candidate.name.clone(),
@@ -229,9 +231,10 @@ fn remove_unused_binding_parts(
     let body_start_index = refactor_form.remove_unused_body_start_index();
     let replacement = if selected.len() == candidates.len() && !preserve_binding_form_when_empty {
         let first_body = &target.children[body_start_index];
-        let last_body = target.children.last().context(
-            "remove-unused-binding expected at least one body expression after validation",
-        )?;
+        let last_body = target
+            .children
+            .last()
+            .ok_or(RemoveSelectionError::NoBodyAfterValidation)?;
         paredit_core_syntax::sexpr::ByteSpan::new(first_body.span.start(), last_body.span.end())
             .slice(input)
             .to_owned()
@@ -259,17 +262,17 @@ fn ensure_variable_binding_form_consistency(
     dialect: paredit_core_syntax::dialect::Dialect,
     head: &str,
     refactor_form: CommonLispBindingRefactorForm,
-) -> Result<()> {
+) -> RemoveUnusedResult<()> {
     let expected = match refactor_form {
         CommonLispBindingRefactorForm::Do(form) | CommonLispBindingRefactorForm::Prog(form) => form,
         _ => return Ok(()),
     };
 
     let Some(actual) = dialect.variable_binding_form_for_head(head) else {
-        anyhow::bail!("remove-unused-binding could not classify variable binding form");
+        return Err(RemoveSelectionError::ClassificationFailed.into());
     };
     if actual != expected {
-        anyhow::bail!("remove-unused-binding variable binding classification mismatch");
+        return Err(RemoveSelectionError::ClassificationMismatch.into());
     }
     Ok(())
 }
@@ -290,11 +293,15 @@ fn binding_name_matches(dialect: Dialect, candidate: &str, expected: &str) -> bo
     }
 }
 
-fn format_single_replacement_form(input: &str, dialect: Dialect) -> Result<String> {
-    let tree = SyntaxTree::parse_with_dialect(input, dialect)
-        .context("remove-unused-binding replacement is not a valid S-expression form")?;
+fn format_single_replacement_form(input: &str, dialect: Dialect) -> RemoveUnusedResult<String> {
+    let tree = SyntaxTree::parse_with_dialect(input, dialect).map_err(|source| {
+        DocumentRefusal::InputInvalid {
+            operation: "remove-unused-binding replacement",
+            source,
+        }
+    })?;
     if tree.root_children().len() != 1 {
-        anyhow::bail!("remove-unused-binding replacement must contain exactly one form");
+        return Err(RemoveSelectionError::ReplacementNotOneForm.into());
     }
 
     let mut formatted = Formatter::new(2).format(&tree);

@@ -28,7 +28,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use paredit_core_semantics::semantics::project::service::canonical_package_id;
 use paredit_core_syntax::common_lisp::{
@@ -111,7 +111,10 @@ pub struct UndefinedPackagePolicy {
 /// designator for the same package — so a file that declares them and then
 /// says `(in-package <nickname>)` is correct code. Collecting only the primary
 /// name reported that as an undefined package.
-pub fn collect_declared_package_names(dialect: Dialect, tree: &SyntaxTree) -> Result<Vec<String>> {
+pub fn collect_declared_package_names(
+    dialect: Dialect,
+    tree: &SyntaxTree,
+) -> ProjectAnalysisResult<Vec<String>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }
@@ -133,7 +136,7 @@ pub fn collect_in_package_references(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<InPackageReference>> {
+) -> ProjectAnalysisResult<Vec<InPackageReference>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

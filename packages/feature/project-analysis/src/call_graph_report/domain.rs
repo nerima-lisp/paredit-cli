@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 
@@ -88,7 +88,7 @@ pub fn build_call_graph_report(
     sources: Vec<CallGraphReportSource>,
     include_external: bool,
     symbol: Option<&SymbolName>,
-) -> Result<CallGraphReport> {
+) -> ProjectAnalysisResult<CallGraphReport> {
     let mut parsed = Vec::with_capacity(sources.len());
     let mut nodes_by_name = BTreeMap::<String, CallGraphNode>::new();
     let mut node_index = CallGraphNodeIndex::new();
@@ -196,7 +196,7 @@ pub fn call_graph_edge_matches(edge: &CallGraphEdge, symbol: Option<&SymbolName>
 fn collect_call_graph_definitions(
     tree: &SyntaxTree,
     dialect: Dialect,
-) -> Result<Vec<CallGraphDefinitionItem>> {
+) -> ProjectAnalysisResult<Vec<CallGraphDefinitionItem>> {
     let mut items = Vec::new();
     for index in 0..tree.root_children().len() {
         let path = Path::root_child(index);

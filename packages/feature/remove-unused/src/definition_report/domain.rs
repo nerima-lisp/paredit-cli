@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::thread;
 
-use anyhow::{Context, Result, anyhow};
+use crate::error::{AnalysisWorkerError, RemoveUnusedError, RemoveUnusedResult};
 
 use paredit_core_semantics::definition_reference::{
     collect_package_form_spans, collect_reference_needles, collect_symbol_references,
@@ -131,7 +131,7 @@ pub fn build_definition_report(
     path: PathBuf,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<DefinitionReportFile> {
+) -> RemoveUnusedResult<DefinitionReportFile> {
     let (package, definitions) = collect_definition_forms(tree, dialect)?;
 
     Ok(DefinitionReportFile {
@@ -147,7 +147,7 @@ pub fn build_parsed_definition_file(
     dialect: Dialect,
     tree: &SyntaxTree,
     text: &str,
-) -> Result<ParsedDefinitionFile> {
+) -> RemoveUnusedResult<ParsedDefinitionFile> {
     let (package, definitions) = collect_definition_forms(tree, dialect)?;
 
     Ok(ParsedDefinitionFile {
@@ -162,13 +162,13 @@ pub fn build_parsed_definition_file(
 
 pub fn collect_unused_definition_candidates(
     files: &[ParsedDefinitionFile],
-) -> Result<Vec<UnusedDefinitionFile>> {
+) -> RemoveUnusedResult<Vec<UnusedDefinitionFile>> {
     for file in files {
         if file.dialect == Dialect::Unknown {
-            anyhow::bail!(
-                "unused-definition analysis does not support dialect unknown: {}",
-                file.path.display()
-            );
+            return Err(RemoveUnusedError::UnsupportedDialect {
+                operation: "unused-definition analysis",
+                dialect: format!("unknown: {}", file.path.display()),
+            });
         }
     }
 
@@ -176,10 +176,13 @@ pub fn collect_unused_definition_candidates(
         .iter()
         .map(|file| {
             SyntaxTree::parse_with_dialect(&file.text, file.dialect)
-                .with_context(|| format!("failed to parse {}", file.path.display()))
+                .map_err(|source| RemoveUnusedError::ParseFailed {
+                    path: file.path.display().to_string(),
+                    source,
+                })
                 .map(|tree| Some(tree.root_view()))
         })
-        .collect::<Result<_>>()?;
+        .collect::<RemoveUnusedResult<_>>()?;
 
     let package_form_spans: Vec<Vec<ByteSpan>> = files
         .iter()
@@ -208,7 +211,7 @@ pub fn collect_unused_definition_candidates(
         .unwrap_or(1)
         .clamp(1, files.len().max(1));
     let mut ordered: Vec<Option<UnusedDefinitionFile>> = (0..files.len()).map(|_| None).collect();
-    thread::scope(|scope| -> Result<()> {
+    thread::scope(|scope| -> RemoveUnusedResult<()> {
         let views = &views;
         let package_form_spans = &package_form_spans;
         let atom_needles = &atom_needles;
@@ -240,7 +243,7 @@ pub fn collect_unused_definition_candidates(
         for handle in handles {
             for (file_index, report) in handle
                 .join()
-                .map_err(|_| anyhow!("unused-definition reference worker thread panicked"))?
+                .map_err(|_| AnalysisWorkerError::ReferenceWorkerPanicked)?
             {
                 ordered[file_index] = Some(report);
             }
@@ -320,7 +323,7 @@ fn file_unused_definition_report(
 pub fn collect_definition_forms(
     tree: &SyntaxTree,
     dialect: Dialect,
-) -> Result<(Option<String>, Vec<DefinitionReportItem>)> {
+) -> RemoveUnusedResult<(Option<String>, Vec<DefinitionReportItem>)> {
     let mut current_package = None;
     let mut definitions = Vec::new();
 

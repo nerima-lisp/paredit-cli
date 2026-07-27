@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{RemoveSelectionError, RemoveUnusedResult};
 
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
 use paredit_core_syntax::common_lisp::{
@@ -37,7 +37,7 @@ pub fn binding_reference_spans(
     candidates: &[LetBindingRemovalCandidate],
     candidate: &LetBindingRemovalCandidate,
     name: &SymbolName,
-) -> Result<Vec<ByteSpan>> {
+) -> RemoveUnusedResult<Vec<ByteSpan>> {
     let context = BindingReferenceContext {
         dialect,
         input,
@@ -48,7 +48,7 @@ pub fn binding_reference_spans(
         name,
     };
     let Some(scope) = refactor_form.reference_scope() else {
-        anyhow::bail!("remove-unused-binding unsupported reference scope");
+        return Err(RemoveSelectionError::UnsupportedReferenceScope.into());
     };
 
     match scope {
@@ -86,7 +86,7 @@ pub fn binding_reference_spans(
 fn name_value_binding_reference_spans(
     context: &BindingReferenceContext<'_>,
     sequential_scope: bool,
-) -> Result<Vec<ByteSpan>> {
+) -> RemoveUnusedResult<Vec<ByteSpan>> {
     let mut reference_spans = Vec::new();
     if sequential_scope {
         for later in context
@@ -95,7 +95,7 @@ fn name_value_binding_reference_spans(
             .filter(|later| later.index > context.candidate.index)
         {
             let later_value = view_at_span(context.binding_form, later.value_span)
-                .context("failed to resolve later binding value")?;
+                .ok_or(RemoveSelectionError::LaterBindingValueUnresolved)?;
             collect_unshadowed_symbol_references(
                 context.dialect,
                 later_value,
@@ -206,7 +206,7 @@ fn local_callable_binding_reference_spans(
     dialect: Dialect,
     target: &ExpressionView,
     name: &SymbolName,
-) -> Result<Vec<ByteSpan>> {
+) -> RemoveUnusedResult<Vec<ByteSpan>> {
     let mut reference_spans = Vec::new();
     let Some(head) = list_head(target) else {
         return Ok(reference_spans);

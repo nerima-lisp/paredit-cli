@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{RemoveSelectionError, RemoveUnusedResult};
 
 use paredit_core_syntax::sexpr::ByteSpan;
 
@@ -8,7 +8,7 @@ pub fn apply_nested_span_edits(
     outer_text: &str,
     outer_span: ByteSpan,
     mut edits: Vec<SpanEdit>,
-) -> Result<String> {
+) -> RemoveUnusedResult<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 
@@ -22,12 +22,14 @@ pub fn apply_nested_span_edits(
     Ok(output)
 }
 
-fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Result<()> {
+fn ensure_non_overlapping_spans(
+    spans: impl IntoIterator<Item = ByteSpan>,
+) -> RemoveUnusedResult<()> {
     let mut previous: Option<ByteSpan> = None;
     for span in spans {
         if let Some(previous) = previous {
             if previous.end() > span.start() {
-                anyhow::bail!("overlapping replacement spans are not supported");
+                return Err(RemoveSelectionError::OverlappingReplacementSpans.into());
             }
         }
         previous = Some(span);

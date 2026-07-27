@@ -65,5 +65,5 @@ pub fn collect_impact_reports(
         });
     }
 
-    build_impact_reports(sources, symbol)
+    Ok(build_impact_reports(sources, symbol)?)
 }

@@ -101,11 +101,20 @@ pub enum BindingContextError {
 
 /// The rewrite would change which binding a name refers to.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{role} for '{name}' references earlier binding '{earlier}'")]
-pub struct BindingCaptureError {
-    pub role: String,
-    pub name: String,
-    pub earlier: String,
+pub enum BindingCaptureError {
+    #[error("{role} for '{name}' references earlier binding '{earlier}'")]
+    ReferencesEarlier {
+        role: String,
+        name: String,
+        earlier: String,
+    },
+
+    /// `introduce-let` would bind a name that is already bound where the
+    /// target sits, so the new binding would shadow the old one.
+    #[error(
+        "introduce-let target is inside an existing binding for '{name}'; choose a different --name"
+    )]
+    WouldShadow { name: String },
 }
 
 /// Anything a binding-form refactor or report can refuse to do.
@@ -135,6 +144,14 @@ pub enum BindingError {
     /// `--binding-index` is one-based; zero is not an index.
     #[error(transparent)]
     BindingIndex(#[from] paredit_core_semantics::BindingIndexError),
+
+    /// The dialect table does not verify this operation.
+    #[error("{operation} is not supported for this dialect")]
+    DialectDoesNotSupport {
+        operation: &'static str,
+        #[source]
+        source: paredit_core_syntax::dialect::UnsupportedSemanticOperation,
+    },
 }
 
 // `From` does not chain.

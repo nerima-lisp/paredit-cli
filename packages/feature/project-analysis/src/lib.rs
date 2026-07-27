@@ -5,6 +5,7 @@ pub mod call_graph_report;
 pub mod call_report;
 pub mod class_cycle_report;
 pub mod complexity_report;
+pub mod error;
 pub mod form_report;
 pub mod impact_report;
 pub mod naming_report;
@@ -41,3 +42,5 @@ pub use unused_local_callable_report::cli::{
     UnusedLocalCallableReportArgs, unused_local_callable_report,
 };
 pub use workspace_report::cli::{WorkspaceReportArgs, workspace_report};
+
+pub use error::{ProjectAnalysisError, ProjectAnalysisResult, WorkspaceAnalysisError};

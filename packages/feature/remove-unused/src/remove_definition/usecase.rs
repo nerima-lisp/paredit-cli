@@ -1,6 +1,6 @@
 use std::path::{Path as FsPath, PathBuf};
 
-use anyhow::{Context, Result};
+use crate::error::{RemoveRequestError, RemoveUnusedError, RemoveUnusedResult};
 
 use crate::definition_report::domain::{DefinitionReportItem, collect_definition_forms};
 use paredit_core_syntax::definition::definition_shape;
@@ -15,10 +15,16 @@ pub struct LoadedDefinitionSource {
     pub dialect: Dialect,
 }
 
+/// The outside world, as this use case needs it.
+///
+/// Its methods keep `anyhow::Result` after §9.2: the port exists so the use
+/// case does not know what an adapter can fail with, and the CLI adapter here
+/// unions a `CliError` with its own. `RemoveUnusedError::Source` carries the
+/// result through.
 pub trait DefinitionSourcePort {
-    fn load(&mut self, file: &FsPath) -> Result<LoadedDefinitionSource>;
+    fn load(&mut self, file: &FsPath) -> anyhow::Result<LoadedDefinitionSource>;
 
-    fn write(&mut self, file: &FsPath, content: &str) -> Result<()>;
+    fn write(&mut self, file: &FsPath, content: &str) -> anyhow::Result<()>;
 }
 
 #[derive(Debug)]
@@ -44,28 +50,34 @@ pub struct RemoveDefinitionPlan {
 pub fn remove_definition(
     source: &mut impl DefinitionSourcePort,
     request: RemoveDefinitionRequest,
-) -> Result<RemoveDefinitionPlan> {
-    let loaded = source.load(&request.file)?;
+) -> RemoveUnusedResult<RemoveDefinitionPlan> {
+    let loaded = source
+        .load(&request.file)
+        .map_err(RemoveUnusedError::Source)?;
     let tree = SyntaxTree::parse_with_dialect(&loaded.text, loaded.dialect)?;
 
     let target_index = match request.path.indexes() {
         [index] => index.get(),
-        _ => anyhow::bail!(
-            "remove-definition requires a top-level definition path, for example --path 2"
-        ),
+        _ => return Err(RemoveRequestError::NotATopLevelPath.into()),
     };
     if target_index >= tree.root_children().len() {
-        anyhow::bail!("top-level path {} is out of range", request.path);
+        return Err(RemoveRequestError::TopLevelPathOutOfRange {
+            path: request.path.to_string(),
+        }
+        .into());
     }
 
     let selection = tree.select_path(&request.path)?;
     let view = selection.view();
     let span = selection.span();
     let Some(head) = list_head(&view) else {
-        anyhow::bail!("selected top-level form is not a list definition");
+        return Err(RemoveRequestError::NotAListDefinition.into());
     };
     if definition_shape(loaded.dialect, &view, head).is_none() {
-        anyhow::bail!("selected top-level form is not recognized as a definition: {head}");
+        return Err(RemoveRequestError::NotADefinition {
+            head: head.to_owned(),
+        }
+        .into());
     }
 
     let definition_text = selection.text().to_owned();
@@ -76,17 +88,21 @@ pub fn remove_definition(
         .expect("recognized definition must be present in the definition report");
     let rewritten = Edit::kill(&loaded.text, &tree, selection)?;
 
-    SyntaxTree::parse_with_dialect(&rewritten, loaded.dialect).with_context(|| {
-        format!(
-            "file would become invalid after removing definition: {}",
-            request.file.display()
-        )
+    SyntaxTree::parse_with_dialect(&rewritten, loaded.dialect).map_err(|source| {
+        RemoveUnusedError::WouldBecomeInvalid {
+            stage: "after",
+            what: "definition",
+            path: request.file.display().to_string(),
+            source,
+        }
     })?;
 
     let changed = rewritten != loaded.text;
     let written = request.write && changed;
     if written {
-        source.write(&request.file, &rewritten)?;
+        source
+            .write(&request.file, &rewritten)
+            .map_err(RemoveUnusedError::Source)?;
     }
 
     Ok(RemoveDefinitionPlan {
@@ -118,8 +134,6 @@ fn list_head(view: &ExpressionView) -> Option<&str> {
 mod tests {
     use std::path::Path;
 
-    use anyhow::Result;
-
     use super::{
         DefinitionSourcePort, LoadedDefinitionSource, RemoveDefinitionRequest, remove_definition,
     };
@@ -132,14 +146,14 @@ mod tests {
     }
 
     impl DefinitionSourcePort for MemorySource {
-        fn load(&mut self, _file: &Path) -> Result<LoadedDefinitionSource> {
+        fn load(&mut self, _file: &Path) -> anyhow::Result<LoadedDefinitionSource> {
             Ok(LoadedDefinitionSource {
                 text: self.text.clone(),
                 dialect: Dialect::CommonLisp,
             })
         }
 
-        fn write(&mut self, _file: &Path, content: &str) -> Result<()> {
+        fn write(&mut self, _file: &Path, content: &str) -> anyhow::Result<()> {
             self.writes.push(content.to_owned());
             Ok(())
         }

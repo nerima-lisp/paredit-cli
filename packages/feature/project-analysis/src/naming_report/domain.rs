@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::error::ProjectAnalysisResult;
 
 use paredit_core_syntax::common_lisp::CommonLispPackageDeclarationForm;
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
@@ -160,7 +160,7 @@ pub fn build_naming_report(
     path: PathBuf,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<NamingReportFile> {
+) -> ProjectAnalysisResult<NamingReportFile> {
     let mut definitions = Vec::new();
 
     for index in 0..tree.root_children().len() {

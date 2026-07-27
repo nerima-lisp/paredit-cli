@@ -7,7 +7,9 @@ mod syntax;
 mod tests;
 mod types;
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{BindingCaptureError, BindingError, BindingResult};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::dialect::{IntroduceLetOperation, VerifiedSemanticPolicy};
@@ -20,20 +22,32 @@ use occurrences::{
 use rewrite::{introduced_let, replace_span, replace_spans_within_span};
 pub use types::{IntroduceLetPlan, IntroduceLetRequest};
 
-pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceLetPlan> {
-    let semantic = request
-        .dialect
-        .verify_introduce_let()
-        .context("introduce-let is not supported for this dialect")?;
-    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("introduce-let input is not a valid S-expression document")?;
+pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> BindingResult<IntroduceLetPlan> {
+    let semantic = request.dialect.verify_introduce_let().map_err(|source| {
+        BindingError::DialectDoesNotSupport {
+            operation: "introduce-let",
+            source,
+        }
+    })?;
+    let input_tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "introduce-let",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
 
     let selected_span = request.target.span;
     let binding_value = selected_span.slice(request.input).to_owned();
     let enclosing = request.enclosing_span.slice(request.input);
-    let enclosing_tree = SyntaxTree::parse_with_dialect(enclosing, request.dialect)
-        .context("failed to parse enclosing list for introduce-let")?;
+    let enclosing_tree =
+        SyntaxTree::parse_with_dialect(enclosing, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "enclosing list for introduce-let",
+                source,
+            }
+        })?;
     let enclosing_view = enclosing_tree.select_path(&Path::root_child(0))?.view();
 
     let selected_relative_span = ByteSpan::new(
@@ -42,10 +56,10 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
     );
 
     if selected_path_shadowed_by_binding(semantic, &request)? {
-        bail!(
-            "introduce-let target is inside an existing binding for '{}'; choose a different --name",
-            request.name.as_str()
-        );
+        return Err(BindingCaptureError::WouldShadow {
+            name: request.name.as_str().to_owned(),
+        }
+        .into());
     }
 
     let (occurrence_spans, skipped_shadowed_occurrence_spans) = if request.all_occurrences {
@@ -73,19 +87,19 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
             request.name.as_str(),
             false,
         ) {
-            bail!(
-                "introduce-let target is inside an existing binding for '{}'; choose a different --name",
-                request.name.as_str()
-            );
+            return Err(BindingCaptureError::WouldShadow {
+                name: request.name.as_str().to_owned(),
+            }
+            .into());
         }
         (vec![selected_span], Vec::new())
     };
 
     if !occurrence_spans.contains(&selected_span) {
-        bail!(
-            "introduce-let target is inside an existing binding for '{}'; choose a different --name",
-            request.name.as_str()
-        );
+        return Err(BindingCaptureError::WouldShadow {
+            name: request.name.as_str().to_owned(),
+        }
+        .into());
     }
 
     let enclosed_replacement = replace_spans_within_span(
@@ -102,8 +116,12 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
     );
     let rewritten = replace_span(request.input, request.enclosing_span, &replacement);
 
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("introduced-let output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "introduced-let",
+            source,
+        }
+    })?;
 
     let changed = rewritten != request.input;
 
@@ -125,7 +143,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
 fn selected_path_shadowed_by_binding(
     semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     request: &IntroduceLetRequest<'_>,
-) -> Result<bool> {
+) -> BindingResult<bool> {
     let Some(path) = &request.path else {
         return Ok(false);
     };
@@ -133,8 +151,13 @@ fn selected_path_shadowed_by_binding(
         return Ok(false);
     };
 
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("failed to parse document for introduce-let")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "document for introduce-let",
+                source,
+            }
+        })?;
     let top_level_view = tree
         .select_path(&Path::root_child(top_level_index.get()))?
         .view();
