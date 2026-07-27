@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn rejects_common_lisp_optional_parameter_when_call_argument_is_missing_under_strict_policy() {

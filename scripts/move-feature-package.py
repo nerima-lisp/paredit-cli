@@ -47,6 +47,10 @@ flet_composition convert_control args io diff shared gate macos_acl usecase cli
 similarity_report duplicate_report form_similarity
 extract_function extract_local_function extract_constant
 inline_function inline_let inline_lambda inline_local_function inline_symbol_macro
+thread_expression unthread_expression replace_forms unwrap_call sort_definitions split_file
+introduce_let let_report split_let split_let_star merge_nested_let merge_nested_let_star
+merge_nested_flet convert_let_to_let_star convert_let_star_to_let convert_flet_to_labels
+convert_labels_to_flet convert_sequential_binding eliminate_empty_binding_form flatten_progn
 """.split())
 
 

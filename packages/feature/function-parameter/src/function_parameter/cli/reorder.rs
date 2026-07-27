@@ -1,18 +1,16 @@
 use anyhow::Result;
 
-use crate::application::usecase::function_parameter::{
+use crate::function_parameter::usecase::{
     ReorderFunctionParametersRequest, plan_reorder_function_parameters,
 };
-use crate::presentation::cli::{
-    read_input_and_dialect, require_output_file, write_file_with_rollback,
-};
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
 
 use super::args::ReorderFunctionParametersArgs;
 use super::render::reorder::print_reorder_function_parameters_plan;
 
-pub(in crate::presentation::cli) fn reorder_function_parameters(
-    args: ReorderFunctionParametersArgs,
-) -> Result<()> {
+pub fn reorder_function_parameters(args: ReorderFunctionParametersArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

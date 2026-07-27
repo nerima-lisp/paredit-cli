@@ -1,20 +1,19 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq};
-use crate::domain::function_parameter::list_edit::atom_text;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+use crate::function_parameter::domain::list_edit::atom_text;
+use paredit_core_syntax::common_lisp::{
+    common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq,
+};
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
-pub(in crate::domain::function_parameter) fn matches_function_call_view(
-    view: &ExpressionView,
-    function_name: &SymbolName,
-) -> bool {
+pub fn matches_function_call_view(view: &ExpressionView, function_name: &SymbolName) -> bool {
     direct_function_call_head(view)
         .is_some_and(|head| common_lisp_symbol_reference_eq(head, function_name.as_str()))
         || setf_place_call_head(view)
             .is_some_and(|head| common_lisp_symbol_reference_eq(head, function_name.as_str()))
 }
 
-pub(super) fn ensure_matching_function_call(
+pub fn ensure_matching_function_call(
     view: &ExpressionView,
     function_name: &SymbolName,
     command: &str,
@@ -37,12 +36,12 @@ pub(super) fn ensure_matching_function_call(
     Ok(())
 }
 
-pub(in crate::domain::function_parameter) struct FunctionCallView<'a> {
-    pub(in crate::domain::function_parameter) view: &'a ExpressionView,
-    pub(in crate::domain::function_parameter) argument_offset: usize,
+pub struct FunctionCallView<'a> {
+    pub view: &'a ExpressionView,
+    pub argument_offset: usize,
 }
 
-pub(in crate::domain::function_parameter) fn resolve_function_call_view<'a>(
+pub fn resolve_function_call_view<'a>(
     view: &'a ExpressionView,
     function_name: &SymbolName,
     call_argument_offset: usize,

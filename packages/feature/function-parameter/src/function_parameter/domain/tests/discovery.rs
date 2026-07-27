@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn discovers_all_same_file_calls() {

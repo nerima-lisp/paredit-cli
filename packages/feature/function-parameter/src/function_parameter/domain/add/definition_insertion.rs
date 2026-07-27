@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
 use super::super::calls::{
     add_keyword_function_parameter_call_edit, add_optional_function_parameter_call_edit,
@@ -15,7 +15,7 @@ use super::super::types::{
     AddFunctionParameterRequest, FunctionParameterInsert, FunctionParameterSection,
 };
 
-pub(super) enum DefinitionInsertionPlan<'a> {
+pub enum DefinitionInsertionPlan<'a> {
     ExistingPositional(&'a PositionalParameterInsertion),
     ExistingOptional(&'a OptionalParameterInsertion),
     ExistingKeyword(&'a KeywordParameterInsertion),
@@ -33,7 +33,7 @@ pub(super) enum DefinitionInsertionPlan<'a> {
 }
 
 impl DefinitionInsertionPlan<'_> {
-    pub(super) const fn resolved_section(&self) -> FunctionParameterSection {
+    pub const fn resolved_section(&self) -> FunctionParameterSection {
         match self {
             Self::ExistingPositional(_) => FunctionParameterSection::Positional,
             Self::ExistingOptional(_) | Self::CreateOptional { .. } => {
@@ -45,7 +45,7 @@ impl DefinitionInsertionPlan<'_> {
         }
     }
 
-    pub(super) fn definition_edit(
+    pub fn definition_edit(
         &self,
         target: &FunctionParameterTarget,
         request: &AddFunctionParameterRequest<'_>,
@@ -87,7 +87,7 @@ impl DefinitionInsertionPlan<'_> {
         }
     }
 
-    pub(super) fn call_edit(
+    pub fn call_edit(
         &self,
         call_view: &ExpressionView,
         function_name: &SymbolName,
@@ -152,7 +152,7 @@ impl DefinitionInsertionPlan<'_> {
     }
 }
 
-pub(super) fn resolve_definition_insertion_plan<'a>(
+pub fn resolve_definition_insertion_plan<'a>(
     target: &'a FunctionParameterTarget,
     request: &AddFunctionParameterRequest<'_>,
 ) -> Option<DefinitionInsertionPlan<'a>> {

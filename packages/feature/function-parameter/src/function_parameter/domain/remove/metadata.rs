@@ -1,22 +1,22 @@
 use anyhow::Result;
 
-use crate::domain::function_parameter::RemoveFunctionParameterRequest;
-use crate::domain::function_parameter::definition::{
+use crate::function_parameter::domain::RemoveFunctionParameterRequest;
+use crate::function_parameter::domain::definition::{
     FunctionParameterTarget, find_unique_parameter_location,
 };
-use crate::domain::function_parameter::list_edit::{
+use crate::function_parameter::domain::list_edit::{
     SpanEdit, is_dotted_list_separator, removal_edit_for_list_item,
 };
 
 #[derive(Debug, Clone)]
-pub(super) struct RemoveParameterMetadata {
-    pub(super) definition_edit: SpanEdit,
-    pub(super) parameter_index: usize,
-    pub(super) parameter_keyword: Option<String>,
-    pub(super) dotted_tail: bool,
+pub struct RemoveParameterMetadata {
+    pub definition_edit: SpanEdit,
+    pub parameter_index: usize,
+    pub parameter_keyword: Option<String>,
+    pub dotted_tail: bool,
 }
 
-pub(super) fn resolve_remove_parameter_metadata(
+pub fn resolve_remove_parameter_metadata(
     target: &FunctionParameterTarget,
     request: &RemoveFunctionParameterRequest<'_>,
 ) -> Result<RemoveParameterMetadata> {

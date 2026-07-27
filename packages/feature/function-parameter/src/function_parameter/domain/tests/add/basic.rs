@@ -1,4 +1,6 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 #[test]
 fn adds_parameter_to_definition_and_call() {

@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView};
 
 use super::FunctionParameterInsert;
 
-pub(super) type SpanEdit = (ByteSpan, String);
+pub type SpanEdit = (ByteSpan, String);
 
-pub(super) fn insertion_edit_for_list_item(
+pub fn insertion_edit_for_list_item(
     container: &ExpressionView,
     protected_prefix_count: usize,
     value: &str,
@@ -51,7 +51,7 @@ pub(super) fn insertion_edit_for_list_item(
     ))
 }
 
-pub(super) fn removal_edit_for_list_item(
+pub fn removal_edit_for_list_item(
     input: &str,
     container: &ExpressionView,
     item_index: usize,
@@ -99,7 +99,7 @@ fn first_newline_or(input: &str, start: usize, end: usize) -> usize {
         .map_or(end, |offset| start + offset)
 }
 
-pub(super) fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<String> {
+pub fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 
@@ -110,9 +110,7 @@ pub(super) fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Re
     Ok(output)
 }
 
-pub(super) fn ensure_non_overlapping_spans(
-    spans: impl IntoIterator<Item = ByteSpan>,
-) -> Result<()> {
+pub fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Result<()> {
     let mut previous_end = None;
     for span in spans {
         let start = span.start().get();
@@ -127,27 +125,27 @@ pub(super) fn ensure_non_overlapping_spans(
     Ok(())
 }
 
-pub(super) const fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
+pub const fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
     left.start().get() < right.end().get() && right.start().get() < left.end().get()
 }
 
-pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
-pub(super) fn atom_text(view: &ExpressionView) -> Option<&str> {
+pub fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
         .then_some(view.text.as_deref())
         .flatten()
 }
 
-pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
     if view.kind != ExpressionKind::List {
         return None;
     }
     atom_child(view, 0)
 }
 
-pub(super) fn is_dotted_list_separator(child: &ExpressionView) -> bool {
+pub fn is_dotted_list_separator(child: &ExpressionView) -> bool {
     atom_text(child).is_some_and(|text| text == ".")
 }

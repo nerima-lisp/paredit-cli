@@ -1,18 +1,16 @@
 use anyhow::Result;
 
-use crate::application::usecase::function_parameter::{
+use crate::function_parameter::usecase::{
     MoveFunctionParameterRequest, plan_move_function_parameter,
 };
-use crate::presentation::cli::{
-    read_input_and_dialect, require_output_file, write_file_with_rollback,
-};
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
 
 use super::args::MoveFunctionParameterArgs;
 use super::render::move_parameter::print_move_function_parameter_plan;
 
-pub(in crate::presentation::cli) fn move_function_parameter(
-    args: MoveFunctionParameterArgs,
-) -> Result<()> {
+pub fn move_function_parameter(args: MoveFunctionParameterArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

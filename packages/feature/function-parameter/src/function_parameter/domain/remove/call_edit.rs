@@ -1,21 +1,21 @@
 use anyhow::Result;
 
-use crate::domain::function_parameter::MissingArgumentPolicy;
-use crate::domain::function_parameter::calls::{
+use crate::function_parameter::domain::MissingArgumentPolicy;
+use crate::function_parameter::domain::calls::{
     remove_function_parameter_call_edit, remove_keyword_function_parameter_call_edit,
 };
-use crate::domain::function_parameter::list_edit::SpanEdit;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use crate::function_parameter::domain::list_edit::SpanEdit;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::metadata::RemoveParameterMetadata;
 
-pub(super) struct RemoveCallEdit {
-    pub(super) span: ByteSpan,
-    pub(super) removed_argument: Option<String>,
-    pub(super) edit: Option<SpanEdit>,
+pub struct RemoveCallEdit {
+    pub span: ByteSpan,
+    pub removed_argument: Option<String>,
+    pub edit: Option<SpanEdit>,
 }
 
-pub(super) fn remove_call_argument_edit(
+pub fn remove_call_argument_edit(
     input: &str,
     call_view: &ExpressionView,
     function_name: &SymbolName,

@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn moves_parameter_and_call_argument() {

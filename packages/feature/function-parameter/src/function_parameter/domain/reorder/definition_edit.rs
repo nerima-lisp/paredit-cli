@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, SyntaxTree};
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, SyntaxTree};
 
 use super::super::list_edit::SpanEdit;
 use super::parameter::ReorderableParameter;
 
-pub(in crate::domain::function_parameter) fn reorder_function_definition_edit(
+pub fn reorder_function_definition_edit(
     input: &str,
     tree: &SyntaxTree,
     container: &ExpressionView,

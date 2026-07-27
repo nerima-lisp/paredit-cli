@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::function_parameter::AddFunctionParameterPlan;
-use crate::presentation::cli::args::OutputFormat;
+use crate::function_parameter::usecase::AddFunctionParameterPlan;
+use paredit_core_cli::args::OutputFormat;
 
-pub(in crate::presentation::cli::function_parameter) fn print_add_function_parameter_plan(
+pub fn print_add_function_parameter_plan(
     plan: &AddFunctionParameterPlan,
     written: bool,
     output: OutputFormat,

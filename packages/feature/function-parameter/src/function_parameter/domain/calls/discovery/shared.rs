@@ -1,9 +1,11 @@
-use crate::domain::common_lisp::{common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq};
-use crate::domain::function_parameter::list_edit::list_head;
-use crate::domain::sexpr::ExpressionView;
-use crate::domain::sexpr::SymbolName;
+use crate::function_parameter::domain::list_edit::list_head;
+use paredit_core_syntax::common_lisp::{
+    common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq,
+};
+use paredit_core_syntax::sexpr::ExpressionView;
+use paredit_core_syntax::sexpr::SymbolName;
 
-pub(super) fn matched_setf_place_call<'a>(
+pub fn matched_setf_place_call<'a>(
     view: &'a ExpressionView,
     function_name: &SymbolName,
 ) -> Option<&'a ExpressionView> {

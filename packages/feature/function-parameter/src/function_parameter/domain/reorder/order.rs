@@ -2,11 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::parameter::ReorderableParameter;
 
-pub(in crate::domain::function_parameter) fn ensure_reorder_stays_within_parameter_groups(
+pub fn ensure_reorder_stays_within_parameter_groups(
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
     command: &str,
@@ -22,7 +22,7 @@ pub(in crate::domain::function_parameter) fn ensure_reorder_stays_within_paramet
     Ok(())
 }
 
-pub(in crate::domain::function_parameter) fn build_new_relative_order(
+pub fn build_new_relative_order(
     old_order: &[SymbolName],
     new_order: &[SymbolName],
 ) -> Result<Vec<usize>> {
@@ -68,6 +68,6 @@ pub(in crate::domain::function_parameter) fn build_new_relative_order(
     Ok(relative_order)
 }
 
-pub(in crate::domain::function_parameter) fn is_identity_order(order: &[usize]) -> bool {
+pub fn is_identity_order(order: &[usize]) -> bool {
     order.iter().copied().eq(0..order.len())
 }

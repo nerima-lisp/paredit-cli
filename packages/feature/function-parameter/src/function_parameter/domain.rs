@@ -31,9 +31,9 @@ pub use types::{
 /// case (CL `&optional`/`&rest`/`&key`/`&aux` markers, `defmethod` type
 /// specializer lists, dotted lambda-list tails) instead of drifting from a
 /// second, less battle-tested implementation.
-pub(crate) fn list_lambda_list_parameter_names(
-    dialect: crate::domain::dialect::Dialect,
-    parameter_form: &crate::domain::sexpr::ExpressionView,
+pub fn list_lambda_list_parameter_names(
+    dialect: paredit_core_syntax::dialect::Dialect,
+    parameter_form: &paredit_core_syntax::sexpr::ExpressionView,
 ) -> anyhow::Result<Vec<String>> {
     definition::parameter_locations(dialect, parameter_form, 0, true, "list-parameters").map(
         |locations| {

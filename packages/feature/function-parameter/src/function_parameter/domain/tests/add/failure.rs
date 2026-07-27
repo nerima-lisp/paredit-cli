@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn rejects_unqualified_duplicate_of_package_qualified_common_lisp_parameter() {

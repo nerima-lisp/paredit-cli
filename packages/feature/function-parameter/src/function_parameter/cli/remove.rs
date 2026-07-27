@@ -1,18 +1,16 @@
 use anyhow::Result;
 
-use crate::application::usecase::function_parameter::{
+use crate::function_parameter::usecase::{
     MissingArgumentPolicy, RemoveFunctionParameterRequest, plan_remove_function_parameter,
 };
-use crate::presentation::cli::{
-    read_input_and_dialect, require_output_file, write_file_with_rollback,
-};
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
 
 use super::args::RemoveFunctionParameterArgs;
 use super::render::remove::print_remove_function_parameter_plan;
 
-pub(in crate::presentation::cli) fn remove_function_parameter(
-    args: RemoveFunctionParameterArgs,
-) -> Result<()> {
+pub fn remove_function_parameter(args: RemoveFunctionParameterArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

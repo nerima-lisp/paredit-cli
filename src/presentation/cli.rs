@@ -96,7 +96,6 @@ mod format_missing_destination_report;
 mod format_newline_report;
 mod format_to_string_report;
 mod funcall_lambda_report;
-mod function_parameter;
 mod getf_default_nil_report;
 mod gethash_default_report;
 mod handler_case_no_clauses_report;
@@ -305,6 +304,7 @@ use paredit_feature_binding::merge_nested_let::cli as merge_nested_let;
 use paredit_feature_binding::merge_nested_let_star::cli as merge_nested_let_star;
 use paredit_feature_binding::split_let::cli as split_let;
 use paredit_feature_binding::split_let_star::cli as split_let_star;
+use paredit_feature_function_parameter::function_parameter::cli as function_parameter;
 
 #[cfg(test)]
 mod tests {

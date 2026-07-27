@@ -1,1 +1,1 @@
-pub use crate::domain::function_parameter::*;
+pub use crate::function_parameter::domain::*;

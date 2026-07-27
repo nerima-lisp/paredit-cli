@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
+use paredit_core_syntax::dialect::Dialect;
 
-use crate::dialect::Dialect;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 use super::calls::{
     FunctionCallPathRequest, add_function_parameter_call_edit, resolve_function_call_paths,

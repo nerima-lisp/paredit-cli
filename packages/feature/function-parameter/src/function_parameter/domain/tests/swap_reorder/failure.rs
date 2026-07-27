@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn rejects_swap_parameter_across_common_lisp_lambda_list_section() {

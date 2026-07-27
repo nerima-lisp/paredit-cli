@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 
-use crate::domain::function_parameter::calls::resolve_function_call_view;
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use crate::function_parameter::domain::calls::resolve_function_call_view;
+use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
 use super::{ParameterGroup, ReorderableParameter};
 
-pub(in crate::domain::function_parameter) fn ensure_positional_arguments_available(
+pub fn ensure_positional_arguments_available(
     view: &ExpressionView,
     function_name: &SymbolName,
     call_argument_offset: usize,
@@ -52,7 +52,7 @@ pub(in crate::domain::function_parameter) fn ensure_positional_arguments_availab
     Ok(())
 }
 
-pub(in crate::domain::function_parameter) fn argument_for_parameter(
+pub fn argument_for_parameter(
     input: &str,
     view: &ExpressionView,
     function_name: &SymbolName,

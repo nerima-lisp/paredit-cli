@@ -5,8 +5,7 @@ use super::{
     plan_move_function_parameter, plan_remove_function_parameter, plan_reorder_function_parameters,
     plan_swap_function_parameters,
 };
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
+use paredit_core_syntax::sexpr::{Path, SymbolName};
 
 fn path(value: &str) -> Path {
     value.parse().expect("path")

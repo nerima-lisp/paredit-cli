@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use crate::domain::function_parameter::FunctionParameterInsert;
-use crate::domain::function_parameter::list_edit::{atom_text, insertion_edit_for_list_item};
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use crate::function_parameter::domain::FunctionParameterInsert;
+use crate::function_parameter::domain::list_edit::{atom_text, insertion_edit_for_list_item};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::validation::resolve_function_call_view;
 
-pub(in crate::domain::function_parameter) fn add_function_parameter_call_edit(
+pub fn add_function_parameter_call_edit(
     view: &ExpressionView,
     function_name: &SymbolName,
     call_argument_offset: usize,
@@ -23,7 +23,7 @@ pub(in crate::domain::function_parameter) fn add_function_parameter_call_edit(
     insertion_edit_for_list_item(call.view, call.argument_offset + 1, argument, insert)
 }
 
-pub(in crate::domain::function_parameter) fn add_positional_function_parameter_call_edit(
+pub fn add_positional_function_parameter_call_edit(
     view: &ExpressionView,
     function_name: &SymbolName,
     call_argument_offset: usize,
@@ -56,7 +56,7 @@ pub(in crate::domain::function_parameter) fn add_positional_function_parameter_c
     )
 }
 
-pub(in crate::domain::function_parameter) fn add_optional_function_parameter_call_edit(
+pub fn add_optional_function_parameter_call_edit(
     view: &ExpressionView,
     function_name: &SymbolName,
     call_argument_offset: usize,
@@ -114,7 +114,7 @@ pub(in crate::domain::function_parameter) fn add_optional_function_parameter_cal
     )
 }
 
-pub(in crate::domain::function_parameter) fn add_keyword_function_parameter_call_edit(
+pub fn add_keyword_function_parameter_call_edit(
     view: &ExpressionView,
     function_name: &SymbolName,
     call_argument_offset: usize,

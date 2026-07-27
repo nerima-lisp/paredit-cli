@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::list_edit::{atom_text, is_dotted_list_separator};
 use super::types::{KeywordArgumentLocation, ParameterLocation, ParameterSection};
@@ -11,7 +11,7 @@ struct LambdaListBinding<'a> {
     keyword: Option<String>,
 }
 
-pub(crate) fn parameter_locations(
+pub fn parameter_locations(
     dialect: Dialect,
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
@@ -172,7 +172,7 @@ fn parameter_locations_from_children(
     Ok(locations)
 }
 
-pub(crate) fn default_keyword_for_parameter(name: &str) -> String {
+pub fn default_keyword_for_parameter(name: &str) -> String {
     if name.starts_with(':') {
         name.to_owned()
     } else {

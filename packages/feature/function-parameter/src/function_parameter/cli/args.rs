@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
 
-use crate::application::usecase::function_parameter::FunctionParameterSection;
-use crate::domain::sexpr::{Path, SymbolName};
-use crate::presentation::cli::args::{DialectArg, OutputFormat, ParameterInsert};
+use crate::function_parameter::usecase::FunctionParameterSection;
+use paredit_core_cli::args::{DialectArg, OutputFormat, ParameterInsert};
+use paredit_core_syntax::sexpr::{Path, SymbolName};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(in crate::presentation::cli::function_parameter) enum ParameterSection {
+pub enum ParameterSection {
     Auto,
     Positional,
     Optional,
@@ -15,9 +15,8 @@ pub(in crate::presentation::cli::function_parameter) enum ParameterSection {
 }
 
 impl ParameterSection {
-    pub(in crate::presentation::cli::function_parameter) const fn into_function_parameter_section(
-        self,
-    ) -> FunctionParameterSection {
+    #[must_use]
+    pub const fn into_function_parameter_section(self) -> FunctionParameterSection {
         match self {
             Self::Auto => FunctionParameterSection::Auto,
             Self::Positional => FunctionParameterSection::Positional,
@@ -28,118 +27,118 @@ impl ParameterSection {
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct AddFunctionParameterArgs {
+pub struct AddFunctionParameterArgs {
     #[arg(short, long)]
-    pub(in crate::presentation::cli::function_parameter) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) definition_path: Path,
+    pub definition_path: Path,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) name: SymbolName,
+    pub name: SymbolName,
     #[arg(long, allow_hyphen_values = true)]
-    pub(in crate::presentation::cli::function_parameter) argument: String,
+    pub argument: String,
     #[arg(long = "call-path")]
-    pub(in crate::presentation::cli::function_parameter) call_paths: Vec<Path>,
+    pub call_paths: Vec<Path>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) all_calls: bool,
+    pub all_calls: bool,
     #[arg(long, value_enum, default_value_t = ParameterInsert::End)]
-    pub(in crate::presentation::cli::function_parameter) insert: ParameterInsert,
+    pub insert: ParameterInsert,
     #[arg(
         long = "parameter-section",
         value_enum,
         default_value_t = ParameterSection::Auto,
         help = "Target lambda-list section: auto, positional, optional, or keyword"
     )]
-    pub(in crate::presentation::cli::function_parameter) section: ParameterSection,
+    pub section: ParameterSection,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) write: bool,
+    pub write: bool,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli::function_parameter) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct MoveFunctionParameterArgs {
+pub struct MoveFunctionParameterArgs {
     #[arg(short, long)]
-    pub(in crate::presentation::cli::function_parameter) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) definition_path: Path,
+    pub definition_path: Path,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) name: SymbolName,
+    pub name: SymbolName,
     #[arg(long = "to-index")]
-    pub(in crate::presentation::cli::function_parameter) to_index: usize,
+    pub to_index: usize,
     #[arg(long = "call-path")]
-    pub(in crate::presentation::cli::function_parameter) call_paths: Vec<Path>,
+    pub call_paths: Vec<Path>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) all_calls: bool,
+    pub all_calls: bool,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) write: bool,
+    pub write: bool,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli::function_parameter) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct SwapFunctionParametersArgs {
+pub struct SwapFunctionParametersArgs {
     #[arg(short, long)]
-    pub(in crate::presentation::cli::function_parameter) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) definition_path: Path,
+    pub definition_path: Path,
     #[arg(long = "left-name")]
-    pub(in crate::presentation::cli::function_parameter) left_name: SymbolName,
+    pub left_name: SymbolName,
     #[arg(long = "right-name")]
-    pub(in crate::presentation::cli::function_parameter) right_name: SymbolName,
+    pub right_name: SymbolName,
     #[arg(long = "call-path")]
-    pub(in crate::presentation::cli::function_parameter) call_paths: Vec<Path>,
+    pub call_paths: Vec<Path>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) all_calls: bool,
+    pub all_calls: bool,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) write: bool,
+    pub write: bool,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli::function_parameter) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct ReorderFunctionParametersArgs {
+pub struct ReorderFunctionParametersArgs {
     #[arg(short, long)]
-    pub(in crate::presentation::cli::function_parameter) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) definition_path: Path,
+    pub definition_path: Path,
     #[arg(long = "parameter", required = true)]
-    pub(in crate::presentation::cli::function_parameter) parameter_order: Vec<SymbolName>,
+    pub parameter_order: Vec<SymbolName>,
     #[arg(long = "call-path")]
-    pub(in crate::presentation::cli::function_parameter) call_paths: Vec<Path>,
+    pub call_paths: Vec<Path>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) all_calls: bool,
+    pub all_calls: bool,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) write: bool,
+    pub write: bool,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli::function_parameter) output: OutputFormat,
+    pub output: OutputFormat,
 }
 
 #[derive(Debug, Args)]
-pub(in crate::presentation::cli) struct RemoveFunctionParameterArgs {
+pub struct RemoveFunctionParameterArgs {
     #[arg(short, long)]
-    pub(in crate::presentation::cli::function_parameter) file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) dialect: Option<DialectArg>,
+    pub dialect: Option<DialectArg>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) definition_path: Path,
+    pub definition_path: Path,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) name: SymbolName,
+    pub name: SymbolName,
     #[arg(long = "call-path")]
-    pub(in crate::presentation::cli::function_parameter) call_paths: Vec<Path>,
+    pub call_paths: Vec<Path>,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) all_calls: bool,
+    pub all_calls: bool,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) allow_missing_argument: bool,
+    pub allow_missing_argument: bool,
     #[arg(long)]
-    pub(in crate::presentation::cli::function_parameter) write: bool,
+    pub write: bool,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub(in crate::presentation::cli::function_parameter) output: OutputFormat,
+    pub output: OutputFormat,
 }

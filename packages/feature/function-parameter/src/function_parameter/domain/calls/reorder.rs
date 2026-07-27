@@ -1,15 +1,14 @@
 use anyhow::{Context, Result};
 
-use crate::domain::function_parameter::list_edit::SpanEdit;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use crate::function_parameter::domain::list_edit::SpanEdit;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::super::reorder::{ParameterGroup, ReorderableParameter};
 use super::validation::resolve_function_call_view;
 
-pub(in crate::domain::function_parameter) type ReorderArgumentEdit =
-    (ByteSpan, Vec<String>, Option<SpanEdit>);
+pub type ReorderArgumentEdit = (ByteSpan, Vec<String>, Option<SpanEdit>);
 
-pub(in crate::domain::function_parameter) fn reorder_function_parameter_call_edit(
+pub fn reorder_function_parameter_call_edit(
     input: &str,
     view: &ExpressionView,
     function_name: &SymbolName,

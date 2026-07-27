@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::function_parameter::MoveFunctionParameterPlan;
-use crate::presentation::cli::args::OutputFormat;
+use crate::function_parameter::usecase::MoveFunctionParameterPlan;
+use paredit_core_cli::args::OutputFormat;
 
-pub(in crate::presentation::cli::function_parameter) fn print_move_function_parameter_plan(
+pub fn print_move_function_parameter_plan(
     plan: &MoveFunctionParameterPlan,
     written: bool,
     output: OutputFormat,

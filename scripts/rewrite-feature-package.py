@@ -205,10 +205,23 @@ def rewrite(name: str, slices: list[str]) -> int:
         counts["pub_crate"] += n
         text, n = re.subn(r"\bpub\(super\)", "pub", text)
         counts["pub_super"] += n
+        # ...except a glob, which re-exports nothing at `pub` and is rejected.
+        text, n = re.subn(r"^(\s*)pub use super::\*;$", r"\1pub(super) use super::*;",
+                          text, flags=re.M)
+        counts["glob_narrowed"] += n
         # A `pub use` cannot re-export an item that is `pub(in ...)`. Those
         # paths also no longer name anything after the layer collapse.
         text, n = re.subn(r"\bpub\(in crate::[a-z_0-9:]+\)", "pub", text)
         counts["pub_in"] += n
+
+        # 4b. Safety net: any `crate::<m>` still naming a module another package
+        #     owns. Earlier rules key on `crate::<layer>::<m>`, so a path that
+        #     lost its layer segment some other way slips past them.
+        for module, owner in OWNER.items():
+            if module in slices:
+                continue
+            text, n = re.subn(rf"\bcrate::{module}::", f"{owner}::{module}::", text)
+            counts["stray_paths"] += n
 
         # 5. Doctests can only import the crate they compile into.
         text, n = re.subn(r"\bparedit_cli::", f"{crate}::", text)
@@ -236,7 +249,18 @@ def rewrite(name: str, slices: list[str]) -> int:
             missing.append(import_line)
         if missing:
             lines = text.splitlines(keepends=True)
-            at = next((i for i, l in enumerate(lines) if l.startswith("use ")), 0)
+            at = next((i for i, l in enumerate(lines) if l.startswith("use ")), None)
+            if at is None:
+                # No existing `use` to anchor on. Inserting at 0 would put the
+                # imports above the module's `//!` inner doc comment, which must
+                # come first (E0753).
+                at = 0
+                while at < len(lines) and (
+                    lines[at].startswith(("//!", "#!["))
+                    or lines[at].strip() == ""
+                    or lines[at].lstrip().startswith("//")
+                ):
+                    at += 1
             for line in reversed(missing):
                 lines.insert(at, line + "\n")
             path.write_text("".join(lines))

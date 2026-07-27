@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 use super::calls::{
     FunctionCallPathRequest, reorder_function_parameter_call_edit, resolve_function_call_paths,
@@ -12,15 +12,15 @@ use super::list_edit::{
 };
 use super::types::{ReorderFunctionParametersPlan, ReorderFunctionParametersRequest};
 
-pub(super) use definition_edit::reorder_function_definition_edit;
-pub(super) use order::{
+pub use definition_edit::reorder_function_definition_edit;
+pub use order::{
     build_new_relative_order, ensure_reorder_stays_within_parameter_groups, is_identity_order,
 };
-pub(super) use parameter::{
+pub use parameter::{
     ParameterGroup, ReorderableParameter, ensure_parameter_is_reorderable, reorderable_parameters,
 };
 
-pub(in crate::domain::function_parameter) mod call_argument;
+pub mod call_argument;
 mod definition_edit;
 mod order;
 mod parameter;

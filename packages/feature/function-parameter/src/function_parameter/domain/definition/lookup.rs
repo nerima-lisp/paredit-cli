@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::types::{FunctionParameterTarget, ParameterLocation};
 
-pub(crate) fn find_unique_parameter_location<'a>(
+pub fn find_unique_parameter_location<'a>(
     target: &'a FunctionParameterTarget,
     parameter_name: &SymbolName,
     operation: &str,

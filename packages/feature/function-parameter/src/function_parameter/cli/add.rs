@@ -1,19 +1,17 @@
 use anyhow::Result;
 
-use crate::application::usecase::function_parameter::{
+use crate::function_parameter::usecase::{
     AddFunctionParameterRequest, FunctionParameterInsert, plan_add_function_parameter,
 };
-use crate::presentation::cli::{
-    read_input_and_dialect, require_output_file, write_file_with_rollback,
-};
+use paredit_core_cli::shared::read_input_and_dialect;
+use paredit_core_cli::shared::require_output_file;
+use paredit_core_cli::shared::write_file_with_rollback;
 
 use super::args::AddFunctionParameterArgs;
 use super::render::add::print_add_function_parameter_plan;
-use crate::presentation::cli::args::ParameterInsert;
+use paredit_core_cli::args::ParameterInsert;
 
-pub(in crate::presentation::cli) fn add_function_parameter(
-    args: AddFunctionParameterArgs,
-) -> Result<()> {
+pub fn add_function_parameter(args: AddFunctionParameterArgs) -> Result<()> {
     if args.write && args.file.is_none() {
         anyhow::bail!("--write requires --file");
     }

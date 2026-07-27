@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn adds_common_lisp_optional_parameter_at_start_before_key_section() {

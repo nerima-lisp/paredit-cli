@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn swaps_common_lisp_optional_parameters_and_call_arguments_within_section() {

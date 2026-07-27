@@ -1,4 +1,5 @@
 pub(super) use super::*;
+use paredit_core_syntax::sexpr::SymbolName;
 
 fn symbol_names(names: &[&str]) -> Vec<SymbolName> {
     names.iter().map(|name| symbol(name)).collect()

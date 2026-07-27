@@ -1,4 +1,5 @@
 use super::*;
+use paredit_core_syntax::dialect::Dialect;
 
 #[test]
 fn removes_parameter_from_common_lisp_flet_binding_and_call_argument() {

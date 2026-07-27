@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
 use super::super::list_edit::{atom_text, is_dotted_list_separator};
 use super::lambda_list::default_keyword_for_parameter;
@@ -9,7 +9,7 @@ use super::types::{
     KeywordParameterInsertion, OptionalParameterInsertion, PositionalParameterInsertion,
 };
 
-pub(crate) fn keyword_parameter_insertion(
+pub fn keyword_parameter_insertion(
     dialect: Dialect,
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
@@ -86,7 +86,7 @@ pub(crate) fn keyword_parameter_insertion(
     }))
 }
 
-pub(crate) fn optional_parameter_insertion(
+pub fn optional_parameter_insertion(
     dialect: Dialect,
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
@@ -145,7 +145,7 @@ pub(crate) fn optional_parameter_insertion(
     }))
 }
 
-pub(crate) fn positional_parameter_insertion(
+pub fn positional_parameter_insertion(
     dialect: Dialect,
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,

@@ -1,11 +1,12 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::function_parameter::ReorderFunctionParametersPlan;
-use crate::domain::sexpr::SymbolName;
-use crate::presentation::cli::args::OutputFormat;
+use crate::function_parameter::usecase::ReorderFunctionParametersPlan;
+use paredit_core_cli::args::OutputFormat;
+use paredit_core_syntax::sexpr::SymbolName;
 
-pub(in crate::presentation::cli::function_parameter) fn print_reorder_function_parameters_plan(
+pub fn print_reorder_function_parameters_plan(
     plan: &ReorderFunctionParametersPlan,
     written: bool,
     output: OutputFormat,

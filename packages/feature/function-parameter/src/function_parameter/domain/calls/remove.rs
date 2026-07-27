@@ -1,17 +1,16 @@
 use anyhow::Result;
 
-use crate::domain::function_parameter::MissingArgumentPolicy;
-use crate::domain::function_parameter::list_edit::{
+use crate::function_parameter::domain::MissingArgumentPolicy;
+use crate::function_parameter::domain::list_edit::{
     SpanEdit, atom_text, removal_edit_for_list_item,
 };
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::validation::resolve_function_call_view;
 
-pub(in crate::domain::function_parameter) type RemoveArgumentEdit =
-    (ByteSpan, Option<String>, Option<SpanEdit>);
+pub type RemoveArgumentEdit = (ByteSpan, Option<String>, Option<SpanEdit>);
 
-pub(in crate::domain::function_parameter) fn remove_function_parameter_call_edit(
+pub fn remove_function_parameter_call_edit(
     input: &str,
     view: &ExpressionView,
     function_name: &SymbolName,
@@ -44,7 +43,7 @@ pub(in crate::domain::function_parameter) fn remove_function_parameter_call_edit
     Ok((call.view.span, Some(removed_argument), Some(edit)))
 }
 
-pub(in crate::domain::function_parameter) fn remove_keyword_function_parameter_call_edit(
+pub fn remove_keyword_function_parameter_call_edit(
     input: &str,
     view: &ExpressionView,
     function_name: &SymbolName,

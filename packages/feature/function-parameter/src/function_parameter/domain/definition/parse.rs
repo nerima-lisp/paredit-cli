@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{CommonLispOperator, common_lisp_symbol_reference_eq};
-use crate::domain::definition::{DefinitionCategory, definition_shape};
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::{CommonLispOperator, common_lisp_symbol_reference_eq};
+use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -14,7 +14,7 @@ use super::insertion::{
 use super::lambda_list::parameter_locations;
 use super::types::{FunctionParameterDefinitionScope, FunctionParameterTarget};
 
-pub(crate) fn parse_remove_function_parameter_definition(
+pub fn parse_remove_function_parameter_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
@@ -22,7 +22,7 @@ pub(crate) fn parse_remove_function_parameter_definition(
     parse_function_parameter_definition(dialect, tree, path, None, "remove-function-parameter")
 }
 
-pub(crate) fn parse_move_function_parameter_definition(
+pub fn parse_move_function_parameter_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
@@ -30,7 +30,7 @@ pub(crate) fn parse_move_function_parameter_definition(
     parse_function_parameter_definition(dialect, tree, path, None, "move-function-parameter")
 }
 
-pub(crate) fn parse_swap_function_parameters_definition(
+pub fn parse_swap_function_parameters_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
@@ -38,7 +38,7 @@ pub(crate) fn parse_swap_function_parameters_definition(
     parse_function_parameter_definition(dialect, tree, path, None, "swap-function-parameters")
 }
 
-pub(crate) fn parse_reorder_function_parameters_definition(
+pub fn parse_reorder_function_parameters_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
@@ -46,7 +46,7 @@ pub(crate) fn parse_reorder_function_parameters_definition(
     parse_function_parameter_definition(dialect, tree, path, None, "reorder-function-parameters")
 }
 
-pub(crate) fn parse_add_function_parameter_definition(
+pub fn parse_add_function_parameter_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,

@@ -70,7 +70,39 @@ def published(src: pathlib.Path, slice_: str) -> list[tuple[str, str]]:
     for fn, arg in re.findall(r"pub fn ([a-z0-9_]+)\s*\(\s*[a-z0-9_]+\s*:\s*([A-Za-z0-9_]+Args)\b", text):
         if arg in args_types:
             pairs.append((arg, fn))
-    return sorted(set(pairs))
+    pairs = sorted(set(pairs))
+
+    # When `cli` is a directory, each pair sits in a submodule, so the slice's
+    # cli/mod.rs must hoist them to `<slice>::cli::<name>` - the path lib.rs
+    # and the composition root use.
+    cli_dir = src / slice_ / "cli"
+    if cli_dir.is_dir() and pairs:
+        by_module: dict[str, list[str]] = {}
+        for f in sorted(cli_dir.glob("*.rs")):
+            if f.name == "mod.rs":
+                continue
+            body = f.read_text()
+            for arg, fn in pairs:
+                if re.search(rf"pub struct {arg}\b", body) or \
+                   re.search(rf"pub fn {fn}\s*\(", body):
+                    for name in (arg, fn):
+                        if (re.search(rf"pub struct {name}\b", body)
+                                or re.search(rf"pub fn {name}\s*\(", body)):
+                            by_module.setdefault(f.stem, []).append(name)
+        mod_rs = cli_dir / "mod.rs"
+        base = mod_rs.read_text() if mod_rs.is_file() else ""
+        hoist = "".join(
+            f"pub use {module}::{{{', '.join(sorted(set(names)))}}};\n"
+            for module, names in sorted(by_module.items())
+        )
+        if hoist and "// Hoisted for the composition root" not in base:
+            mod_rs.write_text(
+                base.rstrip("\n")
+                + "\n\n// Hoisted for the composition root (section 4.2): the argument type and\n"
+                  "// run function of each subcommand this slice owns.\n"
+                + hoist
+            )
+    return pairs
 
 
 def scaffold(name: str, slices: list[str], description: str, deps: list[str]) -> int:

@@ -1,13 +1,13 @@
 use anyhow::Result;
 
-use crate::domain::callable_scope::{
+use crate::function_parameter::domain::calls::matches_function_call_view;
+use crate::function_parameter::domain::list_edit::{list_head, spans_overlap};
+use paredit_core_semantics::callable_scope::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_names,
 };
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::dialect::Dialect;
-use crate::domain::function_parameter::calls::matches_function_call_view;
-use crate::domain::function_parameter::list_edit::{list_head, spans_overlap};
-use crate::domain::sexpr::{
+use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
@@ -161,10 +161,10 @@ impl TraversalStats {
     }
 }
 
-pub(super) fn discover_function_call_paths(
+pub fn discover_function_call_paths(
     tree: &SyntaxTree,
     dialect: Dialect,
-    definition_span: crate::domain::sexpr::ByteSpan,
+    definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
 ) -> Result<Vec<Path>> {
     let mut call_paths = Vec::new();
@@ -338,7 +338,7 @@ fn schedule_matched_descendants<'view>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::sexpr::SyntaxTree;
 
     #[test]
     fn iterative_traversal_handles_thirty_thousand_levels_with_one_path_copy() {

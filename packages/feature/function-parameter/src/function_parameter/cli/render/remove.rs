@@ -1,10 +1,11 @@
 use anyhow::Result;
+use paredit_core_cli::safe_text;
 use serde_json::json;
 
-use crate::application::usecase::function_parameter::RemoveFunctionParameterPlan;
-use crate::presentation::cli::args::OutputFormat;
+use crate::function_parameter::usecase::RemoveFunctionParameterPlan;
+use paredit_core_cli::args::OutputFormat;
 
-pub(in crate::presentation::cli::function_parameter) fn print_remove_function_parameter_plan(
+pub fn print_remove_function_parameter_plan(
     plan: &RemoveFunctionParameterPlan,
     written: bool,
     output: OutputFormat,

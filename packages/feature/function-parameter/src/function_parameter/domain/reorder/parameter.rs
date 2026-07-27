@@ -1,27 +1,27 @@
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::SymbolName;
+use paredit_core_syntax::sexpr::SymbolName;
 
 use super::super::definition::{ParameterLocation, ParameterSection};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::domain::function_parameter) enum ParameterGroup {
+pub enum ParameterGroup {
     Required,
     Optional,
     Keyword,
 }
 
 #[derive(Clone, Debug)]
-pub(in crate::domain::function_parameter) struct ReorderableParameter {
-    pub(in crate::domain::function_parameter) name: SymbolName,
-    pub(in crate::domain::function_parameter) item_index: usize,
-    pub(in crate::domain::function_parameter) group: ParameterGroup,
-    pub(in crate::domain::function_parameter) call_index: Option<usize>,
-    pub(in crate::domain::function_parameter) keyword: Option<String>,
-    pub(in crate::domain::function_parameter) positional_prefix_count: Option<usize>,
+pub struct ReorderableParameter {
+    pub name: SymbolName,
+    pub item_index: usize,
+    pub group: ParameterGroup,
+    pub call_index: Option<usize>,
+    pub keyword: Option<String>,
+    pub positional_prefix_count: Option<usize>,
 }
 
-pub(in crate::domain::function_parameter) fn reorderable_parameters(
+pub fn reorderable_parameters(
     parameters: &[ParameterLocation],
     operation: &str,
 ) -> Result<Vec<ReorderableParameter>> {
@@ -91,7 +91,7 @@ pub(in crate::domain::function_parameter) fn reorderable_parameters(
     Ok(parameters.into_iter().flatten().collect())
 }
 
-pub(in crate::domain::function_parameter) fn ensure_parameter_is_reorderable(
+pub fn ensure_parameter_is_reorderable(
     parameters: &[ReorderableParameter],
     item_index: usize,
     parameter_name: &SymbolName,
