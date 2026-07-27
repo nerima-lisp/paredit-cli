@@ -27,7 +27,6 @@ pub struct RefactorDiffFileResult {
     pub output_parse_ok: bool,
     pub expected_output_parse_ok: bool,
     pub manifest_flags_match: bool,
-    pub stale: bool,
     pub diff: String,
 }
 
@@ -42,4 +41,19 @@ pub struct RefactorDiffSummary {
     pub parse_error_count: usize,
     pub manifest_flag_mismatch_count: usize,
     pub can_apply: bool,
+}
+
+impl RefactorDiffFileResult {
+    /// Whether the manifest was planned against a different input than the one
+    /// on disk.
+    ///
+    /// Derived rather than stored: it is exactly `!input_hash_matches`, and a
+    /// stored copy is a second source of truth that can disagree with the
+    /// first. The architecture guide states this as a rule - derive
+    /// presentation values at the serialization boundary instead of keeping
+    /// them in the model.
+    #[must_use]
+    pub const fn stale(&self) -> bool {
+        !self.input_hash_matches
+    }
 }

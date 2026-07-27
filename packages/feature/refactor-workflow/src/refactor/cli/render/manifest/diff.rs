@@ -78,7 +78,7 @@ pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFor
                     file.output_parse_ok,
                     file.expected_output_parse_ok,
                     file.manifest_flags_match,
-                    file.stale
+                    file.stale()
                 );
                 if !file.diff.is_empty() {
                     print!("{}", file.diff);
@@ -134,7 +134,7 @@ pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFor
                         "output_parse_ok": file.output_parse_ok,
                         "expected_output_parse_ok": file.expected_output_parse_ok,
                         "manifest_flags_match": file.manifest_flags_match,
-                        "stale": file.stale,
+                        "stale": file.stale(),
                         "diff": file.diff.as_str(),
                     }))
                     .collect::<Vec<_>>(),

@@ -52,7 +52,6 @@ pub fn build_refactor_check_result(
         let changed = rewritten != input;
         let manifest_flags_match =
             changed == file.changed && output_parse_ok == file.output_parse_ok;
-        let stale = !input_hash_matches;
 
         files.push(RefactorCheckFileResult {
             path: file.path.clone(),
@@ -68,11 +67,10 @@ pub fn build_refactor_check_result(
             output_parse_ok,
             expected_output_parse_ok: file.output_parse_ok,
             manifest_flags_match,
-            stale,
         });
     }
 
-    let stale_file_count = files.iter().filter(|file| file.stale).count();
+    let stale_file_count = files.iter().filter(|file| file.stale()).count();
     let output_hash_mismatch_count = files
         .iter()
         .filter(|file| !file.output_hash_matches)

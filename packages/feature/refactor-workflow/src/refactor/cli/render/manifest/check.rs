@@ -74,7 +74,7 @@ pub fn print_refactor_check_result(
                     file.output_parse_ok,
                     file.expected_output_parse_ok,
                     file.manifest_flags_match,
-                    file.stale
+                    file.stale()
                 );
             }
         }
@@ -127,7 +127,7 @@ pub fn print_refactor_check_result(
                         "output_parse_ok": file.output_parse_ok,
                         "expected_output_parse_ok": file.expected_output_parse_ok,
                         "manifest_flags_match": file.manifest_flags_match,
-                        "stale": file.stale,
+                        "stale": file.stale(),
                     }))
                     .collect::<Vec<_>>(),
             }))?

@@ -55,7 +55,6 @@ pub fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
         let changed = rewritten != input;
         let manifest_flags_match =
             changed == file.changed && output_parse_ok == file.output_parse_ok;
-        let stale = !input_hash_matches;
         let diff = if changed {
             unified_diff(&file.path, &input, &rewritten)
         } else {
@@ -76,12 +75,11 @@ pub fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
             output_parse_ok,
             expected_output_parse_ok: file.output_parse_ok,
             manifest_flags_match,
-            stale,
             diff,
         });
     }
 
-    let stale_file_count = files.iter().filter(|file| file.stale).count();
+    let stale_file_count = files.iter().filter(|file| file.stale()).count();
     let output_hash_mismatch_count = files
         .iter()
         .filter(|file| !file.output_hash_matches)
