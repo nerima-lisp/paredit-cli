@@ -4,6 +4,8 @@ use crate::common_lisp::{
     CommonLispValueScopeForm, CommonLispVariableBindingForm,
 };
 
+use crate::scheme::SchemeOperator;
+
 use super::Dialect;
 
 impl Dialect {
@@ -34,10 +36,14 @@ impl Dialect {
                 head,
                 "defun" | "defmacro" | "defrecord" | "defmodule" | "defsyntax"
             ),
-            Self::Scheme | Self::Racket => matches!(
-                head,
-                "define" | "define-syntax" | "define-library" | "lambda" | "let" | "let*"
-            ),
+            // Mirrors `SchemeOperator`: a head earns a place here when the
+            // form it names introduces something a definition report should
+            // list. The previous six-entry list omitted `define-values`,
+            // `define-record-type` and every `letrec` flavour, so a file using
+            // them looked as though it defined nothing.
+            Self::Scheme | Self::Racket => SchemeOperator::from_head(head).is_some_and(|operator| {
+                operator.definition_category().is_some() || operator.is_binder()
+            }),
             Self::Clojure => matches!(
                 head,
                 "ns" | "def"

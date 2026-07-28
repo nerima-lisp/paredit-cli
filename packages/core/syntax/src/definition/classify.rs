@@ -1,5 +1,6 @@
 use crate::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
 use crate::dialect::Dialect;
+use crate::scheme::SchemeOperator;
 
 use super::DefinitionCategory;
 
@@ -62,12 +63,25 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
             "defmodule" => DefinitionCategory::Package,
             _ => return None,
         },
-        Dialect::Scheme | Dialect::Racket => match normalized_lower.as_str() {
-            "define" | "lambda" => DefinitionCategory::Function,
-            "define-syntax" => DefinitionCategory::Macro,
-            "define-library" => DefinitionCategory::Package,
-            "let" | "let*" => DefinitionCategory::Other,
-            _ => return None,
+        // Scheme is case-sensitive (R7RS 2.1), so the case-folded `normalized_
+        // lower` used by the other arms would accept `DEFINE`. The raw head is
+        // what the operator table matches on.
+        Dialect::Scheme | Dialect::Racket => match SchemeOperator::from_head(head) {
+            // `(define x 1)` and `(define (f) 1)` share a head. The category
+            // depends on the shape of child 1, which `definition_shape` cannot
+            // see from here, so `Function` stays the reported answer for
+            // continuity; `dialect::semantic::definition_shape` distinguishes
+            // them where a caller needs the difference.
+            Some(SchemeOperator::Define | SchemeOperator::Lambda) => DefinitionCategory::Function,
+            Some(operator) => match operator.definition_category() {
+                Some(category) => category,
+                // A binding form is not a definition, but the existing
+                // contract reports `let`/`let*` as `Other`, and the same is
+                // true of every other scope-opening head.
+                None if operator.is_binder() => DefinitionCategory::Other,
+                None => return None,
+            },
+            None => return None,
         },
         Dialect::Clojure => match normalized_lower.as_str() {
             "ns" => DefinitionCategory::Package,
@@ -147,6 +161,11 @@ pub(super) fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool
                 .as_str(),
             "defmacro" | "cl-defmacro"
         ),
+        // Scheme stays out deliberately. A `defmacro` body is *evaluated* to
+        // produce code, which is what this predicate marks; a `syntax-rules`
+        // template is substituted, never run, and the reference query skips
+        // `define-syntax` bodies wholesale in
+        // `lexical_scope::traversal::binding_forms::scheme` instead.
         Dialect::Lfe
         | Dialect::Scheme
         | Dialect::Racket

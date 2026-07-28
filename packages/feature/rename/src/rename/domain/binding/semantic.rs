@@ -269,19 +269,30 @@ fn collect_selected_binding_scope(
     output: &mut Vec<ByteSpan>,
     shadowed_scope_count: &mut usize,
 ) {
-    if visibility == BindingVisibility::Sequential {
-        for group in groups.iter().skip(selected_group + 1) {
-            if let Some(value) = &group.value {
-                collect_references(
-                    semantic,
-                    value,
-                    from,
-                    input,
-                    output,
-                    shadowed_scope_count,
-                    false,
-                );
-            }
+    // Which of the group's own initializers can see the binding being renamed.
+    //
+    // A parallel `let` evaluates all of them outside the scope, so none. A
+    // `let*` exposes it to the entries written after it. A `letrec` exposes it
+    // to all of them, including its own -- `(letrec ((f (lambda () (f)))))` is
+    // the whole point of the form, and skipping those occurrences would leave
+    // a renamed procedure calling its old name.
+    let visible_initializers: &[BindingGroup] = match visibility {
+        BindingVisibility::Parallel => &[],
+        BindingVisibility::Sequential => groups.get(selected_group + 1..).unwrap_or_default(),
+        BindingVisibility::Recursive => groups,
+    };
+
+    for group in visible_initializers {
+        if let Some(value) = &group.value {
+            collect_references(
+                semantic,
+                value,
+                from,
+                input,
+                output,
+                shadowed_scope_count,
+                false,
+            );
         }
     }
     collect_body_references(
@@ -610,9 +621,20 @@ fn collect_nested_binding_groups(
     output: &mut Vec<ByteSpan>,
     shadowed_scope_count: &mut usize,
 ) {
+    // A `letrec` binds its whole group before any initializer runs, so one
+    // entry naming the symbol hides the outer binding from *every*
+    // initializer -- including those written before it. `let` and `let*` are
+    // decided entry by entry in the loop below.
+    let group_shadows_every_initializer = visibility == BindingVisibility::Recursive
+        && groups
+            .iter()
+            .any(|group| bindings_bind(semantic, &group.names, from));
+
     let mut binding_shadows = false;
     for group in groups {
-        if visibility == BindingVisibility::Parallel || !binding_shadows {
+        let initializer_sees_outer = !group_shadows_every_initializer
+            && (visibility == BindingVisibility::Parallel || !binding_shadows);
+        if initializer_sees_outer {
             if let Some(value) = &group.value {
                 collect_references(
                     semantic,

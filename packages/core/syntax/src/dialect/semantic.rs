@@ -2,6 +2,10 @@ use std::{fmt, marker::PhantomData};
 
 use crate::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_identity_eq};
 use crate::definition::DefinitionCategory;
+use crate::scheme::{
+    SchemeBindingForm, SchemeDefineTarget, SchemeDefinitionForm, SchemeLetKind, SchemeOperator,
+    scheme_define_target,
+};
 use crate::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::Dialect;
@@ -194,6 +198,13 @@ pub enum BindingVisibility {
     Parallel,
     /// Each initializer can reference preceding bindings.
     Sequential,
+    /// Every initializer can reference every binding in the group, including
+    /// its own and those written after it.
+    ///
+    /// Scheme's `letrec`/`letrec*`, and what makes a group of mutually
+    /// recursive procedures work. Treating it as [`Self::Sequential`] would
+    /// leave the initializers *before* the shadowing entry looking unshadowed.
+    Recursive,
 }
 
 /// Describes where a scope obtains its lexical binders.
@@ -530,6 +541,17 @@ const SCHEME_SYNTAX_DEFINE: DefinitionShape = DefinitionShape::new(
     None,
     BodyShape::ChildrenFrom(2),
 );
+/// `(define-syntax-rule (name pattern ...) template)`: the name sits inside
+/// the pattern list, as it does for a procedure `define`.
+const SCHEME_SYNTAX_RULE_DEFINE: DefinitionShape = DefinitionShape::new(
+    DefinitionCategory::Macro,
+    Some(RelativeNodePath::Grandchild {
+        child: 1,
+        grandchild: 0,
+    }),
+    Some(ParameterShape::new(RelativeNodePath::Child(1), 1)),
+    BodyShape::ChildrenFrom(2),
+);
 
 fn definition_shape(
     policy: DialectSemanticPolicy,
@@ -565,10 +587,7 @@ fn definition_shape(
         Dialect::Lfe if head == "defmacro" => {
             direct_callable_shape(form, Delimiter::Paren, DIRECT_MACRO)
         }
-        Dialect::Scheme | Dialect::Racket if head == "define" => scheme_define_shape(form),
-        Dialect::Scheme | Dialect::Racket if head == "define-syntax" => {
-            scheme_define_syntax_shape(form)
-        }
+        Dialect::Scheme | Dialect::Racket => scheme_definition_shape(form, head),
         Dialect::Clojure | Dialect::Hy if head == "defn" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
         }
@@ -599,8 +618,6 @@ fn definition_shape(
         | Dialect::CommonLisp
         | Dialect::EmacsLisp
         | Dialect::Lfe
-        | Dialect::Scheme
-        | Dialect::Racket
         | Dialect::Clojure
         | Dialect::Hy
         | Dialect::Carp
@@ -625,24 +642,77 @@ fn direct_variable_shape(form: &ExpressionView) -> Option<DefinitionShape> {
         .then_some(DIRECT_VARIABLE)
 }
 
+/// Scheme's definition forms, resolved against Scheme's own operator table.
+fn scheme_definition_shape(form: &ExpressionView, head: &str) -> Option<DefinitionShape> {
+    let definition = SchemeOperator::from_head(head)?.definition_form()?;
+
+    match definition {
+        SchemeDefinitionForm::Define | SchemeDefinitionForm::DefineContract => {
+            scheme_define_shape(form)
+        }
+        SchemeDefinitionForm::DefineSyntax => scheme_define_syntax_shape(form),
+        SchemeDefinitionForm::DefineSyntaxRule => scheme_define_syntax_rule_shape(form),
+        SchemeDefinitionForm::DefineRecordType => scheme_named_definition_shape(
+            form,
+            DefinitionCategory::Struct,
+        ),
+        SchemeDefinitionForm::Struct | SchemeDefinitionForm::DefineStruct => {
+            scheme_named_definition_shape(form, DefinitionCategory::Struct)
+        }
+        // `(define-values (a b) producer)` names more than one variable, and
+        // this model has room for exactly one name. Reporting the first would
+        // make the others invisible to a rename, so it reports none.
+        SchemeDefinitionForm::DefineValues => None,
+        // A library name is a *list* -- `(scheme base)` -- not a symbol.
+        SchemeDefinitionForm::DefineLibrary => None,
+    }
+}
+
 fn scheme_define_shape(form: &ExpressionView) -> Option<DefinitionShape> {
     if form.children.len() < 3 {
         return None;
     }
 
-    let target = form.children.get(1)?;
-    if atom_text(target).is_some() {
-        return Some(DIRECT_VARIABLE);
+    match scheme_define_target(form.children.get(1)?)? {
+        SchemeDefineTarget::Variable { .. } => Some(DIRECT_VARIABLE),
+        // A curried `(define ((adder n) x) ...)` puts the name three levels
+        // down, one more than `RelativeNodePath` can address. The traversal
+        // layer reads it via `scheme_define_target`; here it is declined.
+        SchemeDefineTarget::Procedure { formals, .. } if formals.len() == 1 => {
+            Some(SCHEME_FUNCTION_DEFINE)
+        }
+        SchemeDefineTarget::Procedure { .. } => None,
     }
-
-    (is_plain_list(target, Delimiter::Paren)
-        && target.children.first().and_then(atom_text).is_some())
-    .then_some(SCHEME_FUNCTION_DEFINE)
 }
 
 fn scheme_define_syntax_shape(form: &ExpressionView) -> Option<DefinitionShape> {
     (form.children.len() == 3 && atom_text(form.children.get(1)?).is_some())
         .then_some(SCHEME_SYNTAX_DEFINE)
+}
+
+/// `(define-syntax-rule (name pattern ...) template)`.
+fn scheme_define_syntax_rule_shape(form: &ExpressionView) -> Option<DefinitionShape> {
+    let pattern = form.children.get(1)?;
+    (form.children.len() >= 3
+        && scheme_binding_container(pattern)
+        && pattern.children.first().and_then(atom_text).is_some())
+    .then_some(SCHEME_SYNTAX_RULE_DEFINE)
+}
+
+/// A form whose child 1 is the defined name and whose rest is declarations:
+/// `define-record-type`, and Racket's `struct` and `define-struct`.
+fn scheme_named_definition_shape(
+    form: &ExpressionView,
+    category: DefinitionCategory,
+) -> Option<DefinitionShape> {
+    (form.children.len() >= 2 && atom_text(form.children.get(1)?).is_some()).then_some(
+        DefinitionShape::new(
+            category,
+            Some(RelativeNodePath::Child(1)),
+            None,
+            BodyShape::ChildrenFrom(2),
+        ),
+    )
 }
 
 const LIST_BINDINGS_PARALLEL: BinderShape = BinderShape::BindingList {
@@ -709,13 +779,7 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         Dialect::Lfe if head == "lambda" => {
             parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
         }
-        Dialect::Scheme | Dialect::Racket if head == "let" => scheme_let_scope(form),
-        Dialect::Scheme | Dialect::Racket if head == "let*" => {
-            list_scope(form, Delimiter::Paren, LIST_LET_STAR_SCOPE)
-        }
-        Dialect::Scheme | Dialect::Racket if head == "lambda" => {
-            parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
-        }
+        Dialect::Scheme | Dialect::Racket => scheme_scope_shape(form, head),
         Dialect::Clojure if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
         Dialect::Clojure if head == "fn" => clojure_fn_scope(form),
         Dialect::Hy if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
@@ -734,14 +798,127 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         | Dialect::CommonLisp
         | Dialect::EmacsLisp
         | Dialect::Lfe
-        | Dialect::Scheme
-        | Dialect::Racket
         | Dialect::Clojure
         | Dialect::Hy
         | Dialect::Carp
         | Dialect::Janet
         | Dialect::Fennel => None,
     }
+}
+
+/// Scheme's scope-opening forms, resolved against Scheme's own operator table.
+///
+/// Only the forms whose layout this model can express are reported. `do`,
+/// `let-values` and `guard` bind in ways `BinderShape` has no vocabulary for --
+/// a step form, a formals list in the name position, a variable scoped to the
+/// clauses but not the body -- and returning an approximate shape for them
+/// would be worse than returning none: the reference query
+/// (`lexical_scope::traversal::binding_forms::scheme`) handles all three
+/// exactly, and a `None` here leaves the callers that consume shapes reporting
+/// "unsupported" rather than something confidently wrong.
+fn scheme_scope_shape(form: &ExpressionView, head: &str) -> Option<ScopeShape> {
+    let binding = SchemeOperator::from_head(head)?.binding_form()?;
+
+    match binding {
+        SchemeBindingForm::Let { kind, .. } => scheme_let_scope(form, kind),
+        SchemeBindingForm::NamedLet => scheme_named_let_scope(form),
+        SchemeBindingForm::Lambda => scheme_lambda_scope(form),
+        SchemeBindingForm::CaseLambda => scheme_case_lambda_scope(form),
+        SchemeBindingForm::LetValues(_)
+        | SchemeBindingForm::Do
+        | SchemeBindingForm::Guard
+        // `parameterize` opens no lexical scope at all.
+        | SchemeBindingForm::DynamicBinding => None,
+    }
+}
+
+fn scheme_let_scope(form: &ExpressionView, kind: SchemeLetKind) -> Option<ScopeShape> {
+    // `(let loop ((x 1)) ...)` shares its head with the unnamed form and is
+    // told apart only by child 1 being a symbol.
+    if form.children.get(1).and_then(atom_text).is_some() {
+        return scheme_named_let_scope(form);
+    }
+
+    let shape = ScopeShape::new(
+        scheme_binding_list(scheme_visibility(kind)),
+        BodyShape::ChildrenFrom(2),
+    );
+    scheme_list_scope(form, 2, shape)
+}
+
+fn scheme_named_let_scope(form: &ExpressionView) -> Option<ScopeShape> {
+    if form.children.len() < 4 || form.children.get(1).and_then(atom_text).is_none() {
+        return None;
+    }
+    scheme_binding_container(form.children.get(2)?).then_some(SCHEME_NAMED_LET_SCOPE)
+}
+
+fn scheme_lambda_scope(form: &ExpressionView) -> Option<ScopeShape> {
+    // `(lambda args body)` binds one rest parameter rather than a list of
+    // them; that shape has no `ParameterShape` and is left to the traversal.
+    scheme_list_scope(form, 2, PARAMETER_SCOPE)
+}
+
+fn scheme_case_lambda_scope(form: &ExpressionView) -> Option<ScopeShape> {
+    let clauses = form.children.get(1..)?;
+    if clauses.is_empty() || !clauses.iter().all(valid_scheme_lambda_clause) {
+        return None;
+    }
+
+    Some(ScopeShape::new(
+        BinderShape::ParameterClauses {
+            name: None,
+            first_clause_index: 1,
+            parameters: ParameterShape::new(RelativeNodePath::Child(0), 0),
+        },
+        BodyShape::ClauseChildrenFrom {
+            first_clause_index: 1,
+            body_child_index: 1,
+        },
+    ))
+}
+
+fn valid_scheme_lambda_clause(clause: &ExpressionView) -> bool {
+    scheme_binding_container(clause)
+        && clause.children.len() >= 2
+        && clause.children.first().is_some_and(scheme_binding_container)
+}
+
+const fn scheme_visibility(kind: SchemeLetKind) -> BindingVisibility {
+    match kind {
+        SchemeLetKind::Parallel => BindingVisibility::Parallel,
+        SchemeLetKind::Sequential => BindingVisibility::Sequential,
+        SchemeLetKind::Recursive => BindingVisibility::Recursive,
+    }
+}
+
+const fn scheme_binding_list(visibility: BindingVisibility) -> BinderShape {
+    BinderShape::BindingList {
+        container: RelativeNodePath::Child(1),
+        name: RelativeNodePath::Child(0),
+        initializer: Some(RelativeNodePath::Child(1)),
+        visibility,
+    }
+}
+
+fn scheme_list_scope(
+    form: &ExpressionView,
+    minimum_children: usize,
+    shape: ScopeShape,
+) -> Option<ScopeShape> {
+    (form.children.len() > minimum_children
+        && form.children.get(1).is_some_and(scheme_binding_container))
+    .then_some(shape)
+}
+
+/// Whether a node can hold binding entries or parameters.
+///
+/// Brackets count: R6RS 4.2.1 makes them interchangeable with parens, and
+/// `(let ([x 1]) x)` is the ordinary spelling in Racket.
+fn scheme_binding_container(view: &ExpressionView) -> bool {
+    view.kind == ExpressionKind::List
+        && matches!(view.delimiter, Some(Delimiter::Paren | Delimiter::Bracket))
+        && view.reader_prefixes.is_empty()
 }
 
 fn list_scope(
@@ -768,25 +945,6 @@ fn parameter_scope(
 ) -> Option<ScopeShape> {
     (form.children.len() >= 3 && is_plain_list(form.children.get(1)?, parameter_delimiter))
         .then_some(shape)
-}
-
-fn scheme_let_scope(form: &ExpressionView) -> Option<ScopeShape> {
-    if form.children.len() >= 3
-        && form
-            .children
-            .get(1)
-            .is_some_and(|bindings| is_plain_list(bindings, Delimiter::Paren))
-    {
-        return Some(LIST_LET_SCOPE);
-    }
-
-    (form.children.len() >= 4
-        && form.children.get(1).and_then(atom_text).is_some()
-        && form
-            .children
-            .get(2)
-            .is_some_and(|bindings| is_plain_list(bindings, Delimiter::Paren)))
-    .then_some(SCHEME_NAMED_LET_SCOPE)
 }
 
 fn clojure_fn_scope(form: &ExpressionView) -> Option<ScopeShape> {
@@ -1200,6 +1358,142 @@ mod tests {
                 body_child_index: 1,
             },
         )
+    }
+
+    #[test]
+    fn scheme_letrec_reports_recursive_visibility() {
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+
+        for source in ["(letrec ((f 1)) f)", "(letrec* ((f 1)) f)"] {
+            let form = parsed_form(source, Dialect::Scheme);
+            let shape = policy.scope_shape(&form).expect("letrec scope");
+            assert_eq!(
+                shape.binders(),
+                BinderShape::BindingList {
+                    container: RelativeNodePath::Child(1),
+                    name: RelativeNodePath::Child(0),
+                    initializer: Some(RelativeNodePath::Child(1)),
+                    visibility: BindingVisibility::Recursive,
+                },
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn scheme_let_family_maps_each_head_to_its_own_visibility() {
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+        let cases = [
+            ("(let ((x 1)) x)", BindingVisibility::Parallel),
+            ("(let* ((x 1)) x)", BindingVisibility::Sequential),
+            ("(letrec ((x 1)) x)", BindingVisibility::Recursive),
+            ("(let-syntax ((x 1)) x)", BindingVisibility::Parallel),
+            ("(letrec-syntax ((x 1)) x)", BindingVisibility::Recursive),
+        ];
+
+        for (source, visibility) in cases {
+            let form = parsed_form(source, Dialect::Scheme);
+            let shape = policy.scope_shape(&form).expect("known scope");
+            let BinderShape::BindingList {
+                visibility: actual, ..
+            } = shape.binders()
+            else {
+                panic!("{source}: expected a binding list");
+            };
+            assert_eq!(actual, visibility, "{source}");
+        }
+    }
+
+    #[test]
+    fn scheme_binding_lists_may_use_brackets() {
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+        let form = parsed_form("(let ([x 1]) x)", Dialect::Scheme);
+
+        assert_eq!(
+            policy.scope_shape(&form).map(ScopeShape::body),
+            Some(BodyShape::ChildrenFrom(2))
+        );
+    }
+
+    #[test]
+    fn scheme_case_lambda_scopes_each_clause_like_a_multi_arity_callable() {
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+        let form = parsed_form("(case-lambda ((x) x) ((x y) y))", Dialect::Scheme);
+
+        assert_eq!(
+            policy.scope_shape(&form),
+            Some(ScopeShape::new(
+                BinderShape::ParameterClauses {
+                    name: None,
+                    first_clause_index: 1,
+                    parameters: ParameterShape::new(RelativeNodePath::Child(0), 0),
+                },
+                BodyShape::ClauseChildrenFrom {
+                    first_clause_index: 1,
+                    body_child_index: 1,
+                },
+            ))
+        );
+    }
+
+    #[test]
+    fn scheme_forms_this_model_cannot_express_report_no_shape() {
+        // Each of these binds, and each binds in a way `BinderShape` has no
+        // vocabulary for. Returning an approximate shape would be worse than
+        // returning none: the reference query handles all of them exactly.
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+
+        for source in [
+            "(let-values (((a b) (values 1 2))) a)",
+            "(do ((i 0 (+ i 1))) ((= i 3) i))",
+            "(guard (e (#t e)) (raise 1))",
+            "(parameterize ((p 1)) (p))",
+        ] {
+            let form = parsed_form(source, Dialect::Scheme);
+            assert_eq!(policy.scope_shape(&form), None, "{source}");
+        }
+    }
+
+    #[test]
+    fn scheme_definition_shapes_cover_the_record_and_syntax_rule_forms() {
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+        let record = parsed_form(
+            "(define-record-type point (make-point x y) point? (x point-x))",
+            Dialect::Scheme,
+        );
+        let syntax_rule = parsed_form("(define-syntax-rule (swap a b) body)", Dialect::Scheme);
+
+        assert_eq!(
+            policy.definition_shape(&record).map(DefinitionShape::category),
+            Some(DefinitionCategory::Struct)
+        );
+
+        let shape = policy
+            .definition_shape(&syntax_rule)
+            .expect("define-syntax-rule shape");
+        assert_eq!(shape.category(), DefinitionCategory::Macro);
+        assert_eq!(
+            shape.name(),
+            Some(RelativeNodePath::Grandchild {
+                child: 1,
+                grandchild: 0,
+            })
+        );
+        assert_eq!(
+            shape.parameters(),
+            Some(ParameterShape::new(RelativeNodePath::Child(1), 1))
+        );
+    }
+
+    #[test]
+    fn a_curried_define_reports_no_shape_because_its_name_is_too_deep() {
+        // `(define ((adder n) x) ...)` puts the name three levels down, one
+        // more than `RelativeNodePath` can address. Declining beats reporting
+        // `(adder n)` as though it were the name.
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+        let form = parsed_form("(define ((adder n) x) (+ n x))", Dialect::Scheme);
+
+        assert_eq!(policy.definition_shape(&form), None);
     }
 
     #[test]
