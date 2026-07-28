@@ -53,6 +53,12 @@ Each command also reports the `tier` it needs from a dialect — `syntax`
 the dialect resolves call heads in a separate namespace, which decides whether
 renaming a local also rewrites `(f x)`.
 
+A tier says what a command *needs*, not what every dialect delivers, so a
+handful of cells are overridden by measurement where the two disagree. The
+statuses are checked against real invocations in the test suite: a cell may
+not claim support for something the command refuses, and a `scope`-tier report
+may not claim support while examining nothing.
+
 Schema versions 1 and 2 predate `silent` and fold it onto `unsupported`.
 
 ## Exit codes

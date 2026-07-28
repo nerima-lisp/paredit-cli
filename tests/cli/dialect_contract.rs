@@ -383,6 +383,60 @@ fn sampled_cells_behave_the_way_the_matrix_says_they_do() {
     let _ = fs::remove_dir_all(&root);
 }
 
+/// Reports whose `supported` claim means they saw the definitions, paired with
+/// the JSON field that proves it.
+const SCOPE_TIER_EVIDENCE: [(&str, &str); 4] = [
+    ("inspect definitions", "definition_count"),
+    ("inspect complexity", "definition_count"),
+    ("inspect unused-parameters", "checked_definition_count"),
+    ("inspect call-graph", "definition_count"),
+];
+
+#[test]
+fn scope_tier_reports_actually_see_the_definitions_they_claim_to() {
+    // Exiting zero is not enough: `inspect unused-parameters` reported
+    // `checked_definition_count: 0` for Fennel while succeeding, so the matrix
+    // called it supported when it had examined nothing at all.
+    let report = capabilities_json("3");
+    let cells = support_cells(&report["dialect_contract"]);
+    let root = fresh_temp_dir("dialect-contract-scope");
+
+    for dialect in DIALECTS {
+        let (extension, source) = fixture_source(dialect);
+        let file = root.join(format!("{dialect}.{extension}"));
+        fs::write(&file, source).expect("write fixture");
+
+        for (command, field) in SCOPE_TIER_EVIDENCE {
+            let status = cells
+                .get(&format!("{command}|{dialect}"))
+                .unwrap_or_else(|| panic!("{command}|{dialect} missing from the matrix"));
+            if status != "supported" {
+                continue;
+            }
+
+            let stdout = paredit()
+                .args(command.split(' '))
+                .arg(&file)
+                .args(["--dialect", dialect, "--output", "json"])
+                .assert()
+                .success()
+                .get_output()
+                .stdout
+                .clone();
+            let observed = serde_json::from_slice::<serde_json::Value>(&stdout)
+                .unwrap_or_else(|error| panic!("{command}/{dialect}: {error}"))[field]
+                .as_u64()
+                .unwrap_or_else(|| panic!("{command}/{dialect} has no {field}"));
+
+            assert!(
+                observed > 0,
+                "{command}/{dialect} claims support but {field} is 0, so it examined nothing"
+            );
+        }
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
 #[test]
 fn common_lisp_finds_what_the_silent_dialects_miss() {
     // The claim behind `silent` is that the rule exists and simply has no

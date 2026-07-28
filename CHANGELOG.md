@@ -51,6 +51,18 @@ for 99% of its cells.
   bindings in all ten dialects; the Common Lisp specializations layered on
   top (`flet`/`labels`, `macrolet`, `symbol-macrolet`, global callables)
   remain Common Lisp only.
+- Every report that reads a lambda list — `inspect unused-parameters`,
+  `inspect impact`, `inspect signature` — examined nothing in Fennel while
+  succeeding, because the lambda-list resolver knew `defn` but not Fennel's
+  `fn`. They now check Fennel definitions like every other bracket dialect's.
+
+### Known
+
+- `inspect unused-parameters` reads the body of a Scheme or Racket
+  `(define (name args) body)` as its parameter list, because the parameters
+  live inside the second child rather than in one of their own. The
+  capability matrix records those two cells as `silent` rather than claiming
+  a support that would mislead; deepening Scheme is separate work.
 
 ## [1.2.1] - 2026-07-28
 

@@ -18,8 +18,13 @@ pub(super) fn definition_lambda_list_child_index(
     let normalized = normalize_common_lisp_operator_head(head);
 
     match normalized {
+        // `fn` and `macro` are Fennel's callable heads. Reaching here at all
+        // means `classify_definition_head` already accepted the head for the
+        // dialect in hand, and `list_child_index` requires child 2 to be a
+        // list, so an anonymous `(fn [x] x)` — where child 2 is the body —
+        // resolves to no lambda list rather than to the wrong one.
         "cl-defun" | "defsubst" | "definline" | "cl-defmacro" | "define" | "lambda" | "defn"
-        | "defn-" => list_child_index(view, 2),
+        | "defn-" | "fn" | "macro" => list_child_index(view, 2),
         "cl-defmethod" => common_lisp_lambda_list_child_index(
             view,
             CommonLispLambdaListShape::FirstListAtOrAfter(2),

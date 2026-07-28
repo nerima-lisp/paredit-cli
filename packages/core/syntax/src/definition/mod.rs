@@ -552,6 +552,39 @@ mod tests {
     }
 
     #[test]
+    fn finds_the_lambda_list_of_a_named_fennel_callable() {
+        // Without `fn` here, every report that reads a lambda list — unused
+        // parameters, call arity, impact — silently checked nothing in Fennel
+        // while working for every other bracket dialect's `defn`.
+        for (source, head) in [
+            ("(fn add [a b] (+ a b))", "fn"),
+            ("(macro m [x] x)", "macro"),
+        ] {
+            let tree = SyntaxTree::parse_with_dialect(source, Dialect::Fennel).unwrap();
+            let view = tree
+                .select_path(&Path::from_indexes(vec![0]))
+                .unwrap()
+                .view();
+            let shape = definition_shape(Dialect::Fennel, &view, head)
+                .unwrap_or_else(|| panic!("{source} is a definition"));
+
+            assert!(
+                shape.lambda_list(&view).is_some(),
+                "{source} has a lambda list"
+            );
+        }
+
+        // An anonymous `fn` puts its body where the parameter list would be,
+        // so it must resolve to no lambda list rather than to the wrong one.
+        let tree = SyntaxTree::parse_with_dialect("(fn [x] x)", Dialect::Fennel).unwrap();
+        let view = tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .unwrap()
+            .view();
+        assert_eq!(definition_lambda_list_child_index(&view, "fn"), None);
+    }
+
+    #[test]
     fn finds_common_lisp_lambda_list_shapes() {
         let source = "(defmethod render :around ((node widget) stream) (draw node stream))";
         let tree = SyntaxTree::parse(source).unwrap();

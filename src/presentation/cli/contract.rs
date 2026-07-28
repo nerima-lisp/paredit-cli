@@ -519,6 +519,21 @@ const COMMON_LISP_FAMILY_REFACTORS: [&str; 13] = [
     "refactor convert-if-to-unless",
 ];
 
+/// Cells where the tier's answer is wrong and measurement says otherwise.
+///
+/// A tier is an approximation: it says what a command needs, not what every
+/// dialect actually delivers. When the two disagree the measurement wins, and
+/// the reason is recorded here rather than left for a caller to rediscover.
+const MEASURED_EXCEPTIONS: [(&str, &str, SupportStatus); 2] = [
+    // Scheme and Racket write `(define (name args) body)`, putting the
+    // parameters inside the second child rather than in a child of their own.
+    // The lambda-list resolver points at the third child, so these reports
+    // read the body as a parameter list. Deepening Scheme is its own piece of
+    // work; until then the honest answer is not to trust the output.
+    ("inspect unused-parameters", "scheme", SupportStatus::Silent),
+    ("inspect unused-parameters", "racket", SupportStatus::Silent),
+];
+
 /// Returns what `command_path` needs from a dialect.
 ///
 /// Structural editing and formatting are pure paren surgery. The rest defaults
@@ -585,9 +600,17 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
     let Some(category) = command_category(command_path) else {
         return SupportStatus::Unknown;
     };
+    let dialect_label = dialect;
     let Ok(dialect) = dialect.parse::<Dialect>() else {
         return SupportStatus::Unknown;
     };
+
+    if let Some((_, _, status)) = MEASURED_EXCEPTIONS
+        .iter()
+        .find(|(path, exception, _)| *path == command_path && *exception == dialect_label)
+    {
+        return *status;
+    }
 
     // A command that owns an explicit runtime gate is answered by that gate,
     // so the matrix and the refusal can never disagree.
@@ -766,6 +789,28 @@ mod tests {
                     "{table} names {path}, which is not a registered command"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn measured_exceptions_name_real_cells_and_actually_change_the_answer() {
+        for (path, dialect, status) in MEASURED_EXCEPTIONS {
+            assert!(
+                command_category(path).is_some(),
+                "{path} is not a registered command"
+            );
+            assert!(DIALECTS.contains(&dialect), "{dialect} is not a dialect");
+            assert_eq!(support_status(path, dialect), status, "{path} / {dialect}");
+
+            // An exception that agrees with its tier is dead weight: delete it
+            // rather than leave a claim nothing depends on.
+            let category = command_category(path).expect("registered command");
+            assert_ne!(
+                capability_tier(path, category)
+                    .status(dialect.parse::<Dialect>().expect("known dialect"), category),
+                status,
+                "{path} / {dialect} already resolves this way without the exception"
+            );
         }
     }
 
