@@ -2,7 +2,19 @@ name: CI
 
 on:
   pull_request:
+  # A caller that passes secrets explicitly — as main.yml does — may only pass
+  # names declared here. Passing an undeclared one is rejected when the run is
+  # created, so the whole workflow fails to start with no jobs and no logs.
+  # `secrets: inherit` needs no declaration, which is why dropping it in favour
+  # of explicit passing broke every push to main until this block existed.
   workflow_call:
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        description: >-
+          Cachix auth token, forwarded to .github/actions/nix-setup. Optional:
+          absent or empty configures the cache pull-only, which is also what
+          fork pull requests get.
+        required: false
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

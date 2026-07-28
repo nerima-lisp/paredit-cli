@@ -369,12 +369,29 @@
           actionlint =
             pkgs.runCommand "paredit-cli-actionlint"
               {
-                nativeBuildInputs = [ pkgs.actionlint ];
+                nativeBuildInputs = [
+                  pkgs.actionlint
+                  pkgs.git
+                ];
                 src = self;
               }
               ''
                 cp -r $src/. .
                 chmod -R u+w .
+
+                # actionlint locates the project root by walking up for a .git
+                # directory, and `self` is a store copy that has none. Without a
+                # project it cannot resolve a local `uses: ./.github/workflows/*`
+                # reference, so it silently skips every [workflow-call] rule
+                # instead of reporting that it could not check them.
+                #
+                # That blind spot let main.yml pass this gate while passing a
+                # secret ci.yml did not declare, which is rejected when the run
+                # is created: every push to main failed at startup, with no jobs
+                # and no logs, for three days. An empty `git init` is enough --
+                # no commit, no index, just the root marker.
+                git init -q .
+
                 actionlint -color .github/workflows/*.yml
                 touch $out
               '';
