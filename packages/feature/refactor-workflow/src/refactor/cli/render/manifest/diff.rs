@@ -4,20 +4,25 @@ use super::{
     blocked_reason_labels, blocked_reason_text, decision_steps_json, decision_summary_json,
     print_decision_summary,
 };
+use crate::refactor::cli::manifest::status::{
+    ManifestOutputs, ManifestPolicy, RefactorManifestChecks, RefactorManifestMismatchCounts,
+};
 use anyhow::Result;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
 pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFormat) -> Result<()> {
-    let decision = refactor_manifest_decision(
-        result.manifest_policy_passed,
-        result.manifest_outputs_parse,
-        result.summary.stale_file_count,
-        result.summary.output_hash_mismatch_count,
-        result.summary.parse_error_count,
-        result.summary.manifest_flag_mismatch_count,
-    );
+    let decision = refactor_manifest_decision(RefactorManifestChecks {
+        policy: ManifestPolicy::from_passed(result.manifest_policy_passed),
+        outputs: ManifestOutputs::from_parse(result.manifest_outputs_parse),
+        counts: RefactorManifestMismatchCounts {
+            stale_files: result.summary.stale_file_count,
+            output_hash_mismatches: result.summary.output_hash_mismatch_count,
+            parse_errors: result.summary.parse_error_count,
+            manifest_flag_mismatches: result.summary.manifest_flag_mismatch_count,
+        },
+    });
 
     match output {
         OutputFormat::Text => {
@@ -73,11 +78,11 @@ pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFor
                     file.changed,
                     file.expected_changed,
                     file.edit_count,
-                    file.input_hash_matches,
-                    file.output_hash_matches,
+                    file.input_hash_matches(),
+                    file.output_hash_matches(),
                     file.output_parse_ok,
                     file.expected_output_parse_ok,
-                    file.manifest_flags_match,
+                    file.manifest_flags_match(),
                     file.stale()
                 );
                 if !file.diff.is_empty() {
@@ -129,11 +134,11 @@ pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFor
                         "output_hash": file.output_hash.as_str(),
                         "expected_input_hash": file.expected_input_hash.as_str(),
                         "expected_output_hash": file.expected_output_hash.as_str(),
-                        "input_hash_matches": file.input_hash_matches,
-                        "output_hash_matches": file.output_hash_matches,
+                        "input_hash_matches": file.input_hash_matches(),
+                        "output_hash_matches": file.output_hash_matches(),
                         "output_parse_ok": file.output_parse_ok,
                         "expected_output_parse_ok": file.expected_output_parse_ok,
-                        "manifest_flags_match": file.manifest_flags_match,
+                        "manifest_flags_match": file.manifest_flags_match(),
                         "stale": file.stale(),
                         "diff": file.diff.as_str(),
                     }))

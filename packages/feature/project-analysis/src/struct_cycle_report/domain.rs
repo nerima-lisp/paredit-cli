@@ -119,6 +119,7 @@ pub fn collect_struct_inheritance_edges(
     Ok(edges)
 }
 
+#[must_use]
 pub fn analyze_struct_cycles(edges: &[(String, String)]) -> StructCycleSummary {
     let (struct_count, cycles) = string_edge_cycles(edges, common_lisp_symbol_reference_needle);
     StructCycleSummary {

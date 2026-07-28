@@ -1,3 +1,7 @@
+use crate::refactor::cli::manifest::status::{
+    ManifestOutputs, ManifestPolicy, RefactorApplyOutcome, RefactorManifestChecks,
+    RefactorManifestMismatchCounts,
+};
 use std::path::PathBuf;
 
 use proptest::prelude::*;
@@ -159,14 +163,16 @@ proptest! {
         parse_error_count in 0usize..4,
         manifest_flag_mismatch_count in 0usize..4,
     ) {
-        let decision = refactor_manifest_decision(
-            manifest_policy_passed,
-            manifest_outputs_parse,
-            stale_file_count,
-            output_hash_mismatch_count,
-            parse_error_count,
-            manifest_flag_mismatch_count,
-        );
+        let decision = refactor_manifest_decision(RefactorManifestChecks {
+                policy: ManifestPolicy::from_passed(manifest_policy_passed),
+                outputs: ManifestOutputs::from_parse(manifest_outputs_parse),
+                counts: RefactorManifestMismatchCounts {
+                    stale_files: stale_file_count,
+                    output_hash_mismatches: output_hash_mismatch_count,
+                    parse_errors: parse_error_count,
+                    manifest_flag_mismatches: manifest_flag_mismatch_count,
+                },
+            });
 
         let expected_status = if decision.blocked_reasons.is_empty() {
             RefactorStatusKind::Ready
@@ -263,22 +269,28 @@ proptest! {
         manifest_flag_mismatch_count in 0usize..4,
         applied in any::<bool>(),
     ) {
-        let manifest_decision = refactor_manifest_decision(
-            manifest_policy_passed,
-            manifest_outputs_parse,
-            stale_file_count,
-            output_hash_mismatch_count,
-            parse_error_count,
-            manifest_flag_mismatch_count,
-        );
+        let manifest_decision = refactor_manifest_decision(RefactorManifestChecks {
+                policy: ManifestPolicy::from_passed(manifest_policy_passed),
+                outputs: ManifestOutputs::from_parse(manifest_outputs_parse),
+                counts: RefactorManifestMismatchCounts {
+                    stale_files: stale_file_count,
+                    output_hash_mismatches: output_hash_mismatch_count,
+                    parse_errors: parse_error_count,
+                    manifest_flag_mismatches: manifest_flag_mismatch_count,
+                },
+            });
         let apply_decision = refactor_apply_decision(
-            manifest_policy_passed,
-            manifest_outputs_parse,
-            stale_file_count,
-            output_hash_mismatch_count,
-            parse_error_count,
-            manifest_flag_mismatch_count,
-            applied,
+            RefactorManifestChecks {
+                policy: ManifestPolicy::from_passed(manifest_policy_passed),
+                outputs: ManifestOutputs::from_parse(manifest_outputs_parse),
+                counts: RefactorManifestMismatchCounts {
+                    stale_files: stale_file_count,
+                    output_hash_mismatches: output_hash_mismatch_count,
+                    parse_errors: parse_error_count,
+                    manifest_flag_mismatches: manifest_flag_mismatch_count,
+                },
+            },
+            RefactorApplyOutcome::from_applied(applied),
         );
 
         let expected_status = if applied {

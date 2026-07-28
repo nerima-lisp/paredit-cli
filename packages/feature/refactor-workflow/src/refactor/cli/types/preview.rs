@@ -6,7 +6,10 @@ use crate::refactor::usecase::execute::{
 use crate::refactor::usecase::preview::{
     RefactorPreviewEdit, RefactorPreviewPolicy, RefactorPreviewSummary,
 };
-use paredit_core_edit::refactor_preview::{RefactorPreviewDecisionStatus, decide_refactor_preview};
+use paredit_core_edit::refactor_preview::{
+    PreviewPolicy, PreviewWriteParse, PreviewWriteRequest, RefactorPreviewDecisionStatus,
+    decide_refactor_preview,
+};
 use paredit_core_syntax::dialect::Dialect;
 use std::path::PathBuf;
 
@@ -67,9 +70,21 @@ impl RefactorPreview {
     ) -> RefactorPreviewDecision {
         RefactorPreviewDecision {
             status: decide_refactor_preview(
-                self.write_requested,
-                self.policy.passed(),
-                write_plan.refusal().is_some(),
+                if self.write_requested {
+                    PreviewWriteRequest::Requested
+                } else {
+                    PreviewWriteRequest::NotRequested
+                },
+                if self.policy.passed() {
+                    PreviewPolicy::Passed
+                } else {
+                    PreviewPolicy::Failed
+                },
+                if write_plan.refusal().is_some() {
+                    PreviewWriteParse::Refused
+                } else {
+                    PreviewWriteParse::Accepted
+                },
             ),
         }
     }

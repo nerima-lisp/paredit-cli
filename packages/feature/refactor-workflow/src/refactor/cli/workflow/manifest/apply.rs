@@ -65,7 +65,6 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             );
         }
         let input_hash = stable_text_hash(&input);
-        let input_hash_matches = input_hash == file.input_hash;
         let edits = file
             .edits
             .iter()
@@ -75,11 +74,8 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             .with_context(|| format!("manifest edits are invalid for {}", file.path.display()))?;
         let rewritten = apply_byte_span_edits(&input, edits)?;
         let output_hash = stable_text_hash(&rewritten);
-        let output_hash_matches = output_hash == file.output_hash;
         let output_parse_ok = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).is_ok();
         let changed = rewritten != input;
-        let manifest_flags_match =
-            changed == file.changed && output_parse_ok == file.output_parse_ok;
 
         files.push(RefactorApplyFileResult {
             path: file.path.clone(),
@@ -91,24 +87,24 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             output_hash,
             expected_input_hash: file.input_hash.clone(),
             expected_output_hash: file.output_hash.clone(),
-            input_hash_matches,
-            output_hash_matches,
             output_parse_ok,
             expected_output_parse_ok: file.output_parse_ok,
-            manifest_flags_match,
         });
         rewritten_outputs.push((resolved_path, rewritten, expected_original));
     }
 
-    let stale_file_count = files.iter().filter(|file| !file.input_hash_matches).count();
+    let stale_file_count = files
+        .iter()
+        .filter(|file| !file.input_hash_matches())
+        .count();
     let output_hash_mismatch_count = files
         .iter()
-        .filter(|file| !file.output_hash_matches)
+        .filter(|file| !file.output_hash_matches())
         .count();
     let parse_error_count = files.iter().filter(|file| !file.output_parse_ok).count();
     let manifest_flag_mismatch_count = files
         .iter()
-        .filter(|file| !file.manifest_flags_match)
+        .filter(|file| !file.manifest_flags_match())
         .count();
     let can_apply = manifest.policy_passed
         && manifest.all_outputs_parse

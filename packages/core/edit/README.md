@@ -45,7 +45,7 @@ The shared machinery every refactoring is built from — the vocabulary of
 | Module | Principal items |
 | --- | --- |
 | `refactor_plan` | `RefactorOperation`, `RefactorPlanSummary`, `RefactorRiskLevel`, `RawRefactorRisk`, `RefactorPlanGate`, `RefactorPlanTargetKind` |
-| `refactor_preview` | `decide_refactor_preview`, `RefactorPreviewDecisionStatus` |
+| `refactor_preview` | `decide_refactor_preview`, `RefactorPreviewDecisionStatus`, and the three two-value enums it takes: `PreviewWriteRequest`, `PreviewPolicy`, `PreviewWriteParse` |
 | `refactor_execute` | Plan application |
 | `mutation_safety` | `reject_common_lisp_reader_conditionals`, `reject_overlapping_common_lisp_reader_time_forms`, `ReaderConditionalSafetyError` |
 | `extract_shared` | `replace_span`, `replace_span_checked`, `insert_top_level_form`, `TopLevelInsert` |
@@ -55,6 +55,14 @@ The shared machinery every refactoring is built from — the vocabulary of
 The root crate re-exports `refactor_execute`, `refactor_plan` and
 `refactor_preview` as `pub`, and the other nine as `pub(crate)`, mirroring
 their original declarations.
+
+### Why `decide_refactor_preview` takes three enums
+
+It used to take three adjacent `bool`s. It decides a user-visible status and
+the process exit code, so transposing any two of them changed the verdict —
+and `(true, false, true)` gives the compiler nothing to check. `Passed` cannot
+be passed where `Requested` is expected, so the swap is now a type error
+rather than a silent behaviour change.
 
 ## When you change this package
 

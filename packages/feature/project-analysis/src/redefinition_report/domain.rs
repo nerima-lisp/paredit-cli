@@ -137,6 +137,7 @@ pub fn collect_declared_definitions(
         .collect())
 }
 
+#[must_use]
 pub fn analyze_redefinitions(declared: &[DeclaredDefinition]) -> RedefinitionSummary {
     let mut groups: BTreeMap<
         (Option<String>, DefinitionCategory, String),

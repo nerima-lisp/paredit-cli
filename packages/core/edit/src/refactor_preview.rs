@@ -416,12 +416,41 @@ impl RefactorPreviewDecisionStatus {
     }
 }
 
+/// Whether the caller asked for the rewrite to be persisted.
+///
+/// Phase 7: this was the first of three adjacent `bool` parameters to
+/// [`decide_refactor_preview`], which decides a user-visible status and the
+/// process exit code. Transposing any two of the three compiled and changed
+/// the verdict silently; as three distinct two-value enums it cannot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviewWriteRequest {
+    Requested,
+    NotRequested,
+}
+
+/// Whether the refactor's policy gate passed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviewPolicy {
+    Passed,
+    Failed,
+}
+
+/// Whether the write was refused because the rewritten output would not parse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviewWriteParse {
+    Refused,
+    Accepted,
+}
+
 #[must_use]
 pub const fn decide_refactor_preview(
-    write_requested: bool,
-    policy_passed: bool,
-    write_parse_refused: bool,
+    write: PreviewWriteRequest,
+    policy: PreviewPolicy,
+    write_parse: PreviewWriteParse,
 ) -> RefactorPreviewDecisionStatus {
+    let write_requested = matches!(write, PreviewWriteRequest::Requested);
+    let policy_passed = matches!(policy, PreviewPolicy::Passed);
+    let write_parse_refused = matches!(write_parse, PreviewWriteParse::Refused);
     if !policy_passed {
         RefactorPreviewDecisionStatus::BlockedByPolicy
     } else if write_parse_refused {
@@ -430,5 +459,56 @@ pub const fn decide_refactor_preview(
         RefactorPreviewDecisionStatus::WriteApplied
     } else {
         RefactorPreviewDecisionStatus::DryRunReady
+    }
+}
+
+#[cfg(test)]
+mod phase7_tests {
+    use super::*;
+
+    /// Every combination still decides what it decided; the change is that the
+    /// three arguments can no longer be transposed.
+    ///
+    /// The old signature was `(bool, bool, bool)`. Swapping `write_requested`
+    /// and `policy_passed` turned "policy failed, no write" into "write
+    /// applied" — a different status and a different exit code, with nothing
+    /// to catch it. Writing that swap now is a type error, which is why this
+    /// test asserts behaviour rather than trying to demonstrate the bug.
+    #[test]
+    fn the_decision_table_is_unchanged() {
+        use PreviewPolicy::{Failed, Passed};
+        use PreviewWriteParse::{Accepted, Refused};
+        use PreviewWriteRequest::{NotRequested, Requested};
+
+        assert_eq!(
+            decide_refactor_preview(Requested, Failed, Accepted),
+            RefactorPreviewDecisionStatus::BlockedByPolicy
+        );
+        assert_eq!(
+            decide_refactor_preview(Requested, Passed, Refused),
+            RefactorPreviewDecisionStatus::RefusedUnparsableOutput
+        );
+        assert_eq!(
+            decide_refactor_preview(Requested, Passed, Accepted),
+            RefactorPreviewDecisionStatus::WriteApplied
+        );
+        assert_eq!(
+            decide_refactor_preview(NotRequested, Passed, Accepted),
+            RefactorPreviewDecisionStatus::DryRunReady
+        );
+    }
+
+    /// Policy failure outranks a parse refusal, and both outrank the write
+    /// request. That precedence lived only in the order of the `if` arms.
+    #[test]
+    fn policy_failure_outranks_everything_else() {
+        assert_eq!(
+            decide_refactor_preview(
+                PreviewWriteRequest::Requested,
+                PreviewPolicy::Failed,
+                PreviewWriteParse::Refused
+            ),
+            RefactorPreviewDecisionStatus::BlockedByPolicy
+        );
     }
 }

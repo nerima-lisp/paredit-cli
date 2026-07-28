@@ -97,6 +97,7 @@ pub fn collect_package_dependency_edges(
         .collect())
 }
 
+#[must_use]
 pub fn analyze_package_cycles(edges: &[(String, String)]) -> PackageCycleSummary {
     let (package_count, cycles) = string_edge_cycles(edges, common_lisp_symbol_reference_needle);
     PackageCycleSummary {

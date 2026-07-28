@@ -62,6 +62,27 @@ One `(Args, run)` pair per subcommand the workflow owns, per §4.2.
 
 `#[non_exhaustive]` is deliberately absent (§9.4).
 
+`refactor::cli::manifest::status` exports the decision vocabulary:
+`RefactorManifestChecks` with `ManifestPolicy`, `ManifestOutputs` and
+`RefactorManifestMismatchCounts`, plus `RefactorApplyOutcome`.
+
+### Why the manifest decision takes one struct
+
+`refactor_manifest_decision` used to take `(bool, bool, usize, usize, usize,
+usize)` — two adjacent booleans followed by four adjacent counts, none of
+which the compiler could tell apart. It decides whether a refactor may be
+applied, so a caller that swapped `stale_file_count` and `parse_error_count`
+produced a different verdict and a different exit code with nothing to catch
+it. This is the same "request in, decision out" shape the architecture guide
+states for application use cases.
+
+The three per-file result types (`check`, `diff`, `apply`) also stopped
+storing `input_hash_matches`, `output_hash_matches` and
+`manifest_flags_match`. All three are derivable from fields the same struct
+already holds, so storing them made three second sources of truth that could
+disagree with the hashes beside them — the problem `stale()` was written to
+avoid, applied to only one of four cases.
+
 ## Layout
 
 Slice-first, per §3.1 — one slice with two layers:

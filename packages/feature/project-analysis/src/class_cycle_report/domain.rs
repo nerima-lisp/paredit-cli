@@ -114,6 +114,7 @@ pub fn collect_class_inheritance_edges(
     Ok(edges)
 }
 
+#[must_use]
 pub fn analyze_class_cycles(edges: &[(String, String)]) -> ClassCycleSummary {
     let (class_count, cycles) = string_edge_cycles(edges, common_lisp_symbol_reference_needle);
     ClassCycleSummary {

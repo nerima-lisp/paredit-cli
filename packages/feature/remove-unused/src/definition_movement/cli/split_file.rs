@@ -3,7 +3,9 @@ use std::path::Path as FsPath;
 
 use anyhow::{Context, Result};
 
-use paredit_feature_form_transform::split_file::usecase::{SplitFileRequest, plan_split_file};
+use paredit_feature_form_transform::split_file::usecase::{
+    SplitFileDestination, SplitFileRequest, plan_split_file,
+};
 
 use super::args::SplitFileArgs;
 use super::render::split_file::print_split_file_plan;
@@ -38,8 +40,7 @@ pub fn split_file(args: SplitFileArgs) -> Result<()> {
         paths: args.paths,
         names: args.names,
         categories: args.categories,
-        to_file_existed,
-        to_parent_existed,
+        destination: SplitFileDestination::observe(to_file_existed, to_parent_existed),
         write: args.write,
     })?;
 

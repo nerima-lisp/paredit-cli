@@ -1,3 +1,4 @@
+use super::types::SplitFileDestination;
 use std::path::PathBuf;
 
 use proptest::{prelude::*, test_runner::TestCaseError};
@@ -19,8 +20,7 @@ fn split_request<'a>(from_input: &'a str, to_input: &'a str) -> SplitFileRequest
         paths: vec![Path::from_indexes(vec![1]), Path::from_indexes(vec![2])],
         names: Vec::new(),
         categories: Vec::new(),
-        to_file_existed: false,
-        to_parent_existed: false,
+        destination: SplitFileDestination::MissingParent,
         write: false,
     }
 }

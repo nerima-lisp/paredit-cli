@@ -66,6 +66,7 @@ pub struct SystemCyclePolicy {
     pub violations: Vec<String>,
 }
 
+#[must_use]
 pub fn analyze_system_cycles(edges: &[(String, String)]) -> SystemCycleSummary {
     let (system_count, cycles) = string_edge_cycles(edges, common_lisp_symbol_reference_needle);
     SystemCycleSummary {

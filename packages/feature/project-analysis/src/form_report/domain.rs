@@ -95,6 +95,7 @@ pub fn collect_structural_stats(view: &ExpressionView) -> (usize, usize, usize) 
     (stats.atom_count, stats.list_count, stats.max_depth)
 }
 
+#[must_use]
 pub fn build_form_report(request: FormReportRequest<'_>) -> FormReport {
     let stats = FormStats::collect(&request.target);
     let head = expression_head(&request.target).map(ToOwned::to_owned);

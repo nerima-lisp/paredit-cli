@@ -7,6 +7,7 @@ use super::super::types::status::{
 
 pub mod apply;
 pub mod blocked;
+pub mod checks;
 
 #[must_use]
 pub fn refactor_status_decision(check: &RefactorCheckResult) -> RefactorManifestDecision {
@@ -14,22 +15,8 @@ pub fn refactor_status_decision(check: &RefactorCheckResult) -> RefactorManifest
 }
 
 #[must_use]
-pub fn refactor_manifest_decision(
-    manifest_policy_passed: bool,
-    manifest_outputs_parse: bool,
-    stale_file_count: usize,
-    output_hash_mismatch_count: usize,
-    parse_error_count: usize,
-    manifest_flag_mismatch_count: usize,
-) -> RefactorManifestDecision {
-    let blocked_reasons = refactor_manifest_blocked_reasons(
-        manifest_policy_passed,
-        manifest_outputs_parse,
-        stale_file_count,
-        output_hash_mismatch_count,
-        parse_error_count,
-        manifest_flag_mismatch_count,
-    );
+pub fn refactor_manifest_decision(checks: RefactorManifestChecks) -> RefactorManifestDecision {
+    let blocked_reasons = refactor_manifest_blocked_reasons(checks);
     refactor_manifest_decision_from_blocked_reasons(blocked_reasons)
 }
 
@@ -52,24 +39,12 @@ fn refactor_manifest_decision_from_blocked_reasons(
 
 #[must_use]
 pub fn refactor_apply_decision(
-    manifest_policy_passed: bool,
-    manifest_outputs_parse: bool,
-    stale_file_count: usize,
-    output_hash_mismatch_count: usize,
-    parse_error_count: usize,
-    manifest_flag_mismatch_count: usize,
-    applied: bool,
+    checks: RefactorManifestChecks,
+    outcome: RefactorApplyOutcome,
 ) -> RefactorApplyDecision {
-    let decision = refactor_manifest_decision(
-        manifest_policy_passed,
-        manifest_outputs_parse,
-        stale_file_count,
-        output_hash_mismatch_count,
-        parse_error_count,
-        manifest_flag_mismatch_count,
-    );
+    let decision = refactor_manifest_decision(checks);
 
-    let (status, next_action) = refactor_apply_status_and_action(&decision, applied);
+    let (status, next_action) = refactor_apply_status_and_action(&decision, outcome.applied());
 
     RefactorApplyDecision {
         status,
@@ -81,6 +56,10 @@ pub fn refactor_apply_decision(
 pub use apply::refactor_apply_status_and_action;
 pub use blocked::{
     refactor_manifest_blocked_reasons, refactor_status_blocked_reasons, refactor_status_next_action,
+};
+pub use checks::{
+    ManifestOutputs, ManifestPolicy, RefactorApplyOutcome, RefactorManifestChecks,
+    RefactorManifestMismatchCounts,
 };
 
 #[cfg(test)]

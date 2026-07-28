@@ -75,11 +75,11 @@ pub fn print_refactor_status_result(
                     file.changed,
                     file.expected_changed,
                     file.edit_count,
-                    file.input_hash_matches,
-                    file.output_hash_matches,
+                    file.input_hash_matches(),
+                    file.output_hash_matches(),
                     file.output_parse_ok,
                     file.expected_output_parse_ok,
-                    file.manifest_flags_match,
+                    file.manifest_flags_match(),
                     file.stale()
                 );
             }
@@ -137,11 +137,11 @@ pub fn print_refactor_status_result(
                         "output_hash": file.output_hash.as_str(),
                         "expected_input_hash": file.expected_input_hash.as_str(),
                         "expected_output_hash": file.expected_output_hash.as_str(),
-                        "input_hash_matches": file.input_hash_matches,
-                        "output_hash_matches": file.output_hash_matches,
+                        "input_hash_matches": file.input_hash_matches(),
+                        "output_hash_matches": file.output_hash_matches(),
                         "output_parse_ok": file.output_parse_ok,
                         "expected_output_parse_ok": file.expected_output_parse_ok,
-                        "manifest_flags_match": file.manifest_flags_match,
+                        "manifest_flags_match": file.manifest_flags_match(),
                         "stale": file.stale(),
                     }))
                     .collect::<Vec<_>>(),

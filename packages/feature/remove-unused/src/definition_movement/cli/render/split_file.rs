@@ -26,8 +26,11 @@ pub fn print_split_file_plan(plan: &SplitFilePlan, output: OutputFormat) -> Resu
                 }
                 println!("category\t{}", item.definition.category.label());
             }
-            println!("to_file_existed\t{}", plan.to_file_existed);
-            println!("to_parent_existed\t{}", plan.to_parent_existed);
+            println!("to_file_existed\t{}", plan.destination.to_file_existed());
+            println!(
+                "to_parent_existed\t{}",
+                plan.destination.to_parent_existed()
+            );
             println!("changed\t{}", plan.changed);
             println!("written\t{}", plan.written);
         }
@@ -63,8 +66,8 @@ pub fn print_split_file_plan(plan: &SplitFilePlan, output: OutputFormat) -> Resu
                 }).collect::<Vec<_>>(),
                 "from_rewritten": plan.from_rewritten,
                 "to_rewritten": plan.to_rewritten,
-                "to_file_existed": plan.to_file_existed,
-                "to_parent_existed": plan.to_parent_existed,
+                "to_file_existed": plan.destination.to_file_existed(),
+                "to_parent_existed": plan.destination.to_parent_existed(),
                 "changed": plan.changed,
                 "written": plan.written,
             }))?

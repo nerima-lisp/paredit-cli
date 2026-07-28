@@ -16,7 +16,9 @@ mod types;
 use item::{build_split_file_item, package_context_before_top_level};
 use rewrite::{append_top_level_definitions, ensure_non_overlapping_spans, replace_byte_span};
 use syntax::list_head;
-pub use types::{SplitFileDefinition, SplitFileItem, SplitFilePlan, SplitFileRequest};
+pub use types::{
+    SplitFileDefinition, SplitFileDestination, SplitFileItem, SplitFilePlan, SplitFileRequest,
+};
 
 pub fn plan_split_file(request: SplitFileRequest<'_>) -> FormTransformResult<SplitFilePlan> {
     if request.paths.is_empty() && request.names.is_empty() && request.categories.is_empty() {
@@ -202,8 +204,7 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> FormTransformResult<Spl
         items,
         from_rewritten,
         to_rewritten,
-        to_file_existed: request.to_file_existed,
-        to_parent_existed: request.to_parent_existed,
+        destination: request.destination,
         changed,
         written,
     })
