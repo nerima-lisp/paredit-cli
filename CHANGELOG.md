@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-28
+
+No command, flag, exit code, or JSON field changed in this release: nothing
+under `src/` or `packages/` was touched. What changed is how the project
+verifies itself. The whole verification gate went from 27 minutes to 8, by
+removing work it was doing twice rather than by checking less.
+
 ### Changed
 
 - The Rust flake checks are [crane](https://github.com/ipetkov/crane)
@@ -24,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `dev` profile emits line tables instead of full debug information.
   Backtraces still resolve every frame to `file:line`; use
   `RUSTFLAGS=-Cdebuginfo=2` when step-debugging.
+- CI runs one job per flake check instead of one `nix flake check` for all of
+  them, and derives that job list from the flake so a new check cannot silently
+  stop being verified.
 
 ## [1.2.0] - 2026-07-28
 
