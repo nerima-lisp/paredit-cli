@@ -69,6 +69,7 @@ discovery, impact analysis, and preflight checks.
 | `class-cycles` | Report CLOS defclass/define-condition superclass inheritance cycles across two or more classes. |
 | `struct-cycles` | Report defstruct :include cycles across two or more structs. |
 | `system-conflicts` | Report distinct asdf:defsystem forms that claim the same system name. |
+| `elisp-file` | Report Emacs Lisp per-file facts: the `lexical-binding` header, the provided and required features, and the `;;;###autoload` cookies with the definitions they attach to. |
 | `duplicate-slots` | Report defclass/define-condition/defstruct forms declaring the same slot name more than once. |
 | `duplicate-methods` | Report defmethod forms with the same name, qualifier, and specializers declared more than once. |
 | `duplicate-parameters` | Report callable definitions whose lambda list names the same parameter more than once. |

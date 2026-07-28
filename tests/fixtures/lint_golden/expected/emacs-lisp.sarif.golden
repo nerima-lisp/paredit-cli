@@ -1,0 +1,1840 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 59,
+                  "byteOffset": 0,
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:1a9ab02b5ba5ee91:0"
+          },
+          "ruleId": "elisp-missing-lexical-binding"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 21,
+                  "byteOffset": 911,
+                  "startColumn": 1,
+                  "startLine": 36
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:e7da63da042f503c:0"
+          },
+          "ruleId": "elisp-unreachable-lexical-binding"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 14,
+                  "byteOffset": 748,
+                  "startColumn": 3,
+                  "startLine": 28
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:db17ae6e6733fcfc:0"
+          },
+          "ruleId": "elisp-autoload-cookie-without-form"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 14,
+                  "byteOffset": 970,
+                  "startColumn": 1,
+                  "startLine": 40
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:db17ae6e6733fcfc:1"
+          },
+          "ruleId": "elisp-autoload-cookie-without-form"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 77,
+                  "byteOffset": 265,
+                  "startColumn": 1,
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "defcustom fixture-option has no :type, so Customize cannot offer a widget for it"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:cbbc553bbb93971f:0"
+          },
+          "ruleId": "elisp-defcustom-missing-type"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 77,
+                  "byteOffset": 265,
+                  "startColumn": 1,
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:d17a6c91b6493d32:0"
+          },
+          "ruleId": "elisp-defcustom-missing-group"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 4,
+                  "byteOffset": 505,
+                  "startColumn": 4,
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "`loop` was removed in Emacs 27.1; use `cl-loop`"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:8123b7140348beab:0"
+          },
+          "ruleId": "elisp-obsolete-cl-alias"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 15,
+                  "byteOffset": 621,
+                  "startColumn": 3,
+                  "startLine": 21
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:e73bb58661019248:0"
+          },
+          "ruleId": "elisp-quoted-lambda"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 13,
+                  "byteOffset": 418,
+                  "startColumn": 3,
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:4a300b73107118f7:0"
+          },
+          "ruleId": "elisp-interactive-in-macro"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 36,
+                  "byteOffset": 700,
+                  "startColumn": 3,
+                  "startLine": 25
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this condition-case has no handler clauses, so it evaluates its body form and catches nothing"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:a88726d108867fc9:0"
+          },
+          "ruleId": "elisp-condition-case-without-handler"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "paredit",
+          "rules": [
+            {
+              "id": "self-assignment",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a setq/setf/psetq/psetf that assigns a place to itself"
+              }
+            },
+            {
+              "id": "duplicate-setf-places",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a setf/setq/psetf/psetq that assigns the same variable more than once ((setf a 1 a 2))"
+              }
+            },
+            {
+              "id": "setf-arity",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a setq/setf/psetq/psetf with an odd argument count"
+              }
+            },
+            {
+              "id": "setq-non-variable",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a setq/psetq place that is not a variable (a list, literal, or constant)"
+              }
+            },
+            {
+              "id": "manual-incf",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a setf/setq that manually increments a variable ((setf x (1+ x)) is (incf x))"
+              }
+            },
+            {
+              "id": "manual-push",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a setf/setq that manually conses onto a variable ((setf x (cons e x)) is (push e x))"
+              }
+            },
+            {
+              "id": "manual-pushnew",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a setf/setq that manually adjoins onto a variable ((setf x (adjoin e x)) is (pushnew e x))"
+              }
+            },
+            {
+              "id": "explicit-step-delta",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an incf/decf with an explicit delta of 1, the default ((incf x 1) is (incf x))"
+              }
+            },
+            {
+              "id": "negated-step-delta",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an incf/decf with a negative literal delta, which flips the operator ((incf x -1) is (decf x))"
+              }
+            },
+            {
+              "id": "explicit-nil-return",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a return/return-from with an explicit nil result, the default ((return nil) is (return))"
+              }
+            },
+            {
+              "id": "cons-to-list",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a cons onto nil or a list literal ((cons a nil) is (list a); (cons a (list b)) is (list a b))"
+              }
+            },
+            {
+              "id": "double-reverse",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a (reverse (reverse x)), a wasteful obfuscated copy ((reverse (reverse x)) is (copy-seq x))"
+              }
+            },
+            {
+              "id": "modify-macro-arity",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an incf/decf/push/pop call with the wrong number of arguments"
+              }
+            },
+            {
+              "id": "duplicate-parameters",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a lambda list that names the same parameter more than once"
+              }
+            },
+            {
+              "id": "duplicate-lambda-list-keyword",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a lambda list that repeats a lambda-list keyword (&optional, &key, ...)"
+              }
+            },
+            {
+              "id": "lambda-list-keyword-order",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "lambda-list keywords out of the canonical &optional/&rest/&key/&aux order"
+              }
+            },
+            {
+              "id": "redundant-quote",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a self-evaluating literal (number/string/char/keyword) quoted redundantly"
+              }
+            },
+            {
+              "id": "redundant-progn",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a progn that is empty or wraps a single form (progn X is just X)"
+              }
+            },
+            {
+              "id": "nested-progn",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a multi-form progn nested directly inside another progn (its forms splice in)"
+              }
+            },
+            {
+              "id": "nested-when",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a when whose only body is a when, mergeable by and ((when a (when b c)) is (when (and a b) c))"
+              }
+            },
+            {
+              "id": "nested-unless",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c))"
+              }
+            },
+            {
+              "id": "nested-boolean",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a same-operator and/or nested in an and/or, which flattens ((or a (or b c)) is (or a b c))"
+              }
+            },
+            {
+              "id": "nested-cxr",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "nested car/cdr accessors that combine into one ((car (cdr x)) is (cadr x))"
+              }
+            },
+            {
+              "id": "nth-constant-index",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an nth with a small constant index that has an ordinal accessor ((nth 0 x) is (first x))"
+              }
+            },
+            {
+              "id": "nthcdr-zero",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an nthcdr with a zero count, which returns the list unchanged ((nthcdr 0 x) is x)"
+              }
+            },
+            {
+              "id": "nthcdr-small-index",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an nthcdr with a 1-4 count that has a named cdr accessor ((nthcdr 2 x) is (cddr x))"
+              }
+            },
+            {
+              "id": "redundant-body-progn",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a multi-form progn used as a when/unless/let/defun/... body (its forms splice in)"
+              }
+            },
+            {
+              "id": "empty-let",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a let with an empty binding list, which is just progn ((let () body) is (progn body))"
+              }
+            },
+            {
+              "id": "redundant-if-nil",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a three-argument if whose else branch is a redundant literal nil ((if c x nil) is (if c x))"
+              }
+            },
+            {
+              "id": "redundant-let-star",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a let* with zero or one binding, which is just let (no sequential scope in play)"
+              }
+            },
+            {
+              "id": "redundant-funcall",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a funcall of a sharp-quoted symbol ((funcall #'foo a b) is just (foo a b))"
+              }
+            },
+            {
+              "id": "redundant-the",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a (the t form) type declaration, which is vacuous and is just form (t matches every object)"
+              }
+            },
+            {
+              "id": "funcall-lambda",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a funcall of a lambda form, which applies directly ((funcall (lambda (x) x) a) is ((lambda (x) x) a))"
+              }
+            },
+            {
+              "id": "sharp-quoted-lambda",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a lambda form with a redundant #' prefix (#'(lambda (x) x) is (lambda (x) x))"
+              }
+            },
+            {
+              "id": "redundant-identity",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an identity call, which returns its argument unchanged ((identity x) is just x)"
+              }
+            },
+            {
+              "id": "redundant-apply",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an apply of a sharp-quoted symbol to a literal list ((apply #'foo (list a b)) is (foo a b))"
+              }
+            },
+            {
+              "id": "redundant-eql-test",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an eql-defaulting call with an explicit :test #'eql, the default ((find x l :test #'eql) is (find x l))"
+              }
+            },
+            {
+              "id": "redundant-identity-key",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a :key-taking call with an explicit :key #'identity/nil, the default ((sort xs #'< :key #'identity) is (sort xs #'<))"
+              }
+            },
+            {
+              "id": "negated-when-unless",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a when/unless whose test is a (not X)/(null X) negation (flip the macro instead)"
+              }
+            },
+            {
+              "id": "negated-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a not/null of a two-argument numeric comparison ((not (= a b)) is (/= a b))"
+              }
+            },
+            {
+              "id": "negated-if",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a three-argument if with a negated test ((if (not c) a b) is (if c b a))"
+              }
+            },
+            {
+              "id": "if-to-or",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an if whose test and then are the same atom ((if x x y) is (or x y))"
+              }
+            },
+            {
+              "id": "if-not",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a three-argument if with then=nil and else=t ((if test nil t) is (not test))"
+              }
+            },
+            {
+              "id": "one-step-arithmetic",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a +/- of a literal 1 with a shorthand ((+ x 1) is (1+ x); (- x 1) is (1- x))"
+              }
+            },
+            {
+              "id": "one-armed-if",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a two-argument if with no else branch ((if test then) is (when test then))"
+              }
+            },
+            {
+              "id": "self-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a comparison whose two operands are structurally identical"
+              }
+            },
+            {
+              "id": "nil-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an eq/eql/equal/equalp comparison against nil ((eq x nil) is just (null x))"
+              }
+            },
+            {
+              "id": "t-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an eq/eql/equal/equalp comparison against t (only matches the symbol T, not any true value)"
+              }
+            },
+            {
+              "id": "identical-if-branches",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an if whose then and else branches are structurally identical"
+              }
+            },
+            {
+              "id": "constant-if-test",
+              "properties": {
+                "category": "dead-code",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an if whose test is the literal t or nil ((if t a b) is a; (if nil a b) is b)"
+              }
+            },
+            {
+              "id": "constant-when-test",
+              "properties": {
+                "category": "dead-code",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a when/unless with a literal t/nil test ((when t b) is (progn b); (when nil b) is nil)"
+              }
+            },
+            {
+              "id": "if-arity",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an if with the wrong number of arguments (Common Lisp if takes 2 or 3)"
+              }
+            },
+            {
+              "id": "the-arity",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a the special form without exactly two arguments (a type and a form)"
+              }
+            },
+            {
+              "id": "equality-arity",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an eq/eql/equal/equalp call without exactly two arguments"
+              }
+            },
+            {
+              "id": "accessor-arity",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an nth/elt/gethash/getf/... accessor with the wrong number of arguments"
+              }
+            },
+            {
+              "id": "append-list-to-cons",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a one-element append that is just a cons ((append (list x) rest) is (cons x rest))"
+              }
+            },
+            {
+              "id": "format-to-string",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a (format nil \"~A\"/\"~S\" x), which is (princ-to-string x)/(prin1-to-string x)"
+              }
+            },
+            {
+              "id": "format-newline",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a (format t \"~%\"), which is just (terpri) (write a newline to standard output)"
+              }
+            },
+            {
+              "id": "redundant-divisor",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a quotient op with a redundant divisor of 1 ((floor x 1) is (floor x))"
+              }
+            },
+            {
+              "id": "duplicate-case-keys",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a case/ecase/ccase key repeated across more than one clause"
+              }
+            },
+            {
+              "id": "quoted-case-key",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a case/ecase/ccase clause with a quoted key ('a matches quote and a, not a)"
+              }
+            },
+            {
+              "id": "case-nil-key",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a case/ecase/ccase clause with a bare nil key, which is the empty key list and never matches (use ((nil) …))"
+              }
+            },
+            {
+              "id": "typecase-nil-key",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a typecase/etypecase/ctypecase clause with a bare nil type, which is the empty type and never matches (use null)"
+              }
+            },
+            {
+              "id": "malformed-case-clause",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a case/typecase clause that is not a non-empty list"
+              }
+            },
+            {
+              "id": "unreachable-case-clause",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a case/typecase clause after a t/otherwise catch-all that can never run"
+              }
+            },
+            {
+              "id": "exhaustive-case-otherwise",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an ecase/ccase/etypecase/ctypecase with a forbidden t/otherwise clause"
+              }
+            },
+            {
+              "id": "duplicate-cond-tests",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a cond test expression repeated across more than one clause"
+              }
+            },
+            {
+              "id": "unreachable-cond-clause",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a cond clause after a t catch-all that can never run"
+              }
+            },
+            {
+              "id": "malformed-cond-clause",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a cond clause that is not a non-empty list"
+              }
+            },
+            {
+              "id": "duplicate-let-bindings",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a parallel let that binds the same variable more than once"
+              }
+            },
+            {
+              "id": "malformed-let-binding",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a let/let* binding that is neither a symbol nor a (var value) pair"
+              }
+            },
+            {
+              "id": "binds-constant",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a let/let*/do/do* binding whose variable is a constant (nil, t, or a keyword)"
+              }
+            },
+            {
+              "id": "malformed-iteration-spec",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a dolist/dotimes spec that is not a (var form [result]) list"
+              }
+            },
+            {
+              "id": "eval-when-situation",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an eval-when with an invalid situation (not :compile-toplevel/:load-toplevel/:execute)"
+              }
+            },
+            {
+              "id": "duplicate-boolean-operands",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an and/or that lists the same operand more than once"
+              }
+            },
+            {
+              "id": "dead-boolean-operand",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an and/or whose non-final constant operand makes later operands dead"
+              }
+            },
+            {
+              "id": "redundant-boolean-identity",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an and/or with a redundant identity operand (t in and, nil in or; (and a t b) is (and a b))"
+              }
+            },
+            {
+              "id": "de-morgan",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an and/or of all negations, collapsible by De Morgan ((and (not a) (not b)) is (not (or a b)))"
+              }
+            },
+            {
+              "id": "single-operand-boolean",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a single-operand and/or ((and X) and (or X) are just X)"
+              }
+            },
+            {
+              "id": "single-operand-list-op",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a single-argument append/nconc/list*, which returns its argument unchanged ((append x) is x)"
+              }
+            },
+            {
+              "id": "single-operand-arithmetic",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a single-operand +/* ((+ X) and (* X) are just X)"
+              }
+            },
+            {
+              "id": "eql-string-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an eq/eql compared against a string literal (never reliably eql)"
+              }
+            },
+            {
+              "id": "eql-list-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an eq/eql compared against a quoted list literal (never reliably eql)"
+              }
+            },
+            {
+              "id": "eql-search-literal",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a member/assoc/find/substitute/adjoin/... searching for a string/list literal without :test (default eql won't match)"
+              }
+            },
+            {
+              "id": "eq-number-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an eq compared against a number literal (eq on numbers is unreliable)"
+              }
+            },
+            {
+              "id": "eq-char-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an eq compared against a character literal (eq on characters is unreliable; use eql/char=)"
+              }
+            },
+            {
+              "id": "single-arg-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a numeric comparison (< > <= >= = /=) with one argument (always true; missing an operand?)"
+              }
+            },
+            {
+              "id": "sign-comparison",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a =/</> comparison against 0 with a dedicated predicate ((= x 0) is (zerop x))"
+              }
+            },
+            {
+              "id": "single-clause-cond",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a cond with one non-t clause that has a body ((cond (test a b)) is (when test a b))"
+              }
+            },
+            {
+              "id": "cond-t-clause",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a cond with one t clause that has a body ((cond (t a b)) is (progn a b))"
+              }
+            },
+            {
+              "id": "single-value-bind",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a multiple-value-bind of one variable ((multiple-value-bind (x) f body) is (let ((x f)) body))"
+              }
+            },
+            {
+              "id": "format-missing-destination",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a format call whose first argument is a string literal (nil/t/stream destination is missing)"
+              }
+            },
+            {
+              "id": "literal-place",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an incf/decf/push/pop/pushnew/setf/psetf whose place is a self-evaluating literal (cannot be modified)"
+              }
+            },
+            {
+              "id": "destructive-literal",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a destructive call (nreverse/sort/delete/nsubstitute/nconc/...) on a quoted list literal (undefined behavior)"
+              }
+            },
+            {
+              "id": "char-op-string",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a character function (char=/char-code/alpha-char-p/...) applied to a string literal (type error)"
+              }
+            },
+            {
+              "id": "empty-body",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a when/unless/dolist/dotimes with no body (the test/spec runs, then nothing happens)"
+              }
+            },
+            {
+              "id": "identity-arithmetic",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an arithmetic form with a redundant identity operand ((+ x 0), (* x 1), (- x 0), (/ x 1))"
+              }
+            },
+            {
+              "id": "verbose-negation",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "negation written the long way ((- 0 x) and (* x -1) are (- x))"
+              }
+            },
+            {
+              "id": "list-star-to-cons",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a two-argument list*, which is just a cons ((list* a b) is (cons a b))"
+              }
+            },
+            {
+              "id": "values-list-of-list",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a values-list of a list constructor ((values-list (list a b)) is (values a b))"
+              }
+            },
+            {
+              "id": "redundant-prog1",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a prog1 wrapping a single form, which is just that form ((prog1 x) is x)"
+              }
+            },
+            {
+              "id": "subseq-zero",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a subseq from index 0, a whole-sequence copy ((subseq seq 0) is (copy-seq seq))"
+              }
+            },
+            {
+              "id": "car-nthcdr",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a car of an nthcdr, which is nth ((car (nthcdr n x)) is (nth n x))"
+              }
+            },
+            {
+              "id": "car-reverse",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a car of a reverse, a wasteful full copy ((car (reverse x)) is (car (last x)))"
+              }
+            },
+            {
+              "id": "append-nil",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a two-argument append with a nil tail, a fresh copy ((append x nil) is (copy-list x))"
+              }
+            },
+            {
+              "id": "multiple-value-list-of-values",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a multiple-value-list of a values form ((multiple-value-list (values a b)) is (list a b))"
+              }
+            },
+            {
+              "id": "typep-predicate",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a typep against a type with a dedicated predicate ((typep x 'string) is (stringp x))"
+              }
+            },
+            {
+              "id": "coerce-to-t",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a coerce to type t, which returns the object unchanged ((coerce x t) is x)"
+              }
+            },
+            {
+              "id": "gethash-default",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a gethash with an explicit nil default, the default ((gethash k h nil) is (gethash k h))"
+              }
+            },
+            {
+              "id": "make-hash-table-test",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a make-hash-table with an explicit :test 'eql, the default ((make-hash-table :test 'eql) is (make-hash-table))"
+              }
+            },
+            {
+              "id": "zero-divisor",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a division-family form with a literal 0 divisor, a guaranteed division-by-zero ((/ x 0))"
+              }
+            },
+            {
+              "id": "duplicate-keyword",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a make-* call passing the same keyword argument twice ((make-instance 'c :x 1 :x 2))"
+              }
+            },
+            {
+              "id": "defpackage-quoted",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a quoted designator in a defpackage clause, which defpackage does not evaluate ((:export 'foo))"
+              }
+            },
+            {
+              "id": "step-zero",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an incf/decf with an explicit step of 0, a no-op ((incf x 0))"
+              }
+            },
+            {
+              "id": "if-to-unless",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a three-argument if with then=nil ((if c nil e) is (unless c e))"
+              }
+            },
+            {
+              "id": "prog2-to-progn",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a two-form prog2, which is just progn ((prog2 a b) is (progn a b))"
+              }
+            },
+            {
+              "id": "handler-case-no-clauses",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a handler-case with no handler clauses, which is just its body ((handler-case x) is x)"
+              }
+            },
+            {
+              "id": "unwind-protect-no-cleanup",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an unwind-protect with no cleanup forms, which is just its body ((unwind-protect x) is x)"
+              }
+            },
+            {
+              "id": "redundant-start-zero",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a bounded-sequence call with an explicit :start 0, the default ((find x seq :start 0) is (find x seq))"
+              }
+            },
+            {
+              "id": "redundant-end-nil",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a bounded-sequence call with an explicit :end nil, the default ((find x seq :end nil) is (find x seq))"
+              }
+            },
+            {
+              "id": "redundant-from-end-nil",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a sequence call with an explicit :from-end nil, the default ((find x seq :from-end nil) is (find x seq))"
+              }
+            },
+            {
+              "id": "redundant-count-nil",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a remove/delete/substitute call with an explicit :count nil, the default ((remove x seq :count nil) is (remove x seq))"
+              }
+            },
+            {
+              "id": "string-case-fold",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a string= of two same-case-folded operands ((string= (string-downcase a) (string-downcase b)) is (string-equal a b))"
+              }
+            },
+            {
+              "id": "char-case-fold",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a char= of two same-case-folded operands ((char= (char-downcase a) (char-downcase b)) is (char-equal a b))"
+              }
+            },
+            {
+              "id": "nested-string-case",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "nested string case ops where the outer dominates ((string-upcase (string-downcase s)) is (string-upcase s))"
+              }
+            },
+            {
+              "id": "code-char-char-code",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a code-char of a char-code, a round-trip that is just the character ((code-char (char-code c)) is c)"
+              }
+            },
+            {
+              "id": "last-default-count",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a last call with an explicit count of 1, the default ((last x 1) is (last x))"
+              }
+            },
+            {
+              "id": "butlast-default-count",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a butlast/nbutlast call with an explicit count of 1, the default ((butlast x 1) is (butlast x))"
+              }
+            },
+            {
+              "id": "make-list-default-element",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a make-list call with an explicit :initial-element nil, the default ((make-list n :initial-element nil) is (make-list n))"
+              }
+            },
+            {
+              "id": "parse-integer-default-radix",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a parse-integer call with an explicit :radix 10, the default ((parse-integer s :radix 10) is (parse-integer s))"
+              }
+            },
+            {
+              "id": "getf-default-nil",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a getf call with an explicit nil default, the default ((getf p k nil) is (getf p k))"
+              }
+            },
+            {
+              "id": "make-array-default-keyword",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a make-array call with an explicit :adjustable nil or :fill-pointer nil, the default ((make-array n :adjustable nil) is (make-array n))"
+              }
+            },
+            {
+              "id": "nested-char-case",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "nested char case ops where the outer dominates ((char-upcase (char-downcase c)) is (char-upcase c))"
+              }
+            },
+            {
+              "id": "list-star-nil",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b))"
+              }
+            },
+            {
+              "id": "elisp-missing-lexical-binding",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an Emacs Lisp file whose first line does not set lexical-binding"
+              }
+            },
+            {
+              "id": "elisp-unreachable-lexical-binding",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a lexical-binding setting outside the first line, which Emacs never reads"
+              }
+            },
+            {
+              "id": "elisp-autoload-cookie-without-form",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a ;;;###autoload cookie with no top-level form after it"
+              }
+            },
+            {
+              "id": "elisp-defcustom-missing-type",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a defcustom with no :type, which leaves Customize editing a raw sexp"
+              }
+            },
+            {
+              "id": "elisp-defcustom-missing-group",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a defcustom with no :group, which leaves the option out of the group tree"
+              }
+            },
+            {
+              "id": "elisp-obsolete-cl-alias",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an unprefixed cl.el name, removed in Emacs 27.1"
+              }
+            },
+            {
+              "id": "elisp-quoted-lambda",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a quoted lambda, which is a list rather than a closure under lexical binding"
+              }
+            },
+            {
+              "id": "elisp-interactive-in-macro",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an (interactive ...) inside a macro definition, which cannot be a command"
+              }
+            },
+            {
+              "id": "elisp-condition-case-without-handler",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a condition-case with no handler clauses, which catches nothing"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

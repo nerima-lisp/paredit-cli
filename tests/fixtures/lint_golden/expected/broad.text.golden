@@ -133,6 +133,15 @@ rule	getf-default-nil	1
 rule	make-array-default-keyword	1
 rule	nested-char-case	1
 rule	list-star-nil	1
+rule	elisp-missing-lexical-binding	0
+rule	elisp-unreachable-lexical-binding	0
+rule	elisp-autoload-cookie-without-form	0
+rule	elisp-defcustom-missing-type	0
+rule	elisp-defcustom-missing-group	0
+rule	elisp-obsolete-cl-alias	0
+rule	elisp-quoted-lambda	0
+rule	elisp-interactive-in-macro	0
+rule	elisp-condition-case-without-handler	0
 finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself
 finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead
 finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count

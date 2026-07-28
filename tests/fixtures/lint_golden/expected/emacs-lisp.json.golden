@@ -1,0 +1,991 @@
+{
+  "finding_count": 10,
+  "findings": [
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-missing-lexical-binding",
+      "severity": "warning",
+      "span": {
+        "end": 59,
+        "start": 0
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-unreachable-lexical-binding",
+      "severity": "error",
+      "span": {
+        "end": 932,
+        "start": 911
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-autoload-cookie-without-form",
+      "severity": "error",
+      "span": {
+        "end": 762,
+        "start": 748
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-autoload-cookie-without-form",
+      "severity": "error",
+      "span": {
+        "end": 984,
+        "start": 970
+      }
+    },
+    {
+      "category": "malformed",
+      "fixable": false,
+      "message": "defcustom fixture-option has no :type, so Customize cannot offer a widget for it",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-defcustom-missing-type",
+      "severity": "warning",
+      "span": {
+        "end": 342,
+        "start": 265
+      }
+    },
+    {
+      "category": "malformed",
+      "fixable": false,
+      "message": "defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-defcustom-missing-group",
+      "severity": "warning",
+      "span": {
+        "end": 342,
+        "start": 265
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "`loop` was removed in Emacs 27.1; use `cl-loop`",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-obsolete-cl-alias",
+      "severity": "error",
+      "span": {
+        "end": 509,
+        "start": 505
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-quoted-lambda",
+      "severity": "error",
+      "span": {
+        "end": 636,
+        "start": 621
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-interactive-in-macro",
+      "severity": "error",
+      "span": {
+        "end": 431,
+        "start": 418
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "message": "this condition-case has no handler clauses, so it evaluates its body form and catches nothing",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-condition-case-without-handler",
+      "severity": "error",
+      "span": {
+        "end": 736,
+        "start": 700
+      }
+    }
+  ],
+  "per_rule": [
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a setq/setf/psetq/psetf that assigns a place to itself",
+      "rule": "self-assignment"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "a setf/setq/psetf/psetq that assigns the same variable more than once ((setf a 1 a 2))",
+      "rule": "duplicate-setf-places"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "a setq/setf/psetq/psetf with an odd argument count",
+      "rule": "setf-arity"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a setq/psetq place that is not a variable (a list, literal, or constant)",
+      "rule": "setq-non-variable"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a setf/setq that manually increments a variable ((setf x (1+ x)) is (incf x))",
+      "rule": "manual-incf"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a setf/setq that manually conses onto a variable ((setf x (cons e x)) is (push e x))",
+      "rule": "manual-push"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a setf/setq that manually adjoins onto a variable ((setf x (adjoin e x)) is (pushnew e x))",
+      "rule": "manual-pushnew"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an incf/decf with an explicit delta of 1, the default ((incf x 1) is (incf x))",
+      "rule": "explicit-step-delta"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an incf/decf with a negative literal delta, which flips the operator ((incf x -1) is (decf x))",
+      "rule": "negated-step-delta"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a return/return-from with an explicit nil result, the default ((return nil) is (return))",
+      "rule": "explicit-nil-return"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a cons onto nil or a list literal ((cons a nil) is (list a); (cons a (list b)) is (list a b))",
+      "rule": "cons-to-list"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a (reverse (reverse x)), a wasteful obfuscated copy ((reverse (reverse x)) is (copy-seq x))",
+      "rule": "double-reverse"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "an incf/decf/push/pop call with the wrong number of arguments",
+      "rule": "modify-macro-arity"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "a lambda list that names the same parameter more than once",
+      "rule": "duplicate-parameters"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "a lambda list that repeats a lambda-list keyword (&optional, &key, ...)",
+      "rule": "duplicate-lambda-list-keyword"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "lambda-list keywords out of the canonical &optional/&rest/&key/&aux order",
+      "rule": "lambda-list-keyword-order"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a self-evaluating literal (number/string/char/keyword) quoted redundantly",
+      "rule": "redundant-quote"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a progn that is empty or wraps a single form (progn X is just X)",
+      "rule": "redundant-progn"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a multi-form progn nested directly inside another progn (its forms splice in)",
+      "rule": "nested-progn"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a when whose only body is a when, mergeable by and ((when a (when b c)) is (when (and a b) c))",
+      "rule": "nested-when"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c))",
+      "rule": "nested-unless"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a same-operator and/or nested in an and/or, which flattens ((or a (or b c)) is (or a b c))",
+      "rule": "nested-boolean"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "nested car/cdr accessors that combine into one ((car (cdr x)) is (cadr x))",
+      "rule": "nested-cxr"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an nth with a small constant index that has an ordinal accessor ((nth 0 x) is (first x))",
+      "rule": "nth-constant-index"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an nthcdr with a zero count, which returns the list unchanged ((nthcdr 0 x) is x)",
+      "rule": "nthcdr-zero"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an nthcdr with a 1-4 count that has a named cdr accessor ((nthcdr 2 x) is (cddr x))",
+      "rule": "nthcdr-small-index"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a multi-form progn used as a when/unless/let/defun/... body (its forms splice in)",
+      "rule": "redundant-body-progn"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a let with an empty binding list, which is just progn ((let () body) is (progn body))",
+      "rule": "empty-let"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a three-argument if whose else branch is a redundant literal nil ((if c x nil) is (if c x))",
+      "rule": "redundant-if-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a let* with zero or one binding, which is just let (no sequential scope in play)",
+      "rule": "redundant-let-star"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a funcall of a sharp-quoted symbol ((funcall #'foo a b) is just (foo a b))",
+      "rule": "redundant-funcall"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a (the t form) type declaration, which is vacuous and is just form (t matches every object)",
+      "rule": "redundant-the"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a funcall of a lambda form, which applies directly ((funcall (lambda (x) x) a) is ((lambda (x) x) a))",
+      "rule": "funcall-lambda"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a lambda form with a redundant #' prefix (#'(lambda (x) x) is (lambda (x) x))",
+      "rule": "sharp-quoted-lambda"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an identity call, which returns its argument unchanged ((identity x) is just x)",
+      "rule": "redundant-identity"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an apply of a sharp-quoted symbol to a literal list ((apply #'foo (list a b)) is (foo a b))",
+      "rule": "redundant-apply"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an eql-defaulting call with an explicit :test #'eql, the default ((find x l :test #'eql) is (find x l))",
+      "rule": "redundant-eql-test"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a :key-taking call with an explicit :key #'identity/nil, the default ((sort xs #'< :key #'identity) is (sort xs #'<))",
+      "rule": "redundant-identity-key"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a when/unless whose test is a (not X)/(null X) negation (flip the macro instead)",
+      "rule": "negated-when-unless"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a not/null of a two-argument numeric comparison ((not (= a b)) is (/= a b))",
+      "rule": "negated-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a three-argument if with a negated test ((if (not c) a b) is (if c b a))",
+      "rule": "negated-if"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an if whose test and then are the same atom ((if x x y) is (or x y))",
+      "rule": "if-to-or"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a three-argument if with then=nil and else=t ((if test nil t) is (not test))",
+      "rule": "if-not"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a +/- of a literal 1 with a shorthand ((+ x 1) is (1+ x); (- x 1) is (1- x))",
+      "rule": "one-step-arithmetic"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a two-argument if with no else branch ((if test then) is (when test then))",
+      "rule": "one-armed-if"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a comparison whose two operands are structurally identical",
+      "rule": "self-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an eq/eql/equal/equalp comparison against nil ((eq x nil) is just (null x))",
+      "rule": "nil-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an eq/eql/equal/equalp comparison against t (only matches the symbol T, not any true value)",
+      "rule": "t-comparison"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "an if whose then and else branches are structurally identical",
+      "rule": "identical-if-branches"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "an if whose test is the literal t or nil ((if t a b) is a; (if nil a b) is b)",
+      "rule": "constant-if-test"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a when/unless with a literal t/nil test ((when t b) is (progn b); (when nil b) is nil)",
+      "rule": "constant-when-test"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "an if with the wrong number of arguments (Common Lisp if takes 2 or 3)",
+      "rule": "if-arity"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "a the special form without exactly two arguments (a type and a form)",
+      "rule": "the-arity"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "an eq/eql/equal/equalp call without exactly two arguments",
+      "rule": "equality-arity"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "an nth/elt/gethash/getf/... accessor with the wrong number of arguments",
+      "rule": "accessor-arity"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a one-element append that is just a cons ((append (list x) rest) is (cons x rest))",
+      "rule": "append-list-to-cons"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a (format nil \"~A\"/\"~S\" x), which is (princ-to-string x)/(prin1-to-string x)",
+      "rule": "format-to-string"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a (format t \"~%\"), which is just (terpri) (write a newline to standard output)",
+      "rule": "format-newline"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a quotient op with a redundant divisor of 1 ((floor x 1) is (floor x))",
+      "rule": "redundant-divisor"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "a case/ecase/ccase key repeated across more than one clause",
+      "rule": "duplicate-case-keys"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a case/ecase/ccase clause with a quoted key ('a matches quote and a, not a)",
+      "rule": "quoted-case-key"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a case/ecase/ccase clause with a bare nil key, which is the empty key list and never matches (use ((nil) …))",
+      "rule": "case-nil-key"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a typecase/etypecase/ctypecase clause with a bare nil type, which is the empty type and never matches (use null)",
+      "rule": "typecase-nil-key"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a case/typecase clause that is not a non-empty list",
+      "rule": "malformed-case-clause"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a case/typecase clause after a t/otherwise catch-all that can never run",
+      "rule": "unreachable-case-clause"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "an ecase/ccase/etypecase/ctypecase with a forbidden t/otherwise clause",
+      "rule": "exhaustive-case-otherwise"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "a cond test expression repeated across more than one clause",
+      "rule": "duplicate-cond-tests"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a cond clause after a t catch-all that can never run",
+      "rule": "unreachable-cond-clause"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a cond clause that is not a non-empty list",
+      "rule": "malformed-cond-clause"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "a parallel let that binds the same variable more than once",
+      "rule": "duplicate-let-bindings"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a let/let* binding that is neither a symbol nor a (var value) pair",
+      "rule": "malformed-let-binding"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a let/let*/do/do* binding whose variable is a constant (nil, t, or a keyword)",
+      "rule": "binds-constant"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a dolist/dotimes spec that is not a (var form [result]) list",
+      "rule": "malformed-iteration-spec"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "an eval-when with an invalid situation (not :compile-toplevel/:load-toplevel/:execute)",
+      "rule": "eval-when-situation"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "an and/or that lists the same operand more than once",
+      "rule": "duplicate-boolean-operands"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "an and/or whose non-final constant operand makes later operands dead",
+      "rule": "dead-boolean-operand"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an and/or with a redundant identity operand (t in and, nil in or; (and a t b) is (and a b))",
+      "rule": "redundant-boolean-identity"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an and/or of all negations, collapsible by De Morgan ((and (not a) (not b)) is (not (or a b)))",
+      "rule": "de-morgan"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a single-operand and/or ((and X) and (or X) are just X)",
+      "rule": "single-operand-boolean"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a single-argument append/nconc/list*, which returns its argument unchanged ((append x) is x)",
+      "rule": "single-operand-list-op"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a single-operand +/* ((+ X) and (* X) are just X)",
+      "rule": "single-operand-arithmetic"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an eq/eql compared against a string literal (never reliably eql)",
+      "rule": "eql-string-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an eq/eql compared against a quoted list literal (never reliably eql)",
+      "rule": "eql-list-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a member/assoc/find/substitute/adjoin/... searching for a string/list literal without :test (default eql won't match)",
+      "rule": "eql-search-literal"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an eq compared against a number literal (eq on numbers is unreliable)",
+      "rule": "eq-number-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an eq compared against a character literal (eq on characters is unreliable; use eql/char=)",
+      "rule": "eq-char-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a numeric comparison (< > <= >= = /=) with one argument (always true; missing an operand?)",
+      "rule": "single-arg-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a =/</> comparison against 0 with a dedicated predicate ((= x 0) is (zerop x))",
+      "rule": "sign-comparison"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a cond with one non-t clause that has a body ((cond (test a b)) is (when test a b))",
+      "rule": "single-clause-cond"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a cond with one t clause that has a body ((cond (t a b)) is (progn a b))",
+      "rule": "cond-t-clause"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a multiple-value-bind of one variable ((multiple-value-bind (x) f body) is (let ((x f)) body))",
+      "rule": "single-value-bind"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a format call whose first argument is a string literal (nil/t/stream destination is missing)",
+      "rule": "format-missing-destination"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "an incf/decf/push/pop/pushnew/setf/psetf whose place is a self-evaluating literal (cannot be modified)",
+      "rule": "literal-place"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a destructive call (nreverse/sort/delete/nsubstitute/nconc/...) on a quoted list literal (undefined behavior)",
+      "rule": "destructive-literal"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a character function (char=/char-code/alpha-char-p/...) applied to a string literal (type error)",
+      "rule": "char-op-string"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a when/unless/dolist/dotimes with no body (the test/spec runs, then nothing happens)",
+      "rule": "empty-body"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an arithmetic form with a redundant identity operand ((+ x 0), (* x 1), (- x 0), (/ x 1))",
+      "rule": "identity-arithmetic"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "negation written the long way ((- 0 x) and (* x -1) are (- x))",
+      "rule": "verbose-negation"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a two-argument list*, which is just a cons ((list* a b) is (cons a b))",
+      "rule": "list-star-to-cons"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a values-list of a list constructor ((values-list (list a b)) is (values a b))",
+      "rule": "values-list-of-list"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a prog1 wrapping a single form, which is just that form ((prog1 x) is x)",
+      "rule": "redundant-prog1"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a subseq from index 0, a whole-sequence copy ((subseq seq 0) is (copy-seq seq))",
+      "rule": "subseq-zero"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a car of an nthcdr, which is nth ((car (nthcdr n x)) is (nth n x))",
+      "rule": "car-nthcdr"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a car of a reverse, a wasteful full copy ((car (reverse x)) is (car (last x)))",
+      "rule": "car-reverse"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a two-argument append with a nil tail, a fresh copy ((append x nil) is (copy-list x))",
+      "rule": "append-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a multiple-value-list of a values form ((multiple-value-list (values a b)) is (list a b))",
+      "rule": "multiple-value-list-of-values"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a typep against a type with a dedicated predicate ((typep x 'string) is (stringp x))",
+      "rule": "typep-predicate"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a coerce to type t, which returns the object unchanged ((coerce x t) is x)",
+      "rule": "coerce-to-t"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a gethash with an explicit nil default, the default ((gethash k h nil) is (gethash k h))",
+      "rule": "gethash-default"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a make-hash-table with an explicit :test 'eql, the default ((make-hash-table :test 'eql) is (make-hash-table))",
+      "rule": "make-hash-table-test"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a division-family form with a literal 0 divisor, a guaranteed division-by-zero ((/ x 0))",
+      "rule": "zero-divisor"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "a make-* call passing the same keyword argument twice ((make-instance 'c :x 1 :x 2))",
+      "rule": "duplicate-keyword"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a quoted designator in a defpackage clause, which defpackage does not evaluate ((:export 'foo))",
+      "rule": "defpackage-quoted"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an incf/decf with an explicit step of 0, a no-op ((incf x 0))",
+      "rule": "step-zero"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a three-argument if with then=nil ((if c nil e) is (unless c e))",
+      "rule": "if-to-unless"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a two-form prog2, which is just progn ((prog2 a b) is (progn a b))",
+      "rule": "prog2-to-progn"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a handler-case with no handler clauses, which is just its body ((handler-case x) is x)",
+      "rule": "handler-case-no-clauses"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an unwind-protect with no cleanup forms, which is just its body ((unwind-protect x) is x)",
+      "rule": "unwind-protect-no-cleanup"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a bounded-sequence call with an explicit :start 0, the default ((find x seq :start 0) is (find x seq))",
+      "rule": "redundant-start-zero"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a bounded-sequence call with an explicit :end nil, the default ((find x seq :end nil) is (find x seq))",
+      "rule": "redundant-end-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a sequence call with an explicit :from-end nil, the default ((find x seq :from-end nil) is (find x seq))",
+      "rule": "redundant-from-end-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a remove/delete/substitute call with an explicit :count nil, the default ((remove x seq :count nil) is (remove x seq))",
+      "rule": "redundant-count-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a string= of two same-case-folded operands ((string= (string-downcase a) (string-downcase b)) is (string-equal a b))",
+      "rule": "string-case-fold"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a char= of two same-case-folded operands ((char= (char-downcase a) (char-downcase b)) is (char-equal a b))",
+      "rule": "char-case-fold"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "nested string case ops where the outer dominates ((string-upcase (string-downcase s)) is (string-upcase s))",
+      "rule": "nested-string-case"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a code-char of a char-code, a round-trip that is just the character ((code-char (char-code c)) is c)",
+      "rule": "code-char-char-code"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a last call with an explicit count of 1, the default ((last x 1) is (last x))",
+      "rule": "last-default-count"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a butlast/nbutlast call with an explicit count of 1, the default ((butlast x 1) is (butlast x))",
+      "rule": "butlast-default-count"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a make-list call with an explicit :initial-element nil, the default ((make-list n :initial-element nil) is (make-list n))",
+      "rule": "make-list-default-element"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a parse-integer call with an explicit :radix 10, the default ((parse-integer s :radix 10) is (parse-integer s))",
+      "rule": "parse-integer-default-radix"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a getf call with an explicit nil default, the default ((getf p k nil) is (getf p k))",
+      "rule": "getf-default-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a make-array call with an explicit :adjustable nil or :fill-pointer nil, the default ((make-array n :adjustable nil) is (make-array n))",
+      "rule": "make-array-default-keyword"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "nested char case ops where the outer dominates ((char-upcase (char-downcase c)) is (char-upcase c))",
+      "rule": "nested-char-case"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b))",
+      "rule": "list-star-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "an Emacs Lisp file whose first line does not set lexical-binding",
+      "rule": "elisp-missing-lexical-binding"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "a lexical-binding setting outside the first line, which Emacs never reads",
+      "rule": "elisp-unreachable-lexical-binding"
+    },
+    {
+      "category": "suspicious",
+      "count": 2,
+      "description": "a ;;;###autoload cookie with no top-level form after it",
+      "rule": "elisp-autoload-cookie-without-form"
+    },
+    {
+      "category": "malformed",
+      "count": 1,
+      "description": "a defcustom with no :type, which leaves Customize editing a raw sexp",
+      "rule": "elisp-defcustom-missing-type"
+    },
+    {
+      "category": "malformed",
+      "count": 1,
+      "description": "a defcustom with no :group, which leaves the option out of the group tree",
+      "rule": "elisp-defcustom-missing-group"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "an unprefixed cl.el name, removed in Emacs 27.1",
+      "rule": "elisp-obsolete-cl-alias"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "a quoted lambda, which is a list rather than a closure under lexical binding",
+      "rule": "elisp-quoted-lambda"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "an (interactive ...) inside a macro definition, which cannot be a command",
+      "rule": "elisp-interactive-in-macro"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "a condition-case with no handler clauses, which catches nothing",
+      "rule": "elisp-condition-case-without-handler"
+    }
+  ],
+  "policy": {
+    "fail_on_finding": false,
+    "passed": true,
+    "violations": []
+  },
+  "schema_version": 1
+}

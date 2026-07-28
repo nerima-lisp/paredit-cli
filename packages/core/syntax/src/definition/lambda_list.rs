@@ -71,8 +71,19 @@ fn definition_lambda_list_child_index(view: &ExpressionView, head: &str) -> Opti
         // dialect in hand, and `list_child_index` requires child 2 to be a
         // list, so an anonymous `(fn [x] x)` — where child 2 is the body —
         // resolves to no lambda list rather than to the wrong one.
-        "cl-defun" | "defsubst" | "definline" | "cl-defmacro" | "define" | "lambda" | "defn"
-        | "defn-" | "fn" | "macro" => list_child_index(view, 2),
+        "cl-defun"
+        | "cl-defsubst"
+        | "defsubst"
+        | "definline"
+        | "define-inline"
+        | "cl-defmacro"
+        | "cl-define-compiler-macro"
+        | "define"
+        | "lambda"
+        | "defn"
+        | "defn-"
+        | "fn"
+        | "macro" => list_child_index(view, 2),
         "cl-defmethod" => common_lisp_lambda_list_child_index(
             view,
             CommonLispLambdaListShape::FirstListAtOrAfter(2),

@@ -2450,6 +2450,60 @@
       "count": 1,
       "description": "a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b))",
       "rule": "list-star-nil"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an Emacs Lisp file whose first line does not set lexical-binding",
+      "rule": "elisp-missing-lexical-binding"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a lexical-binding setting outside the first line, which Emacs never reads",
+      "rule": "elisp-unreachable-lexical-binding"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a ;;;###autoload cookie with no top-level form after it",
+      "rule": "elisp-autoload-cookie-without-form"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a defcustom with no :type, which leaves Customize editing a raw sexp",
+      "rule": "elisp-defcustom-missing-type"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a defcustom with no :group, which leaves the option out of the group tree",
+      "rule": "elisp-defcustom-missing-group"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an unprefixed cl.el name, removed in Emacs 27.1",
+      "rule": "elisp-obsolete-cl-alias"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a quoted lambda, which is a list rather than a closure under lexical binding",
+      "rule": "elisp-quoted-lambda"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an (interactive ...) inside a macro definition, which cannot be a command",
+      "rule": "elisp-interactive-in-macro"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a condition-case with no handler clauses, which catches nothing",
+      "rule": "elisp-condition-case-without-handler"
     }
   ],
   "policy": {

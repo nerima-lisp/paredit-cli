@@ -15,6 +15,7 @@
 use std::collections::HashSet;
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
+use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, SymbolName};
 
 /// The heads under which a special variable's name is written, canonicalized.
@@ -29,6 +30,13 @@ pub(super) struct SpecialNameIndex {
 impl SpecialNameIndex {
     /// Collects every name a `special` specifier or a `defvar`/`defparameter`
     /// writes, anywhere in the document.
+    ///
+    /// Common Lisp only; the caller guards. Emacs Lisp also has dynamically
+    /// scoped variables, but it decides them by a different rule entirely — a
+    /// `defvar` anywhere, or the absence of `lexical-binding: t` on line 1 —
+    /// which `super::emacs_lisp::EmacsLispDynamicScope` answers. Running this
+    /// scan there would look for `(declaim (special …))` forms that Emacs Lisp
+    /// does not have.
     pub(super) fn scan(document: &ExpressionView) -> Self {
         let mut index = Self::default();
         index.visit(document);
@@ -38,7 +46,7 @@ impl SpecialNameIndex {
     /// An index that proves every name lexical.
     ///
     /// For a dialect with no way to declare a binding special -- Scheme has
-    /// none -- which makes the scan pure cost.
+    /// none, and Emacs Lisp has its own -- which makes the scan pure cost.
     pub(super) fn empty() -> Self {
         Self::default()
     }
@@ -98,7 +106,6 @@ fn atom_text(view: &ExpressionView) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
 
     fn index_of(input: &str) -> SpecialNameIndex {

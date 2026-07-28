@@ -17,10 +17,22 @@
 use super::*;
 use std::path::{Path, PathBuf};
 
-/// The fixture corpus, named without its `.lisp` extension. Collectively
-/// these trigger all 134 lint rules (see the module doc for the coverage
-/// story of each file).
-const FIXTURES: [&str; 3] = ["broad", "nested", "suppressed"];
+/// The fixture corpus, with extensions: the dialect a rule applies to is
+/// resolved from the file name, so the Emacs Lisp rules need an `.el` fixture
+/// and would report nothing against a `.lisp` one. Collectively these trigger
+/// all 143 lint rules (see the module doc for the coverage story of each
+/// file).
+const FIXTURES: [&str; 4] = [
+    "broad.lisp",
+    "nested.lisp",
+    "suppressed.lisp",
+    "emacs-lisp.el",
+];
+
+/// A fixture's golden-file prefix: its name without the extension.
+fn stem(fixture: &str) -> &str {
+    fixture.rsplit_once('.').map_or(fixture, |(stem, _)| stem)
+}
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lint_golden")
@@ -59,7 +71,7 @@ fn check_golden(name: &str, actual: &str) {
 /// new-file create in `scratch` gets — exactly the mismatch `--fix`'s atomic
 /// write then refuses to resolve.
 fn run_lint(fixture: &str, extra_args: &[&str], scratch: &Path) -> std::process::Output {
-    let file_name = format!("{fixture}.lisp");
+    let file_name = fixture.to_owned();
     let source = fs::read(fixture_dir().join(&file_name)).expect("read fixture source");
     fs::write(scratch.join(&file_name), source).expect("seed fixture into scratch dir");
     paredit()
@@ -79,22 +91,23 @@ fn stdout_utf8(output: &std::process::Output) -> String {
 #[test]
 fn lint_golden_outputs_are_pinned() {
     for fixture in FIXTURES {
-        let dir = fresh_temp_dir(&format!("lint-golden-{fixture}"));
+        let stem = stem(fixture);
+        let dir = fresh_temp_dir(&format!("lint-golden-{stem}"));
 
         let text = run_lint(fixture, &["--output", "text"], &dir);
         assert!(text.status.success(), "{fixture} text run failed: {text:?}");
-        check_golden(&format!("{fixture}.text.golden"), &stdout_utf8(&text));
+        check_golden(&format!("{stem}.text.golden"), &stdout_utf8(&text));
 
         let json = run_lint(fixture, &["--output", "json"], &dir);
         assert!(json.status.success(), "{fixture} json run failed: {json:?}");
-        check_golden(&format!("{fixture}.json.golden"), &stdout_utf8(&json));
+        check_golden(&format!("{stem}.json.golden"), &stdout_utf8(&json));
 
         let sarif = run_lint(fixture, &["--sarif"], &dir);
         assert!(
             sarif.status.success(),
             "{fixture} sarif run failed: {sarif:?}"
         );
-        check_golden(&format!("{fixture}.sarif.golden"), &stdout_utf8(&sarif));
+        check_golden(&format!("{stem}.sarif.golden"), &stdout_utf8(&sarif));
 
         let fix_plan = run_lint(fixture, &["--fix-plan", "--output", "json"], &dir);
         assert!(
@@ -102,7 +115,7 @@ fn lint_golden_outputs_are_pinned() {
             "{fixture} fix-plan run failed: {fix_plan:?}"
         );
         check_golden(
-            &format!("{fixture}.fixplan.json.golden"),
+            &format!("{stem}.fixplan.json.golden"),
             &stdout_utf8(&fix_plan),
         );
 
@@ -110,8 +123,8 @@ fn lint_golden_outputs_are_pinned() {
         // is the resulting file content, not the command's stdout.
         let fix = run_lint(fixture, &["--fix"], &dir);
         assert!(fix.status.success(), "{fixture} fix run failed: {fix:?}");
-        let fixed_path = dir.join(format!("{fixture}.lisp"));
+        let fixed_path = dir.join(fixture);
         let fixed = fs::read_to_string(&fixed_path).expect("read fixed fixture");
-        check_golden(&format!("{fixture}.fixed.lisp.golden"), &fixed);
+        check_golden(&format!("{stem}.fixed.source.golden"), &fixed);
     }
 }

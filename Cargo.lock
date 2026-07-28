@@ -658,6 +658,7 @@ dependencies = [
  "paredit-core-workspace",
  "paredit-feature-binding",
  "paredit-feature-conditional-conversion",
+ "paredit-feature-emacs-lisp",
  "paredit-feature-extract",
  "paredit-feature-form-transform",
  "paredit-feature-function-parameter",
@@ -779,6 +780,14 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-emacs-lisp"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

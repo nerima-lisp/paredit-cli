@@ -24,7 +24,7 @@ pub use parser::ParseError;
 pub use tree::AtomOccurrenceIndex;
 pub use tree::{
     AtomOccurrence, ExpressionKind, ExpressionView, OutlineEntry, ReaderPrefix, Selection,
-    SyntaxTree,
+    SourceComment, SyntaxTree,
 };
 pub use types::NonEmptyExpressionPath;
 pub use types::{

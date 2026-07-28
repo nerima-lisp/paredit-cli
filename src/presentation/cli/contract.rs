@@ -1,5 +1,6 @@
 use serde_json::{Map, Value, json};
 
+use crate::application::usecase::emacs_lisp_file_report::supports_emacs_lisp_file_report_dialect;
 use crate::domain::dialect::{Dialect, SemanticOperation};
 use crate::domain::inline_function::supports_inline_function_dialect;
 use crate::domain::inline_let::supports_inline_let_dialect;
@@ -146,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 178] = [
+const INTROSPECTION_COMMANDS: [&str; 179] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -188,6 +189,7 @@ const INTROSPECTION_COMMANDS: [&str; 178] = [
     "inspect struct-cycles",
     "inspect system-conflicts",
     "inspect duplicate-setf-places",
+    "inspect elisp-file",
     "inspect duplicate-slots",
     "inspect duplicate-methods",
     "inspect duplicate-case-keys",
@@ -432,7 +434,14 @@ const SEMANTIC_COMMANDS: [&str; 78] = [
 
 /// Reports that read only the balanced-parens tree, with no dialect vocabulary
 /// beyond the head names the parser already resolves.
-const SYNTAX_TIER_REPORTS: [&str; 8] = [
+///
+/// The tier names what a command *needs*, not which dialects it answers for.
+/// `inspect elisp-file` reads the parse and the comments beside it and nothing
+/// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
+/// way `refactor rename-at` sits at the scope tier and is gated to three
+/// dialects.
+const SYNTAX_TIER_REPORTS: [&str; 9] = [
+    "inspect elisp-file",
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -595,10 +604,18 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "refactor rename-at" => Some(supports_rename_at_dialect(dialect)),
         "refactor inline-function" => Some(supports_inline_function_dialect(dialect)),
         "refactor inline-let" => Some(supports_inline_let_dialect(dialect)),
+        "inspect elisp-file" => Some(supports_emacs_lisp_file_report_dialect(dialect)),
         _ => None,
     };
     match gated {
         Some(true) => SupportStatus::Supported,
+        // A gate that says no presents itself the same way an unmet tier
+        // does, and for the same reason: a refactor refuses and exits
+        // non-zero, a report exits zero with an empty result. Deciding this
+        // here rather than per gate is what keeps `inspect elisp-file` —
+        // which reports nothing for a `.lisp` file — `silent` rather than
+        // claiming it would refuse.
+        Some(false) if matches!(category, CommandCategory::Introspection) => SupportStatus::Silent,
         Some(false) => SupportStatus::Unsupported,
         None => capability_tier(command_path, category).status(dialect, category),
     }
@@ -784,8 +801,12 @@ mod tests {
         }
     }
 
+    /// Commands whose subject is one dialect, so they say nothing about the
+    /// rest — Common Lisp included.
+    const DIALECT_SPECIFIC_REPORTS: [&str; 1] = ["inspect elisp-file"];
+
     #[test]
-    fn only_reports_go_silent_and_only_outside_common_lisp() {
+    fn only_reports_go_silent_and_only_outside_the_dialect_they_are_written_for() {
         for (paths, category) in COMMAND_GROUPS {
             for path in paths {
                 for dialect in DIALECTS {
@@ -799,9 +820,27 @@ mod tests {
                         matches!(category, CommandCategory::Introspection),
                         "{path} / {dialect} is {category:?}, which refuses instead of going silent",
                     );
+                    // Common Lisp is what the analysis layer is written
+                    // against, so a general report is never silent there. A
+                    // report *about another dialect* is the exception, and it
+                    // has to be named rather than inferred.
+                    if DIALECT_SPECIFIC_REPORTS.contains(path) {
+                        continue;
+                    }
                     assert_ne!(dialect, "common-lisp", "{path}");
                 }
             }
+        }
+    }
+
+    #[test]
+    fn a_dialect_specific_report_is_supported_for_exactly_one_dialect() {
+        for path in DIALECT_SPECIFIC_REPORTS {
+            let supported = DIALECTS
+                .iter()
+                .filter(|dialect| support_status(path, dialect) == SupportStatus::Supported)
+                .count();
+            assert_eq!(supported, 1, "{path}");
         }
     }
 

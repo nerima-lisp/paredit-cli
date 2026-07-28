@@ -1531,6 +1531,105 @@
               "shortDescription": {
                 "text": "a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b))"
               }
+            },
+            {
+              "id": "elisp-missing-lexical-binding",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "an Emacs Lisp file whose first line does not set lexical-binding"
+              }
+            },
+            {
+              "id": "elisp-unreachable-lexical-binding",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a lexical-binding setting outside the first line, which Emacs never reads"
+              }
+            },
+            {
+              "id": "elisp-autoload-cookie-without-form",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a ;;;###autoload cookie with no top-level form after it"
+              }
+            },
+            {
+              "id": "elisp-defcustom-missing-type",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a defcustom with no :type, which leaves Customize editing a raw sexp"
+              }
+            },
+            {
+              "id": "elisp-defcustom-missing-group",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning"
+              },
+              "shortDescription": {
+                "text": "a defcustom with no :group, which leaves the option out of the group tree"
+              }
+            },
+            {
+              "id": "elisp-obsolete-cl-alias",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an unprefixed cl.el name, removed in Emacs 27.1"
+              }
+            },
+            {
+              "id": "elisp-quoted-lambda",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a quoted lambda, which is a list rather than a closure under lexical binding"
+              }
+            },
+            {
+              "id": "elisp-interactive-in-macro",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "an (interactive ...) inside a macro definition, which cannot be a command"
+              }
+            },
+            {
+              "id": "elisp-condition-case-without-handler",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error"
+              },
+              "shortDescription": {
+                "text": "a condition-case with no handler clauses, which catches nothing"
+              }
             }
           ]
         }

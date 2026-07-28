@@ -133,4 +133,13 @@ rule	getf-default-nil	0
 rule	make-array-default-keyword	0
 rule	nested-char-case	0
 rule	list-star-nil	0
+rule	elisp-missing-lexical-binding	0
+rule	elisp-unreachable-lexical-binding	0
+rule	elisp-autoload-cookie-without-form	0
+rule	elisp-defcustom-missing-type	0
+rule	elisp-defcustom-missing-group	0
+rule	elisp-obsolete-cl-alias	0
+rule	elisp-quoted-lambda	0
+rule	elisp-interactive-in-macro	0
+rule	elisp-condition-case-without-handler	0
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant

@@ -1,6 +1,7 @@
 use crate::clojure::ClojureOperator;
 use crate::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
 use crate::dialect::Dialect;
+use crate::emacs_lisp::EmacsLispOperator;
 use crate::scheme::SchemeOperator;
 
 use super::DefinitionCategory;
@@ -22,6 +23,13 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
             });
     }
 
+    if dialect == Dialect::EmacsLisp {
+        // Ahead of the shared path, and not through it: everything below
+        // runs `head` through the Common Lisp normalizer, which folds case
+        // and strips a `cl:` prefix. Emacs Lisp does neither.
+        return EmacsLispOperator::from_head(head).and_then(EmacsLispOperator::definition_category);
+    }
+
     // Clojure is case-sensitive and qualifies core forms with `clojure.core/`
     // rather than a Common Lisp package marker, so it must not go through the
     // shared lowercase/`package:symbol` normalization below.
@@ -36,18 +44,6 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
     let normalized = normalize_common_lisp_operator_head(head);
     let normalized_lower = normalized.to_ascii_lowercase();
     let category = match dialect {
-        Dialect::EmacsLisp => match normalized_lower.as_str() {
-            "defun" | "defsubst" | "cl-defun" => DefinitionCategory::Function,
-            "defmacro" | "cl-defmacro" => DefinitionCategory::Macro,
-            "cl-defgeneric" => DefinitionCategory::GenericFunction,
-            "cl-defmethod" => DefinitionCategory::Method,
-            "defvar" => DefinitionCategory::Variable,
-            "defconst" => DefinitionCategory::Constant,
-            "defcustom" | "defgroup" => DefinitionCategory::Customization,
-            "define-minor-mode" | "define-derived-mode" => DefinitionCategory::Mode,
-            "provide" | "require" => DefinitionCategory::Package,
-            _ => return None,
-        },
         Dialect::Lfe => match normalized_lower.as_str() {
             "defun" => DefinitionCategory::Function,
             "defmacro" => DefinitionCategory::Macro,
@@ -136,8 +132,8 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
                 _ => return None,
             }
         }
-        Dialect::CommonLisp | Dialect::Clojure => {
-            unreachable!("Common Lisp and Clojure are handled before dialect dispatch")
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Clojure => {
+            unreachable!("Common Lisp, Emacs Lisp and Clojure are handled before dialect dispatch")
         }
     };
     Some(category)
@@ -155,10 +151,13 @@ pub(super) fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool
             )
         ),
         Dialect::EmacsLisp => matches!(
-            normalize_common_lisp_operator_head(head)
-                .to_ascii_lowercase()
-                .as_str(),
-            "defmacro" | "cl-defmacro"
+            EmacsLispOperator::from_head(head),
+            Some(
+                EmacsLispOperator::Defmacro
+                    | EmacsLispOperator::ClDefmacro
+                    | EmacsLispOperator::ClDefineCompilerMacro
+                    | EmacsLispOperator::DefineInline
+            )
         ),
         Dialect::Clojure => ClojureOperator::from_head(head)
             .is_some_and(ClojureOperator::is_macro_expander_definition),

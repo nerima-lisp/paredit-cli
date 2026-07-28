@@ -48,6 +48,37 @@ pub(in crate::sexpr) struct Comment {
     pub(in crate::sexpr) own_line: bool,
 }
 
+/// A borrowed view of one comment the parse recorded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceComment<'a> {
+    span: ByteSpan,
+    text: &'a str,
+    own_line: bool,
+}
+
+impl<'a> SourceComment<'a> {
+    /// The comment's byte range in the source it was parsed from.
+    #[must_use]
+    pub const fn span(self) -> ByteSpan {
+        self.span
+    }
+
+    /// The comment text exactly as written, delimiters included.
+    #[must_use]
+    pub const fn text(self) -> &'a str {
+        self.text
+    }
+
+    /// Whether only whitespace precedes the comment on its line.
+    ///
+    /// An Emacs Lisp autoload cookie only counts when this is true: the
+    /// `;;;###autoload` that `loaddefs` looks for has to begin its line.
+    #[must_use]
+    pub const fn own_line(self) -> bool {
+        self.own_line
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::sexpr) struct Node {
     pub(in crate::sexpr) kind: NodeKind,
@@ -435,6 +466,21 @@ impl SyntaxTree {
         self.comments
             .iter()
             .any(|comment| comment.span.start() < span.end() && span.start() < comment.span.end())
+    }
+
+    /// Every comment the parse found, in source order.
+    ///
+    /// Comments are kept outside the node tree, so a report that reads them —
+    /// an Emacs Lisp autoload cookie, a `TODO` marker, a suppression
+    /// directive — cannot get at them by walking `children`. Exposing the
+    /// parser's own record is the only way to ask "is this text a comment?"
+    /// without re-lexing the file and getting string literals wrong.
+    pub fn comments(&self) -> impl Iterator<Item = SourceComment<'_>> {
+        self.comments.iter().map(|comment| SourceComment {
+            span: comment.span,
+            text: comment.text.as_str(),
+            own_line: comment.own_line,
+        })
     }
 
     /// Collects every atom in the tree together with its path and byte span.

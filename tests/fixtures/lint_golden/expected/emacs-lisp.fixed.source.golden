@@ -1,0 +1,40 @@
+;;; emacs-lisp.el --- fixture for the Emacs Lisp lint rules
+
+;; Every rule in `paredit-feature-lint-emacs-lisp` fires here. Line 1
+;; deliberately carries no lexical setting, and the Local Variables block at
+;; the end puts one where Emacs will never look for it.
+
+(defcustom fixture-option nil
+  "An option with neither a type nor a group.")
+
+(defmacro fixture-macro (n)
+  "A macro that declares itself a command."
+  (interactive)
+  n)
+
+(defun fixture-loop ()
+  "Use a cl.el name Emacs 27.1 removed."
+  (loop for n from 1 to 3 collect n))
+
+(defun fixture-quoted-lambda ()
+  "Return a list that looks like a function."
+  '(lambda (n) n))
+
+(defun fixture-condition-case ()
+  "Catch nothing at all."
+  (condition-case err (fixture-risky)))
+
+(progn
+  ;;;###autoload
+  (defun fixture-nested-autoload ()
+    "Not extracted: loaddefs reads top-level forms only."
+    nil))
+
+(provide 'emacs-lisp)
+
+;; Local Variables:
+;; lexical-binding: t
+;; End:
+;;; emacs-lisp.el ends here
+
+;;;###autoload

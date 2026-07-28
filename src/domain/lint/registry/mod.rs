@@ -13,7 +13,7 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-pub const RULE_COUNT: usize = 134;
+pub const RULE_COUNT: usize = 143;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -553,5 +553,43 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_sequence::list_star_nil::rule::META,
         &paredit_feature_lint_sequence::list_star_nil::rule::RULE,
+    ),
+    // Emacs Lisp. Every rule below declares `Dialect::EmacsLisp` only, so a
+    // Common Lisp run skips them before walking anything.
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::missing_lexical_binding::rule::META,
+        &paredit_feature_emacs_lisp::missing_lexical_binding::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::unreachable_lexical_binding::rule::META,
+        &paredit_feature_emacs_lisp::unreachable_lexical_binding::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::autoload_cookie_without_form::rule::META,
+        &paredit_feature_emacs_lisp::autoload_cookie_without_form::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::defcustom_missing_type::rule::META,
+        &paredit_feature_emacs_lisp::defcustom_missing_type::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::defcustom_missing_group::rule::META,
+        &paredit_feature_emacs_lisp::defcustom_missing_group::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::obsolete_cl_alias::rule::META,
+        &paredit_feature_emacs_lisp::obsolete_cl_alias::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::quoted_lambda::rule::META,
+        &paredit_feature_emacs_lisp::quoted_lambda::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::interactive_in_macro::rule::META,
+        &paredit_feature_emacs_lisp::interactive_in_macro::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_emacs_lisp::condition_case_without_handler::rule::META,
+        &paredit_feature_emacs_lisp::condition_case_without_handler::rule::RULE,
     ),
 ];

@@ -124,9 +124,10 @@ const COMMON_LISP: [AssignmentForm; 15] = [
     AssignmentForm::new("multiple-value-setq", PlacePositions::NestedInArgument(1)),
 ];
 
-const EMACS_LISP: [AssignmentForm; 12] = [
+const EMACS_LISP: [AssignmentForm; 14] = [
     AssignmentForm::new("setq", PlacePositions::Pairs),
     AssignmentForm::new("setq-default", PlacePositions::Pairs),
+    AssignmentForm::new("setq-local", PlacePositions::Pairs),
     AssignmentForm::new("setf", PlacePositions::Pairs),
     AssignmentForm::new("cl-psetq", PlacePositions::Pairs),
     AssignmentForm::new("cl-psetf", PlacePositions::Pairs),
@@ -137,6 +138,10 @@ const EMACS_LISP: [AssignmentForm; 12] = [
     AssignmentForm::new("cl-pushnew", PlacePositions::SecondArgument),
     AssignmentForm::new("cl-rotatef", PlacePositions::EveryArgument),
     AssignmentForm::new("cl-shiftf", PlacePositions::EveryArgumentButLast),
+    AssignmentForm::new(
+        "cl-multiple-value-setq",
+        PlacePositions::NestedInArgument(1),
+    ),
 ];
 
 /// Scheme and Racket mutate through `set!` only.

@@ -98,6 +98,15 @@ impl<'a> RuleContext<'a> {
         self.tree
     }
 
+    /// The file's exact source text.
+    ///
+    /// Needed by the rules whose subject is a *comment*: Emacs Lisp decides
+    /// whether a file is lexically bound from a `-*- … -*-` header on line 1,
+    /// which is nowhere in the tree.
+    pub const fn source(&self) -> &'a str {
+        self.source
+    }
+
     /// The exact source of `span`, or `""` if the span is not a character
     /// boundary of this document. Spans handed to a rule come from the tree, so
     /// the fallback is unreachable in practice and exists only to keep fix

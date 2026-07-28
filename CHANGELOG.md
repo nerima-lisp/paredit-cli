@@ -11,13 +11,16 @@ The five shallowest dialects — LFE, Fennel, Janet, Hy, and Carp — gain real
 scope analysis, and the dialect capability matrix stops answering "unknown"
 for 99% of its cells.
 
+Emacs Lisp gains the same treatment one layer deeper: its own operator
+model, a binding table, nine lint rules, and a per-file report.
+
 ### Added
 
 - `inspect capabilities --schema-version 3` reports a `dialect_contract` in
-  which every one of the 2750 command/dialect cells is answered. Previously
+  which every one of the 2760 command/dialect cells is answered. Previously
   2720 of them said `unknown`. Cells gain a fourth status, `silent`: the
   command succeeds and reports nothing because it has no rules for that
-  dialect, which is not the same as finding nothing. Roughly 155 of the 275
+  dialect, which is not the same as finding nothing. Roughly 155 of the 276
   commands are silent outside Common Lisp. Each command also reports the
   capability `tier` it needs, and a `dialect_depth` array summarises the
   counts per dialect. Schema versions 1 and 2 keep their three-value
@@ -31,6 +34,26 @@ for 99% of its cells.
   `definterface`/`defmodule`. Because the rename, introduce-let and
   extract-function engines are all driven by these shapes, each addition
   reaches every one of them.
+- Emacs Lisp is analysed by the semantic layer. `build_binding_table` returned
+  an empty table for every dialect but Common Lisp, which left the 170 lint
+  rules and the typing and value layers with nothing to work with on a `.el`
+  file. The Emacs Lisp binding forms are now walked: the `subr-x` conditional
+  binders (`if-let*`, `when-let*`, `and-let*`, `while-let`), `letrec`, `dlet`,
+  `named-let`, `pcase-let*`, `seq-let`, `pcase-dolist`,
+  `cl-destructuring-bind`, `cl-flet*`, `cl-labels`, `cl-macrolet`,
+  `condition-case`, and `with-slots`.
+- `inspect elisp-file` reports the per-file Emacs Lisp facts that are not
+  forms: the `lexical-binding` header, the provided and required features
+  (separating an eager `require` from a deferred `autoload`), and the
+  `;;;###autoload` cookies with the definitions they attach to. It gates with
+  `--fail-on-missing-lexical-binding`.
+- Nine Emacs Lisp lint rules, bringing the suite to 143:
+  `elisp-missing-lexical-binding`, `elisp-unreachable-lexical-binding`,
+  `elisp-autoload-cookie-without-form`, `elisp-defcustom-missing-type`,
+  `elisp-defcustom-missing-group`, `elisp-obsolete-cl-alias`,
+  `elisp-quoted-lambda`, `elisp-interactive-in-macro`, and
+  `elisp-condition-case-without-handler`. Each declares `Dialect::EmacsLisp`
+  only, so a Common Lisp run skips them before walking anything.
 
 ### Fixed
 
@@ -55,7 +78,21 @@ for 99% of its cells.
   `inspect impact`, `inspect signature` — examined nothing in Fennel while
   succeeding, because the lambda-list resolver knew `defn` but not Fennel's
   `fn`. They now check Fennel definitions like every other bracket dialect's.
-
+- Emacs Lisp head resolution no longer applies Common Lisp reader rules. Every
+  dialect capability reached `CommonLispOperator::from_head`, which folds case
+  and strips a `cl:` package prefix; in a `.el` file `LET` and `cl:let` are
+  ordinary user symbols, and both resolved to the `let` special form. Symbol
+  identity in the binding table is likewise exact, so `(let ((x 1)) X)` no
+  longer attributes a reference to `x`.
+- An Emacs Lisp script's `#!/usr/bin/emacs --script` header is read as a
+  comment instead of failing the parse with an unsupported reader dispatch.
+  Emacs skips that line the same way; reading it rather than stripping it
+  keeps every byte offset after it unchanged.
+- `Dialect::EmacsLisp.is_definition_head` recognizes the forms the dialect
+  actually has — `defsubst`, `define-inline`, `cl-defsubst`, `cl-defstruct`,
+  `defvar-local`, `defvar-keymap`, `defface`, `defalias`, `define-error`,
+  `define-globalized-minor-mode`, `ert-deftest` and the rest — and rejects
+  Common Lisp spellings such as `defparameter` and `defpackage`.
 ## [1.2.1] - 2026-07-28
 
 No command, flag, exit code, or JSON field changed in this release: nothing

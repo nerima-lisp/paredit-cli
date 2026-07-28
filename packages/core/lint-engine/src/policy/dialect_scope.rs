@@ -16,6 +16,11 @@ impl RuleDialectScope {
     /// The overwhelming majority: CLHS-specific operator semantics.
     pub const COMMON_LISP_ONLY: Self = Self(&[Dialect::CommonLisp]);
 
+    /// Rules whose subject is Emacs Lisp itself: its file header, its
+    /// autoload cookies, its customization forms, and the `cl.el` spellings
+    /// Emacs 27 removed. None of them means anything in Common Lisp.
+    pub const EMACS_LISP_ONLY: Self = Self(&[Dialect::EmacsLisp]);
+
     /// Rules that encode Clojure semantics, which share almost no operator
     /// vocabulary with the CLHS ones.
     pub const CLOJURE_ONLY: Self = Self(&[Dialect::Clojure]);
@@ -42,6 +47,14 @@ mod tests {
         assert!(scope.includes(Dialect::CommonLisp));
         assert!(!scope.includes(Dialect::Clojure));
         assert!(!scope.includes(Dialect::EmacsLisp));
+    }
+
+    #[test]
+    fn emacs_lisp_only_excludes_every_other_dialect() {
+        let scope = RuleDialectScope::EMACS_LISP_ONLY;
+        assert!(scope.includes(Dialect::EmacsLisp));
+        assert!(!scope.includes(Dialect::CommonLisp));
+        assert!(!scope.includes(Dialect::Unknown));
     }
 
     #[test]

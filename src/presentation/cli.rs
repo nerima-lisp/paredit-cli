@@ -35,6 +35,7 @@ mod dispatch;
 mod duplicate_export_report;
 mod duplicate_method_report;
 mod duplicate_slot_report;
+mod emacs_lisp_file_report;
 mod lint_report;
 mod shadowed_binding_report;
 mod symbol_report;

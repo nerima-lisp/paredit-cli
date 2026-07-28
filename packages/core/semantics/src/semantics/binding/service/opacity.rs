@@ -19,10 +19,12 @@
 
 use paredit_core_syntax::common_lisp::CommonLispOperator;
 use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::emacs_lisp::EmacsLispOperator;
 use paredit_core_syntax::scheme::scheme_head_has_registered_semantics;
 
 use super::super::policy::{
-    is_pure_standard_function, is_pure_standard_scheme_procedure, is_standard_control_form,
+    is_pure_standard_emacs_lisp_function, is_pure_standard_function,
+    is_pure_standard_scheme_procedure, is_standard_control_form,
     is_standard_declaration_identifier,
 };
 
@@ -45,19 +47,29 @@ use super::super::policy::{
 /// opaque too would be sound as well, and would prove nothing about any real
 /// file.
 pub(super) fn head_has_registered_semantics(dialect: Dialect, head: &str) -> bool {
-    // Scheme's own table is the only one that means anything here. Falling
-    // through to the Common Lisp tables would register `list` and `not` -- the
-    // names happen to coincide -- while leaving `vector-ref` and `string=?`
-    // opaque, which is an arbitrary line rather than a sound one.
-    if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
-        return scheme_head_has_registered_semantics(head)
-            || is_pure_standard_scheme_procedure(head);
+    match dialect {
+        // Scheme's own table is the only one that means anything here.
+        // Falling through to the Common Lisp tables would register `list` and
+        // `not` -- the names happen to coincide -- while leaving `vector-ref`
+        // and `string=?` opaque, which is an arbitrary line rather than a
+        // sound one.
+        Dialect::Scheme | Dialect::Racket => {
+            scheme_head_has_registered_semantics(head) || is_pure_standard_scheme_procedure(head)
+        }
+        // Emacs Lisp has no second table of "control forms": its operator
+        // table already holds `progn`, `unwind-protect`, `save-excursion` and
+        // the rest, marked by `evaluates_subforms_in_place`.
+        Dialect::EmacsLisp => {
+            EmacsLispOperator::from_head(head).is_some()
+                || is_pure_standard_emacs_lisp_function(head)
+        }
+        _ => {
+            CommonLispOperator::from_head(head).is_some()
+                || is_pure_standard_function(head)
+                || is_standard_control_form(head)
+                || is_standard_declaration_identifier(head)
+        }
     }
-
-    CommonLispOperator::from_head(head).is_some()
-        || is_pure_standard_function(head)
-        || is_standard_control_form(head)
-        || is_standard_declaration_identifier(head)
 }
 
 #[cfg(test)]
@@ -69,6 +81,20 @@ mod tests {
         assert!(head_has_registered_semantics(Dialect::CommonLisp, "let"));
         assert!(head_has_registered_semantics(Dialect::CommonLisp, "LET*"));
         assert!(head_has_registered_semantics(Dialect::CommonLisp, "defun"));
+    }
+
+    #[test]
+    fn emacs_lisp_registers_its_own_vocabulary_and_not_common_lisp_case_folding() {
+        assert!(head_has_registered_semantics(Dialect::EmacsLisp, "if-let*"));
+        assert!(head_has_registered_semantics(Dialect::EmacsLisp, "cl-flet"));
+        assert!(head_has_registered_semantics(
+            Dialect::EmacsLisp,
+            "with-temp-buffer"
+        ));
+        assert!(head_has_registered_semantics(Dialect::EmacsLisp, "length"));
+        // `LET*` is a symbol a `.el` file may define; it is not the special
+        // form, so a call to it must stay opaque.
+        assert!(!head_has_registered_semantics(Dialect::EmacsLisp, "LET*"));
     }
 
     #[test]
