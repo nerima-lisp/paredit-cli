@@ -1,5 +1,6 @@
 use crate::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
 use crate::dialect::Dialect;
+use crate::emacs_lisp::EmacsLispOperator;
 use crate::scheme::SchemeOperator;
 
 use super::DefinitionCategory;
@@ -21,6 +22,13 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
             });
     }
 
+    if dialect == Dialect::EmacsLisp {
+        // Ahead of the shared path, and not through it: everything below
+        // runs `head` through the Common Lisp normalizer, which folds case
+        // and strips a `cl:` prefix. Emacs Lisp does neither.
+        return EmacsLispOperator::from_head(head).and_then(EmacsLispOperator::definition_category);
+    }
+
     if dialect != Dialect::Unknown && !dialect.is_definition_head(head) {
         return None;
     }
@@ -28,18 +36,6 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
     let normalized = normalize_common_lisp_operator_head(head);
     let normalized_lower = normalized.to_ascii_lowercase();
     let category = match dialect {
-        Dialect::EmacsLisp => match normalized_lower.as_str() {
-            "defun" | "defsubst" | "cl-defun" => DefinitionCategory::Function,
-            "defmacro" | "cl-defmacro" => DefinitionCategory::Macro,
-            "cl-defgeneric" => DefinitionCategory::GenericFunction,
-            "cl-defmethod" => DefinitionCategory::Method,
-            "defvar" => DefinitionCategory::Variable,
-            "defconst" => DefinitionCategory::Constant,
-            "defcustom" | "defgroup" => DefinitionCategory::Customization,
-            "define-minor-mode" | "define-derived-mode" => DefinitionCategory::Mode,
-            "provide" | "require" => DefinitionCategory::Package,
-            _ => return None,
-        },
         Dialect::Lfe => match normalized_lower.as_str() {
             "defun" => DefinitionCategory::Function,
             "defmacro" => DefinitionCategory::Macro,
@@ -139,7 +135,9 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
                 _ => return None,
             }
         }
-        Dialect::CommonLisp => unreachable!("Common Lisp is handled before dialect dispatch"),
+        Dialect::CommonLisp | Dialect::EmacsLisp => {
+            unreachable!("Common Lisp and Emacs Lisp are handled before dialect dispatch")
+        }
     };
     Some(category)
 }
@@ -156,10 +154,13 @@ pub(super) fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool
             )
         ),
         Dialect::EmacsLisp => matches!(
-            normalize_common_lisp_operator_head(head)
-                .to_ascii_lowercase()
-                .as_str(),
-            "defmacro" | "cl-defmacro"
+            EmacsLispOperator::from_head(head),
+            Some(
+                EmacsLispOperator::Defmacro
+                    | EmacsLispOperator::ClDefmacro
+                    | EmacsLispOperator::ClDefineCompilerMacro
+                    | EmacsLispOperator::DefineInline
+            )
         ),
         // Scheme stays out deliberately. A `defmacro` body is *evaluated* to
         // produce code, which is what this predicate marks; a `syntax-rules`

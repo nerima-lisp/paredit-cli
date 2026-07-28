@@ -3,6 +3,7 @@
 pub mod common_lisp;
 pub mod definition;
 pub mod dialect;
+pub mod emacs_lisp;
 pub mod expression_equality;
 pub mod form_shape;
 pub mod graph;

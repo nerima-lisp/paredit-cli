@@ -333,3 +333,78 @@ fn an_explicit_dialect_and_a_decisive_extension_both_outrank_the_directive() {
         Dialect::CommonLisp
     );
 }
+
+#[test]
+fn emacs_lisp_capabilities_do_not_fold_case_or_strip_a_package_prefix() {
+    // Both spellings resolve for Common Lisp, which reads symbols
+    // case-insensitively and knows `cl:` as a package qualifier. Emacs Lisp
+    // does neither, so in a `.el` file these name ordinary user symbols.
+    assert!(Dialect::CommonLisp.is_definition_head("DEFUN"));
+    assert!(Dialect::CommonLisp.is_definition_head("cl:defun"));
+
+    assert!(Dialect::EmacsLisp.is_definition_head("defun"));
+    assert!(!Dialect::EmacsLisp.is_definition_head("DEFUN"));
+    assert!(!Dialect::EmacsLisp.is_definition_head("cl:defun"));
+
+    assert_eq!(
+        Dialect::EmacsLisp.let_binding_form_for_head("let"),
+        Some(CommonLispLetBindingForm::Parallel)
+    );
+    assert_eq!(Dialect::EmacsLisp.let_binding_form_for_head("LET"), None);
+    assert_eq!(Dialect::EmacsLisp.let_binding_form_for_head("cl:let"), None);
+}
+
+#[test]
+fn emacs_lisp_definition_heads_cover_the_families_the_dialect_actually_has() {
+    for head in [
+        "defsubst",
+        "define-inline",
+        "cl-defsubst",
+        "cl-defstruct",
+        "defvar-local",
+        "defvar-keymap",
+        "defface",
+        "defalias",
+        "define-error",
+        "define-globalized-minor-mode",
+        "ert-deftest",
+    ] {
+        assert!(Dialect::EmacsLisp.is_definition_head(head), "{head}");
+    }
+
+    // A user helper that merely starts with `cl-` is not a `cl-lib` form.
+    assert!(!Dialect::EmacsLisp.is_definition_head("cl-my-helper"));
+    // Common Lisp spellings Emacs Lisp does not have.
+    assert!(!Dialect::EmacsLisp.is_definition_head("defparameter"));
+    assert!(!Dialect::EmacsLisp.is_definition_head("defpackage"));
+}
+
+#[test]
+fn a_cl_lib_form_reaches_the_shared_shape_of_its_common_lisp_twin() {
+    // `cl-destructuring-bind` lays its parts out exactly as
+    // `destructuring-bind` does, so it reaches the same shape entry even
+    // though the Common Lisp table has never heard the `cl-` spelling.
+    assert_eq!(
+        Dialect::EmacsLisp.common_lisp_value_scope_form_for_head("cl-destructuring-bind"),
+        Dialect::CommonLisp.common_lisp_value_scope_form_for_head("destructuring-bind")
+    );
+    assert_eq!(
+        Dialect::EmacsLisp.common_lisp_local_callable_form_for_head("cl-labels"),
+        Some(CommonLispLocalCallableForm::Labels)
+    );
+    assert_eq!(
+        Dialect::EmacsLisp.common_lisp_local_callable_form_for_head("cl-macrolet"),
+        Some(CommonLispLocalCallableForm::Macrolet)
+    );
+}
+
+#[test]
+fn emacs_lisp_inline_function_refactor_excludes_macros_and_includes_cl_defsubst() {
+    assert!(Dialect::EmacsLisp.supports_inline_function_refactor_head("defun"));
+    assert!(Dialect::EmacsLisp.supports_inline_function_refactor_head("defsubst"));
+    assert!(Dialect::EmacsLisp.supports_inline_function_refactor_head("cl-defsubst"));
+    // A macro body runs at expansion time; inlining it would move the
+    // computation to the wrong phase.
+    assert!(!Dialect::EmacsLisp.supports_inline_function_refactor_head("defmacro"));
+    assert!(!Dialect::EmacsLisp.supports_inline_function_refactor_head("cl-defmacro"));
+}

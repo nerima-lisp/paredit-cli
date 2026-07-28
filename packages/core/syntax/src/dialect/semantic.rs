@@ -2,6 +2,7 @@ use std::{fmt, marker::PhantomData};
 
 use crate::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_identity_eq};
 use crate::definition::DefinitionCategory;
+use crate::emacs_lisp::EmacsLispOperator;
 use crate::scheme::{
     SchemeBindingForm, SchemeDefineTarget, SchemeDefinitionForm, SchemeLetKind, SchemeOperator,
     scheme_define_target,
@@ -675,15 +676,7 @@ fn definition_shape(
         {
             direct_variable_shape(form)
         }
-        Dialect::EmacsLisp if head == "defun" => {
-            direct_callable_shape(form, Delimiter::Paren, DIRECT_FUNCTION)
-        }
-        Dialect::EmacsLisp if head == "defmacro" => {
-            direct_callable_shape(form, Delimiter::Paren, DIRECT_MACRO)
-        }
-        Dialect::EmacsLisp if matches!(head, "defvar" | "defconst" | "defcustom") => {
-            direct_variable_shape(form)
-        }
+        Dialect::EmacsLisp => emacs_lisp_definition_shape(head, form),
         // LFE `defun`/`defmacro` have two layouts: a single parameter list, or
         // one pattern-matching clause per arity. Without the clause case the
         // first clause is read as the parameter list, so `((x) (* x x))` binds
@@ -745,7 +738,6 @@ fn definition_shape(
         }
         Dialect::Unknown
         | Dialect::CommonLisp
-        | Dialect::EmacsLisp
         | Dialect::Lfe
         | Dialect::Clojure
         | Dialect::Hy
@@ -843,6 +835,59 @@ fn scheme_named_definition_shape(
     )
 }
 
+/// Emacs Lisp definition layouts.
+///
+/// Resolved through [`EmacsLispOperator`] rather than by comparing head text,
+/// so a `.el` file's `DEFUN` — a symbol a user may well have defined — is not
+/// read as the special form.
+fn emacs_lisp_definition_shape(head: &str, form: &ExpressionView) -> Option<DefinitionShape> {
+    match EmacsLispOperator::from_head(head)? {
+        // `cl-defun` and `cl-defsubst` take a full Common Lisp lambda list
+        // rather than Emacs Lisp's `&optional`/`&rest`-only one, but the
+        // *layout* — name, then arglist, then body — is the same, and layout
+        // is all this shape records.
+        EmacsLispOperator::Defun
+        | EmacsLispOperator::Defsubst
+        | EmacsLispOperator::ClDefun
+        | EmacsLispOperator::ClDefsubst => {
+            direct_callable_shape(form, Delimiter::Paren, DIRECT_FUNCTION)
+        }
+        EmacsLispOperator::Defmacro
+        | EmacsLispOperator::ClDefmacro
+        | EmacsLispOperator::DefineInline => {
+            direct_callable_shape(form, Delimiter::Paren, DIRECT_MACRO)
+        }
+        EmacsLispOperator::Defvar
+        | EmacsLispOperator::DefvarLocal
+        | EmacsLispOperator::Defconst
+        | EmacsLispOperator::Defcustom => direct_variable_shape(form),
+        _ => None,
+    }
+}
+
+/// Emacs Lisp lexical-scope layouts.
+///
+/// Only the forms whose bindings are plain symbols visible across a single
+/// contiguous body are listed. The `if-let*` family is deliberately absent:
+/// its ELSE forms are siblings of the THEN form but evaluate with none of the
+/// bindings in scope, and [`BodyShape::ChildrenFrom`] cannot say that — a
+/// rename driven by this shape would rewrite an occurrence in the ELSE branch
+/// that refers to something else entirely. The binding table models those
+/// forms directly instead.
+fn emacs_lisp_scope_shape(head: &str, form: &ExpressionView) -> Option<ScopeShape> {
+    match EmacsLispOperator::from_head(head)? {
+        EmacsLispOperator::Let => list_scope(form, Delimiter::Paren, LIST_LET_SCOPE),
+        // `dlet` binds dynamically rather than lexically, but it binds the
+        // same names in the same places as `let*`, which is what a rename
+        // needs to know.
+        EmacsLispOperator::LetStar | EmacsLispOperator::Dlet => {
+            list_scope(form, Delimiter::Paren, LIST_LET_STAR_SCOPE)
+        }
+        EmacsLispOperator::Lambda => parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE),
+        _ => None,
+    }
+}
+
 const LIST_BINDINGS_PARALLEL: BinderShape = BinderShape::BindingList {
     container: RelativeNodePath::Child(1),
     name: RelativeNodePath::Child(0),
@@ -932,13 +977,7 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         Dialect::CommonLisp if common_lisp_operator_head_eq(head, "lambda") => {
             parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
         }
-        Dialect::EmacsLisp if head == "let" => list_scope(form, Delimiter::Paren, LIST_LET_SCOPE),
-        Dialect::EmacsLisp if head == "let*" => {
-            list_scope(form, Delimiter::Paren, LIST_LET_STAR_SCOPE)
-        }
-        Dialect::EmacsLisp if head == "lambda" => {
-            parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
-        }
+        Dialect::EmacsLisp => emacs_lisp_scope_shape(head, form),
         Dialect::Lfe if head == "let" => list_scope(form, Delimiter::Paren, LIST_LET_SCOPE),
         Dialect::Lfe if head == "let*" => list_scope(form, Delimiter::Paren, LIST_LET_STAR_SCOPE),
         Dialect::Lfe if head == "lambda" => {
@@ -989,7 +1028,6 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         }
         Dialect::Unknown
         | Dialect::CommonLisp
-        | Dialect::EmacsLisp
         | Dialect::Lfe
         | Dialect::Clojure
         | Dialect::Hy

@@ -3,6 +3,7 @@ use crate::common_lisp::{
     CommonLispOperator, CommonLispPackageDeclarationForm, CommonLispRuntimeDependencyForm,
     CommonLispValueScopeForm, CommonLispVariableBindingForm,
 };
+use crate::emacs_lisp::EmacsLispOperator;
 
 use crate::scheme::SchemeOperator;
 
@@ -14,24 +15,9 @@ impl Dialect {
         match self {
             Self::CommonLisp => common_lisp_operator(head)
                 .is_some_and(|operator| operator.definition_category().is_some()),
-            Self::EmacsLisp => matches!(
-                head,
-                "defun"
-                    | "defmacro"
-                    | "defsubst"
-                    | "cl-defun"
-                    | "cl-defmacro"
-                    | "cl-defgeneric"
-                    | "cl-defmethod"
-                    | "defvar"
-                    | "defconst"
-                    | "defcustom"
-                    | "defgroup"
-                    | "define-minor-mode"
-                    | "define-derived-mode"
-                    | "provide"
-                    | "require"
-            ),
+            Self::EmacsLisp => emacs_lisp_operator(head)
+                .and_then(EmacsLispOperator::definition_category)
+                .is_some(),
             Self::Lfe => matches!(
                 head,
                 "defun" | "defmacro" | "defrecord" | "defmodule" | "defsyntax"
@@ -102,16 +88,17 @@ impl Dialect {
         match self {
             Self::CommonLisp => common_lisp_operator(head)
                 .is_some_and(CommonLispOperator::supports_function_parameter_refactor),
-            Self::EmacsLisp => matches!(
-                head,
-                "defun"
-                    | "defmacro"
-                    | "defsubst"
-                    | "cl-defun"
-                    | "cl-defmacro"
-                    | "cl-defgeneric"
-                    | "cl-defmethod"
-            ),
+            // A form has a rewritable parameter list when it has a lambda
+            // list at a knowable position: either a fixed child index, or —
+            // for `cl-defmethod`, whose optional qualifier shifts everything
+            // after it — the first list at or after one.
+            Self::EmacsLisp => emacs_lisp_operator(head).is_some_and(|operator| {
+                (operator.callable_shape().is_some()
+                    || operator
+                        .definition_arglist_is_first_list_at_or_after()
+                        .is_some())
+                    && operator.is_definition()
+            }),
             Self::Lfe => matches!(head, "defun" | "defmacro"),
             Self::Scheme | Self::Racket => matches!(head, "define"),
             Self::Clojure => matches!(head, "defn" | "defn-" | "defmacro"),
@@ -141,7 +128,18 @@ impl Dialect {
         match self {
             Self::CommonLisp => common_lisp_operator(head)
                 .is_some_and(CommonLispOperator::is_inline_function_definition),
-            Self::EmacsLisp => matches!(head, "defun" | "cl-defun" | "defsubst"),
+            // Only forms whose body is ordinary code the caller could have
+            // written inline. A macro's body runs at expansion time, so
+            // inlining it would move the computation to the wrong phase.
+            Self::EmacsLisp => matches!(
+                emacs_lisp_operator(head),
+                Some(
+                    EmacsLispOperator::Defun
+                        | EmacsLispOperator::ClDefun
+                        | EmacsLispOperator::Defsubst
+                        | EmacsLispOperator::ClDefsubst
+                )
+            ),
             Self::Lfe => head == "defun",
             Self::Scheme | Self::Racket => head == "define",
             Self::Clojure | Self::Janet => matches!(head, "defn" | "defn-"),
@@ -205,26 +203,22 @@ impl Dialect {
         self,
         head: &str,
     ) -> Option<CommonLispLocalCallableForm> {
-        if !matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
-            return None;
+        match self {
+            Self::EmacsLisp => emacs_lisp_shaped_operator(head)?.local_callable_form(),
+            Self::CommonLisp | Self::Unknown => common_lisp_operator(head)?.local_callable_form(),
+            _ => None,
         }
-        common_lisp_operator(head)?.local_callable_form()
     }
 
     #[must_use]
     pub fn let_binding_form_for_head(self, head: &str) -> Option<CommonLispLetBindingForm> {
-        if !matches!(
-            self,
-            Self::CommonLisp
-                | Self::EmacsLisp
-                | Self::Lfe
-                | Self::Scheme
-                | Self::Racket
-                | Self::Unknown
-        ) {
-            return None;
+        match self {
+            Self::EmacsLisp => emacs_lisp_shaped_operator(head)?.let_binding_form(),
+            Self::CommonLisp | Self::Lfe | Self::Scheme | Self::Racket | Self::Unknown => {
+                common_lisp_operator(head)?.let_binding_form()
+            }
+            _ => None,
         }
-        common_lisp_operator(head)?.let_binding_form()
     }
 
     #[must_use]
@@ -243,7 +237,10 @@ impl Dialect {
         self,
         head: &str,
     ) -> Option<CommonLispValueScopeForm> {
-        if matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
+        if self == Self::EmacsLisp {
+            return emacs_lisp_shaped_operator(head)?.value_scope_form();
+        }
+        if matches!(self, Self::CommonLisp | Self::Unknown) {
             return common_lisp_operator(head)?.value_scope_form();
         }
 
@@ -266,7 +263,10 @@ impl Dialect {
         self,
         head: &str,
     ) -> Option<CommonLispBindingRefactorForm> {
-        if matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
+        if self == Self::EmacsLisp {
+            return emacs_lisp_shaped_operator(head)?.binding_refactor_form();
+        }
+        if matches!(self, Self::CommonLisp | Self::Unknown) {
             return common_lisp_operator(head)?.binding_refactor_form();
         }
 
@@ -340,7 +340,7 @@ impl Dialect {
             // Lisp package-system form of the same name) and `import` (not a
             // standard Emacs Lisp form at all) would misclassify an
             // unrelated construct as a dependency if allowed through here.
-            match common_lisp_operator(head)?.runtime_dependency_form()? {
+            match emacs_lisp_shaped_operator(head)?.runtime_dependency_form()? {
                 form @ (CommonLispRuntimeDependencyForm::Require
                 | CommonLispRuntimeDependencyForm::Provide
                 | CommonLispRuntimeDependencyForm::Load
@@ -496,4 +496,25 @@ fn bracket_let_binding_head(dialect: Dialect, head: &str) -> bool {
         | Dialect::Racket
         | Dialect::Unknown => false,
     }
+}
+
+fn emacs_lisp_operator(head: &str) -> Option<EmacsLispOperator> {
+    EmacsLispOperator::from_head(head)
+}
+
+/// The Common Lisp shape entry for an Emacs Lisp head, when the two dialects
+/// lay the form out identically.
+///
+/// Resolving through the Emacs Lisp table first is what makes this correct
+/// rather than merely convenient. Consulting
+/// [`CommonLispOperator::from_head`] directly — which is what every Emacs
+/// Lisp arm here used to do — folds case and strips a `cl:` package prefix,
+/// so `LET` and `cl:let` both resolved to the `let` special form in a `.el`
+/// file where they are ordinary user symbols. Going through
+/// [`EmacsLispOperator`] rejects both before any Common Lisp rule applies,
+/// and [`EmacsLispOperator::common_lisp_shape_head`] then names the Common
+/// Lisp spelling whose layout matches, which is how `cl-destructuring-bind`
+/// reaches the `destructuring-bind` shape it shares.
+fn emacs_lisp_shaped_operator(head: &str) -> Option<CommonLispOperator> {
+    CommonLispOperator::from_head(emacs_lisp_operator(head)?.common_lisp_shape_head()?)
 }
