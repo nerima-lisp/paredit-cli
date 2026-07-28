@@ -178,7 +178,7 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"rule_count\": 143"))
+        .stdout(predicate::str::contains("\"rule_count\": 165"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -206,7 +206,7 @@ fn cli_list_rules_filters_by_category() {
     // Every listed rule is in the requested category, and it's a strict subset.
     assert!(!rules.is_empty());
     assert!(rules.iter().all(|r| r["category"] == "dead-code"));
-    assert!(rules.len() < 143);
+    assert!(rules.len() < 165);
     assert_eq!(value["rule_count"], rules.len());
 }
 
@@ -654,8 +654,8 @@ fn cli_lint_stats_rolls_up_by_severity_category_and_rule() {
     assert_eq!(severity("error"), 1);
     assert_eq!(severity("warning"), 1);
 
-    // by_category has one entry per category (all five).
-    assert_eq!(stats["by_category"].as_array().unwrap().len(), 5);
+    // by_category has one entry per category, firing or not.
+    assert_eq!(stats["by_category"].as_array().unwrap().len(), 17);
     // by_rule lists exactly the two firing rules.
     assert_eq!(stats["by_rule"].as_array().unwrap().len(), 2);
 }
@@ -804,7 +804,9 @@ fn cli_lint_list_rules_marks_severity() {
     assert_eq!(severity_of("redundant-quote"), "warning");
     assert_eq!(severity_of("literal-place"), "error");
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
-    assert_eq!(warnings, 96);
+    // The default preset is `recommended`, which holds back the four
+    // `pedantic` rules; `--preset all` is what lists the whole suite.
+    assert_eq!(warnings, 109);
 }
 
 #[test]
@@ -823,8 +825,8 @@ fn cli_lint_list_rules_marks_fixability() {
 
     let fixable_count = rules.iter().filter(|r| r["fixable"] == true).count();
     assert_eq!(
-        fixable_count, 88,
-        "exactly twenty-eight rules are auto-fixable"
+        fixable_count, 92,
+        "the fixable rules the default preset admits"
     );
 
     let redundant_quote = rules
@@ -1585,4 +1587,982 @@ fn cli_lint_fix_plan_conflicts_with_fix() {
         .arg(&file)
         .assert()
         .failure();
+}
+
+// ---------------------------------------------------------------------------
+// The rule *mechanism*: presets, tags, severity overrides, per-rule settings,
+// long-form explanations, cost accounting, stable finding ids, and the
+// suppression scopes. These are the parts of `inspect lint` that are about the
+// rule set rather than about any one rule, so they are grouped rather than
+// scattered among the per-rule tests above.
+// ---------------------------------------------------------------------------
+
+/// Parses a command's stdout as JSON, failing the test with the raw bytes if
+/// it is not.
+fn json_stdout(assert: assert_cmd::assert::Assert) -> serde_json::Value {
+    let output = assert.success().get_output().stdout.clone();
+    serde_json::from_slice(&output).unwrap_or_else(|error| {
+        panic!(
+            "expected JSON, got {error}: {}",
+            String::from_utf8_lossy(&output)
+        )
+    })
+}
+
+#[test]
+fn cli_lint_explain_prints_the_long_form_documentation() {
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--explain",
+                "redundant-the",
+                "--output",
+                "json",
+            ])
+            .assert(),
+    );
+    assert_eq!(value["rule"], "redundant-the");
+    assert_eq!(value["category"], "suspicious");
+    assert_eq!(value["fixable"], true);
+    // Every rule can be explained, whether or not it declares a rationale: the
+    // dialect list alone answers the commonest "why did this find nothing?".
+    assert_eq!(value["dialects"][0], "common-lisp");
+}
+
+#[test]
+fn cli_lint_explain_includes_the_example_and_caveat_when_declared() {
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--explain",
+                "unnecessary-copy",
+                "--output",
+                "json",
+            ])
+            .assert(),
+    );
+    assert!(
+        value["rationale"]
+            .as_str()
+            .expect("a rationale")
+            .contains("copy")
+    );
+    assert_eq!(value["example"]["bad"], "(length (copy-list xs))");
+    assert_eq!(value["example"]["good"], "(length xs)");
+    assert!(value["caveat"].as_str().expect("a caveat").contains("sort"));
+}
+
+#[test]
+fn cli_lint_explain_lists_a_rules_tunable_settings() {
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--explain",
+                "linear-search-in-loop",
+                "--output",
+                "json",
+            ])
+            .assert(),
+    );
+    let settings = value["settings"].as_array().expect("settings array");
+    assert_eq!(settings.len(), 1);
+    assert_eq!(settings[0]["key"], "min-searches");
+    assert_eq!(settings[0]["default"], 1);
+}
+
+#[test]
+fn cli_lint_explain_rejects_an_unknown_rule() {
+    paredit()
+        .args(["inspect", "lint", "--explain", "no-such-rule"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown lint rule"));
+}
+
+#[test]
+fn cli_lint_presets_widen_monotonically() {
+    let count = |preset: &str| {
+        let value = json_stdout(
+            paredit()
+                .args([
+                    "inspect",
+                    "lint",
+                    "--list-rules",
+                    "--preset",
+                    preset,
+                    "--output",
+                    "json",
+                ])
+                .assert(),
+        );
+        value["rule_count"].as_u64().expect("a rule count")
+    };
+    let (minimal, recommended, pedantic, all) = (
+        count("minimal"),
+        count("recommended"),
+        count("pedantic"),
+        count("all"),
+    );
+    assert!(minimal < recommended, "{minimal} < {recommended}");
+    assert!(recommended < pedantic, "{recommended} < {pedantic}");
+    assert!(pedantic <= all, "{pedantic} <= {all}");
+}
+
+#[test]
+fn cli_lint_list_presets_reports_each_rungs_size() {
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--list-presets", "--output", "json"])
+            .assert(),
+    );
+    assert_eq!(value["default"], "recommended");
+    let presets = value["presets"].as_array().expect("presets array");
+    assert_eq!(presets.len(), 4);
+    assert_eq!(presets[0]["preset"], "minimal");
+    assert!(presets[0]["rule_count"].as_u64().expect("count") > 0);
+}
+
+#[test]
+fn cli_lint_default_preset_holds_back_the_pedantic_rules() {
+    let dir = fresh_temp_dir("lint-preset-pedantic");
+    let file = dir.join("a.lisp");
+    // Undocumented and unmarked: two pedantic findings, and nothing else.
+    fs::write(&file, "(defparameter timeout 30)\n").expect("write a.lisp");
+
+    let recommended = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(recommended["finding_count"], 0);
+
+    let pedantic = json_stdout(
+        paredit()
+            .args([
+                "inspect", "lint", "--preset", "pedantic", "--output", "json",
+            ])
+            .arg(&file)
+            .assert(),
+    );
+    assert!(pedantic["finding_count"].as_u64().expect("count") >= 2);
+}
+
+#[test]
+fn cli_lint_tag_filter_narrows_to_rules_carrying_every_named_tag() {
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--list-rules",
+                "--tag",
+                "pedantic",
+                "--preset",
+                "pedantic",
+                "--output",
+                "json",
+            ])
+            .assert(),
+    );
+    let rules = value["rules"].as_array().expect("rules array");
+    assert!(!rules.is_empty());
+    assert!(rules.iter().all(|rule| {
+        rule["tags"]
+            .as_array()
+            .expect("tags")
+            .contains(&serde_json::Value::String("pedantic".to_owned()))
+    }));
+}
+
+#[test]
+fn cli_lint_rejects_an_unknown_tag() {
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--tag", "experimentl"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown lint tag"));
+}
+
+#[test]
+fn cli_lint_deny_promotes_a_warning_to_error() {
+    let dir = fresh_temp_dir("lint-deny");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list '5)\n").expect("write a.lisp");
+
+    let plain = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(plain["findings"][0]["severity"], "warning");
+
+    let denied = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--deny",
+                "redundant-quote",
+                "--output",
+                "json",
+            ])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(denied["findings"][0]["severity"], "error");
+}
+
+#[test]
+fn cli_lint_deny_by_category_reaches_every_rule_in_it() {
+    let dir = fresh_temp_dir("lint-deny-category");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list '5)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--deny",
+                "suspicious",
+                "--output",
+                "json",
+            ])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["findings"][0]["severity"], "error");
+}
+
+#[test]
+fn cli_lint_deny_changes_what_the_severity_gate_fails_on() {
+    let dir = fresh_temp_dir("lint-deny-gate");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list '5)\n").expect("write a.lisp");
+
+    // `redundant-quote` ships as a warning, so an error-level gate passes...
+    paredit()
+        .args(["inspect", "lint", "--fail-on", "error", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    // ...but not once the run has been told to treat it as an error.
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--deny",
+            "redundant-quote",
+            "--fail-on",
+            "error",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn cli_lint_warn_demotes_an_error_below_the_gate() {
+    let dir = fresh_temp_dir("lint-warn-gate");
+    let file = dir.join("a.lisp");
+    // `literal-place` ships as an error.
+    fs::write(&file, "(incf 5)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--fail-on", "error", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .failure();
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--warn",
+            "literal-place",
+            "--fail-on",
+            "error",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+}
+
+#[test]
+fn cli_lint_rejects_an_unknown_deny_selector() {
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--deny", "no-such-thing"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown lint rule"));
+}
+
+#[test]
+fn cli_lint_rule_arg_retunes_a_threshold() {
+    let dir = fresh_temp_dir("lint-rule-arg");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        "(defun scan (items known) (dolist (x items) (member x known)))\n",
+    )
+    .expect("write a.lisp");
+
+    let default = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--rule",
+                "linear-search-in-loop",
+                "--output",
+                "json",
+            ])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(default["finding_count"], 1);
+
+    let raised = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--rule",
+                "linear-search-in-loop",
+                "--rule-arg",
+                "linear-search-in-loop.min-searches=2",
+                "--output",
+                "json",
+            ])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(raised["finding_count"], 0);
+}
+
+#[test]
+fn cli_lint_rejects_a_rule_arg_the_rule_does_not_declare() {
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--list-rules",
+            "--rule-arg",
+            "linear-search-in-loop.nope=2",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("has no setting"));
+}
+
+#[test]
+fn cli_lint_rejects_a_malformed_rule_arg() {
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--rule-arg", "nonsense"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("malformed --rule-arg"));
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--list-rules",
+            "--rule-arg",
+            "linear-search-in-loop.min-searches=lots",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("integer value"));
+}
+
+#[test]
+fn cli_lint_timings_attributes_cost_to_rules() {
+    let dir = fresh_temp_dir("lint-timings");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun f (x) (list '5) (+ x 1))\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--timings", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["files_scanned"], 1);
+    let rules = value["rules"].as_array().expect("rules array");
+    assert!(!rules.is_empty(), "every rule that ran should be listed");
+    // Slowest first, and every listed rule actually ran.
+    let shares: Vec<f64> = rules
+        .iter()
+        .map(|rule| rule["micros"].as_f64().expect("micros"))
+        .collect();
+    assert!(shares.windows(2).all(|pair| pair[0] >= pair[1]));
+    assert!(
+        rules
+            .iter()
+            .all(|rule| rule["invocations"].as_u64().expect("invocations") > 0)
+    );
+}
+
+#[test]
+fn cli_lint_findings_carry_a_content_derived_id() {
+    let dir = fresh_temp_dir("lint-finding-id");
+    let tight = dir.join("tight.lisp");
+    let loose = dir.join("loose.lisp");
+    fs::write(&tight, "(the t (compute x))\n").expect("write tight.lisp");
+    // The same form, reindented across three lines.
+    fs::write(&loose, "(the\n   t\n   (compute\n     x))\n").expect("write loose.lisp");
+
+    let id_of = |path: &std::path::Path| {
+        let value = json_stdout(
+            paredit()
+                .args(["inspect", "lint", "--output", "json"])
+                .arg(path)
+                .assert(),
+        );
+        value["findings"][0]["id"]
+            .as_str()
+            .expect("a finding id")
+            .to_owned()
+    };
+
+    let id = id_of(&tight);
+    assert!(id.starts_with("redundant-the/"));
+    // Reformatting must not change a finding's identity, or every baseline
+    // would go stale the first time the file is formatted.
+    assert_eq!(id, id_of(&loose));
+}
+
+#[test]
+fn cli_lint_two_identical_findings_get_distinct_ids() {
+    let dir = fresh_temp_dir("lint-finding-id-dup");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list '5)\n(list '5)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    let first = value["findings"][0]["id"].as_str().expect("first id");
+    let second = value["findings"][1]["id"].as_str().expect("second id");
+    assert_ne!(first, second);
+}
+
+#[test]
+fn cli_lint_ignore_next_form_covers_the_whole_form() {
+    let dir = fresh_temp_dir("lint-ignore-form");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        ";; paredit:ignore-next-form redundant-quote\n\
+         (defun f ()\n  (list '5)\n  (list '6))\n\
+         (defun g () (list '7))\n",
+    )
+    .expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    // Two findings inside the guarded defun are silenced; the third is not.
+    assert_eq!(value["finding_count"], 1);
+}
+
+#[test]
+fn cli_lint_ignore_file_covers_every_line() {
+    let dir = fresh_temp_dir("lint-ignore-file");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        ";; paredit:ignore-file redundant-quote\n(list '5)\n(list '6)\n",
+    )
+    .expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 0);
+}
+
+#[test]
+fn cli_lint_require_suppression_reason_flags_an_unexplained_directive() {
+    let dir = fresh_temp_dir("lint-suppression-reason");
+    let file = dir.join("a.lisp");
+    fs::write(&file, ";; paredit:ignore redundant-quote\n(list '5)\n").expect("write a.lisp");
+
+    // Without the flag the directive is doing its job and is not reported.
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--report-unused-suppressions",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+
+    let assert = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--report-unused-suppressions",
+            "--require-suppression-reason",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .failure();
+    let value: serde_json::Value =
+        serde_json::from_slice(&assert.get_output().stdout).expect("JSON");
+    assert_eq!(value["unused_suppression_count"], 1);
+    assert_eq!(value["unused_suppressions"][0]["problem"], "missing-reason");
+}
+
+#[test]
+fn cli_lint_a_directive_with_a_reason_satisfies_the_requirement() {
+    let dir = fresh_temp_dir("lint-suppression-reason-ok");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        ";; paredit:ignore redundant-quote -- the macro reads better this way\n(list '5)\n",
+    )
+    .expect("write a.lisp");
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--report-unused-suppressions",
+            "--require-suppression-reason",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+}
+
+#[test]
+fn cli_lint_remove_unused_suppressions_deletes_only_the_stale_ones() {
+    let dir = fresh_temp_dir("lint-remove-suppressions");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        ";; paredit:ignore no-such-rule\n(defun g () t)\n\
+         ;; paredit:ignore redundant-quote\n(list '5)\n",
+    )
+    .expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--remove-unused-suppressions",
+                "--output",
+                "json",
+            ])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["suppressions_removed"], 1);
+
+    let rewritten = fs::read_to_string(&file).expect("read a.lisp");
+    assert!(!rewritten.contains("no-such-rule"));
+    // The live directive is untouched.
+    assert!(rewritten.contains("paredit:ignore redundant-quote"));
+    assert!(rewritten.contains("(defun g () t)"));
+}
+
+#[test]
+fn cli_lint_remove_unused_suppressions_narrows_a_partly_stale_directive() {
+    let dir = fresh_temp_dir("lint-narrow-suppressions");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        ";; paredit:ignore redundant-quote no-such-rule\n(list '5)\n",
+    )
+    .expect("write a.lisp");
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--remove-unused-suppressions",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+
+    let rewritten = fs::read_to_string(&file).expect("read a.lisp");
+    assert!(rewritten.contains("paredit:ignore redundant-quote"));
+    assert!(!rewritten.contains("no-such-rule"));
+}
+
+#[test]
+fn cli_lint_docs_generates_a_markdown_reference() {
+    let output = paredit()
+        .args(["inspect", "lint", "--docs"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let markdown = String::from_utf8(output).expect("UTF-8 markdown");
+
+    assert!(markdown.starts_with("# Lint rules"));
+    // Every category is a heading and every rule a subheading.
+    assert!(markdown.contains("## performance"));
+    assert!(markdown.contains("### `unnecessary-copy`"));
+    // The worked example a rule declares is rendered as a code block.
+    assert!(markdown.contains("(length (copy-list xs))"));
+    // A rule's tunable knob is documented with the flag that sets it.
+    assert!(markdown.contains("--rule-arg linear-search-in-loop.min-searches="));
+}
+
+#[test]
+fn cli_lint_github_annotations_follow_the_overridden_severity() {
+    let dir = fresh_temp_dir("lint-github-severity");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list '5)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--github"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("::warning file="));
+
+    paredit()
+        .args(["inspect", "lint", "--github", "--deny", "redundant-quote"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("::error file="));
+}
+
+#[test]
+fn cli_lint_sarif_publishes_the_finding_id_as_a_fingerprint() {
+    let dir = fresh_temp_dir("lint-sarif-id");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(the t x)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--sarif"])
+            .arg(&file)
+            .assert(),
+    );
+    let fingerprints = &value["runs"][0]["results"][0]["partialFingerprints"];
+    assert!(
+        fingerprints["pareditFindingId"]
+            .as_str()
+            .expect("a finding id")
+            .starts_with("redundant-the/")
+    );
+}
+
+#[test]
+fn cli_lint_no_destructive_fixes_holds_back_the_tagged_rewrites() {
+    let dir = fresh_temp_dir("lint-no-destructive");
+    let file = dir.join("a.lisp");
+    // `copy-before-destructive` is the one fix tagged `destructive`;
+    // `redundant-the` next to it is not.
+    fs::write(&file, "(list (nreverse (copy-list xs)) (the t y))\n").expect("write a.lisp");
+
+    // Both fixes are pending, so the CI gate fails and names them.
+    paredit()
+        .args(["inspect", "lint", "--fix", "--check"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("2 auto-fixable finding(s)"));
+
+    // With the tagged fix held back, only the safe one is offered.
+    let held = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--fix",
+            "--diff",
+            "--no-destructive-fixes",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let diff = String::from_utf8(held).expect("UTF-8 diff");
+    assert!(diff.contains("(the t y)"), "the safe fix still applies");
+    assert!(
+        !diff.contains("reverse xs"),
+        "the destructive fix is held back"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Custom rules: a project's own pattern rules, their declarative tests, and
+// the deprecation shorthand. These run as a second pass and are then
+// indistinguishable from shipped findings in every output mode, which is what
+// most of the assertions below are checking.
+// ---------------------------------------------------------------------------
+
+/// Writes a rule directory and returns its path.
+fn rule_dir(name: &str, rules: &str) -> PathBuf {
+    let dir = fresh_temp_dir(name).join("rules");
+    std::fs::create_dir_all(&dir).expect("create rule dir");
+    fs::write(dir.join("house.lisp"), rules).expect("write house.lisp");
+    dir
+}
+
+#[test]
+fn cli_lint_custom_rule_reports_like_a_shipped_one() {
+    let rules = rule_dir(
+        "lint-custom-report",
+        r#"(defrule no-bare-print
+             :category suspicious
+             :severity error
+             :description "print writes to *standard-output* directly"
+             :pattern (print ?x)
+             :message "use (format t ...) rather than print")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-report-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun run () (print (compute 1)))\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 1);
+    let finding = &value["findings"][0];
+    assert_eq!(finding["rule"], "no-bare-print");
+    // The custom rule's own metadata, not the "unknown rule" fallback.
+    assert_eq!(finding["severity"], "error");
+    assert_eq!(finding["category"], "suspicious");
+    assert_eq!(finding["fixable"], false);
+    // And a content-derived id, exactly like a shipped finding.
+    assert!(
+        finding["id"]
+            .as_str()
+            .expect("an id")
+            .starts_with("no-bare-print/")
+    );
+}
+
+#[test]
+fn cli_lint_custom_rule_fix_applies_like_a_shipped_one() {
+    let rules = rule_dir(
+        "lint-custom-fix",
+        r#"(defrule no-bare-print
+             :pattern (print ?x)
+             :message "m"
+             :fix (format t "~a~%" ?x))"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-fix-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print (compute 1))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--fix", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read a.lisp"),
+        "(format t \"~a~%\" (compute 1))\n"
+    );
+}
+
+#[test]
+fn cli_lint_a_custom_finding_obeys_a_suppression_comment() {
+    let rules = rule_dir(
+        "lint-custom-suppress",
+        r#"(defrule no-bare-print :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-suppress-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, ";; paredit:ignore no-bare-print\n(print 1)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 0);
+}
+
+#[test]
+fn cli_lint_a_custom_finding_trips_the_severity_gate() {
+    let rules = rule_dir(
+        "lint-custom-gate",
+        r#"(defrule no-bare-print :severity error :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-gate-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--fail-on", "error", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn cli_lint_deprecate_reports_any_call_to_the_named_operator() {
+    let rules = rule_dir(
+        "lint-custom-deprecate",
+        r#"(deprecate legacy-connect :use connect :reason "removed in 3.0")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-deprecate-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(legacy-connect)\n(legacy-connect \"db\" 5)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 2);
+    assert_eq!(value["findings"][0]["rule"], "deprecated-legacy-connect");
+    assert!(
+        value["findings"][0]["message"]
+            .as_str()
+            .expect("a message")
+            .contains("use connect instead (removed in 3.0)")
+    );
+}
+
+#[test]
+fn cli_lint_test_rules_passes_a_correct_rule_set() {
+    let rules = rule_dir(
+        "lint-custom-harness-ok",
+        r#"(defrule no-bare-print
+             :pattern (print ?x)
+             :message "m"
+             :fix (format t "~a" ?x))
+           (deftest no-bare-print
+             (:matches "(print 1)")
+             (:no-match "(princ 1)")
+             (:fix "(print 1)" "(format t \"~a\" 1)"))"#,
+    );
+    let value = json_stdout_or_text(
+        paredit()
+            .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+            .arg(&rules)
+            .assert()
+            .success(),
+    );
+    assert!(value.contains("failure_count\t0"), "{value}");
+}
+
+#[test]
+fn cli_lint_test_rules_fails_a_pattern_that_grew_too_broad() {
+    let rules = rule_dir(
+        "lint-custom-harness-broad",
+        r#"(defrule no-bare-print :pattern (?op ?x) :message "m")
+           (deftest no-bare-print (:no-match "(princ 1)"))"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(":no-match"));
+}
+
+#[test]
+fn cli_lint_rejects_a_custom_rule_that_shadows_a_shipped_one() {
+    let rules = rule_dir(
+        "lint-custom-collision",
+        r#"(defrule redundant-quote :pattern (print ?x) :message "m")"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("collides with a shipped rule"));
+}
+
+#[test]
+fn cli_lint_rejects_a_custom_rule_whose_fix_names_an_unbound_variable() {
+    let rules = rule_dir(
+        "lint-custom-unbound",
+        r#"(defrule r :pattern (f ?a) :message "m" :fix (g ?b))"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("does not bind"));
+}
+
+#[test]
+fn cli_lint_list_rules_shows_the_projects_own_rules() {
+    let rules = rule_dir(
+        "lint-custom-list",
+        r#"(defrule house-style :category naming :pattern (print ?x) :message "m")"#,
+    );
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .assert(),
+    );
+    let custom = value["custom_rules"]
+        .as_array()
+        .expect("custom_rules array");
+    assert_eq!(custom.len(), 1);
+    assert_eq!(custom[0]["rule"], "house-style");
+    assert_eq!(custom[0]["category"], "naming");
+}
+
+/// stdout as a `String`, for the modes whose output is not JSON.
+fn json_stdout_or_text(assert: assert_cmd::assert::Assert) -> String {
+    String::from_utf8(assert.get_output().stdout.clone()).expect("UTF-8 stdout")
 }

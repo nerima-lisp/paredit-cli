@@ -35,6 +35,46 @@ pub fn list_head(view: &ExpressionView) -> Option<&str> {
     is_paren_list(view).then(|| atom_child(view, 0)).flatten()
 }
 
+/// The symbol without its package qualifier: `cl:append` → `append`.
+///
+/// Splits on the *last* marker so `pkg:name` and `pkg::internal` both reduce to
+/// the name, and leaves a bare `:keyword` alone — a keyword's name has no
+/// package part, and stripping its colon would make `:test` compare equal to a
+/// function named `test`.
+#[must_use]
+pub fn unqualified(symbol: &str) -> &str {
+    if symbol.starts_with(':') {
+        return symbol;
+    }
+    match symbol.rsplit_once(':') {
+        Some((_, name)) if !name.is_empty() => name,
+        _ => symbol,
+    }
+}
+
+/// Whether `symbol` names `expected`, ignoring case and any package qualifier.
+///
+/// The reader upcases unescaped symbols and a package prefix does not change
+/// which function is named, so `CL:APPEND`, `cl:append`, and `append` are one
+/// operator. Comparing raw text would silently skip the qualified spelling,
+/// which is the spelling a large codebase uses.
+#[must_use]
+pub fn symbol_is(symbol: &str, expected: &str) -> bool {
+    unqualified(symbol).eq_ignore_ascii_case(expected)
+}
+
+/// Whether `symbol` names any of `expected`.
+#[must_use]
+pub fn symbol_in(symbol: &str, expected: &[&str]) -> bool {
+    expected.iter().any(|name| symbol_is(symbol, name))
+}
+
+/// Whether `view` is a `(...)` call to one of `heads`.
+#[must_use]
+pub fn calls(view: &ExpressionView, heads: &[&str]) -> bool {
+    list_head(view).is_some_and(|head| symbol_in(head, heads))
+}
+
 /// Calls `visit` on `root` and every descendant view, in pre-order (a view
 /// before its children). The single place the whole-tree recursion that
 /// body-form lints share is written.
@@ -73,6 +113,27 @@ mod tests {
     #[test]
     fn atom_child_reads_a_positional_symbol() {
         assert_eq!(atom_child(&root("(defun f ())"), 1), Some("f"));
+    }
+
+    #[test]
+    fn symbol_comparison_ignores_case_and_package() {
+        assert!(symbol_is("APPEND", "append"));
+        assert!(symbol_is("cl:append", "append"));
+        assert!(symbol_is("COMMON-LISP::APPEND", "append"));
+        assert!(!symbol_is("appendf", "append"));
+    }
+
+    #[test]
+    fn a_keyword_keeps_its_colon_so_it_is_not_a_function_name() {
+        assert_eq!(unqualified(":test"), ":test");
+        assert!(!symbol_is(":test", "test"));
+    }
+
+    #[test]
+    fn calls_reads_a_qualified_head() {
+        assert!(calls(&root("(cl:append a b)"), &["append"]));
+        assert!(!calls(&root("(nconc a b)"), &["append"]));
+        assert!(!calls(&root("x"), &["append"]));
     }
 
     #[test]

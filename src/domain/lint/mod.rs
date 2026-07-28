@@ -30,9 +30,9 @@ use std::sync::OnceLock;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
 
-use engine::HeadIndex;
-use model::{LintFinding, LintOutcome, LintPolicy, LintPolicyOptions, LintSummary};
-use policy::RuleSelection;
+use engine::{HeadIndex, PassOptions, PassOutcome};
+use model::{LintFinding, LintOutcome, LintPolicy, LintPolicyOptions, LintSummary, Severity};
+use policy::{RuleFilter, RuleSelection, SeverityOverrides};
 use rule::RuleCatalog;
 
 /// The shipped rule set. The engine and policy take this as an argument, so
@@ -69,13 +69,48 @@ pub fn collect_lint_outcomes(
     )
 }
 
-/// The rules `only`/`exclude`/`categories` select, over the shipped set.
+/// Runs the shipped rule set over one file with the per-run knobs (rule
+/// settings, per-rule timing).
+pub fn collect_lint_pass(
+    path: &Path,
+    dialect: Dialect,
+    tree: &SyntaxTree,
+    source: &str,
+    selection: RuleSelection<'_>,
+    options: PassOptions<'_>,
+) -> LintResult<PassOutcome> {
+    engine::collect_lint_pass(
+        CATALOG,
+        head_index(),
+        path,
+        dialect,
+        tree,
+        source,
+        selection,
+        options,
+    )
+}
+
+/// The rules `filter` selects, over the shipped set.
 pub fn resolve_active_rules(
-    only: &[String],
-    exclude: &[String],
-    categories: &[String],
+    filter: &RuleFilter<'_>,
 ) -> std::result::Result<Vec<&'static str>, RuleSelectionError> {
-    policy::resolve_active_rules(CATALOG, only, exclude, categories)
+    policy::resolve_active_rules(CATALOG, filter)
+}
+
+/// Applies one `--deny`/`--warn` selector against the shipped set.
+pub fn apply_severity_override(
+    overrides: &mut SeverityOverrides,
+    selector: &str,
+    severity: Severity,
+) -> std::result::Result<(), RuleSelectionError> {
+    overrides.apply(CATALOG, selector, severity)
+}
+
+/// The severity `rule` is reported at under `overrides`, over the shipped set.
+#[must_use]
+pub fn overridden_rule_severity(overrides: &SeverityOverrides, rule: &str) -> Severity {
+    overrides.severity_of(CATALOG, rule)
 }
 
 /// Summarizes findings over the shipped rule set.
@@ -84,14 +119,24 @@ pub fn summarize_lint_findings(findings: Vec<LintFinding>, active: &[&str]) -> L
     policy::summarize_lint_findings(CATALOG, findings, active)
 }
 
-/// Gate conditions `finding_rules` violates, over the shipped rule set.
+/// Gate conditions `finding_rules` violates, over the shipped rule set and the
+/// run's `--deny`/`--warn` re-ranking.
 #[must_use]
-pub fn lint_gate_violations(options: LintPolicyOptions, finding_rules: &[&str]) -> Vec<String> {
-    policy::lint_gate_violations(CATALOG, options, finding_rules)
+pub fn lint_gate_violations(
+    overrides: &SeverityOverrides,
+    options: LintPolicyOptions,
+    finding_rules: &[&str],
+) -> Vec<String> {
+    policy::lint_gate_violations(CATALOG, overrides, options, finding_rules)
 }
 
-/// Judges a summary against the gate, over the shipped rule set.
+/// Judges a summary against the gate, over the shipped rule set and the run's
+/// `--deny`/`--warn` re-ranking.
 #[must_use]
-pub fn evaluate_lint_policy(options: LintPolicyOptions, summary: &LintSummary) -> LintPolicy {
-    policy::evaluate_lint_policy(CATALOG, options, summary)
+pub fn evaluate_lint_policy(
+    overrides: &SeverityOverrides,
+    options: LintPolicyOptions,
+    summary: &LintSummary,
+) -> LintPolicy {
+    policy::evaluate_lint_policy(CATALOG, overrides, options, summary)
 }

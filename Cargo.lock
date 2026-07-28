@@ -665,8 +665,13 @@ dependencies = [
  "paredit-feature-inline",
  "paredit-feature-lint-conditional",
  "paredit-feature-lint-control-flow",
+ "paredit-feature-lint-convention",
+ "paredit-feature-lint-custom",
  "paredit-feature-lint-form-shape",
  "paredit-feature-lint-numeric",
+ "paredit-feature-lint-performance",
+ "paredit-feature-lint-portability",
+ "paredit-feature-lint-safety",
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
  "paredit-feature-package",
@@ -885,6 +890,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-convention"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-custom"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "thiserror",
+]
+
+[[package]]
 name = "paredit-feature-lint-form-shape"
 version = "1.2.1"
 dependencies = [
@@ -915,6 +937,30 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-performance"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-portability"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-safety"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

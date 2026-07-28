@@ -58,7 +58,7 @@ re-exports rather than code. A contract test enforces that, with a short
 allowlist for the **composition root**: modules that enumerate or aggregate
 several features and therefore belong in neither core nor a feature.
 
-The lint `REGISTRY` is the canonical example. It names all 143 rules, and every
+The lint `REGISTRY` is the canonical example. It names all 169 rules, and every
 rule depends on the engine; putting the registry in either would be a cycle. So
 the engine takes a `RuleCatalog` as an argument and never learns which rules
 exist, the rules never learn the registry does, and the registry sits in the
@@ -121,23 +121,48 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-The 143 rules live in seven themed packages. Six are split by the Lisp syntax
-they are about —
-`feature/lint-{conditional,sequence,numeric,control-flow,form-shape,string-char}`
-— and the seventh, `feature/lint-emacs-lisp`, by *dialect*: its rules are
-about Emacs Lisp's own file conventions (`lexical-binding`, `;;;###autoload`,
-`defcustom` options, the `cl.el` names Emacs 27 removed) rather than about
-S-expression shape, so none of them has a Common Lisp counterpart to share a
-theme with. A rule declares its `dialect_scope`, and the dispatcher skips one
-whose scope excludes the file's dialect before walking anything.
-Each rule is one directory holding `rule.rs` (what the registry registers),
-`domain.rs` (the detection), `usecase.rs`, and `cli/` (its own `inspect`
-subcommand).
+The 169 shipped rules live in eleven themed packages, split three ways. A
+twelfth, `feature/lint-custom`, holds no rules at all: it is the pattern
+language and the second pass that run the rules a *project* writes for itself.
 
-**`REGISTRY` is in neither.** It names all 143 rules, and every rule depends on
+Six are split by the Lisp syntax they are about —
+`feature/lint-{conditional,sequence,numeric,control-flow,form-shape,string-char}`.
+`feature/lint-emacs-lisp` is split by *dialect*: its rules are about Emacs
+Lisp's own file conventions (`lexical-binding`, `;;;###autoload`, `defcustom`
+options, the `cl.el` names Emacs 27 removed) rather than about S-expression
+shape, so none of them has a Common Lisp counterpart to share a theme with.
+
+The remaining four —
+`feature/lint-{performance,portability,safety,convention}` — are split by the
+*kind of claim* the rule makes rather than by the syntax it reads: cost,
+environment assumptions, what the form does to the world outside it, and what a
+definition says about itself. Grouping those by operator would scatter each
+argument across six packages.
+
+A rule declares its `dialect_scope`, and the dispatcher skips one whose scope
+excludes the file's dialect before walking anything.
+
+Layout inside a package follows what a rule is *shared with*. The seven older
+packages give each rule a directory holding `rule.rs` (what the registry
+registers), `domain.rs` (the detection), `usecase.rs`, and `cli/` — because
+each of those rules also has its own standalone `inspect <rule>` command, and
+the split is what lets the command and the rule share one detection. The four
+newer packages give each rule a single module: they ship as lint rules only,
+reachable through `inspect lint --rule <name>`, so there is one consumer and
+the three-file split would be indirection with nothing on the other end.
+
+**`REGISTRY` is in neither.** It names all 169 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.
+
+**Custom rules cannot be in `REGISTRY` either**, for a different reason:
+`RuleCatalog` holds `&'static [RuleEntry]` so the four derived arrays can be
+computed at compile time, and a rule read from a file at startup has no
+`'static` lifetime to offer. They run as a second pass whose findings are
+merged into the report, and the merge is two functions in
+`src/presentation/cli/lint_report/workflow.rs`. The two passes share the
+finding type — so every output mode renders both — and nothing else.
 
 Adding a rule touches exactly three places:
 

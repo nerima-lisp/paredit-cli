@@ -14,22 +14,28 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::domain::dialect::Dialect;
+use crate::domain::lint::engine::PassOptions;
+pub use crate::domain::lint::engine::RuleTimings;
 pub use crate::domain::lint::model::RuleFix;
 use crate::domain::lint::policy::RuleSelection;
 use crate::domain::lint::registry::catalog;
 use crate::domain::sexpr::{ByteSpan, SyntaxTree};
 
 pub use crate::domain::lint::model::{
-    LintFinding, LintPolicy, LintPolicyOptions, LintSummary, Severity,
+    FindingId, LintFinding, LintPolicy, LintPolicyOptions, LintSummary, RuleExample,
+    RuleExplanation, RuleSetting, RuleSettings, RuleTag, RuleTags, Severity,
 };
+pub use crate::domain::lint::policy::{RuleFilter, RulePreset, SeverityOverrides};
 // The registry-injecting wrappers, not the raw `policy` functions: those now
 // take the catalogue explicitly so the engine can live without a registry.
 pub use crate::domain::lint::registry::catalog::{
-    CATEGORIES, FIXABLE_RULES, RULE_DOCS, RULES, WARNING_RULES, rule_description, rule_is_fixable,
-    rule_severity,
+    CATEGORIES, EXPERIMENTAL_RULES, FIXABLE_RULES, PEDANTIC_RULES, RULE_DOCS, RULES, TAGS,
+    WARNING_RULES, rule_description, rule_dialects, rule_explanation, rule_is_fixable,
+    rule_setting, rule_settings, rule_severity, rule_tags,
 };
 pub use crate::domain::lint::{
-    evaluate_lint_policy, lint_gate_violations, resolve_active_rules, summarize_lint_findings,
+    apply_severity_override, evaluate_lint_policy, lint_gate_violations, overridden_rule_severity,
+    resolve_active_rules, summarize_lint_findings,
 };
 
 /// One rule's rewrite for one finding: the rule that offered it and the span
@@ -136,6 +142,84 @@ pub fn collect_lint_findings_and_fixes(
     Ok((findings, fixes))
 }
 
+/// What one file's pass should compute beyond the findings themselves.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LintPassRequest<'a> {
+    /// The rules allowed to contribute a *fix*. Findings are always collected
+    /// for every rule, because a report covers the whole suite and filters
+    /// afterwards; a fix from an unselected rule must never reach a file.
+    pub active: &'a [&'a str],
+    /// The caller's `--rule-arg` overrides.
+    pub settings: Option<&'a RuleSettings>,
+    /// Whether to time each rule (`--timings`).
+    pub measure: bool,
+}
+
+/// One file's pass: every finding, the selected rules' fixes, and — when asked
+/// for — what each rule cost.
+#[derive(Debug)]
+pub struct LintPassResult {
+    pub findings: Vec<LintFinding>,
+    pub fixes: Vec<RuleFixFor>,
+    pub timings: Option<RuleTimings>,
+}
+
+/// Runs the suite over one file and returns everything a report can need from
+/// a single walk.
+///
+/// The three narrower collectors above predate the per-run knobs and remain
+/// because they read better at their call sites; each is this function with
+/// two of the three outputs discarded. Every output path that needs more than
+/// one of them goes through here, so no path walks a file twice.
+pub fn run_lint_pass(
+    path: &Path,
+    dialect: Dialect,
+    tree: &SyntaxTree,
+    source: &str,
+    request: LintPassRequest<'_>,
+) -> Result<LintPassResult> {
+    let outcome = crate::domain::lint::collect_lint_pass(
+        path,
+        dialect,
+        tree,
+        source,
+        RuleSelection::All,
+        PassOptions {
+            settings: request.settings,
+            measure: request.measure,
+        },
+    )?;
+
+    let mut findings = Vec::with_capacity(outcome.outcomes.len());
+    let mut fixes = Vec::new();
+    for item in outcome.outcomes {
+        let (finding, fix) = item.into_parts();
+        if let Some(fix) = fix.filter(|_| request.active.contains(&finding.rule)) {
+            fixes.push((finding.rule, finding.span, fix));
+        }
+        findings.push(finding);
+    }
+    Ok(LintPassResult {
+        findings,
+        fixes,
+        timings: outcome.timings,
+    })
+}
+
+/// Pairs a timing table with the rule names it is indexed by.
+///
+/// [`RuleTimings`] is indexed by registration position and never names a rule
+/// — the engine has no registry. `RULES` is derived from the same registry in
+/// the same order, so the join is an index, and doing it here keeps the
+/// invariant "these two arrays agree" in the module that owns both.
+#[must_use]
+pub fn rule_timing_report(timings: &RuleTimings) -> Vec<(&'static str, std::time::Duration, u64)> {
+    timings
+        .entries()
+        .map(|(position, elapsed, invocations)| (RULES[position], elapsed, invocations))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -197,6 +281,52 @@ mod tests {
     }
 
     #[test]
+    fn every_tagged_rule_is_a_real_rule() {
+        for rule in EXPERIMENTAL_RULES {
+            assert!(RULES.contains(&rule), "{rule} is not in RULES");
+            assert!(rule_tags(rule).contains(RuleTag::Experimental));
+        }
+        for rule in PEDANTIC_RULES {
+            assert!(RULES.contains(&rule), "{rule} is not in RULES");
+            assert!(rule_tags(rule).contains(RuleTag::Pedantic));
+        }
+    }
+
+    #[test]
+    fn a_rule_that_declares_a_setting_declares_it_completely() {
+        for rule in RULES {
+            let mut keys = Vec::new();
+            for setting in rule_settings(rule) {
+                assert!(
+                    !setting.description().is_empty(),
+                    "{rule}.{} has no description",
+                    setting.key()
+                );
+                assert!(
+                    rule_setting(rule, setting.key()).is_some(),
+                    "{rule}.{} is not findable by key",
+                    setting.key()
+                );
+                keys.push(setting.key());
+            }
+            let unique: std::collections::BTreeSet<&str> = keys.iter().copied().collect();
+            assert_eq!(unique.len(), keys.len(), "{rule} declares a key twice");
+        }
+    }
+
+    #[test]
+    fn every_rule_reports_at_least_one_dialect() {
+        // A rule scoped to no dialect can never fire, which is a registration
+        // mistake no other test would notice.
+        for rule in RULES {
+            assert!(
+                !rule_dialects(rule).is_empty(),
+                "{rule} is scoped to no dialect"
+            );
+        }
+    }
+
+    #[test]
     fn aggregates_findings_from_multiple_rules() {
         let found = findings("(progn (setq x x) (eql y \"z\"))");
         let rules: Vec<&str> = found.iter().map(|finding| finding.rule).collect();
@@ -207,8 +337,11 @@ mod tests {
 
     #[test]
     fn a_clean_file_has_no_findings() {
-        let found = findings("(defun f (x y) (+ x y))");
-        assert!(found.is_empty());
+        // Documented, because `missing-docstring` is one of the rules being
+        // run: this collector applies every rule, and the preset that would
+        // normally hold that one back is a *selection* concern above it.
+        let found = findings(r#"(defun f (x y) "Add X and Y." (+ x y))"#);
+        assert!(found.is_empty(), "unexpected findings: {found:?}");
     }
 
     #[test]
@@ -226,30 +359,57 @@ mod tests {
         assert_eq!(summary.finding_count, 1);
     }
 
+    /// The historical three selectors, which is what most of these tests vary.
+    fn resolve(only: &[String], exclude: &[String], categories: &[String]) -> Vec<&'static str> {
+        resolve_active_rules(&RuleFilter::named(only, exclude, categories)).expect("resolve")
+    }
+
+    /// Every rule the default preset admits — which is every shipped rule that
+    /// carries neither the `pedantic` nor the `experimental` tag.
+    fn recommended() -> Vec<&'static str> {
+        RULES
+            .iter()
+            .copied()
+            .filter(|rule| {
+                !rule_tags(rule).contains(RuleTag::Pedantic)
+                    && !rule_tags(rule).contains(RuleTag::Experimental)
+            })
+            .collect()
+    }
+
     #[test]
-    fn resolve_active_rules_defaults_to_every_rule() {
-        let active = resolve_active_rules(&[], &[], &[]).expect("resolve");
-        assert_eq!(active, RULES.to_vec());
+    fn resolve_active_rules_defaults_to_the_recommended_preset() {
+        assert_eq!(resolve(&[], &[], &[]), recommended());
+    }
+
+    #[test]
+    fn the_all_preset_admits_every_shipped_rule() {
+        let filter = RuleFilter {
+            preset: RulePreset::All,
+            ..RuleFilter::default()
+        };
+        assert_eq!(
+            resolve_active_rules(&filter).expect("resolve"),
+            RULES.to_vec()
+        );
     }
 
     #[test]
     fn resolve_active_rules_honors_only() {
-        let active =
-            resolve_active_rules(&["self-assignment".to_owned()], &[], &[]).expect("resolve");
+        let active = resolve(&["self-assignment".to_owned()], &[], &[]);
         assert_eq!(active, vec!["self-assignment"]);
     }
 
     #[test]
     fn resolve_active_rules_honors_exclude() {
-        let active =
-            resolve_active_rules(&[], &["self-assignment".to_owned()], &[]).expect("resolve");
+        let active = resolve(&[], &["self-assignment".to_owned()], &[]);
         assert!(!active.contains(&"self-assignment"));
-        assert_eq!(active.len(), RULES.len() - 1);
+        assert_eq!(active.len(), recommended().len() - 1);
     }
 
     #[test]
     fn resolve_active_rules_honors_category() {
-        let active = resolve_active_rules(&[], &[], &["arity".to_owned()]).expect("resolve");
+        let active = resolve(&[], &[], &["arity".to_owned()]);
         assert_eq!(
             active,
             vec![
@@ -265,8 +425,7 @@ mod tests {
 
     #[test]
     fn resolve_active_rules_category_minus_exclude() {
-        let active = resolve_active_rules(&[], &["if-arity".to_owned()], &["arity".to_owned()])
-            .expect("resolve");
+        let active = resolve(&[], &["if-arity".to_owned()], &["arity".to_owned()]);
         assert_eq!(
             active,
             vec![
@@ -281,12 +440,123 @@ mod tests {
 
     #[test]
     fn resolve_active_rules_rejects_an_unknown_rule() {
-        assert!(resolve_active_rules(&["not-a-rule".to_owned()], &[], &[]).is_err());
+        let only = ["not-a-rule".to_owned()];
+        assert!(resolve_active_rules(&RuleFilter::named(&only, &[], &[])).is_err());
     }
 
     #[test]
     fn resolve_active_rules_rejects_an_unknown_category() {
-        assert!(resolve_active_rules(&[], &[], &["not-a-category".to_owned()]).is_err());
+        let categories = ["not-a-category".to_owned()];
+        assert!(resolve_active_rules(&RuleFilter::named(&[], &[], &categories)).is_err());
+    }
+
+    #[test]
+    fn the_minimal_preset_is_the_error_rules_of_the_recommended_one() {
+        let filter = RuleFilter {
+            preset: RulePreset::Minimal,
+            ..RuleFilter::default()
+        };
+        let minimal = resolve_active_rules(&filter).expect("resolve");
+        let expected: Vec<&str> = recommended()
+            .into_iter()
+            .filter(|rule| rule_severity(rule) == Severity::Error)
+            .collect();
+        assert_eq!(minimal, expected);
+        assert!(!minimal.is_empty());
+        assert!(minimal.len() < recommended().len());
+    }
+
+    #[test]
+    fn severity_overrides_promote_and_demote_against_the_shipped_catalogue() {
+        let mut overrides = SeverityOverrides::new();
+        // redundant-quote ships as a warning; if-arity ships as an error.
+        assert_eq!(
+            overridden_rule_severity(&overrides, "redundant-quote"),
+            Severity::Warning
+        );
+        apply_severity_override(&mut overrides, "redundant-quote", Severity::Error)
+            .expect("known rule");
+        apply_severity_override(&mut overrides, "if-arity", Severity::Warning).expect("known rule");
+        assert_eq!(
+            overridden_rule_severity(&overrides, "redundant-quote"),
+            Severity::Error
+        );
+        assert_eq!(
+            overridden_rule_severity(&overrides, "if-arity"),
+            Severity::Warning
+        );
+        assert!(apply_severity_override(&mut overrides, "no-such-rule", Severity::Error).is_err());
+    }
+
+    #[test]
+    fn a_category_severity_override_reaches_every_rule_in_it() {
+        let mut overrides = SeverityOverrides::new();
+        apply_severity_override(&mut overrides, "arity", Severity::Warning)
+            .expect("known category");
+        for rule in RULES {
+            if rule_category(rule) == Some("arity") {
+                assert_eq!(
+                    overridden_rule_severity(&overrides, rule),
+                    Severity::Warning,
+                    "{rule} was not demoted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn one_pass_answers_findings_fixes_and_timings_together() {
+        let source = "(progn (setq x x) (the t y))";
+        let tree = SyntaxTree::parse(source).expect("parse input");
+        let active = RULES.to_vec();
+        let result = run_lint_pass(
+            &PathBuf::from("test.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            source,
+            LintPassRequest {
+                active: &active,
+                settings: None,
+                measure: true,
+            },
+        )
+        .expect("run pass");
+
+        let rules: Vec<&str> = result.findings.iter().map(|f| f.rule).collect();
+        assert!(rules.contains(&"self-assignment"));
+        assert!(rules.contains(&"redundant-the"));
+        // self-assignment is report-only; redundant-the is fixable.
+        let fixed: Vec<&str> = result.fixes.iter().map(|(rule, _, _)| *rule).collect();
+        assert_eq!(fixed, vec!["redundant-the"]);
+
+        let timings = result.timings.expect("--timings was requested");
+        let report = rule_timing_report(&timings);
+        assert_eq!(report.len(), RULES.len());
+        assert_eq!(report[0].0, RULES[0]);
+        // Every rule the pass ran was invoked at least once on this file.
+        assert!(
+            report
+                .iter()
+                .any(|(rule, _, invocations)| *rule == "redundant-the" && *invocations > 0)
+        );
+    }
+
+    #[test]
+    fn a_pass_that_was_not_asked_to_measure_reports_no_timings() {
+        let source = "(setq x x)";
+        let tree = SyntaxTree::parse(source).expect("parse input");
+        let result = run_lint_pass(
+            &PathBuf::from("test.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            source,
+            LintPassRequest::default(),
+        )
+        .expect("run pass");
+        assert!(result.timings.is_none());
+        // No rule was `active`, so no fix is offered even for a fixable rule.
+        assert!(result.fixes.is_empty());
+        assert_eq!(result.findings.len(), 1);
     }
 
     #[test]
@@ -311,12 +581,47 @@ mod tests {
     fn policy_fails_only_when_flag_set() {
         let summary = summarize_lint_findings(findings("(setq x x)"), &RULES);
 
-        let quiet = evaluate_lint_policy(LintPolicyOptions::new(false, None), &summary);
+        let quiet = evaluate_lint_policy(
+            &SeverityOverrides::new(),
+            LintPolicyOptions::new(false, None),
+            &summary,
+        );
         assert!(quiet.passed);
         assert_eq!(quiet.finding_count, 1);
 
-        let strict = evaluate_lint_policy(LintPolicyOptions::new(true, None), &summary);
+        let strict = evaluate_lint_policy(
+            &SeverityOverrides::new(),
+            LintPolicyOptions::new(true, None),
+            &summary,
+        );
         assert!(!strict.passed);
+    }
+
+    #[test]
+    fn a_denied_rule_trips_a_gate_its_shipped_severity_would_not() {
+        // redundant-quote ships as a warning, so `--fail-on error` passes...
+        let summary = summarize_lint_findings(findings("(list '5)"), &RULES);
+        let options = LintPolicyOptions::new(false, Some(Severity::Error));
+        assert!(evaluate_lint_policy(&SeverityOverrides::new(), options, &summary).passed);
+
+        // ...until the run says otherwise. A `--deny` that changed only the
+        // printed severity would have changed nothing that matters.
+        let mut overrides = SeverityOverrides::new();
+        apply_severity_override(&mut overrides, "redundant-quote", Severity::Error)
+            .expect("known rule");
+        assert!(!evaluate_lint_policy(&overrides, options, &summary).passed);
+    }
+
+    #[test]
+    fn a_warned_rule_stops_tripping_a_gate_its_shipped_severity_would() {
+        let summary = summarize_lint_findings(findings("(incf 5)"), &RULES);
+        let options = LintPolicyOptions::new(false, Some(Severity::Error));
+        assert!(!evaluate_lint_policy(&SeverityOverrides::new(), options, &summary).passed);
+
+        let mut overrides = SeverityOverrides::new();
+        apply_severity_override(&mut overrides, "literal-place", Severity::Warning)
+            .expect("known rule");
+        assert!(evaluate_lint_policy(&overrides, options, &summary).passed);
     }
 
     #[test]
@@ -327,12 +632,12 @@ mod tests {
 
         // --fail-on error trips on the error, not on the warning.
         let opts = LintPolicyOptions::new(false, Some(Severity::Error));
-        assert!(!evaluate_lint_policy(opts, &error_only).passed);
-        assert!(evaluate_lint_policy(opts, &warning_only).passed);
+        assert!(!evaluate_lint_policy(&SeverityOverrides::new(), opts, &error_only).passed);
+        assert!(evaluate_lint_policy(&SeverityOverrides::new(), opts, &warning_only).passed);
 
         // --fail-on warning trips on either (warning is the lower bar).
         let opts = LintPolicyOptions::new(false, Some(Severity::Warning));
-        assert!(!evaluate_lint_policy(opts, &error_only).passed);
-        assert!(!evaluate_lint_policy(opts, &warning_only).passed);
+        assert!(!evaluate_lint_policy(&SeverityOverrides::new(), opts, &error_only).passed);
+        assert!(!evaluate_lint_policy(&SeverityOverrides::new(), opts, &warning_only).passed);
     }
 }

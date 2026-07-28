@@ -4,6 +4,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "redundant-quote/07bb8307b4864109/0",
       "message": "quoting number 5 is redundant",
       "path": "nested.lisp",
       "rule": "redundant-quote",
@@ -16,6 +17,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "redundant-progn/9715182cb9f63314/0",
       "message": "redundant progn: progn wraps a single form; it is equivalent to that form",
       "path": "nested.lisp",
       "rule": "redundant-progn",
@@ -28,6 +30,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "redundant-progn/8d949e5fcf0552a8/0",
       "message": "redundant progn: progn wraps a single form; it is equivalent to that form",
       "path": "nested.lisp",
       "rule": "redundant-progn",
@@ -40,6 +43,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "redundant-progn/d76c6d3cd567aa37/0",
       "message": "redundant progn: progn wraps a single form; it is equivalent to that form",
       "path": "nested.lisp",
       "rule": "redundant-progn",
@@ -52,6 +56,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-progn/32d9beb078a330f2/0",
       "message": "progn with 2 forms is nested directly in another progn; splice its forms in",
       "path": "nested.lisp",
       "rule": "nested-progn",
@@ -64,6 +69,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-progn/92784ad7b319e3e5/0",
       "message": "progn with 2 forms is nested directly in another progn; splice its forms in",
       "path": "nested.lisp",
       "rule": "nested-progn",
@@ -76,6 +82,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-when/01c713b3cc5714bd/0",
       "message": "when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)",
       "path": "nested.lisp",
       "rule": "nested-when",
@@ -88,6 +95,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-when/47f3cc8d19ddaaf5/0",
       "message": "when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)",
       "path": "nested.lisp",
       "rule": "nested-when",
@@ -100,6 +108,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-unless/835cbf88e8f4a683/0",
       "message": "unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)",
       "path": "nested.lisp",
       "rule": "nested-unless",
@@ -112,6 +121,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-unless/4f88eac26094a26d/0",
       "message": "unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)",
       "path": "nested.lisp",
       "rule": "nested-unless",
@@ -124,6 +134,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-boolean/f45659592901beaf/0",
       "message": "and nested in a and flattens; its operands splice in",
       "path": "nested.lisp",
       "rule": "nested-boolean",
@@ -136,6 +147,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-boolean/d0023e693387d698/0",
       "message": "or nested in a or flattens; its operands splice in",
       "path": "nested.lisp",
       "rule": "nested-boolean",
@@ -148,6 +160,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-cxr/711a5272cecca21e/0",
       "message": "nested car/cdr accessors combine into (cadr …)",
       "path": "nested.lisp",
       "rule": "nested-cxr",
@@ -160,6 +173,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "nested-cxr/3c85de2e7690aceb/0",
       "message": "nested car/cdr accessors combine into (cddr …)",
       "path": "nested.lisp",
       "rule": "nested-cxr",
@@ -172,6 +186,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "redundant-body-progn/cf5441812f2f8395/0",
       "message": "progn with 3 forms is a defun body; splice its forms in",
       "path": "nested.lisp",
       "rule": "redundant-body-progn",
@@ -184,6 +199,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "redundant-body-progn/656d6b2196b97388/0",
       "message": "progn with 2 forms is a when body; splice its forms in",
       "path": "nested.lisp",
       "rule": "redundant-body-progn",
@@ -196,6 +212,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "empty-let/dc954b1687c1363e/0",
       "message": "let with no bindings is just progn; (let () body) is (progn body)",
       "path": "nested.lisp",
       "rule": "empty-let",
@@ -208,6 +225,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "redundant-let-star/0f0bdbf55650550e/0",
       "message": "let* with 1 binding is just let; sequential scope is unused",
       "path": "nested.lisp",
       "rule": "redundant-let-star",
@@ -220,6 +238,7 @@
     {
       "category": "suspicious",
       "fixable": true,
+      "id": "single-operand-boolean/242e39c274656eed/0",
       "message": "or has a single operand; (or X) is just X",
       "path": "nested.lisp",
       "rule": "single-operand-boolean",
@@ -1034,6 +1053,138 @@
       "count": 0,
       "description": "a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b))",
       "rule": "list-star-nil"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a (length …) call used only to decide whether a sequence is empty, which walks the whole sequence",
+      "rule": "length-emptiness-test"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a loop that grows a sequence by appending to its own accumulated value, which is quadratic",
+      "rule": "quadratic-accumulation"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a loop that linearly searches the same collection on every round, which is quadratic",
+      "rule": "linear-search-in-loop"
+    },
+    {
+      "category": "allocation",
+      "count": 0,
+      "description": "a copy-seq/copy-list result passed to an operator that only reads it, so the copy is garbage",
+      "rule": "unnecessary-copy"
+    },
+    {
+      "category": "allocation",
+      "count": 0,
+      "description": "a fresh copy fed to a destructive operator, where one non-destructive operator does both",
+      "rule": "copy-before-destructive"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a symbol from an implementation's own package, outside any reader conditional guarding it",
+      "rule": "implementation-package-symbol"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a filesystem call given a string that spells one host's path syntax",
+      "rule": "unportable-pathname"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a (code-char N) call with a literal code, which assumes ASCII and hides which character it means",
+      "rule": "ascii-code-char"
+    },
+    {
+      "category": "numeric-precision",
+      "count": 0,
+      "description": "an exact equality test against a float literal, whose result depends on rounding upstream",
+      "rule": "float-equality"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a function body assigning to a *special-looking* global, which is shared mutable state",
+      "rule": "global-mutation-in-function"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a conditional that tests a place and then assigns to the same place, which another thread can interleave",
+      "rule": "check-then-act"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "an eval, intern, or read-from-string whose argument is not a literal the source shows",
+      "rule": "eval-of-non-constant"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a read of external data with no enclosing *read-eval* nil binding, so #. in the input executes",
+      "rule": "read-without-read-eval-guard"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a subprocess launched with a command line built by format or concatenate, which a value can escape",
+      "rule": "subprocess-string-building"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a let-bound (open …) stream with no unwind-protect, so a non-local exit leaks the handle",
+      "rule": "unclosed-stream"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a with-open-file whose last body form is the stream, which the form has already closed",
+      "rule": "stream-escapes-with-open-file"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a handler-case clause on a broad condition type whose body discards the condition entirely",
+      "rule": "handler-case-swallows-error"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a handler-case clause whose condition type an earlier clause already covers, so it never runs",
+      "rule": "unreachable-handler-clause"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "an (ignore x) declaration whose variable the body uses, or which names no parameter at all",
+      "rule": "ignore-declaration-conflict"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "an optimize declaration naming one quality twice with different values",
+      "rule": "contradictory-optimize"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a defclass slot option that is not one of the standard ones, or an :initarg that is not a keyword",
+      "rule": "defclass-slot-option"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a defmethod whose required-parameter count differs from its defgeneric in the same file",
+      "rule": "method-lambda-list-mismatch"
     },
     {
       "category": "suspicious",

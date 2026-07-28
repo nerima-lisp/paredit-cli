@@ -133,6 +133,28 @@ rule	getf-default-nil	1
 rule	make-array-default-keyword	1
 rule	nested-char-case	1
 rule	list-star-nil	1
+rule	length-emptiness-test	0
+rule	quadratic-accumulation	0
+rule	linear-search-in-loop	0
+rule	unnecessary-copy	0
+rule	copy-before-destructive	0
+rule	implementation-package-symbol	0
+rule	unportable-pathname	0
+rule	ascii-code-char	0
+rule	float-equality	0
+rule	global-mutation-in-function	0
+rule	check-then-act	0
+rule	eval-of-non-constant	0
+rule	read-without-read-eval-guard	0
+rule	subprocess-string-building	0
+rule	unclosed-stream	0
+rule	stream-escapes-with-open-file	0
+rule	handler-case-swallows-error	0
+rule	unreachable-handler-clause	0
+rule	ignore-declaration-conflict	0
+rule	contradictory-optimize	0
+rule	defclass-slot-option	0
+rule	method-lambda-list-mismatch	0
 rule	elisp-missing-lexical-binding	0
 rule	elisp-unreachable-lexical-binding	0
 rule	elisp-autoload-cookie-without-form	0
@@ -142,140 +164,140 @@ rule	elisp-obsolete-cl-alias	0
 rule	elisp-quoted-lambda	0
 rule	elisp-interactive-in-macro	0
 rule	elisp-condition-case-without-handler	0
-finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself
-finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead
-finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count
-finding	setq-non-variable	error	malformed	fixable=false	broad.lisp	7092	setq place (car x) is not a variable
-finding	manual-incf	warning	suspicious	fixable=true	broad.lisp	3644	setf manually adjusts a variable; use incf
-finding	manual-push	warning	suspicious	fixable=true	broad.lisp	3710	setf conses onto a variable; use push
-finding	manual-pushnew	warning	suspicious	fixable=true	broad.lisp	3776	setf adjoins onto a variable; use pushnew
-finding	explicit-step-delta	warning	suspicious	fixable=true	broad.lisp	2773	incf delta of 1 is the default; (incf x 1) is (incf x)
-finding	negated-step-delta	warning	suspicious	fixable=true	broad.lisp	2847	negative delta flips the operator; use decf with a positive delta
-finding	explicit-nil-return	warning	suspicious	fixable=true	broad.lisp	2920	return-from nil result is the default; drop the redundant nil
-finding	cons-to-list	warning	suspicious	fixable=true	broad.lisp	1223	cons onto nil/a list is a list constructor; use list
-finding	double-reverse	warning	suspicious	fixable=true	broad.lisp	1290	(reverse (reverse x)) is a wasteful copy; use (copy-seq x)
-finding	modify-macro-arity	error	arity	fixable=false	broad.lisp	7158	incf takes 1 or 2 argument(s) but has 3
-finding	duplicate-parameters	error	duplicate	fixable=false	broad.lisp	7231	scale names parameter factor more than once (2×)
-finding	duplicate-lambda-list-keyword	error	duplicate	fixable=false	broad.lisp	7306	dupkw repeats lambda-list keyword &optional (2×)
-finding	lambda-list-keyword-order	error	malformed	fixable=false	broad.lisp	7390	kworder lists lambda-list keyword &optional after &key
-finding	redundant-quote	warning	suspicious	fixable=true	broad.lisp	438	quoting number 5 is redundant
-finding	redundant-progn	warning	suspicious	fixable=true	broad.lisp	502	redundant progn: progn wraps a single form; it is equivalent to that form
-finding	nested-progn	warning	suspicious	fixable=true	broad.lisp	581	progn with 2 forms is nested directly in another progn; splice its forms in
-finding	nested-when	warning	suspicious	fixable=true	broad.lisp	3135	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)
-finding	nested-unless	warning	suspicious	fixable=true	broad.lisp	3201	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)
-finding	nested-boolean	warning	suspicious	fixable=true	broad.lisp	3073	or nested in a or flattens; its operands splice in
-finding	nested-cxr	warning	suspicious	fixable=true	broad.lisp	3845	nested car/cdr accessors combine into (cadr …)
-finding	nth-constant-index	warning	suspicious	fixable=true	broad.lisp	3910	nth with a constant index; use (first …)
-finding	nthcdr-zero	warning	suspicious	fixable=true	broad.lisp	3983	nthcdr with a zero count returns the list unchanged; (nthcdr 0 x) is x
-finding	nthcdr-small-index	warning	suspicious	fixable=true	broad.lisp	4049	nthcdr with a small count has a named cdr accessor; use (cddr …)
-finding	redundant-body-progn	warning	suspicious	fixable=true	broad.lisp	665	progn with 2 forms is a when body; splice its forms in
-finding	empty-let	warning	suspicious	fixable=true	broad.lisp	732	let with no bindings is just progn; (let () body) is (progn body)
-finding	redundant-if-nil	warning	suspicious	fixable=true	broad.lisp	796	if else branch is a redundant nil; (if c x nil) is (if c x)
-finding	redundant-let-star	warning	suspicious	fixable=true	broad.lisp	2559	let* with 1 binding is just let; sequential scope is unused
-finding	redundant-funcall	warning	suspicious	fixable=true	broad.lisp	867	funcall of #'g is a direct call; (funcall #'g …) is (g …)
-finding	redundant-the	warning	suspicious	fixable=true	broad.lisp	939	(the t form) is a vacuous type declaration; it is just form
-finding	funcall-lambda	warning	suspicious	fixable=true	broad.lisp	1007	funcall of a lambda applies it directly; ((lambda …) …) drops the funcall
-finding	sharp-quoted-lambda	warning	suspicious	fixable=true	broad.lisp	1084	#' on a lambda is redundant; #'(lambda …) is (lambda …)
-finding	redundant-identity	warning	suspicious	fixable=true	broad.lisp	1150	identity returns its argument unchanged; (identity x) is x
-finding	redundant-apply	warning	suspicious	fixable=true	broad.lisp	4122	apply of #'g to a literal list is a direct call; use (g …)
-finding	redundant-eql-test	warning	suspicious	fixable=true	broad.lisp	4192	find defaults :test to eql; the explicit :test #'eql is redundant
-finding	redundant-identity-key	warning	suspicious	fixable=true	broad.lisp	5452	sort defaults :key to identity; the explicit :key #'identity is redundant
-finding	negated-when-unless	warning	suspicious	fixable=true	broad.lisp	3503	when test is (not …); use unless on the un-negated test
-finding	negated-comparison	warning	suspicious	fixable=true	broad.lisp	5599	negated comparison has a complement operator; use >=
-finding	negated-if	warning	suspicious	fixable=true	broad.lisp	5672	if test is negated; (if (not c) a b) is (if c b a)
-finding	if-to-or	warning	suspicious	fixable=true	broad.lisp	5737	if returns its test or the else; (if x x y) is (or x y)
-finding	if-not	warning	suspicious	fixable=true	broad.lisp	5800	if with then=nil and else=t is a negation; (if test nil t) is (not test)
-finding	one-step-arithmetic	warning	suspicious	fixable=true	broad.lisp	6155	add/subtract of 1 has a shorthand; use 1+
-finding	one-armed-if	warning	suspicious	fixable=true	broad.lisp	3577	if has no else branch; (if test then) is (when test then)
-finding	self-comparison	error	suspicious	fixable=false	broad.lisp	7476	eq compares operand status with itself
-finding	nil-comparison	warning	suspicious	fixable=true	broad.lisp	6518	equal against nil is a null test; use (null X)
-finding	t-comparison	warning	suspicious	fixable=false	broad.lisp	7558	eq against t matches only the symbol T, not any true value
-finding	identical-if-branches	error	dead-code	fixable=false	broad.lisp	7607	if branches are identical: (foo x)
-finding	constant-if-test	warning	dead-code	fixable=true	broad.lisp	6229	if test is the constant t; one branch is dead
-finding	constant-when-test	warning	dead-code	fixable=true	broad.lisp	6300	when test is the constant t; the body always runs, so this is a progn
-finding	if-arity	error	arity	fixable=false	broad.lisp	6735	if takes 2 or 3 arguments but has 4
-finding	the-arity	error	arity	fixable=false	broad.lisp	7683	the takes exactly 2 arguments (a type and a form) but has 1
-finding	equality-arity	error	arity	fixable=false	broad.lisp	7747	eq takes exactly 2 arguments but has 1
-finding	accessor-arity	error	arity	fixable=false	broad.lisp	7816	gethash takes 2 or 3 argument(s) but has 1
-finding	append-list-to-cons	warning	suspicious	fixable=true	broad.lisp	1359	a one-element append is just a cons; (append (list x) rest) is (cons x rest)
-finding	format-to-string	warning	suspicious	fixable=true	broad.lisp	1433	format to a string is just princ-to-string; use (princ-to-string x)
-finding	format-newline	warning	suspicious	fixable=true	broad.lisp	1504	(format t "~%") just writes a newline; use (terpri)
-finding	redundant-divisor	warning	suspicious	fixable=true	broad.lisp	1573	the divisor defaults to 1; (floor x 1) is (floor x)
-finding	duplicate-case-keys	error	duplicate	fixable=false	broad.lisp	7885	case repeats key :a (2×)
-finding	quoted-case-key	error	suspicious	fixable=false	broad.lisp	7970	case key 'apple is quoted; case keys are not evaluated
-finding	quoted-case-key	error	suspicious	fixable=false	broad.lisp	7986	case key 'carrot is quoted; case keys are not evaluated
-finding	case-nil-key	error	dead-code	fixable=false	broad.lisp	8038	case clause key nil is the empty key list and never matches; use ((nil) …)
-finding	typecase-nil-key	error	dead-code	fixable=false	broad.lisp	8109	typecase clause type nil is the empty type and never matches; use null
-finding	malformed-case-clause	error	malformed	fixable=false	broad.lisp	8184	case clause 2 is not a non-empty list
-finding	malformed-case-clause	error	malformed	fixable=false	broad.lisp	8186	case clause :two is not a non-empty list
-finding	unreachable-case-clause	error	dead-code	fixable=false	broad.lisp	8269	case has 1 unreachable clause(s) after a t/otherwise catch-all
-finding	exhaustive-case-otherwise	error	malformed	fixable=false	broad.lisp	8339	ecase does not permit a t clause (it is exhaustive)
-finding	duplicate-cond-tests	error	duplicate	fixable=false	broad.lisp	8401	cond repeats test (foo) (2×)
-finding	unreachable-cond-clause	error	dead-code	fixable=false	broad.lisp	8498	cond has 1 unreachable clause(s) after a t clause
-finding	malformed-cond-clause	error	malformed	fixable=false	broad.lisp	8595	cond clause :zero is not a non-empty list
-finding	duplicate-let-bindings	error	duplicate	fixable=false	broad.lisp	8630	let binds x more than once (2×)
-finding	malformed-let-binding	error	malformed	fixable=false	broad.lisp	8713	let binding (x 1 y 2) has 4 elements; expected a symbol or (var value)
-finding	binds-constant	error	malformed	fixable=false	broad.lisp	8789	let cannot bind the constant nil
-finding	binds-constant	error	malformed	fixable=false	broad.lisp	8797	let cannot bind the constant :status
-finding	malformed-iteration-spec	error	malformed	fixable=false	broad.lisp	8860	dolist spec (x) must be (var form [result])
-finding	eval-when-situation	error	malformed	fixable=false	broad.lisp	8961	eval-when situation :executee is not valid
-finding	duplicate-boolean-operands	error	duplicate	fixable=false	broad.lisp	9005	or repeats operand x (2×)
-finding	dead-boolean-operand	error	dead-code	fixable=false	broad.lisp	9086	and short-circuits at literal nil; later operands are dead
-finding	redundant-boolean-identity	warning	suspicious	fixable=true	broad.lisp	6373	and has a redundant t operand; drop it
-finding	de-morgan	warning	suspicious	fixable=true	broad.lisp	6454	and of negations collapses by De Morgan to (not (or …))
-finding	single-operand-boolean	warning	suspicious	fixable=true	broad.lisp	3269	and has a single operand; (and X) is just X
-finding	single-operand-list-op	warning	suspicious	fixable=true	broad.lisp	3346	append of one argument returns it unchanged; (append x) is x
-finding	single-operand-arithmetic	warning	suspicious	fixable=true	broad.lisp	3423	* has a single operand; (* X) is just X
-finding	eql-string-comparison	error	suspicious	fixable=false	broad.lisp	9167	eql compares against string literal "root"
-finding	eql-list-comparison	error	suspicious	fixable=false	broad.lisp	9243	eql compares against quoted list literal (:a :b)
-finding	eql-search-literal	error	suspicious	fixable=false	broad.lisp	9336	member searches for literal "x" with the default eql test; add :test
-finding	eq-number-comparison	error	suspicious	fixable=true	broad.lisp	6587	eq compares against number literal 7
-finding	eq-char-comparison	error	suspicious	fixable=true	broad.lisp	6662	eq compares against character literal #\a; use eql or char=
-finding	single-arg-comparison	error	suspicious	fixable=false	broad.lisp	9411	< has a single argument; the comparison is always true (missing an operand?)
-finding	sign-comparison	warning	suspicious	fixable=true	broad.lisp	5529	comparison against 0 has a dedicated predicate; use zerop
-finding	single-clause-cond	warning	suspicious	fixable=true	broad.lisp	2632	single-clause cond with a body is just when; (cond (test a b)) is (when test a b)
-finding	cond-t-clause	warning	suspicious	fixable=true	broad.lisp	2705	single t-clause cond is just progn; (cond (t a b)) is (progn a b)
-finding	single-value-bind	warning	suspicious	fixable=true	broad.lisp	2994	multiple-value-bind of one variable is just let; (multiple-value-bind (x) f body) is (let ((x f)) body)
-finding	format-missing-destination	error	suspicious	fixable=false	broad.lisp	9483	format destination is the string literal "~a~%"; a nil/t/stream destination is missing
-finding	literal-place	error	malformed	fixable=false	broad.lisp	9560	incf place 5 is a literal and cannot be modified
-finding	destructive-literal	error	suspicious	fixable=false	broad.lisp	9628	nreverse destructively modifies quoted literal (a b c) (undefined behavior)
-finding	char-op-string	error	malformed	fixable=false	broad.lisp	9711	char= is given string literal "a"; it requires a character (type error)
-finding	empty-body	warning	suspicious	fixable=false	broad.lisp	9778	when has no body; the test/spec runs, then nothing
-finding	identity-arithmetic	warning	suspicious	fixable=false	broad.lisp	9840	+ has a redundant identity operand 0 (it does nothing)
-finding	verbose-negation	warning	suspicious	fixable=true	broad.lisp	1645	negation written the long way; use (- x)
-finding	list-star-to-cons	warning	suspicious	fixable=true	broad.lisp	1716	a two-argument list* is just a cons; (list* a b) is (cons a b)
-finding	values-list-of-list	warning	suspicious	fixable=true	broad.lisp	1788	values-list of a fresh list is just values; (values-list (list a b)) is (values a b)
-finding	redundant-prog1	warning	suspicious	fixable=true	broad.lisp	1862	a prog1 wrapping a single form is just that form; (prog1 x) is x
-finding	subseq-zero	warning	suspicious	fixable=true	broad.lisp	1932	a subseq from index 0 copies the whole sequence; (subseq seq 0) is (copy-seq seq)
-finding	car-nthcdr	warning	suspicious	fixable=true	broad.lisp	1998	car of an nthcdr is nth; (car (nthcdr n x)) is (nth n x)
-finding	car-reverse	warning	suspicious	fixable=true	broad.lisp	2063	car of a reverse copies the whole list to read one element; use (car (last x))
-finding	append-nil	warning	suspicious	fixable=true	broad.lisp	2129	append with a nil tail is a fresh copy; (append x nil) is (copy-list x)
-finding	multiple-value-list-of-values	warning	suspicious	fixable=true	broad.lisp	2194	multiple-value-list of a values form is just list; (multiple-value-list (values a b)) is (list a b)
-finding	typep-predicate	warning	suspicious	fixable=true	broad.lisp	2278	typep against this type has a dedicated predicate; use (stringp x)
-finding	coerce-to-t	warning	suspicious	fixable=true	broad.lisp	2348	coerce to type t returns the object unchanged; (coerce x t) is x
-finding	gethash-default	warning	suspicious	fixable=true	broad.lisp	2414	the gethash default is nil; (gethash k h nil) is (gethash k h)
-finding	make-hash-table-test	warning	suspicious	fixable=true	broad.lisp	2484	the make-hash-table :test defaults to eql; drop the explicit :test 'eql
-finding	zero-divisor	warning	suspicious	fixable=false	broad.lisp	9892	/ by a literal 0 always signals division-by-zero
-finding	duplicate-keyword	warning	duplicate	fixable=false	broad.lisp	9959	keyword :x is passed more than once; the leftmost value wins
-finding	defpackage-quoted	warning	malformed	fixable=false	broad.lisp	10031	defpackage does not evaluate its options; drop the quote in the :export clause
-finding	step-zero	warning	suspicious	fixable=false	broad.lisp	10103	incf by 0 is a no-op that changes nothing
-finding	if-to-unless	warning	suspicious	fixable=true	broad.lisp	5861	an if with a nil then-branch is an unless; (if c nil e) is (unless c e)
-finding	prog2-to-progn	warning	suspicious	fixable=true	broad.lisp	5928	a two-form prog2 is just progn; (prog2 a b) is (progn a b)
-finding	handler-case-no-clauses	warning	suspicious	fixable=true	broad.lisp	5997	a handler-case with no clauses is just its body; (handler-case x) is x
-finding	unwind-protect-no-cleanup	warning	suspicious	fixable=true	broad.lisp	6075	an unwind-protect with no cleanup is just its body; (unwind-protect x) is x
-finding	redundant-start-zero	warning	suspicious	fixable=true	broad.lisp	4265	find :start defaults to 0; drop the explicit :start 0
-finding	redundant-end-nil	warning	suspicious	fixable=true	broad.lisp	4340	find :end defaults to nil; drop the explicit :end nil
-finding	redundant-from-end-nil	warning	suspicious	fixable=true	broad.lisp	4412	find :from-end defaults to nil; drop the explicit :from-end nil
-finding	redundant-count-nil	warning	suspicious	fixable=true	broad.lisp	4489	remove :count defaults to nil; drop the explicit :count nil
-finding	string-case-fold	warning	suspicious	fixable=true	broad.lisp	4563	case-folding both sides of string= is case-insensitive; use string-equal
-finding	char-case-fold	warning	suspicious	fixable=true	broad.lisp	4634	case-folding both sides of char= is case-insensitive; use char-equal
-finding	nested-string-case	warning	suspicious	fixable=true	broad.lisp	4703	the outer string case op dominates; the inner one is dead work
-finding	code-char-char-code	warning	suspicious	fixable=true	broad.lisp	4776	code-char of char-code is a round-trip; (code-char (char-code c)) is c
-finding	last-default-count	warning	suspicious	fixable=true	broad.lisp	4850	explicit count of 1 restates last's default; (last x 1) is (last x)
-finding	butlast-default-count	warning	suspicious	fixable=true	broad.lisp	4923	explicit count of 1 restates butlast's default; (butlast x 1) is (butlast x)
-finding	make-list-default-element	warning	suspicious	fixable=true	broad.lisp	4999	explicit :initial-element nil restates make-list's default; drop it
-finding	parse-integer-default-radix	warning	suspicious	fixable=true	broad.lisp	5079	explicit :radix 10 restates parse-integer's default; drop it
-finding	getf-default-nil	warning	suspicious	fixable=true	broad.lisp	5161	explicit nil default restates getf's default; (getf p k nil) is (getf p k)
-finding	make-array-default-keyword	warning	suspicious	fixable=true	broad.lisp	5232	explicit :adjustable nil restates make-array's default; drop it
-finding	nested-char-case	warning	suspicious	fixable=true	broad.lisp	5313	the outer char case op dominates; the inner one is dead work
-finding	list-star-nil	warning	suspicious	fixable=true	broad.lisp	5384	list* with a nil tail is a spelled-out list; (list* a b nil) is (list a b)
+finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself	self-assignment/5f1a5b802aa99b47/0
+finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead	duplicate-setf-places/8104810ed815b9fd/0
+finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count	setf-arity/b0a5b422aad6d4d2/0
+finding	setq-non-variable	error	malformed	fixable=false	broad.lisp	7092	setq place (car x) is not a variable	setq-non-variable/93a38b0abb06fba2/0
+finding	manual-incf	warning	suspicious	fixable=true	broad.lisp	3644	setf manually adjusts a variable; use incf	manual-incf/e9cc51bb9767dcb7/0
+finding	manual-push	warning	suspicious	fixable=true	broad.lisp	3710	setf conses onto a variable; use push	manual-push/4847791ff6aa61f5/0
+finding	manual-pushnew	warning	suspicious	fixable=true	broad.lisp	3776	setf adjoins onto a variable; use pushnew	manual-pushnew/1e8f91739c283b2f/0
+finding	explicit-step-delta	warning	suspicious	fixable=true	broad.lisp	2773	incf delta of 1 is the default; (incf x 1) is (incf x)	explicit-step-delta/00a1f8d32f2b1a3f/0
+finding	negated-step-delta	warning	suspicious	fixable=true	broad.lisp	2847	negative delta flips the operator; use decf with a positive delta	negated-step-delta/c72d843010c3cb77/0
+finding	explicit-nil-return	warning	suspicious	fixable=true	broad.lisp	2920	return-from nil result is the default; drop the redundant nil	explicit-nil-return/83c6c0866319952f/0
+finding	cons-to-list	warning	suspicious	fixable=true	broad.lisp	1223	cons onto nil/a list is a list constructor; use list	cons-to-list/30734641edf18c29/0
+finding	double-reverse	warning	suspicious	fixable=true	broad.lisp	1290	(reverse (reverse x)) is a wasteful copy; use (copy-seq x)	double-reverse/64abc2d4def62155/0
+finding	modify-macro-arity	error	arity	fixable=false	broad.lisp	7158	incf takes 1 or 2 argument(s) but has 3	modify-macro-arity/1c9711db871ff5e7/0
+finding	duplicate-parameters	error	duplicate	fixable=false	broad.lisp	7231	scale names parameter factor more than once (2×)	duplicate-parameters/fc20fd38e853fe41/0
+finding	duplicate-lambda-list-keyword	error	duplicate	fixable=false	broad.lisp	7306	dupkw repeats lambda-list keyword &optional (2×)	duplicate-lambda-list-keyword/2f60a48b9e4ef7e3/0
+finding	lambda-list-keyword-order	error	malformed	fixable=false	broad.lisp	7390	kworder lists lambda-list keyword &optional after &key	lambda-list-keyword-order/617c0a49865251a2/0
+finding	redundant-quote	warning	suspicious	fixable=true	broad.lisp	438	quoting number 5 is redundant	redundant-quote/07bb8307b4864109/0
+finding	redundant-progn	warning	suspicious	fixable=true	broad.lisp	502	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/a2fdba9820c97822/0
+finding	nested-progn	warning	suspicious	fixable=true	broad.lisp	581	progn with 2 forms is nested directly in another progn; splice its forms in	nested-progn/5cd55ce143529b1f/0
+finding	nested-when	warning	suspicious	fixable=true	broad.lisp	3135	when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)	nested-when/3709b9f1558a096d/0
+finding	nested-unless	warning	suspicious	fixable=true	broad.lisp	3201	unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)	nested-unless/374f1c05f4fd74ef/0
+finding	nested-boolean	warning	suspicious	fixable=true	broad.lisp	3073	or nested in a or flattens; its operands splice in	nested-boolean/62bd4b586d0045bf/0
+finding	nested-cxr	warning	suspicious	fixable=true	broad.lisp	3845	nested car/cdr accessors combine into (cadr …)	nested-cxr/109a80ae72e5eb4e/0
+finding	nth-constant-index	warning	suspicious	fixable=true	broad.lisp	3910	nth with a constant index; use (first …)	nth-constant-index/9c4d78c87d9ad119/0
+finding	nthcdr-zero	warning	suspicious	fixable=true	broad.lisp	3983	nthcdr with a zero count returns the list unchanged; (nthcdr 0 x) is x	nthcdr-zero/bfda713e07890a09/0
+finding	nthcdr-small-index	warning	suspicious	fixable=true	broad.lisp	4049	nthcdr with a small count has a named cdr accessor; use (cddr …)	nthcdr-small-index/f273b4ffe8359de6/0
+finding	redundant-body-progn	warning	suspicious	fixable=true	broad.lisp	665	progn with 2 forms is a when body; splice its forms in	redundant-body-progn/bd91eb5e515cc145/0
+finding	empty-let	warning	suspicious	fixable=true	broad.lisp	732	let with no bindings is just progn; (let () body) is (progn body)	empty-let/6f975d0b4722f4eb/0
+finding	redundant-if-nil	warning	suspicious	fixable=true	broad.lisp	796	if else branch is a redundant nil; (if c x nil) is (if c x)	redundant-if-nil/e883c2a7438b14d9/0
+finding	redundant-let-star	warning	suspicious	fixable=true	broad.lisp	2559	let* with 1 binding is just let; sequential scope is unused	redundant-let-star/a18f256659e1ba9a/0
+finding	redundant-funcall	warning	suspicious	fixable=true	broad.lisp	867	funcall of #'g is a direct call; (funcall #'g …) is (g …)	redundant-funcall/80c1c3159cdf3d87/0
+finding	redundant-the	warning	suspicious	fixable=true	broad.lisp	939	(the t form) is a vacuous type declaration; it is just form	redundant-the/2bac242fe26b506b/0
+finding	funcall-lambda	warning	suspicious	fixable=true	broad.lisp	1007	funcall of a lambda applies it directly; ((lambda …) …) drops the funcall	funcall-lambda/673d7cfe29eecb61/0
+finding	sharp-quoted-lambda	warning	suspicious	fixable=true	broad.lisp	1084	#' on a lambda is redundant; #'(lambda …) is (lambda …)	sharp-quoted-lambda/8265b306d04d5a6a/0
+finding	redundant-identity	warning	suspicious	fixable=true	broad.lisp	1150	identity returns its argument unchanged; (identity x) is x	redundant-identity/05affcb5b7734a90/0
+finding	redundant-apply	warning	suspicious	fixable=true	broad.lisp	4122	apply of #'g to a literal list is a direct call; use (g …)	redundant-apply/f5c33aecf2ade963/0
+finding	redundant-eql-test	warning	suspicious	fixable=true	broad.lisp	4192	find defaults :test to eql; the explicit :test #'eql is redundant	redundant-eql-test/08921075042be6dd/0
+finding	redundant-identity-key	warning	suspicious	fixable=true	broad.lisp	5452	sort defaults :key to identity; the explicit :key #'identity is redundant	redundant-identity-key/0d6a3e2540c960d7/0
+finding	negated-when-unless	warning	suspicious	fixable=true	broad.lisp	3503	when test is (not …); use unless on the un-negated test	negated-when-unless/8cea77f08ec45975/0
+finding	negated-comparison	warning	suspicious	fixable=true	broad.lisp	5599	negated comparison has a complement operator; use >=	negated-comparison/63ee3702a87c2d97/0
+finding	negated-if	warning	suspicious	fixable=true	broad.lisp	5672	if test is negated; (if (not c) a b) is (if c b a)	negated-if/33df133ba8537bf9/0
+finding	if-to-or	warning	suspicious	fixable=true	broad.lisp	5737	if returns its test or the else; (if x x y) is (or x y)	if-to-or/ab61c84ad573df95/0
+finding	if-not	warning	suspicious	fixable=true	broad.lisp	5800	if with then=nil and else=t is a negation; (if test nil t) is (not test)	if-not/62237ccefbf0b61e/0
+finding	one-step-arithmetic	warning	suspicious	fixable=true	broad.lisp	6155	add/subtract of 1 has a shorthand; use 1+	one-step-arithmetic/044bc8cb6d37fb31/0
+finding	one-armed-if	warning	suspicious	fixable=true	broad.lisp	3577	if has no else branch; (if test then) is (when test then)	one-armed-if/efd043892749780a/0
+finding	self-comparison	error	suspicious	fixable=false	broad.lisp	7476	eq compares operand status with itself	self-comparison/448235d114bbed7c/0
+finding	nil-comparison	warning	suspicious	fixable=true	broad.lisp	6518	equal against nil is a null test; use (null X)	nil-comparison/826bacda3f3e61e2/0
+finding	t-comparison	warning	suspicious	fixable=false	broad.lisp	7558	eq against t matches only the symbol T, not any true value	t-comparison/5e76896e21ed7ee4/0
+finding	identical-if-branches	error	dead-code	fixable=false	broad.lisp	7607	if branches are identical: (foo x)	identical-if-branches/5ea1ac8de34ee4b7/0
+finding	constant-if-test	warning	dead-code	fixable=true	broad.lisp	6229	if test is the constant t; one branch is dead	constant-if-test/026b11490469946b/0
+finding	constant-when-test	warning	dead-code	fixable=true	broad.lisp	6300	when test is the constant t; the body always runs, so this is a progn	constant-when-test/9b0a7978fb01361b/0
+finding	if-arity	error	arity	fixable=false	broad.lisp	6735	if takes 2 or 3 arguments but has 4	if-arity/312e6de6292b7113/0
+finding	the-arity	error	arity	fixable=false	broad.lisp	7683	the takes exactly 2 arguments (a type and a form) but has 1	the-arity/1898bfc17b742eda/0
+finding	equality-arity	error	arity	fixable=false	broad.lisp	7747	eq takes exactly 2 arguments but has 1	equality-arity/34d47bdb8164b7a4/0
+finding	accessor-arity	error	arity	fixable=false	broad.lisp	7816	gethash takes 2 or 3 argument(s) but has 1	accessor-arity/b4355bf4eacf6bc5/0
+finding	append-list-to-cons	warning	suspicious	fixable=true	broad.lisp	1359	a one-element append is just a cons; (append (list x) rest) is (cons x rest)	append-list-to-cons/88d7b250cdb0e3fd/0
+finding	format-to-string	warning	suspicious	fixable=true	broad.lisp	1433	format to a string is just princ-to-string; use (princ-to-string x)	format-to-string/39b50b82e8ac11f4/0
+finding	format-newline	warning	suspicious	fixable=true	broad.lisp	1504	(format t "~%") just writes a newline; use (terpri)	format-newline/b36342f1429c38ae/0
+finding	redundant-divisor	warning	suspicious	fixable=true	broad.lisp	1573	the divisor defaults to 1; (floor x 1) is (floor x)	redundant-divisor/ec0523314eb5cfd2/0
+finding	duplicate-case-keys	error	duplicate	fixable=false	broad.lisp	7885	case repeats key :a (2×)	duplicate-case-keys/33bca4c760e6356b/0
+finding	quoted-case-key	error	suspicious	fixable=false	broad.lisp	7970	case key 'apple is quoted; case keys are not evaluated	quoted-case-key/9a7165a51a9415a2/0
+finding	quoted-case-key	error	suspicious	fixable=false	broad.lisp	7986	case key 'carrot is quoted; case keys are not evaluated	quoted-case-key/a3c77c1112303135/0
+finding	case-nil-key	error	dead-code	fixable=false	broad.lisp	8038	case clause key nil is the empty key list and never matches; use ((nil) …)	case-nil-key/2146ba19257dc6ac/0
+finding	typecase-nil-key	error	dead-code	fixable=false	broad.lisp	8109	typecase clause type nil is the empty type and never matches; use null	typecase-nil-key/2146ba19257dc6ac/0
+finding	malformed-case-clause	error	malformed	fixable=false	broad.lisp	8184	case clause 2 is not a non-empty list	malformed-case-clause/af63af4c8601a015/0
+finding	malformed-case-clause	error	malformed	fixable=false	broad.lisp	8186	case clause :two is not a non-empty list	malformed-case-clause/0aa07f4e709cc5f1/0
+finding	unreachable-case-clause	error	dead-code	fixable=false	broad.lisp	8269	case has 1 unreachable clause(s) after a t/otherwise catch-all	unreachable-case-clause/f0fe18a1d1f7cd70/0
+finding	exhaustive-case-otherwise	error	malformed	fixable=false	broad.lisp	8339	ecase does not permit a t clause (it is exhaustive)	exhaustive-case-otherwise/2a99d8e2b6f9f1f7/0
+finding	duplicate-cond-tests	error	duplicate	fixable=false	broad.lisp	8401	cond repeats test (foo) (2×)	duplicate-cond-tests/8e590007a2341d0f/0
+finding	unreachable-cond-clause	error	dead-code	fixable=false	broad.lisp	8498	cond has 1 unreachable clause(s) after a t clause	unreachable-cond-clause/bf880ff3fe6aad2b/0
+finding	malformed-cond-clause	error	malformed	fixable=false	broad.lisp	8595	cond clause :zero is not a non-empty list	malformed-cond-clause/985b7e37a585f76b/0
+finding	duplicate-let-bindings	error	duplicate	fixable=false	broad.lisp	8630	let binds x more than once (2×)	duplicate-let-bindings/786fd22df524c3b4/0
+finding	malformed-let-binding	error	malformed	fixable=false	broad.lisp	8713	let binding (x 1 y 2) has 4 elements; expected a symbol or (var value)	malformed-let-binding/b287ea0350e932c2/0
+finding	binds-constant	error	malformed	fixable=false	broad.lisp	8789	let cannot bind the constant nil	binds-constant/238892383a531bb8/0
+finding	binds-constant	error	malformed	fixable=false	broad.lisp	8797	let cannot bind the constant :status	binds-constant/e7aba77a1dc6c0e4/0
+finding	malformed-iteration-spec	error	malformed	fixable=false	broad.lisp	8860	dolist spec (x) must be (var form [result])	malformed-iteration-spec/0a94b117f74d8cdc/0
+finding	eval-when-situation	error	malformed	fixable=false	broad.lisp	8961	eval-when situation :executee is not valid	eval-when-situation/db9d83b2f50bfeff/0
+finding	duplicate-boolean-operands	error	duplicate	fixable=false	broad.lisp	9005	or repeats operand x (2×)	duplicate-boolean-operands/20e6cca62d6c6b08/0
+finding	dead-boolean-operand	error	dead-code	fixable=false	broad.lisp	9086	and short-circuits at literal nil; later operands are dead	dead-boolean-operand/3a7c0733832bd30e/0
+finding	redundant-boolean-identity	warning	suspicious	fixable=true	broad.lisp	6373	and has a redundant t operand; drop it	redundant-boolean-identity/6099f3c432a128b2/0
+finding	de-morgan	warning	suspicious	fixable=true	broad.lisp	6454	and of negations collapses by De Morgan to (not (or …))	de-morgan/59f199d4d6ca0ffc/0
+finding	single-operand-boolean	warning	suspicious	fixable=true	broad.lisp	3269	and has a single operand; (and X) is just X	single-operand-boolean/7e86df9999f069f3/0
+finding	single-operand-list-op	warning	suspicious	fixable=true	broad.lisp	3346	append of one argument returns it unchanged; (append x) is x	single-operand-list-op/6e6fdee3fc4c76f1/0
+finding	single-operand-arithmetic	warning	suspicious	fixable=true	broad.lisp	3423	* has a single operand; (* X) is just X	single-operand-arithmetic/5d68a41993e476ea/0
+finding	eql-string-comparison	error	suspicious	fixable=false	broad.lisp	9167	eql compares against string literal "root"	eql-string-comparison/5df8497b5e9f67a1/0
+finding	eql-list-comparison	error	suspicious	fixable=false	broad.lisp	9243	eql compares against quoted list literal (:a :b)	eql-list-comparison/610ef7b2729acd17/0
+finding	eql-search-literal	error	suspicious	fixable=false	broad.lisp	9336	member searches for literal "x" with the default eql test; add :test	eql-search-literal/96249e1f05669ad0/0
+finding	eq-number-comparison	error	suspicious	fixable=true	broad.lisp	6587	eq compares against number literal 7	eq-number-comparison/23196700b33d9c59/0
+finding	eq-char-comparison	error	suspicious	fixable=true	broad.lisp	6662	eq compares against character literal #\a; use eql or char=	eq-char-comparison/0372a7cb6b4144bd/0
+finding	single-arg-comparison	error	suspicious	fixable=false	broad.lisp	9411	< has a single argument; the comparison is always true (missing an operand?)	single-arg-comparison/4900cb84bed5a9b8/0
+finding	sign-comparison	warning	suspicious	fixable=true	broad.lisp	5529	comparison against 0 has a dedicated predicate; use zerop	sign-comparison/93d63434e0602a33/0
+finding	single-clause-cond	warning	suspicious	fixable=true	broad.lisp	2632	single-clause cond with a body is just when; (cond (test a b)) is (when test a b)	single-clause-cond/370e08e4584356c3/0
+finding	cond-t-clause	warning	suspicious	fixable=true	broad.lisp	2705	single t-clause cond is just progn; (cond (t a b)) is (progn a b)	cond-t-clause/8c478783d564aef8/0
+finding	single-value-bind	warning	suspicious	fixable=true	broad.lisp	2994	multiple-value-bind of one variable is just let; (multiple-value-bind (x) f body) is (let ((x f)) body)	single-value-bind/aabdcc153cb0635a/0
+finding	format-missing-destination	error	suspicious	fixable=false	broad.lisp	9483	format destination is the string literal "~a~%"; a nil/t/stream destination is missing	format-missing-destination/7a85f56d04f4c6ff/0
+finding	literal-place	error	malformed	fixable=false	broad.lisp	9560	incf place 5 is a literal and cannot be modified	literal-place/7088193b550b4211/0
+finding	destructive-literal	error	suspicious	fixable=false	broad.lisp	9628	nreverse destructively modifies quoted literal (a b c) (undefined behavior)	destructive-literal/5bf9f65d8c2b2acc/0
+finding	char-op-string	error	malformed	fixable=false	broad.lisp	9711	char= is given string literal "a"; it requires a character (type error)	char-op-string/90d896193ca587cd/0
+finding	empty-body	warning	suspicious	fixable=false	broad.lisp	9778	when has no body; the test/spec runs, then nothing	empty-body/713b5add40eb9a23/0
+finding	identity-arithmetic	warning	suspicious	fixable=false	broad.lisp	9840	+ has a redundant identity operand 0 (it does nothing)	identity-arithmetic/5957946d13e87c0f/0
+finding	verbose-negation	warning	suspicious	fixable=true	broad.lisp	1645	negation written the long way; use (- x)	verbose-negation/db07057c02c96d6b/0
+finding	list-star-to-cons	warning	suspicious	fixable=true	broad.lisp	1716	a two-argument list* is just a cons; (list* a b) is (cons a b)	list-star-to-cons/8dfbceb8e6484013/0
+finding	values-list-of-list	warning	suspicious	fixable=true	broad.lisp	1788	values-list of a fresh list is just values; (values-list (list a b)) is (values a b)	values-list-of-list/a01fe3b901d6d599/0
+finding	redundant-prog1	warning	suspicious	fixable=true	broad.lisp	1862	a prog1 wrapping a single form is just that form; (prog1 x) is x	redundant-prog1/d11c68d1c2a8c075/0
+finding	subseq-zero	warning	suspicious	fixable=true	broad.lisp	1932	a subseq from index 0 copies the whole sequence; (subseq seq 0) is (copy-seq seq)	subseq-zero/86623ddc853cc31a/0
+finding	car-nthcdr	warning	suspicious	fixable=true	broad.lisp	1998	car of an nthcdr is nth; (car (nthcdr n x)) is (nth n x)	car-nthcdr/fa5f8068ce51888c/0
+finding	car-reverse	warning	suspicious	fixable=true	broad.lisp	2063	car of a reverse copies the whole list to read one element; use (car (last x))	car-reverse/358664c82b8eb6c2/0
+finding	append-nil	warning	suspicious	fixable=true	broad.lisp	2129	append with a nil tail is a fresh copy; (append x nil) is (copy-list x)	append-nil/9dcde276136a9a2c/0
+finding	multiple-value-list-of-values	warning	suspicious	fixable=true	broad.lisp	2194	multiple-value-list of a values form is just list; (multiple-value-list (values a b)) is (list a b)	multiple-value-list-of-values/1b4099bfb77b9dcf/0
+finding	typep-predicate	warning	suspicious	fixable=true	broad.lisp	2278	typep against this type has a dedicated predicate; use (stringp x)	typep-predicate/c4524e22023511e4/0
+finding	coerce-to-t	warning	suspicious	fixable=true	broad.lisp	2348	coerce to type t returns the object unchanged; (coerce x t) is x	coerce-to-t/5287c8c7f1849642/0
+finding	gethash-default	warning	suspicious	fixable=true	broad.lisp	2414	the gethash default is nil; (gethash k h nil) is (gethash k h)	gethash-default/f31c83fc13478b4e/0
+finding	make-hash-table-test	warning	suspicious	fixable=true	broad.lisp	2484	the make-hash-table :test defaults to eql; drop the explicit :test 'eql	make-hash-table-test/35479fa9b5b47097/0
+finding	zero-divisor	warning	suspicious	fixable=false	broad.lisp	9892	/ by a literal 0 always signals division-by-zero	zero-divisor/bb4a55b5af90f7db/0
+finding	duplicate-keyword	warning	duplicate	fixable=false	broad.lisp	9959	keyword :x is passed more than once; the leftmost value wins	duplicate-keyword/9a11e6557d3eae3f/0
+finding	defpackage-quoted	warning	malformed	fixable=false	broad.lisp	10031	defpackage does not evaluate its options; drop the quote in the :export clause	defpackage-quoted/c37b38bb92c1afca/0
+finding	step-zero	warning	suspicious	fixable=false	broad.lisp	10103	incf by 0 is a no-op that changes nothing	step-zero/d9ce2059b5b3a5cc/0
+finding	if-to-unless	warning	suspicious	fixable=true	broad.lisp	5861	an if with a nil then-branch is an unless; (if c nil e) is (unless c e)	if-to-unless/54bbf94ef24fbf44/0
+finding	prog2-to-progn	warning	suspicious	fixable=true	broad.lisp	5928	a two-form prog2 is just progn; (prog2 a b) is (progn a b)	prog2-to-progn/cfc0af416a06509b/0
+finding	handler-case-no-clauses	warning	suspicious	fixable=true	broad.lisp	5997	a handler-case with no clauses is just its body; (handler-case x) is x	handler-case-no-clauses/e6eca94ec47a803d/0
+finding	unwind-protect-no-cleanup	warning	suspicious	fixable=true	broad.lisp	6075	an unwind-protect with no cleanup is just its body; (unwind-protect x) is x	unwind-protect-no-cleanup/0517ee52f6bcfa89/0
+finding	redundant-start-zero	warning	suspicious	fixable=true	broad.lisp	4265	find :start defaults to 0; drop the explicit :start 0	redundant-start-zero/204c4a0fd8b6054d/0
+finding	redundant-end-nil	warning	suspicious	fixable=true	broad.lisp	4340	find :end defaults to nil; drop the explicit :end nil	redundant-end-nil/95fb7a788caa4221/0
+finding	redundant-from-end-nil	warning	suspicious	fixable=true	broad.lisp	4412	find :from-end defaults to nil; drop the explicit :from-end nil	redundant-from-end-nil/74a10cdf08c695fc/0
+finding	redundant-count-nil	warning	suspicious	fixable=true	broad.lisp	4489	remove :count defaults to nil; drop the explicit :count nil	redundant-count-nil/b4e4e8611abe92d2/0
+finding	string-case-fold	warning	suspicious	fixable=true	broad.lisp	4563	case-folding both sides of string= is case-insensitive; use string-equal	string-case-fold/35ed4435ec80226f/0
+finding	char-case-fold	warning	suspicious	fixable=true	broad.lisp	4634	case-folding both sides of char= is case-insensitive; use char-equal	char-case-fold/1151e7de6ce93524/0
+finding	nested-string-case	warning	suspicious	fixable=true	broad.lisp	4703	the outer string case op dominates; the inner one is dead work	nested-string-case/e1b50d70e857d80e/0
+finding	code-char-char-code	warning	suspicious	fixable=true	broad.lisp	4776	code-char of char-code is a round-trip; (code-char (char-code c)) is c	code-char-char-code/d64bd87a6ec1dd94/0
+finding	last-default-count	warning	suspicious	fixable=true	broad.lisp	4850	explicit count of 1 restates last's default; (last x 1) is (last x)	last-default-count/ee8e9f6b4ebb33ac/0
+finding	butlast-default-count	warning	suspicious	fixable=true	broad.lisp	4923	explicit count of 1 restates butlast's default; (butlast x 1) is (butlast x)	butlast-default-count/6841ef3bad2f901d/0
+finding	make-list-default-element	warning	suspicious	fixable=true	broad.lisp	4999	explicit :initial-element nil restates make-list's default; drop it	make-list-default-element/091b9e3ccae97a5b/0
+finding	parse-integer-default-radix	warning	suspicious	fixable=true	broad.lisp	5079	explicit :radix 10 restates parse-integer's default; drop it	parse-integer-default-radix/6689082ca07df47e/0
+finding	getf-default-nil	warning	suspicious	fixable=true	broad.lisp	5161	explicit nil default restates getf's default; (getf p k nil) is (getf p k)	getf-default-nil/ccab3d746985ff27/0
+finding	make-array-default-keyword	warning	suspicious	fixable=true	broad.lisp	5232	explicit :adjustable nil restates make-array's default; drop it	make-array-default-keyword/5378b26260ebe135/0
+finding	nested-char-case	warning	suspicious	fixable=true	broad.lisp	5313	the outer char case op dominates; the inner one is dead work	nested-char-case/e5d63774dec3163c/0
+finding	list-star-nil	warning	suspicious	fixable=true	broad.lisp	5384	list* with a nil tail is a spelled-out list; (list* a b nil) is (list a b)	list-star-nil/3d15900073a4c4e4/0
