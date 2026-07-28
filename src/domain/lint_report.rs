@@ -1,7 +1,7 @@
 //! The published surface of the lint suite.
 //!
 //! The rules, the registry they are derived from, and the single pass that
-//! runs them live in [`crate::domain::lint`]. This module is the stable façade
+//! runs them live in `crate::domain::lint`. This module is the stable façade
 //! the application and CLI layers import: the report types, the catalogue
 //! constants, and the two entry points that produce findings and fixes for one
 //! parsed file.
@@ -104,7 +104,7 @@ pub fn collect_lint_fixes(
 ///
 /// Filtering after the walk is identical to filtering before it, and that is
 /// not an accident of the current rules:
-/// [`RuleSelection`](crate::domain::lint::policy::RuleSelection) is a per-rule
+/// [`crate::domain::lint::policy::RuleSelection`] is a per-rule
 /// membership test, rules never observe one another, and a rule left out of
 /// `active` contributes no fix either way. The one thing that must not happen
 /// — a fix from an unselected rule reaching the plan — is exactly what the

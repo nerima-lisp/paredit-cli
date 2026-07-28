@@ -11,7 +11,7 @@
 //! arguments byte-identical, so the rule is auto-fixable.
 //!
 //! This is the `make-hash-table` sibling of
-//! [`crate::domain::redundant_eql_test_report`] (which covers the sequence/list
+//! `redundant-eql-test` (which covers the sequence/list
 //! operators whose `:test` defaults to `eql`).
 //!
 //! Reuses the shared whole-tree walk from

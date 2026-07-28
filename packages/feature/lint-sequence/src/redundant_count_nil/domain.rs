@@ -5,7 +5,7 @@
 //! restates the default.
 //!
 //! Scope is gated to the removing/substituting operators whose `:count` defaults
-//! to `nil` ([`COUNT_HEADS`] — `remove`, `delete`, `substitute`, `nsubstitute`,
+//! to `nil` (`COUNT_HEADS` — `remove`, `delete`, `substitute`, `nsubstitute`,
 //! and their `-if`/`-if-not` variants). Operators that do not take a `:count`
 //! keyword (`find`, `position`, …) are not touched. Only a bare `nil` literal
 //! value is flagged.

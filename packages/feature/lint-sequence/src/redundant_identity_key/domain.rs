@@ -6,7 +6,7 @@
 //! restates the default.
 //!
 //! Scope is gated to operators documented to accept a `:key` argument
-//! ([`KEY_HEADS`]). Note this list is *not* the same as the eql-defaulting
+//! (`KEY_HEADS`). Note this list is *not* the same as the eql-defaulting
 //! `:test` set: `tree-equal` takes `:test` but no `:key` (excluded here), while
 //! `sort`/`stable-sort`/`merge`/`reduce` and the `-if` variants take `:key` but
 //! no `:test` (included here). The list keeps only CLHS-verified `:key`-takers,

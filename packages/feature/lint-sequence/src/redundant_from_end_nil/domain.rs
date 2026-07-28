@@ -5,7 +5,7 @@
 //! `:from-end nil` restates the default.
 //!
 //! Scope is gated to the operators whose `:from-end` defaults to `nil`
-//! ([`FROM_END_HEADS`] — `find`, `position`, `count`, `remove`, `substitute`,
+//! (`FROM_END_HEADS` — `find`, `position`, `count`, `remove`, `substitute`,
 //! the `-if`/`-if-not` variants, `remove-duplicates`, `reduce`, `search`,
 //! `mismatch`, …). Only a bare `nil` literal value is flagged.
 //!

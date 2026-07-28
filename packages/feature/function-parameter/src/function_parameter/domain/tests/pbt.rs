@@ -4,26 +4,33 @@ use paredit_core_syntax::sexpr::SyntaxTree;
 use proptest::{prelude::*, test_runner::TestCaseError};
 
 proptest! {
+    /// Explores the shape the CLI property test explored - two existing
+    /// parameters and `--all-calls`, so call discovery is on the path - at
+    /// proptest's default 256 cases rather than the 24 a process-per-case
+    /// test could afford. §12.4.
     #[test]
     fn pbt_add_parameter_output_remains_parseable(
         name in "[a-z][a-z0-9]{0,8}",
-        param in "[a-z][a-z0-9]{0,8}",
-        added in "[a-z][a-z0-9]{0,8}",
-        value in "[-]?[0-9]{1,4}",
-        argument in "[-]?[0-9]{1,4}",
+        a in "[a-z][a-z0-9]{0,8}",
+        b in "[a-z][a-z0-9]{0,8}",
+        c in "[a-z][a-z0-9]{0,8}",
+        first in "[-]?[0-9]{1,4}",
+        second in "[-]?[0-9]{1,4}",
+        third in "[-]?[0-9]{1,4}",
     ) {
-        prop_assume!(name != param);
-        prop_assume!(name != added);
-        prop_assume!(param != added);
-        let input = format!("(defun {name} ({param}) {param})\n(print ({name} {value}))");
+        prop_assume!(name != a && name != b && name != c);
+        prop_assume!(a != b && a != c && b != c);
+        let input = format!(
+            "(defun {name} ({a} {b}) (list {a} {b} {c}))\n(print ({name} {first} {second}))\n"
+        );
         let plan = plan_add_function_parameter(AddFunctionParameterRequest {
             input: &input,
             dialect: Dialect::CommonLisp,
             definition_path: path("0"),
-            name: symbol(&added),
-            argument: argument.clone(),
-            call_paths: vec![path("1.1")],
-            all_calls: false,
+            name: symbol(&c),
+            argument: third.clone(),
+            call_paths: Vec::new(),
+            all_calls: true,
             insert: FunctionParameterInsert::End,
             section: FunctionParameterSection::Auto,
         })
@@ -31,38 +38,47 @@ proptest! {
 
         prop_assert_eq!(
             &plan.rewritten,
-            &format!("(defun {name} ({param} {added}) {param})\n(print ({name} {value} {argument}))")
+            &format!(
+                "(defun {name} ({a} {b} {c}) (list {a} {b} {c}))\n(print ({name} {first} {second} {third}))\n"
+            )
         );
         SyntaxTree::parse(&plan.rewritten)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
     }
 
+    /// Three parameters and `--all-calls`, matching the CLI property test the
+    /// recorded shrink came from.
     #[test]
     fn pbt_move_parameter_output_remains_parseable(
         name in "[a-z][a-z0-9]{0,8}",
         a in "[a-z][a-z0-9]{0,8}",
         b in "[a-z][a-z0-9]{0,8}",
+        c in "[a-z][a-z0-9]{0,8}",
         first in "[-]?[0-9]{1,4}",
         second in "[-]?[0-9]{1,4}",
+        third in "[-]?[0-9]{1,4}",
     ) {
-        prop_assume!(name != a);
-        prop_assume!(name != b);
-        prop_assume!(a != b);
-        let input = format!("(defun {name} ({a} {b}) (list {a} {b}))\n(print ({name} {first} {second}))");
+        prop_assume!(name != a && name != b && name != c);
+        prop_assume!(a != b && a != c && b != c);
+        let input = format!(
+            "(defun {name} ({a} {b} {c}) (list {a} {b} {c}))\n(print ({name} {first} {second} {third}))\n"
+        );
         let plan = plan_move_function_parameter(MoveFunctionParameterRequest {
             input: &input,
             dialect: Dialect::CommonLisp,
             definition_path: path("0"),
-            name: symbol(&b),
+            name: symbol(&c),
             to_index: 0,
-            call_paths: vec![path("1.1")],
-            all_calls: false,
+            call_paths: Vec::new(),
+            all_calls: true,
         })
         .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
         prop_assert_eq!(
             &plan.rewritten,
-            &format!("(defun {name} ({b} {a}) (list {a} {b}))\n(print ({name} {second} {first}))")
+            &format!(
+                "(defun {name} ({c} {a} {b}) (list {a} {b} {c}))\n(print ({name} {third} {first} {second}))\n"
+            )
         );
         SyntaxTree::parse(&plan.rewritten)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;

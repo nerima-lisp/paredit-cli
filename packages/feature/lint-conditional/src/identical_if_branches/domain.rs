@@ -5,7 +5,7 @@
 //! Common Lisp analog of the well-known `if_same_then_else` lint, almost
 //! always a copy-paste error where one branch was never edited to differ.
 //!
-//! Like [`crate::domain::self_assignment_report`], an `if` can appear
+//! Like `self-assignment`, an `if` can appear
 //! anywhere in a body, so this report walks the whole expression tree and
 //! reuses the same reader-aware structural comparison from
 //! [`paredit_core_syntax::expression_equality`].

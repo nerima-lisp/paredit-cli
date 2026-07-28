@@ -6,7 +6,7 @@ use crate::model::{LintFinding, LintPolicy, LintPolicyOptions, LintSummary};
 use crate::rule::RuleCatalog;
 
 /// Summarizes findings, keeping only those from `active` rules; `per_rule`
-/// lists exactly the active rules (in [`RULES`] order) so the checklist
+/// lists exactly the active rules (in the catalogue's registration order) so the checklist
 /// reflects what actually ran.
 #[must_use]
 pub fn summarize_lint_findings(

@@ -9,7 +9,7 @@
 //! not visible from a single file, so those are left alone to keep the rule
 //! free of false positives.
 //!
-//! Complements [`crate::domain::malformed_let_binding_report`], which checks a
+//! Complements `malformed-let-binding`, which checks a
 //! binding's *shape*; this rule checks the *validity of the bound variable*.
 //!
 //! Reuses the shared whole-tree walk from

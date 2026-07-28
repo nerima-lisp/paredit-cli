@@ -2,7 +2,7 @@
 //! never referenced anywhere in the analyzed fileset — not `:use`d, not
 //! `:import-from`ed, and never reached through a qualified symbol
 //! (`pkg:sym` or `pkg::sym`). This is the package-level analog of
-//! [`crate::domain::definition_report`]'s unused-definition detection: a
+//! `definition-report`'s unused-definition detection: a
 //! candidate for deletion, or evidence that a package's public API is
 //! consumed only outside the analyzed fileset (e.g. by downstream
 //! consumers of a library) — `--fail-on-unused` stays an opt-in gate for
@@ -10,7 +10,7 @@
 //! carries.
 //!
 //! Built on the same [`crate::dependency_report::domain::build_dependency_report`]
-//! extraction used by [`crate::domain::package_cycle_report`] (for
+//! extraction used by `package-cycle-report` (for
 //! `DefpackageUse`/`DefpackageImportFrom` edges) and
 //! [`crate::package_boundary_report::domain`] (for `QualifiedSymbol`
 //! references) — every kind of package reference this report needs is

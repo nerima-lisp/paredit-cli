@@ -6,7 +6,7 @@
 //!
 //! To stay free of false positives without a full arglist model, scope is gated
 //! to operators with a *fixed, known* positional-argument prefix
-//! ([`KEY_OPERATORS`] — the `make-*` constructors), so the keyword plist begins
+//! (`KEY_OPERATORS` — the `make-*` constructors), so the keyword plist begins
 //! at a known index and a positional argument that happens to be a keyword can
 //! never be mistaken for a keyword-argument name. Within the plist, keywords sit
 //! at even offsets; a name repeated across those offsets is flagged. A malformed
@@ -143,7 +143,7 @@ pub fn examine(
     }
 }
 
-/// Collects every call in [`KEY_OPERATORS`] passing a duplicate keyword argument
+/// Collects every call in `KEY_OPERATORS` passing a duplicate keyword argument
 /// across a whole file, along with the total number of such calls scanned.
 pub fn collect_duplicate_keywords(
     path: &Path,

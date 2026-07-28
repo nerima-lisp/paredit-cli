@@ -5,7 +5,7 @@
 //! the default.
 //!
 //! Scope is gated to the single-sequence operators whose `:end` defaults to `nil`
-//! ([`END_HEADS`] — `find`, `position`, `count`, `remove`, `substitute`, the
+//! (`END_HEADS` — `find`, `position`, `count`, `remove`, `substitute`, the
 //! `-if`/`-if-not` variants, `fill`, `reduce`, `parse-integer`, the string-case
 //! functions, …). Two-sequence operators (`search`, `mismatch`, `replace`) use
 //! `:end1`/`:end2`, never a bare `:end`, and are not touched. Only a bare

@@ -16,7 +16,7 @@
 //!
 //! Because the fix simply unwraps to the sole operand (an already-present
 //! subexpression, copied verbatim), this rule is auto-fixable — the same fix
-//! shape as [`crate::domain::single_operand_boolean_report`]. Contrast
+//! shape as `single-operand-boolean`. Contrast
 //! [`crate::identity_arithmetic::domain`], which would have to *delete*
 //! an operand from a multi-argument form and is therefore report-only.
 //!

@@ -34,7 +34,7 @@ fn atoms_equal(left: &str, right: &str) -> bool {
 
 /// Structural equality of two expression views: same kind and delimiter, and
 /// recursively equal children, with atoms compared by reader-aware
-/// [`atoms_equal`].
+/// `atoms_equal`.
 #[must_use]
 pub fn expressions_structurally_equal(left: &ExpressionView, right: &ExpressionView) -> bool {
     if left.kind != right.kind || left.delimiter != right.delimiter {

@@ -80,4 +80,4 @@ at the [documentation site](https://nerima-lisp.github.io/paredit-cli/).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/nerima-lisp/paredit-cli/blob/main/LICENSE).

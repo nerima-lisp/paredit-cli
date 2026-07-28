@@ -37,7 +37,7 @@ impl Scope {
 /// *this* position mean", which a per-symbol query cannot answer without
 /// already knowing the symbol.
 ///
-/// Only *resolvable* references are in [`BindingTable::resolution`]. Free
+/// Only *resolvable* references are in `BindingTable::resolution`. Free
 /// variables, globals, and anything inside an opaque region are absent — the
 /// table never guesses, so a lookup miss means "not statically known", not
 /// "no such name".

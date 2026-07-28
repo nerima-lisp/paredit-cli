@@ -31,10 +31,10 @@ impl RuleSelection<'_> {
 /// Resolves the active rule set for one run.
 ///
 /// The included set is the rules named by `only`, or every rule in the
-/// categories named by `categories`, or (when both are empty) all of [`RULES`];
+/// categories named by `categories`, or (when both are empty) all of the catalogue;
 /// `exclude` then removes rules from it. `only` and `categories` are mutually
-/// exclusive at the CLI layer. Every named rule must be one of [`RULES`] and
-/// every named category one of [`CATEGORIES`] — an unknown name is a hard error
+/// exclusive at the CLI layer. Every named rule must be one of the catalogue's rules and
+/// every named category one of the catalogue's categories — an unknown name is a hard error
 /// rather than a silent no-op, so a typo in CI fails loudly. The result
 /// preserves the catalogue's registration order.
 pub fn resolve_active_rules(

@@ -4,7 +4,7 @@
 //! exactly `(find x seq)` — the explicit start restates the default.
 //!
 //! Scope is gated to the single-sequence operators whose `:start` defaults to `0`
-//! ([`START_HEADS`] — `find`, `position`, `count`, `remove`, `substitute`, the
+//! (`START_HEADS` — `find`, `position`, `count`, `remove`, `substitute`, the
 //! `-if`/`-if-not` variants, `fill`, `reduce`, `parse-integer`, the string-case
 //! functions, …). Two-sequence operators (`search`, `mismatch`, `replace`) use
 //! `:start1`/`:start2`, never a bare `:start`, and are not touched. Only a bare

@@ -83,7 +83,7 @@ impl ValueTableBuilder {
     /// overwriting it: with two `defconstant`s in one file there is no way to
     /// know which one a reference sees, so the honest answer is neither. This
     /// mirrors the conservative rejection in
-    /// [`crate::inline_literal_constant`].
+    /// `inline-literal-constant`.
     pub fn define_constant(&mut self, name: SymbolName, value: PropagatableValue) {
         if self.ambiguous_constants.contains(&name) {
             return;

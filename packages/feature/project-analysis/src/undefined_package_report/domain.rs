@@ -9,7 +9,7 @@
 //! `COMMON-LISP-USER`, `KEYWORD` — are never flagged.
 //!
 //! Both sides of the comparison are canonicalized by the project layer's
-//! [`PackageId`] rather than by a bare upcasing, which is what makes a
+//! [`PackageId`](paredit_core_semantics::semantics::project::PackageId) rather than by a bare upcasing, which is what makes a
 //! *nickname* a legitimate designator: `(defpackage :my-app (:nicknames :app))`
 //! declares two names for one package, and `(in-package :app)` is not a typo.
 //! Reading only the primary name reported it as undefined.

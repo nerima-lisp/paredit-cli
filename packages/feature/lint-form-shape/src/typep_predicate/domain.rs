@@ -5,7 +5,7 @@
 //! more directly. For example `(typep x 'string)` is `(stringp x)`,
 //! `(typep x 'null)` is `(null x)`, `(typep x 'list)` is `(listp x)`.
 //!
-//! Only type names in the [`TYPE_PREDICATES`] table are flagged (each mapping is
+//! Only type names in the `TYPE_PREDICATES` table are flagged (each mapping is
 //! a CLHS-guaranteed exact equivalence). A compound type specifier
 //! (`(integer 0 9)`), a type with no dedicated predicate (`fixnum`), the
 //! always-true `t`, an unquoted or computed type argument, and a

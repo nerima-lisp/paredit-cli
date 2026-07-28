@@ -6,7 +6,7 @@
 //! (usually a wrong variable on one side that happened to be edited to match)
 //! rather than an intended write.
 //!
-//! Like [`crate::domain::duplicate_case_key_report`], an assignment form can
+//! Like `duplicate-case-keys`, an assignment form can
 //! appear anywhere in a body, so this report walks the whole expression tree.
 //!
 //! Scope: Common Lisp only. Structural equality folds symbol case exactly as

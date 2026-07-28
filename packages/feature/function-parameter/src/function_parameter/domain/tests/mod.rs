@@ -19,5 +19,6 @@ mod add;
 mod discovery;
 mod move_parameter;
 mod pbt;
+mod recorded_shrinks;
 mod remove;
 mod swap_reorder;

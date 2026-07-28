@@ -8,7 +8,7 @@
 //! Scoped to these fixed-arity macros on purpose: `pushnew` and the general
 //! `setf`/`setq` family take a variable number of arguments (keyword options
 //! or place/value pairs) and are handled elsewhere
-//! ([`crate::domain::setf_arity_report`]).
+//! (`setf-arity`).
 //!
 //! Forms whose argument count is not statically visible are skipped to avoid
 //! false positives: a quoted/quasiquoted form (data or a template), and any

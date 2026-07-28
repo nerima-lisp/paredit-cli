@@ -5,7 +5,7 @@
 //! restates the default and adds only noise.
 //!
 //! Scope is gated to the operators whose `:test` is documented to default to
-//! `eql` ([`EQL_TEST_HEADS`] — `member`, `assoc`, `find`, `position`, `count`,
+//! `eql` (`EQL_TEST_HEADS` — `member`, `assoc`, `find`, `position`, `count`,
 //! `remove`, the set operations, …). A function with a *required* predicate
 //! (e.g. `sort`) or a different default is never touched, and only `:test`
 //! (never `:test-not`, which means "not eql") with an `eql` designator is

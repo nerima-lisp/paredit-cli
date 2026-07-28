@@ -6,7 +6,7 @@
 //! therefore has no false positives.
 //!
 //! Reuses the same lambda-list extraction the parameter refactors and
-//! [`crate::domain::unused_parameter_report`] rely on
+//! the unused-parameter report rely on
 //! ([`paredit_feature_function_parameter::function_parameter::domain::list_lambda_list_parameter_names`]),
 //! so it inherits their handling of lambda-list keywords (`&optional`,
 //! `&rest`, `&key`, `&aux`), default-value forms, and `&key`-with-supplied-p

@@ -10,7 +10,7 @@
 //!
 //! Scope: Common Lisp only, since ASDF `defsystem` is CL-specific. Reuses
 //! the same [`paredit_core_syntax::common_lisp::normalize_common_lisp_package_designator`]
-//! designator normalization [`crate::domain::system_cycle_report`] and
+//! designator normalization `system-cycle-report` and
 //! [`crate::dependency_report::domain`] already rely on for system-name
 //! designators (`"my-system"`, `#:my-system`, or a bare symbol all name the
 //! same system).
