@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{CallBindingError, InlineResult};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
@@ -17,16 +17,19 @@ pub fn destructure_argument_entries(
     pattern: &InlineDestructurePattern,
     argument: &str,
     allow_drop_arguments: bool,
-) -> Result<Vec<(String, String)>> {
-    let tree = SyntaxTree::parse_with_dialect(argument, dialect).with_context(|| {
-        format!("inline-function could not parse macro destructuring argument: {argument}")
+) -> InlineResult<Vec<(String, String)>> {
+    let tree = SyntaxTree::parse_with_dialect(argument, dialect).map_err(|source| {
+        CallBindingError::DestructuringArgumentDoesNotParse {
+            argument: argument.to_string(),
+            source,
+        }
     })?;
     let argument_expression = tree
         .select_path(&Path::root_child(0))
-        .context("inline-function expected a single argument expression for destructuring")?
+        .map_err(|_| CallBindingError::ExpectedSingleArgument)?
         .view();
     if tree.root_children().len() != 1 {
-        anyhow::bail!("inline-function expected a single argument expression for destructuring");
+        return Err(CallBindingError::ExpectedSingleArgument.into());
     }
 
     let mut entries = Vec::new();
@@ -48,7 +51,7 @@ fn collect_destructured_argument_entries(
     source: &str,
     allow_drop_arguments: bool,
     output: &mut Vec<(String, String)>,
-) -> Result<()> {
+) -> InlineResult<()> {
     match pattern {
         InlineDestructurePattern::Name(name) => {
             output.push((name.clone(), argument.span.slice(source).to_owned()));
@@ -56,10 +59,13 @@ fn collect_destructured_argument_entries(
         }
         InlineDestructurePattern::List(items) => {
             if argument.kind != ExpressionKind::List {
-                anyhow::bail!(
-                    "inline-function macro destructuring expected a list argument, found {}",
-                    argument.span.slice(source)
-                );
+                return Err(CallBindingError::Destructuring {
+                    problem: format!(
+                        "expected a list argument, found {}",
+                        argument.span.slice(source)
+                    ),
+                }
+                .into());
             }
             collect_destructured_list_argument_entries(
                 dialect,
@@ -80,28 +86,35 @@ fn collect_destructured_list_argument_entries(
     source: &str,
     allow_drop_arguments: bool,
     output: &mut Vec<(String, String)>,
-) -> Result<()> {
+) -> InlineResult<()> {
     if argument.children.len() < pattern.required.len() {
-        anyhow::bail!(
-            "inline-function macro destructuring arity mismatch: pattern expects at least {} element(s), argument has {} element(s)",
-            pattern.required.len(),
-            argument.children.len()
-        );
+        return Err(CallBindingError::Destructuring {
+            problem: format!(
+                "arity mismatch: pattern expects at least {} element(s), argument has {} element(s)",
+                pattern.required.len(),
+                argument.children.len()
+            ),
+        }
+        .into());
     }
     let max_len = pattern.required.len() + pattern.optional.len();
     if pattern.keys.is_empty() && pattern.rest.is_none() && argument.children.len() > max_len {
-        anyhow::bail!(
-            "inline-function macro destructuring arity mismatch: pattern expects at most {} element(s), argument has {} element(s)",
-            max_len,
-            argument.children.len()
-        );
+        return Err(CallBindingError::Destructuring {
+            problem: format!(
+                "arity mismatch: pattern expects at most {} element(s), argument has {} element(s)",
+                max_len,
+                argument.children.len()
+            ),
+        }
+        .into());
     }
     let key_start = max_len.min(argument.children.len());
     let key_args = &argument.children[key_start..];
     if !pattern.keys.is_empty() && key_args.len() % 2 != 0 {
-        anyhow::bail!(
-            "inline-function inner &key destructuring arguments must be supplied as keyword/value pairs"
-        );
+        return Err(CallBindingError::InnerKeyDestructuring {
+            problem: "arguments must be supplied as keyword/value pairs".to_owned(),
+        }
+        .into());
     }
     let call_side_allow_other_keys = call_side_allow_other_keys_from_views(key_args, source);
 
@@ -140,16 +153,17 @@ fn collect_destructured_list_argument_entries(
             let key = pair[0].span.slice(source);
             let value = pair[1].span.slice(source);
             if !key.starts_with(':') {
-                anyhow::bail!(
-                    "inline-function inner &key destructuring expected keyword argument, found {key}"
-                );
+                return Err(CallBindingError::InnerKeyDestructuring {
+                    problem: format!("expected keyword argument, found {key}"),
+                }
+                .into());
             }
             if key == item.keyword {
                 if matched.is_some() {
-                    anyhow::bail!(
-                        "inline-function macro destructuring argument supplies duplicate keyword {}",
-                        item.keyword
-                    );
+                    return Err(CallBindingError::Destructuring {
+                        problem: format!("argument supplies duplicate keyword {}", item.keyword),
+                    }
+                    .into());
                 }
                 matched = Some(value.to_owned());
             }
@@ -182,7 +196,7 @@ fn validate_unknown_destructure_keywords(
     source: &str,
     allow_drop_arguments: bool,
     call_side_allow_other_keys: &CallSideAllowOtherKeys,
-) -> Result<()> {
+) -> InlineResult<()> {
     if pattern.keys.is_empty() {
         return Ok(());
     }
@@ -200,9 +214,10 @@ fn validate_unknown_destructure_keywords(
             )? {
                 continue;
             }
-            anyhow::bail!(
-                "inline-function macro destructuring argument supplies unsupported keyword {key}"
-            );
+            return Err(CallBindingError::Destructuring {
+                problem: format!("argument supplies unsupported keyword {key}"),
+            }
+            .into());
         }
     }
 
@@ -213,7 +228,7 @@ fn should_tolerate_unknown_destructure_keyword(
     pattern: &InlineDestructureListPattern,
     allow_drop_arguments: bool,
     call_side_allow_other_keys: &CallSideAllowOtherKeys,
-) -> Result<bool> {
+) -> InlineResult<bool> {
     if pattern.rest.is_some() {
         if pattern.allow_other_keys {
             return Ok(true);
@@ -231,14 +246,14 @@ fn should_tolerate_unknown_destructure_keyword(
 
 fn call_side_allows_other_keys(
     call_side_allow_other_keys: &CallSideAllowOtherKeys,
-) -> Result<bool> {
+) -> InlineResult<bool> {
     match call_side_allow_other_keys {
         CallSideAllowOtherKeys::True => Ok(true),
-        CallSideAllowOtherKeys::Unknown(value) => {
-            anyhow::bail!(
-                "inline-function cannot determine whether inner :allow-other-keys value {value} suppresses unknown keyword"
-            );
+        CallSideAllowOtherKeys::Unknown(value) => Err(CallBindingError::AllowOtherKeysNotLiteral {
+            qualifier: "inner ".to_owned(),
+            value: value.to_string(),
         }
+        .into()),
         CallSideAllowOtherKeys::AbsentOrFalse => Ok(false),
     }
 }
@@ -264,7 +279,7 @@ fn bind_optional_destructure_pattern(
     argument: Option<&ExpressionView>,
     source: &str,
     default_scope: &[(String, String)],
-) -> Result<Vec<(String, String)>> {
+) -> InlineResult<Vec<(String, String)>> {
     let mut entries = if let Some(argument) = argument {
         let mut entries = destructured_binding_entries(
             dialect,
@@ -290,7 +305,7 @@ fn resolve_destructure_default_value(
     dialect: Dialect,
     pattern: &InlineDestructureOptionalPattern,
     default_scope: &[(String, String)],
-) -> Result<String> {
+) -> InlineResult<String> {
     let Some(value) = pattern.default_value.as_ref() else {
         return Ok("nil".to_owned());
     };
@@ -303,7 +318,7 @@ fn bind_key_destructure_pattern(
     pattern: &InlineDestructureKeyPattern,
     argument: Option<String>,
     default_scope: &[(String, String)],
-) -> Result<Vec<(String, String)>> {
+) -> InlineResult<Vec<(String, String)>> {
     let mut entries = if let Some(argument) = argument {
         let mut entries = destructured_binding_entries(dialect, &pattern.binding, argument)?;
         if let Some(supplied_p) = &pattern.supplied_p {
@@ -325,7 +340,7 @@ fn resolve_key_destructure_default_value(
     dialect: Dialect,
     pattern: &InlineDestructureKeyPattern,
     default_scope: &[(String, String)],
-) -> Result<String> {
+) -> InlineResult<String> {
     let Some(value) = pattern.default_value.as_ref() else {
         return Ok("nil".to_owned());
     };

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{InlineError, InlineResult, InlineSelectionError};
 
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
@@ -25,48 +25,64 @@ pub fn parse_inline_function_definition(
     dialect: Dialect,
     input: &str,
     view: ExpressionView,
-) -> Result<InlineDefinition> {
+) -> InlineResult<InlineDefinition> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-        anyhow::bail!("inline-function definition selection must be a function definition list");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-function",
+            problem: "definition selection must be a function definition list".to_owned(),
+        }
+        .into());
     }
     if view.children.len() < 3 {
-        anyhow::bail!(
-            "inline-function definition must include a name, parameters, and a body expression"
-        );
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-function",
+            problem: "definition must include a name, parameters, and a body expression".to_owned(),
+        }
+        .into());
     }
 
-    let head = atom_text(&view.children[0])
-        .context("inline-function definition must start with a definition atom")?;
+    let head = atom_text(&view.children[0]).ok_or_else(|| {
+        InlineError::from(InlineSelectionError::Shape {
+            operation: "inline-function",
+            problem: "definition must start with a definition atom".to_owned(),
+        })
+    })?;
     let definition_kind = match definition_shape(dialect, &view, head).map(|shape| shape.category) {
         Some(DefinitionCategory::Macro) => {
             if !dialect.supports_inline_function_refactor_head(head) {
-                anyhow::bail!(
-                    "{}",
-                    unsupported_inline_function_definition_message(dialect, head)
-                );
+                return Err(InlineSelectionError::UnsupportedDefinition {
+                    message: unsupported_inline_function_definition_message(dialect, head),
+                }
+                .into());
             }
             InlineDefinitionKind::Macro
         }
         _ if !dialect.supports_inline_function_refactor_head(head) => {
-            anyhow::bail!(
-                "{}",
-                unsupported_inline_function_definition_message(dialect, head)
-            );
+            return Err(InlineSelectionError::UnsupportedDefinition {
+                message: unsupported_inline_function_definition_message(dialect, head),
+            }
+            .into());
         }
         _ => InlineDefinitionKind::Function,
     };
 
     let (name, params, accepts_other_keys, body_start) = if head == "define" {
-        let signature = view.children.get(1).context(
-            "scheme define selection must include a signature list: (define (name args...) body)",
-        )?;
+        let signature = view.children.get(1).ok_or_else(|| InlineError::from(InlineSelectionError::Unnamed {
+            message: "scheme define selection must include a signature list: (define (name args...) body)".to_owned(),
+        }))?;
         if signature.kind != ExpressionKind::List || signature.delimiter != Some(Delimiter::Paren) {
-            anyhow::bail!(
-                "inline-function currently supports scheme procedure defines, not variable defines"
-            );
+            return Err(InlineSelectionError::Shape {
+                operation: "inline-function",
+                problem: "currently supports scheme procedure defines, not variable defines"
+                    .to_owned(),
+            }
+            .into());
         }
-        let name = atom_child(signature, 0)
-            .context("scheme define signature must start with a function name")?;
+        let name = atom_child(signature, 0).ok_or_else(|| {
+            InlineError::from(InlineSelectionError::Unnamed {
+                message: "scheme define signature must start with a function name".to_owned(),
+            })
+        })?;
         let (params, _) = inline_parameter_names_from_children(
             dialect,
             input,
@@ -75,12 +91,16 @@ pub fn parse_inline_function_definition(
         )?;
         (SymbolName::new(name.to_owned())?, params, false, 2)
     } else {
-        let name =
-            atom_child(&view, 1).context("function definition must include a symbol name")?;
-        let params = view
-            .children
-            .get(2)
-            .context("function definition must include a parameter list")?;
+        let name = atom_child(&view, 1).ok_or_else(|| {
+            InlineError::from(InlineSelectionError::Unnamed {
+                message: "function definition must include a symbol name".to_owned(),
+            })
+        })?;
+        let params = view.children.get(2).ok_or_else(|| {
+            InlineError::from(InlineSelectionError::Unnamed {
+                message: "function definition must include a parameter list".to_owned(),
+            })
+        })?;
         let (params, accepts_other_keys) =
             inline_parameter_names(dialect, input, definition_kind, params)?;
         (
@@ -96,10 +116,14 @@ pub fn parse_inline_function_definition(
         InlineDefinitionKind::Function => inline_function_body_view(body_forms)?,
         InlineDefinitionKind::Macro => {
             let [body] = body_forms else {
-                anyhow::bail!(
-                    "inline-function currently requires exactly one effective body expression; found {}",
-                    body_forms.len()
-                );
+                return Err(InlineSelectionError::Shape {
+                    operation: "inline-function",
+                    problem: format!(
+                        "currently requires exactly one effective body expression; found {}",
+                        body_forms.len()
+                    ),
+                }
+                .into());
             };
             body.clone()
         }

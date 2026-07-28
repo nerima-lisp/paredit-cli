@@ -1,6 +1,8 @@
 //! Use case for expanding one conservative Common Lisp `symbol-macrolet` binding.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{DialectRefusal, DocumentRefusal};
+
+use crate::error::{InlineError, InlineResult, InlineSafetyError, InlineSelectionError};
 
 use crate::inline_let::domain::{InlineLetRequest, plan_inline_let};
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -36,32 +38,60 @@ pub struct InlineSymbolMacroPlan {
 
 pub fn plan_inline_symbol_macro(
     request: InlineSymbolMacroRequest<'_>,
-) -> Result<InlineSymbolMacroPlan> {
+) -> InlineResult<InlineSymbolMacroPlan> {
     if request.dialect != Dialect::CommonLisp {
-        bail!("inline-symbol-macro currently supports only Common Lisp");
+        return Err(DialectRefusal::CurrentlyCommonLispOnly {
+            operation: "inline-symbol-macro",
+        }
+        .into());
     }
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("inline-symbol-macro input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "inline-symbol-macro",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
-        bail!("inline-symbol-macro cannot replace a form containing comments");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-symbol-macro",
+            problem: "cannot replace a form containing comments".to_owned(),
+        }
+        .into());
     }
     if contains_reader_prefix(&form) {
-        bail!("inline-symbol-macro requires a form without reader prefixes");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-symbol-macro",
+            problem: "requires a form without reader prefixes".to_owned(),
+        }
+        .into());
     }
     require_head(&form, "symbol-macrolet")?;
     if form.children.len() != 3 {
-        bail!("inline-symbol-macro requires exactly one body expression");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-symbol-macro",
+            problem: "requires exactly one body expression".to_owned(),
+        }
+        .into());
     }
 
     let bindings = &form.children[1];
     if bindings.kind != ExpressionKind::List || bindings.children.len() != 1 {
-        bail!("inline-symbol-macro requires exactly one binding");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-symbol-macro",
+            problem: "requires exactly one binding".to_owned(),
+        }
+        .into());
     }
     let binding = &bindings.children[0];
     if binding.kind != ExpressionKind::List || binding.children.len() != 2 {
-        bail!("inline-symbol-macro binding must be a (name expansion) pair");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-symbol-macro",
+            problem: "binding must be a (name expansion) pair".to_owned(),
+        }
+        .into());
     }
     let binding_name = plain_symbol(&binding.children[0])?;
     let body = &form.children[2];
@@ -83,7 +113,10 @@ pub fn plan_inline_symbol_macro(
                 && reference.end().get() <= place.end().get()
         })
     }) {
-        bail!("inline-symbol-macro rejects references used as mutation places");
+        return Err(InlineSafetyError::MutationPlace {
+            operation: "inline-symbol-macro",
+        }
+        .into());
     }
 
     let inline = plan_inline_let(InlineLetRequest {
@@ -106,7 +139,7 @@ pub fn plan_inline_symbol_macro(
     })
 }
 
-fn require_head(view: &ExpressionView, expected: &str) -> Result<()> {
+fn require_head(view: &ExpressionView, expected: &str) -> InlineResult<()> {
     let matches = view.kind == ExpressionKind::List
         && view
             .children
@@ -114,17 +147,30 @@ fn require_head(view: &ExpressionView, expected: &str) -> Result<()> {
             .and_then(atom_symbol_text)
             .is_some_and(|head| common_lisp_symbol_reference_eq(head, expected));
     if !matches {
-        bail!("inline-symbol-macro selection must be a symbol-macrolet form");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-symbol-macro",
+            problem: "selection must be a symbol-macrolet form".to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
 
-fn plain_symbol(view: &ExpressionView) -> Result<SymbolName> {
+fn plain_symbol(view: &ExpressionView) -> InlineResult<SymbolName> {
     if view.kind != ExpressionKind::Atom {
-        bail!("inline-symbol-macro binding name must be a plain symbol");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-symbol-macro",
+            problem: "binding name must be a plain symbol".to_owned(),
+        }
+        .into());
     }
-    Ok(SymbolName::new(atom_symbol_text(view).context(
-        "inline-symbol-macro binding name must be a plain symbol",
+    Ok(SymbolName::new(atom_symbol_text(view).ok_or_else(
+        || {
+            InlineError::from(InlineSelectionError::Shape {
+                operation: "inline-symbol-macro",
+                problem: "binding name must be a plain symbol".to_owned(),
+            })
+        },
     )?)?)
 }
 
@@ -132,7 +178,7 @@ fn contains_reader_prefix(view: &ExpressionView) -> bool {
     !view.reader_prefixes.is_empty() || view.children.iter().any(contains_reader_prefix)
 }
 
-fn reject_declarations(view: &ExpressionView) -> Result<()> {
+fn reject_declarations(view: &ExpressionView) -> InlineResult<()> {
     if view.kind == ExpressionKind::List
         && view
             .children
@@ -140,7 +186,7 @@ fn reject_declarations(view: &ExpressionView) -> Result<()> {
             .and_then(atom_symbol_text)
             .is_some_and(is_common_lisp_declaration_form)
     {
-        bail!("inline-symbol-macro rejects declarations");
+        return Err(InlineSafetyError::SymbolMacroDeclarations.into());
     }
     for child in &view.children {
         reject_declarations(child)?;
@@ -185,7 +231,7 @@ fn collect_place_spans(view: &ExpressionView, spans: &mut Vec<ByteSpan>) {
 mod tests {
     use super::*;
 
-    fn plan(input: &str) -> Result<InlineSymbolMacroPlan> {
+    fn plan(input: &str) -> InlineResult<InlineSymbolMacroPlan> {
         plan_inline_symbol_macro(InlineSymbolMacroRequest {
             input,
             dialect: Dialect::CommonLisp,

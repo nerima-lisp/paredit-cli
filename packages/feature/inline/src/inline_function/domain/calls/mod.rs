@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{CallBindingError, InlineError, InlineResult, InlineSelectionError};
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
@@ -23,7 +23,7 @@ pub fn bind_inline_function_arguments(
     function_name: &SymbolName,
     accepts_other_keys: bool,
     allow_drop_arguments: bool,
-) -> Result<InlineArgumentBindings> {
+) -> InlineResult<InlineArgumentBindings> {
     binding::bind_inline_function_arguments(
         dialect,
         params,
@@ -41,8 +41,8 @@ pub fn resolve_function_call_paths(
     all_calls: bool,
     definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
-    command: &str,
-) -> Result<Vec<Path>> {
+    command: &'static str,
+) -> InlineResult<Vec<Path>> {
     validate_or_resolve_function_call_paths(
         tree,
         dialect,
@@ -59,20 +59,34 @@ pub fn parse_inline_function_call(
     view: ExpressionView,
     function_name: &SymbolName,
     input: &str,
-) -> Result<InlineFunctionCall> {
+) -> InlineResult<InlineFunctionCall> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-        anyhow::bail!("inline-function call selection must be a function call list");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-function",
+            problem: "call selection must be a function call list".to_owned(),
+        }
+        .into());
     }
-    let head = atom_text(
-        view.children
-            .first()
-            .context("inline-function call must not be empty")?,
-    )
-    .context("inline-function call must start with an atom")?;
+    let head = atom_text(view.children.first().ok_or_else(|| {
+        InlineError::from(InlineSelectionError::Shape {
+            operation: "inline-function",
+            problem: "call must not be empty".to_owned(),
+        })
+    })?)
+    .ok_or_else(|| {
+        InlineError::from(InlineSelectionError::Shape {
+            operation: "inline-function",
+            problem: "call must start with an atom".to_owned(),
+        })
+    })?;
     if !inline_function_symbol_reference_eq(dialect, head, function_name.as_str()) {
-        anyhow::bail!(
-            "inline-function call head '{head}' does not match selected definition '{function_name}'"
-        );
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-function",
+            problem: format!(
+                "call head '{head}' does not match selected definition '{function_name}'"
+            ),
+        }
+        .into());
     }
 
     Ok(InlineFunctionCall {
@@ -90,30 +104,45 @@ fn validate_explicit_function_call_paths(
     explicit_call_paths: &[Path],
     definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
-    command: &str,
-) -> Result<()> {
+    command: &'static str,
+) -> InlineResult<()> {
     let discoverable_call_paths =
         discovery::discover_function_call_paths(tree, dialect, definition_span, function_name)?;
     for call_path in explicit_call_paths {
         let selection = tree.select_path(call_path)?;
         let view = selection.view();
         if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-            anyhow::bail!("{command} --call-path {call_path} must select a function call list");
+            return Err(CallBindingError::CallPathNotACallList {
+                command,
+                path: call_path.to_string(),
+            }
+            .into());
         }
 
         let head = list_head(&view)
-            .context("inline-function call must not be empty")?
+            .ok_or_else(|| {
+                InlineError::from(InlineSelectionError::Shape {
+                    operation: "inline-function",
+                    problem: "call must not be empty".to_owned(),
+                })
+            })?
             .to_owned();
         if !inline_function_symbol_reference_eq(dialect, &head, function_name.as_str()) {
-            anyhow::bail!(
-                "{command} --call-path {call_path} head '{head}' does not match selected definition '{function_name}'"
-            );
+            return Err(CallBindingError::CallPathHeadMismatch {
+                command,
+                path: call_path.to_string(),
+                head: head.to_string(),
+                function: function_name.to_string(),
+            }
+            .into());
         }
 
         if !discoverable_call_paths.iter().any(|path| path == call_path) {
-            anyhow::bail!(
-                "{command} --call-path {call_path} resolves to a call shadowed by a local callable binding or overlaps the selected definition"
-            );
+            return Err(CallBindingError::CallPathShadowed {
+                command,
+                path: call_path.to_string(),
+            }
+            .into());
         }
     }
 
@@ -143,23 +172,27 @@ pub fn validate_or_resolve_function_call_paths(
     all_calls: bool,
     definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
-    command: &str,
-) -> Result<Vec<Path>> {
+    command: &'static str,
+) -> InlineResult<Vec<Path>> {
     if all_calls && !explicit_call_paths.is_empty() {
-        anyhow::bail!("{command} accepts either --all-calls or repeated --call-path, not both");
+        return Err(CallBindingError::AllCallsAndCallPath { command }.into());
     }
 
     if all_calls {
         let call_paths =
             discovery::discover_function_call_paths(tree, dialect, definition_span, function_name)?;
         if call_paths.is_empty() {
-            anyhow::bail!("{command} --all-calls found no same-file calls for {function_name}");
+            return Err(CallBindingError::NoSameFileCalls {
+                command,
+                function: function_name.to_string(),
+            }
+            .into());
         }
         return Ok(call_paths);
     }
 
     if explicit_call_paths.is_empty() {
-        anyhow::bail!("{command} requires at least one --call-path or --all-calls");
+        return Err(CallBindingError::NoCallSelector { command }.into());
     }
 
     validate_explicit_function_call_paths(

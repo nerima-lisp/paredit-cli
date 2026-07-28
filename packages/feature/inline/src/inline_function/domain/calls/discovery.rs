@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::InlineResult;
 
 use paredit_core_semantics::callable_scope::{
     common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
@@ -23,7 +23,7 @@ pub fn discover_function_call_paths(
     dialect: Dialect,
     definition_span: ByteSpan,
     function_name: &SymbolName,
-) -> Result<Vec<Path>> {
+) -> InlineResult<Vec<Path>> {
     let context = InlineCallTraversal {
         dialect,
         definition_span,

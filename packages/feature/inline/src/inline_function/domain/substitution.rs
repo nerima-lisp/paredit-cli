@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{InlineInternalError, InlineResult, InlineSafetyError};
 
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
 use paredit_core_syntax::dialect::Dialect;
@@ -15,7 +15,7 @@ pub fn substitute_inline_function_body(
     args: &[String],
     allow_duplicate_evaluation: bool,
     allow_drop_arguments: bool,
-) -> Result<(String, Vec<InlineFunctionParameterPlan>)> {
+) -> InlineResult<(String, Vec<InlineFunctionParameterPlan>)> {
     substitute_references(
         dialect,
         input,
@@ -32,10 +32,10 @@ pub fn substitute_expression(
     input: &str,
     params: &[String],
     args: &[String],
-) -> Result<String> {
+) -> InlineResult<String> {
     let tree = SyntaxTree::parse_with_dialect(input, dialect)?;
     if tree.root_children().len() != 1 {
-        anyhow::bail!("inline-function default value must be a single S-expression");
+        return Err(InlineInternalError::DefaultValueNotSingleExpression.into());
     }
     let expression = tree.select_path(&Path::root_child(0))?.view();
     let (rewritten, _) =
@@ -51,7 +51,7 @@ fn substitute_references(
     args: &[String],
     allow_duplicate_evaluation: bool,
     allow_drop_arguments: bool,
-) -> Result<(String, Vec<InlineFunctionParameterPlan>)> {
+) -> InlineResult<(String, Vec<InlineFunctionParameterPlan>)> {
     let mut replacements = Vec::new();
     let mut parameter_plans = Vec::with_capacity(params.len());
 
@@ -62,14 +62,18 @@ fn substitute_references(
         spans.sort_by_key(|span| span.start());
 
         if spans.is_empty() && !allow_drop_arguments {
-            anyhow::bail!(
-                "inline-function would drop argument '{argument}' for unused parameter '{param}'; pass --allow-drop-arguments to permit it"
-            );
+            return Err(InlineSafetyError::WouldDropArgument {
+                argument: argument.to_string(),
+                parameter: param.to_string(),
+            }
+            .into());
         }
         if spans.len() > 1 && !allow_duplicate_evaluation {
-            anyhow::bail!(
-                "inline-function would duplicate argument '{argument}' for parameter '{param}'; pass --allow-duplicate-evaluation to permit it"
-            );
+            return Err(InlineSafetyError::WouldDuplicateArgument {
+                argument: argument.to_string(),
+                parameter: param.to_string(),
+            }
+            .into());
         }
 
         for span in &spans {

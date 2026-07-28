@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{InlineError, InlineInternalError, InlineResult, InlineSelectionError};
 
 use paredit_core_syntax::common_lisp::{CommonLispOperator, is_common_lisp_declaration_form};
 use paredit_core_syntax::dialect::Dialect;
@@ -16,14 +16,17 @@ pub fn unsupported_inline_function_definition_message(dialect: Dialect, head: &s
     format!("inline-function does not support definition head: {head}")
 }
 
-pub fn inline_function_body_view(body_forms: &[ExpressionView]) -> Result<ExpressionView> {
+pub fn inline_function_body_view(body_forms: &[ExpressionView]) -> InlineResult<ExpressionView> {
     let [body] = body_forms else {
-        let first = body_forms
-            .first()
-            .context("inline-function definition must include at least one body expression")?;
+        let first = body_forms.first().ok_or_else(|| {
+            InlineError::from(InlineSelectionError::Shape {
+                operation: "inline-function",
+                problem: "definition must include at least one body expression".to_owned(),
+            })
+        })?;
         let last = body_forms
             .last()
-            .context("inline-function expected a non-empty effective body after validation")?;
+            .ok_or_else(|| InlineError::from(InlineInternalError::EmptyBodyAfterValidation))?;
         return Ok(ExpressionView {
             kind: ExpressionKind::Root,
             delimiter: None,

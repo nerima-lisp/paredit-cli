@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{InlineInternalError, InlineResult};
 
 use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan};
 
@@ -6,7 +6,7 @@ pub fn apply_relative_body_edits(
     input: &str,
     body_span: ByteSpan,
     mut replacements: Vec<(ByteSpan, String)>,
-) -> Result<String> {
+) -> InlineResult<String> {
     replacements.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(replacements.iter().map(|(span, _)| *span))?;
 
@@ -20,7 +20,10 @@ pub fn apply_relative_body_edits(
     Ok(output)
 }
 
-pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) -> Result<String> {
+pub fn apply_byte_span_edits(
+    input: &str,
+    mut edits: Vec<(ByteSpan, String)>,
+) -> InlineResult<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 
@@ -31,14 +34,14 @@ pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) ->
     Ok(output)
 }
 
-pub fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Result<()> {
+pub fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> InlineResult<()> {
     let mut previous_end = None;
     for span in spans {
         let start = span.start().get();
         let end = span.end().get();
         if let Some(previous_end) = previous_end {
             if start < previous_end {
-                anyhow::bail!("refusing overlapping rewrite spans");
+                return Err(InlineInternalError::OverlappingRewriteSpans.into());
             }
         }
         previous_end = Some(end);

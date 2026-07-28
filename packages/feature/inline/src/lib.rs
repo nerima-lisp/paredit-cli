@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod error;
 pub mod inline_function;
 pub mod inline_lambda;
 pub mod inline_let;
@@ -15,3 +16,8 @@ pub use inline_let::cli::{InlineLetArgs, inline_let};
 pub use inline_literal_constant::cli::{InlineLiteralConstantArgs, inline_literal_constant};
 pub use inline_local_function::cli::{InlineLocalFunctionArgs, inline_local_function};
 pub use inline_symbol_macro::cli::{InlineSymbolMacroArgs, inline_symbol_macro};
+
+pub use error::{
+    CallBindingError, InlineError, InlineInternalError, InlineResult, InlineSafetyError,
+    InlineSelectionError, UnsupportedLambdaList,
+};

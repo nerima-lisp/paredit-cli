@@ -1,6 +1,10 @@
 //! Pure planning rules for inlining a single-binding `let` form.
 
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{
+    InlineError, InlineInternalError, InlineResult, InlineSafetyError, InlineSelectionError,
+};
 
 use paredit_core_semantics::lexical_scope::{collect_unshadowed_symbol_references, value_capture};
 use paredit_core_syntax::dialect::Dialect;
@@ -48,20 +52,29 @@ pub const fn supports_inline_let_dialect(dialect: Dialect) -> bool {
     )
 }
 
-fn require_supported_dialect(dialect: Dialect) -> Result<()> {
+fn require_supported_dialect(dialect: Dialect) -> InlineResult<()> {
     if supports_inline_let_dialect(dialect) {
         return Ok(());
     }
 
-    anyhow::bail!(
-        "inline-let requires a known dialect because semantic safety cannot be verified for unknown input"
-    )
+    Err(InlineSelectionError::Shape {
+        operation: "inline-let",
+        problem:
+            "requires a known dialect because semantic safety cannot be verified for unknown input"
+                .to_owned(),
+    }
+    .into())
 }
 
-pub fn plan_inline_let(request: InlineLetRequest<'_>) -> Result<InlineLetPlan> {
+pub fn plan_inline_let(request: InlineLetRequest<'_>) -> InlineResult<InlineLetPlan> {
     require_supported_dialect(request.dialect)?;
-    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("inline-let input is not a valid S-expression document")?;
+    let input_tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "inline-let",
+                source,
+            }
+        })?;
     paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals(
         &input_tree,
         request.dialect,
@@ -115,32 +128,39 @@ fn select_target_from_tree(
     tree: &SyntaxTree,
     path: Option<&Path>,
     requested_target: &ExpressionView,
-) -> Result<ExpressionView> {
+) -> InlineResult<ExpressionView> {
     let selected = match path {
         Some(path) => tree.select_path(path)?,
         None => tree.select_at(requested_target.span.start().get())?,
     };
     let target = selected.view();
     if target.span != requested_target.span {
-        anyhow::bail!("inline-let target does not match the dialect-aware input tree");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: "target does not match the dialect-aware input tree".to_owned(),
+        }
+        .into());
     }
     Ok(target)
 }
 
-pub fn plan(request: CoreRequest<'_>) -> Result<CorePlan> {
+pub fn plan(request: CoreRequest<'_>) -> InlineResult<CorePlan> {
     require_supported_dialect(request.dialect)?;
-    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("inline-let input is not a valid S-expression document")?;
+    let input_tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "inline-let",
+                source,
+            }
+        })?;
     let target = select_target_from_tree(&input_tree, request.path.as_ref(), &request.target)?;
     let parts = parts(request.dialect, request.input, &target)?;
     let reference_count = parts.reference_spans.len();
     if reference_count == 0 {
-        anyhow::bail!("inline-let would drop an unused binding value");
+        return Err(InlineSafetyError::LetWouldDropBinding.into());
     }
     if reference_count > 1 && !request.allow_duplicate_evaluation {
-        anyhow::bail!(
-            "inline-let would duplicate binding value evaluation; pass --allow-duplicate-evaluation to permit it"
-        );
+        return Err(InlineSafetyError::LetWouldDuplicateEvaluation.into());
     }
 
     let replacement = replace_body_references(
@@ -150,8 +170,12 @@ pub fn plan(request: CoreRequest<'_>) -> Result<CorePlan> {
         &parts.binding_value,
     );
     let rewritten = replace_span(request.input, parts.let_span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("inline-let output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "inline-let",
+            source,
+        }
+    })?;
 
     Ok(CorePlan {
         dialect: request.dialect,
@@ -176,16 +200,33 @@ struct Parts {
     reference_spans: Vec<ByteSpan>,
 }
 
-fn parts(dialect: Dialect, input: &str, target: &ExpressionView) -> Result<Parts> {
+fn parts(dialect: Dialect, input: &str, target: &ExpressionView) -> InlineResult<Parts> {
     if target.kind != ExpressionKind::List {
-        anyhow::bail!("inline-let selection must be a let list");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: "selection must be a let list".to_owned(),
+        }
+        .into());
     }
     if target.children.len() < 3 {
-        anyhow::bail!("inline-let requires one binding and at least one body expression");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: "requires one binding and at least one body expression".to_owned(),
+        }
+        .into());
     }
-    let head = atom_text(&target.children[0]).context("inline-let form must start with an atom")?;
+    let head = atom_text(&target.children[0]).ok_or_else(|| {
+        InlineError::from(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: "form must start with an atom".to_owned(),
+        })
+    })?;
     if !dialect.supports_inline_let_refactor_head(head) {
-        anyhow::bail!("inline-let selection must start with let");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: "selection must start with let".to_owned(),
+        }
+        .into());
     }
 
     let (binding_name, binding_value_view) = match dialect {
@@ -220,16 +261,17 @@ fn parts(dialect: Dialect, input: &str, target: &ExpressionView) -> Result<Parts
     )
     .first()
     {
-        anyhow::bail!(
-            "inline-let would capture variable `{name}`: it is free in the binding value but a nested binding in the let body would shadow it, changing the meaning of the code"
-        );
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: format!("would capture variable `{name}`: it is free in the binding value but a nested binding in the let body would shadow it, changing the meaning of the code"),
+        }.into());
     }
 
     let first_body = &target.children[2];
     let last_body = target
         .children
         .last()
-        .context("inline-let body disappeared after validation")?;
+        .ok_or_else(|| InlineError::from(InlineInternalError::LetBodyDisappeared))?;
     Ok(Parts {
         let_span: target.span,
         binding_name,
@@ -240,38 +282,66 @@ fn parts(dialect: Dialect, input: &str, target: &ExpressionView) -> Result<Parts
     })
 }
 
-fn vector_let_binding(binding_form: &ExpressionView) -> Result<(String, &ExpressionView)> {
+fn vector_let_binding(binding_form: &ExpressionView) -> InlineResult<(String, &ExpressionView)> {
     if binding_form.kind != ExpressionKind::List
         || binding_form.delimiter != Some(Delimiter::Bracket)
     {
-        anyhow::bail!("dialect expects vector let bindings: [name value]");
+        return Err(InlineSelectionError::Unnamed {
+            message: "dialect expects vector let bindings: [name value]".to_owned(),
+        }
+        .into());
     }
     if binding_form.children.len() != 2 {
-        anyhow::bail!("inline-let currently supports exactly one vector binding");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: "currently supports exactly one vector binding".to_owned(),
+        }
+        .into());
     }
     let name = atom_text(&binding_form.children[0])
-        .context("let binding name must be an atom")?
+        .ok_or_else(|| {
+            InlineError::from(InlineSelectionError::Unnamed {
+                message: "let binding name must be an atom".to_owned(),
+            })
+        })?
         .to_owned();
     Ok((name, &binding_form.children[1]))
 }
 
-fn list_pair_let_binding(binding_form: &ExpressionView) -> Result<(String, &ExpressionView)> {
+fn list_pair_let_binding(binding_form: &ExpressionView) -> InlineResult<(String, &ExpressionView)> {
     if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
     {
-        anyhow::bail!("dialect expects list-pair let bindings: ((name value))");
+        return Err(InlineSelectionError::Unnamed {
+            message: "dialect expects list-pair let bindings: ((name value))".to_owned(),
+        }
+        .into());
     }
     if binding_form.children.len() != 1 {
-        anyhow::bail!("inline-let currently supports exactly one list-pair binding");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-let",
+            problem: "currently supports exactly one list-pair binding".to_owned(),
+        }
+        .into());
     }
     let pair = &binding_form.children[0];
     if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-        anyhow::bail!("let binding must be a (name value) pair");
+        return Err(InlineSelectionError::Unnamed {
+            message: "let binding must be a (name value) pair".to_owned(),
+        }
+        .into());
     }
     if pair.children.len() != 2 {
-        anyhow::bail!("let binding pair must contain a name and value");
+        return Err(InlineSelectionError::Unnamed {
+            message: "let binding pair must contain a name and value".to_owned(),
+        }
+        .into());
     }
     let name = atom_text(&pair.children[0])
-        .context("let binding name must be an atom")?
+        .ok_or_else(|| {
+            InlineError::from(InlineSelectionError::Unnamed {
+                message: "let binding name must be an atom".to_owned(),
+            })
+        })?
         .to_owned();
     Ok((name, &pair.children[1]))
 }
@@ -313,7 +383,11 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
 mod tests {
     use super::*;
 
-    fn plan(input: &str, dialect: Dialect, allow_duplicate_evaluation: bool) -> Result<CorePlan> {
+    fn plan(
+        input: &str,
+        dialect: Dialect,
+        allow_duplicate_evaluation: bool,
+    ) -> InlineResult<CorePlan> {
         let path = Path::from_indexes(vec![0]);
         let tree = SyntaxTree::parse_with_dialect(input, dialect)?;
         let target = tree.select_path(&path)?.view();

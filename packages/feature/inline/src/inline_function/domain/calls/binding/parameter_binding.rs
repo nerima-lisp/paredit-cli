@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{InlineInternalError, InlineResult};
 
 use paredit_core_syntax::dialect::Dialect;
 
@@ -15,7 +15,7 @@ pub fn bind_positional_parameter(
     argument: Option<String>,
     default_scope: &[(String, String)],
     allow_drop_arguments: bool,
-) -> Result<ParameterBinding> {
+) -> InlineResult<ParameterBinding> {
     if let Some(argument) = argument {
         return supplied_parameter_binding(dialect, param, argument, allow_drop_arguments);
     }
@@ -29,7 +29,7 @@ pub fn bind_keyword_parameter(
     argument: Option<String>,
     default_scope: &[(String, String)],
     allow_drop_arguments: bool,
-) -> Result<ParameterBinding> {
+) -> InlineResult<ParameterBinding> {
     if let Some(argument) = argument {
         return supplied_parameter_binding(dialect, param, argument, allow_drop_arguments);
     }
@@ -41,7 +41,7 @@ pub fn bind_aux_parameter(
     dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
-) -> Result<ParameterBinding> {
+) -> InlineResult<ParameterBinding> {
     let name = simple_binding_name(param)?;
     let argument = resolve_default_value(dialect, param, default_scope)?;
     Ok(ParameterBinding {
@@ -56,7 +56,7 @@ fn supplied_parameter_binding(
     param: &InlineParameter,
     argument: String,
     allow_drop_arguments: bool,
-) -> Result<ParameterBinding> {
+) -> InlineResult<ParameterBinding> {
     let supplied_p = param
         .supplied_p
         .as_ref()
@@ -80,7 +80,7 @@ fn missing_parameter_binding(
     param: &InlineParameter,
     default_scope: &[(String, String)],
     allow_drop_arguments: bool,
-) -> Result<ParameterBinding> {
+) -> InlineResult<ParameterBinding> {
     let argument = resolve_default_value(dialect, param, default_scope)?;
     let mut body_entries =
         bound_parameter_argument_entries(dialect, param, argument.clone(), allow_drop_arguments)?;
@@ -102,7 +102,7 @@ fn resolve_default_value(
     dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
-) -> Result<String> {
+) -> InlineResult<String> {
     let Some(value) = param.default_value.as_ref() else {
         return Ok("nil".to_owned());
     };
@@ -114,7 +114,7 @@ fn supplied_parameter_default_scope_entries(
     param: &InlineParameter,
     argument_entries: &[(String, String)],
     supplied_p: Option<(String, String)>,
-) -> Result<Vec<(String, String)>> {
+) -> InlineResult<Vec<(String, String)>> {
     let mut entries = match &param.binding {
         InlineParameterBinding::Name(name) => vec![(name.clone(), name.clone())],
         InlineParameterBinding::Destructure(_) => argument_entries.to_vec(),
@@ -130,7 +130,7 @@ pub fn bound_parameter_argument_entries(
     param: &InlineParameter,
     argument: String,
     allow_drop_arguments: bool,
-) -> Result<Vec<(String, String)>> {
+) -> InlineResult<Vec<(String, String)>> {
     match &param.binding {
         InlineParameterBinding::Name(name) => Ok(vec![(name.clone(), argument)]),
         InlineParameterBinding::Destructure(pattern) => {
@@ -139,18 +139,18 @@ pub fn bound_parameter_argument_entries(
     }
 }
 
-fn simple_binding_name(param: &InlineParameter) -> Result<String> {
+fn simple_binding_name(param: &InlineParameter) -> InlineResult<String> {
     param
         .primary_name()
         .map(ToOwned::to_owned)
-        .context("inline-function internal error: expected simple parameter binding")
+        .ok_or_else(|| InlineInternalError::ExpectedSimpleParameterBinding.into())
 }
 
 pub fn destructured_binding_entries(
     dialect: Dialect,
     pattern: &InlineDestructurePattern,
     argument: String,
-) -> Result<Vec<(String, String)>> {
+) -> InlineResult<Vec<(String, String)>> {
     match pattern {
         InlineDestructurePattern::Name(name) => Ok(vec![(name.clone(), argument)]),
         InlineDestructurePattern::List(_) => {

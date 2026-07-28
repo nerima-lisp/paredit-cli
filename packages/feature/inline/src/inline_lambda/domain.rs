@@ -1,6 +1,10 @@
 //! Semantics-preserving inlining of immediately invoked Common Lisp lambdas.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{DialectRefusal, DocumentRefusal};
+
+use crate::error::{
+    CallBindingError, InlineError, InlineResult, InlineSafetyError, InlineSelectionError,
+};
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
@@ -31,44 +35,78 @@ pub struct Plan {
     pub changed: bool,
 }
 
-pub fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> InlineResult<Plan> {
     validate_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("inline-lambda input is not valid")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputInvalid {
+                operation: "inline-lambda",
+                source,
+            }
+        })?;
     let call = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(call.span) {
-        bail!("inline-lambda cannot replace a call containing comments");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-lambda",
+            problem: "cannot replace a call containing comments".to_owned(),
+        }
+        .into());
     }
     if call.kind != ExpressionKind::List || !call.reader_prefixes.is_empty() {
-        bail!("inline-lambda selected form must be a plain call list");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-lambda",
+            problem: "selected form must be a plain call list".to_owned(),
+        }
+        .into());
     }
-    let lambda = call
-        .children
-        .first()
-        .context("inline-lambda selected call has no operator")?;
+    let lambda = call.children.first().ok_or_else(|| {
+        InlineError::from(InlineSelectionError::Shape {
+            operation: "inline-lambda",
+            problem: "selected call has no operator".to_owned(),
+        })
+    })?;
     require_head(lambda, "lambda", "call operator must be a lambda form")?;
     if lambda.children.len() != 3 {
-        bail!("inline-lambda requires exactly one lambda body expression");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-lambda",
+            problem: "requires exactly one lambda body expression".to_owned(),
+        }
+        .into());
     }
     let parameters = &lambda.children[1];
     if parameters.kind != ExpressionKind::List || !parameters.reader_prefixes.is_empty() {
-        bail!("inline-lambda requires a plain required-parameter list");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-lambda",
+            problem: "requires a plain required-parameter list".to_owned(),
+        }
+        .into());
     }
     let mut names = Vec::with_capacity(parameters.children.len());
     for parameter in &parameters.children {
         let name = plain_symbol(parameter, "required parameter")?;
         if name.as_str().starts_with('&') {
-            bail!("inline-lambda supports required parameters only");
+            return Err(InlineSelectionError::Shape {
+                operation: "inline-lambda",
+                problem: "supports required parameters only".to_owned(),
+            }
+            .into());
         }
         if names.iter().any(|existing: &SymbolName| {
             common_lisp_symbol_reference_eq(existing.as_str(), name.as_str())
         }) {
-            bail!("inline-lambda requires unique parameter names");
+            return Err(InlineSelectionError::Shape {
+                operation: "inline-lambda",
+                problem: "requires unique parameter names".to_owned(),
+            }
+            .into());
         }
         names.push(name);
     }
     if call.children.len() != names.len() + 1 {
-        bail!("inline-lambda requires exact call arity");
+        return Err(CallBindingError::ExactArityRequired {
+            operation: "inline-lambda",
+        }
+        .into());
     }
     let body = &lambda.children[2];
     reject_boundary(body)?;
@@ -87,8 +125,12 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
         .join(" ");
     let replacement = format!("(let ({rendered}) {})", body.span.slice(request.input));
     let rewritten = replace_span(request.input, call.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("inline-lambda output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputInvalid {
+            operation: "inline-lambda",
+            source,
+        }
+    })?;
     Ok(Plan {
         dialect: request.dialect,
         path: request.path,
@@ -101,23 +143,37 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     })
 }
 
-pub fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> InlineResult<()> {
     if dialect != Dialect::CommonLisp {
-        bail!("inline-lambda currently supports only Common Lisp");
+        return Err(DialectRefusal::CurrentlyCommonLispOnly {
+            operation: "inline-lambda",
+        }
+        .into());
     }
     Ok(())
 }
 
-fn plain_symbol(view: &ExpressionView, role: &str) -> Result<SymbolName> {
+fn plain_symbol(view: &ExpressionView, role: &str) -> InlineResult<SymbolName> {
     if view.kind != ExpressionKind::Atom || !view.reader_prefixes.is_empty() {
-        bail!("inline-lambda requires a plain {role}");
+        return Err(InlineSelectionError::NotPlain {
+            operation: "inline-lambda",
+            role: role.to_owned(),
+        }
+        .into());
     }
-    SymbolName::new(
-        atom_symbol_text(view).with_context(|| format!("inline-lambda requires a plain {role}"))?,
-    )
-    .with_context(|| format!("inline-lambda has invalid {role}"))
+    let text = atom_symbol_text(view).ok_or_else(|| InlineSelectionError::NotPlain {
+        operation: "inline-lambda",
+        role: role.to_owned(),
+    })?;
+    SymbolName::new(text).map_err(|_| {
+        InlineSelectionError::Invalid {
+            operation: "inline-lambda",
+            role: role.to_owned(),
+        }
+        .into()
+    })
 }
-fn require_head(view: &ExpressionView, expected: &str, message: &str) -> Result<()> {
+fn require_head(view: &ExpressionView, expected: &str, message: &str) -> InlineResult<()> {
     if view.kind != ExpressionKind::List
         || !view.reader_prefixes.is_empty()
         || !view
@@ -126,11 +182,15 @@ fn require_head(view: &ExpressionView, expected: &str, message: &str) -> Result<
             .and_then(atom_symbol_text)
             .is_some_and(|head| common_lisp_symbol_reference_eq(head, expected))
     {
-        bail!("inline-lambda {message}");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-lambda",
+            problem: message.to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
-fn reject_boundary(view: &ExpressionView) -> Result<()> {
+fn reject_boundary(view: &ExpressionView) -> InlineResult<()> {
     if view.kind == ExpressionKind::List
         && view
             .children
@@ -142,7 +202,7 @@ fn reject_boundary(view: &ExpressionView) -> Result<()> {
                     .any(|form| common_lisp_symbol_reference_eq(head, form))
             })
     {
-        bail!("inline-lambda rejects control transfer or declarations tied to a function boundary");
+        return Err(InlineSafetyError::LambdaControlTransfer.into());
     }
     for child in &view.children {
         reject_boundary(child)?;

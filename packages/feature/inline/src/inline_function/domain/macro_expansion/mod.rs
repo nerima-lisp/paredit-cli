@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::Result;
+use crate::error::{InlineInternalError, InlineResult, InlineSafetyError};
 use expansion::{
     count_references_in_expanded_expression, expand_unquote_expression, expand_unquote_splicing,
 };
@@ -22,7 +22,7 @@ pub fn expand_inline_macro_body(
     argument_bindings: &[(String, String)],
     allow_duplicate_evaluation: bool,
     allow_drop_arguments: bool,
-) -> Result<(String, Vec<InlineFunctionParameterPlan>)> {
+) -> InlineResult<(String, Vec<InlineFunctionParameterPlan>)> {
     let mut reference_counts = BTreeMap::new();
     for (name, _) in argument_bindings {
         reference_counts.insert(name.clone(), 0usize);
@@ -53,14 +53,18 @@ pub fn expand_inline_macro_body(
     for (name, argument) in argument_bindings {
         let reference_count = reference_counts.remove(name).unwrap_or_default();
         if reference_count == 0 && !allow_drop_arguments {
-            anyhow::bail!(
-                "inline-function would drop argument '{argument}' for unused parameter '{name}'; pass --allow-drop-arguments to permit it"
-            );
+            return Err(InlineSafetyError::WouldDropArgument {
+                argument: argument.to_string(),
+                parameter: name.to_string(),
+            }
+            .into());
         }
         if reference_count > 1 && !allow_duplicate_evaluation {
-            anyhow::bail!(
-                "inline-function would duplicate argument '{argument}' for parameter '{name}'; pass --allow-duplicate-evaluation to permit it"
-            );
+            return Err(InlineSafetyError::WouldDuplicateArgument {
+                argument: argument.to_string(),
+                parameter: name.to_string(),
+            }
+            .into());
         }
         parameters.push(InlineFunctionParameterPlan {
             name: name.clone(),
@@ -79,7 +83,7 @@ fn expand_plain_macro_body(
     body_bindings: &[(String, String)],
     argument_bindings: &[(String, String)],
     reference_counts: &mut BTreeMap<String, usize>,
-) -> Result<String> {
+) -> InlineResult<String> {
     let (intermediate, _) = substitute_inline_function_body(
         dialect,
         input,
@@ -127,7 +131,7 @@ fn render_macro_template(
     body_bindings: &[(String, String)],
     argument_bindings: &[(String, String)],
     reference_counts: &mut BTreeMap<String, usize>,
-) -> Result<String> {
+) -> InlineResult<String> {
     render_prefixed_expression(
         dialect,
         input,
@@ -153,7 +157,7 @@ fn render_prefixed_expression(
     body_bindings: &[(String, String)],
     argument_bindings: &[(String, String)],
     reference_counts: &mut BTreeMap<String, usize>,
-) -> Result<String> {
+) -> InlineResult<String> {
     let Some(prefix) = view.reader_prefixes.get(prefix_index).copied() else {
         return render_core_expression(
             dialect,
@@ -209,7 +213,7 @@ fn render_prefixed_expression(
         }
         ReaderPrefix::UnquoteSplicing => {
             if quasiquote_depth == 1 {
-                anyhow::bail!("inline-function found unsupported top-level ,@expr in defmacro body")
+                Err(InlineInternalError::UnsupportedTopLevelSplice.into())
             } else {
                 let rendered = render_prefixed_expression(
                     dialect,
@@ -279,16 +283,16 @@ fn render_core_expression(
     body_bindings: &[(String, String)],
     argument_bindings: &[(String, String)],
     reference_counts: &mut BTreeMap<String, usize>,
-) -> Result<String> {
+) -> InlineResult<String> {
     match view.kind {
         ExpressionKind::Atom => Ok(view
             .text
             .clone()
-            .ok_or_else(|| anyhow::anyhow!("inline-function expected atom text in macro body"))?),
+            .ok_or(InlineInternalError::ExpectedAtomTextInMacroBody)?),
         ExpressionKind::List => {
-            let delimiter = view.delimiter.ok_or_else(|| {
-                anyhow::anyhow!("inline-function expected delimited list in macro body")
-            })?;
+            let delimiter = view
+                .delimiter
+                .ok_or(InlineInternalError::ExpectedDelimitedListInMacroBody)?;
             let mut rendered_children = Vec::with_capacity(view.children.len());
             for child in &view.children {
                 if quasiquote_depth == 1
@@ -315,8 +319,6 @@ fn render_core_expression(
             }
             Ok(literal_render::render_list(delimiter, rendered_children))
         }
-        ExpressionKind::Root => {
-            anyhow::bail!("inline-function macro body must be a single expression")
-        }
+        ExpressionKind::Root => Err(InlineInternalError::MacroBodyNotSingleExpression.into()),
     }
 }

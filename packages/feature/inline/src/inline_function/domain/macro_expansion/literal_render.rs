@@ -1,8 +1,8 @@
-use anyhow::Result;
+use crate::error::InlineResult;
 
 use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub fn render_unquoted_source(view: &ExpressionView) -> Result<String> {
+pub fn render_unquoted_source(view: &ExpressionView) -> InlineResult<String> {
     Ok(render_literal_expression_from(view, 1))
 }
 

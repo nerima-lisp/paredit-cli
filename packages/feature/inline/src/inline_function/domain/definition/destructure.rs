@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{InlineError, InlineResult, UnsupportedLambdaList};
 
 use paredit_core_syntax::sexpr::{Delimiter, ExpressionView};
 
@@ -15,12 +15,13 @@ use super::types::{
 pub fn parse_macro_destructure_pattern(
     input: &str,
     child: &ExpressionView,
-) -> Result<InlineDestructurePattern> {
+) -> InlineResult<InlineDestructurePattern> {
     if let Some(name) = atom_text(child) {
         if name.starts_with('&') {
-            anyhow::bail!(
-                "inline-function currently supports only required destructuring patterns in defmacro parameter lists"
-            );
+            return Err(UnsupportedLambdaList::SupportsOnly {
+                supported: "required destructuring patterns in defmacro parameter lists".to_owned(),
+            }
+            .into());
         }
         return Ok(InlineDestructurePattern::Name(name.to_owned()));
     }
@@ -28,9 +29,10 @@ pub fn parse_macro_destructure_pattern(
     match child.delimiter {
         Some(Delimiter::Paren | Delimiter::Bracket) => {}
         _ => {
-            anyhow::bail!(
-                "inline-function currently supports only list destructuring patterns in defmacro parameter lists"
-            );
+            return Err(UnsupportedLambdaList::SupportsOnly {
+                supported: "list destructuring patterns in defmacro parameter lists".to_owned(),
+            }
+            .into());
         }
     }
 
@@ -50,28 +52,37 @@ pub fn parse_macro_destructure_pattern(
     for (index, pattern) in child.children.iter().enumerate() {
         if is_dotted_list_separator(pattern) {
             if in_key || in_aux {
-                anyhow::bail!(
-                    "inline-function does not support dotted destructuring lists after {}",
-                    if in_key { "&key" } else { "&aux" }
-                );
+                return Err(UnsupportedLambdaList::NotSupportedAfter {
+                    construct: "dotted destructuring lists".to_owned(),
+                    after: if in_key { "&key" } else { "&aux" }.to_string(),
+                }
+                .into());
             }
             if rest.is_some() || in_rest {
-                anyhow::bail!(
-                    "inline-function supports at most one inner &rest or &body destructuring parameter"
-                );
+                return Err(UnsupportedLambdaList::AtMostOne {
+                    construct: "inner &rest or &body destructuring parameter".to_owned(),
+                }
+                .into());
             }
             if index == 0 {
-                anyhow::bail!(
-                    "inline-function inner dotted destructuring must begin with a binding pattern"
-                );
+                return Err(UnsupportedLambdaList::Requirement {
+                    subject: "inner dotted destructuring".to_owned(),
+                    requirement: "begin with a binding pattern".to_owned(),
+                }
+                .into());
             }
-            let tail = child.children.get(index + 1).context(
-                "inline-function inner dotted destructuring must be followed by a binding name",
-            )?;
+            let tail = child.children.get(index + 1).ok_or_else(|| {
+                InlineError::from(UnsupportedLambdaList::MustBeFollowedBy {
+                    marker: "inner dotted destructuring".to_owned(),
+                    expected: "a binding name".to_owned(),
+                })
+            })?;
             if index + 2 != child.children.len() {
-                anyhow::bail!(
-                    "inline-function inner dotted destructuring must end after the tail binding"
-                );
+                return Err(UnsupportedLambdaList::Requirement {
+                    subject: "inner dotted destructuring".to_owned(),
+                    requirement: "end after the tail binding".to_owned(),
+                }
+                .into());
             }
             rest = Some(Box::new(InlineDestructurePattern::Name(
                 dotted_tail_parameter_name(tail)?.to_owned(),
@@ -80,17 +91,25 @@ pub fn parse_macro_destructure_pattern(
         }
         if let Some(marker) = atom_text(pattern).filter(|name| name.starts_with('&')) {
             if in_whole {
-                anyhow::bail!("inline-function inner &whole must be followed by a binding name");
+                return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                    marker: "inner &whole".to_owned(),
+                    expected: "a binding name".to_owned(),
+                }
+                .into());
             }
             if in_rest {
-                anyhow::bail!(
-                    "inline-function inner &rest or &body must be followed by a binding pattern"
-                );
+                return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                    marker: "inner &rest or &body".to_owned(),
+                    expected: "a binding pattern".to_owned(),
+                }
+                .into());
             }
             if in_aux {
-                anyhow::bail!(
-                    "inline-function does not support inner {marker} destructuring after &aux"
-                );
+                return Err(UnsupportedLambdaList::NotSupportedAfter {
+                    construct: format!("inner {marker} destructuring"),
+                    after: "&aux".to_owned(),
+                }
+                .into());
             }
 
             match marker {
@@ -106,9 +125,12 @@ pub fn parse_macro_destructure_pattern(
                         || in_aux
                         || allow_other_keys
                     {
-                        anyhow::bail!(
-                            "inline-function inner &whole must appear before any other destructuring parameter"
-                        );
+                        return Err(UnsupportedLambdaList::Requirement {
+                            subject: "inner &whole".to_owned(),
+                            requirement: "appear before any other destructuring parameter"
+                                .to_owned(),
+                        }
+                        .into());
                     }
                     in_whole = true;
                     in_optional = false;
@@ -119,9 +141,11 @@ pub fn parse_macro_destructure_pattern(
                 }
                 "&optional" => {
                     if rest.is_some() {
-                        anyhow::bail!(
-                            "inline-function does not support inner &optional destructuring parameters after &rest or &body"
-                        );
+                        return Err(UnsupportedLambdaList::NotSupportedAfter {
+                            construct: "inner &optional destructuring parameters".to_owned(),
+                            after: "&rest or &body".to_owned(),
+                        }
+                        .into());
                     }
                     in_optional = true;
                     in_rest = false;
@@ -131,14 +155,17 @@ pub fn parse_macro_destructure_pattern(
                 }
                 "&rest" | "&body" => {
                     if in_key {
-                        anyhow::bail!(
-                            "inline-function does not support inner {marker} destructuring after &key"
-                        );
+                        return Err(UnsupportedLambdaList::NotSupportedAfter {
+                            construct: format!("inner {marker} destructuring"),
+                            after: "&key".to_owned(),
+                        }
+                        .into());
                     }
                     if rest.is_some() || in_rest {
-                        anyhow::bail!(
-                            "inline-function supports at most one inner &rest or &body destructuring parameter"
-                        );
+                        return Err(UnsupportedLambdaList::AtMostOne {
+                            construct: "inner &rest or &body destructuring parameter".to_owned(),
+                        }
+                        .into());
                     }
                     in_optional = false;
                     in_rest = true;
@@ -159,9 +186,10 @@ pub fn parse_macro_destructure_pattern(
                 }
                 "&aux" => {
                     if in_aux || !aux.is_empty() {
-                        anyhow::bail!(
-                            "inline-function supports at most one inner &aux destructuring section"
-                        );
+                        return Err(UnsupportedLambdaList::AtMostOne {
+                            construct: "inner &aux destructuring section".to_owned(),
+                        }
+                        .into());
                     }
                     in_optional = false;
                     in_rest = false;
@@ -169,18 +197,26 @@ pub fn parse_macro_destructure_pattern(
                     in_aux = true;
                     continue;
                 }
-                _ => anyhow::bail!(
-                    "inline-function currently supports only inner &whole, &optional, &rest, &body, &key, &allow-other-keys, and &aux destructuring markers in defmacro parameter lists; found {marker}"
-                ),
+                _ => {
+                    return Err(UnsupportedLambdaList::SupportsOnly {
+                        supported: format!(
+                            "inner &whole, &optional, &rest, &body, &key, &allow-other-keys, and &aux destructuring markers in defmacro parameter lists; found {marker}"
+                        ),
+                    }
+                    .into());
+                }
             }
         }
 
         if in_whole {
             whole = Some(
                 atom_text(pattern)
-                    .context(
-                        "inline-function currently supports only simple symbol inner &whole destructuring parameters",
-                    )?
+                    .ok_or_else(|| {
+                        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+                            supported: "simple symbol inner &whole destructuring parameters"
+                                .to_owned(),
+                        })
+                    })?
                     .to_owned(),
             );
             in_whole = false;
@@ -195,9 +231,11 @@ pub fn parse_macro_destructure_pattern(
         } else if in_optional {
             optional.push(parse_macro_optional_destructure_pattern(input, pattern)?);
         } else if rest.is_some() {
-            anyhow::bail!(
-                "inline-function does not support required destructuring parameters after inner &rest or &body"
-            );
+            return Err(UnsupportedLambdaList::NotSupportedAfter {
+                construct: "required destructuring parameters".to_owned(),
+                after: "inner &rest or &body".to_owned(),
+            }
+            .into());
         } else if in_aux {
             aux.push(aux_parameter(input, pattern)?);
         } else {
@@ -205,10 +243,18 @@ pub fn parse_macro_destructure_pattern(
         }
     }
     if in_whole {
-        anyhow::bail!("inline-function inner &whole must be followed by a binding name");
+        return Err(UnsupportedLambdaList::MustBeFollowedBy {
+            marker: "inner &whole".to_owned(),
+            expected: "a binding name".to_owned(),
+        }
+        .into());
     }
     if in_rest {
-        anyhow::bail!("inline-function inner &rest or &body must be followed by a binding pattern");
+        return Err(UnsupportedLambdaList::MustBeFollowedBy {
+            marker: "inner &rest or &body".to_owned(),
+            expected: "a binding pattern".to_owned(),
+        }
+        .into());
     }
     Ok(InlineDestructurePattern::List(
         InlineDestructureListPattern {
@@ -226,7 +272,7 @@ pub fn parse_macro_destructure_pattern(
 fn parse_macro_optional_destructure_pattern(
     input: &str,
     child: &ExpressionView,
-) -> Result<InlineDestructureOptionalPattern> {
+) -> InlineResult<InlineDestructureOptionalPattern> {
     if atom_text(child).is_some() {
         return Ok(InlineDestructureOptionalPattern {
             binding: parse_macro_destructure_pattern(input, child)?,
@@ -235,21 +281,32 @@ fn parse_macro_optional_destructure_pattern(
         });
     }
 
-    let binding = child.children.first().context(
-        "inline-function currently supports only simple or destructuring inner &optional parameter specifications",
-    )?;
+    let binding = child.children.first().ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple or destructuring inner &optional parameter specifications"
+                .to_owned(),
+        })
+    })?;
     let supplied_p = match child.children.len() {
         0..=2 => None,
         3 => Some(
             atom_text(&child.children[2])
-                .context(
-                    "inline-function currently supports only atom supplied-p names in inner &optional parameter specifications",
-                )?
+                .ok_or_else(|| {
+                    InlineError::from(UnsupportedLambdaList::SupportsOnly {
+                        supported:
+                            "atom supplied-p names in inner &optional parameter specifications"
+                                .to_owned(),
+                    })
+                })?
                 .to_owned(),
         ),
-        _ => anyhow::bail!(
-            "inline-function currently supports only simple or destructuring inner &optional parameter specifications"
-        ),
+        _ => {
+            return Err(UnsupportedLambdaList::SupportsOnly {
+                supported: "simple or destructuring inner &optional parameter specifications"
+                    .to_owned(),
+            }
+            .into());
+        }
     };
 
     Ok(InlineDestructureOptionalPattern {
@@ -265,12 +322,13 @@ fn parse_macro_optional_destructure_pattern(
 fn parse_macro_key_destructure_pattern(
     input: &str,
     child: &ExpressionView,
-) -> Result<InlineDestructureKeyPattern> {
+) -> InlineResult<InlineDestructureKeyPattern> {
     if let Some(name) = atom_text(child) {
         if name.starts_with(':') {
-            anyhow::bail!(
-                "inline-function requires a binding name for inner &key destructuring parameter {name}"
-            );
+            return Err(UnsupportedLambdaList::RequiresBindingName {
+                parameter: format!("inner &key destructuring parameter {name}"),
+            }
+            .into());
         }
         return Ok(InlineDestructureKeyPattern {
             binding: InlineDestructurePattern::Name(name.to_owned()),
@@ -280,9 +338,11 @@ fn parse_macro_key_destructure_pattern(
         });
     }
 
-    let binding = child.children.first().context(
-        "inline-function currently supports only simple inner &key destructuring specifications",
-    )?;
+    let binding = child.children.first().ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple inner &key destructuring specifications".to_owned(),
+        })
+    })?;
     let (binding, keyword) = parse_macro_key_binding(input, binding)?;
     Ok(InlineDestructureKeyPattern {
         binding,
@@ -295,12 +355,13 @@ fn parse_macro_key_destructure_pattern(
 fn parse_macro_key_binding(
     input: &str,
     binding: &ExpressionView,
-) -> Result<(InlineDestructurePattern, String)> {
+) -> InlineResult<(InlineDestructurePattern, String)> {
     if let Some(name) = atom_text(binding) {
         if name.starts_with(':') {
-            anyhow::bail!(
-                "inline-function requires a binding name for inner &key destructuring parameter {name}"
-            );
+            return Err(UnsupportedLambdaList::RequiresBindingName {
+                parameter: format!("inner &key destructuring parameter {name}"),
+            }
+            .into());
         }
         return Ok((
             InlineDestructurePattern::Name(name.to_owned()),
@@ -311,16 +372,21 @@ fn parse_macro_key_binding(
     if binding.children.len() == 2
         && atom_text(&binding.children[0]).is_some_and(|name| name.starts_with(':'))
     {
-        let external = atom_text(&binding.children[0])
-            .context("inline-function currently supports only atom inner &key external names")?;
+        let external = atom_text(&binding.children[0]).ok_or_else(|| {
+            InlineError::from(UnsupportedLambdaList::SupportsOnly {
+                supported: "atom inner &key external names".to_owned(),
+            })
+        })?;
         let internal = parse_macro_destructure_pattern(input, &binding.children[1])?;
         return Ok((internal, external.to_owned()));
     }
 
     let pattern = parse_macro_destructure_pattern(input, binding)?;
-    let first_name =
-        pattern.binding_names().first().cloned().context(
-            "inline-function inner &key destructuring pattern must bind at least one name",
-        )?;
+    let first_name = pattern.binding_names().first().cloned().ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::Requirement {
+            subject: "inner &key destructuring pattern".to_owned(),
+            requirement: "bind at least one name".to_owned(),
+        })
+    })?;
     Ok((pattern, format!(":{first_name}")))
 }

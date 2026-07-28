@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{Context, Result};
+use crate::error::{InlineInternalError, InlineResult};
 
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
 use paredit_core_syntax::dialect::Dialect;
@@ -15,11 +15,11 @@ pub fn expand_unquote_expression(
     body_bindings: &[(String, String)],
     argument_bindings: &[(String, String)],
     reference_counts: &mut BTreeMap<String, usize>,
-) -> Result<String> {
+) -> InlineResult<String> {
     let literal_source = render_unquoted_source(view)?;
     let literal_tree =
         paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(&literal_source, dialect)
-            .context("invalid unquote form")?;
+            .map_err(|_| InlineInternalError::InvalidUnquote)?;
     let expression = literal_tree
         .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))?
         .view();
@@ -66,7 +66,7 @@ pub fn count_references_in_expanded_expression(
     dialect: Dialect,
     source: &str,
     reference_counts: &mut BTreeMap<String, usize>,
-) -> Result<()> {
+) -> InlineResult<()> {
     let expression_tree = parse_single_expression_tree(dialect, source)?;
     let expression = expression_tree
         .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))?
@@ -85,7 +85,7 @@ pub fn count_references_in_expanded_expression(
 pub fn parse_single_expression_tree(
     dialect: Dialect,
     source: &str,
-) -> Result<paredit_core_syntax::sexpr::SyntaxTree> {
+) -> InlineResult<paredit_core_syntax::sexpr::SyntaxTree> {
     Ok(paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(
         source, dialect,
     )?)
@@ -97,7 +97,7 @@ pub fn expand_unquote_splicing(
     body_bindings: &[(String, String)],
     argument_bindings: &[(String, String)],
     reference_counts: &mut BTreeMap<String, usize>,
-) -> Result<Vec<String>> {
+) -> InlineResult<Vec<String>> {
     let expanded = expand_unquote_expression(
         dialect,
         view,
@@ -107,12 +107,12 @@ pub fn expand_unquote_splicing(
     )?;
     let expanded_tree =
         paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(&expanded, dialect)
-            .context("invalid ,@ expansion")?;
+            .map_err(|_| InlineInternalError::InvalidSpliceExpansion)?;
     let expression = expanded_tree
         .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))?
         .view();
     if expression.kind != ExpressionKind::List {
-        anyhow::bail!("inline-function requires ,@ expansions to produce a list form");
+        return Err(InlineInternalError::SpliceMustProduceList.into());
     }
     Ok(expression
         .children

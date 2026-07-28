@@ -35,7 +35,7 @@ fn inline_plan(input: &str) -> InlineFunctionPlan {
     plan_inline_function(default_inline_request(input)).expect("plan")
 }
 
-fn inline_error(input: &str, context: &str) -> anyhow::Error {
+fn inline_error(input: &str, context: &str) -> crate::error::InlineError {
     plan_inline_function(default_inline_request(input)).expect_err(context)
 }
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{CallBindingError, InlineInternalError, InlineResult};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SymbolName;
@@ -37,7 +37,7 @@ pub fn bind_inline_function_arguments(
     function_name: &SymbolName,
     accepts_other_keys: bool,
     allow_drop_arguments: bool,
-) -> Result<InlineArgumentBindings> {
+) -> InlineResult<InlineArgumentBindings> {
     let InlineFunctionCall {
         raw_args,
         whole_call,
@@ -71,12 +71,12 @@ pub fn bind_inline_function_arguments(
         .count();
 
     if raw_args.len() < required_positional_count {
-        anyhow::bail!(
-            "inline-function arity mismatch for {}: definition requires {} positional argument(s), call has {} argument(s)",
-            function_name,
-            required_positional_count,
-            raw_args.len()
-        );
+        return Err(CallBindingError::PositionalArity {
+            function: function_name.to_string(),
+            required: required_positional_count,
+            actual: raw_args.len(),
+        }
+        .into());
     }
 
     if keyword_params.is_empty() {
@@ -116,14 +116,16 @@ pub fn bind_inline_function_arguments(
     bind_keyword_arguments(&ctx)
 }
 
-fn bind_non_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineArgumentBindings> {
+fn bind_non_keyword_arguments(
+    ctx: &InlineBindingContext<'_>,
+) -> InlineResult<InlineArgumentBindings> {
     if ctx.rest_index.is_none() && ctx.raw_args.len() > ctx.positional_count {
-        anyhow::bail!(
-            "inline-function arity mismatch for {}: definition has {} parameter(s), call has {} argument(s)",
-            ctx.function_name,
-            ctx.positional_count,
-            ctx.raw_args.len()
-        );
+        return Err(CallBindingError::ParameterArity {
+            function: ctx.function_name.to_string(),
+            parameters: ctx.positional_count,
+            arguments: ctx.raw_args.len(),
+        }
+        .into());
     }
 
     let mut body_bindings = Vec::new();
@@ -161,14 +163,14 @@ fn bind_non_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineAr
     })
 }
 
-fn bind_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineArgumentBindings> {
+fn bind_keyword_arguments(ctx: &InlineBindingContext<'_>) -> InlineResult<InlineArgumentBindings> {
     let keyword_args = &ctx.raw_args[ctx.positional_count..];
     let keyword_arg_count = keyword_args.len();
     if keyword_arg_count % 2 != 0 {
-        anyhow::bail!(
-            "inline-function keyword arguments for {} must be supplied as keyword/value pairs",
-            ctx.function_name
-        );
+        return Err(CallBindingError::KeywordPairsRequired {
+            function: ctx.function_name.to_string(),
+        }
+        .into());
     }
     let call_side_allow_other_keys =
         super::keyword_args::call_side_allow_other_keys_from_strings(keyword_args);
@@ -199,26 +201,26 @@ fn bind_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineArgume
     }
     for param in ctx.keyword_params {
         let InlineParameterKind::Keyword { keyword } = &param.kind else {
-            anyhow::bail!("inline-function internal error: keyword parameter missing keyword");
+            return Err(InlineInternalError::KeywordParameterMissingKeyword.into());
         };
         let mut matched = None;
         for pair in keyword_args.chunks_exact(2) {
             let key = &pair[0];
             let value = &pair[1];
             if !key.starts_with(':') {
-                anyhow::bail!(
-                    "inline-function expected keyword argument for {}, found {}",
-                    ctx.function_name,
-                    key
-                );
+                return Err(CallBindingError::ExpectedKeyword {
+                    function: ctx.function_name.to_string(),
+                    found: key.to_string(),
+                }
+                .into());
             }
             if key == keyword {
                 if matched.is_some() {
-                    anyhow::bail!(
-                        "inline-function call for {} supplies duplicate keyword {}",
-                        ctx.function_name,
-                        keyword
-                    );
+                    return Err(CallBindingError::DuplicateKeyword {
+                        function: ctx.function_name.to_string(),
+                        keyword: keyword.to_string(),
+                    }
+                    .into());
                 }
                 matched = Some(value.clone());
             }
@@ -269,7 +271,7 @@ fn bind_leading_parameters(
     body_bindings: &mut Vec<(String, String)>,
     argument_bindings: &mut Vec<(String, String)>,
     default_scope: &mut Vec<(String, String)>,
-) -> Result<()> {
+) -> InlineResult<()> {
     let mut positional_index = 0usize;
     for param in params {
         match &param.kind {
@@ -316,7 +318,7 @@ pub fn bind_aux_parameter(
     dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
-) -> Result<super::types::ParameterBinding> {
+) -> InlineResult<super::types::ParameterBinding> {
     parameter_binding::bind_aux_parameter(dialect, param, default_scope)
 }
 
@@ -324,6 +326,6 @@ pub fn destructured_binding_entries(
     dialect: Dialect,
     pattern: &super::super::definition::InlineDestructurePattern,
     argument: String,
-) -> Result<Vec<(String, String)>> {
+) -> InlineResult<Vec<(String, String)>> {
     parameter_binding::destructured_binding_entries(dialect, pattern, argument)
 }

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{InlineError, InlineResult, UnsupportedLambdaList};
 
 use paredit_core_syntax::sexpr::ExpressionView;
 
@@ -8,26 +8,35 @@ use super::super::types::{
     InlineDefinitionKind, InlineParameter, InlineParameterBinding, InlineParameterKind,
 };
 
-pub fn rest_parameter_name(child: &ExpressionView) -> Result<&str> {
-    atom_text(child)
-        .context("inline-function currently supports only simple symbol &rest parameters")
+pub fn rest_parameter_name(child: &ExpressionView) -> InlineResult<&str> {
+    atom_text(child).ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple symbol &rest parameters".to_owned(),
+        })
+    })
 }
 
-pub fn whole_parameter_name(child: &ExpressionView) -> Result<&str> {
-    atom_text(child)
-        .context("inline-function currently supports only simple symbol &whole parameters")
+pub fn whole_parameter_name(child: &ExpressionView) -> InlineResult<&str> {
+    atom_text(child).ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple symbol &whole parameters".to_owned(),
+        })
+    })
 }
 
-pub fn environment_parameter_name(child: &ExpressionView) -> Result<&str> {
-    atom_text(child)
-        .context("inline-function currently supports only simple symbol &environment parameters")
+pub fn environment_parameter_name(child: &ExpressionView) -> InlineResult<&str> {
+    atom_text(child).ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple symbol &environment parameters".to_owned(),
+        })
+    })
 }
 
 pub fn optional_parameter(
     input: &str,
     definition_kind: InlineDefinitionKind,
     child: &ExpressionView,
-) -> Result<InlineParameter> {
+) -> InlineResult<InlineParameter> {
     Ok(InlineParameter {
         binding: optional_parameter_binding(input, definition_kind, child)?,
         kind: InlineParameterKind::Positional { optional: true },
@@ -40,20 +49,25 @@ fn optional_parameter_binding(
     input: &str,
     definition_kind: InlineDefinitionKind,
     child: &ExpressionView,
-) -> Result<InlineParameterBinding> {
+) -> InlineResult<InlineParameterBinding> {
     if let Some(name) = atom_text(child) {
         return Ok(InlineParameterBinding::Name(name.to_owned()));
     }
 
-    let binding = child.children.first().context(
-        "inline-function currently supports only simple or destructuring &optional parameter specifications",
-    )?;
+    let binding = child.children.first().ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple or destructuring &optional parameter specifications".to_owned(),
+        })
+    })?;
     if let Some(name) = atom_text(binding) {
         return Ok(InlineParameterBinding::Name(name.to_owned()));
     }
 
     if definition_kind != InlineDefinitionKind::Macro {
-        anyhow::bail!("inline-function currently supports only simple symbol parameters");
+        return Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple symbol parameters".to_owned(),
+        }
+        .into());
     }
 
     Ok(InlineParameterBinding::Destructure(
@@ -61,19 +75,23 @@ fn optional_parameter_binding(
     ))
 }
 
-fn optional_parameter_supplied_p(child: &ExpressionView) -> Result<Option<String>> {
+fn optional_parameter_supplied_p(child: &ExpressionView) -> InlineResult<Option<String>> {
     match child.children.len() {
         0..=2 => Ok(None),
         3 => Ok(Some(
             atom_text(&child.children[2])
-                .context(
-                    "inline-function currently supports only atom supplied-p names in &optional parameter specifications",
-                )?
+                .ok_or_else(|| {
+                    InlineError::from(UnsupportedLambdaList::SupportsOnly {
+                        supported: "atom supplied-p names in &optional parameter specifications"
+                            .to_owned(),
+                    })
+                })?
                 .to_owned(),
         )),
-        _ => anyhow::bail!(
-            "inline-function currently supports only simple or destructuring &optional parameter specifications"
-        ),
+        _ => Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple or destructuring &optional parameter specifications".to_owned(),
+        }
+        .into()),
     }
 }
 
@@ -88,10 +106,13 @@ pub fn keyword_parameter(
     input: &str,
     definition_kind: InlineDefinitionKind,
     child: &ExpressionView,
-) -> Result<InlineParameter> {
+) -> InlineResult<InlineParameter> {
     if let Some(name) = atom_text(child) {
         if name.starts_with(':') {
-            anyhow::bail!("inline-function requires a binding name for &key parameter {name}");
+            return Err(UnsupportedLambdaList::RequiresBindingName {
+                parameter: format!("&key parameter {name}"),
+            }
+            .into());
         }
         return Ok(InlineParameter {
             binding: InlineParameterBinding::Name(name.to_owned()),
@@ -103,13 +124,17 @@ pub fn keyword_parameter(
         });
     }
 
-    let binding = child
-        .children
-        .first()
-        .context("inline-function currently supports only simple &key parameter specifications")?;
+    let binding = child.children.first().ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple &key parameter specifications".to_owned(),
+        })
+    })?;
     if let Some(name) = atom_text(binding) {
         if name.starts_with(':') {
-            anyhow::bail!("inline-function requires a binding name for &key parameter {name}");
+            return Err(UnsupportedLambdaList::RequiresBindingName {
+                parameter: format!("&key parameter {name}"),
+            }
+            .into());
         }
         return Ok(InlineParameter {
             binding: InlineParameterBinding::Name(name.to_owned()),
@@ -122,24 +147,39 @@ pub fn keyword_parameter(
     }
 
     let [external, internal] = binding.children.as_slice() else {
-        anyhow::bail!("inline-function currently supports only (:keyword name) &key bindings");
+        return Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "(:keyword name) &key bindings".to_owned(),
+        }
+        .into());
     };
-    let external = atom_text(external)
-        .context("inline-function currently supports only atom &key external names")?;
+    let external = atom_text(external).ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "atom &key external names".to_owned(),
+        })
+    })?;
     if !external.starts_with(':') {
-        anyhow::bail!("inline-function &key external name must be a keyword: {external}");
+        return Err(UnsupportedLambdaList::Requirement {
+            subject: "&key external name".to_owned(),
+            requirement: format!("be a keyword: {external}"),
+        }
+        .into());
     }
     let internal_binding = if let Some(internal) = atom_text(internal) {
         if internal.starts_with(':') {
-            anyhow::bail!(
-                "inline-function &key internal binding must not be a keyword: {internal}"
-            );
+            return Err(UnsupportedLambdaList::Requirement {
+                subject: "&key internal binding".to_owned(),
+                requirement: format!("not be a keyword: {internal}"),
+            }
+            .into());
         }
         InlineParameterBinding::Name(internal.to_owned())
     } else if definition_kind == InlineDefinitionKind::Macro {
         InlineParameterBinding::Destructure(parse_macro_destructure_pattern(input, internal)?)
     } else {
-        anyhow::bail!("inline-function currently supports only atom &key internal names");
+        return Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "atom &key internal names".to_owned(),
+        }
+        .into());
     };
 
     Ok(InlineParameter {
@@ -164,26 +204,30 @@ pub(in super::super) fn keyword_parameter_default_value(
 
 pub(in super::super) fn keyword_parameter_supplied_p(
     child: &ExpressionView,
-) -> Result<Option<String>> {
+) -> InlineResult<Option<String>> {
     match child.children.len() {
         0..=2 => Ok(None),
         3 => Ok(Some(
             atom_text(&child.children[2])
-                .context(
-                    "inline-function currently supports only atom supplied-p names in &key parameter specifications",
-                )?
+                .ok_or_else(|| {
+                    InlineError::from(UnsupportedLambdaList::SupportsOnly {
+                        supported: "atom supplied-p names in &key parameter specifications"
+                            .to_owned(),
+                    })
+                })?
                 .to_owned(),
         )),
-        _ => anyhow::bail!(
-            "inline-function currently supports only simple &key parameter specifications"
-        ),
+        _ => Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple &key parameter specifications".to_owned(),
+        }
+        .into()),
     }
 }
 
 pub(in super::super) fn aux_parameter(
     input: &str,
     child: &ExpressionView,
-) -> Result<InlineParameter> {
+) -> InlineResult<InlineParameter> {
     if let Some(name) = atom_text(child) {
         return Ok(InlineParameter {
             binding: InlineParameterBinding::Name(name.to_owned()),
@@ -193,16 +237,21 @@ pub(in super::super) fn aux_parameter(
         });
     }
 
-    let binding = child
-        .children
-        .first()
-        .context("inline-function currently supports only simple &aux parameter specifications")?;
-    let name = atom_text(binding)
-        .context("inline-function currently supports only simple &aux parameter specifications")?;
+    let binding = child.children.first().ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple &aux parameter specifications".to_owned(),
+        })
+    })?;
+    let name = atom_text(binding).ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple &aux parameter specifications".to_owned(),
+        })
+    })?;
     if child.children.len() > 2 {
-        anyhow::bail!(
-            "inline-function currently supports only simple &aux parameter specifications"
-        );
+        return Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple &aux parameter specifications".to_owned(),
+        }
+        .into());
     }
 
     Ok(InlineParameter {
@@ -220,11 +269,19 @@ pub(in super::super) fn is_dotted_list_separator(child: &ExpressionView) -> bool
     atom_text(child) == Some(".")
 }
 
-pub(in super::super) fn dotted_tail_parameter_name(child: &ExpressionView) -> Result<&str> {
-    let name = atom_text(child)
-        .context("inline-function dotted lambda lists must end in a binding name")?;
+pub(in super::super) fn dotted_tail_parameter_name(child: &ExpressionView) -> InlineResult<&str> {
+    let name = atom_text(child).ok_or_else(|| {
+        InlineError::from(UnsupportedLambdaList::Requirement {
+            subject: "dotted lambda lists".to_owned(),
+            requirement: "end in a binding name".to_owned(),
+        })
+    })?;
     if name == "." || name.starts_with('&') {
-        anyhow::bail!("inline-function dotted lambda lists must end in a binding name");
+        return Err(UnsupportedLambdaList::Requirement {
+            subject: "dotted lambda lists".to_owned(),
+            requirement: "end in a binding name".to_owned(),
+        }
+        .into());
     }
     Ok(name)
 }
@@ -233,7 +290,7 @@ pub fn parse_required_parameter(
     input: &str,
     definition_kind: InlineDefinitionKind,
     child: &ExpressionView,
-) -> Result<InlineParameter> {
+) -> InlineResult<InlineParameter> {
     if let Some(name) = atom_text(child) {
         return Ok(InlineParameter {
             binding: InlineParameterBinding::Name(name.to_owned()),
@@ -244,7 +301,10 @@ pub fn parse_required_parameter(
     }
 
     if definition_kind != InlineDefinitionKind::Macro {
-        anyhow::bail!("inline-function currently supports only simple symbol parameters");
+        return Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "simple symbol parameters".to_owned(),
+        }
+        .into());
     }
 
     Ok(InlineParameter {

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{InlineError, InlineResult, UnsupportedLambdaList};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{Delimiter, ExpressionView};
@@ -75,7 +75,7 @@ impl InlineLambdaListParseState {
         child: &ExpressionView,
         index: usize,
         children: &[ExpressionView],
-    ) -> Result<bool> {
+    ) -> InlineResult<bool> {
         if is_dotted_list_separator(child) {
             self.push_dotted_tail(children, index)?;
             return Ok(true);
@@ -91,28 +91,43 @@ impl InlineLambdaListParseState {
         Ok(false)
     }
 
-    fn push_dotted_tail(&mut self, children: &[ExpressionView], index: usize) -> Result<()> {
+    fn push_dotted_tail(&mut self, children: &[ExpressionView], index: usize) -> InlineResult<()> {
         if self.has_rest_or_body {
-            anyhow::bail!("inline-function supports at most one &rest or &body parameter");
+            return Err(UnsupportedLambdaList::AtMostOne {
+                construct: "&rest or &body parameter".to_owned(),
+            }
+            .into());
         }
         if matches!(
             self.section,
             InlineLambdaListSection::Keyword { .. } | InlineLambdaListSection::Aux
         ) {
-            anyhow::bail!(
-                "inline-function does not support dotted lambda lists after {}",
-                self.section.label()
-            );
+            return Err(UnsupportedLambdaList::NotSupportedAfter {
+                construct: "dotted lambda lists".to_owned(),
+                after: self.section.label().to_string(),
+            }
+            .into());
         }
         if index == 0 {
-            anyhow::bail!("inline-function dotted lambda lists must begin with a binding name");
+            return Err(UnsupportedLambdaList::Requirement {
+                subject: "dotted lambda lists".to_owned(),
+                requirement: "begin with a binding name".to_owned(),
+            }
+            .into());
         }
 
-        let tail = children
-            .get(index + 1)
-            .context("inline-function dotted lambda lists must be followed by a binding name")?;
+        let tail = children.get(index + 1).ok_or_else(|| {
+            InlineError::from(UnsupportedLambdaList::MustBeFollowedBy {
+                marker: "dotted lambda lists".to_owned(),
+                expected: "a binding name".to_owned(),
+            })
+        })?;
         if index + 2 != children.len() {
-            anyhow::bail!("inline-function dotted lambda lists must end after the tail binding");
+            return Err(UnsupportedLambdaList::Requirement {
+                subject: "dotted lambda lists".to_owned(),
+                requirement: "end after the tail binding".to_owned(),
+            }
+            .into());
         }
 
         self.params.push(InlineParameter {
@@ -126,19 +141,32 @@ impl InlineLambdaListParseState {
         Ok(())
     }
 
-    fn handle_marker(&mut self, marker: &str, definition_kind: InlineDefinitionKind) -> Result<()> {
+    fn handle_marker(
+        &mut self,
+        marker: &str,
+        definition_kind: InlineDefinitionKind,
+    ) -> InlineResult<()> {
         if !self.supports_common_lisp_lambda_list {
-            anyhow::bail!(
-                "inline-function function parameter modifiers are not supported: {marker}"
-            );
+            return Err(UnsupportedLambdaList::ModifierNotSupported {
+                marker: marker.to_string(),
+            }
+            .into());
         }
 
         match self.pending_macro_parameter {
             Some(PendingMacroParameter::Whole) => {
-                anyhow::bail!("inline-function &whole must be followed by a binding name");
+                return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                    marker: "&whole".to_owned(),
+                    expected: "a binding name".to_owned(),
+                }
+                .into());
             }
             Some(PendingMacroParameter::Environment) => {
-                anyhow::bail!("inline-function &environment must be followed by a binding name");
+                return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                    marker: "&environment".to_owned(),
+                    expected: "a binding name".to_owned(),
+                }
+                .into());
             }
             None => {}
         }
@@ -147,7 +175,11 @@ impl InlineLambdaListParseState {
             self.section,
             InlineLambdaListSection::RestOrBody { consumed: false }
         ) {
-            anyhow::bail!("inline-function &rest or &body must be followed by a binding name");
+            return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                marker: "&rest or &body".to_owned(),
+                expected: "a binding name".to_owned(),
+            }
+            .into());
         }
 
         match marker {
@@ -170,34 +202,37 @@ impl InlineLambdaListParseState {
                 };
                 Ok(())
             }
-            _ => anyhow::bail!(
-                "inline-function currently supports only required, &optional, &rest, &body, &whole, &environment, &aux, and simple &key parameters; found {marker}"
-            ),
+            _ => Err(UnsupportedLambdaList::SupportsOnly {
+                supported: format!("required, &optional, &rest, &body, &whole, &environment, &aux, and simple &key parameters; found {marker}"),
+            }
+            .into()),
         }
     }
 
-    fn enter_optional_section(&mut self) -> Result<()> {
+    fn enter_optional_section(&mut self) -> InlineResult<()> {
         if !matches!(self.section, InlineLambdaListSection::Required) {
-            anyhow::bail!(
-                "inline-function does not support &optional parameters after {}",
-                self.section.label()
-            );
+            return Err(UnsupportedLambdaList::NotSupportedAfter {
+                construct: "&optional parameters".to_owned(),
+                after: self.section.label().to_string(),
+            }
+            .into());
         }
         self.section = InlineLambdaListSection::Optional;
         Ok(())
     }
 
-    fn enter_keyword_section(&mut self) -> Result<()> {
+    fn enter_keyword_section(&mut self) -> InlineResult<()> {
         if !matches!(
             self.section,
             InlineLambdaListSection::Required
                 | InlineLambdaListSection::Optional
                 | InlineLambdaListSection::RestOrBody { consumed: true }
         ) {
-            anyhow::bail!(
-                "inline-function does not support &key parameters after {}",
-                self.section.label()
-            );
+            return Err(UnsupportedLambdaList::NotSupportedAfter {
+                construct: "&key parameters".to_owned(),
+                after: self.section.label().to_string(),
+            }
+            .into());
         }
         self.section = InlineLambdaListSection::Keyword {
             allow_other_keys: false,
@@ -205,18 +240,22 @@ impl InlineLambdaListParseState {
         Ok(())
     }
 
-    fn enter_rest_or_body_section(&mut self, marker: &str) -> Result<()> {
+    fn enter_rest_or_body_section(&mut self, marker: &str) -> InlineResult<()> {
         if !matches!(
             self.section,
             InlineLambdaListSection::Required | InlineLambdaListSection::Optional
         ) {
-            anyhow::bail!(
-                "inline-function does not support {marker} parameters after {}",
-                self.section.label()
-            );
+            return Err(UnsupportedLambdaList::NotSupportedAfter {
+                construct: format!("{marker} parameters"),
+                after: self.section.label().to_string(),
+            }
+            .into());
         }
         if self.has_rest_or_body {
-            anyhow::bail!("inline-function supports at most one &rest or &body parameter");
+            return Err(UnsupportedLambdaList::AtMostOne {
+                construct: "&rest or &body parameter".to_owned(),
+            }
+            .into());
         }
 
         self.has_rest_or_body = true;
@@ -224,7 +263,7 @@ impl InlineLambdaListParseState {
         Ok(())
     }
 
-    fn enter_aux_section(&mut self) -> Result<()> {
+    fn enter_aux_section(&mut self) -> InlineResult<()> {
         if !matches!(
             self.section,
             InlineLambdaListSection::Required
@@ -232,35 +271,47 @@ impl InlineLambdaListParseState {
                 | InlineLambdaListSection::RestOrBody { consumed: true }
                 | InlineLambdaListSection::Keyword { .. }
         ) {
-            anyhow::bail!(
-                "inline-function does not support &aux parameters after {}",
-                self.section.label()
-            );
+            return Err(UnsupportedLambdaList::NotSupportedAfter {
+                construct: "&aux parameters".to_owned(),
+                after: self.section.label().to_string(),
+            }
+            .into());
         }
         self.section = InlineLambdaListSection::Aux;
         Ok(())
     }
 
-    fn begin_pending_macro_parameter(&mut self, pending: PendingMacroParameter) -> Result<()> {
+    fn begin_pending_macro_parameter(
+        &mut self,
+        pending: PendingMacroParameter,
+    ) -> InlineResult<()> {
         match pending {
             PendingMacroParameter::Whole => {
                 if self.has_whole {
-                    anyhow::bail!("inline-function supports at most one &whole parameter");
+                    return Err(UnsupportedLambdaList::AtMostOne {
+                        construct: "&whole parameter".to_owned(),
+                    }
+                    .into());
                 }
                 if self
                     .params
                     .iter()
                     .any(|param| !matches!(param.kind, InlineParameterKind::Environment))
                 {
-                    anyhow::bail!(
-                        "inline-function currently supports &whole only before ordinary macro parameters"
-                    );
+                    return Err(UnsupportedLambdaList::SupportsOnlyWhen {
+                        construct: "&whole".to_owned(),
+                        restriction: "before ordinary macro parameters".to_owned(),
+                    }
+                    .into());
                 }
                 self.has_whole = true;
             }
             PendingMacroParameter::Environment => {
                 if self.has_environment {
-                    anyhow::bail!("inline-function supports at most one &environment parameter");
+                    return Err(UnsupportedLambdaList::AtMostOne {
+                        construct: "&environment parameter".to_owned(),
+                    }
+                    .into());
                 }
                 self.has_environment = true;
             }
@@ -276,7 +327,7 @@ impl InlineLambdaListParseState {
         input: &str,
         definition_kind: InlineDefinitionKind,
         child: &ExpressionView,
-    ) -> Result<InlineParameter> {
+    ) -> InlineResult<InlineParameter> {
         match self.pending_macro_parameter.take() {
             Some(PendingMacroParameter::Whole) => Ok(InlineParameter {
                 binding: InlineParameterBinding::Name(whole_parameter_name(child)?.to_owned()),
@@ -301,7 +352,7 @@ impl InlineLambdaListParseState {
         input: &str,
         definition_kind: InlineDefinitionKind,
         child: &ExpressionView,
-    ) -> Result<InlineParameter> {
+    ) -> InlineResult<InlineParameter> {
         match self.section {
             InlineLambdaListSection::Required => {
                 parse_required_parameter(input, definition_kind, child)
@@ -319,9 +370,13 @@ impl InlineLambdaListParseState {
                     supplied_p: None,
                 })
             }
-            InlineLambdaListSection::RestOrBody { consumed: true } => anyhow::bail!(
-                "inline-function does not support ordinary parameters after &rest or &body"
-            ),
+            InlineLambdaListSection::RestOrBody { consumed: true } => {
+                Err(UnsupportedLambdaList::NotSupportedAfter {
+                    construct: "ordinary parameters".to_owned(),
+                    after: "&rest or &body".to_owned(),
+                }
+                .into())
+            }
             InlineLambdaListSection::Keyword { .. } => {
                 keyword_parameter(input, definition_kind, child)
             }
@@ -329,13 +384,21 @@ impl InlineLambdaListParseState {
         }
     }
 
-    fn finish(self) -> Result<(Vec<InlineParameter>, bool)> {
+    fn finish(self) -> InlineResult<(Vec<InlineParameter>, bool)> {
         match self.pending_macro_parameter {
             Some(PendingMacroParameter::Whole) => {
-                anyhow::bail!("inline-function &whole must be followed by a binding name");
+                return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                    marker: "&whole".to_owned(),
+                    expected: "a binding name".to_owned(),
+                }
+                .into());
             }
             Some(PendingMacroParameter::Environment) => {
-                anyhow::bail!("inline-function &environment must be followed by a binding name");
+                return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                    marker: "&environment".to_owned(),
+                    expected: "a binding name".to_owned(),
+                }
+                .into());
             }
             None => {}
         }
@@ -344,7 +407,11 @@ impl InlineLambdaListParseState {
             self.section,
             InlineLambdaListSection::RestOrBody { consumed: false }
         ) {
-            anyhow::bail!("inline-function &rest or &body must be followed by a binding name");
+            return Err(UnsupportedLambdaList::MustBeFollowedBy {
+                marker: "&rest or &body".to_owned(),
+                expected: "a binding name".to_owned(),
+            }
+            .into());
         }
 
         Ok((self.params, self.accepts_other_keys))
@@ -356,7 +423,7 @@ pub fn inline_parameter_names(
     input: &str,
     definition_kind: InlineDefinitionKind,
     parameter_form: &ExpressionView,
-) -> Result<(Vec<InlineParameter>, bool)> {
+) -> InlineResult<(Vec<InlineParameter>, bool)> {
     match parameter_form.delimiter {
         Some(Delimiter::Paren | Delimiter::Bracket) => inline_parameter_names_from_children(
             dialect,
@@ -364,7 +431,10 @@ pub fn inline_parameter_names(
             definition_kind,
             &parameter_form.children,
         ),
-        _ => anyhow::bail!("inline-function currently supports only flat symbol parameter lists"),
+        _ => Err(UnsupportedLambdaList::SupportsOnly {
+            supported: "flat symbol parameter lists".to_owned(),
+        }
+        .into()),
     }
 }
 
@@ -373,7 +443,7 @@ pub fn inline_parameter_names_from_children(
     input: &str,
     definition_kind: InlineDefinitionKind,
     children: &[ExpressionView],
-) -> Result<(Vec<InlineParameter>, bool)> {
+) -> InlineResult<(Vec<InlineParameter>, bool)> {
     let mut state = InlineLambdaListParseState::new(dialect, children.len());
 
     for (index, child) in children.iter().enumerate() {

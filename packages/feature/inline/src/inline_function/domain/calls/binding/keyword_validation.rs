@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{CallBindingError, InlineResult};
 
 use paredit_core_syntax::sexpr::SymbolName;
 
@@ -14,7 +14,7 @@ pub fn validate_unknown_keyword_arguments(
     accepts_other_keys: bool,
     allow_drop_arguments: bool,
     call_side_allow_other_keys: &CallSideAllowOtherKeys,
-) -> Result<()> {
+) -> InlineResult<()> {
     for pair in keyword_args.chunks_exact(2) {
         let key = &pair[0];
         if !keyword_params
@@ -32,9 +32,11 @@ pub fn validate_unknown_keyword_arguments(
             )? {
                 continue;
             }
-            anyhow::bail!(
-                "inline-function call for {function_name} supplies unsupported keyword {key}"
-            );
+            return Err(CallBindingError::UnsupportedKeyword {
+                function: function_name.to_string(),
+                keyword: key.to_string(),
+            }
+            .into());
         }
     }
 
@@ -46,7 +48,7 @@ fn should_tolerate_unknown_keyword(
     accepts_other_keys: bool,
     allow_drop_arguments: bool,
     call_side_allow_other_keys: &CallSideAllowOtherKeys,
-) -> Result<bool> {
+) -> InlineResult<bool> {
     if rest_index.is_some() {
         if accepts_other_keys {
             return Ok(true);
@@ -64,14 +66,14 @@ fn should_tolerate_unknown_keyword(
 
 fn call_side_allows_other_keys(
     call_side_allow_other_keys: &CallSideAllowOtherKeys,
-) -> Result<bool> {
+) -> InlineResult<bool> {
     match call_side_allow_other_keys {
         CallSideAllowOtherKeys::True => Ok(true),
-        CallSideAllowOtherKeys::Unknown(value) => {
-            anyhow::bail!(
-                "inline-function cannot determine whether :allow-other-keys value {value} suppresses unknown keyword"
-            );
+        CallSideAllowOtherKeys::Unknown(value) => Err(CallBindingError::AllowOtherKeysNotLiteral {
+            qualifier: String::new(),
+            value: value.to_string(),
         }
+        .into()),
         CallSideAllowOtherKeys::AbsentOrFalse => Ok(false),
     }
 }

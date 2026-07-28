@@ -1,6 +1,8 @@
 //! Use-case helpers for inlining function calls.
 
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{InlineInternalError, InlineResult, InlineSafetyError};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
@@ -43,7 +45,9 @@ struct InlineFunctionParts {
     replacement: String,
 }
 
-pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<InlineFunctionPlan> {
+pub fn plan_inline_function(
+    request: InlineFunctionRequest<'_>,
+) -> InlineResult<InlineFunctionPlan> {
     ensure_inline_function_dialect_supported(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
@@ -54,11 +58,7 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
     // has a comment (for example, documenting what the body does) would
     // silently discard it, since it is not preserved anywhere else.
     if request.remove_definition && tree.has_comment_in(definition_span) {
-        anyhow::bail!(
-            "inline-function cannot remove a definition that contains a comment; \
-             the comment is not copied to call sites and would be discarded. \
-             Drop --remove-definition or remove the comment first"
-        );
+        return Err(InlineSafetyError::RemoveDefinitionWithComment.into());
     }
     let definition = parse_inline_function_definition(
         request.dialect,
@@ -91,14 +91,14 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
         )?;
 
         if parts.function_name != function_name {
-            anyhow::bail!(
-                "inline-function resolved inconsistent function name: expected {}, found {}",
-                function_name,
-                parts.function_name
-            );
+            return Err(InlineInternalError::InconsistentFunctionName {
+                expected: function_name.to_string(),
+                found: parts.function_name.to_string(),
+            }
+            .into());
         }
         if spans_overlap(parts.definition_span, parts.call_span) {
-            anyhow::bail!("inline-function definition and call selections must not overlap");
+            return Err(InlineSafetyError::DefinitionAndCallOverlap.into());
         }
 
         edits.push((parts.call_span, parts.replacement.clone()));
@@ -120,8 +120,12 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
     }
     let rewritten = apply_byte_span_edits(request.input, edits)?;
 
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("inline-function output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "inline-function",
+            source,
+        }
+    })?;
 
     Ok(InlineFunctionPlan {
         dialect: request.dialect,
@@ -144,14 +148,14 @@ pub const fn supports_inline_function_dialect(dialect: Dialect) -> bool {
     matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp)
 }
 
-fn ensure_inline_function_dialect_supported(dialect: Dialect) -> Result<()> {
+fn ensure_inline_function_dialect_supported(dialect: Dialect) -> InlineResult<()> {
     if supports_inline_function_dialect(dialect) {
         Ok(())
     } else {
-        anyhow::bail!(
-            "inline-function does not support dialect {}",
-            dialect.label()
-        )
+        Err(InlineSafetyError::UnsupportedDialect {
+            dialect: dialect.label().to_owned(),
+        }
+        .into())
     }
 }
 
@@ -162,7 +166,7 @@ fn inline_function_parts(
     call_selection: ExpressionView,
     allow_duplicate_evaluation: bool,
     allow_drop_arguments: bool,
-) -> Result<InlineFunctionParts> {
+) -> InlineResult<InlineFunctionParts> {
     let definition =
         parse_inline_function_definition(dialect, input, definition_selection.clone())?;
     validate_macro_environment_parameters(dialect, input, &definition)?;
@@ -229,7 +233,7 @@ fn inline_function_parts(
     })
 }
 
-fn replacement_view_for_inline_function(tree: &SyntaxTree) -> Result<ExpressionView> {
+fn replacement_view_for_inline_function(tree: &SyntaxTree) -> InlineResult<ExpressionView> {
     if tree.root_children().len() == 1 {
         return Ok(tree.select_path(&Path::root_child(0))?.view());
     }
@@ -256,7 +260,7 @@ fn validate_macro_environment_parameters(
     dialect: Dialect,
     input: &str,
     definition: &InlineDefinition,
-) -> Result<()> {
+) -> InlineResult<()> {
     if definition.kind != InlineDefinitionKind::Macro {
         return Ok(());
     }
@@ -270,9 +274,9 @@ fn validate_macro_environment_parameters(
         if !matches!(param.kind, InlineParameterKind::Environment) {
             continue;
         }
-        let name = param.primary_name().context(
-            "inline-function internal error: &environment parameter must use a simple binding",
-        )?;
+        let name = param
+            .primary_name()
+            .ok_or(InlineInternalError::EnvironmentNotSimple)?;
 
         reject_environment_references_in_expression(
             dialect,
@@ -283,9 +287,13 @@ fn validate_macro_environment_parameters(
         )?;
 
         for (context, default_value) in &initialization_expressions {
-            let default_tree = SyntaxTree::parse_with_dialect(default_value, dialect)
-                .with_context(|| {
-                    format!("inline-function could not parse {context}: {default_value}")
+            let default_tree =
+                SyntaxTree::parse_with_dialect(default_value, dialect).map_err(|source| {
+                    InlineInternalError::CouldNotParse {
+                        context: context.to_string(),
+                        value: default_value.to_string(),
+                        source,
+                    }
                 })?;
             let default_expression = default_tree
                 .select_path(&paredit_core_syntax::sexpr::Path::root_child(0))?
@@ -359,7 +367,7 @@ fn reject_environment_references_in_expression(
     context: &str,
     input: &str,
     expression: &ExpressionView,
-) -> Result<()> {
+) -> InlineResult<()> {
     let symbol = SymbolName::new(parameter_name.to_owned())?;
     let mut spans = Vec::new();
     collect_unshadowed_symbol_references(dialect, expression, &symbol, input, &mut spans);
@@ -367,7 +375,9 @@ fn reject_environment_references_in_expression(
         return Ok(());
     }
 
-    anyhow::bail!(
-        "inline-function cannot inline macros that reference &environment parameter '{parameter_name}' in the {context}; source-level inlining cannot reconstruct macro expansion environments"
-    );
+    Err(InlineSafetyError::ReferencesEnvironment {
+        parameter: parameter_name.to_string(),
+        context: context.to_string(),
+    }
+    .into())
 }

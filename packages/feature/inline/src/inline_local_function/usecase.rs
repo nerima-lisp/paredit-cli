@@ -1,9 +1,9 @@
 //! Application facade for inlining a single Common Lisp `flet` call.
 
+use crate::error::InlineResult;
 use crate::inline_local_function::domain::{
     self as inline_local_function, Request as DomainRequest,
 };
-use anyhow::Result;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
@@ -37,7 +37,7 @@ pub struct InlineLocalFunctionPlan {
 
 pub fn plan_inline_local_function(
     request: InlineLocalFunctionRequest<'_>,
-) -> Result<InlineLocalFunctionPlan> {
+) -> InlineResult<InlineLocalFunctionPlan> {
     inline_local_function::validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

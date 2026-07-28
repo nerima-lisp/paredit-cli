@@ -1,6 +1,8 @@
 //! Use case for inlining an immutable, self-evaluating Common Lisp constant.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{DialectRefusal, DocumentRefusal};
+
+use crate::error::{InlineError, InlineResult, InlineSafetyError, InlineSelectionError};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
@@ -32,17 +34,29 @@ pub struct InlineLiteralConstantPlan {
 
 pub fn plan_inline_literal_constant(
     request: InlineLiteralConstantRequest<'_>,
-) -> Result<InlineLiteralConstantPlan> {
+) -> InlineResult<InlineLiteralConstantPlan> {
     if request.dialect != Dialect::CommonLisp {
-        bail!("inline-literal-constant supports only Common Lisp");
+        return Err(DialectRefusal::CommonLispOnly {
+            operation: "inline-literal-constant",
+        }
+        .into());
     }
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("inline-literal-constant input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "inline-literal-constant",
+                source,
+            }
+        })?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let definition = tree.select_path(&request.path)?.view();
     require_top_level_path(&request.path)?;
     if tree.has_comment_in(definition.span) {
-        bail!("inline-literal-constant cannot remove a definition containing comments");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "cannot remove a definition containing comments".to_owned(),
+        }
+        .into());
     }
     let (constant_name, literal) = parse_definition(&definition, request.input)?;
     reject_duplicate_definitions(&tree, &constant_name)?;
@@ -56,7 +70,11 @@ pub fn plan_inline_literal_constant(
     )?;
     references.retain(|reference| !contains_span(definition.span, reference.span));
     if references.is_empty() {
-        bail!("inline-literal-constant requires at least one safe value reference");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "requires at least one safe value reference".to_owned(),
+        }
+        .into());
     }
     let mut place_spans = Vec::new();
     for (index, _) in tree.root_children().iter().enumerate() {
@@ -68,7 +86,10 @@ pub fn plan_inline_literal_constant(
             .iter()
             .any(|place| contains_span(*place, reference.span))
     }) {
-        bail!("inline-literal-constant rejects references used as mutation places");
+        return Err(InlineSafetyError::MutationPlace {
+            operation: "inline-literal-constant",
+        }
+        .into());
     }
 
     let mut edits = references
@@ -85,8 +106,12 @@ pub fn plan_inline_literal_constant(
         rewritten.replace_range(span.start().get()..span.end().get(), &replacement);
     }
     let rewritten = collapse_removed_definition_gap(&rewritten);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("inline-literal-constant output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "inline-literal-constant",
+            source,
+        }
+    })?;
 
     Ok(InlineLiteralConstantPlan {
         dialect: request.dialect,
@@ -100,34 +125,62 @@ pub fn plan_inline_literal_constant(
     })
 }
 
-fn require_top_level_path(path: &Path) -> Result<()> {
+fn require_top_level_path(path: &Path) -> InlineResult<()> {
     if path.indexes().len() != 1 {
-        bail!("inline-literal-constant requires a top-level defconstant path");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "requires a top-level defconstant path".to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
 
-fn parse_definition(definition: &ExpressionView, input: &str) -> Result<(SymbolName, String)> {
+fn parse_definition(
+    definition: &ExpressionView,
+    input: &str,
+) -> InlineResult<(SymbolName, String)> {
     if definition.kind != ExpressionKind::List || definition.children.len() != 3 {
-        bail!("inline-literal-constant requires (defconstant name literal)");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "requires (defconstant name literal)".to_owned(),
+        }
+        .into());
     }
-    let head = plain_symbol(&definition.children[0])
-        .context("inline-literal-constant requires a plain defconstant head")?;
+    let head = plain_symbol(&definition.children[0]).ok_or_else(|| {
+        InlineError::from(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "requires a plain defconstant head".to_owned(),
+        })
+    })?;
     if !common_lisp_symbol_reference_eq(head, "defconstant") {
-        bail!("inline-literal-constant selection must be a defconstant form");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "selection must be a defconstant form".to_owned(),
+        }
+        .into());
     }
-    let name_text = plain_symbol(&definition.children[1])
-        .context("inline-literal-constant requires a plain constant name")?;
+    let name_text = plain_symbol(&definition.children[1]).ok_or_else(|| {
+        InlineError::from(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "requires a plain constant name".to_owned(),
+        })
+    })?;
     if name_text.contains(':') || name_text.starts_with('&') {
-        bail!("inline-literal-constant requires an unqualified constant name");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "requires an unqualified constant name".to_owned(),
+        }
+        .into());
     }
     let name = SymbolName::new(name_text)?;
     let value = &definition.children[2];
     let literal = &input[value.span.start().get()..value.span.end().get()];
     if !is_safe_literal(value, literal) {
-        bail!(
-            "inline-literal-constant supports only immutable self-evaluating literals (numbers, characters, T, NIL, and keywords)"
-        );
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "supports only immutable self-evaluating literals (numbers, characters, T, NIL, and keywords)".to_owned(),
+        }.into());
     }
     Ok((name, literal.to_owned()))
 }
@@ -181,7 +234,7 @@ fn is_conservative_number(atom: &str) -> bool {
         && unsigned.bytes().any(|byte| byte.is_ascii_digit())
 }
 
-fn reject_duplicate_definitions(tree: &SyntaxTree, name: &SymbolName) -> Result<()> {
+fn reject_duplicate_definitions(tree: &SyntaxTree, name: &SymbolName) -> InlineResult<()> {
     let mut count = 0;
     for (index, _) in tree.root_children().iter().enumerate() {
         let view = tree.select_path(&Path::root_child(index))?.view();
@@ -202,7 +255,11 @@ fn reject_duplicate_definitions(tree: &SyntaxTree, name: &SymbolName) -> Result<
         }
     }
     if count != 1 {
-        bail!("inline-literal-constant requires exactly one matching defconstant definition");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-literal-constant",
+            problem: "requires exactly one matching defconstant definition".to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
@@ -279,7 +336,7 @@ fn collapse_removed_definition_gap(input: &str) -> String {
 mod tests {
     use super::*;
 
-    fn plan(input: &str) -> Result<InlineLiteralConstantPlan> {
+    fn plan(input: &str) -> InlineResult<InlineLiteralConstantPlan> {
         plan_inline_literal_constant(InlineLiteralConstantRequest {
             input,
             dialect: Dialect::CommonLisp,

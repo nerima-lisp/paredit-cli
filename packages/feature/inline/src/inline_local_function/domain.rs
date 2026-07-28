@@ -1,6 +1,10 @@
 //! Pure planning rules for inlining a single Common Lisp `flet` call.
 
-use anyhow::{Context, Result, bail};
+use paredit_core_edit::{DialectRefusal, DocumentRefusal};
+
+use crate::error::{
+    CallBindingError, InlineError, InlineResult, InlineSafetyError, InlineSelectionError,
+};
 
 use paredit_core_semantics::lexical_scope::collect_unshadowed_symbol_references;
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
@@ -37,47 +41,84 @@ pub struct Plan {
     pub changed: bool,
 }
 
-pub fn plan(request: Request<'_>) -> Result<Plan> {
+pub fn plan(request: Request<'_>) -> InlineResult<Plan> {
     validate_dialect(request.dialect)?;
-    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
-        .context("inline-local-function input is not a valid S-expression document")?;
+    let tree =
+        SyntaxTree::parse_with_dialect(request.input, request.dialect).map_err(|source| {
+            DocumentRefusal::InputNotAnSexprDocument {
+                operation: "inline-local-function",
+                source,
+            }
+        })?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
-        bail!("inline-local-function cannot replace an flet form containing comments");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-local-function",
+            problem: "cannot replace an flet form containing comments".to_owned(),
+        }
+        .into());
     }
     require_list_head(&form, "flet", "selected form must be an flet form")?;
     if form.children.len() != 3 {
-        bail!("inline-local-function requires exactly one flet body expression");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-local-function",
+            problem: "requires exactly one flet body expression".to_owned(),
+        }
+        .into());
     }
     let bindings = &form.children[1];
     if bindings.kind != ExpressionKind::List || !bindings.reader_prefixes.is_empty() {
-        bail!("inline-local-function requires a plain flet binding list");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-local-function",
+            problem: "requires a plain flet binding list".to_owned(),
+        }
+        .into());
     }
     if bindings.children.len() != 1 {
-        bail!("inline-local-function requires exactly one flet binding");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-local-function",
+            problem: "requires exactly one flet binding".to_owned(),
+        }
+        .into());
     }
     let definition = &bindings.children[0];
     if definition.kind != ExpressionKind::List
         || !definition.reader_prefixes.is_empty()
         || definition.children.len() != 3
     {
-        bail!("inline-local-function requires one definition with a single body expression");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-local-function",
+            problem: "requires one definition with a single body expression".to_owned(),
+        }
+        .into());
     }
     let function_name = plain_symbol(&definition.children[0], "local function name")?;
     let parameter_list = &definition.children[1];
     if parameter_list.kind != ExpressionKind::List || !parameter_list.reader_prefixes.is_empty() {
-        bail!("inline-local-function requires a plain required-parameter list");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-local-function",
+            problem: "requires a plain required-parameter list".to_owned(),
+        }
+        .into());
     }
     let mut parameter_names = Vec::with_capacity(parameter_list.children.len());
     for parameter in &parameter_list.children {
         let name = plain_symbol(parameter, "required parameter")?;
         if name.as_str().starts_with('&') {
-            bail!("inline-local-function supports required parameters only");
+            return Err(InlineSelectionError::Shape {
+                operation: "inline-local-function",
+                problem: "supports required parameters only".to_owned(),
+            }
+            .into());
         }
         if parameter_names.iter().any(|existing: &SymbolName| {
             common_lisp_symbol_reference_eq(existing.as_str(), name.as_str())
         }) {
-            bail!("inline-local-function requires unique parameter names");
+            return Err(InlineSelectionError::Shape {
+                operation: "inline-local-function",
+                problem: "requires unique parameter names".to_owned(),
+            }
+            .into());
         }
         parameter_names.push(name);
     }
@@ -91,7 +132,10 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
         "flet body must be exactly one direct call to the local function",
     )?;
     if call.children.len() != parameter_names.len() + 1 {
-        bail!("inline-local-function requires exact call arity");
+        return Err(CallBindingError::ExactArityRequired {
+            operation: "inline-local-function",
+        }
+        .into());
     }
     let mut parameters = Vec::with_capacity(parameter_names.len());
     for (name, argument) in parameter_names.into_iter().zip(&call.children[1..]) {
@@ -104,11 +148,15 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
             &mut references,
         );
         if references.len() != 1 {
-            bail!(
-                "inline-local-function requires parameter '{}' to be referenced exactly once; found {}",
-                name,
-                references.len()
-            );
+            return Err(InlineSelectionError::Shape {
+                operation: "inline-local-function",
+                problem: format!(
+                    "requires parameter '{}' to be referenced exactly once; found {}",
+                    name,
+                    references.len()
+                ),
+            }
+            .into());
         }
         parameters.push(ParameterPlan {
             name,
@@ -124,8 +172,12 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
         .join(" ");
     let replacement = format!("(let ({bindings}) {body})");
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("inline-local-function output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "inline-local-function",
+            source,
+        }
+    })?;
     Ok(Plan {
         dialect: request.dialect,
         path: request.path,
@@ -139,9 +191,12 @@ pub fn plan(request: Request<'_>) -> Result<Plan> {
     })
 }
 
-pub fn validate_dialect(dialect: Dialect) -> Result<()> {
+pub fn validate_dialect(dialect: Dialect) -> InlineResult<()> {
     if dialect != Dialect::CommonLisp {
-        bail!("inline-local-function currently supports only Common Lisp");
+        return Err(DialectRefusal::CurrentlyCommonLispOnly {
+            operation: "inline-local-function",
+        }
+        .into());
     }
     Ok(())
 }
@@ -154,16 +209,30 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
-fn plain_symbol(view: &ExpressionView, role: &str) -> Result<SymbolName> {
+fn plain_symbol(view: &ExpressionView, role: &str) -> InlineResult<SymbolName> {
     if view.kind != ExpressionKind::Atom || !view.reader_prefixes.is_empty() {
-        bail!("inline-local-function requires a plain {role}");
+        return Err(InlineSelectionError::NotPlain {
+            operation: "inline-local-function",
+            role: role.to_owned(),
+        }
+        .into());
     }
-    let text = atom_symbol_text(view)
-        .with_context(|| format!("inline-local-function requires a plain {role}"))?;
-    SymbolName::new(text).with_context(|| format!("inline-local-function has invalid {role}"))
+    let text = atom_symbol_text(view).ok_or_else(|| {
+        InlineError::from(InlineSelectionError::NotPlain {
+            operation: "inline-local-function",
+            role: role.to_owned(),
+        })
+    })?;
+    SymbolName::new(text).map_err(|_| {
+        InlineSelectionError::Invalid {
+            operation: "inline-local-function",
+            role: role.to_owned(),
+        }
+        .into()
+    })
 }
 
-fn require_list_head(view: &ExpressionView, expected: &str, message: &str) -> Result<()> {
+fn require_list_head(view: &ExpressionView, expected: &str, message: &str) -> InlineResult<()> {
     let matches = view.kind == ExpressionKind::List
         && view.reader_prefixes.is_empty()
         && view
@@ -172,12 +241,16 @@ fn require_list_head(view: &ExpressionView, expected: &str, message: &str) -> Re
             .and_then(atom_symbol_text)
             .is_some_and(|head| common_lisp_symbol_reference_eq(head, expected));
     if !matches {
-        bail!("inline-local-function {message}");
+        return Err(InlineSelectionError::Shape {
+            operation: "inline-local-function",
+            problem: message.to_owned(),
+        }
+        .into());
     }
     Ok(())
 }
 
-fn reject_self_call(view: &ExpressionView, name: &str) -> Result<()> {
+fn reject_self_call(view: &ExpressionView, name: &str) -> InlineResult<()> {
     if view.kind == ExpressionKind::List
         && view
             .children
@@ -185,7 +258,7 @@ fn reject_self_call(view: &ExpressionView, name: &str) -> Result<()> {
             .and_then(atom_symbol_text)
             .is_some_and(|head| common_lisp_symbol_reference_eq(head, name))
     {
-        bail!("inline-local-function rejects recursive or same-name calls in the definition body");
+        return Err(InlineSafetyError::RecursiveLocalFunction.into());
     }
     for child in &view.children {
         reject_self_call(child, name)?;
@@ -193,7 +266,7 @@ fn reject_self_call(view: &ExpressionView, name: &str) -> Result<()> {
     Ok(())
 }
 
-fn reject_control_transfer(view: &ExpressionView) -> Result<()> {
+fn reject_control_transfer(view: &ExpressionView) -> InlineResult<()> {
     if view.kind == ExpressionKind::List
         && view
             .children
@@ -205,7 +278,7 @@ fn reject_control_transfer(view: &ExpressionView) -> Result<()> {
                     .any(|form| common_lisp_symbol_reference_eq(head, form))
             })
     {
-        bail!("inline-local-function rejects non-local control transfer or declarations");
+        return Err(InlineSafetyError::NonLocalControlTransfer.into());
     }
     for child in &view.children {
         reject_control_transfer(child)?;
@@ -217,7 +290,7 @@ fn reject_control_transfer(view: &ExpressionView) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn plan(input: &str) -> Result<Plan> {
+    fn plan(input: &str) -> InlineResult<Plan> {
         super::plan(Request {
             input,
             dialect: Dialect::CommonLisp,

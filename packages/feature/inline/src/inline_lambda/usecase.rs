@@ -1,7 +1,7 @@
 //! Application facade for inlining an immediately invoked Common Lisp lambda.
 
+use crate::error::InlineResult;
 use crate::inline_lambda::domain::{self as inline_lambda, Request as DomainRequest};
-use anyhow::Result;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
@@ -29,7 +29,7 @@ pub struct InlineLambdaPlan {
     pub changed: bool,
 }
 
-pub fn plan_inline_lambda(request: InlineLambdaRequest<'_>) -> Result<InlineLambdaPlan> {
+pub fn plan_inline_lambda(request: InlineLambdaRequest<'_>) -> InlineResult<InlineLambdaPlan> {
     inline_lambda::validate_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
