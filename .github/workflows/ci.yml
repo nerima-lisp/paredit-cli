@@ -14,7 +14,13 @@ permissions:
 jobs:
   check:
     name: Verify
-    timeout-minutes: 30
+    # `nix flake check` builds 11 derivations, several of which compile the
+    # whole 24-package workspace under a different toolchain or flag set. It
+    # took 26m56s here on a warm Cachix cache; a cold cache (any commit whose
+    # source hash Cachix has not seen) exceeds 30 minutes and the job is
+    # cancelled mid-check, which reads as a spurious failure. 60 leaves room
+    # for a cold run without letting a genuinely hung build burn an hour.
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

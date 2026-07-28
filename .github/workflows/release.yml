@@ -16,7 +16,11 @@ jobs:
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # See the note on ci.yml's Verify job: this runs the same `nix flake check`
+    # and is the more likely of the two to hit a cold Cachix cache, because a
+    # release commit's source hash is new by construction. v1.2.0's first
+    # attempt was cancelled at exactly 30 minutes part-way through the check.
+    timeout-minutes: 60
     permissions:
       contents: write # Create the GitHub Release.
     steps:
