@@ -1,10 +1,12 @@
 use crate::error::{RenameResult, SemanticShapeError};
 
 use paredit_core_syntax::dialect::{
-    BinderShape, BindingVisibility, BodyShape, DefinitionShape, ParameterShape, RelativeNodePath,
-    RenameBindingOperation, ScopeShape, VerifiedSemanticPolicy,
+    BinderShape, BindingVisibility, BodyShape, DefinitionShape, NameListArity, ParameterShape,
+    RelativeNodePath, RenameBindingOperation, ScopeShape, VerifiedSemanticPolicy,
 };
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
+use paredit_core_syntax::sexpr::{
+    ByteOffset, ByteSpan, ExpressionKind, ExpressionView, SymbolName,
+};
 
 use super::build_binding_rename_parts;
 use super::destructure::binding_pattern_name_spans;
@@ -143,6 +145,44 @@ fn select_scope_binding_and_collect(
                     shadowed_scope_count,
                 );
             }
+            Ok(binding)
+        }
+        BinderShape::NameList {
+            container,
+            first_name_index,
+            names,
+        } => {
+            let bindings = name_list_bindings(view, container, first_name_index, names, input)?;
+            let binding = select_unique_binding(semantic, bindings, from)?;
+            // The expressions that drive the iteration sit between the names
+            // and the body but are evaluated outside this scope, so they are
+            // not references to the binding being renamed.
+            collect_body_references(
+                semantic,
+                view,
+                scope.body(),
+                from,
+                input,
+                output,
+                shadowed_scope_count,
+            );
+            Ok(binding)
+        }
+        BinderShape::SingleName { name } => {
+            let binding = single_pattern_binding(
+                resolve_relative(view, name).ok_or(SemanticShapeError::BindingContainerMissing)?,
+                input,
+            )?;
+            let binding = select_unique_binding(semantic, vec![binding], from)?;
+            collect_body_references(
+                semantic,
+                view,
+                scope.body(),
+                from,
+                input,
+                output,
+                shadowed_scope_count,
+            );
             Ok(binding)
         }
         BinderShape::Parameters(parameters) => {
@@ -384,6 +424,76 @@ fn parameter_bindings(
     parameter_name_spans(&container, input)
 }
 
+/// Resolves the bare names a `NameList` binder introduces, ignoring the
+/// trailing children that drive the form rather than bind anything.
+fn name_list_bindings(
+    view: &ExpressionView,
+    container: RelativeNodePath,
+    first_name_index: usize,
+    names: NameListArity,
+    input: &str,
+) -> RenameResult<Vec<ParameterNameSpan>> {
+    let container =
+        resolve_relative(view, container).ok_or(SemanticShapeError::BindingContainerMissing)?;
+    let available = container
+        .children
+        .len()
+        .checked_sub(first_name_index)
+        .ok_or(SemanticShapeError::ParameterLayoutOutsideContainer)?;
+    let name_count = names
+        .name_count(available)
+        .ok_or(SemanticShapeError::ParameterLayoutOutsideContainer)?;
+    Ok(container
+        .children
+        .iter()
+        .skip(first_name_index)
+        .take(name_count)
+        .flat_map(|name| binding_pattern_name_spans(name, input))
+        .collect())
+}
+
+/// Walks the children of a `NameList` binder that drive the form. They are
+/// evaluated in the enclosing scope, so references there are not shadowed.
+#[allow(clippy::too_many_arguments)]
+fn collect_name_list_drivers(
+    semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
+    view: &ExpressionView,
+    container: RelativeNodePath,
+    first_name_index: usize,
+    names: NameListArity,
+    from: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+) {
+    let Some(container) = resolve_relative(view, container) else {
+        return;
+    };
+    let Some(name_count) = container
+        .children
+        .len()
+        .checked_sub(first_name_index)
+        .and_then(|available| names.name_count(available))
+    else {
+        return;
+    };
+    for driver in container
+        .children
+        .iter()
+        .skip(first_name_index + name_count)
+    {
+        collect_references(
+            semantic,
+            driver,
+            from,
+            input,
+            output,
+            shadowed_scope_count,
+            false,
+        );
+    }
+}
+
 fn single_pattern_binding(view: &ExpressionView, input: &str) -> RenameResult<ParameterNameSpan> {
     let mut bindings = binding_pattern_name_spans(view, input).into_iter();
     let binding = bindings
@@ -405,13 +515,10 @@ fn collect_references(
     is_call_head: bool,
 ) {
     if view.kind == ExpressionKind::Atom {
-        if !is_lisp2_call_head(semantic, is_call_head)
-            && view
-                .text
-                .as_deref()
-                .is_some_and(|name| semantic.identifiers_equal(name, from.as_str()))
-        {
-            output.push(view.span);
+        if !is_lisp2_call_head(semantic, is_call_head) {
+            if let Some(span) = reference_span(semantic, view, from) {
+                output.push(span);
+            }
         }
         return;
     }
@@ -518,6 +625,72 @@ fn collect_nested_scope_references(
                 view,
                 &groups,
                 visibility,
+                scope.body(),
+                shadows_from,
+                from,
+                input,
+                output,
+                shadowed_scope_count,
+            );
+        }
+        BinderShape::NameList {
+            container,
+            first_name_index,
+            names,
+        } => {
+            // The driver expressions are evaluated in this enclosing scope, so
+            // they still hold renameable references even when the names below
+            // shadow the symbol for the body.
+            collect_name_list_drivers(
+                semantic,
+                view,
+                container,
+                first_name_index,
+                names,
+                from,
+                input,
+                output,
+                shadowed_scope_count,
+            );
+            let shadows_from = name_list_bindings(view, container, first_name_index, names, input)
+                .is_ok_and(|bindings| bindings_bind(semantic, &bindings, from));
+            collect_nested_parameter_body(
+                semantic,
+                view,
+                scope.body(),
+                shadows_from,
+                from,
+                input,
+                output,
+                shadowed_scope_count,
+            );
+        }
+        BinderShape::SingleName { name } => {
+            let shadows_from = resolve_relative(view, name)
+                .is_some_and(|name| pattern_binds(semantic, name, from, input));
+            // Everything between the name and the body drives the iteration and
+            // is evaluated outside the scope the name opens.
+            let body_start = match scope.body() {
+                BodyShape::ChildrenFrom(first) => first,
+                BodyShape::ChildrenAfter(_) | BodyShape::ClauseChildrenFrom { .. } => return,
+            };
+            for (index, child) in view.children.iter().enumerate().take(body_start) {
+                if index <= name.child() {
+                    continue;
+                }
+                collect_references(
+                    semantic,
+                    child,
+                    from,
+                    input,
+                    output,
+                    shadowed_scope_count,
+                    false,
+                );
+            }
+            collect_nested_parameter_body(
+                semantic,
+                view,
                 scope.body(),
                 shadows_from,
                 from,
@@ -834,14 +1007,34 @@ fn identifiers_equal(
     semantic.identifiers_equal(candidate, from.as_str())
 }
 
+/// Returns the span to rewrite when `view` refers to `from`.
+///
+/// Usually that is the whole atom. In dialects where an atom can name a
+/// binding and then reach into its value — Fennel's `handle:read`, Hy's
+/// `obj.attr` — only the leading segment is the name, so rewriting the whole
+/// atom would destroy the access path and rewriting nothing would leave the
+/// reference pointing at a name that no longer exists.
+fn reference_span(
+    semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
+    view: &ExpressionView,
+    from: &SymbolName,
+) -> Option<ByteSpan> {
+    let text = view.text.as_deref()?;
+    if identifiers_equal(semantic, text, from) {
+        return Some(view.span);
+    }
+
+    let root_len = semantic.dialect().binding_reference_root_len(text)?;
+    if !identifiers_equal(semantic, text.get(..root_len)?, from) {
+        return None;
+    }
+    let start = view.span.start();
+    ByteSpan::try_new(start, ByteOffset::new(start.get().checked_add(root_len)?))
+}
+
 const fn is_lisp2_call_head(
     semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
     is_call_head: bool,
 ) -> bool {
-    is_call_head
-        && matches!(
-            semantic.dialect(),
-            paredit_core_syntax::dialect::Dialect::CommonLisp
-                | paredit_core_syntax::dialect::Dialect::EmacsLisp
-        )
+    is_call_head && semantic.dialect().separates_function_namespace()
 }

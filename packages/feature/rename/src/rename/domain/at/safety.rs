@@ -6,15 +6,16 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 pub fn ensure_binding_target_is_available(
+    dialect: Dialect,
     view: &ExpressionView,
     from: &SymbolName,
     to: &SymbolName,
     binding_span: ByteSpan,
     input: &str,
 ) -> RenameResult<()> {
-    let semantic = Dialect::CommonLisp
-        .verify_rename_binding()
-        .expect("Common Lisp rename-binding semantics are verified");
+    let Ok(semantic) = dialect.verify_rename_binding() else {
+        return Err(RenameAtError::UnsupportedDialect.into());
+    };
     let Ok(existing) = binding_rename_parts(semantic, view, to, input) else {
         return Ok(());
     };

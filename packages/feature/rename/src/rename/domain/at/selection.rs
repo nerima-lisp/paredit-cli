@@ -1,5 +1,6 @@
 use crate::error::{BindingSelectionError, RenameResult};
 
+use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{AtomOccurrenceIndex, ByteSpan, ExpressionView, Path};
 
 #[derive(Clone, Copy)]
@@ -21,7 +22,16 @@ impl<'a> AtomPathIndex<'a> {
     }
 }
 
-pub fn is_common_lisp_value_position(atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
+/// Reports whether an occurrence sits where a lexical value can be referenced.
+///
+/// In a dialect that resolves call heads in their own namespace, the head of a
+/// form names a function rather than the surrounding `let` binding, so it is
+/// not a value position. In a Lisp-1 the head is an ordinary value reference
+/// and has to be renamed with the rest.
+pub fn is_value_position(dialect: Dialect, atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
+    if !dialect.separates_function_namespace() {
+        return true;
+    }
     atom_paths
         .last_index_for_span(span)
         .is_some_and(|index| index != 0)

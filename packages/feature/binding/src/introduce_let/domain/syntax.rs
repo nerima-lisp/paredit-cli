@@ -201,6 +201,27 @@ fn binder_shape_contains_name(
                 .step_by(stride)
                 .any(|node| semantic_pattern_contains_name(semantic, node, name))
         }),
+        BinderShape::NameList {
+            container,
+            first_name_index,
+            names,
+        } => resolve_relative(view, container).is_some_and(|bindings| {
+            bindings
+                .children
+                .len()
+                .checked_sub(first_name_index)
+                .and_then(|available| names.name_count(available))
+                .is_some_and(|count| {
+                    bindings
+                        .children
+                        .iter()
+                        .skip(first_name_index)
+                        .take(count)
+                        .any(|node| semantic_pattern_contains_name(semantic, node, name))
+                })
+        }),
+        BinderShape::SingleName { name: bound } => resolve_relative(view, bound)
+            .is_some_and(|node| semantic_pattern_contains_name(semantic, node, name)),
         BinderShape::Parameters(parameters) => {
             parameter_shape_contains_name(semantic, view, parameters, name)
         }

@@ -1,43 +1,125 @@
 #[test]
-fn cli_rename_at_rejects_non_common_lisp_dialects_without_writing() {
+fn cli_rename_at_rejects_unknown_dialects_before_parsing_and_without_writing() {
     let input = "(";
-    for (dialect, extension) in [
-        ("emacs-lisp", "el"),
-        ("lfe", "lfe"),
-        ("scheme", "scm"),
-        ("racket", "rkt"),
-        ("clojure", "clj"),
-        ("hy", "hy"),
-        ("carp", "carp"),
-        ("janet", "janet"),
-        ("fennel", "fnl"),
-    ] {
-        let dir = fresh_temp_dir(&format!("rename-at-{dialect}-rejected"));
-        let file = dir.join(format!("input.{extension}"));
-        fs::write(&file, input).expect("write malformed non-Common-Lisp rename-at fixture");
+    let dir = fresh_temp_dir("rename-at-unknown-rejected");
+    let file = dir.join("input.txt");
+    fs::write(&file, input).expect("write malformed unknown-dialect rename-at fixture");
 
-        let mut cmd = paredit();
-        cmd.arg("refactor")
+    let mut cmd = paredit();
+    cmd.arg("refactor")
+        .arg("rename-at")
+        .arg("--file")
+        .arg(&file)
+        .arg("--at")
+        .arg("0")
+        .arg("--to")
+        .arg("thunk")
+        .arg("--dialect")
+        .arg("unknown")
+        .arg("--write")
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("rename-at requires a known dialect")
+                .and(predicate::str::contains("failed to parse input").not()),
+        );
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read unchanged unknown-dialect fixture"),
+        input
+    );
+}
+
+#[test]
+fn cli_rename_at_resolves_lexical_bindings_in_every_supported_dialect() {
+    // `--at` points at the binding name in each fixture.
+    for (dialect, extension, input, at, expected) in [
+        (
+            "emacs-lisp",
+            "el",
+            "(let ((x 1)) (+ x x))",
+            "7",
+            "(let ((y 1)) (+ y y))",
+        ),
+        (
+            "lfe",
+            "lfe",
+            "(let ((x 1)) (+ x x))",
+            "7",
+            "(let ((y 1)) (+ y y))",
+        ),
+        (
+            "scheme",
+            "scm",
+            "(let ((x 1)) (+ x x))",
+            "7",
+            "(let ((y 1)) (+ y y))",
+        ),
+        (
+            "racket",
+            "rkt",
+            "(let ((x 1)) (+ x x))",
+            "7",
+            "(let ((y 1)) (+ y y))",
+        ),
+        (
+            "clojure",
+            "clj",
+            "(let [x 1] (+ x x))",
+            "6",
+            "(let [y 1] (+ y y))",
+        ),
+        (
+            "hy",
+            "hy",
+            "(let [x 1] (+ x x))",
+            "6",
+            "(let [y 1] (+ y y))",
+        ),
+        (
+            "carp",
+            "carp",
+            "(let [x 1] (+ x x))",
+            "6",
+            "(let [y 1] (+ y y))",
+        ),
+        (
+            "janet",
+            "janet",
+            "(let [x 1] (+ x x))",
+            "6",
+            "(let [y 1] (+ y y))",
+        ),
+        (
+            "fennel",
+            "fnl",
+            "(let [x 1] (+ x x))",
+            "6",
+            "(let [y 1] (+ y y))",
+        ),
+    ] {
+        let dir = fresh_temp_dir(&format!("rename-at-{dialect}-supported"));
+        let file = dir.join(format!("input.{extension}"));
+        fs::write(&file, input).expect("write rename-at fixture");
+
+        paredit()
+            .arg("refactor")
             .arg("rename-at")
             .arg("--file")
             .arg(&file)
             .arg("--at")
-            .arg("0")
+            .arg(at)
             .arg("--to")
-            .arg("thunk")
+            .arg("y")
             .arg("--dialect")
             .arg(dialect)
             .arg("--write")
             .assert()
-            .failure()
-            .stderr(
-                predicate::str::contains("rename-at currently supports Common Lisp only")
-                    .and(predicate::str::contains("failed to parse input").not()),
-            );
+            .success();
 
         assert_eq!(
-            fs::read_to_string(&file).expect("read unchanged non-Common-Lisp fixture"),
-            input,
+            fs::read_to_string(&file).expect("read rewritten fixture"),
+            expected,
             "dialect: {dialect}"
         );
     }

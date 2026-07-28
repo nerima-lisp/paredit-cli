@@ -49,13 +49,39 @@ impl Dialect {
                     | "defmulti"
                     | "defmethod"
             ),
-            Self::Hy => matches!(head, "defn" | "defmacro" | "defclass" | "setv" | "require"),
+            Self::Hy => matches!(
+                head,
+                "defn" | "defn/a" | "defmacro" | "defclass" | "setv" | "setx" | "require"
+            ),
             Self::Carp => matches!(
                 head,
-                "defn" | "def" | "deftype" | "definterface" | "defdynamic" | "defmodule"
+                "defn"
+                    | "def"
+                    | "defmacro"
+                    | "deftype"
+                    | "definterface"
+                    | "defdynamic"
+                    | "defndynamic"
+                    | "defmodule"
             ),
-            Self::Janet => matches!(head, "def" | "defn" | "defmacro" | "def-" | "defn-"),
-            Self::Fennel => matches!(head, "fn" | "lambda" | "macro" | "local" | "global"),
+            Self::Janet => matches!(
+                head,
+                "def"
+                    | "def-"
+                    | "defn"
+                    | "defn-"
+                    | "defmacro"
+                    | "defmacro-"
+                    | "var"
+                    | "var-"
+                    | "varfn"
+            ),
+            // `λ` is Fennel's own spelling of `lambda`, and `macros` defines a
+            // table of macros rather than a single one.
+            Self::Fennel => matches!(
+                head,
+                "fn" | "lambda" | "λ" | "macro" | "macros" | "local" | "global" | "var"
+            ),
             Self::Unknown => {
                 head.starts_with("def")
                     || head.starts_with("cl-def")
@@ -78,11 +104,13 @@ impl Dialect {
                     | "cl-defgeneric"
                     | "cl-defmethod"
             ),
-            Self::Lfe => matches!(head, "defun"),
+            Self::Lfe => matches!(head, "defun" | "defmacro"),
             Self::Scheme | Self::Racket => matches!(head, "define"),
-            Self::Clojure | Self::Hy | Self::Carp => matches!(head, "defn" | "defmacro"),
-            Self::Janet => matches!(head, "defn" | "defmacro"),
-            Self::Fennel => matches!(head, "fn" | "lambda"),
+            Self::Clojure => matches!(head, "defn" | "defn-" | "defmacro"),
+            Self::Hy => matches!(head, "defn" | "defn/a" | "defmacro"),
+            Self::Carp => matches!(head, "defn" | "defndynamic" | "defmacro"),
+            Self::Janet => matches!(head, "defn" | "defn-" | "defmacro" | "defmacro-" | "varfn"),
+            Self::Fennel => matches!(head, "fn" | "lambda" | "λ" | "macro"),
             Self::Unknown => {
                 Self::CommonLisp.supports_function_parameter_refactor_head(head)
                     || matches!(
@@ -108,8 +136,10 @@ impl Dialect {
             Self::EmacsLisp => matches!(head, "defun" | "cl-defun" | "defsubst"),
             Self::Lfe => head == "defun",
             Self::Scheme | Self::Racket => head == "define",
-            Self::Clojure | Self::Hy | Self::Carp | Self::Janet => matches!(head, "defn" | "defn-"),
-            Self::Fennel => head == "fn",
+            Self::Clojure | Self::Janet => matches!(head, "defn" | "defn-"),
+            Self::Hy => matches!(head, "defn" | "defn/a"),
+            Self::Carp => matches!(head, "defn" | "defndynamic"),
+            Self::Fennel => matches!(head, "fn" | "lambda" | "λ"),
             Self::Unknown => {
                 Self::CommonLisp.supports_inline_function_refactor_head(head)
                     || matches!(
@@ -220,6 +250,15 @@ impl Dialect {
                     CommonLispLetBindingForm::Sequential,
                 )),
                 "lambda" | "match-lambda" => Some(CommonLispBindingRefactorForm::LambdaLike),
+                // LFE's `flet`/`fletrec` bind `(name (args) body)` entries,
+                // which is the Common Lisp `flet`/`labels` layout rather than
+                // the `(name value)` pairs a let-style binding list holds.
+                "flet" => Some(CommonLispBindingRefactorForm::LocalCallable(
+                    CommonLispLocalCallableForm::Flet,
+                )),
+                "fletrec" => Some(CommonLispBindingRefactorForm::LocalCallable(
+                    CommonLispLocalCallableForm::Labels,
+                )),
                 _ => None,
             },
             Self::Scheme | Self::Racket => match head {
@@ -232,12 +271,19 @@ impl Dialect {
                 "lambda" => Some(CommonLispBindingRefactorForm::LambdaLike),
                 _ => None,
             },
-            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel if head == "let" => {
+            // Bracketed binding forms all take the same `[name value ...]`
+            // pairs, so the resource and conditional binders join `let`.
+            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel
+                if bracket_let_binding_head(self, head) =>
+            {
                 Some(CommonLispBindingRefactorForm::Let(
                     CommonLispLetBindingForm::Parallel,
                 ))
             }
-            Self::Clojure | Self::Hy | Self::Carp | Self::Fennel if head == "fn" => {
+            Self::Clojure | Self::Hy | Self::Carp | Self::Janet if head == "fn" => {
+                Some(CommonLispBindingRefactorForm::LambdaLike)
+            }
+            Self::Fennel if matches!(head, "fn" | "lambda" | "λ") => {
                 Some(CommonLispBindingRefactorForm::LambdaLike)
             }
             _ => None,
@@ -296,9 +342,92 @@ impl Dialect {
             && common_lisp_operator(head).is_some_and(CommonLispOperator::is_asdf_system_definition)
     }
 
+    /// Reports whether this dialect resolves the head of a call in a separate
+    /// namespace from ordinary values, as Common Lisp does.
+    ///
+    /// In such a dialect `(f 2)` calls the function `f` no matter what a
+    /// surrounding `let` bound `f` to, so renaming that lexical binding must
+    /// leave the call head alone. LFE inherits the split from Erlang, where a
+    /// function is identified by name and arity rather than by a value.
+    ///
+    /// A dialect that returns `false` is a Lisp-1: the head is an ordinary
+    /// value reference and renaming the binding has to rewrite it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use paredit_core_syntax::dialect::Dialect;
+    ///
+    /// assert!(Dialect::CommonLisp.separates_function_namespace());
+    /// assert!(Dialect::Lfe.separates_function_namespace());
+    /// assert!(!Dialect::Scheme.separates_function_namespace());
+    /// assert!(!Dialect::Fennel.separates_function_namespace());
+    /// ```
+    #[must_use]
+    pub const fn separates_function_namespace(self) -> bool {
+        matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Lfe)
+    }
+
+    /// Returns the byte length of the leading segment of `text` that names a
+    /// binding, when the atom reaches into that binding rather than being it.
+    ///
+    /// Fennel's `handle:read` and `tbl.field` and Hy's `obj.attr` access a
+    /// member of whatever value the leading segment is bound to, so renaming
+    /// that binding has to rewrite the segment: rewriting the whole atom would
+    /// destroy the access path, and rewriting nothing would leave the reference
+    /// pointing at a name that no longer exists.
+    ///
+    /// Janet's `file/open` and Carp's `Array.length` look similar but are not:
+    /// their separators namespace a *module*, resolved from the environment
+    /// rather than from any lexical binding, so a local named `file` must leave
+    /// `file/open` alone. Those dialects therefore return `None`.
+    ///
+    /// Also returns `None` when the whole atom is the name, when the atom
+    /// merely starts with a separator (`:keyword`, Fennel's `.` accessor form),
+    /// and for numeric literals such as `1.5`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use paredit_core_syntax::dialect::Dialect;
+    ///
+    /// assert_eq!(Dialect::Fennel.binding_reference_root_len("handle:read"), Some(6));
+    /// assert_eq!(Dialect::Fennel.binding_reference_root_len("tbl.field"), Some(3));
+    /// assert_eq!(Dialect::Hy.binding_reference_root_len("obj.attr"), Some(3));
+    /// assert_eq!(Dialect::Fennel.binding_reference_root_len("handle"), None);
+    /// assert_eq!(Dialect::Fennel.binding_reference_root_len(":keyword"), None);
+    /// assert_eq!(Dialect::Fennel.binding_reference_root_len("1.5"), None);
+    /// // Module namespacing, not member access on a binding.
+    /// assert_eq!(Dialect::Janet.binding_reference_root_len("file/open"), None);
+    /// assert_eq!(Dialect::Carp.binding_reference_root_len("Array.length"), None);
+    /// assert_eq!(Dialect::CommonLisp.binding_reference_root_len("a:b"), None);
+    /// ```
+    #[must_use]
+    pub fn binding_reference_root_len(self, text: &str) -> Option<usize> {
+        let separators: &[char] = match self {
+            Self::Fennel => &['.', ':'],
+            Self::Hy => &['.'],
+            Self::CommonLisp
+            | Self::EmacsLisp
+            | Self::Lfe
+            | Self::Scheme
+            | Self::Racket
+            | Self::Clojure
+            | Self::Carp
+            | Self::Janet
+            | Self::Unknown => return None,
+        };
+
+        let root_len = text.find(separators)?;
+        let root = text.get(..root_len)?;
+        (!root.is_empty() && !root.bytes().all(|byte| byte.is_ascii_digit())).then_some(root_len)
+    }
+
     pub fn supports_inline_let_refactor_head(self, head: &str) -> bool {
         match self {
-            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel => head == "let",
+            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel => {
+                bracket_let_binding_head(self, head)
+            }
             Self::CommonLisp
             | Self::EmacsLisp
             | Self::Lfe
@@ -313,4 +442,29 @@ impl Dialect {
 
 fn common_lisp_operator(head: &str) -> Option<CommonLispOperator> {
     CommonLispOperator::from_head(head)
+}
+
+/// Reports whether `head` opens a bracketed `[name value ...]` binding list.
+///
+/// Beyond `let`, each of these dialects spells resource acquisition and
+/// conditional binding with the same pair list, so a binding refactor that
+/// understands one understands all of them. Janet's `if-let` and `if-with` are
+/// excluded: their else branch is outside the binding's scope.
+fn bracket_let_binding_head(dialect: Dialect, head: &str) -> bool {
+    match dialect {
+        Dialect::Clojure => head == "let",
+        Dialect::Hy => matches!(head, "let" | "with" | "for"),
+        Dialect::Carp => matches!(head, "let" | "let-do"),
+        Dialect::Janet => matches!(
+            head,
+            "let" | "with" | "with-vars" | "when-let" | "when-with"
+        ),
+        Dialect::Fennel => matches!(head, "let" | "with-open"),
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Lfe
+        | Dialect::Scheme
+        | Dialect::Racket
+        | Dialect::Unknown => false,
+    }
 }
