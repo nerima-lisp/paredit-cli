@@ -50,7 +50,15 @@ impl Formatter {
     /// Compacts a whole list onto one line regardless of its head style,
     /// returning `None` when the result would exceed the width budget or any
     /// child cannot be compacted.
-    fn compact_form(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
+    ///
+    /// Reader prefixes count against the budget but are not written here,
+    /// because [`Formatter::format_node`] has already emitted them by the time
+    /// it dispatches on the head's style.
+    pub(in crate::sexpr::formatter) fn compact_form(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+    ) -> Option<String> {
         let node = tree.node(node_id);
         if self.is_opaque_reader_form(node) {
             return Some(node.span.slice(&tree.source).to_owned());

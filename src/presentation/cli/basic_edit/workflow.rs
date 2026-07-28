@@ -10,7 +10,7 @@ use crate::presentation::cli::shared::{
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    let rendered = Formatter::new(args.indent).format(&tree);
+    let rendered = Formatter::with_dialect(args.indent, dialect).format(&tree);
     Ok(emit_document(
         &input, dialect, args.write, args.diff, rendered,
     )?)

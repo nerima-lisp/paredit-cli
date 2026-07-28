@@ -21,6 +21,10 @@ impl RuleDialectScope {
     /// Emacs 27 removed. None of them means anything in Common Lisp.
     pub const EMACS_LISP_ONLY: Self = Self(&[Dialect::EmacsLisp]);
 
+    /// Rules that encode Clojure semantics, which share almost no operator
+    /// vocabulary with the CLHS ones.
+    pub const CLOJURE_ONLY: Self = Self(&[Dialect::Clojure]);
+
     /// A rule that holds for an arbitrary set of dialects.
     #[must_use]
     pub const fn new(dialects: &'static [Dialect]) -> Self {
@@ -58,5 +62,12 @@ mod tests {
         let scope = RuleDialectScope::new(&[Dialect::CommonLisp, Dialect::EmacsLisp]);
         assert!(scope.includes(Dialect::EmacsLisp));
         assert!(!scope.includes(Dialect::Scheme));
+    }
+
+    #[test]
+    fn clojure_only_and_common_lisp_only_are_disjoint() {
+        assert!(RuleDialectScope::CLOJURE_ONLY.includes(Dialect::Clojure));
+        assert!(!RuleDialectScope::CLOJURE_ONLY.includes(Dialect::CommonLisp));
+        assert!(!RuleDialectScope::COMMON_LISP_ONLY.includes(Dialect::Clojure));
     }
 }

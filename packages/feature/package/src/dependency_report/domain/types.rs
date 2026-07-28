@@ -64,6 +64,17 @@ pub enum DependencyKind {
     DefpackageUse,
     DefpackageImportFrom,
     QualifiedSymbol,
+    /// A `(:require ...)` libspec inside a Clojure `ns` form.
+    NsRequire,
+    /// A `(:require-macros ...)` libspec, which loads a namespace at
+    /// ClojureScript compile time rather than at run time.
+    NsRequireMacros,
+    /// A `(:use ...)` libspec inside a Clojure `ns` form.
+    NsUse,
+    /// An `(:import ...)` class or package spec inside a Clojure `ns` form.
+    NsImport,
+    /// A `(:load ...)` path inside a Clojure `ns` form.
+    NsLoad,
 }
 
 impl DependencyKind {
@@ -82,6 +93,11 @@ impl DependencyKind {
             Self::DefpackageUse => "defpackage-use",
             Self::DefpackageImportFrom => "defpackage-import-from",
             Self::QualifiedSymbol => "qualified-symbol",
+            Self::NsRequire => "ns-require",
+            Self::NsRequireMacros => "ns-require-macros",
+            Self::NsUse => "ns-use",
+            Self::NsImport => "ns-import",
+            Self::NsLoad => "ns-load",
         }
     }
 }

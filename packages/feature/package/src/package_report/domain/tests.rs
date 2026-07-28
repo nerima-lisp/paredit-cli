@@ -95,3 +95,29 @@ proptest! {
         );
     }
 }
+
+#[test]
+fn clojure_ns_is_reported_as_the_file_namespace_not_as_a_package_definition() {
+    let tree = SyntaxTree::parse_with_dialect(
+        "(ns my.app (:require [clojure.string :as str]))",
+        Dialect::Clojure,
+    )
+    .expect("parse fixture");
+    let report = build_package_report(&tree, Dialect::Clojure).expect("build package report");
+
+    assert_eq!(report.in_packages.len(), 1);
+    assert_eq!(report.in_packages[0].name, "my.app");
+    // The `:require` clause is a dependency edge, reported by the dependency
+    // layer. Reporting `ns` as a defpackage as well would double-count it and
+    // would expose the form to the defpackage export/nickname refactors.
+    assert!(report.defpackages.is_empty());
+}
+
+#[test]
+fn clojure_namespace_detection_does_not_leak_into_other_dialects() {
+    let tree =
+        SyntaxTree::parse_with_dialect("(ns my.app)", Dialect::EmacsLisp).expect("parse fixture");
+    let report = build_package_report(&tree, Dialect::EmacsLisp).expect("build package report");
+
+    assert!(report.in_packages.is_empty());
+}

@@ -592,3 +592,265 @@ fn clamps_extreme_indent_without_overflow_or_unbounded_padding() {
     assert!(formatted.len() < 1_024);
     SyntaxTree::parse(&formatted).expect("formatted output parses again");
 }
+
+/// Parses and formats `input` as Clojure.
+///
+/// Both halves have to agree on the dialect: parsing decides which reader
+/// prefixes exist, and formatting decides which operator table lays lists out.
+fn format_clojure(input: &str) -> String {
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid Clojure");
+    Formatter::with_dialect(2, Dialect::Clojure).format(&tree)
+}
+
+#[test]
+fn keeps_the_clojure_namespace_name_on_the_ns_head_line() {
+    let input = "(ns myapp.core \"Core namespace.\" (:require [clojure.string :as str]))";
+    assert_eq!(
+        format_clojure(input),
+        "(ns myapp.core\n  \"Core namespace.\"\n  (:require [clojure.string :as str]))\n"
+    );
+}
+
+#[test]
+fn keeps_the_clojure_parameter_vector_on_the_defn_head_line() {
+    let input = "(defn greet [first-name last-name] (log first-name) (str first-name last-name))";
+    assert_eq!(
+        format_clojure(input),
+        "(defn greet [first-name last-name]\n  (log first-name)\n  (str first-name last-name))\n"
+    );
+}
+
+#[test]
+fn moves_clojure_definition_children_below_a_docstring_or_attribute_map() {
+    let input =
+        "(defn greet \"Greets a person.\" {:added \"1.0\"} [name & opts] (str \"Hello, \" name))";
+    assert_eq!(
+        format_clojure(input),
+        concat!(
+            "(defn greet\n",
+            "  \"Greets a person.\"\n",
+            "  {:added \"1.0\"}\n",
+            "  [name & opts]\n",
+            "  (str \"Hello, \" name))\n"
+        )
+    );
+}
+
+#[test]
+fn gives_each_clojure_arity_clause_its_own_line() {
+    let input = "(defn multi ([x] (multi x 1)) ([x y] (+ x y)) ([x y & more] (apply + x y more)))";
+    assert_eq!(
+        format_clojure(input),
+        concat!(
+            "(defn multi\n",
+            "  ([x] (multi x 1))\n",
+            "  ([x y] (+ x y))\n",
+            "  ([x y & more] (apply + x y more)))\n"
+        )
+    );
+}
+
+#[test]
+fn formats_clojure_fn_forms_with_and_without_a_name() {
+    let cases = [
+        ("(fn [x] (inc x))", "(fn [x] (inc x))\n"),
+        ("(fn named [x] (inc x))", "(fn named [x] (inc x))\n"),
+        (
+            "(fn ([x] x) ([x y] (+ x y)))",
+            "(fn\n  ([x] x)\n  ([x y] (+ x y)))\n",
+        ),
+    ];
+
+    for (input, expected) in cases {
+        assert_eq!(format_clojure(input), expected, "{input}");
+    }
+}
+
+#[test]
+fn keeps_the_clojure_type_and_field_vector_on_the_defrecord_head_line() {
+    let input = "(defrecord Circle [radius] Shape (area [this] (* Math/PI radius radius)))";
+    assert_eq!(
+        format_clojure(input),
+        concat!(
+            "(defrecord Circle [radius]\n",
+            "  Shape\n",
+            "  (area [this] (* Math/PI radius radius)))\n"
+        )
+    );
+}
+
+#[test]
+fn keeps_the_clojure_defmethod_dispatch_value_on_the_head_line() {
+    let input = "(defmethod encode :json [x] (validate x) (str x))";
+    assert_eq!(
+        format_clojure(input),
+        "(defmethod encode :json [x]\n  (validate x)\n  (str x))\n"
+    );
+}
+
+#[test]
+fn keeps_each_clojure_cond_test_and_result_on_one_line() {
+    let input = "(cond (pos? x) :positive (neg? x) :negative :else :zero)";
+    assert_eq!(
+        format_clojure(input),
+        "(cond\n  (pos? x) :positive\n  (neg? x) :negative\n  :else :zero)\n"
+    );
+}
+
+#[test]
+fn keeps_clojure_case_and_condp_clause_pairs_on_one_line() {
+    let cases = [
+        // `case`'s trailing default has no partner, so it gets its own line.
+        ("(case x :a 1 :b 2 3)", "(case x\n  :a 1\n  :b 2\n  3)\n"),
+        (
+            "(condp = x 1 :one 2 :two :other)",
+            "(condp = x\n  1 :one\n  2 :two\n  :other)\n",
+        ),
+    ];
+
+    for (input, expected) in cases {
+        assert_eq!(format_clojure(input), expected, "{input}");
+    }
+}
+
+#[test]
+fn gives_each_clojure_threading_step_its_own_line() {
+    let input = "(-> x (assoc :a 1) (update :b inc))";
+    assert_eq!(
+        format_clojure(input),
+        "(-> x\n    (assoc :a 1)\n    (update :b inc))\n"
+    );
+}
+
+#[test]
+fn keeps_the_rebinding_name_of_a_clojure_as_threading_form_on_the_head_line() {
+    let input = "(as-> x v (assoc v :a 1) (update v :b inc))";
+    assert_eq!(
+        format_clojure(input),
+        "(as-> x v\n      (assoc v :a 1)\n      (update v :b inc))\n"
+    );
+}
+
+#[test]
+fn formats_clojure_binding_vectors_as_name_value_pairs() {
+    let input = "(let [full (str a b) upper (str/upper-case full) n 42] (str \"Hello, \" upper))";
+    assert_eq!(
+        format_clojure(input),
+        concat!(
+            "(let [full (str a b)\n",
+            "      upper (str/upper-case full)\n",
+            "      n 42]\n",
+            "  (str \"Hello, \" upper))\n"
+        )
+    );
+}
+
+#[test]
+fn keeps_clojure_metadata_attached_to_the_form_it_decorates() {
+    // The parser emits `^:private` and `^:const` as siblings of the symbol they
+    // decorate, so a layout that counted raw children would give each its own
+    // line.
+    let cases = [
+        (
+            "(def ^:private ^:const max-retries 3)",
+            "(def ^:private ^:const max-retries 3)\n",
+        ),
+        (
+            "(defn ^:private tagged [x] (log x) (inc x))",
+            "(defn ^:private tagged [x]\n  (log x)\n  (inc x))\n",
+        ),
+    ];
+
+    for (input, expected) in cases {
+        assert_eq!(format_clojure(input), expected, "{input}");
+    }
+}
+
+#[test]
+fn keeps_clojure_reader_conditional_feature_pairs_together() {
+    let input = "#?(:clj (def platform :jvm) :cljs (def platform :js))";
+    assert_eq!(
+        format_clojure(input),
+        "#?(:clj (def platform :jvm)\n   :cljs (def platform :js))\n"
+    );
+}
+
+#[test]
+fn keeps_short_clojure_forms_with_a_single_body_child_on_one_line() {
+    // Breaking these gains nothing: there is no second body form to line the
+    // first one up with.
+    let cases = [
+        "(def data #{1 2 3})",
+        "(defmulti encode :type)",
+        "(defn- helper [x y] (+ x y))",
+        "(deftype Point [x y])",
+        "(-> x inc)",
+    ];
+
+    for input in cases {
+        assert_eq!(format_clojure(input), format!("{input}\n"), "{input}");
+    }
+}
+
+#[test]
+fn keeps_the_head_alone_on_its_line_for_clojure_head_body_forms() {
+    // `do`, `try`, and `comment` exist to put the head on a line of its own, so
+    // they do not collapse the way the prefix-body styles do.
+    let input = "(do (a) (b))";
+    assert_eq!(format_clojure(input), "(do\n  (a)\n  (b))\n");
+}
+
+#[test]
+fn clojure_formatting_is_idempotent() {
+    let input = concat!(
+        "(ns myapp.core \"Core namespace.\" (:require [clojure.string :as str]))\n",
+        "(def ^:private ^:const max-retries 3)\n",
+        "(defn greet \"Greets a person.\" {:added \"1.0\"} [name] (str \"Hello, \" name))\n",
+        "(defn multi ([x] (multi x 1)) ([x y] (+ x y)))\n",
+        "(defrecord Circle [radius] Shape (area [this] (* Math/PI radius radius)))\n",
+        "(defn classify [x] (let [y (abs x) z (inc y)] (cond (pos? y) :positive (neg? y) :negative :else :zero)))\n",
+        "(defn threaded [x] (-> x (assoc :a 1) (update :b inc) (->> (map inc))))\n",
+        "#?(:clj (def platform :jvm) :cljs (def platform :js))\n",
+    );
+
+    let formatted = format_clojure(input);
+    let reparsed =
+        SyntaxTree::parse_with_dialect(&formatted, Dialect::Clojure).expect("output parses again");
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::Clojure).format(&reparsed),
+        formatted,
+        "Clojure formatting must be stable after reparsing"
+    );
+}
+
+#[test]
+fn clojure_layouts_do_not_leak_into_other_dialects() {
+    // `Formatter::new` must keep laying every dialect out with the Common Lisp
+    // table, so a caller that does not know the dialect sees no change. The
+    // input is deliberately too wide to fit on one line: that is the only way
+    // the two tables' layouts become visible.
+    let input =
+        "(defn greet [first-name last-name] (log first-name) (str first-name \" \" last-name))";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid Clojure");
+
+    let common_lisp_layout = concat!(
+        "(defn\n",
+        "  greet\n",
+        "  [first-name last-name]\n",
+        "  (log first-name)\n",
+        "  (str first-name \" \" last-name))\n"
+    );
+    assert_eq!(Formatter::new(2).format(&tree), common_lisp_layout);
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::CommonLisp).format(&tree),
+        common_lisp_layout
+    );
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::Clojure).format(&tree),
+        concat!(
+            "(defn greet [first-name last-name]\n",
+            "  (log first-name)\n",
+            "  (str first-name \" \" last-name))\n"
+        )
+    );
+}

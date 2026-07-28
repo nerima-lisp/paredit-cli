@@ -456,7 +456,8 @@ mod tests {
             Dialect::Scheme,
             "define-syntax"
         ));
-        assert!(!is_macro_expander_definition(Dialect::Clojure, "defmacro"));
+        assert!(is_macro_expander_definition(Dialect::Clojure, "defmacro"));
+        assert!(!is_macro_expander_definition(Dialect::Clojure, "defn"));
     }
 
     #[test]
@@ -562,7 +563,9 @@ mod tests {
             (Dialect::Scheme, "defn"),
             (Dialect::Fennel, "defconst"),
             (Dialect::EmacsLisp, "ns"),
-            (Dialect::Clojure, "defn-"),
+            // `defn-` is NOT foreign to Clojure: it is `clojure.core/defn-`.
+            (Dialect::Clojure, "defun"),
+            (Dialect::Clojure, "setv"),
             (Dialect::Janet, "defrecord"),
         ] {
             assert_eq!(
@@ -734,5 +737,68 @@ mod tests {
             None,
             "indexes beyond the view must not be considered body forms"
         );
+    }
+}
+
+#[cfg(test)]
+mod clojure_lambda_list_tests {
+    use super::*;
+    use crate::sexpr::SyntaxTree;
+
+    fn clojure_form(source: &str) -> ExpressionView {
+        SyntaxTree::parse_with_dialect(source, Dialect::Clojure)
+            .expect("fixture parses")
+            .select_path(&Path::from_indexes(vec![0]))
+            .expect("select")
+            .view()
+    }
+
+    fn lambda_list_text<'a>(source: &'a str, head: &str) -> Option<&'a str> {
+        let view = clojure_form(source);
+        let shape = definition_shape(Dialect::Clojure, &view, head)?;
+        let span = shape.lambda_list(&view)?.span;
+        Some(span.slice(source))
+    }
+
+    #[test]
+    fn defmethod_parameters_are_found_after_the_dispatch_value() {
+        // A vector dispatch value used to be mistaken for the parameter
+        // vector, because the Common Lisp `defmethod` rule takes the first
+        // list at or after child 2. Adding a parameter then rewrote the
+        // dispatch value and silently changed which calls the method matched.
+        assert_eq!(
+            lambda_list_text(
+                "(defmethod encode [:json :pretty] [x] (str x))",
+                "defmethod"
+            ),
+            Some("[x]")
+        );
+        assert_eq!(
+            lambda_list_text("(defmethod encode :json [x] (str x))", "defmethod"),
+            Some("[x]")
+        );
+    }
+
+    #[test]
+    fn defn_parameters_are_found_past_a_docstring_and_attribute_map() {
+        assert_eq!(lambda_list_text("(defn f [x] x)", "defn"), Some("[x]"));
+        assert_eq!(
+            lambda_list_text(r#"(defn f "doc" [x] x)"#, "defn"),
+            Some("[x]")
+        );
+        assert_eq!(
+            lambda_list_text(r#"(defn f "doc" {:added "1.0"} [x y] x)"#, "defn"),
+            Some("[x y]")
+        );
+        assert_eq!(
+            lambda_list_text("(defn- f {:added \"1.0\"} [x] x)", "defn-"),
+            Some("[x]")
+        );
+    }
+
+    #[test]
+    fn multi_arity_defn_reports_no_single_parameter_vector() {
+        // Each clause carries its own, so there is no one index to report.
+        assert_eq!(lambda_list_text("(defn f ([x] x) ([x y] y))", "defn"), None);
     }
 }

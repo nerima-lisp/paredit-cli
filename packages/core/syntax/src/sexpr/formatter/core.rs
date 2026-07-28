@@ -1,5 +1,6 @@
 use super::styles::ListStyle;
 use super::{Formatter, MAX_INLINE_WIDTH};
+use crate::dialect::Dialect;
 use crate::sexpr::tree::{Node, NodeKind, SyntaxTree};
 use crate::sexpr::types::Delimiter;
 use crate::sexpr::types::NodeId;
@@ -26,10 +27,22 @@ enum TopLevelItem {
 }
 
 impl Formatter {
+    /// Builds a formatter that lays every dialect out with the Common Lisp
+    /// operator table.
+    ///
+    /// Prefer [`Formatter::with_dialect`] when the dialect is known: Clojure
+    /// forms only get their own layouts through that constructor.
     #[must_use]
     pub fn new(indent: usize) -> Self {
+        Self::with_dialect(indent, Dialect::Unknown)
+    }
+
+    /// Builds a formatter that lays lists out with `dialect`'s operator table.
+    #[must_use]
+    pub fn with_dialect(indent: usize, dialect: Dialect) -> Self {
         Self {
             indent: indent.min(MAX_INLINE_WIDTH),
+            dialect,
         }
     }
 
@@ -203,6 +216,12 @@ impl Formatter {
                     return;
                 }
                 self.write_reader_prefixes(tree, node, output);
+                // A reader conditional is keyed off its prefix, not its head:
+                // the head of `#?(:clj a :cljs b)` is the feature keyword.
+                if self.dialect == Dialect::Clojure && Self::is_clojure_reader_conditional(node) {
+                    self.format_clojure_reader_conditional(tree, node_id, depth, output);
+                    return;
+                }
                 if let Some(head) = self.head_text(tree, node_id) {
                     match self.style_for_head(head) {
                         ListStyle::Definition => {
@@ -264,6 +283,27 @@ impl Formatter {
                         }
                         ListStyle::If => {
                             self.format_prefix_body(tree, node_id, depth, 2, output);
+                        }
+                        ListStyle::ClojureDefinition => {
+                            self.format_clojure_definition(tree, node_id, depth, output);
+                        }
+                        ListStyle::ClojureFunction => {
+                            self.format_clojure_function(tree, node_id, depth, output);
+                        }
+                        ListStyle::ClojurePrefixBody(prefix_len) => {
+                            self.format_clojure_prefix_body(
+                                tree, node_id, depth, prefix_len, output,
+                            );
+                        }
+                        ListStyle::ClojureThreading(prefix_len) => {
+                            self.format_clojure_threading(
+                                tree, node_id, depth, head, prefix_len, output,
+                            );
+                        }
+                        ListStyle::ClojurePairClauses(prefix_len) => {
+                            self.format_clojure_pair_clauses(
+                                tree, node_id, depth, prefix_len, output,
+                            );
                         }
                         ListStyle::General => {
                             self.format_general_list(tree, node_id, depth, output);
