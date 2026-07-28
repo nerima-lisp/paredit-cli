@@ -1,6 +1,7 @@
 //! The bindings visible at the current point of the walk.
 
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::dialect::Dialect;
 
 use super::super::model::{BindingId, BindingKind};
 
@@ -27,7 +28,15 @@ pub(super) enum Namespace {
 }
 
 impl Namespace {
-    const fn admits(self, kind: BindingKind) -> bool {
+    const fn admits(self, dialect: Dialect, kind: BindingKind) -> bool {
+        // Scheme is a Lisp-1: `(let ((f car)) (f x))` calls the *variable* `f`,
+        // and `(letrec ((f (lambda ...))) f)` reads the same binding it calls.
+        // Splitting the namespaces there would leave every local procedure's
+        // call sites unresolved.
+        if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
+            return true;
+        }
+
         match self {
             Self::Value => matches!(
                 kind,
@@ -45,12 +54,23 @@ impl Namespace {
 /// still be reachable once the walk leaves the inner scope. Leaving a scope is
 /// a [`ScopeStack::rewind`] to the depth recorded on entry, which is why every
 /// binder saves the depth before it declares anything.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(super) struct ScopeStack {
     visible: Vec<VisibleBinding>,
+    /// Decides both name equality and whether the namespaces are separate.
+    /// Common Lisp folds case and package qualification and keeps variables
+    /// apart from functions; Scheme does neither.
+    dialect: Dialect,
 }
 
 impl ScopeStack {
+    pub(super) const fn new(dialect: Dialect) -> Self {
+        Self {
+            visible: Vec::new(),
+            dialect,
+        }
+    }
+
     pub(super) fn depth(&self) -> usize {
         self.visible.len()
     }
@@ -76,10 +96,22 @@ impl ScopeStack {
             .iter()
             .rev()
             .find(|binding| {
-                namespace.admits(binding.kind)
-                    && common_lisp_symbol_reference_eq(&binding.name, name)
+                namespace.admits(self.dialect, binding.kind)
+                    && self.names_equal(&binding.name, name)
             })
             .map(|binding| binding.id)
+    }
+
+    /// Name equality in the dialect's own terms.
+    ///
+    /// Common Lisp folds case and package qualification, so `X`, `x` and
+    /// `cl-user:x` are one symbol. R7RS 2.1 makes Scheme case-sensitive, where
+    /// folding would resolve `Loop` to a binding named `loop`.
+    fn names_equal(&self, candidate: &str, name: &str) -> bool {
+        match self.dialect {
+            Dialect::Scheme | Dialect::Racket => candidate == name,
+            _ => common_lisp_symbol_reference_eq(candidate, name),
+        }
     }
 
     pub(super) fn visible_ids(&self) -> Vec<BindingId> {
@@ -92,7 +124,7 @@ mod tests {
     use super::*;
 
     fn stack() -> ScopeStack {
-        let mut stack = ScopeStack::default();
+        let mut stack = ScopeStack::new(Dialect::CommonLisp);
         stack.push(BindingId::new(0), "x", BindingKind::Variable);
         stack.push(BindingId::new(1), "f", BindingKind::Function);
         stack.push(BindingId::new(2), "x", BindingKind::Variable);
@@ -126,6 +158,25 @@ mod tests {
             stack.resolve("f", Namespace::Function),
             Some(BindingId::new(1))
         );
+    }
+
+    #[test]
+    fn scheme_resolves_one_namespace_and_compares_names_exactly() {
+        // A Lisp-1 with case-sensitive identifiers: a local procedure is
+        // reachable from value position, and `X` is not `x`.
+        let mut stack = ScopeStack::new(Dialect::Scheme);
+        stack.push(BindingId::new(0), "f", BindingKind::Function);
+        stack.push(BindingId::new(1), "x", BindingKind::Variable);
+
+        assert_eq!(
+            stack.resolve("f", Namespace::Value),
+            Some(BindingId::new(0))
+        );
+        assert_eq!(
+            stack.resolve("x", Namespace::Function),
+            Some(BindingId::new(1))
+        );
+        assert_eq!(stack.resolve("X", Namespace::Value), None);
     }
 
     #[test]

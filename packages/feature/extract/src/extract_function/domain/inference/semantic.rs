@@ -162,6 +162,21 @@ fn collect_binding_scope(
                 extend_with_names(semantic, &mut body_bound_params, &entry.names);
             }
         }
+        // `letrec`: every name is in scope in every initializer, so all of
+        // them are bound before any initializer is read. That is the mirror
+        // image of `Parallel`, where none of them is.
+        BindingVisibility::Recursive => {
+            extend_with_binding_names(semantic, &mut body_bound_params, &entries);
+            for entry in &entries {
+                collect_binding_initializer(
+                    semantic,
+                    entry,
+                    explicit_params,
+                    &body_bound_params,
+                    params,
+                );
+            }
+        }
     }
 
     if let Some(scope_name) = scope_name {

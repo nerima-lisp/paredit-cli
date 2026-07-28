@@ -19,7 +19,9 @@ pub enum RenameAtError {
 impl fmt::Display for RenameAtError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
-            Self::UnsupportedDialect => "rename-at currently supports Common Lisp only",
+            Self::UnsupportedDialect => {
+                "rename-at currently supports Common Lisp, Scheme, and Racket only"
+            }
             Self::InvalidSelection => "--at must select a symbol atom",
             Self::UnsupportedPackageSyntax => {
                 "rename-at does not support package-qualified, keyword, or uninterned symbols"

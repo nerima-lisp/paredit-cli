@@ -18,9 +18,12 @@
 //! since Common Lisp has no registry of ordinary function heads.
 
 use paredit_core_syntax::common_lisp::CommonLispOperator;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::scheme::scheme_head_has_registered_semantics;
 
 use super::super::policy::{
-    is_pure_standard_function, is_standard_control_form, is_standard_declaration_identifier,
+    is_pure_standard_function, is_pure_standard_scheme_procedure, is_standard_control_form,
+    is_standard_declaration_identifier,
 };
 
 /// Whether `head` names a form whose semantics this layer knows.
@@ -41,7 +44,16 @@ use super::super::policy::{
 /// sound while leaving ordinary code analysable — treating `(print x)` as
 /// opaque too would be sound as well, and would prove nothing about any real
 /// file.
-pub(super) fn head_has_registered_semantics(head: &str) -> bool {
+pub(super) fn head_has_registered_semantics(dialect: Dialect, head: &str) -> bool {
+    // Scheme's own table is the only one that means anything here. Falling
+    // through to the Common Lisp tables would register `list` and `not` -- the
+    // names happen to coincide -- while leaving `vector-ref` and `string=?`
+    // opaque, which is an arbitrary line rather than a sound one.
+    if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
+        return scheme_head_has_registered_semantics(head)
+            || is_pure_standard_scheme_procedure(head);
+    }
+
     CommonLispOperator::from_head(head).is_some()
         || is_pure_standard_function(head)
         || is_standard_control_form(head)
@@ -54,15 +66,15 @@ mod tests {
 
     #[test]
     fn binding_forms_are_registered() {
-        assert!(head_has_registered_semantics("let"));
-        assert!(head_has_registered_semantics("LET*"));
-        assert!(head_has_registered_semantics("defun"));
+        assert!(head_has_registered_semantics(Dialect::CommonLisp, "let"));
+        assert!(head_has_registered_semantics(Dialect::CommonLisp, "LET*"));
+        assert!(head_has_registered_semantics(Dialect::CommonLisp, "defun"));
     }
 
     #[test]
     fn standard_functions_are_registered_because_they_cannot_assign() {
-        assert!(head_has_registered_semantics("/"));
-        assert!(head_has_registered_semantics("length"));
+        assert!(head_has_registered_semantics(Dialect::CommonLisp, "/"));
+        assert!(head_has_registered_semantics(Dialect::CommonLisp, "length"));
     }
 
     #[test]
@@ -70,9 +82,12 @@ mod tests {
         // `(declare (ignore x))` is walked as if `(ignore x)` were a call.
         // Leaving it unregistered made the enclosing scope opaque for a form
         // that has no run-time semantics at all.
-        assert!(head_has_registered_semantics("ignore"));
-        assert!(head_has_registered_semantics("OPTIMIZE"));
-        assert!(head_has_registered_semantics("speed"));
+        assert!(head_has_registered_semantics(Dialect::CommonLisp, "ignore"));
+        assert!(head_has_registered_semantics(
+            Dialect::CommonLisp,
+            "OPTIMIZE"
+        ));
+        assert!(head_has_registered_semantics(Dialect::CommonLisp, "speed"));
     }
 
     #[test]
@@ -80,7 +95,13 @@ mod tests {
         // `my-with-thing` could expand into `(setq x …)`; nothing in the
         // source rules that out. `with-open-file` is a standard *macro* whose
         // expansion this layer does not model, so it stays opaque too.
-        assert!(!head_has_registered_semantics("my-with-thing"));
-        assert!(!head_has_registered_semantics("app:helper"));
+        assert!(!head_has_registered_semantics(
+            Dialect::CommonLisp,
+            "my-with-thing"
+        ));
+        assert!(!head_has_registered_semantics(
+            Dialect::CommonLisp,
+            "app:helper"
+        ));
     }
 }

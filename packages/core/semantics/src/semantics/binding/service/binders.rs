@@ -36,6 +36,14 @@ impl Walk<'_> {
         let Some(head) = head_text(&view.children[0]) else {
             return false;
         };
+
+        // Scheme resolves against its own table. Routing it through the
+        // Common Lisp one would recognise `let`, `let*` and `lambda` and
+        // nothing else Scheme binds with.
+        if matches!(self.dialect, Dialect::Scheme | Dialect::Racket) {
+            return self.scheme_binder(view, scope, head);
+        }
+
         let Some(operator) = CommonLispOperator::from_head(head) else {
             return false;
         };
@@ -408,7 +416,7 @@ impl Walk<'_> {
         head: &str,
         operator: CommonLispOperator,
     ) -> bool {
-        let Some(shape) = definition_shape(Dialect::CommonLisp, view, head) else {
+        let Some(shape) = definition_shape(self.dialect, view, head) else {
             return false;
         };
 

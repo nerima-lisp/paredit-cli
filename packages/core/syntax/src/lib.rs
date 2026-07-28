@@ -7,5 +7,6 @@ pub mod expression_equality;
 pub mod form_shape;
 pub mod graph;
 pub mod leading_trivia;
+pub mod scheme;
 pub mod sexpr;
 pub mod view_query;

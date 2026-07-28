@@ -1,11 +1,13 @@
 #[test]
-fn cli_rename_at_rejects_non_common_lisp_dialects_without_writing() {
+fn cli_rename_at_rejects_unsupported_dialects_without_writing() {
     let input = "(";
+    // Scheme and Racket are deliberately absent: they now have verified
+    // rename-binding semantics and a binding table of their own, so a
+    // `rename-at` there is refused for the *parse* failure below rather than
+    // for the dialect.
     for (dialect, extension) in [
         ("emacs-lisp", "el"),
         ("lfe", "lfe"),
-        ("scheme", "scm"),
-        ("racket", "rkt"),
         ("clojure", "clj"),
         ("hy", "hy"),
         ("carp", "carp"),
@@ -31,8 +33,10 @@ fn cli_rename_at_rejects_non_common_lisp_dialects_without_writing() {
             .assert()
             .failure()
             .stderr(
-                predicate::str::contains("rename-at currently supports Common Lisp only")
-                    .and(predicate::str::contains("failed to parse input").not()),
+                predicate::str::contains(
+                    "rename-at currently supports Common Lisp, Scheme, and Racket only",
+                )
+                .and(predicate::str::contains("failed to parse input").not()),
             );
 
         assert_eq!(

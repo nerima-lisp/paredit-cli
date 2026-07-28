@@ -195,6 +195,8 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
             "refactor inline-let|racket",
             "refactor inline-let|scheme",
             "refactor rename-at|common-lisp",
+            "refactor rename-at|racket",
+            "refactor rename-at|scheme",
         ]
         .into_iter()
         .map(str::to_owned)
@@ -218,8 +220,6 @@ fn schema_v2_reports_the_complete_dialect_matrix() {
             "refactor rename-at|hy",
             "refactor rename-at|janet",
             "refactor rename-at|lfe",
-            "refactor rename-at|racket",
-            "refactor rename-at|scheme",
         ]
         .into_iter()
         .map(str::to_owned)

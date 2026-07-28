@@ -23,11 +23,17 @@ use super::special_names::SpecialNameIndex;
 
 /// Builds the binding table for one parsed file.
 ///
-/// Only Common Lisp is analysed. Other dialects get an empty table rather than
-/// a guessed one: the binding forms differ enough that a shared traversal
-/// would have to assume, and this layer records only what it can prove. An
-/// empty table reads as "nothing is statically known", which every consumer
-/// already has to handle.
+/// Common Lisp and Scheme are analysed; every other dialect gets an empty
+/// table rather than a guessed one. The binding forms differ enough that a
+/// shared traversal would have to assume, and this layer records only what it
+/// can prove. An empty table reads as "nothing is statically known", which
+/// every consumer already has to handle.
+///
+/// Scheme is not a special case of the Common Lisp walk. It is a Lisp-1, its
+/// identifiers are case-sensitive, it has no `declare`/`special` machinery,
+/// and half its binding forms have no Common Lisp counterpart -- so the
+/// dispatch, the name comparison and the namespace rule are all asked of the
+/// dialect rather than assumed.
 ///
 /// `input` is taken but not read: every fact the table records is a span, and
 /// the assertion below is the whole of what the source text is good for here —
@@ -35,7 +41,10 @@ use super::special_names::SpecialNameIndex;
 #[must_use]
 pub fn build_binding_table(dialect: Dialect, tree: &SyntaxTree, input: &str) -> BindingTable {
     let builder = BindingTableBuilder::new();
-    if dialect != Dialect::CommonLisp {
+    if !matches!(
+        dialect,
+        Dialect::CommonLisp | Dialect::Scheme | Dialect::Racket
+    ) {
         return builder.finish();
     }
 
@@ -47,10 +56,17 @@ pub fn build_binding_table(dialect: Dialect, tree: &SyntaxTree, input: &str) -> 
     );
 
     let mut walk = Walk {
-        specials: SpecialNameIndex::scan(&document),
+        dialect,
+        // Only Common Lisp has a way to declare a binding special, so the
+        // scan is skipped entirely elsewhere rather than run to find nothing.
+        specials: if dialect == Dialect::CommonLisp {
+            SpecialNameIndex::scan(&document)
+        } else {
+            SpecialNameIndex::empty()
+        },
         document: &document,
         builder,
-        stack: ScopeStack::default(),
+        stack: ScopeStack::new(dialect),
         definitions: HashSet::new(),
     };
 
@@ -64,6 +80,10 @@ pub fn build_binding_table(dialect: Dialect, tree: &SyntaxTree, input: &str) -> 
 /// The walk's state: the table under construction plus the bindings visible at
 /// the current position.
 pub(super) struct Walk<'a> {
+    /// Which language's rules the walk is applying. Decides the binder
+    /// dispatch, name equality, whether the namespaces are separate, and
+    /// whether `(declare ...)` means anything.
+    pub(super) dialect: Dialect,
     /// The whole document. The `special` scan needs it: a binding is dynamic
     /// because of a `declaim`/`proclaim`/`defvar` that may sit anywhere in the
     /// file, or a `declare` in an *enclosing* form.
@@ -147,7 +167,7 @@ impl Walk<'_> {
         // A computed head (`((lambda ...) x)`) is as unreadable as an unknown
         // macro, so both land here. They are told apart in the cause: only an
         // unknown *name* is something a transparency table could ever fix.
-        if !head.is_some_and(head_has_registered_semantics) {
+        if !head.is_some_and(|head| head_has_registered_semantics(self.dialect, head)) {
             let cause = match (head, first) {
                 (Some(_), Some(atom)) => {
                     OpacityCause::new(OpacityCauseKind::UnknownHead, atom.span)
@@ -182,9 +202,13 @@ impl Walk<'_> {
     /// `lexical_scope::traversal::body` does: a declaration is not evaluated,
     /// so the symbols in it are not references.
     pub(super) fn body(&mut self, forms: &[ExpressionView], scope: ScopeId) {
+        // Scheme has no `(declare ...)`, so a leading form spelled that way is
+        // an ordinary call and its symbols are ordinary references.
+        let skips_declarations = self.dialect == Dialect::CommonLisp;
         let mut started = false;
         for form in forms {
-            if !started
+            if skips_declarations
+                && !started
                 && form
                     .children
                     .first()
@@ -222,7 +246,9 @@ impl Walk<'_> {
         let name = SymbolName::new(bound.name.clone()).ok()?;
 
         // A naming convention is not a proof; only a real declaration makes a
-        // binding special. See `SpecialBinding`.
+        // binding special. See `SpecialBinding`. Scheme has no such
+        // declaration at all, and its `specials` index is empty, so the
+        // condition short-circuits to `Lexical` there.
         let special = if kind == BindingKind::Variable
             && self.specials.may_be_declared_special(&name)
             && common_lisp_dynamic_binding_is_declared(self.document, target, &name)

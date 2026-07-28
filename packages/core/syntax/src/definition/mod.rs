@@ -9,7 +9,7 @@ use crate::sexpr::{ByteSpan, ExpressionView, Path};
 
 use classify::classify_definition_head;
 use lambda_list::{
-    definition_body_start_child_index, definition_lambda_list_child_index,
+    definition_body_start_child_index, definition_lambda_list_position,
     definition_lambda_parameter_arity, definition_lambda_parameter_count,
 };
 use name::{definition_name_target, definition_name_text};
@@ -42,8 +42,21 @@ pub enum DefinitionCategory {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DefinitionShape {
     pub category: DefinitionCategory,
+    /// Kept so arity questions can be answered in the right language. A
+    /// Common Lisp lambda list marks its optional tail with `&optional`; a
+    /// Scheme one marks it with a dotted `. rest` and Racket brackets. Reading
+    /// either with the other's rules produces a confident wrong answer.
+    dialect: Dialect,
     name_child_index: Option<usize>,
     lambda_list_child_index: Option<usize>,
+    /// The first child of the lambda list that is actually a parameter.
+    ///
+    /// `0` everywhere the lambda list is a list of nothing but parameters,
+    /// which is every Common Lisp definition form. Scheme's `define` packs the
+    /// name and the parameters into one node -- `(define (f x y) ...)` has
+    /// lambda list `(f x y)` -- so there it is `1`. Reading that node's
+    /// children directly counts the procedure's own name as a parameter.
+    lambda_list_first_parameter_index: usize,
     body_start_child_index: usize,
 }
 
@@ -86,18 +99,40 @@ impl DefinitionShape {
             .and_then(|index| view.children.get(index))
     }
 
+    /// The parameter nodes of the lambda list, with any leading name skipped.
+    ///
+    /// Prefer this to walking `lambda_list(view).children` directly: the two
+    /// agree for every Common Lisp form and disagree for Scheme's `define`,
+    /// where child 0 of the lambda list is the procedure's own name.
+    #[must_use]
+    pub fn lambda_parameters(self, view: &ExpressionView) -> Option<&[ExpressionView]> {
+        let lambda_list = self.lambda_list(view)?;
+        let start = self
+            .lambda_list_first_parameter_index
+            .min(lambda_list.children.len());
+        Some(&lambda_list.children[start..])
+    }
+
+    /// Where the parameters begin inside the lambda list node.
+    #[must_use]
+    pub const fn lambda_list_first_parameter_index(self) -> usize {
+        self.lambda_list_first_parameter_index
+    }
+
+    #[must_use]
     pub fn lambda_parameter_count(self, view: &ExpressionView) -> Option<usize> {
-        self.lambda_list(view)
-            .map(definition_lambda_parameter_count)
+        self.lambda_parameters(view)
+            .map(|parameters| definition_lambda_parameter_count(self.dialect, parameters))
     }
 
     /// Return the (minimum, maximum) call-argument arity this definition's
     /// lambda list accepts; MAXIMUM is `None` when unbounded. See
     /// DEFINITION_LAMBDA_PARAMETER_ARITY for why this differs from
     /// LAMBDA_PARAMETER_COUNT's flat total.
+    #[must_use]
     pub fn lambda_parameter_arity(self, view: &ExpressionView) -> Option<(usize, Option<usize>)> {
-        self.lambda_list(view)
-            .map(definition_lambda_parameter_arity)
+        self.lambda_parameters(view)
+            .map(|parameters| definition_lambda_parameter_arity(self.dialect, parameters))
     }
 
     #[must_use]
@@ -260,14 +295,17 @@ pub fn definition_shape(
     head: &str,
 ) -> Option<DefinitionShape> {
     let category = classify_definition_head(dialect, head)?;
-    let lambda_list_child_index = definition_lambda_list_child_index(view, head);
+    let position = definition_lambda_list_position(dialect, view, head);
+    let lambda_list_child_index = position.map(|(index, _)| index);
     let body_start_child_index =
         definition_body_start_child_index(view, head, Some(category), lambda_list_child_index);
 
     Some(DefinitionShape {
         category,
+        dialect,
         name_child_index: definition_name_child_index(head),
         lambda_list_child_index,
+        lambda_list_first_parameter_index: position.map_or(0, |(_, first)| first),
         body_start_child_index,
     })
 }
@@ -561,8 +599,8 @@ mod tests {
             .view();
 
         assert_eq!(
-            definition_lambda_list_child_index(&view, "defmethod"),
-            Some(3)
+            definition_lambda_list_position(Dialect::CommonLisp, &view, "defmethod"),
+            Some((3, 0))
         );
         assert_eq!(
             definition_shape(Dialect::CommonLisp, &view, "defmethod").map(|shape| shape.category),
@@ -582,7 +620,8 @@ mod tests {
                 &view,
                 "defmethod",
                 Some(DefinitionCategory::Method),
-                definition_lambda_list_child_index(&view, "defmethod")
+                definition_lambda_list_position(Dialect::CommonLisp, &view, "defmethod")
+                    .map(|(index, _)| index)
             ),
             4
         );
@@ -596,8 +635,8 @@ mod tests {
             .view();
 
         assert_eq!(
-            definition_lambda_list_child_index(&qualified, "cl:defmacro"),
-            Some(2)
+            definition_lambda_list_position(Dialect::CommonLisp, &qualified, "cl:defmacro"),
+            Some((2, 0))
         );
 
         let defsetf_source = "(defsetf accessor (item) (value) (list item value))";

@@ -6,13 +6,13 @@ use paredit_core_syntax::dialect::{
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::body::collect_body_forms;
-use super::lambda_lists::collect_lambda_list_references;
-use super::{collect_unshadowed_symbol_references_in_context, symbol_name_matches};
-use crate::lexical_scope::bindings::{binding_binds, generic_binding_groups};
+use super::lambda_lists::{collect_lambda_list_references, collect_lambda_list_references_from};
+use super::symbol_name_matches;
 
 mod clause_bindings;
 mod local_callables;
 mod loop_bindings;
+mod scheme;
 mod slots;
 mod value_bindings;
 
@@ -22,6 +22,7 @@ use loop_bindings::{
     collect_do_like_binding_references, collect_iteration_binding_references,
     collect_parallel_let_references, collect_sequential_let_references,
 };
+use scheme::collect_scheme_special_form;
 use slots::collect_slot_binding_references;
 use value_bindings::collect_value_binding_references;
 
@@ -40,13 +41,18 @@ pub(super) fn collect_shadow_aware_special_form(
         return false;
     };
 
-    if is_dialect_callable_head(dialect, head) {
-        return collect_dialect_callable_references(dialect, view, symbol, input, output);
+    // Scheme is resolved against its own operator table first. Routing it
+    // through the Common Lisp one recognised `let`, `let*` and `lambda` -- the
+    // three heads the languages happen to share -- and nothing else Scheme
+    // binds with.
+    if matches!(dialect, Dialect::Scheme | Dialect::Racket)
+        && collect_scheme_special_form(dialect, view, head, symbol, input, output)
+    {
+        return true;
     }
 
-    if dialect == Dialect::Scheme && is_scheme_named_let(view, head) {
-        collect_named_let_references(dialect, view, symbol, input, output);
-        return true;
+    if is_dialect_callable_head(dialect, head) {
+        return collect_dialect_callable_references(dialect, view, symbol, input, output);
     }
 
     let Some(operator) = CommonLispOperator::from_head(head) else {
@@ -143,9 +149,12 @@ pub(super) fn collect_shadow_aware_special_form(
                 // FLET-bound-function branch above; the plain body-only scan
                 // this replaced skipped every default-value form entirely.
                 Some(parameter_form) => {
-                    collect_lambda_list_references(
+                    collect_lambda_list_references_from(
                         dialect,
                         parameter_form,
+                        // Non-zero only for Scheme's `define`, whose lambda
+                        // list carries the procedure name in child 0.
+                        shape.lambda_list_first_parameter_index(),
                         body_forms,
                         symbol,
                         input,
@@ -290,51 +299,6 @@ fn resolve_relative(view: &ExpressionView, path: RelativeNodePath) -> Option<&Ex
     let child = view.children.get(path.child())?;
     path.grandchild()
         .map_or(Some(child), |grandchild| child.children.get(grandchild))
-}
-
-fn is_scheme_named_let(view: &ExpressionView, head: &str) -> bool {
-    (head == "let" || head == "let*")
-        && view
-            .children
-            .get(1)
-            .and_then(super::super::syntax::atom_text)
-            .is_some()
-}
-
-fn collect_named_let_references(
-    dialect: Dialect,
-    view: &ExpressionView,
-    symbol: &SymbolName,
-    input: &str,
-    output: &mut Vec<ByteSpan>,
-) {
-    let Some(loop_name) = view.children.get(1) else {
-        return;
-    };
-    let Some(binding_form) = view.children.get(2) else {
-        return;
-    };
-
-    let bindings = generic_binding_groups(binding_form).unwrap_or_default();
-    for binding in &bindings {
-        if let Some(value) = &binding.value {
-            collect_unshadowed_symbol_references_in_context(
-                dialect, value, symbol, input, output, 0,
-            );
-        }
-    }
-
-    let loop_name_binds = super::super::syntax::atom_text(loop_name)
-        .is_some_and(|name| super::symbol_name_matches(dialect, name, symbol.as_str()));
-    if loop_name_binds
-        || bindings
-            .iter()
-            .any(|binding| binding_binds(binding, symbol))
-    {
-        return;
-    }
-
-    collect_body_forms(dialect, &view.children[3..], symbol, input, output);
 }
 
 const fn should_scan_definition_body(operator: CommonLispOperator) -> bool {

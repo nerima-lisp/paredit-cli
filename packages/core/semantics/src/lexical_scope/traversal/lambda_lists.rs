@@ -1,5 +1,6 @@
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::scheme::{scheme_formal_defaults_in, scheme_formals_in};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::body::collect_body_forms;
@@ -22,15 +23,51 @@ pub(super) fn collect_lambda_list_references(
     input: &str,
     output: &mut Vec<ByteSpan>,
 ) -> bool {
+    collect_lambda_list_references_from(
+        dialect,
+        parameter_form,
+        0,
+        body_forms,
+        symbol,
+        input,
+        output,
+    )
+}
+
+/// As [`collect_lambda_list_references`], but skipping a leading prefix of the
+/// parameter node that holds something other than parameters.
+///
+/// Scheme's `(define (f x) body)` has lambda list `(f x)`: reading it from 0
+/// treats the procedure's own name as a parameter, which makes every recursive
+/// call in the body look shadowed and silently drops it from a rename.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn collect_lambda_list_references_from(
+    dialect: Dialect,
+    parameter_form: &ExpressionView,
+    first_parameter_index: usize,
+    body_forms: &[ExpressionView],
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) -> bool {
     if parameter_form.kind != ExpressionKind::List {
         return false;
     }
 
+    let parameters = parameter_form
+        .children
+        .get(first_parameter_index.min(parameter_form.children.len())..)
+        .unwrap_or_default();
+
+    if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
+        return collect_scheme_formals_references(
+            dialect, parameters, body_forms, symbol, input, output,
+        );
+    }
+
     if matches!(
         dialect,
-        Dialect::Scheme
-            | Dialect::Racket
-            | Dialect::Lfe
+        Dialect::Lfe
             | Dialect::Clojure
             | Dialect::Hy
             | Dialect::Carp
@@ -38,12 +75,7 @@ pub(super) fn collect_lambda_list_references(
             | Dialect::Fennel
     ) {
         return collect_simple_parameter_list_references(
-            dialect,
-            parameter_form,
-            body_forms,
-            symbol,
-            input,
-            output,
+            dialect, parameters, body_forms, symbol, input, output,
         );
     }
 
@@ -81,17 +113,55 @@ pub(super) fn collect_lambda_list_references(
 
 fn collect_simple_parameter_list_references(
     dialect: Dialect,
-    parameter_form: &ExpressionView,
+    parameters: &[ExpressionView],
     body_forms: &[ExpressionView],
     symbol: &SymbolName,
     input: &str,
     output: &mut Vec<ByteSpan>,
 ) -> bool {
-    let is_shadowed = parameter_form.children.iter().any(|parameter| {
+    let is_shadowed = parameters.iter().any(|parameter| {
         lambda_list_binding_names(parameter, LambdaListMode::Required)
             .iter()
             .any(|name| symbol_name_matches(dialect, name, symbol.as_str()))
     });
+
+    if !is_shadowed {
+        collect_body_forms(dialect, body_forms, symbol, input, output);
+    }
+    true
+}
+
+/// Scheme formals, read with Scheme's own rules.
+///
+/// The flat scan above gets three things wrong here. The `.` of `(a . rest)`
+/// is not a parameter; the `rest` after it is. Racket's `[x default]` binds
+/// only `x`, and the default is an ordinary expression in the *enclosing*
+/// scope that a reference query must still walk. And `#:mode mode` binds
+/// `mode`, not the keyword token.
+fn collect_scheme_formals_references(
+    dialect: Dialect,
+    parameters: &[ExpressionView],
+    body_forms: &[ExpressionView],
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) -> bool {
+    // Walked before the shadowing test, because a default-value expression is
+    // evaluated outside the scope the parameters open.
+    for default_form in scheme_formal_defaults_in(parameters) {
+        collect_unshadowed_symbol_references_in_context(
+            dialect,
+            default_form,
+            symbol,
+            input,
+            output,
+            0,
+        );
+    }
+
+    let is_shadowed = scheme_formals_in(parameters)
+        .iter()
+        .any(|formal| symbol_name_matches(dialect, &formal.name, symbol.as_str()));
 
     if !is_shadowed {
         collect_body_forms(dialect, body_forms, symbol, input, output);

@@ -461,6 +461,8 @@ mod tests {
     fn dispatch_adapter_allows_only_verified_supported_cells() {
         let supported = [
             ("refactor rename-at", "common-lisp"),
+            ("refactor rename-at", "scheme"),
+            ("refactor rename-at", "racket"),
             ("refactor inline-function", "common-lisp"),
             ("refactor inline-function", "emacs-lisp"),
             ("refactor inline-let", "common-lisp"),
@@ -477,7 +479,6 @@ mod tests {
 
         let unsupported = [
             ("refactor rename-at", "emacs-lisp"),
-            ("refactor rename-at", "scheme"),
             ("refactor rename-at", "clojure"),
             ("refactor rename-at", "janet"),
             ("refactor rename-at", "fennel"),

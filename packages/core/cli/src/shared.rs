@@ -253,8 +253,15 @@ pub fn resolve_target<'a>(
     }
 }
 
+/// Resolves the dialect for one input, consulting its `#lang` line.
+///
+/// An explicit `--dialect` always wins and a recognised extension is trusted
+/// over the contents; the directive only breaks ties. That matters for stdin
+/// and for the `.scm`-named Racket files that turn up in mixed projects,
+/// where reading Racket as R7RS Scheme applies the wrong reader to `#:keyword`
+/// literals and the wrong rules to `struct`.
 pub fn detect_dialect(input: &SourceInput, explicit: Option<DialectArg>) -> Dialect {
-    Dialect::detect(input.file.as_deref(), explicit.map(Into::into))
+    Dialect::detect_in_source(input.file.as_deref(), explicit.map(Into::into), &input.text)
 }
 
 pub fn require_output_file(file: Option<&PathBuf>) -> CliResult<&PathBuf> {

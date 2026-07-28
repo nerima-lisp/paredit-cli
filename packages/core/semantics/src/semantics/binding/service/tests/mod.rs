@@ -10,6 +10,7 @@ mod assignments;
 mod differential;
 mod opacity;
 mod property;
+mod scheme_differential;
 mod scoping;
 
 pub(super) fn build(input: &str) -> BindingTable {

@@ -152,20 +152,28 @@ fn rejects_package_syntax_in_replacement_symbol() {
 }
 
 #[test]
-fn support_predicate_accepts_only_common_lisp() {
-    assert!(super::super::supports_rename_at_dialect(
-        Dialect::CommonLisp
-    ));
+fn support_predicate_accepts_the_dialects_with_a_binding_table() {
+    // The three dialects `build_binding_table` analyses and
+    // `verify_rename_binding` accepts. Every other one has no way to prove
+    // which occurrences belong to the selected binding.
+    for dialect in [Dialect::CommonLisp, Dialect::Scheme, Dialect::Racket] {
+        assert!(
+            super::super::supports_rename_at_dialect(dialect),
+            "{dialect:?}"
+        );
+    }
 
     for dialect in [
         Dialect::EmacsLisp,
-        Dialect::Scheme,
         Dialect::Clojure,
         Dialect::Janet,
         Dialect::Fennel,
         Dialect::Unknown,
     ] {
-        assert!(!super::super::supports_rename_at_dialect(dialect));
+        assert!(
+            !super::super::supports_rename_at_dialect(dialect),
+            "{dialect:?}"
+        );
     }
 }
 
@@ -173,7 +181,6 @@ fn support_predicate_accepts_only_common_lisp() {
 fn rejects_unsupported_dialects_before_parsing_malformed_input() {
     for dialect in [
         Dialect::EmacsLisp,
-        Dialect::Scheme,
         Dialect::Clojure,
         Dialect::Janet,
         Dialect::Fennel,
