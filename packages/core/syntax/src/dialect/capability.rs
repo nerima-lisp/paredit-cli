@@ -141,6 +141,27 @@ impl Dialect {
         matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown)
     }
 
+    /// Whether `(f a . rest)` is a legal parameter list in this dialect.
+    ///
+    /// Deliberately broader than
+    /// [`Self::supports_common_lisp_lambda_list_refactor_model`], which asks
+    /// the different question of whether `&optional`/`&key`/`&rest` markers
+    /// apply. A dotted tail is the *only* way to write a rest parameter in
+    /// Scheme (R7RS 4.1.4), so gating it on the Common Lisp model rejected
+    /// ordinary Scheme.
+    #[must_use]
+    pub const fn supports_dotted_rest_parameter(self) -> bool {
+        matches!(
+            self,
+            Self::CommonLisp
+                | Self::EmacsLisp
+                | Self::Lfe
+                | Self::Scheme
+                | Self::Racket
+                | Self::Unknown
+        )
+    }
+
     #[must_use]
     pub fn common_lisp_local_callable_form_for_head(
         self,

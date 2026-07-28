@@ -338,11 +338,11 @@ impl<'a> Parser<'a> {
         self.consume_character_literal();
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
-            if self.policy.supports_symbol_escapes() && byte == b'\\' {
+            if self.policy.supports_single_escape() && byte == b'\\' {
                 self.consume_single_escape()?;
                 continue;
             }
-            if self.policy.supports_symbol_escapes() && byte == b'|' {
+            if self.policy.supports_bar_quoted_symbols() && byte == b'|' {
                 self.consume_multiple_escape()?;
                 continue;
             }

@@ -35,12 +35,32 @@ pub fn list_lambda_list_parameter_names(
     dialect: paredit_core_syntax::dialect::Dialect,
     parameter_form: &paredit_core_syntax::sexpr::ExpressionView,
 ) -> crate::error::FunctionParameterResult<Vec<String>> {
-    definition::parameter_locations(dialect, parameter_form, 0, true, "list-parameters").map(
-        |locations| {
-            locations
-                .into_iter()
-                .map(|location| location.name)
-                .collect()
-        },
+    list_lambda_list_parameter_names_from(dialect, parameter_form, 0)
+}
+
+/// As [`list_lambda_list_parameter_names`], but skipping a leading prefix of
+/// the lambda list that is not made of parameters.
+///
+/// Scheme's `(define (f x y) ...)` keeps the procedure name in the same node
+/// as its parameters, so callers pass
+/// `DefinitionShape::lambda_list_first_parameter_index` here. Reading from 0
+/// reports `f` as a parameter of itself.
+pub fn list_lambda_list_parameter_names_from(
+    dialect: paredit_core_syntax::dialect::Dialect,
+    parameter_form: &paredit_core_syntax::sexpr::ExpressionView,
+    first_parameter_index: usize,
+) -> crate::error::FunctionParameterResult<Vec<String>> {
+    definition::parameter_locations(
+        dialect,
+        parameter_form,
+        first_parameter_index,
+        true,
+        "list-parameters",
     )
+    .map(|locations| {
+        locations
+            .into_iter()
+            .map(|location| location.name)
+            .collect()
+    })
 }

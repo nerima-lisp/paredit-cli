@@ -24,7 +24,7 @@ use anyhow::Result;
 use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
-use crate::domain::function_parameter::list_lambda_list_parameter_names;
+use crate::domain::function_parameter::list_lambda_list_parameter_names_from;
 use crate::domain::let_report::build_let_report;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
@@ -146,7 +146,11 @@ pub fn build_shadowed_binding_report(
         let Some(lambda_list) = shape.lambda_list(&view) else {
             continue;
         };
-        let Ok(names) = list_lambda_list_parameter_names(dialect, lambda_list) else {
+        let Ok(names) = list_lambda_list_parameter_names_from(
+            dialect,
+            lambda_list,
+            shape.lambda_list_first_parameter_index(),
+        ) else {
             continue;
         };
         if names.is_empty() {

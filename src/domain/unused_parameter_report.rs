@@ -18,7 +18,7 @@ use anyhow::Result;
 use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
-use crate::domain::function_parameter::list_lambda_list_parameter_names;
+use crate::domain::function_parameter::list_lambda_list_parameter_names_from;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -127,7 +127,11 @@ pub fn build_unused_parameter_report(
         // unsupported marker) is skipped rather than failing the whole scan:
         // one unusual macro's parameter DSL should not block reporting on
         // every other definition in the file.
-        let Ok(parameter_names) = list_lambda_list_parameter_names(dialect, lambda_list) else {
+        let Ok(parameter_names) = list_lambda_list_parameter_names_from(
+            dialect,
+            lambda_list,
+            shape.lambda_list_first_parameter_index(),
+        ) else {
             continue;
         };
         checked_definition_count += 1;

@@ -46,10 +46,14 @@ fn parameter_locations_from_children(
     let mut section = ParameterSection::Required;
     let supports_common_lisp_lambda_list =
         dialect.supports_common_lisp_lambda_list_refactor_model();
+    let supports_dotted_rest = dialect.supports_dotted_rest_parameter();
 
     for (item_index, child) in children.iter().enumerate().skip(protected_prefix_count) {
         if is_dotted_list_separator(child) {
-            if !supports_common_lisp_lambda_list {
+            // Asked separately from the `&optional`/`&key` model above: a
+            // dotted tail is the only rest-parameter syntax Scheme has, so
+            // gating it on Common Lisp's marker keywords rejected `(f a . xs)`.
+            if !supports_dotted_rest {
                 return Err(LambdaListError::DottedNotSupported { operation }.into());
             }
             if section != ParameterSection::Required
