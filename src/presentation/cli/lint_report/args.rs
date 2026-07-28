@@ -58,7 +58,7 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// Files to scan. Not required with the catalogue-only modes
     /// (--list-rules, --list-presets, --list-tags, --explain, --docs).
     #[arg(required_unless_present_any = [
-        "list_rules", "list_presets", "list_tags", "explain", "docs",
+        "list_rules", "list_presets", "list_tags", "explain", "docs", "test_rules",
     ])]
     pub(in crate::presentation::cli::lint_report) files: Vec<PathBuf>,
     /// List every available lint rule with its description, then exit without scanning.
@@ -161,6 +161,14 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// can change runtime behaviour rather than only spelling.
     #[arg(long, requires = "fix")]
     pub(in crate::presentation::cli::lint_report) no_destructive_fixes: bool,
+    /// Load the project's own pattern rules from this directory instead of
+    /// the default `.paredit/rules`.
+    #[arg(long, value_name = "DIR")]
+    pub(in crate::presentation::cli::lint_report) custom_rules: Option<PathBuf>,
+    /// Instead of scanning, run the `deftest` clauses in the custom rule files
+    /// and exit 3 if any fail.
+    #[arg(long, conflicts_with_all = ["sarif", "github", "fix", "fix_plan", "stats"])]
+    pub(in crate::presentation::cli::lint_report) test_rules: bool,
     /// Treat a `paredit:ignore` directive with no `-- reason` as an unused
     /// suppression, so CI can require every silenced finding to say why.
     #[arg(long)]

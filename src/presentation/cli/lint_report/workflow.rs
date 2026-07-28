@@ -4,12 +4,13 @@ use crate::application::usecase::lint_report::{
     CATEGORIES, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, LintSuppressions,
     RULES, RuleFilter, RuleFixFor, RulePreset, RuleSettings, RuleTag, RuleTimings, Severity,
     SeverityOverrides, apply_severity_override, collect_lint_findings, evaluate_lint_policy,
-    lint_gate_violations, overridden_rule_severity, resolve_active_rules, rule_category,
-    rule_setting, rule_tags, rule_timing_report, run_lint_pass, summarize_lint_findings,
+    lint_gate_violations, resolve_active_rules, rule_setting, rule_tags, rule_timing_report,
+    run_lint_pass, summarize_lint_findings,
 };
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 use crate::presentation::cli::lint_report::args::LintReportArgs;
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
+use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
 use crate::presentation::cli::lint_report::render::{
     FindingIds, LintFileFix, LintFix, LintFixPlanEntry, LintReplacement, LintSarifResult,
     LintStats, LintSuppressionRemoval, LintTiming, print_lint_docs, print_lint_explanation,
@@ -309,6 +310,14 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     let active = resolve_active_rules(&filter)?;
     let overrides = resolve_severity_overrides(&args)?;
     let settings = resolve_rule_settings(&args)?;
+    // Loaded before any file is read, so a rule file that does not parse fails
+    // the run rather than contributing nothing to a green one.
+    let custom = custom::load(args.custom_rules.as_deref())?;
+    let meta = RuleMetaResolver::new(&overrides, &custom);
+
+    if args.test_rules {
+        return lint_report_test_rules(&custom);
+    }
 
     if let Some(rule) = &args.explain {
         if !RULES.contains(&rule.as_str()) {
@@ -343,7 +352,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     }
 
     if args.list_rules {
-        return print_lint_rule_catalog(&active, args.output);
+        return print_lint_rule_catalog(&active, &custom, args.output);
     }
 
     let files = expand_input_files(&args.files, args.dialect)?;
@@ -353,15 +362,15 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     }
 
     if args.sarif {
-        return lint_report_sarif(&args, &files, &active, &overrides, &settings);
+        return lint_report_sarif(&args, &files, &active, &meta, &custom, &settings);
     }
 
     if args.github {
-        return lint_report_github(&args, &files, &active, &overrides);
+        return lint_report_github(&args, &files, &active, &meta, &custom);
     }
 
     if args.stats {
-        return lint_report_stats(&args, &files, &active, &overrides);
+        return lint_report_stats(&args, &files, &active, &meta, &custom);
     }
 
     if args.remove_unused_suppressions {
@@ -381,7 +390,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     }
 
     if args.fix {
-        return lint_report_fix(&args, &files, &active, &settings);
+        return lint_report_fix(&args, &files, &active, &custom, &settings);
     }
 
     let baseline = load_baseline(&args)?;
@@ -402,6 +411,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
             },
         )?
         .findings;
+        let file_findings = merge_custom(file_findings, &custom, file, &tree, &input.text);
         let file_findings = retain_unsuppressed(file_findings, &input.text, &tree);
         let file_findings = retain_unbaselined(file_findings, &input.text, baseline.as_ref());
         // Ids are assigned per file, against that file's source, and the
@@ -410,13 +420,13 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
         // filters, which it does.
         let kept: Vec<LintFinding> = file_findings
             .into_iter()
-            .filter(|finding| active.contains(&finding.rule))
+            .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
         ids.extend(assign_finding_ids(&kept, &input.text));
         findings.extend(kept);
     }
 
-    let summary = summarize_lint_findings(findings, &active);
+    let summary = summarize_lint_findings(findings, &active_with_custom(&active, &custom));
     let policy = evaluate_lint_policy(
         &overrides,
         LintPolicyOptions::new(args.fail_on_finding, args.fail_on.map(Severity::from)),
@@ -425,7 +435,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     let policy_passed = policy.passed;
     let policy_message = policy.violations.join("; ");
 
-    print_lint_report(&summary, &policy, &ids, &overrides, args.output)?;
+    print_lint_report(&summary, &policy, &ids, &meta, args.output)?;
 
     if !policy_passed {
         return Err(crate::presentation::cli::gate::gate_failure(format!(
@@ -580,7 +590,8 @@ fn lint_report_sarif(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
-    overrides: &SeverityOverrides,
+    meta: &RuleMetaResolver<'_>,
+    custom: &CustomRules,
     settings: &RuleSettings,
 ) -> Result<()> {
     let baseline = load_baseline(args)?;
@@ -603,12 +614,14 @@ fn lint_report_sarif(
                 measure: false,
             },
         )?;
-        let fixes = fix_map(pass.fixes);
-        let findings = retain_unsuppressed(pass.findings, &input.text, &tree);
+        let mut fixes = fix_map(pass.fixes);
+        let findings = merge_custom(pass.findings, custom, file, &tree, &input.text);
+        custom_fixes(custom, file, &tree, &input.text, &mut fixes);
+        let findings = retain_unsuppressed(findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let findings: Vec<LintFinding> = findings
             .into_iter()
-            .filter(|finding| active.contains(&finding.rule))
+            .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
         let ids = assign_finding_ids(&findings, &input.text);
         for (index, finding) in findings.into_iter().enumerate() {
@@ -634,9 +647,9 @@ fn lint_report_sarif(
     }
 
     let finding_rules: Vec<&'static str> = results.iter().map(|result| result.rule).collect();
-    print_lint_sarif(&results, overrides)?;
+    print_lint_sarif(&results, meta)?;
 
-    if let Some(message) = gate_message(&finding_rules, args, overrides) {
+    if let Some(message) = gate_message(&finding_rules, args, meta.overrides()) {
         return Err(crate::presentation::cli::gate::gate_failure(format!(
             "lint-report policy failed: {message}"
         )));
@@ -738,6 +751,7 @@ fn lint_report_fix(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
+    custom: &CustomRules,
     settings: &RuleSettings,
 ) -> Result<()> {
     let mut file_fixes = Vec::new();
@@ -758,6 +772,7 @@ fn lint_report_fix(
 
         for _ in 0..MAX_FIX_PASSES {
             let mut fixes = collect_lint_fixes(file, dialect, &tree, &text, active, settings)?;
+            custom_fixes(custom, file, &tree, &text, &mut fixes);
             // Re-parse suppressions each pass: line numbers shift as edits land,
             // but the directive comment and its form move together.
             let suppressions = LintSuppressions::parse_in_tree(&text, &tree);
@@ -936,7 +951,8 @@ fn lint_report_stats(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
-    overrides: &SeverityOverrides,
+    meta: &RuleMetaResolver<'_>,
+    custom: &CustomRules,
 ) -> Result<()> {
     let baseline = load_baseline(args)?;
     let mut by_rule: std::collections::BTreeMap<&'static str, usize> =
@@ -945,15 +961,18 @@ fn lint_report_stats(
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let findings = retain_unsuppressed(
+        let findings = merge_custom(
             collect_lint_findings(file, dialect, &tree)?,
-            &input.text,
+            custom,
+            file,
             &tree,
+            &input.text,
         );
+        let findings = retain_unsuppressed(findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let mut file_had_finding = false;
         for finding in findings {
-            if !active.contains(&finding.rule) {
+            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
                 continue;
             }
             *by_rule.entry(finding.rule).or_insert(0) += 1;
@@ -970,7 +989,7 @@ fn lint_report_stats(
     let mut error_count = 0;
     let mut warning_count = 0;
     for (rule, count) in &by_rule {
-        match overridden_rule_severity(overrides, rule) {
+        match meta.severity(rule) {
             Severity::Error => error_count += count,
             Severity::Warning => warning_count += count,
         }
@@ -983,7 +1002,7 @@ fn lint_report_stats(
         .map(|category| {
             let count = by_rule
                 .iter()
-                .filter(|(rule, _)| rule_category(rule) == Some(*category))
+                .filter(|(rule, _)| meta.category(rule) == Some(*category))
                 .map(|(_, count)| *count)
                 .sum();
             (*category, count)
@@ -1045,21 +1064,25 @@ fn lint_report_github(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
-    overrides: &SeverityOverrides,
+    meta: &RuleMetaResolver<'_>,
+    custom: &CustomRules,
 ) -> Result<()> {
     let baseline = load_baseline(args)?;
     let mut finding_rules: Vec<&'static str> = Vec::new();
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let findings = retain_unsuppressed(
+        let findings = merge_custom(
             collect_lint_findings(file, dialect, &tree)?,
-            &input.text,
+            custom,
+            file,
             &tree,
+            &input.text,
         );
+        let findings = retain_unsuppressed(findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         for finding in findings {
-            if !active.contains(&finding.rule) {
+            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
                 continue;
             }
             finding_rules.push(finding.rule);
@@ -1070,17 +1093,120 @@ fn lint_report_github(
                 column,
                 finding.rule,
                 &finding.message,
-                overridden_rule_severity(overrides, finding.rule),
+                meta.severity(finding.rule),
             );
         }
     }
 
-    if let Some(message) = gate_message(&finding_rules, args, overrides) {
+    if let Some(message) = gate_message(&finding_rules, args, meta.overrides()) {
         return Err(crate::presentation::cli::gate::gate_failure(format!(
             "lint-report policy failed: {message}"
         )));
     }
 
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Custom rules, merged into the shipped suite's findings.
+//
+// The two passes stay separate (see `custom.rs` for why the engine cannot hold
+// a rule read at startup), and they meet here: one function that appends the
+// custom findings to a file's list, and one that adds their fixes to the map
+// `--fix` and `--fix-plan` index. Everything downstream — suppressions, the
+// baseline, ids, the gate, every output format — then treats both alike.
+// ---------------------------------------------------------------------------
+
+/// Appends the custom rules' findings for one file.
+///
+/// Appended rather than interleaved: the shipped suite's order is a published
+/// contract, and putting a project's rules after it means adding one cannot
+/// move a shipped finding.
+fn merge_custom(
+    mut findings: Vec<LintFinding>,
+    custom: &CustomRules,
+    file: &std::path::Path,
+    tree: &SyntaxTree,
+    text: &str,
+) -> Vec<LintFinding> {
+    if custom.is_empty() {
+        return findings;
+    }
+    for (rule, finding) in custom.findings(tree, text) {
+        findings.push(LintFinding {
+            rule,
+            path: file.to_path_buf(),
+            span: finding.span,
+            message: finding.message,
+        });
+    }
+    findings
+}
+
+/// Adds the custom rules' rewrites to a file's fix map.
+fn custom_fixes(
+    custom: &CustomRules,
+    _file: &std::path::Path,
+    tree: &SyntaxTree,
+    text: &str,
+    fixes: &mut FixMap,
+) {
+    if custom.is_empty() {
+        return;
+    }
+    for (rule, finding) in custom.findings(tree, text) {
+        let Some(replacement) = finding.fix else {
+            continue;
+        };
+        let (start, end) = (finding.span.start().get(), finding.span.end().get());
+        fixes.insert(
+            (rule, start, end),
+            LintFix {
+                description: format!("Apply the custom rule {rule}"),
+                replacements: vec![LintReplacement {
+                    byte_offset: start,
+                    byte_length: end.saturating_sub(start),
+                    text: replacement,
+                }],
+            },
+        );
+    }
+}
+
+/// The active rule list widened by the custom rules.
+///
+/// `summarize_lint_findings` keeps only findings whose rule is in this list and
+/// builds the per-rule checklist from it, so a custom rule that is not here
+/// would be silently dropped after having been computed.
+fn active_with_custom(active: &[&'static str], custom: &CustomRules) -> Vec<&'static str> {
+    let mut widened = active.to_vec();
+    widened.extend(custom.names());
+    widened
+}
+
+/// Runs the `deftest` clauses in the custom rule files.
+///
+/// A separate mode rather than part of a scan: a rule file is code, and code
+/// nobody can check goes wrong quietly. Exits 3 on any failure so CI can keep
+/// a project's own rules correct the same way it keeps its own tests correct.
+fn lint_report_test_rules(custom: &CustomRules) -> Result<()> {
+    let failures = custom.test();
+    let rule_count = custom.ruleset().rules.len();
+    let test_count = custom.ruleset().tests.len();
+
+    println!("custom_rule_count\t{rule_count}");
+    println!("custom_test_count\t{test_count}");
+    println!("failure_count\t{}", failures.len());
+    for failure in &failures {
+        println!("failure\t{failure}");
+    }
+
+    if !failures.is_empty() {
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
+            "{} custom rule test(s) failed",
+            failures.len()
+        )));
+    }
     Ok(())
 }
 

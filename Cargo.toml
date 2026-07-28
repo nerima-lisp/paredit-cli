@@ -60,6 +60,7 @@ paredit-feature-lint-performance = { path = "packages/feature/lint-performance" 
 paredit-feature-lint-portability = { path = "packages/feature/lint-portability" }
 paredit-feature-lint-safety = { path = "packages/feature/lint-safety" }
 paredit-feature-lint-convention = { path = "packages/feature/lint-convention" }
+paredit-feature-lint-custom = { path = "packages/feature/lint-custom" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 anyhow = "1.0"

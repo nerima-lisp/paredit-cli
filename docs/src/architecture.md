@@ -121,7 +121,9 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-The 169 rules live in eleven themed packages, split three ways.
+The 169 shipped rules live in eleven themed packages, split three ways. A
+twelfth, `feature/lint-custom`, holds no rules at all: it is the pattern
+language and the second pass that run the rules a *project* writes for itself.
 
 Six are split by the Lisp syntax they are about —
 `feature/lint-{conditional,sequence,numeric,control-flow,form-shape,string-char}`.
@@ -153,6 +155,14 @@ the three-file split would be indirection with nothing on the other end.
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.
+
+**Custom rules cannot be in `REGISTRY` either**, for a different reason:
+`RuleCatalog` holds `&'static [RuleEntry]` so the four derived arrays can be
+computed at compile time, and a rule read from a file at startup has no
+`'static` lifetime to offer. They run as a second pass whose findings are
+merged into the report, and the merge is two functions in
+`src/presentation/cli/lint_report/workflow.rs`. The two passes share the
+finding type — so every output mode renders both — and nothing else.
 
 Adding a rule touches exactly three places:
 

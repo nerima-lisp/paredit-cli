@@ -235,6 +235,59 @@ rule and a whitespace-normalized prefix of the reported form, so it survives
 reformatting and unrelated edits above it — which is what makes it usable as a
 key for baselines and suppression tooling.
 
+### Rules a project writes for itself
+
+The 169 shipped rules are the ones everybody gets. A rule like "in *this*
+codebase, `defentity` must always be given a `:table`" is the majority of what
+a mature project wants and none of what a linter can ship, so a project writes
+those itself, in Lisp, in `.paredit/rules/*.lisp`:
+
+```lisp
+(defrule entity-needs-table
+  :category malformed          ; optional; defaults to suspicious
+  :severity error              ; optional; defaults to warning
+  :description "a defentity with no :table option"
+  :pattern (defentity ?name ...)
+  :message "defentity needs a :table"
+  :fix (defentity ?name :table "TODO"))   ; optional
+
+(deftest entity-needs-table
+  (:matches  "(defentity user)")
+  (:no-match "(defentity user :table \"users\")")
+  (:fix "(defentity user)" "(defentity user :table \"TODO\")"))
+
+(deprecate legacy-connect :use connect :reason "removed in 3.0")
+```
+
+The directory is read automatically when it exists; `--custom-rules <DIR>`
+points elsewhere. A rule file that does not load fails the run — a project that
+has written a rule and sees a green build has been told the rule passed.
+
+Three spellings are special in a `:pattern`:
+
+| Spelling | Matches |
+| --- | --- |
+| `?name` | one form, and binds it; a repeated `?name` must match the *same* form, which is how `(setf ?p ?p)` says "self-assignment" |
+| `?_` | one form, binding nothing, so two `?_` need not agree |
+| `...` | the rest of the enclosing list, however many forms |
+
+Everything else matches itself: a symbol case- and package-insensitively (so
+`(cl:print x)` matches `(print ?x)`), a string or number exactly.
+
+A `:fix` is a template in the same language; each `?name` is replaced by the
+source it bound, verbatim, so the parts the fix does not change keep their
+formatting. A template naming a variable the pattern does not bind is rejected
+when the file loads.
+
+`--test-rules` runs every `deftest` and exits 3 on a failure. `:no-match` is
+the clause that earns its keep: it is what catches a pattern that grew broader
+than its author meant.
+
+Custom findings are then indistinguishable from shipped ones — same suppression
+comments, same baseline, same stable ids, same `--fail-on` gate, same SARIF and
+GitHub output, same `--fix`. `--list-rules` lists them in a separate
+`custom_rules` block so the two are still tellable apart.
+
 ### Suppressing findings in source
 
 Three scopes, each spelled as a comment:

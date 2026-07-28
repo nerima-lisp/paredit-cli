@@ -2325,3 +2325,244 @@ fn cli_lint_no_destructive_fixes_holds_back_the_tagged_rewrites() {
         "the destructive fix is held back"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Custom rules: a project's own pattern rules, their declarative tests, and
+// the deprecation shorthand. These run as a second pass and are then
+// indistinguishable from shipped findings in every output mode, which is what
+// most of the assertions below are checking.
+// ---------------------------------------------------------------------------
+
+/// Writes a rule directory and returns its path.
+fn rule_dir(name: &str, rules: &str) -> PathBuf {
+    let dir = fresh_temp_dir(name).join("rules");
+    std::fs::create_dir_all(&dir).expect("create rule dir");
+    fs::write(dir.join("house.lisp"), rules).expect("write house.lisp");
+    dir
+}
+
+#[test]
+fn cli_lint_custom_rule_reports_like_a_shipped_one() {
+    let rules = rule_dir(
+        "lint-custom-report",
+        r#"(defrule no-bare-print
+             :category suspicious
+             :severity error
+             :description "print writes to *standard-output* directly"
+             :pattern (print ?x)
+             :message "use (format t ...) rather than print")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-report-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun run () (print (compute 1)))\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 1);
+    let finding = &value["findings"][0];
+    assert_eq!(finding["rule"], "no-bare-print");
+    // The custom rule's own metadata, not the "unknown rule" fallback.
+    assert_eq!(finding["severity"], "error");
+    assert_eq!(finding["category"], "suspicious");
+    assert_eq!(finding["fixable"], false);
+    // And a content-derived id, exactly like a shipped finding.
+    assert!(
+        finding["id"]
+            .as_str()
+            .expect("an id")
+            .starts_with("no-bare-print/")
+    );
+}
+
+#[test]
+fn cli_lint_custom_rule_fix_applies_like_a_shipped_one() {
+    let rules = rule_dir(
+        "lint-custom-fix",
+        r#"(defrule no-bare-print
+             :pattern (print ?x)
+             :message "m"
+             :fix (format t "~a~%" ?x))"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-fix-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print (compute 1))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--fix", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read a.lisp"),
+        "(format t \"~a~%\" (compute 1))\n"
+    );
+}
+
+#[test]
+fn cli_lint_a_custom_finding_obeys_a_suppression_comment() {
+    let rules = rule_dir(
+        "lint-custom-suppress",
+        r#"(defrule no-bare-print :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-suppress-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, ";; paredit:ignore no-bare-print\n(print 1)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 0);
+}
+
+#[test]
+fn cli_lint_a_custom_finding_trips_the_severity_gate() {
+    let rules = rule_dir(
+        "lint-custom-gate",
+        r#"(defrule no-bare-print :severity error :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-gate-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--fail-on", "error", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn cli_lint_deprecate_reports_any_call_to_the_named_operator() {
+    let rules = rule_dir(
+        "lint-custom-deprecate",
+        r#"(deprecate legacy-connect :use connect :reason "removed in 3.0")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-deprecate-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(legacy-connect)\n(legacy-connect \"db\" 5)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 2);
+    assert_eq!(value["findings"][0]["rule"], "deprecated-legacy-connect");
+    assert!(
+        value["findings"][0]["message"]
+            .as_str()
+            .expect("a message")
+            .contains("use connect instead (removed in 3.0)")
+    );
+}
+
+#[test]
+fn cli_lint_test_rules_passes_a_correct_rule_set() {
+    let rules = rule_dir(
+        "lint-custom-harness-ok",
+        r#"(defrule no-bare-print
+             :pattern (print ?x)
+             :message "m"
+             :fix (format t "~a" ?x))
+           (deftest no-bare-print
+             (:matches "(print 1)")
+             (:no-match "(princ 1)")
+             (:fix "(print 1)" "(format t \"~a\" 1)"))"#,
+    );
+    let value = json_stdout_or_text(
+        paredit()
+            .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+            .arg(&rules)
+            .assert()
+            .success(),
+    );
+    assert!(value.contains("failure_count\t0"), "{value}");
+}
+
+#[test]
+fn cli_lint_test_rules_fails_a_pattern_that_grew_too_broad() {
+    let rules = rule_dir(
+        "lint-custom-harness-broad",
+        r#"(defrule no-bare-print :pattern (?op ?x) :message "m")
+           (deftest no-bare-print (:no-match "(princ 1)"))"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(":no-match"));
+}
+
+#[test]
+fn cli_lint_rejects_a_custom_rule_that_shadows_a_shipped_one() {
+    let rules = rule_dir(
+        "lint-custom-collision",
+        r#"(defrule redundant-quote :pattern (print ?x) :message "m")"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("collides with a shipped rule"));
+}
+
+#[test]
+fn cli_lint_rejects_a_custom_rule_whose_fix_names_an_unbound_variable() {
+    let rules = rule_dir(
+        "lint-custom-unbound",
+        r#"(defrule r :pattern (f ?a) :message "m" :fix (g ?b))"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("does not bind"));
+}
+
+#[test]
+fn cli_lint_list_rules_shows_the_projects_own_rules() {
+    let rules = rule_dir(
+        "lint-custom-list",
+        r#"(defrule house-style :category naming :pattern (print ?x) :message "m")"#,
+    );
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .assert(),
+    );
+    let custom = value["custom_rules"]
+        .as_array()
+        .expect("custom_rules array");
+    assert_eq!(custom.len(), 1);
+    assert_eq!(custom[0]["rule"], "house-style");
+    assert_eq!(custom[0]["category"], "naming");
+}
+
+/// stdout as a `String`, for the modes whose output is not JSON.
+fn json_stdout_or_text(assert: assert_cmd::assert::Assert) -> String {
+    String::from_utf8(assert.get_output().stdout.clone()).expect("UTF-8 stdout")
+}

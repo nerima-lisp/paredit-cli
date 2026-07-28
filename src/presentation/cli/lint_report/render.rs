@@ -5,10 +5,11 @@ use serde_json::json;
 
 use crate::application::usecase::lint_report::{
     CATEGORIES, LintPolicy, LintSummary, RULE_DOCS, RULES, RulePreset, RuleTag, Severity,
-    SeverityOverrides, overridden_rule_severity, rule_category, rule_description, rule_dialects,
-    rule_explanation, rule_is_fixable, rule_settings, rule_severity, rule_tags,
+    rule_category, rule_description, rule_dialects, rule_explanation, rule_is_fixable,
+    rule_settings, rule_severity, rule_tags,
 };
 use crate::presentation::cli::OutputFormat;
+use crate::presentation::cli::lint_report::custom::{CustomRules, RuleMetaResolver};
 
 /// The stable identity of each finding in a summary, keyed by its position.
 ///
@@ -21,10 +22,10 @@ pub(super) fn print_lint_report(
     summary: &LintSummary,
     policy: &LintPolicy,
     ids: &FindingIds,
-    overrides: &SeverityOverrides,
+    meta: &RuleMetaResolver<'_>,
     output: OutputFormat,
 ) -> Result<()> {
-    let severity_of = |rule: &str| overridden_rule_severity(overrides, rule).as_str();
+    let severity_of = |rule: &str| meta.severity(rule).as_str();
     match output {
         OutputFormat::Text => {
             println!("finding_count\t{}", summary.finding_count);
@@ -39,8 +40,8 @@ pub(super) fn print_lint_report(
                     "finding\t{}\t{}\t{}\tfixable={}\t{}\t{}\t{}\t{}",
                     safe_text!(finding.rule),
                     severity_of(finding.rule),
-                    rule_category(finding.rule).unwrap_or(""),
-                    rule_is_fixable(finding.rule),
+                    meta.category(finding.rule).unwrap_or(""),
+                    meta.is_fixable(finding.rule),
                     safe_text!(finding.path.display()),
                     finding.span.start().get(),
                     safe_text!(finding.message),
@@ -59,7 +60,7 @@ pub(super) fn print_lint_report(
                         .map(|(rule, count)| json!({
                             "rule": rule,
                             "count": count,
-                            "category": rule_category(rule),
+                            "category": meta.category(rule),
                             "description": rule_description(rule),
                         }))
                         .collect::<Vec<_>>(),
@@ -78,8 +79,8 @@ pub(super) fn print_lint_report(
                             "id": ids.get(index),
                             "rule": finding.rule,
                             "severity": severity_of(finding.rule),
-                            "category": rule_category(finding.rule),
-                            "fixable": rule_is_fixable(finding.rule),
+                            "category": meta.category(finding.rule),
+                            "fixable": meta.is_fixable(finding.rule),
                             "path": finding.path.display().to_string(),
                             "span": {
                                 "start": finding.span.start().get(),
@@ -466,14 +467,28 @@ pub(super) fn print_lint_suppression_removal(
 /// selectors, `active` is every rule. The rule names are exactly the values
 /// accepted by `--rule`/`--exclude`, and the categories those accepted by
 /// `--category`.
-pub(super) fn print_lint_rule_catalog(active: &[&str], output: OutputFormat) -> Result<()> {
+pub(super) fn print_lint_rule_catalog(
+    active: &[&str],
+    custom: &CustomRules,
+    output: OutputFormat,
+) -> Result<()> {
     let listed: Vec<&(&str, &str, &str)> = RULE_DOCS
         .iter()
         .filter(|(rule, _, _)| active.contains(rule))
         .collect();
+    // A project's own rules are listed beside the shipped ones, tagged so the
+    // two are distinguishable: a caller asking "what will run?" is asking about
+    // both, and a caller asking "what shipped?" needs to be able to tell.
+    let project: Vec<(&'static str, &'static str, String, Severity, bool)> = custom
+        .catalog()
+        .map(|(name, category, description, severity, fixable)| {
+            (name, category, description.to_owned(), severity, fixable)
+        })
+        .collect();
     match output {
         OutputFormat::Text => {
             println!("rule_count\t{}", listed.len());
+            println!("custom_rule_count\t{}", project.len());
             println!("categories\t{}", CATEGORIES.join(","));
             for (rule, category, description) in &listed {
                 println!(
@@ -486,6 +501,16 @@ pub(super) fn print_lint_rule_catalog(active: &[&str], output: OutputFormat) -> 
                     safe_text!(description),
                 );
             }
+            for (rule, category, description, severity, fixable) in &project {
+                println!(
+                    "custom-rule\t{}\t{}\t{}\tfixable={}\t{}",
+                    safe_text!(rule),
+                    safe_text!(category),
+                    severity.as_str(),
+                    fixable,
+                    safe_text!(description),
+                );
+            }
         }
         OutputFormat::Json => {
             println!(
@@ -493,6 +518,16 @@ pub(super) fn print_lint_rule_catalog(active: &[&str], output: OutputFormat) -> 
                 serde_json::to_string_pretty(&json!({
                     "schema_version": 1,
                     "rule_count": listed.len(),
+                    "custom_rules": project
+                        .iter()
+                        .map(|(rule, category, description, severity, fixable)| json!({
+                            "rule": rule,
+                            "category": category,
+                            "severity": severity.as_str(),
+                            "description": description,
+                            "fixable": fixable,
+                        }))
+                        .collect::<Vec<_>>(),
                     "categories": CATEGORIES,
                     "rules": listed
                         .iter()
@@ -736,7 +771,7 @@ pub(super) struct LintSarifResult {
 /// [`RULE_DOCS`]; each result references its `ruleId` and physical location.
 pub(super) fn print_lint_sarif(
     results: &[LintSarifResult],
-    overrides: &SeverityOverrides,
+    meta: &RuleMetaResolver<'_>,
 ) -> Result<()> {
     let rules = RULE_DOCS
         .iter()
@@ -745,7 +780,7 @@ pub(super) fn print_lint_sarif(
             let mut properties = json!({
                 "category": category,
                 "fixable": rule_is_fixable(rule),
-                "severity": overridden_rule_severity(overrides, rule).as_str(),
+                "severity": meta.severity(rule).as_str(),
                 "tags": rule_tags(rule).names(),
             });
             // SARIF's `fullDescription` is exactly the long-form text
@@ -771,7 +806,7 @@ pub(super) fn print_lint_sarif(
         .map(|result| {
             let mut value = json!({
                 "ruleId": result.rule,
-                "level": overridden_rule_severity(overrides, result.rule).as_str(),
+                "level": meta.severity(result.rule).as_str(),
                 "message": { "text": result.message },
                 "partialFingerprints": {
                     "primaryLocationLineHash": result.fingerprint,
