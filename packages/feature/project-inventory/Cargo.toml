@@ -1,0 +1,22 @@
+[package]
+name = "paredit-feature-project-inventory"
+description = "Reports about a project rather than a form: the public API surface and its drift, the test map, the symbol index, keyword-aware arity, dead expressions, and the ASDF system inventory"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-cli = { path = "../../core/cli" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`.
+[lints]
+workspace = true

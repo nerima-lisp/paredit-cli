@@ -1,0 +1,23 @@
+[package]
+name = "paredit-feature-semantic-report"
+description = "Reports that expose the semantic layer directly: proved types, flow narrowing, constant values, value propagation, and side-effect purity"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-semantics = { path = "../../core/semantics" }
+paredit-core-cli = { path = "../../core/cli" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`.
+[lints]
+workspace = true

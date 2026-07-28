@@ -526,6 +526,112 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::UndefinedPackages(args) => {
                 undefined_package_report::workflow::undefined_package_report(args)?;
             }
+            command::InspectCommand::ApiSurface(args) => {
+                api_surface_report::workflow::api_surface_report(args)?;
+            }
+            command::InspectCommand::ApiDiff(args) => {
+                api_diff_report::workflow::api_diff_report(args)?;
+            }
+            command::InspectCommand::TestMap(args) => {
+                test_map_report::workflow::test_map_report(args)?;
+            }
+            command::InspectCommand::SymbolIndex(args) => {
+                symbol_index_report::workflow::symbol_index_report(args)?;
+            }
+            command::InspectCommand::KeywordArity(args) => {
+                keyword_arity_report::workflow::keyword_arity_report(args)?;
+            }
+            command::InspectCommand::UnreachableExpressions(args) => {
+                unreachable_expression_report::workflow::unreachable_expression_report(args)?;
+            }
+            command::InspectCommand::ExternalSystems(args) => {
+                external_system_report::workflow::external_system_report(args)?;
+            }
+            command::InspectCommand::Licenses(args) => {
+                license_report::workflow::license_report(args)?;
+            }
+            command::InspectCommand::SerialConsistency(args) => {
+                serial_consistency_report::workflow::serial_consistency_report(args)?;
+            }
+            command::InspectCommand::Blame(args) => {
+                blame_report::workflow::blame_report(args)?;
+            }
+            command::InspectCommand::DuplicationRatio(args) => {
+                duplication_ratio_report::workflow::duplication_ratio_report(args)?;
+            }
+            command::InspectCommand::Cohesion(args) => {
+                cohesion_report::workflow::cohesion_report(args)?;
+            }
+            command::InspectCommand::Hotspots(args) => {
+                hotspot_report::workflow::hotspot_report(args)?;
+            }
+            command::InspectCommand::DebtScore(args) => {
+                debt_score_report::workflow::debt_score_report(args)?;
+            }
+            command::InspectCommand::Indentation(args) => {
+                indentation_report::workflow::indentation_report(args)?;
+            }
+            command::InspectCommand::Docstrings(args) => {
+                docstring_report::workflow::docstring_report(args)?;
+            }
+            command::InspectCommand::Todo(args) => {
+                todo_report::workflow::todo_report(args)?;
+            }
+            command::InspectCommand::LineMetrics(args) => {
+                line_metrics_report::workflow::line_metrics_report(args)?;
+            }
+            command::InspectCommand::MacroExpansion(args) => {
+                macro_expansion_report::workflow::macro_expansion_report(args)?;
+            }
+            command::InspectCommand::MacroHygiene(args) => {
+                macro_hygiene_report::workflow::macro_hygiene_report(args)?;
+            }
+            command::InspectCommand::Loop(args) => {
+                loop_report::workflow::loop_report(args)?;
+            }
+            command::InspectCommand::FormatDirectives(args) => {
+                format_directive_report::workflow::format_directive_report(args)?;
+            }
+            command::InspectCommand::ReadConditionals(args) => {
+                read_conditional_report::workflow::read_conditional_report(args)?;
+            }
+            command::InspectCommand::ReadTimeEval(args) => {
+                read_time_eval_report::workflow::read_time_eval_report(args)?;
+            }
+            command::InspectCommand::CircularLiterals(args) => {
+                circular_literal_report::workflow::circular_literal_report(args)?;
+            }
+            command::InspectCommand::ReadtableCase(args) => {
+                readtable_case_report::workflow::readtable_case_report(args)?;
+            }
+            command::InspectCommand::PackageLocks(args) => {
+                package_lock_report::workflow::package_lock_report(args)?;
+            }
+            command::InspectCommand::MethodCombination(args) => {
+                method_combination_report::workflow::method_combination_report(args)?;
+            }
+            command::InspectCommand::ClassHierarchy(args) => {
+                class_hierarchy_report::workflow::class_hierarchy_report(args)?;
+            }
+            command::InspectCommand::GenericDispatch(args) => {
+                generic_dispatch_report::workflow::generic_dispatch_report(args)?;
+            }
+            command::InspectCommand::Restarts(args) => {
+                restart_report::workflow::restart_report(args)?;
+            }
+            command::InspectCommand::Types(args) => type_report::workflow::type_report(args)?,
+            command::InspectCommand::Narrowing(args) => {
+                narrowing_report::workflow::narrowing_report(args)?;
+            }
+            command::InspectCommand::Constants(args) => {
+                constant_report::workflow::constant_report(args)?;
+            }
+            command::InspectCommand::ValuePropagation(args) => {
+                value_propagation_report::workflow::value_propagation_report(args)?;
+            }
+            command::InspectCommand::Effects(args) => {
+                effect_report::workflow::effect_report(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

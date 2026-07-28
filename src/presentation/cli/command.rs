@@ -1,67 +1,76 @@
 use super::{
-    accessor_arity_report, append_list_to_cons_report, append_nil_report,
+    accessor_arity_report, api_diff_report, api_surface_report, append_list_to_cons_report,
+    append_nil_report,
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
-    binds_constant_report, butlast_default_count_report, call_cycle_report, call_graph_report,
-    call_report, capabilities, car_nthcdr_report, car_reverse_report, case_nil_key_report,
-    char_case_fold_report, char_op_string_report, class_cycle_report, code_char_char_code_report,
-    coerce_to_t_report, complexity_report, cond_t_clause_report, cons_to_list_report,
-    constant_if_test_report, constant_when_test_report, convert_cond_to_if, convert_flet_to_labels,
-    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
-    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
-    convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
-    definition_movement, definition_removal, definition_report, defpackage_quoted_report,
-    dependency_report, destructive_literal_report, double_reverse_report,
-    duplicate_boolean_operand_report, duplicate_case_key_report, duplicate_cond_test_report,
-    duplicate_export_report, duplicate_keyword_report, duplicate_lambda_list_keyword_report,
-    duplicate_let_binding_report, duplicate_method_report, duplicate_parameter_report,
-    duplicate_report, duplicate_setf_place_report, duplicate_slot_report,
+    binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
+    call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
+    case_nil_key_report, char_case_fold_report, char_op_string_report, circular_literal_report,
+    class_cycle_report, class_hierarchy_report, code_char_char_code_report, coerce_to_t_report,
+    cohesion_report, complexity_report, cond_t_clause_report, cons_to_list_report,
+    constant_if_test_report, constant_report, constant_when_test_report, convert_cond_to_if,
+    convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless, convert_if_to_when,
+    convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
+    dead_boolean_operand_report, debt_score_report, definition_movement, definition_removal,
+    definition_report, defpackage_quoted_report, dependency_report, destructive_literal_report,
+    docstring_report, double_reverse_report, duplicate_boolean_operand_report,
+    duplicate_case_key_report, duplicate_cond_test_report, duplicate_export_report,
+    duplicate_keyword_report, duplicate_lambda_list_keyword_report, duplicate_let_binding_report,
+    duplicate_method_report, duplicate_parameter_report, duplicate_report,
+    duplicate_setf_place_report, duplicate_slot_report, duplication_ratio_report, effect_report,
     eliminate_empty_binding_form, emacs_lisp_file_report, empty_body_report, empty_let_report,
     eq_char_comparison_report, eq_number_comparison_report, eql_list_comparison_report,
     eql_search_literal_report, eql_string_comparison_report, equality_arity_report,
     eval_when_situation_report, exhaustive_case_otherwise_report, explicit_nil_return_report,
-    explicit_step_delta_report, extract_constant, extract_function, extract_local_function,
-    flatten_progn, form_report, format_missing_destination_report, format_newline_report,
-    format_to_string_report, funcall_lambda_report, function_parameter, getf_default_nil_report,
-    gethash_default_report, handler_case_no_clauses_report, identical_if_branch_report,
-    identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report,
-    if_to_unless_report, impact_report, inline_function, inline_lambda, inline_let,
-    inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let,
-    lambda_list_keyword_order_report, last_default_count_report, let_report, lint_report,
-    list_star_nil_report, list_star_to_cons_report, literal_place_report,
-    make_array_default_keyword_report, make_hash_table_test_report,
-    make_list_default_element_report, malformed_case_clause_report, malformed_cond_clause_report,
-    malformed_iteration_spec_report, malformed_let_binding_report, manual_incf_report,
-    manual_push_report, manual_pushnew_report, merge_nested_flet, merge_nested_let,
-    merge_nested_let_star, modify_macro_arity_report, multiple_value_list_of_values_report,
-    naming_report, negated_comparison_report, negated_if_report, negated_step_delta_report,
+    explicit_step_delta_report, external_system_report, extract_constant, extract_function,
+    extract_local_function, flatten_progn, form_report, format_directive_report,
+    format_missing_destination_report, format_newline_report, format_to_string_report,
+    funcall_lambda_report, function_parameter, generic_dispatch_report, getf_default_nil_report,
+    gethash_default_report, handler_case_no_clauses_report, hotspot_report,
+    identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_not_report,
+    if_to_or_report, if_to_unless_report, impact_report, indentation_report, inline_function,
+    inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
+    introduce_let, keyword_arity_report, lambda_list_keyword_order_report,
+    last_default_count_report, let_report, license_report, line_metrics_report, lint_report,
+    list_star_nil_report, list_star_to_cons_report, literal_place_report, loop_report,
+    macro_expansion_report, macro_hygiene_report, make_array_default_keyword_report,
+    make_hash_table_test_report, make_list_default_element_report, malformed_case_clause_report,
+    malformed_cond_clause_report, malformed_iteration_spec_report, malformed_let_binding_report,
+    manual_incf_report, manual_push_report, manual_pushnew_report, merge_nested_flet,
+    merge_nested_let, merge_nested_let_star, method_combination_report, modify_macro_arity_report,
+    multiple_value_list_of_values_report, naming_report, narrowing_report,
+    negated_comparison_report, negated_if_report, negated_step_delta_report,
     negated_when_unless_report, nested_boolean_report, nested_char_case_report, nested_cxr_report,
     nested_progn_report, nested_string_case_report, nested_unless_report, nested_when_report,
     nil_comparison_report, nth_constant_index_report, nthcdr_small_index_report,
     nthcdr_zero_report, one_armed_if_report, one_step_arithmetic_report, package,
-    package_boundary_report, package_conflict_report, package_cycle_report,
+    package_boundary_report, package_conflict_report, package_cycle_report, package_lock_report,
     parse_integer_default_radix_report, prog2_to_progn_report, quoted_case_key_report,
-    reachability_report, redefinition_report, redundant_apply_report, redundant_body_progn_report,
+    reachability_report, read_conditional_report, read_time_eval_report, readtable_case_report,
+    redefinition_report, redundant_apply_report, redundant_body_progn_report,
     redundant_boolean_identity_report, redundant_count_nil_report, redundant_divisor_report,
     redundant_end_nil_report, redundant_eql_test_report, redundant_from_end_nil_report,
     redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
     redundant_if_nil_report, redundant_let_star_report, redundant_prog1_report,
     redundant_progn_report, redundant_quote_report, redundant_start_zero_report,
     redundant_the_report, refactor, remove_unused_binding, remove_unused_control, rename,
-    rename_control, replace_forms, self_assignment_report, self_comparison_report,
-    setf_arity_report, setq_non_variable_report, shadowed_binding_report,
-    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
-    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
-    single_operand_boolean_report, single_operand_list_op_report, single_value_bind_report,
-    split_let, split_let_star, step_zero_report, string_case_fold_report, struct_cycle_report,
-    subseq_zero_report, symbol_report, system_conflict_report, system_cycle_report,
-    t_comparison_report, the_arity_report, thread_expression, typecase_nil_key_report,
+    rename_control, replace_forms, restart_report, self_assignment_report, self_comparison_report,
+    serial_consistency_report, setf_arity_report, setq_non_variable_report,
+    shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
+    similarity_report, single_arg_comparison_report, single_clause_cond_report,
+    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
+    single_value_bind_report, split_let, split_let_star, step_zero_report, string_case_fold_report,
+    struct_cycle_report, subseq_zero_report, symbol_index_report, symbol_report,
+    system_conflict_report, system_cycle_report, t_comparison_report, test_map_report,
+    the_arity_report, thread_expression, todo_report, type_report, typecase_nil_key_report,
     typep_predicate_report, undefined_package_report, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unthread_expression, unused_export_report,
-    unused_local_callable_report, unused_nickname_report, unused_package_report,
-    unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
-    values_list_of_list_report, verbose_negation_report, workspace_report, zero_divisor_report,
+    unreachable_cond_clause_report, unreachable_expression_report, unthread_expression,
+    unused_export_report, unused_local_callable_report, unused_nickname_report,
+    unused_package_report, unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
+    value_propagation_report, values_list_of_list_report, verbose_negation_report,
+    workspace_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -451,6 +460,78 @@ pub(super) enum InspectCommand {
     DuplicateExports(duplicate_export_report::args::DuplicateExportReportArgs),
     /// Report defpackage :nicknames never used as a qualifier anywhere.
     UnusedNicknames(unused_nickname_report::args::UnusedNicknameReportArgs),
+    /// Report every exported symbol with the signature its export commits to.
+    ApiSurface(api_surface_report::args::ApiSurfaceReportArgs),
+    /// Compare the current API against an api-surface snapshot and answer major, minor, or patch.
+    ApiDiff(api_diff_report::args::ApiDiffReportArgs),
+    /// Pair definitions with the tests that name them, and report both sides that have no counterpart.
+    TestMap(test_map_report::args::TestMapReportArgs),
+    /// Index every symbol to its definition site and occurrence offsets, for editor and agent caches.
+    SymbolIndex(symbol_index_report::args::SymbolIndexReportArgs),
+    /// Check call sites against &optional, &rest, and &key lambda lists, including unknown keyword names.
+    KeywordArity(keyword_arity_report::args::KeywordArityReportArgs),
+    /// Report forms that cannot run because a non-local exit precedes them in the same implicit progn.
+    UnreachableExpressions(unreachable_expression_report::args::UnreachableExpressionReportArgs),
+    /// Report which ASDF systems this project depends on but does not define.
+    ExternalSystems(external_system_report::args::ExternalSystemReportArgs),
+    /// Report each defsystem's declared licence, its copyleft strength, and which are superseded.
+    Licenses(license_report::args::LicenseReportArgs),
+    /// Report components whose declared dependencies contradict or duplicate their system's :serial t.
+    SerialConsistency(serial_consistency_report::args::SerialConsistencyReportArgs),
+    /// Report the last author, date, and commit for each definition, so a finding can be routed.
+    Blame(blame_report::args::BlameReportArgs),
+    /// Report what fraction of a file is structurally repeated, and each repeated shape.
+    DuplicationRatio(duplication_ratio_report::args::DuplicationRatioReportArgs),
+    /// Report per-definition coupling and the file's internal/external call ratio.
+    Cohesion(cohesion_report::args::CohesionReportArgs),
+    /// Rank definitions by git change frequency multiplied by complexity.
+    Hotspots(hotspot_report::args::HotspotReportArgs),
+    /// Report one debt score per file, with the weighted contribution of every input shown.
+    DebtScore(debt_score_report::args::DebtScoreReportArgs),
+    /// Report body forms indented against the Emacs/SLIME convention, which is a different question from format.
+    Indentation(indentation_report::args::IndentationReportArgs),
+    /// Report definitions with no docstring, and docstrings naming a parameter the lambda list does not have.
+    Docstrings(docstring_report::args::DocstringReportArgs),
+    /// Report TODO/FIXME/XXX/HACK/BUG markers with the definition each one sits in.
+    Todo(todo_report::args::TodoReportArgs),
+    /// Report line length, file length, and lines per definition against configurable thresholds.
+    LineMetrics(line_metrics_report::args::LineMetricsReportArgs),
+    /// Report what each same-file defmacro expands its own call sites into, and why any call was declined.
+    MacroExpansion(macro_expansion_report::args::MacroExpansionReportArgs),
+    /// Report macro templates that can capture a caller's variable or evaluate a caller's argument twice.
+    MacroHygiene(macro_hygiene_report::args::MacroHygieneReportArgs),
+    /// Report each loop's clauses: what it binds, what it accumulates, and whether anything can stop it.
+    Loop(loop_report::args::LoopReportArgs),
+    /// Report format control strings against the arguments their directives consume.
+    FormatDirectives(format_directive_report::args::FormatDirectiveReportArgs),
+    /// Report every #+/#- reader conditional, the features it tests, and the code it guards.
+    ReadConditionals(read_conditional_report::args::ReadConditionalReportArgs),
+    /// Report every #. read-time evaluation, separating inert data from a live call.
+    ReadTimeEval(read_time_eval_report::args::ReadTimeEvalReportArgs),
+    /// Report #n= and #n# reader labels, and each label with no counterpart.
+    CircularLiterals(circular_literal_report::args::CircularLiteralReportArgs),
+    /// Report symbols whose identity changes with readtable-case, and the escapes that pin it.
+    ReadtableCase(readtable_case_report::args::ReadtableCaseReportArgs),
+    /// Report definitions and bindings that collide with a COMMON-LISP symbol.
+    PackageLocks(package_lock_report::args::PackageLockReportArgs),
+    /// Report defmethod qualifiers, and the :before/:after methods with no primary to run around.
+    MethodCombination(method_combination_report::args::MethodCombinationReportArgs),
+    /// Report the CLOS inheritance tree, each class's inherited slots, and the slots a subclass shadows.
+    ClassHierarchy(class_hierarchy_report::args::ClassHierarchyReportArgs),
+    /// Report defgeneric declarations against the defmethod forms that implement them.
+    GenericDispatch(generic_dispatch_report::args::GenericDispatchReportArgs),
+    /// Report established restarts against invoked ones, and each side with no counterpart.
+    Restarts(restart_report::args::RestartReportArgs),
+    /// Report the semantic layer's proved types, and declarations that contradict what the value layer proved.
+    Types(type_report::args::TypeReportArgs),
+    /// Report where a branch's test narrows a binding's type, and which branch the narrowing holds in.
+    Narrowing(narrowing_report::args::NarrowingReportArgs),
+    /// Report expressions that provably evaluate to a literal, and the file-level defconstant values.
+    Constants(constant_report::args::ConstantReportArgs),
+    /// Report which bindings carry a provable constant, and the first condition that blocked the rest.
+    ValuePropagation(value_propagation_report::args::ValuePropagationReportArgs),
+    /// Report each definition as pure, effectful, or undecidable, propagating effects along same-file calls.
+    Effects(effect_report::args::EffectReportArgs),
     /// Report in-package forms naming a package no analyzed defpackage declares.
     UndefinedPackages(undefined_package_report::args::UndefinedPackageReportArgs),
 }
