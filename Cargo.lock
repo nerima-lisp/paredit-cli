@@ -657,6 +657,7 @@ dependencies = [
  "paredit-core-syntax",
  "paredit-core-workspace",
  "paredit-feature-binding",
+ "paredit-feature-code-metrics",
  "paredit-feature-conditional-conversion",
  "paredit-feature-emacs-lisp",
  "paredit-feature-extract",
@@ -674,11 +675,14 @@ dependencies = [
  "paredit-feature-lint-safety",
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
+ "paredit-feature-lisp-analysis",
  "paredit-feature-package",
  "paredit-feature-project-analysis",
+ "paredit-feature-project-inventory",
  "paredit-feature-refactor-workflow",
  "paredit-feature-remove-unused",
  "paredit-feature-rename",
+ "paredit-feature-semantic-report",
  "paredit-feature-similarity",
  "predicates",
  "proptest",
@@ -770,6 +774,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-code-metrics"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]
@@ -996,6 +1011,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lisp-analysis"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
 name = "paredit-feature-package"
 version = "1.2.1"
 dependencies = [
@@ -1027,6 +1053,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-project-inventory"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]
@@ -1082,6 +1119,18 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-semantic-report"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

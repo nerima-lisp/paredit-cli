@@ -25,17 +25,18 @@ pub use operator::{
 #[cfg(test)]
 pub use reader_condition::common_lisp_reader_conditional_dispatches;
 pub use reader_condition::{
-    CommonLispReaderConditionalKind, common_lisp_reader_conditional_forms,
+    CommonLispReaderConditionalForm, CommonLispReaderConditionalKind,
+    common_lisp_reader_conditional_forms,
     reader_conditional_kind as common_lisp_reader_conditional_kind,
 };
 #[cfg(test)]
 pub use reader_label::common_lisp_reader_label_dispatches;
 pub use reader_label::{
-    CommonLispReaderLabelKind, common_lisp_reader_label_forms,
+    CommonLispReaderLabelForm, CommonLispReaderLabelKind, common_lisp_reader_label_forms,
     reader_label_kind as common_lisp_reader_label_kind,
 };
 pub use reader_literal::{
-    CommonLispReaderLiteralKind, common_lisp_reader_literals,
+    CommonLispReaderLiteral, CommonLispReaderLiteralKind, common_lisp_reader_literals,
     reader_literal_kind as common_lisp_reader_literal_kind,
 };
 pub use scope::{

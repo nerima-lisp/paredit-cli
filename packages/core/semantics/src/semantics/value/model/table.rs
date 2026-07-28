@@ -55,6 +55,25 @@ impl ValueTable {
     pub fn constant_count(&self) -> usize {
         self.constants.len()
     }
+
+    /// Every binding that provably carries a constant value.
+    ///
+    /// Unordered, because the backing map is. A report that prints these must
+    /// impose its own order — by the binding's definition span — or its output
+    /// is not reproducible between runs.
+    #[must_use]
+    pub fn binding_values(&self) -> impl ExactSizeIterator<Item = (BindingId, &PropagatableValue)> {
+        self.bindings
+            .iter()
+            .map(|(binding, value)| (*binding, value))
+    }
+
+    /// Every file-level constant, keyed by its reader-folded name. Unordered;
+    /// see [`ValueTable::binding_values`].
+    #[must_use]
+    pub fn constants(&self) -> impl ExactSizeIterator<Item = (&SymbolName, &PropagatableValue)> {
+        self.constants.iter()
+    }
 }
 
 /// A value table under construction.

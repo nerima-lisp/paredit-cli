@@ -73,6 +73,23 @@ impl TypeTable {
     pub fn expression_count(&self) -> usize {
         self.expressions.len()
     }
+
+    /// Every binding this layer proved a type for.
+    ///
+    /// Unordered, because the backing map is. A report that prints these must
+    /// impose its own order — by span, not by `BindingId` — or its output is
+    /// not reproducible between runs.
+    #[must_use]
+    pub fn binding_types(&self) -> impl ExactSizeIterator<Item = (BindingId, Ty)> {
+        self.bindings.iter().map(|(binding, ty)| (*binding, *ty))
+    }
+
+    /// Every expression this layer proved a type for. Unordered; see
+    /// [`TypeTable::binding_types`].
+    #[must_use]
+    pub fn expression_types(&self) -> impl ExactSizeIterator<Item = (NodeKey, Ty)> {
+        self.expressions.iter().map(|(key, ty)| (*key, *ty))
+    }
 }
 
 /// A type table under construction.

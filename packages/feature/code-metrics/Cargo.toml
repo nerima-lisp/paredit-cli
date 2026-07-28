@@ -1,0 +1,22 @@
+[package]
+name = "paredit-feature-code-metrics"
+description = "Quality metrics over a whole tree: docstrings, task comments, line shape, indentation convention, duplication ratio, package cohesion, change hotspots, and the debt score that aggregates them"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-cli = { path = "../../core/cli" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`.
+[lints]
+workspace = true
