@@ -954,3 +954,36 @@ fn rejects_mismatched_delimiter() {
         }
     );
 }
+
+#[test]
+fn a_lang_directive_is_read_as_a_line_directive_not_a_dispatch() {
+    // Every real Racket file opens with one, and reading `#lang` as a reader
+    // dispatch made all of them fail to parse.
+    for dialect in [Dialect::Racket, Dialect::Scheme] {
+        let tree = SyntaxTree::parse_with_dialect("#lang racket/base\n(define x 1)\n", dialect)
+            .unwrap_or_else(|error| panic!("{dialect:?}: {error}"));
+        let root = tree.root_view();
+
+        assert_eq!(root.children.len(), 1, "{dialect:?}");
+        assert_eq!(
+            root.children[0].children.first().and_then(|head| head.text.as_deref()),
+            Some("define"),
+            "{dialect:?}"
+        );
+    }
+}
+
+#[test]
+fn a_lang_directive_is_kept_as_trivia_rather_than_dropped() {
+    // The directive names the language for the whole file, so a tool that
+    // rewrites the source must not lose it. Reading it as a line comment puts
+    // it in the leading trivia, ahead of the first form.
+    let source = "#lang racket/base\n(define x 1)\n";
+    let tree = SyntaxTree::parse_with_dialect(source, Dialect::Racket).expect("parse");
+    let first = tree.root_view().children.first().cloned().expect("one form");
+
+    assert_eq!(
+        &source[..first.span.start().get()],
+        "#lang racket/base\n"
+    );
+}

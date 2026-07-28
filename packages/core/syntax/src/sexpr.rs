@@ -7,6 +7,8 @@ mod formatter;
 mod parser;
 pub mod reader;
 mod reader_policy;
+
+pub(crate) use reader_policy::lang_directive_language as reader_policy_lang_directive;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;

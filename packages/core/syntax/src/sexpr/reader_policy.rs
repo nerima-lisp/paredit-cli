@@ -59,6 +59,17 @@ impl DialectReaderPolicy {
             Dialect::Janet if byte == b'#' => Some(1),
             Dialect::Janet => None,
             _ if byte == b';' => Some(1),
+            // `#lang racket/base` is a reader *directive*, not a datum: it
+            // names the language for the rest of the file and extends to the
+            // end of the line. Every real Racket file opens with one, and
+            // reading it as a dispatch made all of them fail to parse.
+            //
+            // Consuming it as a line comment keeps it in the trivia, so it
+            // survives a format round-trip; `Dialect::detect` reads it
+            // separately to decide which language the file is in.
+            Dialect::Scheme | Dialect::Racket if starts_with_lang_directive(bytes, pos) => {
+                Some(LANG_DIRECTIVE.len())
+            }
             _ => None,
         }
     }
@@ -398,6 +409,22 @@ impl DialectReaderPolicy {
     }
 }
 
+/// The Racket language directive, which the reader consumes to end of line.
+pub(crate) const LANG_DIRECTIVE: &str = "#lang";
+
+/// Whether a `#lang` directive starts at `pos`.
+///
+/// The directive must be followed by whitespace: `#language` is not one, and
+/// neither is a bare `#lang` at end of input.
+pub(crate) fn starts_with_lang_directive(bytes: &[u8], pos: usize) -> bool {
+    bytes
+        .get(pos..pos + LANG_DIRECTIVE.len())
+        .is_some_and(|window| window == LANG_DIRECTIVE.as_bytes())
+        && bytes
+            .get(pos + LANG_DIRECTIVE.len())
+            .is_some_and(u8::is_ascii_whitespace)
+}
+
 const fn classify_shared_prefix(
     byte: u8,
     next: Option<u8>,
@@ -465,4 +492,16 @@ const fn classify_quote_prefix(byte: u8, next: Option<u8>) -> Option<ReaderMacro
 
 const fn prefix(semantic: ReaderPrefix, width: usize) -> Option<ReaderMacro> {
     Some(ReaderMacro::Prefix { semantic, width })
+}
+
+/// The language a `#lang` line names, given the line's text.
+///
+/// Lives beside the reader's own directive constants so the parser and the
+/// dialect detector cannot disagree about what counts as one.
+pub(crate) fn lang_directive_language(line: &str) -> Option<&str> {
+    if !starts_with_lang_directive(line.as_bytes(), 0) {
+        return None;
+    }
+    let language = line[LANG_DIRECTIVE.len()..].trim();
+    (!language.is_empty()).then_some(language)
 }
