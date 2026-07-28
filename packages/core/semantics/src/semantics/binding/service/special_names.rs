@@ -35,6 +35,14 @@ impl SpecialNameIndex {
         index
     }
 
+    /// An index that proves every name lexical.
+    ///
+    /// For a dialect with no way to declare a binding special -- Scheme has
+    /// none -- which makes the scan pure cost.
+    pub(super) fn empty() -> Self {
+        Self::default()
+    }
+
     /// Whether `name` is worth asking the real predicate about.
     ///
     /// A miss is a proof of "not special"; a hit proves nothing on its own.
