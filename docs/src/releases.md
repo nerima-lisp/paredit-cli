@@ -23,7 +23,6 @@ Stable — changed only in a major release:
   meanings.
 - **JSON reports.** For a given top-level `schema_version`, documented fields
   keep their names, types, and semantics.
-- **The Rust library API** re-exported from the `paredit_cli` crate root.
 - **The Nix interface**: the `default`, `lint`, `format`, and `format-files`
   packages, the `default`, `lint`, and `format` apps, the `default` overlay,
   and the `mkLintCheck` / `mkFormatCheck` / `treefmtFormatter` helpers
@@ -35,8 +34,14 @@ Not stable — may change in any release, including a patch:
   spacing of `--output text` and of default (non-JSON) reports. Parse
   `--output json` instead.
 - **Diagnostic and error message text** on stderr. Branch on the exit code.
-- **Everything below the crate root**: module paths, internal types, and any
-  item not re-exported from `paredit_cli`.
+- **The Rust library API**, including items re-exported from the `paredit_cli`
+  crate root. The crate sets `publish = false` and is not released to a
+  registry: the supported way to consume `paredit-cli` is the command-line
+  interface, and the library exists to build it. Signatures, error types, and
+  module paths may change in any release. If you depend on the crate through a
+  git tag or revision, pin it exactly and expect to adjust on upgrade —
+  `1.2.0`, for instance, replaced `anyhow::Result` with per-package error
+  enums throughout.
 - **Analysis breadth.** Lint and inspection commands may report *more*
   findings after an upgrade as rules are added or sharpened. Reports are not
   a fixed-size contract; gate on the fields, not on a finding count.

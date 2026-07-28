@@ -20,11 +20,16 @@ diff -u /tmp/prev.json /tmp/next.json
 ```
 
 - **Major** — a stable surface was removed, renamed, or changed meaning: a
-  command path, a flag, an exit code, a documented JSON field, a `paredit_cli`
-  crate-root export, or a Nix output.
+  command path, a flag, an exit code, a documented JSON field, or a Nix output.
 - **Minor** — new commands, flags, fields, lint rules, dialects, or a raised
   MSRV.
 - **Patch** — fixes and text-output changes only.
+
+The Rust library API is deliberately absent from that list. It is not a stable
+surface — see [what `1.x` guarantees](releases.md#what-1x-guarantees) — because
+the crate is `publish = false` and the CLI is the supported interface. A change
+confined to the library, however sweeping, does not on its own force a major
+release.
 
 ## Prepare the release commit
 
