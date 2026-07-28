@@ -212,7 +212,21 @@ fn collect_binding_pattern_name_spans(
                 index += 2;
                 continue;
             }
+            // `:strs`/`:syms` do bind their vector, but a split-out binding
+            // has to keep looking the value up by string or symbol rather
+            // than by keyword, which `BindingEdit::clojure_keys_map` cannot
+            // yet express. Binding them here without that rewrite would
+            // silently change the lookup key, so they stay unrenameable and
+            // report "binding name was not found" instead.
             if matches!(marker, ":strs" | ":syms") {
+                index += 2;
+                continue;
+            }
+            // `:or` only supplies defaults for names bound elsewhere in this
+            // same pattern. Descending into its map bound every such name a
+            // second time, which made `rename-binding` reject the form as
+            // "binding name is ambiguous in the selected form".
+            if marker == ":or" {
                 index += 2;
                 continue;
             }
