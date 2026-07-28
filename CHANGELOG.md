@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The five shallowest dialects — LFE, Fennel, Janet, Hy, and Carp — gain real
+scope analysis, and the dialect capability matrix stops answering "unknown"
+for 99% of its cells.
+
+### Added
+
+- `inspect capabilities --schema-version 3` reports a `dialect_contract` in
+  which every one of the 2750 command/dialect cells is answered. Previously
+  2720 of them said `unknown`. Cells gain a fourth status, `silent`: the
+  command succeeds and reports nothing because it has no rules for that
+  dialect, which is not the same as finding nothing. Roughly 155 of the 275
+  commands are silent outside Common Lisp. Each command also reports the
+  capability `tier` it needs, and a `dialect_depth` array summarises the
+  counts per dialect. Schema versions 1 and 2 keep their three-value
+  vocabulary and fold `silent` onto `unsupported`.
+- Scope and definition shapes for the binding forms these dialects actually
+  use: LFE `flet`/`fletrec`/`match-lambda`/`defrecord`/`defmodule`, Fennel
+  `lambda`/`var`/`with-open` and the `each`/`for`/`collect`/`icollect`/
+  `accumulate`/`fcollect` comprehensions, Janet `var`/`varfn`/`def-`/named
+  `fn`/`each`/`with`/`with-vars`/`with-syms`/`when-let`/`when-with`, Hy
+  `for`/`with`/`defclass`, and Carp `let-do`/`defndynamic`/`deftype`/
+  `definterface`/`defmodule`. Because the rename, introduce-let and
+  extract-function engines are all driven by these shapes, each addition
+  reaches every one of them.
+
+### Fixed
+
+- LFE's clause-style `(defun f ((x) body) ((x y) body))` was read as a single
+  parameter list, so the first clause's body was treated as a parameter and
+  renaming reported an ambiguity that did not exist. Each clause now scopes
+  its own parameters, matching how Clojure's multi-arity `fn` is handled.
+- Renaming a lexical binding in LFE rewrote the head of a call, but LFE
+  resolves call heads in a separate namespace like Common Lisp and Emacs
+  Lisp: `(f 2)` calls the function `f` whatever a surrounding `let` bound.
+- Renaming a binding in Fennel or Hy left member accesses behind, producing
+  code that no longer compiled: renaming `f` in `(with-open [f ...] (f:read))`
+  rewrote the binder and not `f:read`. The leading segment is now rewritten
+  in place. Janet's `file/open` and Carp's `Array.length` are deliberately
+  untouched — those separators namespace a module, not a lexical binding.
+- `refactor rename-at` accepted Common Lisp only, even though the binding
+  search underneath it is dialect-neutral. It now resolves lexical value
+  bindings in all ten dialects; the Common Lisp specializations layered on
+  top (`flet`/`labels`, `macrolet`, `symbol-macrolet`, global callables)
+  remain Common Lisp only.
+- Every report that reads a lambda list — `inspect unused-parameters`,
+  `inspect impact`, `inspect signature` — examined nothing in Fennel while
+  succeeding, because the lambda-list resolver knew `defn` but not Fennel's
+  `fn`. They now check Fennel definitions like every other bracket dialect's.
+
 ## [1.2.1] - 2026-07-28
 
 No command, flag, exit code, or JSON field changed in this release: nothing

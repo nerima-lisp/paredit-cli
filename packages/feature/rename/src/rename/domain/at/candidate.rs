@@ -29,12 +29,22 @@ pub struct SpecializedCandidateContext<'a> {
     pub to: &'a SymbolName,
 }
 
-pub use lexical_value::binding_candidates;
+pub use lexical_value::{BindingCandidateContext, binding_candidates};
 
+/// Adds the candidates that go beyond a lexical value binding.
+///
+/// Every one of these reads Common Lisp operator names — `flet`/`labels`,
+/// `macrolet`, `symbol-macrolet`, and the global callable namespace — so they
+/// are skipped for the other dialects rather than being applied to forms that
+/// merely share a spelling. Those dialects therefore resolve lexical value
+/// bindings only, which the capability matrix reports.
 pub fn add_specialized_candidates(
     output: &mut Vec<Candidate>,
     context: SpecializedCandidateContext<'_>,
 ) -> RenameResult<()> {
+    if context.dialect != Dialect::CommonLisp {
+        return Ok(());
+    }
     global_callable::add(output, &context)?;
     scoped_callable::add_local_function(output, &context)?;
     scoped_callable::add_macro(output, &context)?;

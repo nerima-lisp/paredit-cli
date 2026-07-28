@@ -20,6 +20,45 @@ each with nested `commands` and an `args` array. Every arg entry carries
 `long`, `short`, `kind` (`option`, `flag`, or `positional`), `help`,
 `required`, `repeatable`, `default_values`, and `possible_values`.
 
+## Discover how deep a dialect goes
+
+`--schema-version 3` adds a `dialect_contract`: every command crossed with
+every dialect, so you can tell before invoking anything whether a command
+knows the dialect you are pointing it at.
+
+```sh
+paredit inspect capabilities --schema-version 3
+```
+
+Each cell carries one of four statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `supported` | The command's analysis is implemented for this dialect. |
+| `silent` | **The command succeeds and reports nothing, because it has no rules for this dialect.** An empty report is not a clean bill of health. |
+| `unsupported` | The command refuses and exits non-zero. |
+| `unknown` | Not classified. No cell answers this today. |
+
+`silent` is the one worth reading carefully. Almost every `inspect` command
+exits `0` for every dialect, so a `finding_count` of `0` looks identical
+whether the code is clean or the tool has nothing to say about it. Roughly 155
+of the 275 commands are `silent` outside Common Lisp; treat their output as
+absent rather than negative.
+
+Each command also reports the `tier` it needs from a dialect — `syntax`
+(balanced parens only), `scope` (lexical binder and definition shapes),
+`common-lisp-family` (Common Lisp and Emacs Lisp), or
+`common-lisp-semantics` (the operator, package and CLOS model). A
+`dialect_depth` array summarises the counts per dialect and records whether
+the dialect resolves call heads in a separate namespace, which decides whether
+renaming a local also rewrites `(f x)`.
+
+The statuses are checked against real invocations in the test suite: a cell
+may not claim support for something the command refuses, and a `scope`-tier
+report may not claim support while examining nothing.
+
+Schema versions 1 and 2 predate `silent` and fold it onto `unsupported`.
+
 ## Exit codes
 
 | Code | Meaning |

@@ -14,6 +14,8 @@ enum CapabilitiesSchemaVersion {
     V1,
     #[value(name = "2")]
     V2,
+    #[value(name = "3")]
+    V3,
 }
 
 impl CapabilitiesSchemaVersion {
@@ -21,7 +23,13 @@ impl CapabilitiesSchemaVersion {
         match self {
             Self::V1 => 1,
             Self::V2 => 2,
+            Self::V3 => 3,
         }
+    }
+
+    /// Reports whether this version carries the per-dialect support matrix.
+    const fn includes_dialect_contract(self) -> bool {
+        matches!(self, Self::V2 | Self::V3)
     }
 }
 
@@ -47,8 +55,9 @@ pub(super) fn capabilities(args: CapabilitiesArgs) -> Result<()> {
                 "about": about_text(&root),
                 "commands": subcommand_reports(&root, args.schema_version),
             });
-            if matches!(args.schema_version, CapabilitiesSchemaVersion::V2) {
-                report["dialect_contract"] = super::contract::dialect_contract_report();
+            if args.schema_version.includes_dialect_contract() {
+                report["dialect_contract"] =
+                    super::contract::dialect_contract_report(args.schema_version.number());
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
         }

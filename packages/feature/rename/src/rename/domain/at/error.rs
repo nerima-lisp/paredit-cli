@@ -20,7 +20,7 @@ impl fmt::Display for RenameAtError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::UnsupportedDialect => {
-                "rename-at currently supports Common Lisp, Scheme, and Racket only"
+                "rename-at requires a known dialect; pass --dialect or use a recognized extension"
             }
             Self::InvalidSelection => "--at must select a symbol atom",
             Self::UnsupportedPackageSyntax => {

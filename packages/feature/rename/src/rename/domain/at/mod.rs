@@ -4,7 +4,7 @@ use crate::error::{BindingSelectionError, RenameResult};
 
 use super::reader::executable_reader_context_at_path;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
-use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::dialect::{Dialect, SemanticOperation};
 use paredit_core_syntax::sexpr::{SymbolName, SyntaxTree};
 
 mod candidate;
@@ -13,17 +13,24 @@ mod safety;
 mod selection;
 mod types;
 
-use candidate::{SpecializedCandidateContext, add_specialized_candidates, binding_candidates};
+use candidate::{
+    BindingCandidateContext, SpecializedCandidateContext, add_specialized_candidates,
+    binding_candidates,
+};
 pub use error::RenameAtError;
 use selection::AtomPathIndex;
 pub use types::{RenameAtNamespace, RenameAtPlan, RenameAtRequest};
 
+/// Reports whether `rename-at` can resolve a binding for this dialect.
+///
+/// Every dialect with a verified rename-binding policy qualifies: the lexical
+/// candidate search runs on the dialect-neutral scope shapes. The Common Lisp
+/// specializations layered on top of it — `flet`/`labels`, `macrolet`,
+/// `symbol-macrolet` and global callables — stay Common Lisp only, so for the
+/// other dialects `rename-at` resolves lexical value bindings and nothing else.
 #[must_use]
 pub const fn supports_rename_at_dialect(dialect: Dialect) -> bool {
-    matches!(
-        dialect,
-        Dialect::CommonLisp | Dialect::Scheme | Dialect::Racket
-    )
+    dialect.supports_semantic_operation(SemanticOperation::RenameBinding)
 }
 
 pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan> {
@@ -63,37 +70,35 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan
     let from =
         SymbolName::new(selected.text.to_owned()).map_err(|_| BindingSelectionError::NotASymbol)?;
     let root_view = tree.root_view();
-    let mut candidates = binding_candidates(
-        request.dialect,
-        &tree,
-        &root_view,
+    let mut candidates = binding_candidates(BindingCandidateContext {
+        tree: &tree,
+        dialect: request.dialect,
+        root_view: &root_view,
         atom_paths,
-        request.input,
-        &path,
-        &from,
-        &request.to,
-    )?;
+        input: request.input,
+        path: &path,
+        from: &from,
+        to: &request.to,
+    })?;
     // Every specialized candidate is a Common Lisp construct: a global
     // callable rename that follows `#'`/`function` designators, `flet`/
-    // `macrolet` bindings, and `define-symbol-macro`. Scheme has none of them,
-    // and its single namespace means the lexical candidate above already
-    // covers call sites.
-    if matches!(request.dialect, Dialect::CommonLisp) {
-        add_specialized_candidates(
-            &mut candidates,
-            SpecializedCandidateContext {
-                input: request.input,
-                dialect: request.dialect,
-                tree: &tree,
-                root_view: &root_view,
-                atom_paths,
-                path: &path,
-                selected_span: selected.span,
-                from: &from,
-                to: &request.to,
-            },
-        )?;
-    }
+    // `macrolet` bindings, and `define-symbol-macro`. No other dialect has
+    // them, and a single-namespace dialect's lexical candidate above already
+    // covers call sites. `add_specialized_candidates` enforces that itself.
+    add_specialized_candidates(
+        &mut candidates,
+        SpecializedCandidateContext {
+            input: request.input,
+            dialect: request.dialect,
+            tree: &tree,
+            root_view: &root_view,
+            atom_paths,
+            path: &path,
+            selected_span: selected.span,
+            from: &from,
+            to: &request.to,
+        },
+    )?;
 
     let candidate = match candidates.len() {
         0 => return Err(RenameAtError::Unresolved.into()),

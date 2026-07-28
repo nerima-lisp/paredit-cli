@@ -22,24 +22,20 @@ impl<'a> AtomPathIndex<'a> {
     }
 }
 
-pub fn is_common_lisp_value_position(atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
+/// Whether an occurrence reads the binding a value rename is renaming.
+///
+/// Common Lisp, Emacs Lisp and LFE are Lisp-2s, so head position reads the
+/// *function* namespace and a variable rename must leave it alone. A Lisp-1
+/// has no such split: `(let ((f car)) (f x))` calls the very binding it
+/// introduced, and skipping head position there would rename the definition
+/// while leaving every call site pointing at a name that no longer exists.
+pub fn is_value_position(dialect: Dialect, atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
+    if !dialect.separates_function_namespace() {
+        return true;
+    }
     atom_paths
         .last_index_for_span(span)
         .is_some_and(|index| index != 0)
-}
-
-/// Whether an occurrence reads the binding a value rename is renaming.
-///
-/// Common Lisp is a Lisp-2, so head position reads the *function* namespace
-/// and a variable rename must leave it alone. Scheme is a Lisp-1:
-/// `(let ((f car)) (f x))` calls the very binding it introduced, and skipping
-/// head position there would rename the definition while leaving every call
-/// site pointing at a name that no longer exists.
-pub fn is_value_position(dialect: Dialect, atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
-    match dialect {
-        Dialect::Scheme | Dialect::Racket => true,
-        _ => is_common_lisp_value_position(atom_paths, span),
-    }
 }
 
 pub fn ancestor_views<'a>(

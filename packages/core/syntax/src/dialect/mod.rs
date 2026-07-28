@@ -9,8 +9,8 @@ mod semantic;
 
 pub use semantic::{
     BinderShape, BindingVisibility, BodyShape, DefinitionShape, ExtractFunctionOperation,
-    IntroduceLetOperation, ParameterShape, RelativeNodePath, RenameBindingOperation, ScopeShape,
-    SemanticOperation, UnsupportedSemanticOperation, VerifiedSemanticPolicy,
+    IntroduceLetOperation, NameListArity, ParameterShape, RelativeNodePath, RenameBindingOperation,
+    ScopeShape, SemanticOperation, UnsupportedSemanticOperation, VerifiedSemanticPolicy,
 };
 
 #[cfg(test)]

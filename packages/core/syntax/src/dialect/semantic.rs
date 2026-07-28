@@ -207,6 +207,36 @@ pub enum BindingVisibility {
     Recursive,
 }
 
+/// How many children of a bare-name container are actually binding names.
+///
+/// Iteration forms such as Fennel's `each` put the names first and the value
+/// that drives the loop last, so the count is not always the container length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NameListArity {
+    /// Exactly this many names; every later child drives the form.
+    Exact(usize),
+    /// Every child is a name except this many trailing driver expressions.
+    AllButLast(usize),
+}
+
+impl NameListArity {
+    /// Returns how many of `available` children are binding names, or `None`
+    /// when the container is too short to satisfy the arity.
+    #[must_use]
+    pub const fn name_count(self, available: usize) -> Option<usize> {
+        match self {
+            Self::Exact(count) => {
+                if available >= count {
+                    Some(count)
+                } else {
+                    None
+                }
+            }
+            Self::AllButLast(drivers) => available.checked_sub(drivers),
+        }
+    }
+}
+
 /// Describes where a scope obtains its lexical binders.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinderShape {
@@ -244,6 +274,23 @@ pub enum BinderShape {
         stride: usize,
         /// Visibility of earlier bindings from later initializers.
         visibility: BindingVisibility,
+    },
+    /// Bare binding names in a container, with no per-name initializer.
+    ///
+    /// Fennel's iteration forms use this: `(each [k v (pairs t)] ...)` binds
+    /// `k` and `v`, and the trailing child is the iterator rather than a name.
+    NameList {
+        /// Path to the container holding the names.
+        container: RelativeNodePath,
+        /// Index of the first child in the container that is a name.
+        first_name_index: usize,
+        /// How many children starting at `first_name_index` are names.
+        names: NameListArity,
+    },
+    /// A single bare binding name at a fixed path, as in Janet's `each`.
+    SingleName {
+        /// Path to the bound name.
+        name: RelativeNodePath,
     },
     /// A callable parameter list.
     Parameters(ParameterShape),
@@ -368,6 +415,24 @@ impl DialectSemanticPolicy {
 }
 
 impl Dialect {
+    /// Reports whether this dialect has verified semantics for `operation`.
+    ///
+    /// This is the same decision the `verify_*` factories make, exposed so that
+    /// callers can describe the support matrix without minting a proof token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use paredit_core_syntax::dialect::{Dialect, SemanticOperation};
+    ///
+    /// assert!(Dialect::Fennel.supports_semantic_operation(SemanticOperation::RenameBinding));
+    /// assert!(!Dialect::Unknown.supports_semantic_operation(SemanticOperation::RenameBinding));
+    /// ```
+    #[must_use]
+    pub const fn supports_semantic_operation(self, operation: SemanticOperation) -> bool {
+        DialectSemanticPolicy::new(self).supports(operation)
+    }
+
     /// Verifies that introduce-let has semantic support for this dialect.
     pub fn verify_introduce_let(
         self,
@@ -541,6 +606,44 @@ const SCHEME_SYNTAX_DEFINE: DefinitionShape = DefinitionShape::new(
     None,
     BodyShape::ChildrenFrom(2),
 );
+/// Resolves a definition that names a type-like entity: the head introduces a
+/// name but nothing after it is a lexical binder. Carp's `deftype` and Hy's
+/// `defclass` are of this shape.
+fn named_only(form: &ExpressionView, category: DefinitionCategory) -> Option<DefinitionShape> {
+    (form.children.len() >= 2 && atom_text(form.children.get(1)?).is_some()).then(|| {
+        DefinitionShape::new(
+            category,
+            Some(RelativeNodePath::Child(1)),
+            None,
+            BodyShape::ChildrenFrom(2),
+        )
+    })
+}
+
+/// Resolves a definition whose arities are separate pattern-matching clauses,
+/// as in LFE's `(defun f ((x) body) ((x y) body))`.
+fn clause_definition_shape(
+    form: &ExpressionView,
+    category: DefinitionCategory,
+) -> Option<DefinitionShape> {
+    let clauses = form.children.get(2..)?;
+    (form.children.len() >= 3
+        && atom_text(form.children.get(1)?).is_some()
+        && clauses
+            .iter()
+            .all(|clause| is_arity_clause(clause, Delimiter::Paren)))
+    .then(|| {
+        DefinitionShape::new(
+            category,
+            Some(RelativeNodePath::Child(1)),
+            None,
+            BodyShape::ClauseChildrenFrom {
+                first_clause_index: 2,
+                body_child_index: 1,
+            },
+        )
+    })
+}
 /// `(define-syntax-rule (name pattern ...) template)`: the name sits inside
 /// the pattern list, as it does for a procedure `define`.
 const SCHEME_SYNTAX_RULE_DEFINE: DefinitionShape = DefinitionShape::new(
@@ -581,12 +684,23 @@ fn definition_shape(
         Dialect::EmacsLisp if matches!(head, "defvar" | "defconst" | "defcustom") => {
             direct_variable_shape(form)
         }
+        // LFE `defun`/`defmacro` have two layouts: a single parameter list, or
+        // one pattern-matching clause per arity. Without the clause case the
+        // first clause is read as the parameter list, so `((x) (* x x))` binds
+        // both `x` and `(* x x)` as parameters.
+        // The clause layout is tried first because its first clause is itself a
+        // paren list, so the single-parameter-list reading would accept it and
+        // then treat the clause body as a second parameter.
         Dialect::Lfe if head == "defun" => {
-            direct_callable_shape(form, Delimiter::Paren, DIRECT_FUNCTION)
+            clause_definition_shape(form, DefinitionCategory::Function)
+                .or_else(|| direct_callable_shape(form, Delimiter::Paren, DIRECT_FUNCTION))
         }
         Dialect::Lfe if head == "defmacro" => {
-            direct_callable_shape(form, Delimiter::Paren, DIRECT_MACRO)
+            clause_definition_shape(form, DefinitionCategory::Macro)
+                .or_else(|| direct_callable_shape(form, Delimiter::Paren, DIRECT_MACRO))
         }
+        Dialect::Lfe if head == "defrecord" => named_only(form, DefinitionCategory::Struct),
+        Dialect::Lfe if head == "defmodule" => named_only(form, DefinitionCategory::Package),
         Dialect::Scheme | Dialect::Racket => scheme_definition_shape(form, head),
         Dialect::Clojure | Dialect::Hy if head == "defn" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
@@ -595,25 +709,40 @@ fn definition_shape(
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_MACRO)
         }
         Dialect::Clojure if head == "def" => direct_variable_shape(form),
-        Dialect::Hy if head == "setv" => direct_variable_shape(form),
-        Dialect::Carp if head == "defn" => {
+        Dialect::Hy if matches!(head, "setv" | "setx") => direct_variable_shape(form),
+        Dialect::Hy if head == "defclass" => named_only(form, DefinitionCategory::Class),
+        // Carp splits its dynamic (compile-time) bindings in two: `defdynamic`
+        // names a value, `defndynamic` names a function with a parameter list.
+        Dialect::Carp if matches!(head, "defn" | "defndynamic") => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
         }
-        Dialect::Carp if head == "def" => direct_variable_shape(form),
-        Dialect::Janet if matches!(head, "defn" | "defn-") => {
-            direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
-        }
-        Dialect::Janet if head == "defmacro" => {
+        Dialect::Carp if head == "defmacro" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_MACRO)
         }
-        Dialect::Janet if matches!(head, "def" | "def-") => direct_variable_shape(form),
-        Dialect::Fennel if head == "fn" => {
+        Dialect::Carp if matches!(head, "def" | "defdynamic") => direct_variable_shape(form),
+        Dialect::Carp if head == "deftype" => named_only(form, DefinitionCategory::Struct),
+        Dialect::Carp if head == "defmodule" => named_only(form, DefinitionCategory::Package),
+        Dialect::Carp if head == "definterface" => named_only(form, DefinitionCategory::Other),
+        Dialect::Janet if matches!(head, "defn" | "defn-" | "varfn") => {
+            direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
+        }
+        Dialect::Janet if matches!(head, "defmacro" | "defmacro-") => {
+            direct_callable_shape(form, Delimiter::Bracket, DIRECT_MACRO)
+        }
+        Dialect::Janet if matches!(head, "def" | "def-" | "var" | "var-") => {
+            direct_variable_shape(form)
+        }
+        // Fennel's `fn` and `lambda` are the same layout; `lambda` (and its
+        // `λ` spelling) only adds runtime arity checks.
+        Dialect::Fennel if matches!(head, "fn" | "lambda" | "λ") => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
         }
         Dialect::Fennel if head == "macro" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_MACRO)
         }
-        Dialect::Fennel if matches!(head, "local" | "global") => direct_variable_shape(form),
+        Dialect::Fennel if matches!(head, "local" | "global" | "var") => {
+            direct_variable_shape(form)
+        }
         Dialect::Unknown
         | Dialect::CommonLisp
         | Dialect::EmacsLisp
@@ -742,6 +871,43 @@ const LIST_LET_STAR_SCOPE: ScopeShape =
     ScopeShape::new(LIST_BINDINGS_SEQUENTIAL, BodyShape::ChildrenFrom(2));
 const FLAT_LET_SCOPE: ScopeShape =
     ScopeShape::new(FLAT_BINDINGS_SEQUENTIAL, BodyShape::ChildrenFrom(2));
+/// Every child of the binder container is a name, as in Janet's
+/// `(with-syms [a b] ...)`.
+const BARE_NAMES_SCOPE: ScopeShape = ScopeShape::new(
+    BinderShape::NameList {
+        container: RelativeNodePath::Child(1),
+        first_name_index: 0,
+        names: NameListArity::AllButLast(0),
+    },
+    BodyShape::ChildrenFrom(2),
+);
+/// Names first, one trailing expression driving the form, as in Fennel's
+/// `(each [k v (pairs t)] ...)`.
+const ITERATOR_DRIVEN_SCOPE: ScopeShape = ScopeShape::new(
+    BinderShape::NameList {
+        container: RelativeNodePath::Child(1),
+        first_name_index: 0,
+        names: NameListArity::AllButLast(1),
+    },
+    BodyShape::ChildrenFrom(2),
+);
+/// One name followed by numeric range expressions, as in Fennel's
+/// `(for [i 1 10] ...)`.
+const RANGE_DRIVEN_SCOPE: ScopeShape = ScopeShape::new(
+    BinderShape::NameList {
+        container: RelativeNodePath::Child(1),
+        first_name_index: 0,
+        names: NameListArity::Exact(1),
+    },
+    BodyShape::ChildrenFrom(2),
+);
+/// A bare name, the collection it walks, then the body: Janet's `each`.
+const SINGLE_NAME_ITERATION_SCOPE: ScopeShape = ScopeShape::new(
+    BinderShape::SingleName {
+        name: RelativeNodePath::Child(1),
+    },
+    BodyShape::ChildrenFrom(3),
+);
 const SCHEME_NAMED_LET_SCOPE: ScopeShape = ScopeShape::new(
     BinderShape::NamedBindingList {
         scope_name: RelativeNodePath::Child(1),
@@ -778,19 +944,47 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         Dialect::Lfe if head == "lambda" => {
             parameter_scope(form, Delimiter::Paren, PARAMETER_SCOPE)
         }
+        Dialect::Lfe if head == "match-lambda" => clause_scope(form, None, 1, Delimiter::Paren),
+        // Each clause of a pattern-matching `defun`/`defmacro` scopes its own
+        // parameters, which a single form-relative parameter list cannot say.
+        Dialect::Lfe if matches!(head, "defun" | "defmacro") => (form.children.len() >= 3
+            && atom_text(form.children.get(1)?).is_some())
+        .then(|| clause_scope(form, Some(RelativeNodePath::Child(1)), 2, Delimiter::Paren))
+        .flatten(),
         Dialect::Scheme | Dialect::Racket => scheme_scope_shape(form, head),
         Dialect::Clojure if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
         Dialect::Clojure if head == "fn" => clojure_fn_scope(form),
-        Dialect::Hy if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
+        // Hy's `for` and `with` take the same bracketed `name value` pairs as
+        // its `let`, so all three share the flat-pair layout.
+        Dialect::Hy if matches!(head, "let" | "for" | "with") => flat_scope(form, FLAT_LET_SCOPE),
         Dialect::Hy if head == "fn" => parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE),
-        Dialect::Carp if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
+        Dialect::Carp if matches!(head, "let" | "let-do") => flat_scope(form, FLAT_LET_SCOPE),
         Dialect::Carp if head == "fn" => parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE),
-        Dialect::Janet if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
-        Dialect::Janet if head == "fn" => {
-            parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE)
+        // Janet's resource and conditional binding forms all take one bracketed
+        // `name value` pair list. `if-let`/`if-with` are deliberately absent:
+        // their else branch is outside the binding's scope, which this shape
+        // vocabulary cannot express.
+        Dialect::Janet
+            if matches!(
+                head,
+                "let" | "with" | "with-vars" | "when-let" | "when-with"
+            ) =>
+        {
+            flat_scope(form, FLAT_LET_SCOPE)
         }
-        Dialect::Fennel if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
-        Dialect::Fennel if head == "fn" => {
+        Dialect::Janet if head == "with-syms" => bare_name_scope(form),
+        Dialect::Janet if head == "each" => single_name_scope(form),
+        Dialect::Janet if head == "fn" => janet_fn_scope(form),
+        Dialect::Fennel if matches!(head, "let" | "with-open") => flat_scope(form, FLAT_LET_SCOPE),
+        // Fennel's comprehensions bind leading names and take the value that
+        // drives them as the last child of the same bracket.
+        Dialect::Fennel if matches!(head, "each" | "collect" | "icollect" | "accumulate") => {
+            iteration_scope(form, ITERATOR_DRIVEN_SCOPE)
+        }
+        Dialect::Fennel if matches!(head, "for" | "fcollect") => {
+            iteration_scope(form, RANGE_DRIVEN_SCOPE)
+        }
+        Dialect::Fennel if matches!(head, "fn" | "lambda" | "λ") => {
             parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE)
         }
         Dialect::Unknown
@@ -967,6 +1161,88 @@ fn parameter_scope(
         .then_some(shape)
 }
 
+/// Resolves a scope whose binder container holds only bare names.
+fn bare_name_scope(form: &ExpressionView) -> Option<ScopeShape> {
+    let names = form.children.get(1)?;
+    (form.children.len() >= 3
+        && is_plain_list(names, Delimiter::Bracket)
+        && !names.children.is_empty()
+        && names.children.iter().all(|name| atom_text(name).is_some()))
+    .then_some(BARE_NAMES_SCOPE)
+}
+
+/// Resolves a scope that binds names at the front of its container and takes
+/// the remaining children as the expressions driving the iteration.
+fn iteration_scope(form: &ExpressionView, shape: ScopeShape) -> Option<ScopeShape> {
+    let BinderShape::NameList { names, .. } = shape.binders() else {
+        return None;
+    };
+    let container = form.children.get(1)?;
+    if form.children.len() < 3 || !is_plain_list(container, Delimiter::Bracket) {
+        return None;
+    }
+    let name_count = names.name_count(container.children.len())?;
+    (name_count > 0
+        && container
+            .children
+            .iter()
+            .take(name_count)
+            .all(|name| atom_text(name).is_some()))
+    .then_some(shape)
+}
+
+/// Resolves a scope that binds one bare name ahead of the value it walks.
+fn single_name_scope(form: &ExpressionView) -> Option<ScopeShape> {
+    (form.children.len() >= 4 && atom_text(form.children.get(1)?).is_some())
+        .then_some(SINGLE_NAME_ITERATION_SCOPE)
+}
+
+/// Resolves Janet's `fn`, whose name is optional: `(fn [x] x)` and
+/// `(fn named [x] x)` are both valid.
+fn janet_fn_scope(form: &ExpressionView) -> Option<ScopeShape> {
+    let first = form.children.get(1)?;
+    if is_plain_list(first, Delimiter::Bracket) {
+        return parameter_scope(form, Delimiter::Bracket, PARAMETER_SCOPE);
+    }
+
+    (form.children.len() >= 4
+        && atom_text(first).is_some()
+        && is_plain_list(form.children.get(2)?, Delimiter::Bracket))
+    .then_some(ScopeShape::new(
+        BinderShape::NamedParameters {
+            name: RelativeNodePath::Child(1),
+            parameters: ParameterShape::new(RelativeNodePath::Child(2), 0),
+        },
+        BodyShape::ChildrenFrom(3),
+    ))
+}
+
+/// Resolves a form whose arities are separate pattern-matching clauses, as in
+/// LFE's `match-lambda` and its clause-style `defun`.
+fn clause_scope(
+    form: &ExpressionView,
+    name: Option<RelativeNodePath>,
+    first_clause_index: usize,
+    parameter_delimiter: Delimiter,
+) -> Option<ScopeShape> {
+    let clauses = form.children.get(first_clause_index..)?;
+    (!clauses.is_empty()
+        && clauses
+            .iter()
+            .all(|clause| is_arity_clause(clause, parameter_delimiter)))
+    .then_some(ScopeShape::new(
+        BinderShape::ParameterClauses {
+            name,
+            first_clause_index,
+            parameters: ParameterShape::new(RelativeNodePath::Child(0), 0),
+        },
+        BodyShape::ClauseChildrenFrom {
+            first_clause_index,
+            body_child_index: 1,
+        },
+    ))
+}
+
 fn clojure_fn_scope(form: &ExpressionView) -> Option<ScopeShape> {
     let first = form.children.get(1)?;
     let (name, first_shape_index) = if atom_text(first).is_some() {
@@ -992,7 +1268,11 @@ fn clojure_fn_scope(form: &ExpressionView) -> Option<ScopeShape> {
     }
 
     let clauses = &form.children[first_shape_index..];
-    if clauses.is_empty() || !clauses.iter().all(valid_clojure_arity_clause) {
+    if clauses.is_empty()
+        || !clauses
+            .iter()
+            .all(|clause| is_arity_clause(clause, Delimiter::Bracket))
+    {
         return None;
     }
 
@@ -1009,13 +1289,16 @@ fn clojure_fn_scope(form: &ExpressionView) -> Option<ScopeShape> {
     ))
 }
 
-fn valid_clojure_arity_clause(clause: &ExpressionView) -> bool {
+/// Reports whether a form is one arity clause: a parameter list followed by at
+/// least one body form. Clojure spells the parameter list with brackets and
+/// LFE with parens, so the delimiter is the caller's decision.
+fn is_arity_clause(clause: &ExpressionView, parameter_delimiter: Delimiter) -> bool {
     is_plain_list(clause, Delimiter::Paren)
         && clause.children.len() >= 2
         && clause
             .children
             .first()
-            .is_some_and(|parameters| is_plain_list(parameters, Delimiter::Bracket))
+            .is_some_and(|parameters| is_plain_list(parameters, parameter_delimiter))
 }
 
 fn form_head(form: &ExpressionView) -> Option<&str> {
@@ -1264,6 +1547,184 @@ mod tests {
             assert_eq!(
                 DialectSemanticPolicy::new(dialect).definition_shape(&form),
                 None,
+                "{dialect:?}: {source}"
+            );
+        }
+    }
+
+    #[test]
+    fn lfe_clause_defun_scopes_each_clause_instead_of_reading_one_parameter_list() {
+        let policy = DialectSemanticPolicy::new(Dialect::Lfe);
+        let clauses = parsed_form("(defun f ((x) (* x x)) ((x y) (* x y)))", Dialect::Lfe);
+
+        // Read as a single parameter list, `((x) (* x x))` would bind both `(x)`
+        // and `(* x x)` as parameters and swallow the first clause's body.
+        assert_eq!(
+            policy.scope_shape(&clauses),
+            Some(ScopeShape::new(
+                BinderShape::ParameterClauses {
+                    name: Some(RelativeNodePath::Child(1)),
+                    first_clause_index: 2,
+                    parameters: ParameterShape::new(RelativeNodePath::Child(0), 0),
+                },
+                BodyShape::ClauseChildrenFrom {
+                    first_clause_index: 2,
+                    body_child_index: 1,
+                },
+            ))
+        );
+
+        // A single parameter list is still read as one, not as a clause.
+        let direct = parsed_form("(defun f (x) (* x x))", Dialect::Lfe);
+        assert_eq!(policy.scope_shape(&direct), None);
+        assert_eq!(
+            policy.definition_shape(&direct).map(DefinitionShape::body),
+            Some(BodyShape::ChildrenFrom(3))
+        );
+    }
+
+    #[test]
+    fn fennel_iteration_forms_bind_leading_names_and_leave_the_driver_alone() {
+        let policy = DialectSemanticPolicy::new(Dialect::Fennel);
+        let cases = [
+            ("(each [k v (pairs t)] k)", NameListArity::AllButLast(1)),
+            (
+                "(icollect [_ v (ipairs t)] v)",
+                NameListArity::AllButLast(1),
+            ),
+            (
+                "(accumulate [a 0 _ v (ipairs t)] a)",
+                NameListArity::AllButLast(1),
+            ),
+            ("(for [i 1 10] i)", NameListArity::Exact(1)),
+            ("(fcollect [i 1 10] i)", NameListArity::Exact(1)),
+        ];
+
+        for (source, names) in cases {
+            let form = parsed_form(source, Dialect::Fennel);
+            assert_eq!(
+                policy.scope_shape(&form).map(ScopeShape::binders),
+                Some(BinderShape::NameList {
+                    container: RelativeNodePath::Child(1),
+                    first_name_index: 0,
+                    names,
+                }),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn name_list_arity_reports_how_many_children_are_names() {
+        assert_eq!(NameListArity::Exact(1).name_count(3), Some(1));
+        assert_eq!(NameListArity::Exact(3).name_count(2), None);
+        assert_eq!(NameListArity::AllButLast(1).name_count(3), Some(2));
+        assert_eq!(NameListArity::AllButLast(1).name_count(0), None);
+        assert_eq!(NameListArity::AllButLast(0).name_count(2), Some(2));
+    }
+
+    #[test]
+    fn shallow_dialect_scopes_resolve_for_their_own_binding_vocabulary() {
+        let cases = [
+            (Dialect::Janet, "(each x xs x)"),
+            (Dialect::Janet, "(with [f (file/open \"a\")] f)"),
+            (Dialect::Janet, "(when-let [x 1] x)"),
+            (Dialect::Janet, "(with-syms [a b] a)"),
+            (Dialect::Janet, "(fn named [x] x)"),
+            (Dialect::Hy, "(for [x xs] x)"),
+            (Dialect::Hy, "(with [f (open \"a\")] f)"),
+            (Dialect::Carp, "(let-do [x 1] x)"),
+            (Dialect::Fennel, "(with-open [f (io.open \"a\")] f)"),
+            (Dialect::Fennel, "(lambda [x] x)"),
+            (Dialect::Lfe, "(match-lambda ((x) x))"),
+        ];
+
+        for (dialect, source) in cases {
+            let form = parsed_form(source, dialect);
+            assert!(
+                DialectSemanticPolicy::new(dialect)
+                    .scope_shape(&form)
+                    .is_some(),
+                "{dialect:?}: {source}"
+            );
+        }
+    }
+
+    #[test]
+    fn shallow_dialect_scope_resolvers_fail_closed_on_malformed_forms() {
+        let cases = [
+            // Janet's `if-let` is deliberately absent: its else branch sits
+            // outside the binding's scope, which this vocabulary cannot say.
+            (Dialect::Janet, "(if-let [x 1] x 2)"),
+            (Dialect::Janet, "(each x)"),
+            (Dialect::Janet, "(with-syms [(a)] a)"),
+            (Dialect::Janet, "(fn named)"),
+            (Dialect::Fennel, "(each [(pairs t)] 1)"),
+            (Dialect::Fennel, "(for [] 1)"),
+            (Dialect::Fennel, "(each [k v (pairs t)])"),
+            (Dialect::Lfe, "(match-lambda (x))"),
+        ];
+
+        for (dialect, source) in cases {
+            let form = parsed_form(source, dialect);
+            assert_eq!(
+                DialectSemanticPolicy::new(dialect).scope_shape(&form),
+                None,
+                "{dialect:?}: {source}"
+            );
+        }
+    }
+
+    #[test]
+    fn shallow_dialect_definitions_carry_their_own_categories() {
+        let cases = [
+            (
+                Dialect::Lfe,
+                "(defrecord point x y)",
+                DefinitionCategory::Struct,
+            ),
+            (
+                Dialect::Carp,
+                "(deftype T [a Int])",
+                DefinitionCategory::Struct,
+            ),
+            (
+                Dialect::Carp,
+                "(defmodule M (def x 1))",
+                DefinitionCategory::Package,
+            ),
+            (
+                Dialect::Carp,
+                "(definterface f (Fn [a] a))",
+                DefinitionCategory::Other,
+            ),
+            (
+                Dialect::Carp,
+                "(defndynamic f [x] x)",
+                DefinitionCategory::Function,
+            ),
+            (Dialect::Hy, "(defclass C [] 1)", DefinitionCategory::Class),
+            (
+                Dialect::Janet,
+                "(varfn f [x] x)",
+                DefinitionCategory::Function,
+            ),
+            (Dialect::Janet, "(var x 1)", DefinitionCategory::Variable),
+            (
+                Dialect::Fennel,
+                "(lambda f [x] x)",
+                DefinitionCategory::Function,
+            ),
+            (Dialect::Fennel, "(var x 1)", DefinitionCategory::Variable),
+        ];
+
+        for (dialect, source, category) in cases {
+            let form = parsed_form(source, dialect);
+            assert_eq!(
+                DialectSemanticPolicy::new(dialect)
+                    .definition_shape(&form)
+                    .map(DefinitionShape::category),
+                Some(category),
                 "{dialect:?}: {source}"
             );
         }

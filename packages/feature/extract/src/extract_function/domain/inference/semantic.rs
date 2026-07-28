@@ -1,6 +1,6 @@
 use paredit_core_syntax::dialect::{
-    BinderShape, BindingVisibility, BodyShape, DefinitionShape, Dialect, ParameterShape,
-    RelativeNodePath, ScopeShape,
+    BinderShape, BindingVisibility, BodyShape, DefinitionShape, Dialect, NameListArity,
+    ParameterShape, RelativeNodePath, ScopeShape,
 };
 use paredit_core_syntax::sexpr::ExpressionView;
 
@@ -80,6 +80,30 @@ fn collect_scope(
             container,
             Some(scope_name),
             visibility,
+            scope.body(),
+            explicit_params,
+            bound_params,
+            params,
+        ),
+        BinderShape::NameList {
+            container,
+            first_name_index,
+            names,
+        } => collect_name_list_scope(
+            semantic,
+            view,
+            container,
+            first_name_index,
+            names,
+            scope.body(),
+            explicit_params,
+            bound_params,
+            params,
+        ),
+        BinderShape::SingleName { name } => collect_single_name_scope(
+            semantic,
+            view,
+            name,
             scope.body(),
             explicit_params,
             bound_params,
@@ -223,6 +247,116 @@ fn extend_with_binding_names(
     for entry in entries {
         extend_with_names(semantic, bound_params, &entry.names);
     }
+}
+
+/// Collects free variables across a binder that names the front of a container
+/// and drives itself with the rest, as Fennel's `each` and `for` do. The driver
+/// expressions are evaluated before the names exist, so they see only the
+/// enclosing bindings.
+#[allow(clippy::too_many_arguments)]
+fn collect_name_list_scope(
+    semantic: ExtractFunctionSemantic,
+    view: &ExpressionView,
+    container_path: RelativeNodePath,
+    first_name_index: usize,
+    names: NameListArity,
+    body: BodyShape,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) {
+    let Some(container) = resolve_relative(view, container_path) else {
+        return;
+    };
+    let Some(name_count) = container
+        .children
+        .len()
+        .checked_sub(first_name_index)
+        .and_then(|available| names.name_count(available))
+    else {
+        return;
+    };
+
+    for driver in container
+        .children
+        .iter()
+        .skip(first_name_index + name_count)
+    {
+        collect_inferred_extract_function_params(
+            semantic,
+            driver,
+            false,
+            explicit_params,
+            bound_params,
+            params,
+        );
+    }
+
+    let mut body_bound_params = bound_params.to_vec();
+    for name in container
+        .children
+        .iter()
+        .skip(first_name_index)
+        .take(name_count)
+    {
+        extend_with_pattern(semantic, &mut body_bound_params, name);
+    }
+
+    collect_body(
+        semantic,
+        view,
+        body,
+        explicit_params,
+        &body_bound_params,
+        params,
+    );
+}
+
+/// Collects free variables across a binder that names one value ahead of the
+/// collection it walks, as Janet's `each` does.
+#[allow(clippy::too_many_arguments)]
+fn collect_single_name_scope(
+    semantic: ExtractFunctionSemantic,
+    view: &ExpressionView,
+    name_path: RelativeNodePath,
+    body: BodyShape,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) {
+    let Some(name) = resolve_relative(view, name_path) else {
+        return;
+    };
+    let BodyShape::ChildrenFrom(body_start) = body else {
+        return;
+    };
+
+    for driver in view
+        .children
+        .iter()
+        .take(body_start)
+        .skip(name_path.child() + 1)
+    {
+        collect_inferred_extract_function_params(
+            semantic,
+            driver,
+            false,
+            explicit_params,
+            bound_params,
+            params,
+        );
+    }
+
+    let mut body_bound_params = bound_params.to_vec();
+    extend_with_pattern(semantic, &mut body_bound_params, name);
+    collect_body(
+        semantic,
+        view,
+        body,
+        explicit_params,
+        &body_bound_params,
+        params,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
