@@ -84,6 +84,10 @@ model, a binding table, nine lint rules, and a per-file report.
   ordinary user symbols, and both resolved to the `let` special form. Symbol
   identity in the binding table is likewise exact, so `(let ((x 1)) X)` no
   longer attributes a reference to `x`.
+- An Emacs Lisp script's `#!/usr/bin/emacs --script` header is read as a
+  comment instead of failing the parse with an unsupported reader dispatch.
+  Emacs skips that line the same way; reading it rather than stripping it
+  keeps every byte offset after it unchanged.
 - `Dialect::EmacsLisp.is_definition_head` recognizes the forms the dialect
   actually has — `defsubst`, `define-inline`, `cl-defsubst`, `cl-defstruct`,
   `defvar-local`, `defvar-keymap`, `defface`, `defalias`, `define-error`,

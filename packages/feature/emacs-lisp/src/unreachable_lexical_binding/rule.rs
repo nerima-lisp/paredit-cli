@@ -74,13 +74,19 @@ impl LintRule for Rule {
 }
 
 /// The byte just past the line whose header Emacs would read.
+///
+/// That is line 1, or line 2 when line 1 is a `#!` script header — the same
+/// exception `emacs_lisp_file_header` applies, and it has to match: a setting
+/// this function still counts as "below the header" would be reported as
+/// unreachable while Emacs was reading it.
 fn header_line_end(source: &str) -> usize {
-    let mut end = source.find('\n').map_or(source.len(), |index| index + 1);
-    if source.starts_with("#!") {
-        end += source
-            .get(end..)
-            .and_then(|rest| rest.find('\n'))
-            .map_or(source.get(end..).map_or(0, str::len), |index| index + 1);
+    let lines = if source.starts_with("#!") { 2 } else { 1 };
+    let mut end = 0;
+    for _ in 0..lines {
+        match source[end..].find('\n') {
+            Some(index) => end += index + 1,
+            None => return source.len(),
+        }
     }
     end
 }

@@ -78,6 +78,13 @@ impl DialectReaderPolicy {
             {
                 Some(LANG_DIRECTIVE.len())
             }
+            // An Emacs Lisp script starts `#!/usr/bin/emacs --script`, and
+            // Emacs skips that line the way it skips a comment. Reading it as
+            // one keeps the byte offsets of everything after it unchanged,
+            // which stripping the line would not; and restricting it to
+            // offset 0 keeps a stray `#!` anywhere else the reader error it
+            // has always been.
+            Dialect::EmacsLisp if pos == 0 && bytes.starts_with(b"#!") => Some(2),
             _ => None,
         }
     }

@@ -131,6 +131,14 @@ fn a_lexical_binding_setting_below_the_first_line_is_reported_as_unreachable() {
 }
 
 #[test]
+fn a_shebang_defers_the_header_to_line_two_for_this_rule_too() {
+    // The header Emacs reads is on line 2 here, so the rule must not report
+    // the very setting that is working.
+    let source = "#!/usr/bin/emacs --script\n                  ;;; -*- lexical-binding: t -*-\n                  (defun f () nil)\n";
+    assert_eq!(rules_for_file(source), [] as [&str; 0]);
+}
+
+#[test]
 fn prose_mentioning_lexical_binding_is_not_a_setting() {
     let source = ";;; f.el --- x -*- lexical-binding: t -*-\n\
                   ;; This file needs lexical-binding to be enabled.\n\

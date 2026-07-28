@@ -366,3 +366,25 @@ fn known_control_forms_evaluate_their_subforms_where_they_are_written() {
     let binding = EmacsLispOperator::from_head("let").expect("let");
     assert!(!binding.evaluates_subforms_in_place());
 }
+
+#[test]
+fn a_script_shebang_is_read_as_a_comment() {
+    // `#!/usr/bin/emacs --script` is how an Emacs Lisp script begins, and
+    // Emacs skips that line. Reading it as a comment rather than stripping it
+    // keeps every byte offset after it unchanged.
+    let tree = parse("#!/usr/bin/emacs --script\n(defun f () nil)\n");
+    let root = tree.root_view();
+
+    assert_eq!(root.children.len(), 1);
+    assert_eq!(
+        root.children[0].span.start().get(),
+        "#!/usr/bin/emacs --script\n".len()
+    );
+}
+
+#[test]
+fn a_hash_bang_anywhere_else_is_still_a_reader_error() {
+    // Only the script header is a comment; `#!` is not Emacs Lisp syntax, so
+    // one in the middle of a file must not be silently swallowed.
+    assert!(SyntaxTree::parse_with_dialect("(f)\n#!oops\n", Dialect::EmacsLisp).is_err());
+}
