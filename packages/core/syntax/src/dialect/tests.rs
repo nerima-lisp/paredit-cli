@@ -1,6 +1,7 @@
 use crate::common_lisp::{
-    CommonLispLetBindingForm, CommonLispLocalCallableForm, CommonLispPackageDeclarationForm,
-    CommonLispRuntimeDependencyForm, CommonLispValueScopeForm, CommonLispVariableBindingForm,
+    CommonLispBindingRefactorForm, CommonLispLetBindingForm, CommonLispLocalCallableForm,
+    CommonLispPackageDeclarationForm, CommonLispRuntimeDependencyForm, CommonLispValueScopeForm,
+    CommonLispVariableBindingForm,
 };
 
 use super::Dialect;
@@ -195,15 +196,26 @@ fn exposes_extract_function_value_scope_capability_by_dialect() {
             CommonLispLetBindingForm::Parallel
         ))
     );
+    // Clojure `let` is sequential, never parallel: `(let [x 1 y (inc x)] y)`
+    // is legal and `y`'s initializer sees `x`. Reporting Parallel here would
+    // contradict `DialectSemanticPolicy::scope_shape`, which models the same
+    // form as FLAT_BINDINGS_SEQUENTIAL.
     assert_eq!(
         Dialect::Clojure.common_lisp_value_scope_form_for_head("let"),
         Some(CommonLispValueScopeForm::Let(
-            CommonLispLetBindingForm::Parallel
+            CommonLispLetBindingForm::Sequential
         ))
     );
     assert_eq!(
         Dialect::Clojure.common_lisp_value_scope_form_for_head("fn"),
         Some(CommonLispValueScopeForm::FunctionLiteral)
+    );
+    // Hy and Carp keep the parallel model; only Clojure moved.
+    assert_eq!(
+        Dialect::Hy.common_lisp_value_scope_form_for_head("let"),
+        Some(CommonLispValueScopeForm::Let(
+            CommonLispLetBindingForm::Parallel
+        ))
     );
     assert_eq!(
         Dialect::Clojure.common_lisp_value_scope_form_for_head("do"),
@@ -332,4 +344,90 @@ fn an_explicit_dialect_and_a_decisive_extension_both_outrank_the_directive() {
         Dialect::detect_in_source(Some(std::path::Path::new("core.lisp")), None, source),
         Dialect::CommonLisp
     );
+}
+
+#[test]
+fn clojure_definition_capabilities_come_from_the_clojure_operator_table() {
+    // `defn-` is `clojure.core/defn-`, not a Janet or Hy import: the outline
+    // and definition reports missed every private helper while it was absent.
+    assert!(Dialect::Clojure.is_definition_head("defn-"));
+    assert!(Dialect::Clojure.supports_function_parameter_refactor_head("defn-"));
+    assert!(Dialect::Clojure.supports_inline_function_refactor_head("defn-"));
+
+    for head in [
+        "ns",
+        "in-ns",
+        "def",
+        "defonce",
+        "declare",
+        "defn",
+        "defmacro",
+        "defmulti",
+        "defmethod",
+        "defprotocol",
+        "definterface",
+        "defrecord",
+        "deftype",
+        "defstruct",
+        "deftest",
+    ] {
+        assert!(Dialect::Clojure.is_definition_head(head), "head {head}");
+    }
+
+    // A `defmethod` carries its parameter vector after the dispatch value, so
+    // it belongs in the parameter refactor set even though it is not inlinable.
+    assert!(Dialect::Clojure.supports_function_parameter_refactor_head("defmethod"));
+    assert!(!Dialect::Clojure.supports_inline_function_refactor_head("defmethod"));
+    assert!(!Dialect::Clojure.supports_inline_function_refactor_head("defmacro"));
+
+    // Heads belonging to neighbouring bracket dialects stay foreign.
+    assert!(!Dialect::Clojure.is_definition_head("defun"));
+    assert!(!Dialect::Clojure.is_definition_head("setv"));
+    assert!(!Dialect::Clojure.is_definition_head("def-"));
+    assert!(!Dialect::Clojure.is_definition_head("defmodule"));
+
+    // A core form may be written fully qualified.
+    assert!(Dialect::Clojure.is_definition_head("clojure.core/defn"));
+    assert!(!Dialect::Clojure.is_definition_head("my.ns/defn"));
+}
+
+#[test]
+fn clojure_let_is_reported_as_sequential_at_every_capability_layer() {
+    // `(let [x 1 y (inc x)] y)` is legal Clojure and `y`'s initializer sees
+    // `x`; there is no parallel `let` in the language. Both capability
+    // accessors must say so, or they contradict
+    // `DialectSemanticPolicy::scope_shape`'s FLAT_BINDINGS_SEQUENTIAL.
+    assert_eq!(
+        Dialect::Clojure.common_lisp_value_scope_form_for_head("let"),
+        Some(CommonLispValueScopeForm::Let(
+            CommonLispLetBindingForm::Sequential
+        ))
+    );
+    assert_eq!(
+        Dialect::Clojure.common_lisp_binding_refactor_form_for_head("let"),
+        Some(CommonLispBindingRefactorForm::Let(
+            CommonLispLetBindingForm::Sequential
+        ))
+    );
+
+    // Sibling bracket dialects are untouched by that correction.
+    for dialect in [Dialect::Hy, Dialect::Carp, Dialect::Janet, Dialect::Fennel] {
+        assert_eq!(
+            dialect.common_lisp_binding_refactor_form_for_head("let"),
+            Some(CommonLispBindingRefactorForm::Let(
+                CommonLispLetBindingForm::Parallel
+            )),
+            "{dialect:?}"
+        );
+    }
+    assert_eq!(
+        Dialect::Clojure.common_lisp_binding_refactor_form_for_head("fn"),
+        Some(CommonLispBindingRefactorForm::LambdaLike)
+    );
+
+    // Only `let` is an inline-let target; the other sequential binding forms
+    // Clojure has (`loop`, `when-let`, ...) are not plain lets.
+    assert!(Dialect::Clojure.supports_inline_let_refactor_head("let"));
+    assert!(!Dialect::Clojure.supports_inline_let_refactor_head("loop"));
+    assert!(!Dialect::Clojure.supports_inline_let_refactor_head("when-let"));
 }

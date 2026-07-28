@@ -320,6 +320,16 @@ pub fn local_callable_bindings_child_index(
 }
 
 pub fn let_star_bindings_child_index(dialect: Dialect, view: &ExpressionView) -> Option<usize> {
+    // The sequential-bindings walker treats every child of the container as a
+    // `(name value)` entry. A bracket container holds a flat `[name value
+    // ...]` vector instead, so claiming it here would walk binding names as
+    // if they were entries and lose the shadowing analysis of any nested
+    // scope inside an initializer. Decline and let the generic child walk
+    // handle it, as it did before Clojure `let` was reported as sequential.
+    if view.children.get(1)?.delimiter == Some(Delimiter::Bracket) {
+        return None;
+    }
+
     matches!(
         dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
         Some(CommonLispValueScopeForm::Let(form)) if form.is_sequential()

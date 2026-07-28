@@ -47,6 +47,82 @@ fn property_generated_formatter_output_is_parseable_and_stable() {
     }
 }
 
+/// Every Clojure layout has to survive a reparse unchanged.
+///
+/// This matters more than it does for Common Lisp, because several Clojure
+/// layouts decide their head-line width from the tree's shape rather than from
+/// the head alone: whether `defn`'s name is followed by a parameter vector,
+/// whether `fn` carries a self-reference name, and how `^meta` descriptors group
+/// with the form they decorate. Every one of those decisions has to read the
+/// same way on the formatter's own output as it did on the original source.
+#[test]
+fn property_generated_clojure_formatter_output_is_parseable_and_stable() {
+    let heads = [
+        "defn",
+        "defn-",
+        "defmacro",
+        "fn",
+        "let",
+        "loop",
+        "doseq",
+        "letfn",
+        "->",
+        "->>",
+        "as->",
+        "some->",
+        "cond",
+        "case",
+        "condp",
+        "ns",
+        "def",
+        "defonce",
+        "defrecord",
+        "deftype",
+        "defmethod",
+        "defprotocol",
+        "do",
+        "try",
+        "comment",
+        "when",
+        "when-let",
+        "if",
+        "if-let",
+        "doto",
+        // An ordinary call, which must keep the general layout.
+        "process-batch",
+    ];
+    let bodies = [
+        "",
+        " [alpha beta]",
+        " [alpha beta] (one alpha)",
+        " name [alpha beta] (one alpha) (two beta)",
+        " \"docstring\" {:added \"1.0\"} [alpha beta] (one alpha) (two beta)",
+        " ([alpha] (one alpha)) ([alpha beta] (two alpha beta))",
+        " item (one item) other (two other) :else (three)",
+        " ^:private ^:const tagged [alpha] (one alpha)",
+        " [alpha (a) beta (b) gamma (c)] (one alpha) (two beta)",
+        " value (alpha 1) (beta 2) (gamma 3)",
+    ];
+
+    let formatter = Formatter::with_dialect(2, Dialect::Clojure);
+    for head in heads {
+        for body in bodies {
+            let input = format!("({head}{body})\n");
+            let tree = SyntaxTree::parse_with_dialect(&input, Dialect::Clojure)
+                .expect("generated input parses");
+            let formatted = formatter.format(&tree);
+            let reparsed = SyntaxTree::parse_with_dialect(&formatted, Dialect::Clojure)
+                .expect("formatted output parses again");
+
+            assert_eq!(
+                formatter.format(&reparsed),
+                formatted,
+                "Clojure formatter output must be stable after reparsing {input:?}"
+            );
+        }
+    }
+}
+
 #[test]
 fn property_generated_rename_preserves_parse_and_atom_spans() {
     for index in 0..64 {

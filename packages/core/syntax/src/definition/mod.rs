@@ -456,7 +456,8 @@ mod tests {
             Dialect::Scheme,
             "define-syntax"
         ));
-        assert!(!is_macro_expander_definition(Dialect::Clojure, "defmacro"));
+        assert!(is_macro_expander_definition(Dialect::Clojure, "defmacro"));
+        assert!(!is_macro_expander_definition(Dialect::Clojure, "defn"));
     }
 
     #[test]
@@ -562,7 +563,9 @@ mod tests {
             (Dialect::Scheme, "defn"),
             (Dialect::Fennel, "defconst"),
             (Dialect::EmacsLisp, "ns"),
-            (Dialect::Clojure, "defn-"),
+            // `defn-` is NOT foreign to Clojure: it is `clojure.core/defn-`.
+            (Dialect::Clojure, "defun"),
+            (Dialect::Clojure, "setv"),
             (Dialect::Janet, "defrecord"),
         ] {
             assert_eq!(
