@@ -825,7 +825,7 @@ fn cli_lint_list_rules_marks_fixability() {
 
     let fixable_count = rules.iter().filter(|r| r["fixable"] == true).count();
     assert_eq!(
-        fixable_count, 91,
+        fixable_count, 92,
         "the fixable rules the default preset admits"
     );
 

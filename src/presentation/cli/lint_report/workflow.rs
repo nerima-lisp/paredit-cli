@@ -1222,6 +1222,12 @@ mod tests {
     /// can actually produce a fix for. Each line below is the minimal trigger
     /// for one fixable rule; a non-fixable trigger (`if-arity`) is included to
     /// prove no stray fix leaks in.
+    ///
+    /// Two fixtures, because a rule declares the dialects it applies to and the
+    /// dispatcher skips one whose scope excludes the file's: an Emacs Lisp rule
+    /// can only be triggered by an Emacs Lisp file, and asking a Common Lisp
+    /// fixture to cover one would fail for a reason that has nothing to do with
+    /// the fix engine.
     #[test]
     fn fixable_rules_match_the_fix_engine() {
         let source = concat!(
@@ -1318,21 +1324,30 @@ mod tests {
             "(code-char 65)\n",        // ascii-code-char
             "(if a b c d)\n",          // if-arity — NOT fixable
         );
-        let tree =
-            crate::domain::sexpr::SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)
-                .expect("parse fixture");
-        let active: Vec<&str> = RULES.to_vec();
-        let fixes = collect_lint_fixes(
-            &PathBuf::from("fixture.lisp"),
-            Dialect::CommonLisp,
-            &tree,
-            source,
-            &active,
-            &RuleSettings::new(),
-        )
-        .expect("collect fixes");
+        // The Emacs Lisp half. Its rules declare `Dialect::EmacsLisp` only, so
+        // they never see the fixture above.
+        let elisp_source = ";;; -*- lexical-binding: t -*-\n(mapcar '(lambda (x) x) xs)\n";
 
-        let produced: BTreeSet<&str> = fixes.keys().map(|(rule, _, _)| *rule).collect();
+        let active: Vec<&str> = RULES.to_vec();
+        let mut produced: BTreeSet<&str> = BTreeSet::new();
+        for (text, dialect, name) in [
+            (source, Dialect::CommonLisp, "fixture.lisp"),
+            (elisp_source, Dialect::EmacsLisp, "fixture.el"),
+        ] {
+            let tree = crate::domain::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
+                .expect("parse fixture");
+            let fixes = collect_lint_fixes(
+                &PathBuf::from(name),
+                dialect,
+                &tree,
+                text,
+                &active,
+                &RuleSettings::new(),
+            )
+            .expect("collect fixes");
+            produced.extend(fixes.keys().map(|(rule, _, _)| *rule));
+        }
+
         let declared: BTreeSet<&str> = FIXABLE_RULES.iter().copied().collect();
         assert_eq!(
             produced, declared,

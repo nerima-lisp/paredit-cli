@@ -94,7 +94,7 @@
     },
     {
       "category": "suspicious",
-      "fixable": false,
+      "fixable": true,
       "id": "elisp-quoted-lambda/d01b8b8f281f7655/0",
       "message": "a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope",
       "path": "emacs-lisp.el",

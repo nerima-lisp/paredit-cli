@@ -18,7 +18,7 @@
 
 (defun fixture-quoted-lambda ()
   "Return a list that looks like a function."
-  '(lambda (n) n))
+  (lambda (n) n))
 
 (defun fixture-condition-case ()
   "Catch nothing at all."

@@ -3085,12 +3085,18 @@
               }
             },
             {
+              "fullDescription": {
+                "text": "`(quote (lambda …))` is a list whose first element is the symbol `lambda`. Under `lexical-binding: t` it captures nothing, so any variable its body reads from the enclosing scope is unbound when it runs — and the byte compiler cannot compile it."
+              },
               "id": "elisp-quoted-lambda",
               "properties": {
                 "category": "suspicious",
-                "fixable": false,
+                "fixable": true,
+                "rationale": "`(quote (lambda …))` is a list whose first element is the symbol `lambda`. Under `lexical-binding: t` it captures nothing, so any variable its body reads from the enclosing scope is unbound when it runs — and the byte compiler cannot compile it.",
                 "severity": "error",
-                "tags": []
+                "tags": [
+                  "destructive"
+                ]
               },
               "shortDescription": {
                 "text": "a quoted lambda, which is a list rather than a closure under lexical binding"
