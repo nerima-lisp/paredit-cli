@@ -67,7 +67,15 @@ impl DialectReaderPolicy {
             // Consuming it as a line comment keeps it in the trivia, so it
             // survives a format round-trip; `Dialect::detect` reads it
             // separately to decide which language the file is in.
-            Dialect::Scheme | Dialect::Racket if starts_with_lang_directive(bytes, pos) => {
+            //
+            // The `byte == b'#'` guard is not redundant. `is_atom_boundary`
+            // calls this once per byte of every atom in the file, so without
+            // it each of those bytes would pay a bounds check and a five-byte
+            // comparison. `head_index` records what a per-token cost on this
+            // path did to the lint benchmark.
+            Dialect::Scheme | Dialect::Racket
+                if byte == b'#' && starts_with_lang_directive(bytes, pos) =>
+            {
                 Some(LANG_DIRECTIVE.len())
             }
             _ => None,
