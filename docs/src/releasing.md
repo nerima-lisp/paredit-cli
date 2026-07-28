@@ -36,8 +36,19 @@ release.
 1. Set the new version in `Cargo.toml`.
 2. Refresh `Cargo.lock` (`cargo update --workspace --offline`, or any build)
    so the recorded `paredit-cli` version matches.
-3. Update the documentation for anything the release changes.
-4. Commit as `chore(release): vX.Y.Z`.
+3. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`. This is not
+   optional: the "Extract release notes" step in `release.yml` builds the
+   GitHub release body by running an `awk` script over this file, and it fails
+   the workflow if the section for the pushed tag is missing or empty. The
+   heading must match `## [X.Y.Z] - YYYY-MM-DD` exactly — the script matches it
+   literally, so a malformed heading yields an empty body rather than an error.
+4. Update the documentation for anything the release changes, including the
+   `vX.Y.Z` in the install examples in `installation.md` and `releases.md`.
+5. Commit as `chore(release): vX.Y.Z`.
+
+`nix flake check` verifies steps 1–4: `compatibility_contract` runs
+`release.yml`'s real `awk` script against the real `CHANGELOG.md`, so a missing
+section fails the gate rather than the tag push.
 
 ## Verify the release candidate
 
