@@ -4,10 +4,10 @@ use anyhow::Result;
 use serde_json::json;
 
 use crate::application::usecase::dependency_report::DependencyKind;
-use crate::presentation::cli::args::OutputFormat;
+use crate::presentation::cli::OutputFormat;
 use crate::presentation::cli::dependency_report::types::DependencyReportFile;
 
-pub(super) fn print_dependency_report(
+pub fn print_dependency_report(
     reports: &[DependencyReportFile],
     output: OutputFormat,
 ) -> Result<()> {

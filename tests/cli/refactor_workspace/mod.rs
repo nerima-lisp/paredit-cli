@@ -16,5 +16,5 @@ fn write_fixture(path: &Path, contents: &str) {
         fs::create_dir_all(parent).expect("create fixture parent dir");
     }
 
-    fs::write(path, contents).expect("write fixture")
+    fs::write(path, contents).expect("write fixture");
 }

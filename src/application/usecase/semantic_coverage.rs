@@ -12,12 +12,22 @@
 //! [`crate::application::usecase::similarity_report`]: this module only knows
 //! how to turn bytes into a report, not how paths become files.
 
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::domain::dialect::Dialect;
-use crate::domain::semantics::binding::{Binding, BindingKind, build_binding_table};
-use crate::domain::semantics::value::{build_value_table, evaluate_constant};
-use crate::domain::sexpr::{ExpressionKind, SyntaxTree};
+use crate::domain::semantics::binding::{
+    Binding, BindingKind, BindingTable, OpacityCauseKind, build_binding_table,
+};
+use crate::domain::semantics::project::GlobalTable;
+use crate::domain::semantics::project::service::{
+    FilePackages, ProjectFile, build_global_table, resolve_file_packages,
+};
+use crate::domain::semantics::value::{
+    ProjectConstants, ValueTable, build_value_table, build_value_table_in_project,
+    evaluate_constant,
+};
+use crate::domain::sexpr::{ByteSpan, ExpressionKind, SyntaxTree};
 use crate::domain::view_query::for_each_subview;
 
 /// The files to measure. Discovery (walking directories, filtering
@@ -61,6 +71,7 @@ pub enum SemanticCoverageProcessingStage {
 }
 
 impl SemanticCoverageProcessingStage {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Read => "read",
@@ -115,53 +126,144 @@ pub enum BindingNonResolutionReason {
     Special,
     /// The binder gave it no initial form to propagate.
     NoInitialForm,
-    /// Every other condition held, but the initial form itself did not fold
-    /// to a known value (an unregistered operator, unresolved sub-reference,
-    /// or an unfoldable literal like a string or a float).
+    /// Every other condition held, but the initial form did not fold at all —
+    /// an unregistered operator or an unresolved sub-reference.
     InitialFormNotConstant,
+    /// The initial form folded to a `Known` value that cannot be substituted
+    /// for a reference: a string, whose contents are mutable through
+    /// `(setf (char s 0) …)`, or a float, whose printed form is not its value.
+    ///
+    /// Split out from [`Self::InitialFormNotConstant`] because it is a
+    /// deliberate refusal rather than a gap in the folder. Widening the folder
+    /// would not move a single binding out of this bucket, so counting the two
+    /// together would misdirect the next round of work.
+    InitialFormNotPropagatable,
+}
+
+/// One opaque region, as a corpus histogram counts them.
+///
+/// The split is the whole point of the histogram: only an unregistered *name*
+/// is something a transparency-table entry could ever remove. Quoted data and
+/// reader dispatch are structural — no table entry makes them readable — so
+/// they are counted apart rather than crowding the ranking of heads worth
+/// looking at.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OpacityCauseLabel {
+    /// The head that no table registered, case-folded the way Common Lisp
+    /// reads symbols. The package prefix is kept: `app:helper` and `helper`
+    /// are different names.
+    UnknownHead(String),
+    /// A region no name could describe.
+    Structural(OpacityCauseKind),
+}
+
+impl OpacityCauseLabel {
+    #[must_use]
+    pub fn display(&self) -> String {
+        match self {
+            Self::UnknownHead(head) => head.clone(),
+            Self::Structural(kind) => format!("<{}>", kind.label()),
+        }
+    }
 }
 
 /// A count of unresolved `Variable` bindings, broken down by the first
 /// disqualifying fact about each one.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BindingNonResolutionBreakdown {
     reassigned: usize,
     opaque_scope: usize,
     special: usize,
     no_initial_form: usize,
     initial_form_not_constant: usize,
+    initial_form_not_propagatable: usize,
+    opacity_causes: BTreeMap<OpacityCauseLabel, usize>,
+    uninitialized_binders: BTreeMap<Option<String>, usize>,
 }
 
 impl BindingNonResolutionBreakdown {
+    #[must_use]
     pub const fn reassigned(&self) -> usize {
         self.reassigned
     }
 
+    #[must_use]
     pub const fn opaque_scope(&self) -> usize {
         self.opaque_scope
     }
 
+    #[must_use]
     pub const fn special(&self) -> usize {
         self.special
     }
 
+    #[must_use]
     pub const fn no_initial_form(&self) -> usize {
         self.no_initial_form
     }
 
+    #[must_use]
     pub const fn initial_form_not_constant(&self) -> usize {
         self.initial_form_not_constant
     }
 
+    #[must_use]
+    pub const fn initial_form_not_propagatable(&self) -> usize {
+        self.initial_form_not_propagatable
+    }
+
+    /// What made each opaque scope opaque, counted once per binding.
+    ///
+    /// The counts sum to [`Self::opaque_scope`]: every binding contributes the
+    /// first cause recorded for it and no more, so a head's count reads as
+    /// "bindings this form alone is blocking", not "times the form appears".
+    #[must_use]
+    pub const fn opacity_causes(&self) -> &BTreeMap<OpacityCauseLabel, usize> {
+        &self.opacity_causes
+    }
+
+    /// Which binder left each uninitialized binding without a value.
+    ///
+    /// Separates the structural ceiling from a real gap: a `defun` parameter
+    /// has no initial form because a caller supplies it, and no amount of
+    /// analysis changes that, whereas a `let` with no value form is ordinary
+    /// code the layer simply declines to follow.
+    ///
+    /// `None` keys a binding with no binding operator at all — a definition's
+    /// own name — rather than a made-up head, so "recognized with no binder"
+    /// stays distinguishable from "bound by a form literally named that".
+    #[must_use]
+    pub const fn uninitialized_binders(&self) -> &BTreeMap<Option<String>, usize> {
+        &self.uninitialized_binders
+    }
+
+    /// [`Self::opacity_causes`] with the largest counts first.
+    ///
+    /// Ties break on the label so two runs over the same corpus print the same
+    /// ranking: a measurement whose output reorders between runs cannot be
+    /// diffed, which is most of what this harness is for.
+    #[must_use]
+    pub fn ranked_opacity_causes(&self) -> Vec<(&OpacityCauseLabel, usize)> {
+        rank(&self.opacity_causes)
+    }
+
+    /// [`Self::uninitialized_binders`] with the largest counts first.
+    #[must_use]
+    pub fn ranked_uninitialized_binders(&self) -> Vec<(&Option<String>, usize)> {
+        rank(&self.uninitialized_binders)
+    }
+
+    #[must_use]
     pub const fn total(&self) -> usize {
         self.reassigned
             + self.opaque_scope
             + self.special
             + self.no_initial_form
             + self.initial_form_not_constant
+            + self.initial_form_not_propagatable
     }
 
-    fn record(&mut self, reason: BindingNonResolutionReason) {
+    const fn record(&mut self, reason: BindingNonResolutionReason) {
         match reason {
             BindingNonResolutionReason::Reassigned => self.reassigned += 1,
             BindingNonResolutionReason::OpaqueScope => self.opaque_scope += 1,
@@ -170,7 +272,21 @@ impl BindingNonResolutionBreakdown {
             BindingNonResolutionReason::InitialFormNotConstant => {
                 self.initial_form_not_constant += 1;
             }
+            BindingNonResolutionReason::InitialFormNotPropagatable => {
+                self.initial_form_not_propagatable += 1;
+            }
         }
+    }
+
+    fn record_opacity_cause(&mut self, label: OpacityCauseLabel) {
+        *self.opacity_causes.entry(label).or_default() += 1;
+    }
+
+    fn record_uninitialized_binder(&mut self, head: Option<&str>) {
+        *self
+            .uninitialized_binders
+            .entry(head.map(str::to_ascii_lowercase))
+            .or_default() += 1;
     }
 
     fn merge(&mut self, other: &Self) {
@@ -179,7 +295,21 @@ impl BindingNonResolutionBreakdown {
         self.special += other.special;
         self.no_initial_form += other.no_initial_form;
         self.initial_form_not_constant += other.initial_form_not_constant;
+        self.initial_form_not_propagatable += other.initial_form_not_propagatable;
+        for (label, count) in &other.opacity_causes {
+            *self.opacity_causes.entry(label.clone()).or_default() += count;
+        }
+        for (head, count) in &other.uninitialized_binders {
+            *self.uninitialized_binders.entry(head.clone()).or_default() += count;
+        }
     }
+}
+
+/// Orders a histogram by descending count, breaking ties on the key.
+fn rank<K: Ord>(counts: &BTreeMap<K, usize>) -> Vec<(&K, usize)> {
+    let mut ranked: Vec<(&K, usize)> = counts.iter().map(|(key, count)| (key, *count)).collect();
+    ranked.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(right.0)));
+    ranked
 }
 
 /// What the semantic layer resolved in one file.
@@ -194,6 +324,7 @@ pub struct SemanticCoverageFileReport {
 }
 
 impl SemanticCoverageFileReport {
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -201,25 +332,30 @@ impl SemanticCoverageFileReport {
     /// Every `Variable`-kind binding the binding table recorded. Function,
     /// macro, symbol-macro, and slot bindings are out of scope: only a
     /// variable's *value* is something the value table resolves.
+    #[must_use]
     pub const fn variable_binding_count(&self) -> usize {
         self.variable_binding_count
     }
 
     /// How many of those the value table gave a constant value.
+    #[must_use]
     pub const fn resolved_binding_count(&self) -> usize {
         self.resolved_binding_count
     }
 
     /// Every `(...)` list expression in the file, at any nesting depth.
+    #[must_use]
     pub const fn list_expression_count(&self) -> usize {
         self.list_expression_count
     }
 
     /// How many of those `evaluate_constant` folded to `Known`.
+    #[must_use]
     pub const fn known_list_expression_count(&self) -> usize {
         self.known_list_expression_count
     }
 
+    #[must_use]
     pub const fn non_resolution(&self) -> &BindingNonResolutionBreakdown {
         &self.non_resolution
     }
@@ -233,6 +369,7 @@ pub struct SemanticCoverageReport {
 }
 
 impl SemanticCoverageReport {
+    #[must_use]
     pub fn files(&self) -> &[SemanticCoverageFileReport] {
         &self.files
     }
@@ -240,6 +377,7 @@ impl SemanticCoverageReport {
     /// Files the source discovered but could not be read, decoded, or
     /// parsed. Measurement continues over the rest: a corpus with a handful
     /// of unreadable files should not lose every other file's numbers.
+    #[must_use]
     pub fn errors(&self) -> &[SemanticCoverageFileError] {
         &self.errors
     }
@@ -272,6 +410,7 @@ impl SemanticCoverageReport {
             .sum()
     }
 
+    #[must_use]
     pub fn total_non_resolution(&self) -> BindingNonResolutionBreakdown {
         let mut total = BindingNonResolutionBreakdown::default();
         for file in &self.files {
@@ -289,22 +428,50 @@ pub fn build_semantic_coverage_report(
         .discover(&request)
         .map_err(SemanticCoverageWorkflowError::Source)?;
 
-    let mut files = Vec::with_capacity(inventory.files.len());
+    let mut loaded = Vec::with_capacity(inventory.files.len());
     let mut errors = Vec::new();
     for file in &inventory.files {
-        match measure_file(source, file) {
-            Ok(report) => files.push(report),
+        match load_file(source, file) {
+            Ok(file) => loaded.push(file),
             Err(error) => errors.push(error),
         }
     }
 
+    // The project table is what makes a `defconstant` visible to a file that
+    // does not define it, and building it needs every file analysed first —
+    // which is the whole reason discovery and measurement are separate passes
+    // here. Analysis *order* does not matter: the table carries a value only
+    // for a constant defined exactly once project-wide, and "exactly once" is
+    // the same however the files are visited.
+    let project_files: Vec<ProjectFile<'_>> = loaded
+        .iter()
+        .map(|file| ProjectFile::new(&file.tree, &file.packages, &file.values))
+        .collect();
+    let globals = build_global_table(Dialect::CommonLisp, &project_files);
+
+    let files = loaded
+        .iter()
+        .map(|file| measure_file(file, &globals))
+        .collect();
+
     Ok(SemanticCoverageReport { files, errors })
 }
 
-fn measure_file(
+/// One file, parsed and analysed on its own, before any project context
+/// exists to widen it.
+struct LoadedFile {
+    path: PathBuf,
+    text: String,
+    tree: SyntaxTree,
+    bindings: BindingTable,
+    packages: FilePackages,
+    values: ValueTable,
+}
+
+fn load_file(
     source: &impl SemanticCoverageSourcePort,
     file: &DiscoveredSemanticCoverageFile,
-) -> Result<SemanticCoverageFileReport, SemanticCoverageFileError> {
+) -> Result<LoadedFile, SemanticCoverageFileError> {
     let bytes = source.load(file).map_err(|message| {
         file_error(&file.path, SemanticCoverageProcessingStage::Read, message)
     })?;
@@ -325,11 +492,46 @@ fn measure_file(
 
     let bindings = build_binding_table(Dialect::CommonLisp, &tree, &text);
     let values = build_value_table(Dialect::CommonLisp, &tree, &bindings);
+    let packages = resolve_file_packages(Dialect::CommonLisp, &tree);
+
+    Ok(LoadedFile {
+        path: file.path.clone(),
+        text,
+        tree,
+        bindings,
+        packages,
+        values,
+    })
+}
+
+/// Measures one already-loaded file, this time with the project's constants
+/// available to it.
+///
+/// The value table is rebuilt rather than reused: the one computed during
+/// loading exists only to tell the project table what this file *defines*, and
+/// measuring what the file can *see* is a different question. A development
+/// harness can afford the second pass; nothing on the lint path does this.
+fn measure_file(file: &LoadedFile, globals: &GlobalTable) -> SemanticCoverageFileReport {
+    let LoadedFile {
+        text,
+        tree,
+        bindings,
+        packages,
+        ..
+    } = file;
+    let project = ProjectConstants::new(globals, packages);
+    let values = build_value_table_in_project(Dialect::CommonLisp, tree, bindings, Some(&project));
 
     let mut report = SemanticCoverageFileReport {
         path: file.path.clone(),
         ..SemanticCoverageFileReport::default()
     };
+
+    // Initial forms whose fold outcome decides between "did not fold" and
+    // "folded to something unpropagatable". Answering that needs the *view*
+    // at the span, which only the traversal below has, so the question is
+    // parked here and settled there.
+    let mut pending_initial_forms: HashMap<ByteSpan, usize> = HashMap::new();
 
     for (id, binding) in bindings.bindings() {
         if binding.kind() != BindingKind::Variable {
@@ -338,29 +540,77 @@ fn measure_file(
         report.variable_binding_count += 1;
         if values.binding_value(id).is_some() {
             report.resolved_binding_count += 1;
-        } else {
-            report
-                .non_resolution
-                .record(classify_non_resolution(binding));
+            continue;
+        }
+
+        match classify_non_resolution(binding) {
+            BindingNonResolutionReason::OpaqueScope => {
+                report
+                    .non_resolution
+                    .record(BindingNonResolutionReason::OpaqueScope);
+                report
+                    .non_resolution
+                    .record_opacity_cause(opacity_cause_label(binding, text));
+            }
+            BindingNonResolutionReason::NoInitialForm => {
+                report
+                    .non_resolution
+                    .record(BindingNonResolutionReason::NoInitialForm);
+                report
+                    .non_resolution
+                    .record_uninitialized_binder(binding.binder_head());
+            }
+            BindingNonResolutionReason::InitialFormNotConstant => {
+                // Deferred: counted once the traversal has folded the form.
+                let span = binding
+                    .init_form()
+                    .expect("the classifier reached this arm only with an initial form");
+                *pending_initial_forms.entry(span).or_default() += 1;
+            }
+            reason => report.non_resolution.record(reason),
         }
     }
 
     let document = tree.root_view();
+    let mut folded_initial_forms: HashSet<ByteSpan> = HashSet::new();
     for_each_subview(&document, |view| {
+        if pending_initial_forms.contains_key(&view.span)
+            && evaluate_constant(Dialect::CommonLisp, view, bindings, &values).is_known()
+        {
+            folded_initial_forms.insert(view.span);
+        }
+
         if view.kind != ExpressionKind::List {
             return;
         }
         report.list_expression_count += 1;
-        if evaluate_constant(Dialect::CommonLisp, view, &bindings, &values).is_known() {
+        if evaluate_constant(Dialect::CommonLisp, view, bindings, &values).is_known() {
             report.known_list_expression_count += 1;
         }
     });
 
-    Ok(report)
+    for (span, count) in pending_initial_forms {
+        // A `Known` fold that still did not reach the binding means the value
+        // exists but refuses to travel — a string or a float.
+        let reason = if folded_initial_forms.contains(&span) {
+            BindingNonResolutionReason::InitialFormNotPropagatable
+        } else {
+            BindingNonResolutionReason::InitialFormNotConstant
+        };
+        for _ in 0..count {
+            report.non_resolution.record(reason);
+        }
+    }
+
+    report
 }
 
 /// Classifies an unresolved `Variable` binding by the first disqualifying
 /// fact, in the same order `Binding::is_propagatable` checks them.
+///
+/// [`BindingNonResolutionReason::InitialFormNotPropagatable`] is never
+/// returned here: telling it from `InitialFormNotConstant` needs the initial
+/// form folded, which the caller does.
 fn classify_non_resolution(binding: &Binding) -> BindingNonResolutionReason {
     if !binding.assignments().is_empty() {
         BindingNonResolutionReason::Reassigned
@@ -372,6 +622,30 @@ fn classify_non_resolution(binding: &Binding) -> BindingNonResolutionReason {
         BindingNonResolutionReason::NoInitialForm
     } else {
         BindingNonResolutionReason::InitialFormNotConstant
+    }
+}
+
+/// Names the region that cost an opaque binding its transparency.
+///
+/// The binding table records the site as a span rather than a name, so the
+/// name is sliced back out here — the harness is the one caller that wants
+/// text, and it is holding the source those spans index into.
+fn opacity_cause_label(binding: &Binding, text: &str) -> OpacityCauseLabel {
+    let Some(cause) = binding.opacity_cause() else {
+        // The table marks a scope opaque and records why in the same call, so
+        // this is unreachable; classifying it as unknown-head would invent a
+        // name, and inventing evidence is the one thing this measurement must
+        // not do.
+        return OpacityCauseLabel::Structural(OpacityCauseKind::UnreadableHead);
+    };
+    match cause.kind() {
+        OpacityCauseKind::UnknownHead => text
+            .get(cause.site().start().get()..cause.site().end().get())
+            .map_or_else(
+                || OpacityCauseLabel::Structural(OpacityCauseKind::UnreadableHead),
+                |head| OpacityCauseLabel::UnknownHead(head.to_ascii_lowercase()),
+            ),
+        kind => OpacityCauseLabel::Structural(kind),
     }
 }
 

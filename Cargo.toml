@@ -1,7 +1,8 @@
 [package]
 name = "paredit-cli"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
+publish = false
 rust-version = "1.85"
 license = "MIT"
 description = "Structure-editing CLI for safe S-expression refactoring by AI coding agents"
@@ -21,6 +22,32 @@ lto = "fat"
 codegen-units = 1
 
 [dependencies]
+# Extracted core packages (Phase 1 onwards).
+paredit-core-syntax = { path = "packages/core/syntax" }
+paredit-core-semantics = { path = "packages/core/semantics" }
+paredit-core-edit = { path = "packages/core/edit" }
+paredit-core-lint-engine = { path = "packages/core/lint-engine" }
+paredit-core-cli = { path = "packages/core/cli" }
+paredit-feature-similarity = { path = "packages/feature/similarity" }
+paredit-feature-extract = { path = "packages/feature/extract" }
+paredit-feature-inline = { path = "packages/feature/inline" }
+paredit-feature-form-transform = { path = "packages/feature/form-transform" }
+paredit-core-workspace = { path = "packages/core/workspace" }
+
+paredit-feature-binding = { path = "packages/feature/binding" }
+paredit-feature-function-parameter = { path = "packages/feature/function-parameter" }
+paredit-feature-package = { path = "packages/feature/package" }
+paredit-feature-remove-unused = { path = "packages/feature/remove-unused" }
+paredit-feature-rename = { path = "packages/feature/rename" }
+paredit-feature-project-analysis = { path = "packages/feature/project-analysis" }
+paredit-feature-refactor-workflow = { path = "packages/feature/refactor-workflow" }
+paredit-feature-lint-string-char = { path = "packages/feature/lint-string-char" }
+paredit-feature-lint-control-flow = { path = "packages/feature/lint-control-flow" }
+paredit-feature-lint-numeric = { path = "packages/feature/lint-numeric" }
+paredit-feature-lint-sequence = { path = "packages/feature/lint-sequence" }
+paredit-feature-lint-conditional = { path = "packages/feature/lint-conditional" }
+paredit-feature-lint-form-shape = { path = "packages/feature/lint-form-shape" }
+paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"
@@ -47,9 +74,68 @@ harness = false
 name = "lint_report"
 harness = false
 
-[lints.rust]
+# Inherited from [workspace.lints] below, so the root package and every
+# packages/*/* member are governed by one definition. A member that omits
+# `[lints] workspace = true` silently loses `unsafe_code = "deny"` without any
+# error, which is why a contract test checks every member for it.
+[lints]
+workspace = true
+
+# The workspace sections are deliberately placed after [package].
+# .github/workflows/release.yml reads the crate version with
+#   sed -n 's/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -n1
+# which takes the first column-0 `version =` line in the file. Keeping
+# [package] first means that line stays the package version even though
+# [workspace.package] declares one too. A contract test asserts the two agree,
+# so a one-sided bump cannot ship a mismatched tag.
+[workspace]
+# Must stay a wildcard. crane cannot resolve sources for an omitted member, and
+# an explicit list silently drops any package added without editing this line.
+# Note that Cargo rejects a glob matching nothing, so this line can only exist
+# while at least one packages/*/* member does.
+members = ["packages/*/*"]
+
+# Required, not cosmetic. This workspace has a root package, so a bare
+# `cargo test` / `cargo nextest run` would otherwise build only the root and
+# silently skip every member's unit tests - 272 of them at the first
+# extraction, with no warning and a green result. flake.nix invokes nextest
+# without `--workspace`, so the default member set is what CI actually runs.
+default-members = [".", "packages/*/*"]
+
+[workspace.package]
+version = "1.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/nerima-lisp/paredit-cli"
+
+# Single source of truth for dependency versions, so 26 members cannot drift
+# apart. Verify with `cargo tree --duplicates` when adding one.
+[workspace.dependencies]
+anyhow = "1.0"
+blake3 = "1.8"
+cap-std = "4.0"
+clap = { version = "4.6", features = ["derive"] }
+clap_complete = "4.5"
+libc = "0.2"
+serde_json = "1.0"
+thiserror = "2.0"
+xattr = "1.6"
+# dev-dependencies shared with members
+proptest = "1.11"
+
+[workspace.lints.rust]
 unsafe_code = "deny"
 missing_debug_implementations = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 all = "warn"
+# Individually promoted after Phase -1 cleared every existing occurrence.
+# `clippy::pedantic` is deliberately NOT enabled wholesale: it also carries
+# lints this project rejects, such as `needless_pass_by_value`.
+must_use_candidate = "warn"
+semicolon_if_nothing_returned = "warn"
+uninlined_format_args = "warn"
+# Nursery lint, kept because it guards the `const fn` signatures added in
+# Phase -1. Its two cfg-dependent false positives carry a local `allow`.
+missing_const_for_fn = "warn"

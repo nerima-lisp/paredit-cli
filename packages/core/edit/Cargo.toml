@@ -1,0 +1,26 @@
+[package]
+name = "paredit-core-edit"
+description = "Refactor plans, previews, mutation safety, and binding-form edits"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../syntax" }
+paredit-core-semantics = { path = "../semantics" }
+# No anyhow. The 107 refusals here normalise to 64 shapes, 59% of them
+# repeated across seven edit families with only the operation name differing;
+# EditRefusal carries `operation` instead. See src/error.rs.
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

@@ -58,19 +58,27 @@ fn refactor_manifest_round_trip_has_no_dialect_agnostic_parse_calls() {
     let sources = [
         (
             "preview",
-            include_str!("../../../src/presentation/cli/refactor/workflow/preview/build.rs"),
+            include_str!(
+                "../../../packages/feature/refactor-workflow/src/refactor/cli/workflow/preview/build.rs"
+            ),
         ),
         (
             "check",
-            include_str!("../../../src/presentation/cli/refactor/manifest/check.rs"),
+            include_str!(
+                "../../../packages/feature/refactor-workflow/src/refactor/cli/manifest/check.rs"
+            ),
         ),
         (
             "diff",
-            include_str!("../../../src/presentation/cli/refactor/workflow/manifest/diff.rs"),
+            include_str!(
+                "../../../packages/feature/refactor-workflow/src/refactor/cli/workflow/manifest/diff.rs"
+            ),
         ),
         (
             "apply",
-            include_str!("../../../src/presentation/cli/refactor/workflow/manifest/apply.rs"),
+            include_str!(
+                "../../../packages/feature/refactor-workflow/src/refactor/cli/workflow/manifest/apply.rs"
+            ),
         ),
     ];
 

@@ -74,10 +74,12 @@ pub struct UnusedParameterReportPolicyOptions {
 }
 
 impl UnusedParameterReportPolicyOptions {
-    pub fn new(fail_on_unused: bool) -> Self {
+    #[must_use]
+    pub const fn new(fail_on_unused: bool) -> Self {
         Self { fail_on_unused }
     }
 
+    #[must_use]
     pub const fn fail_on_unused(self) -> bool {
         self.fail_on_unused
     }
@@ -169,6 +171,7 @@ pub fn build_unused_parameter_report(
     })
 }
 
+#[must_use]
 pub fn evaluate_unused_parameter_policy(
     options: UnusedParameterReportPolicyOptions,
     reports: &[UnusedParameterReportFile],

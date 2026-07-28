@@ -1,0 +1,41 @@
+use anyhow::Result;
+
+use crate::identity_arithmetic::cli::args::IdentityArithmeticReportArgs;
+use crate::identity_arithmetic::cli::render::print_identity_arithmetic_report;
+use crate::identity_arithmetic::usecase::{
+    IdentityArithmeticPolicyOptions, collect_identity_arithmetic,
+    evaluate_identity_arithmetic_policy, summarize_identity_arithmetic,
+};
+use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
+
+pub fn identity_arithmetic_report(args: IdentityArithmeticReportArgs) -> Result<()> {
+    let files = expand_input_files(&args.files, args.dialect)?;
+
+    let mut arithmetic_form_count = 0;
+    let mut violations = Vec::new();
+
+    for file in &files {
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let (file_form_count, file_violations) = collect_identity_arithmetic(file, dialect, &tree)?;
+        arithmetic_form_count += file_form_count;
+        violations.extend(file_violations);
+    }
+
+    let summary = summarize_identity_arithmetic(arithmetic_form_count, violations);
+    let policy = evaluate_identity_arithmetic_policy(
+        IdentityArithmeticPolicyOptions::new(args.fail_on_violation),
+        &summary,
+    );
+    let policy_passed = policy.passed;
+    let policy_message = policy.violations.join("; ");
+
+    print_identity_arithmetic_report(&summary, &policy, args.output)?;
+
+    if !policy_passed {
+        return Err(paredit_core_cli::gate::gate_failure(format!(
+            "identity-arithmetic-report policy failed: {policy_message}"
+        )));
+    }
+
+    Ok(())
+}

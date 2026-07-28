@@ -1,0 +1,64 @@
+use anyhow::Result;
+use paredit_core_cli::safe_text;
+use serde_json::json;
+
+use crate::list_star_to_cons::usecase::{ListStarToConsPolicy, ListStarToConsSummary};
+use paredit_core_cli::args::OutputFormat;
+
+pub fn print_list_star_to_cons_report(
+    summary: &ListStarToConsSummary,
+    policy: &ListStarToConsPolicy,
+    output: OutputFormat,
+) -> Result<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("list_star_form_count\t{}", summary.list_star_form_count);
+            println!("violation_count\t{}", summary.violations.len());
+            if policy.fail_on_violation {
+                println!("policy\tfail_on_violation=true\tpassed={}", policy.passed);
+            }
+            for item in &summary.violations {
+                println!(
+                    "violation\t{}\t{}",
+                    safe_text!(item.path.display()),
+                    item.span.start().get(),
+                );
+            }
+        }
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "schema_version": 1,
+                    "list_star_form_count": summary.list_star_form_count,
+                    "violation_count": summary.violations.len(),
+                    "policy": {
+                        "fail_on_violation": policy.fail_on_violation,
+                        "passed": policy.passed,
+                        "violations": &policy.violations,
+                    },
+                    "violations": summary.violations
+                        .iter()
+                        .map(|item| json!({
+                            "path": item.path.display().to_string(),
+                            "span": {
+                                "start": item.span.start().get(),
+                                "end": item.span.end().get(),
+                            },
+                            "car_span": {
+                                "start": item.car_span.start().get(),
+                                "end": item.car_span.end().get(),
+                            },
+                            "cdr_span": {
+                                "start": item.cdr_span.start().get(),
+                                "end": item.cdr_span.end().get(),
+                            },
+                        }))
+                        .collect::<Vec<_>>(),
+                }))?
+            );
+        }
+    }
+
+    Ok(())
+}

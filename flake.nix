@@ -344,7 +344,7 @@
             rustc = msrvToolchain;
           };
         in
-        {
+        rec {
           treefmt = treefmtFor.${system}.config.build.check self;
           actionlint =
             pkgs.runCommand "paredit-cli-actionlint"
@@ -419,6 +419,10 @@
           });
           msrv = mkPareditWithPlatform pkgs msrvRustPlatform;
           package = self.packages.${system}.default;
+          # Aliases satisfying the org-wide conformance check's checks.{default,formatting,docs} naming convention.
+          default = nextest;
+          formatting = treefmt;
+          docs = documentation;
         }
       );
 

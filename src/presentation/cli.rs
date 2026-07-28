@@ -4,272 +4,52 @@ macro_rules! safe_text {
     };
 }
 
-mod accessor_arity_report;
 mod analysis_report;
-mod append_list_to_cons_report;
-mod append_nil_report;
-mod args;
 mod basic_edit;
-mod binds_constant_report;
-mod butlast_default_count_report;
-mod call_cycle_report;
-mod call_graph_report;
-mod call_report;
 mod capabilities;
-mod car_nthcdr_report;
-mod car_reverse_report;
-mod case_nil_key_report;
-mod char_case_fold_report;
-mod char_op_string_report;
-mod class_cycle_report;
-mod code_char_char_code_report;
-mod coerce_to_t_report;
 mod command;
-mod complexity_report;
-mod cond_t_clause_report;
-mod conditional_conversion;
-mod cons_to_list_report;
-mod constant_if_test_report;
-mod constant_when_test_report;
 mod contract;
-mod convert_cond_to_if;
-mod convert_flet_to_labels;
-mod convert_if_to_cond;
-mod convert_if_to_unless;
-mod convert_if_to_when;
-mod convert_labels_to_flet;
-mod convert_let_star_to_let;
-mod convert_let_to_let_star;
-mod convert_sequential_binding;
-mod convert_unless_to_if;
-mod convert_when_to_if;
-mod de_morgan_report;
-mod dead_boolean_operand_report;
-mod definition_movement;
-mod definition_removal;
-mod definition_report;
-mod defpackage_quoted_report;
 mod dependency_report;
-mod destructive_literal_report;
-mod dispatch;
-mod double_reverse_report;
-mod duplicate_boolean_operand_report;
-mod duplicate_case_key_report;
-mod duplicate_cond_test_report;
-mod duplicate_export_report;
-mod duplicate_keyword_report;
-mod duplicate_lambda_list_keyword_report;
-mod duplicate_let_binding_report;
-mod duplicate_method_report;
-mod duplicate_parameter_report;
-mod duplicate_report;
-mod duplicate_setf_place_report;
-mod duplicate_slot_report;
-mod eliminate_empty_binding_form;
-mod empty_body_report;
-mod empty_let_report;
-mod eq_char_comparison_report;
-mod eq_number_comparison_report;
-mod eql_list_comparison_report;
-mod eql_search_literal_report;
-mod eql_string_comparison_report;
-mod equality_arity_report;
-mod eval_when_situation_report;
-mod exhaustive_case_otherwise_report;
-mod explicit_nil_return_report;
-mod explicit_step_delta_report;
-mod extract_constant;
-mod extract_function;
-mod extract_local_function;
-mod flatten_progn;
-mod form_report;
-mod format_missing_destination_report;
-mod format_newline_report;
-mod format_to_string_report;
-mod funcall_lambda_report;
-mod function_parameter;
-mod gate;
-mod getf_default_nil_report;
-mod gethash_default_report;
-mod handler_case_no_clauses_report;
-mod identical_if_branch_report;
-mod identity_arithmetic_report;
-mod if_arity_report;
-mod if_not_report;
-mod if_to_or_report;
-mod if_to_unless_report;
-mod impact_report;
-mod inline_function;
-mod inline_lambda;
-mod inline_let;
-mod inline_literal_constant;
-mod inline_local_function;
-mod inline_symbol_macro;
-mod introduce_let;
-mod lambda_list_keyword_order_report;
-mod last_default_count_report;
-mod let_report;
-mod lint_report;
-mod list_star_nil_report;
-mod list_star_to_cons_report;
-mod literal_place_report;
-mod make_array_default_keyword_report;
-mod make_hash_table_test_report;
-mod make_list_default_element_report;
-mod malformed_case_clause_report;
-mod malformed_cond_clause_report;
-mod malformed_iteration_spec_report;
-mod malformed_let_binding_report;
-mod manual_incf_report;
-mod manual_push_report;
-mod manual_pushnew_report;
-mod merge_nested_flet;
-mod merge_nested_let;
-mod merge_nested_let_star;
-mod modify_macro_arity_report;
-mod multiple_value_list_of_values_report;
-mod naming_report;
-mod negated_comparison_report;
-mod negated_if_report;
-mod negated_step_delta_report;
-mod negated_when_unless_report;
-mod nested_boolean_report;
-mod nested_char_case_report;
-mod nested_cxr_report;
-mod nested_progn_report;
-mod nested_string_case_report;
-mod nested_unless_report;
-mod nested_when_report;
-mod nil_comparison_report;
-mod nth_constant_index_report;
-mod nthcdr_small_index_report;
-mod nthcdr_zero_report;
-mod one_armed_if_report;
-mod one_step_arithmetic_report;
-mod package;
-mod package_boundary_report;
-mod package_conflict_report;
-mod package_cycle_report;
-mod parse_integer_default_radix_report;
-mod prog2_to_progn_report;
-mod quoted_case_key_report;
-mod reachability_report;
-mod redefinition_report;
-mod redundant_apply_report;
-mod redundant_body_progn_report;
-mod redundant_boolean_identity_report;
-mod redundant_count_nil_report;
-mod redundant_divisor_report;
-mod redundant_end_nil_report;
-mod redundant_eql_test_report;
-mod redundant_from_end_nil_report;
-mod redundant_funcall_report;
-mod redundant_identity_key_report;
-mod redundant_identity_report;
-mod redundant_if_nil_report;
-mod redundant_let_star_report;
-mod redundant_prog1_report;
-mod redundant_progn_report;
-mod redundant_quote_report;
-mod redundant_start_zero_report;
-mod redundant_the_report;
-mod refactor;
-mod remove_unused_binding;
-mod remove_unused_control;
-mod rename;
-mod rename_control;
-mod replace_forms;
-mod self_assignment_report;
-mod self_comparison_report;
-mod setf_arity_report;
-mod setq_non_variable_report;
-mod shadowed_binding_report;
-mod shared;
-mod sharp_quoted_lambda_report;
-mod sign_comparison_report;
-mod signature_report;
-mod similarity_report;
-mod single_arg_comparison_report;
-mod single_clause_cond_report;
-mod single_operand_arithmetic_report;
-mod single_operand_boolean_report;
-mod single_operand_list_op_report;
-mod single_value_bind_report;
-mod split_let;
-mod split_let_star;
-mod step_zero_report;
-mod string_case_fold_report;
-mod struct_cycle_report;
-mod subseq_zero_report;
-mod symbol_report;
-mod system_conflict_report;
-mod system_cycle_report;
-mod t_comparison_report;
-mod the_arity_report;
-mod thread_expression;
-mod typecase_nil_key_report;
-mod typep_predicate_report;
-mod undefined_package_report;
-mod unreachable_case_clause_report;
-mod unreachable_cond_clause_report;
-mod unthread_expression;
-mod unused_export_report;
-mod unused_local_callable_report;
-mod unused_nickname_report;
-mod unused_package_report;
-mod unused_parameter_report;
-mod unwind_protect_no_cleanup_report;
-mod unwrap_call;
-mod values_list_of_list_report;
-mod verbose_negation_report;
-mod workspace_report;
-mod zero_divisor_report;
 
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::{Path as FsPath, PathBuf};
+// Phase 2 facade (section 4.1). args/shared/gate - and shared's io, diff and
+// macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
+// it enumerates three features' capabilities, which makes it composition root
+// (section 11.5.1).
+use paredit_core_cli::{args, gate, shared};
+// Phase 3 facade: the composition root sees each slice's Args type and run fn.
+use paredit_feature_extract::extract_constant::cli as extract_constant;
+use paredit_feature_extract::extract_function::cli as extract_function;
+use paredit_feature_extract::extract_local_function::cli as extract_local_function;
+use paredit_feature_form_transform::replace_forms::cli as replace_forms;
+use paredit_feature_form_transform::thread_expression::cli as thread_expression;
+use paredit_feature_form_transform::unthread_expression::cli as unthread_expression;
+use paredit_feature_form_transform::unwrap_call::cli as unwrap_call;
+use paredit_feature_inline::inline_function::cli as inline_function;
+use paredit_feature_inline::inline_lambda::cli as inline_lambda;
+use paredit_feature_inline::inline_let::cli as inline_let;
+use paredit_feature_inline::inline_local_function::cli as inline_local_function;
+use paredit_feature_inline::inline_symbol_macro::cli as inline_symbol_macro;
+use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
+use paredit_feature_similarity::similarity_report::cli as similarity_report;
+mod dispatch;
+mod duplicate_export_report;
+mod duplicate_method_report;
+mod duplicate_slot_report;
+mod lint_report;
+mod shadowed_binding_report;
+mod symbol_report;
+mod unused_parameter_report;
+
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use crate::application::refactor::execute::{
-    RefactorExecuteGateInputs, RefactorExecuteMode, RefactorExecuteOutputParseResult,
-    RefactorExecutePolicyResult, RefactorExecutePreVerificationResult,
-    RefactorExecutePreflightInputs, RefactorWriteRefusal, build_refactor_execute_decision,
-    build_refactor_execute_preflight_decision,
-};
-use crate::application::refactor::plan::{
-    RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
-    RefactorPlanPolicyOptions as DomainRefactorPlanPolicyOptions, RefactorPlanRequest,
-    RefactorPlanStep, RefactorPlanSummary, RefactorVerificationCheck, RefactorVerificationRequest,
-    VerificationPhase as ApplicationVerificationPhase, build_refactor_plan_decision,
-    refactor_plan_gates as application_refactor_plan_gates,
-    refactor_verification_checks as application_refactor_verification_checks,
-};
-use crate::application::refactor::preview::{
-    RefactorPreviewEdit, RefactorPreviewPolicy,
-    RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions, RefactorPreviewSummary,
-    evaluate_refactor_preview_policy, refactor_preview_edits,
-};
-use crate::application::usecase::impact_report::{
-    ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
-    summarize_impact_reports,
-};
-use crate::domain::definition::DefinitionCategory;
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
-use anyhow::{Context, Result};
-use clap::{Args, Parser, ValueEnum};
-use serde_json::{Value, json};
+use anyhow::Result;
+use clap::{Args, Parser};
+use serde_json::json;
 
 use args::*;
 use command::Command;
-pub(crate) use shared::{
-    MAX_SOURCE_INPUT_BYTES, apply_byte_span_edits, bounded_preview, matching_symbol_occurrences,
-    read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_limit,
-    read_text_with_limit, require_output_file, resolve_target, stable_text_hash, terminal_safe,
-    terminal_safe_error_chain, unified_diff, write_artifact_with_rollback,
-    write_file_with_rollback, write_files_with_rollback,
-};
+pub(crate) use shared::{read_input_dialect_and_tree, terminal_safe, terminal_safe_error_chain};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -284,6 +64,7 @@ struct Cli {
     command: Command,
 }
 
+#[must_use]
 pub fn run() -> ExitCode {
     let cli = Cli::parse();
     match dispatch::dispatch(cli.command) {
@@ -298,6 +79,196 @@ pub fn run() -> ExitCode {
         }
     }
 }
+
+// Facade re-exports for extracted feature packages (section 4.1).
+use paredit_feature_binding::convert_flet_to_labels::cli as convert_flet_to_labels;
+use paredit_feature_binding::convert_labels_to_flet::cli as convert_labels_to_flet;
+use paredit_feature_binding::convert_let_star_to_let::cli as convert_let_star_to_let;
+use paredit_feature_binding::convert_let_to_let_star::cli as convert_let_to_let_star;
+use paredit_feature_binding::convert_sequential_binding::cli as convert_sequential_binding;
+use paredit_feature_binding::eliminate_empty_binding_form::cli as eliminate_empty_binding_form;
+use paredit_feature_binding::flatten_progn::cli as flatten_progn;
+use paredit_feature_binding::introduce_let::cli as introduce_let;
+use paredit_feature_binding::let_report::cli as let_report;
+use paredit_feature_binding::merge_nested_flet::cli as merge_nested_flet;
+use paredit_feature_binding::merge_nested_let::cli as merge_nested_let;
+use paredit_feature_binding::merge_nested_let_star::cli as merge_nested_let_star;
+use paredit_feature_binding::split_let::cli as split_let;
+use paredit_feature_binding::split_let_star::cli as split_let_star;
+use paredit_feature_conditional_conversion::convert_cond_to_if::cli as convert_cond_to_if;
+use paredit_feature_conditional_conversion::convert_if_to_cond::cli as convert_if_to_cond;
+use paredit_feature_conditional_conversion::convert_if_to_unless::cli as convert_if_to_unless;
+use paredit_feature_conditional_conversion::convert_if_to_when::cli as convert_if_to_when;
+use paredit_feature_conditional_conversion::convert_unless_to_if::cli as convert_unless_to_if;
+use paredit_feature_conditional_conversion::convert_when_to_if::cli as convert_when_to_if;
+use paredit_feature_function_parameter::function_parameter::cli as function_parameter;
+use paredit_feature_inline::inline_literal_constant::cli as inline_literal_constant;
+use paredit_feature_lint_conditional::case_nil_key::cli as case_nil_key_report;
+use paredit_feature_lint_conditional::cond_t_clause::cli as cond_t_clause_report;
+use paredit_feature_lint_conditional::constant_if_test::cli as constant_if_test_report;
+use paredit_feature_lint_conditional::constant_when_test::cli as constant_when_test_report;
+use paredit_feature_lint_conditional::de_morgan::cli as de_morgan_report;
+use paredit_feature_lint_conditional::dead_boolean_operand::cli as dead_boolean_operand_report;
+use paredit_feature_lint_conditional::duplicate_boolean_operands::cli as duplicate_boolean_operand_report;
+use paredit_feature_lint_conditional::duplicate_case_keys::cli as duplicate_case_key_report;
+use paredit_feature_lint_conditional::duplicate_cond_tests::cli as duplicate_cond_test_report;
+use paredit_feature_lint_conditional::empty_body::cli as empty_body_report;
+use paredit_feature_lint_conditional::exhaustive_case_otherwise::cli as exhaustive_case_otherwise_report;
+use paredit_feature_lint_conditional::identical_if_branches::cli as identical_if_branch_report;
+use paredit_feature_lint_conditional::if_arity::cli as if_arity_report;
+use paredit_feature_lint_conditional::if_not::cli as if_not_report;
+use paredit_feature_lint_conditional::if_to_or::cli as if_to_or_report;
+use paredit_feature_lint_conditional::if_to_unless::cli as if_to_unless_report;
+use paredit_feature_lint_conditional::malformed_case_clause::cli as malformed_case_clause_report;
+use paredit_feature_lint_conditional::malformed_cond_clause::cli as malformed_cond_clause_report;
+use paredit_feature_lint_conditional::negated_comparison::cli as negated_comparison_report;
+use paredit_feature_lint_conditional::negated_if::cli as negated_if_report;
+use paredit_feature_lint_conditional::negated_when_unless::cli as negated_when_unless_report;
+use paredit_feature_lint_conditional::nested_boolean::cli as nested_boolean_report;
+use paredit_feature_lint_conditional::nested_unless::cli as nested_unless_report;
+use paredit_feature_lint_conditional::nested_when::cli as nested_when_report;
+use paredit_feature_lint_conditional::one_armed_if::cli as one_armed_if_report;
+use paredit_feature_lint_conditional::quoted_case_key::cli as quoted_case_key_report;
+use paredit_feature_lint_conditional::redundant_boolean_identity::cli as redundant_boolean_identity_report;
+use paredit_feature_lint_conditional::redundant_if_nil::cli as redundant_if_nil_report;
+use paredit_feature_lint_conditional::single_clause_cond::cli as single_clause_cond_report;
+use paredit_feature_lint_conditional::single_operand_boolean::cli as single_operand_boolean_report;
+use paredit_feature_lint_conditional::typecase_nil_key::cli as typecase_nil_key_report;
+use paredit_feature_lint_conditional::unreachable_case_clause::cli as unreachable_case_clause_report;
+use paredit_feature_lint_conditional::unreachable_cond_clause::cli as unreachable_cond_clause_report;
+use paredit_feature_lint_control_flow::binds_constant::cli as binds_constant_report;
+use paredit_feature_lint_control_flow::eval_when_situation::cli as eval_when_situation_report;
+use paredit_feature_lint_control_flow::explicit_nil_return::cli as explicit_nil_return_report;
+use paredit_feature_lint_control_flow::handler_case_no_clauses::cli as handler_case_no_clauses_report;
+use paredit_feature_lint_control_flow::malformed_iteration_spec::cli as malformed_iteration_spec_report;
+use paredit_feature_lint_control_flow::nested_progn::cli as nested_progn_report;
+use paredit_feature_lint_control_flow::prog2_to_progn::cli as prog2_to_progn_report;
+use paredit_feature_lint_control_flow::redundant_body_progn::cli as redundant_body_progn_report;
+use paredit_feature_lint_control_flow::redundant_prog1::cli as redundant_prog1_report;
+use paredit_feature_lint_control_flow::redundant_progn::cli as redundant_progn_report;
+use paredit_feature_lint_control_flow::unwind_protect_no_cleanup::cli as unwind_protect_no_cleanup_report;
+use paredit_feature_lint_form_shape::butlast_default_count::cli as butlast_default_count_report;
+use paredit_feature_lint_form_shape::coerce_to_t::cli as coerce_to_t_report;
+use paredit_feature_lint_form_shape::defpackage_quoted::cli as defpackage_quoted_report;
+use paredit_feature_lint_form_shape::duplicate_keyword::cli as duplicate_keyword_report;
+use paredit_feature_lint_form_shape::duplicate_lambda_list_keyword::cli as duplicate_lambda_list_keyword_report;
+use paredit_feature_lint_form_shape::duplicate_let_bindings::cli as duplicate_let_binding_report;
+use paredit_feature_lint_form_shape::duplicate_parameters::cli as duplicate_parameter_report;
+use paredit_feature_lint_form_shape::duplicate_setf_places::cli as duplicate_setf_place_report;
+use paredit_feature_lint_form_shape::empty_let::cli as empty_let_report;
+use paredit_feature_lint_form_shape::funcall_lambda::cli as funcall_lambda_report;
+use paredit_feature_lint_form_shape::getf_default_nil::cli as getf_default_nil_report;
+use paredit_feature_lint_form_shape::gethash_default::cli as gethash_default_report;
+use paredit_feature_lint_form_shape::lambda_list_keyword_order::cli as lambda_list_keyword_order_report;
+use paredit_feature_lint_form_shape::make_array_default_keyword::cli as make_array_default_keyword_report;
+use paredit_feature_lint_form_shape::make_hash_table_test::cli as make_hash_table_test_report;
+use paredit_feature_lint_form_shape::make_list_default_element::cli as make_list_default_element_report;
+use paredit_feature_lint_form_shape::malformed_let_binding::cli as malformed_let_binding_report;
+use paredit_feature_lint_form_shape::manual_incf::cli as manual_incf_report;
+use paredit_feature_lint_form_shape::manual_push::cli as manual_push_report;
+use paredit_feature_lint_form_shape::manual_pushnew::cli as manual_pushnew_report;
+use paredit_feature_lint_form_shape::multiple_value_list_of_values::cli as multiple_value_list_of_values_report;
+use paredit_feature_lint_form_shape::nested_char_case::cli as nested_char_case_report;
+use paredit_feature_lint_form_shape::nested_cxr::cli as nested_cxr_report;
+use paredit_feature_lint_form_shape::parse_integer_default_radix::cli as parse_integer_default_radix_report;
+use paredit_feature_lint_form_shape::redundant_apply::cli as redundant_apply_report;
+use paredit_feature_lint_form_shape::redundant_funcall::cli as redundant_funcall_report;
+use paredit_feature_lint_form_shape::redundant_identity::cli as redundant_identity_report;
+use paredit_feature_lint_form_shape::redundant_let_star::cli as redundant_let_star_report;
+use paredit_feature_lint_form_shape::redundant_quote::cli as redundant_quote_report;
+use paredit_feature_lint_form_shape::redundant_the::cli as redundant_the_report;
+use paredit_feature_lint_form_shape::self_assignment::cli as self_assignment_report;
+use paredit_feature_lint_form_shape::setf_arity::cli as setf_arity_report;
+use paredit_feature_lint_form_shape::setq_non_variable::cli as setq_non_variable_report;
+use paredit_feature_lint_form_shape::sharp_quoted_lambda::cli as sharp_quoted_lambda_report;
+use paredit_feature_lint_form_shape::single_value_bind::cli as single_value_bind_report;
+use paredit_feature_lint_form_shape::the_arity::cli as the_arity_report;
+use paredit_feature_lint_form_shape::typep_predicate::cli as typep_predicate_report;
+use paredit_feature_lint_form_shape::values_list_of_list::cli as values_list_of_list_report;
+use paredit_feature_lint_numeric::eq_char_comparison::cli as eq_char_comparison_report;
+use paredit_feature_lint_numeric::eq_number_comparison::cli as eq_number_comparison_report;
+use paredit_feature_lint_numeric::eql_list_comparison::cli as eql_list_comparison_report;
+use paredit_feature_lint_numeric::eql_string_comparison::cli as eql_string_comparison_report;
+use paredit_feature_lint_numeric::equality_arity::cli as equality_arity_report;
+use paredit_feature_lint_numeric::explicit_step_delta::cli as explicit_step_delta_report;
+use paredit_feature_lint_numeric::identity_arithmetic::cli as identity_arithmetic_report;
+use paredit_feature_lint_numeric::literal_place::cli as literal_place_report;
+use paredit_feature_lint_numeric::modify_macro_arity::cli as modify_macro_arity_report;
+use paredit_feature_lint_numeric::negated_step_delta::cli as negated_step_delta_report;
+use paredit_feature_lint_numeric::nil_comparison::cli as nil_comparison_report;
+use paredit_feature_lint_numeric::one_step_arithmetic::cli as one_step_arithmetic_report;
+use paredit_feature_lint_numeric::redundant_divisor::cli as redundant_divisor_report;
+use paredit_feature_lint_numeric::self_comparison::cli as self_comparison_report;
+use paredit_feature_lint_numeric::sign_comparison::cli as sign_comparison_report;
+use paredit_feature_lint_numeric::single_arg_comparison::cli as single_arg_comparison_report;
+use paredit_feature_lint_numeric::single_operand_arithmetic::cli as single_operand_arithmetic_report;
+use paredit_feature_lint_numeric::step_zero::cli as step_zero_report;
+use paredit_feature_lint_numeric::t_comparison::cli as t_comparison_report;
+use paredit_feature_lint_numeric::verbose_negation::cli as verbose_negation_report;
+use paredit_feature_lint_numeric::zero_divisor::cli as zero_divisor_report;
+use paredit_feature_lint_sequence::accessor_arity::cli as accessor_arity_report;
+use paredit_feature_lint_sequence::append_list_to_cons::cli as append_list_to_cons_report;
+use paredit_feature_lint_sequence::append_nil::cli as append_nil_report;
+use paredit_feature_lint_sequence::car_nthcdr::cli as car_nthcdr_report;
+use paredit_feature_lint_sequence::car_reverse::cli as car_reverse_report;
+use paredit_feature_lint_sequence::cons_to_list::cli as cons_to_list_report;
+use paredit_feature_lint_sequence::destructive_literal::cli as destructive_literal_report;
+use paredit_feature_lint_sequence::double_reverse::cli as double_reverse_report;
+use paredit_feature_lint_sequence::eql_search_literal::cli as eql_search_literal_report;
+use paredit_feature_lint_sequence::last_default_count::cli as last_default_count_report;
+use paredit_feature_lint_sequence::list_star_nil::cli as list_star_nil_report;
+use paredit_feature_lint_sequence::list_star_to_cons::cli as list_star_to_cons_report;
+use paredit_feature_lint_sequence::nth_constant_index::cli as nth_constant_index_report;
+use paredit_feature_lint_sequence::nthcdr_small_index::cli as nthcdr_small_index_report;
+use paredit_feature_lint_sequence::nthcdr_zero::cli as nthcdr_zero_report;
+use paredit_feature_lint_sequence::redundant_count_nil::cli as redundant_count_nil_report;
+use paredit_feature_lint_sequence::redundant_end_nil::cli as redundant_end_nil_report;
+use paredit_feature_lint_sequence::redundant_eql_test::cli as redundant_eql_test_report;
+use paredit_feature_lint_sequence::redundant_from_end_nil::cli as redundant_from_end_nil_report;
+use paredit_feature_lint_sequence::redundant_identity_key::cli as redundant_identity_key_report;
+use paredit_feature_lint_sequence::redundant_start_zero::cli as redundant_start_zero_report;
+use paredit_feature_lint_sequence::single_operand_list_op::cli as single_operand_list_op_report;
+use paredit_feature_lint_sequence::subseq_zero::cli as subseq_zero_report;
+use paredit_feature_lint_string_char::char_case_fold::cli as char_case_fold_report;
+use paredit_feature_lint_string_char::char_op_string::cli as char_op_string_report;
+use paredit_feature_lint_string_char::code_char_char_code::cli as code_char_char_code_report;
+use paredit_feature_lint_string_char::format_missing_destination::cli as format_missing_destination_report;
+use paredit_feature_lint_string_char::format_newline::cli as format_newline_report;
+use paredit_feature_lint_string_char::format_to_string::cli as format_to_string_report;
+use paredit_feature_lint_string_char::nested_string_case::cli as nested_string_case_report;
+use paredit_feature_lint_string_char::string_case_fold::cli as string_case_fold_report;
+use paredit_feature_package::package::cli as package;
+use paredit_feature_package::package_boundary_report::cli as package_boundary_report;
+use paredit_feature_package::package_conflict_report::cli as package_conflict_report;
+use paredit_feature_package::system_conflict_report::cli as system_conflict_report;
+use paredit_feature_package::unused_export_report::cli as unused_export_report;
+use paredit_feature_package::unused_nickname_report::cli as unused_nickname_report;
+use paredit_feature_package::unused_package_report::cli as unused_package_report;
+use paredit_feature_project_analysis::call_cycle_report::cli as call_cycle_report;
+use paredit_feature_project_analysis::call_graph_report::cli as call_graph_report;
+use paredit_feature_project_analysis::call_report::cli as call_report;
+use paredit_feature_project_analysis::class_cycle_report::cli as class_cycle_report;
+use paredit_feature_project_analysis::complexity_report::cli as complexity_report;
+use paredit_feature_project_analysis::form_report::cli as form_report;
+use paredit_feature_project_analysis::impact_report::cli as impact_report;
+use paredit_feature_project_analysis::naming_report::cli as naming_report;
+use paredit_feature_project_analysis::package_cycle_report::cli as package_cycle_report;
+use paredit_feature_project_analysis::reachability_report::cli as reachability_report;
+use paredit_feature_project_analysis::redefinition_report::cli as redefinition_report;
+use paredit_feature_project_analysis::signature_report::cli as signature_report;
+use paredit_feature_project_analysis::struct_cycle_report::cli as struct_cycle_report;
+use paredit_feature_project_analysis::system_cycle_report::cli as system_cycle_report;
+use paredit_feature_project_analysis::undefined_package_report::cli as undefined_package_report;
+use paredit_feature_project_analysis::unused_local_callable_report::cli as unused_local_callable_report;
+use paredit_feature_project_analysis::workspace_report::cli as workspace_report;
+use paredit_feature_refactor_workflow::refactor::cli as refactor;
+use paredit_feature_remove_unused::definition_movement::cli as definition_movement;
+use paredit_feature_remove_unused::definition_removal::cli as definition_removal;
+use paredit_feature_remove_unused::definition_report::cli as definition_report;
+use paredit_feature_remove_unused::remove_unused_binding::cli as remove_unused_binding;
+use paredit_feature_remove_unused::remove_unused_control::cli as remove_unused_control;
+use paredit_feature_rename::rename::cli as rename;
+use paredit_feature_rename::rename_control::cli as rename_control;
 
 #[cfg(test)]
 mod tests {

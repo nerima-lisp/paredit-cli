@@ -1,0 +1,192 @@
+use crate::error::{BindingSelectionError, RenameResult};
+
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
+
+use super::build_binding_rename_parts;
+use super::collect_symbol_atom_spans_unshadowed;
+use super::common_lisp;
+use super::forms::parameter_name_spans;
+use super::types::BindingRenameParts;
+
+pub fn clause_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> RenameResult<BindingRenameParts> {
+    let mut target = None;
+    let mut duplicate_count = 0usize;
+
+    for clause in &view.children[2..] {
+        if clause.kind != ExpressionKind::List || clause.delimiter != Some(Delimiter::Paren) {
+            continue;
+        }
+
+        let Some(parameter_form) = clause.children.get(1) else {
+            continue;
+        };
+        let parameters = parameter_name_spans(parameter_form, input)?;
+        let Some(parameter) = parameters
+            .iter()
+            .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
+        else {
+            continue;
+        };
+
+        duplicate_count += 1;
+        target = Some((clause, parameter.clone()));
+    }
+
+    if duplicate_count > 1 {
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "clauses".to_owned(),
+        }
+        .into());
+    }
+
+    let (target_clause, target_parameter) =
+        target.ok_or_else(|| BindingSelectionError::NotFound {
+            from: from.to_string(),
+            form: form.to_string(),
+        })?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &target_clause.children[2..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+
+    Ok(build_binding_rename_parts(
+        form,
+        view.span,
+        target_parameter.name_span,
+        target_parameter.binding_edit,
+        reference_spans,
+        shadowed_scope_count,
+    ))
+}
+
+pub fn loop_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> RenameResult<BindingRenameParts> {
+    let mut target = None;
+    let mut duplicate_count = 0usize;
+
+    for spec in common_lisp::loop_binding_specs(view, input) {
+        if !common_lisp_symbol_reference_eq(&spec.name, from.as_str()) {
+            continue;
+        }
+        duplicate_count += 1;
+        target = Some(spec.clone());
+    }
+
+    if duplicate_count > 1 {
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "clauses".to_owned(),
+        }
+        .into());
+    }
+
+    let target = target.ok_or_else(|| BindingSelectionError::NotFound {
+        from: from.to_string(),
+        form: form.to_string(),
+    })?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &view.children[target.reference_start_index..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+
+    Ok(build_binding_rename_parts(
+        form,
+        view.span,
+        target.name_span,
+        target.binding_edit,
+        reference_spans,
+        shadowed_scope_count,
+    ))
+}
+
+pub fn slot_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> RenameResult<BindingRenameParts> {
+    let slot_specs =
+        view.children
+            .get(1)
+            .ok_or_else(|| BindingSelectionError::FormMissingPart {
+                form: form.to_string(),
+                what: "slot specs".to_owned(),
+            })?;
+    let mut target = None;
+    let mut duplicate_count = 0usize;
+
+    for spec in &slot_specs.children {
+        let Some((name, span, edit)) = common_lisp::slot_spec_binding_name(spec) else {
+            continue;
+        };
+        if !common_lisp_symbol_reference_eq(name, from.as_str()) {
+            continue;
+        }
+        duplicate_count += 1;
+        target = Some((span, edit));
+    }
+
+    if duplicate_count > 1 {
+        return Err(BindingSelectionError::Ambiguous {
+            from: from.to_string(),
+            form: form.to_string(),
+            location: "specs".to_owned(),
+        }
+        .into());
+    }
+
+    let (binding_span, binding_edit) = target.ok_or_else(|| BindingSelectionError::NotFound {
+        from: from.to_string(),
+        form: form.to_string(),
+    })?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &view.children[3..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+
+    Ok(build_binding_rename_parts(
+        form,
+        view.span,
+        binding_span,
+        binding_edit,
+        reference_spans,
+        shadowed_scope_count,
+    ))
+}

@@ -71,7 +71,7 @@ fn assert_thread_expression_property(
         .map_err(|err| TestCaseError::fail(format!("parse json: {err}")))?;
     prop_assert_eq!(report["changed"].as_bool(), Some(true));
     let replacement = report["replacement"].as_str().unwrap_or_default();
-    let expected_prefix = format!("({} seed", expected_operator);
+    let expected_prefix = format!("({expected_operator} seed");
     prop_assert!(replacement.starts_with(&expected_prefix));
 
     let rewritten = report["rewritten"].as_str().unwrap_or_default();
@@ -131,7 +131,7 @@ fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseErro
 }
 
 proptest! {
-    #![proptest_config(cli_proptest_config(12))]
+    #![proptest_config(cli_proptest_config_replaying_recorded_failures(12))]
 
     #[test]
     fn cli_thread_expression_preserves_parseability_for_generated_chains(depth in 1usize..8) {

@@ -1,0 +1,32 @@
+[package]
+name = "paredit-feature-remove-unused"
+description = "Removing unused bindings, control forms and definitions, and moving definitions between files"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-semantics = { path = "../../core/semantics" }
+paredit-core-edit = { path = "../../core/edit" }
+paredit-core-workspace = { path = "../../core/workspace" }
+paredit-core-cli = { path = "../../core/cli" }
+# Feature-to-feature edges (section 2.2 measured 89 of them).
+paredit-feature-package = { path = "../package" }
+paredit-feature-form-transform = { path = "../form-transform" }
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

@@ -1,0 +1,56 @@
+use crate::error::FunctionParameterResult;
+
+use crate::function_parameter::domain::RemoveFunctionParameterRequest;
+use crate::function_parameter::domain::definition::{
+    FunctionParameterTarget, find_unique_parameter_location,
+};
+use crate::function_parameter::domain::list_edit::{
+    SpanEdit, is_dotted_list_separator, removal_edit_for_list_item,
+};
+
+#[derive(Debug, Clone)]
+pub struct RemoveParameterMetadata {
+    pub definition_edit: SpanEdit,
+    pub parameter_index: usize,
+    pub parameter_keyword: Option<String>,
+    pub dotted_tail: bool,
+}
+
+pub fn resolve_remove_parameter_metadata(
+    target: &FunctionParameterTarget,
+    request: &RemoveFunctionParameterRequest<'_>,
+) -> FunctionParameterResult<RemoveParameterMetadata> {
+    let parameter =
+        find_unique_parameter_location(target, &request.name, "remove-function-parameter")?;
+    let parameter_item_index = parameter.item_index;
+    let parameter_index = parameter
+        .call_index
+        .or_else(|| {
+            parameter
+                .keyword_argument
+                .as_ref()
+                .map(|keyword| keyword.positional_prefix_count)
+        })
+        .unwrap_or(parameter_item_index);
+    let parameter_keyword = parameter
+        .keyword_argument
+        .as_ref()
+        .map(|keyword| keyword.keyword.clone());
+    let dotted_tail = parameter_item_index > 0
+        && target
+            .parameter_container
+            .children
+            .get(parameter_item_index - 1)
+            .is_some_and(is_dotted_list_separator);
+
+    Ok(RemoveParameterMetadata {
+        definition_edit: removal_edit_for_list_item(
+            request.input,
+            &target.parameter_container,
+            parameter_item_index,
+        )?,
+        parameter_index,
+        parameter_keyword,
+        dotted_tail,
+    })
+}

@@ -1,6 +1,6 @@
 pub(super) use super::*;
 
-fn cli_option_fixture(index: usize) -> &'static str {
+const fn cli_option_fixture(index: usize) -> &'static str {
     match index {
         0 => "(:nicknames #:d)",
         1 => "(:use #:cl)",

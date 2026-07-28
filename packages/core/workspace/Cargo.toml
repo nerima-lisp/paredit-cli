@@ -1,0 +1,27 @@
+[package]
+name = "paredit-core-workspace"
+description = "Workspace discovery and filesystem identity for source inputs"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../syntax" }
+thiserror.workspace = true
+blake3.workspace = true
+cap-std.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+# The test harness still returns anyhow::Result; production code does not.
+anyhow.workspace = true
+proptest.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

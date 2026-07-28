@@ -133,6 +133,11 @@ nav:
       - Architecture: architecture.md
       - Integrations: integrations.md
       - Releases and Compatibility: releases.md
+      - Release Checklist: releasing.md
   - Contributing:
       - Development: development.md
       - Repository Documentation: repository.md
+      - Contributing Guide: contributing.md
+      - Code of Conduct: code-of-conduct.md
+      - Security Policy: security-policy.md
+      - Support: support.md

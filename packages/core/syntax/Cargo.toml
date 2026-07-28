@@ -1,0 +1,24 @@
+[package]
+name = "paredit-core-syntax"
+description = "Lisp syntax kernel: parsing, dialects, Common Lisp forms, and definition shapes"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# No anyhow. Section 9.2 finished here: every fallible entry point returns a
+# thiserror enum, so a caller matches on a variant instead of a message.
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+# Mandatory. Without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error of any kind.
+# crate_metadata_contract.rs checks every member for this line.
+[lints]
+workspace = true

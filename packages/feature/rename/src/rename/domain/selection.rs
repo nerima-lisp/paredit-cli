@@ -1,0 +1,109 @@
+use crate::error::{BindingSelectionError, RenameResult};
+
+use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
+pub use paredit_core_syntax::sexpr::reader::atom_text;
+use paredit_core_syntax::sexpr::{
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Selection, SymbolName, SyntaxTree,
+};
+
+use super::RenameTarget;
+
+pub fn select_rename_target<'a>(
+    tree: &'a SyntaxTree,
+    target: &RenameTarget,
+) -> RenameResult<Selection<'a>> {
+    match target {
+        RenameTarget::Path(path) => Ok(tree.select_path(path)?),
+        RenameTarget::Offset(offset) => Ok(tree.select_at(*offset)?),
+    }
+}
+
+pub fn collect_symbol_atom_spans(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+) {
+    if atom_text(view).is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol.as_str())) {
+        output.push(view.span);
+        return;
+    }
+    for child in &view.children {
+        collect_symbol_atom_spans(child, symbol, output);
+    }
+}
+
+pub fn apply_byte_span_edits(
+    input: &str,
+    mut edits: Vec<(ByteSpan, String)>,
+) -> RenameResult<String> {
+    edits.sort_by_key(|(span, _)| span.start());
+    ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
+
+    let mut output = input.to_owned();
+    for (span, replacement) in edits.into_iter().rev() {
+        output.replace_range(span.as_range(), &replacement);
+    }
+    Ok(output)
+}
+
+fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> RenameResult<()> {
+    let mut previous: Option<ByteSpan> = None;
+    for span in spans {
+        if let Some(previous) = previous {
+            if previous.end().get() > span.start().get() {
+                return Err(BindingSelectionError::OverlappingEdits {
+                    first_start: previous.start().get(),
+                    first_end: previous.end().get(),
+                    second_start: span.start().get(),
+                    second_end: span.end().get(),
+                }
+                .into());
+            }
+        }
+        previous = Some(span);
+    }
+    Ok(())
+}
+
+pub fn list_head(view: &ExpressionView) -> Option<&str> {
+    if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
+        return None;
+    }
+
+    atom_child(view, 0)
+}
+
+pub fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+    view.children.get(index).and_then(atom_text)
+}
+
+pub trait SpannedCallSite {
+    fn span(&self) -> ByteSpan;
+}
+
+/// Keeps only the outermost call site among any that nest inside one
+/// another (e.g. `(foo (foo x))`), since rewriting the outer site already
+/// rewrites everything nested inside its span.
+pub fn select_outermost_call_sites<T: SpannedCallSite>(mut candidates: Vec<T>) -> (Vec<T>, Vec<T>) {
+    candidates.sort_by_key(|site| {
+        (
+            site.span().start().get(),
+            std::cmp::Reverse(site.span().len()),
+        )
+    });
+
+    let mut selected: Vec<T> = Vec::new();
+    let mut skipped_nested = Vec::new();
+    for site in candidates {
+        if selected.iter().any(|selected: &T| {
+            selected.span().contains_span(site.span()) && selected.span() != site.span()
+        }) {
+            skipped_nested.push(site);
+        } else {
+            selected.push(site);
+        }
+    }
+    selected.sort_by_key(|site| site.span().start());
+    skipped_nested.sort_by_key(|site| site.span().start());
+    (selected, skipped_nested)
+}

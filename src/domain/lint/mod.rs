@@ -12,11 +12,86 @@
 //! for decisions that need no tree, [`engine`] for the pass, [`registry`] for
 //! the catalogue, and [`rules`] for the rules themselves.
 
-pub mod engine;
-pub mod model;
-pub mod policy;
-pub mod registry;
-pub mod rule;
-pub mod rules;
+// Phase 2 facade (section 4.1). engine/model/policy/rule now live in
+// `paredit-core-lint-engine`; `registry` and `rules` stay here, because a
+// registry naming every rule while every rule depends on the engine is a cycle
+// (section 4.2).
+pub use paredit_core_lint_engine::{LintResult, RuleSelectionError, engine, model, policy, rule};
 
-pub use engine::collect_lint_outcomes;
+#[cfg(test)]
+mod engine_dispatch_tests;
+pub mod registry;
+#[cfg(test)]
+mod rule_registry_tests;
+
+use std::path::Path;
+use std::sync::OnceLock;
+
+use crate::domain::dialect::Dialect;
+use crate::domain::sexpr::SyntaxTree;
+
+use engine::HeadIndex;
+use model::{LintFinding, LintOutcome, LintPolicy, LintPolicyOptions, LintSummary};
+use policy::RuleSelection;
+use rule::RuleCatalog;
+
+/// The shipped rule set. The engine and policy take this as an argument, so
+/// they never name a rule or count them - that separation is what lets the
+/// engine live in its own package while the registry stays with the rules
+/// (section 4.2).
+pub const CATALOG: RuleCatalog = RuleCatalog::new(&registry::REGISTRY);
+
+/// The process-wide operator index. Building it touches every registered rule,
+/// so it is cached here, next to the registry it is derived from, rather than
+/// inside the engine.
+pub fn head_index() -> &'static HeadIndex {
+    static INDEX: OnceLock<HeadIndex> = OnceLock::new();
+    INDEX.get_or_init(|| engine::build_head_index(CATALOG))
+}
+
+/// Runs the shipped rule set over one file. Thin wrapper over
+/// [`engine::collect_lint_outcomes`] that supplies the catalogue and index.
+pub fn collect_lint_outcomes(
+    path: &Path,
+    dialect: Dialect,
+    tree: &SyntaxTree,
+    source: &str,
+    selection: RuleSelection<'_>,
+) -> LintResult<Vec<LintOutcome>> {
+    engine::collect_lint_outcomes(
+        CATALOG,
+        head_index(),
+        path,
+        dialect,
+        tree,
+        source,
+        selection,
+    )
+}
+
+/// The rules `only`/`exclude`/`categories` select, over the shipped set.
+pub fn resolve_active_rules(
+    only: &[String],
+    exclude: &[String],
+    categories: &[String],
+) -> std::result::Result<Vec<&'static str>, RuleSelectionError> {
+    policy::resolve_active_rules(CATALOG, only, exclude, categories)
+}
+
+/// Summarizes findings over the shipped rule set.
+#[must_use]
+pub fn summarize_lint_findings(findings: Vec<LintFinding>, active: &[&str]) -> LintSummary {
+    policy::summarize_lint_findings(CATALOG, findings, active)
+}
+
+/// Gate conditions `finding_rules` violates, over the shipped rule set.
+#[must_use]
+pub fn lint_gate_violations(options: LintPolicyOptions, finding_rules: &[&str]) -> Vec<String> {
+    policy::lint_gate_violations(CATALOG, options, finding_rules)
+}
+
+/// Judges a summary against the gate, over the shipped rule set.
+#[must_use]
+pub fn evaluate_lint_policy(options: LintPolicyOptions, summary: &LintSummary) -> LintPolicy {
+    policy::evaluate_lint_policy(CATALOG, options, summary)
+}

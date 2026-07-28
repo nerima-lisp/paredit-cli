@@ -55,6 +55,7 @@ pub enum ScopeKind {
 }
 
 impl ScopeKind {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Parameter => "parameter",
@@ -70,7 +71,7 @@ struct Scope {
     label: Option<String>,
 }
 
-fn spans_contain(outer: ByteSpan, inner: ByteSpan) -> bool {
+const fn spans_contain(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
@@ -97,10 +98,12 @@ pub struct ShadowedBindingPolicyOptions {
 }
 
 impl ShadowedBindingPolicyOptions {
-    pub fn new(fail_on_shadowed: bool) -> Self {
+    #[must_use]
+    pub const fn new(fail_on_shadowed: bool) -> Self {
         Self { fail_on_shadowed }
     }
 
+    #[must_use]
     pub const fn fail_on_shadowed(self) -> bool {
         self.fail_on_shadowed
     }
@@ -210,6 +213,7 @@ pub fn build_shadowed_binding_report(
     })
 }
 
+#[must_use]
 pub fn evaluate_shadowed_binding_policy(
     options: ShadowedBindingPolicyOptions,
     reports: &[ShadowedBindingReportFile],

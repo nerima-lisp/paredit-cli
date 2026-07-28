@@ -1,0 +1,33 @@
+# Revisions to skip when running `git blame`.
+#
+# Only bulk revisions with no behavioural change belong here: mechanical
+# Clippy fixes (`#[must_use]`, `const fn`, trailing-semicolon and `format!`
+# consistency) and the pure `git mv` commits of the package-by-feature
+# migration, which move files without touching a single byte of content.
+# See SPEC-package-by-feature.md sections 9.5 and 13.1.
+#
+# Never add a revision that changes behaviour: doing so hides the real author
+# of that behaviour from `git blame` permanently.
+#
+# GitHub honours this file automatically. Locally, enable it once with:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Entries are full 40-character SHAs, one per line, newest last.
+
+# Phase -1: mechanical Clippy fixes, no behavioural change.
+
+# style: trailing semicolons (clippy::semicolon_if_nothing_returned)
+378ae94c0c8f744e0a17dc999c36314d857e5ffd
+
+# style: inlined format arguments (clippy::uninlined_format_args)
+d2c09b4452711e4f3f57e0b46f0219e422cadabd
+
+# docs: split overlong first doc paragraphs (clippy::too_long_first_doc_paragraph)
+903e3489d65b73a70e2dd1cec76184643dc813d5
+
+# style: #[must_use] annotations (clippy::must_use_candidate)
+df2d9e19c494f33ee7d5903c09f8369c8fee9353
+
+# perf: const fn signatures (clippy::missing_const_for_fn)
+fd3f2d7468b88844c4d5544fc9ad695c4bb7df85
