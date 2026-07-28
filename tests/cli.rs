@@ -129,6 +129,8 @@ mod duplicate_slot_report;
 mod edit_transpose;
 #[path = "cli/eliminate_empty_binding_form.rs"]
 mod eliminate_empty_binding_form;
+#[path = "cli/emacs_lisp_file_report.rs"]
+mod emacs_lisp_file_report;
 #[path = "cli/empty_body_report.rs"]
 mod empty_body_report;
 #[path = "cli/empty_let_report.rs"]

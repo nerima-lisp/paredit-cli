@@ -146,7 +146,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 178] = [
+const INTROSPECTION_COMMANDS: [&str; 179] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -188,6 +188,7 @@ const INTROSPECTION_COMMANDS: [&str; 178] = [
     "inspect struct-cycles",
     "inspect system-conflicts",
     "inspect duplicate-setf-places",
+    "inspect elisp-file",
     "inspect duplicate-slots",
     "inspect duplicate-methods",
     "inspect duplicate-case-keys",

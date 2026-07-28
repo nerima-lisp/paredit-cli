@@ -1,11 +1,19 @@
-# paredit-feature-lint-emacs-lisp
+# paredit-feature-emacs-lisp
 
-Lint rules for Emacs Lisp.
+Emacs Lisp analysis: one report and nine lint rules.
 
 ## Responsibilities
 
-The rules here are the ones whose subject is Emacs Lisp itself rather than
-S-expression shape, so none of them has a Common Lisp counterpart to share:
+Everything here is about Emacs Lisp *itself* rather than about S-expression
+shape, so none of it has a Common Lisp counterpart to share.
+
+`file_report` answers the questions an agent has before editing a `.el` file
+and cannot answer from the tree: is this file lexically bound, what feature
+does it provide, which libraries does it load eagerly versus defer, and which
+definitions carry an autoload cookie. Two of the three are *comments*, which
+is why the report takes the source text and not just the parse.
+
+The lint rules cover:
 
 - **File-level conventions.** `lexical-binding` on line 1 and the
   `;;;###autoload` cookie are comments that change what the code around them

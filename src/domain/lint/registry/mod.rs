@@ -557,39 +557,39 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     // Emacs Lisp. Every rule below declares `Dialect::EmacsLisp` only, so a
     // Common Lisp run skips them before walking anything.
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::missing_lexical_binding::rule::META,
-        &paredit_feature_lint_emacs_lisp::missing_lexical_binding::rule::RULE,
+        &paredit_feature_emacs_lisp::missing_lexical_binding::rule::META,
+        &paredit_feature_emacs_lisp::missing_lexical_binding::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::unreachable_lexical_binding::rule::META,
-        &paredit_feature_lint_emacs_lisp::unreachable_lexical_binding::rule::RULE,
+        &paredit_feature_emacs_lisp::unreachable_lexical_binding::rule::META,
+        &paredit_feature_emacs_lisp::unreachable_lexical_binding::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::autoload_cookie_without_form::rule::META,
-        &paredit_feature_lint_emacs_lisp::autoload_cookie_without_form::rule::RULE,
+        &paredit_feature_emacs_lisp::autoload_cookie_without_form::rule::META,
+        &paredit_feature_emacs_lisp::autoload_cookie_without_form::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::defcustom_missing_type::rule::META,
-        &paredit_feature_lint_emacs_lisp::defcustom_missing_type::rule::RULE,
+        &paredit_feature_emacs_lisp::defcustom_missing_type::rule::META,
+        &paredit_feature_emacs_lisp::defcustom_missing_type::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::defcustom_missing_group::rule::META,
-        &paredit_feature_lint_emacs_lisp::defcustom_missing_group::rule::RULE,
+        &paredit_feature_emacs_lisp::defcustom_missing_group::rule::META,
+        &paredit_feature_emacs_lisp::defcustom_missing_group::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::obsolete_cl_alias::rule::META,
-        &paredit_feature_lint_emacs_lisp::obsolete_cl_alias::rule::RULE,
+        &paredit_feature_emacs_lisp::obsolete_cl_alias::rule::META,
+        &paredit_feature_emacs_lisp::obsolete_cl_alias::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::quoted_lambda::rule::META,
-        &paredit_feature_lint_emacs_lisp::quoted_lambda::rule::RULE,
+        &paredit_feature_emacs_lisp::quoted_lambda::rule::META,
+        &paredit_feature_emacs_lisp::quoted_lambda::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::interactive_in_macro::rule::META,
-        &paredit_feature_lint_emacs_lisp::interactive_in_macro::rule::RULE,
+        &paredit_feature_emacs_lisp::interactive_in_macro::rule::META,
+        &paredit_feature_emacs_lisp::interactive_in_macro::rule::RULE,
     ),
     RuleEntry::new(
-        &paredit_feature_lint_emacs_lisp::condition_case_without_handler::rule::META,
-        &paredit_feature_lint_emacs_lisp::condition_case_without_handler::rule::RULE,
+        &paredit_feature_emacs_lisp::condition_case_without_handler::rule::META,
+        &paredit_feature_emacs_lisp::condition_case_without_handler::rule::RULE,
     ),
 ];

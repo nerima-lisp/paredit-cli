@@ -4,6 +4,7 @@ pub mod autoload_cookie_without_form;
 pub mod condition_case_without_handler;
 pub mod defcustom_missing_group;
 pub mod defcustom_missing_type;
+pub mod file_report;
 pub mod interactive_in_macro;
 pub mod missing_lexical_binding;
 pub mod obsolete_cl_alias;

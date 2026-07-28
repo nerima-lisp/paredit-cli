@@ -43,6 +43,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::DuplicateSetfPlaces(args) => {
                 duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?;
             }
+            command::InspectCommand::ElispFile(args) => {
+                emacs_lisp_file_report::workflow::emacs_lisp_file_report(args)?;
+            }
             command::InspectCommand::DuplicateSlots(args) => {
                 duplicate_slot_report::workflow::duplicate_slot_report(args)?;
             }

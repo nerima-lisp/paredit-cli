@@ -17,6 +17,7 @@ pub mod unused_parameter_report;
 pub use paredit_feature_similarity::duplicate_report::usecase as duplicate_report;
 pub use paredit_feature_similarity::similarity_report::usecase as similarity_report;
 
+pub use paredit_feature_emacs_lisp::file_report::usecase as emacs_lisp_file_report;
 pub use paredit_feature_extract::extract_constant::usecase as extract_constant;
 pub use paredit_feature_extract::extract_function::usecase as extract_function;
 pub use paredit_feature_extract::extract_local_function::usecase as extract_local_function;

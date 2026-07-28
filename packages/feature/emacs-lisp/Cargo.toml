@@ -1,6 +1,6 @@
 [package]
-name = "paredit-feature-lint-emacs-lisp"
-description = "Lint rules for Emacs Lisp: file headers, autoload cookies, customization forms, and obsolete cl.el spellings"
+name = "paredit-feature-emacs-lisp"
+description = "Emacs Lisp analysis: the per-file header/feature/autoload report, and the lint rules for the dialect's own conventions"
 readme = "README.md"
 publish = false
 version.workspace = true
