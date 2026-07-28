@@ -8,6 +8,7 @@ use paredit_core_syntax::common_lisp::{
     common_lisp_reader_label_kind, is_common_lisp_declaration_form,
 };
 use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::emacs_lisp::EmacsLispOperator;
 use paredit_core_syntax::sexpr::reader::apply_reader_prefix_context;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree,
@@ -17,33 +18,44 @@ use super::super::model::{
     BindingDraft, BindingId, BindingKind, BindingTable, BindingTableBuilder, OpacityCause,
     OpacityCauseKind, ScopeId, SpecialBinding,
 };
+use super::emacs_lisp::EmacsLispDynamicScope;
 use super::opacity::head_has_registered_semantics;
-use super::scope_stack::{Namespace, ScopeStack};
+use super::scope_stack::{Namespace, ScopeStack, SymbolIdentity};
 use super::special_names::SpecialNameIndex;
 
 /// Builds the binding table for one parsed file.
 ///
-/// Common Lisp and Scheme are analysed; every other dialect gets an empty
-/// table rather than a guessed one. The binding forms differ enough that a
-/// shared traversal would have to assume, and this layer records only what it
-/// can prove. An empty table reads as "nothing is statically known", which
-/// every consumer already has to handle.
+/// Common Lisp, Emacs Lisp, Scheme and Racket are analysed; every other
+/// dialect gets an empty table rather than a guessed one. The binding forms
+/// differ enough that a shared traversal would have to assume, and this layer
+/// records only what it can prove. An empty table reads as "nothing is
+/// statically known", which every consumer already has to handle.
 ///
-/// Scheme is not a special case of the Common Lisp walk. It is a Lisp-1, its
-/// identifiers are case-sensitive, it has no `declare`/`special` machinery,
-/// and half its binding forms have no Common Lisp counterpart -- so the
-/// dispatch, the name comparison and the namespace rule are all asked of the
-/// dialect rather than assumed.
+/// None of the three is a special case of the Common Lisp walk. Scheme is a
+/// Lisp-1 with case-sensitive identifiers and no `declare`/`special`
+/// machinery; Emacs Lisp is a Lisp-2 that is also case-sensitive, has no
+/// package syntax, and decides whether a `let` is lexical from a comment on
+/// line 1. So the dispatch, the name comparison, the namespace rule and the
+/// dynamic-binding rule are all asked of the dialect rather than assumed.
 ///
-/// `input` is taken but not read: every fact the table records is a span, and
-/// the assertion below is the whole of what the source text is good for here —
-/// pinning that those spans index into the string the caller will slice with.
+/// `input` is read for Emacs Lisp, and only there: the `lexical-binding`
+/// setting that decides what every `let` in the file means is a comment, so it
+/// is absent from the tree. Elsewhere the parameter is only the assertion
+/// below — pinning that the spans the table records index into the string the
+/// caller will slice with.
+///
+/// `input` *is* read for Emacs Lisp, and only there: whether a plain `let`
+/// binds lexically or dynamically in that dialect is decided by the
+/// `lexical-binding` setting on the file's first line, which is a comment and
+/// therefore absent from the tree. For Common Lisp the parameter is still only
+/// the assertion below — pinning that the spans the table records index into
+/// the string the caller will slice with.
 #[must_use]
 pub fn build_binding_table(dialect: Dialect, tree: &SyntaxTree, input: &str) -> BindingTable {
     let builder = BindingTableBuilder::new();
     if !matches!(
         dialect,
-        Dialect::CommonLisp | Dialect::Scheme | Dialect::Racket
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Racket
     ) {
         return builder.finish();
     }
@@ -64,6 +76,9 @@ pub fn build_binding_table(dialect: Dialect, tree: &SyntaxTree, input: &str) -> 
         } else {
             SpecialNameIndex::empty()
         },
+        // Emacs Lisp answers the same question a different way, from the file
+        // header and the `defvar`s in the file.
+        dynamic_scope: EmacsLispDynamicScope::of(dialect, tree, input),
         document: &document,
         builder,
         stack: ScopeStack::new(dialect),
@@ -84,6 +99,9 @@ pub(super) struct Walk<'a> {
     /// dispatch, name equality, whether the namespaces are separate, and
     /// whether `(declare ...)` means anything.
     pub(super) dialect: Dialect,
+    /// Emacs Lisp's file-level answer to "does a plain `let` bind lexically?".
+    /// Inert for every other dialect.
+    pub(super) dynamic_scope: EmacsLispDynamicScope,
     /// The whole document. The `special` scan needs it: a binding is dynamic
     /// because of a `declaim`/`proclaim`/`defvar` that may sit anywhere in the
     /// file, or a `declare` in an *enclosing* form.
@@ -202,23 +220,35 @@ impl Walk<'_> {
     /// `lexical_scope::traversal::body` does: a declaration is not evaluated,
     /// so the symbols in it are not references.
     pub(super) fn body(&mut self, forms: &[ExpressionView], scope: ScopeId) {
-        // Scheme has no `(declare ...)`, so a leading form spelled that way is
-        // an ordinary call and its symbols are ordinary references.
-        let skips_declarations = self.dialect == Dialect::CommonLisp;
         let mut started = false;
         for form in forms {
-            if skips_declarations
-                && !started
-                && form
-                    .children
-                    .first()
-                    .and_then(head_text)
-                    .is_some_and(is_common_lisp_declaration_form)
-            {
+            if !started && self.is_declaration_form(form) {
                 continue;
             }
             started = true;
             self.form(form, scope, 0);
+        }
+    }
+
+    /// Whether `form` is a leading declaration this dialect does not evaluate.
+    ///
+    /// Common Lisp and Emacs Lisp both have one, and they are not the same
+    /// form: Emacs Lisp spells it `(declare …)` or `(cl-declare …)` and reads
+    /// the head case-sensitively. Either way the contents are metadata —
+    /// `(declare (indent 1))` names no function `indent` — so walking into one
+    /// marks every enclosing binding opaque on a head that is not a head.
+    ///
+    /// Scheme has neither, so a leading form spelled that way is an ordinary
+    /// call and its symbols are ordinary references.
+    fn is_declaration_form(&self, form: &ExpressionView) -> bool {
+        let Some(head) = form.children.first().and_then(head_text) else {
+            return false;
+        };
+        match self.dialect {
+            Dialect::CommonLisp => is_common_lisp_declaration_form(head),
+            Dialect::EmacsLisp => EmacsLispOperator::from_head(head)
+                .is_some_and(EmacsLispOperator::is_declaration_form),
+            _ => false,
         }
     }
 
@@ -249,14 +279,12 @@ impl Walk<'_> {
         // binding special. See `SpecialBinding`. Scheme has no such
         // declaration at all, and its `specials` index is empty, so the
         // condition short-circuits to `Lexical` there.
-        let special = if kind == BindingKind::Variable
-            && self.specials.may_be_declared_special(&name)
-            && common_lisp_dynamic_binding_is_declared(self.document, target, &name)
-        {
-            SpecialBinding::DeclaredSpecial
-        } else {
-            SpecialBinding::Lexical
-        };
+        let special =
+            if kind == BindingKind::Variable && self.binding_is_dynamic(target, head, &name) {
+                SpecialBinding::DeclaredSpecial
+            } else {
+                SpecialBinding::Lexical
+            };
 
         let mut draft = BindingDraft::new(name, kind, scope, bound.span)
             .with_binder_head(head)
@@ -269,6 +297,27 @@ impl Walk<'_> {
         self.definitions.insert(bound.span);
         self.stack.push(id, &bound.name, kind);
         Some(id)
+    }
+
+    /// Whether a variable binding of `name` by `head` is dynamically scoped.
+    ///
+    /// Two dialects reach the same conclusion by opposite routes. Common Lisp
+    /// requires a `declaim`/`proclaim`/`defvar`/`declare` that names the
+    /// symbol, and the walk verifies it reaches this binding. Emacs Lisp asks
+    /// a file-level question first — without `lexical-binding: t` on line 1,
+    /// *every* variable binding in the file is dynamic — and only then looks
+    /// for a `defvar`. Scheme has no such concept at all, and its `specials`
+    /// index is empty, so the Common Lisp path short-circuits to `false`.
+    fn binding_is_dynamic(&self, target: &ExpressionView, head: &str, name: &SymbolName) -> bool {
+        match self.dialect {
+            Dialect::EmacsLisp => self
+                .dynamic_scope
+                .is_dynamic(EmacsLispOperator::from_head(head), name.as_str()),
+            _ => {
+                self.specials.may_be_declared_special(name)
+                    && common_lisp_dynamic_binding_is_declared(self.document, target, name)
+            }
+        }
     }
 }
 

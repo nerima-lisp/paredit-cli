@@ -5,6 +5,37 @@ use paredit_core_syntax::dialect::Dialect;
 
 use super::super::model::{BindingId, BindingKind};
 
+/// How two spellings of a name are compared.
+///
+/// Not a detail: Common Lisp's reader upcases unescaped symbols and strips a
+/// package qualifier, so `X`, `x`, and `cl-user:x` are one name. Emacs Lisp
+/// does neither, so `X` and `x` are two names and a lookup that folded them
+/// would resolve a reference to a binding it has nothing to do with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SymbolIdentity {
+    /// Case-insensitive, package-qualifier-insensitive (Common Lisp).
+    ReaderFolded,
+    /// Byte-for-byte (Emacs Lisp, and every dialect with a single namespace
+    /// of case-sensitive symbols).
+    Exact,
+}
+
+impl SymbolIdentity {
+    pub(super) const fn of(dialect: Dialect) -> Self {
+        match dialect {
+            Dialect::CommonLisp => Self::ReaderFolded,
+            _ => Self::Exact,
+        }
+    }
+
+    fn names_equal(self, candidate: &str, expected: &str) -> bool {
+        match self {
+            Self::ReaderFolded => common_lisp_symbol_reference_eq(candidate, expected),
+            Self::Exact => candidate == expected,
+        }
+    }
+}
+
 /// One binding visible at the current point of the walk.
 #[derive(Debug, Clone)]
 struct VisibleBinding {
@@ -18,9 +49,10 @@ struct VisibleBinding {
 
 /// Which namespace a symbol occurrence is read in.
 ///
-/// Common Lisp keeps variables and functions apart, so `(flet ((x ...)) x)`
-/// reads a *variable* `x`. Symbol macros and `with-slots` slots expand in
-/// value position, so they share the value namespace with variables.
+/// Both Common Lisp and Emacs Lisp keep variables and functions apart, so
+/// `(cl-flet ((x ...)) x)` reads a *variable* `x`. Symbol macros and
+/// `with-slots` slots expand in value position, so they share the value
+/// namespace with variables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Namespace {
     Value,
@@ -106,10 +138,12 @@ impl ScopeStack {
     ///
     /// Common Lisp folds case and package qualification, so `X`, `x` and
     /// `cl-user:x` are one symbol. R7RS 2.1 makes Scheme case-sensitive, where
-    /// folding would resolve `Loop` to a binding named `loop`.
+    /// folding would resolve `Loop` to a binding named `loop`. Emacs Lisp is
+    /// case-sensitive too and has no package syntax at all, so a colon there
+    /// is an ordinary character in a symbol name.
     fn names_equal(&self, candidate: &str, name: &str) -> bool {
         match self.dialect {
-            Dialect::Scheme | Dialect::Racket => candidate == name,
+            Dialect::Scheme | Dialect::Racket | Dialect::EmacsLisp => candidate == name,
             _ => common_lisp_symbol_reference_eq(candidate, name),
         }
     }
@@ -177,6 +211,23 @@ mod tests {
             Some(BindingId::new(1))
         );
         assert_eq!(stack.resolve("X", Namespace::Value), None);
+    }
+
+    #[test]
+    fn emacs_lisp_compares_names_exactly_but_keeps_its_two_namespaces() {
+        // A Lisp-2 like Common Lisp, but with no reader case folding and no
+        // package syntax: `X` is not `x`, and a colon is an ordinary
+        // character in a symbol name.
+        let mut stack = ScopeStack::new(Dialect::EmacsLisp);
+        stack.push(BindingId::new(0), "x", BindingKind::Variable);
+
+        assert_eq!(
+            stack.resolve("x", Namespace::Value),
+            Some(BindingId::new(0))
+        );
+        assert_eq!(stack.resolve("X", Namespace::Value), None);
+        assert_eq!(stack.resolve("cl-user:x", Namespace::Value), None);
+        assert_eq!(stack.resolve("x", Namespace::Function), None);
     }
 
     #[test]

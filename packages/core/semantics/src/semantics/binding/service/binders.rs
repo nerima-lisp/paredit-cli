@@ -33,6 +33,10 @@ impl Walk<'_> {
             return false;
         }
 
+        if self.dialect == Dialect::EmacsLisp {
+            return self.emacs_lisp_binder(view, scope);
+        }
+
         let Some(head) = head_text(&view.children[0]) else {
             return false;
         };

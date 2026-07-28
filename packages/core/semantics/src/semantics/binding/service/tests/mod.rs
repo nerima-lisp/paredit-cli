@@ -8,14 +8,19 @@ use super::build_binding_table;
 
 mod assignments;
 mod differential;
+mod emacs_lisp;
 mod opacity;
 mod property;
 mod scheme_differential;
 mod scoping;
 
 pub(super) fn build(input: &str) -> BindingTable {
-    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
-    build_binding_table(Dialect::CommonLisp, &tree, input)
+    build_in(Dialect::CommonLisp, input)
+}
+
+pub(super) fn build_in(dialect: Dialect, input: &str) -> BindingTable {
+    let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse");
+    build_binding_table(dialect, &tree, input)
 }
 
 /// Every binding as `name@definition-start`, in registration order.
