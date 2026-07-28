@@ -59,6 +59,25 @@ impl DialectReaderPolicy {
             Dialect::Janet if byte == b'#' => Some(1),
             Dialect::Janet => None,
             _ if byte == b';' => Some(1),
+            // `#lang racket/base` is a reader *directive*, not a datum: it
+            // names the language for the rest of the file and extends to the
+            // end of the line. Every real Racket file opens with one, and
+            // reading it as a dispatch made all of them fail to parse.
+            //
+            // Consuming it as a line comment keeps it in the trivia, so it
+            // survives a format round-trip; `Dialect::detect` reads it
+            // separately to decide which language the file is in.
+            //
+            // The `byte == b'#'` guard is not redundant. `is_atom_boundary`
+            // calls this once per byte of every atom in the file, so without
+            // it each of those bytes would pay a bounds check and a five-byte
+            // comparison. `head_index` records what a per-token cost on this
+            // path did to the lint benchmark.
+            Dialect::Scheme | Dialect::Racket
+                if byte == b'#' && starts_with_lang_directive(bytes, pos) =>
+            {
+                Some(LANG_DIRECTIVE.len())
+            }
             _ => None,
         }
     }
@@ -74,7 +93,26 @@ impl DialectReaderPolicy {
         )
     }
 
-    pub(super) const fn supports_symbol_escapes(self) -> bool {
+    /// Whether `|...|` reads as one symbol rather than a token boundary.
+    ///
+    /// R7RS 2.1 gives Scheme the same vertical-line notation Common Lisp has
+    /// in CLHS 2.1.4.2, so `|Foo Bar|` is a single identifier in both.
+    pub(super) const fn supports_bar_quoted_symbols(self) -> bool {
+        matches!(
+            self.dialect,
+            Dialect::CommonLisp | Dialect::Scheme | Dialect::Racket | Dialect::Unknown
+        )
+    }
+
+    /// Whether a bare `\` escapes the next character *outside* `|...|`.
+    ///
+    /// Deliberately narrower than [`Self::supports_bar_quoted_symbols`].
+    /// Common Lisp's single-escape works anywhere in a token, so `a\ b` is one
+    /// symbol; Scheme has no such rule, and its `\x41;` escapes are legal only
+    /// inside a vertical-line region, which `consume_multiple_escape` handles
+    /// on its own. Reading a stray `\` as an escape in Scheme would swallow
+    /// the delimiter after it and unbalance the tree.
+    pub(super) const fn supports_single_escape(self) -> bool {
         matches!(self.dialect, Dialect::CommonLisp | Dialect::Unknown)
     }
 
@@ -132,8 +170,17 @@ impl DialectReaderPolicy {
 
     const fn allows_delimiter(self, delimiter: Delimiter) -> bool {
         match self.dialect {
-            Dialect::CommonLisp | Dialect::Scheme => matches!(delimiter, Delimiter::Paren),
-            Dialect::EmacsLisp => matches!(delimiter, Delimiter::Paren | Delimiter::Bracket),
+            Dialect::CommonLisp => matches!(delimiter, Delimiter::Paren),
+            // R6RS 4.2.1 makes `[` `]` equivalent to `(` `)`, and every Scheme
+            // in wide use -- Guile, Chez, Chicken, Gauche, MIT -- accepts them
+            // even under an R7RS reader, where they are merely reserved. The
+            // bracketed binding list `(let ([x 1]) x)` is the dominant idiom,
+            // so refusing it rejected the majority of real Scheme outright.
+            // Braces stay out: no Scheme reader gives them a meaning, and
+            // Racket, which does, is a separate arm below.
+            Dialect::Scheme | Dialect::EmacsLisp => {
+                matches!(delimiter, Delimiter::Paren | Delimiter::Bracket)
+            }
             Dialect::Racket
             | Dialect::Lfe
             | Dialect::Clojure
@@ -243,6 +290,15 @@ impl DialectReaderPolicy {
                 b'\\' | b't' | b'T' | b'f' | b'F' | b'b' | b'B' | b'o' | b'O' | b'd' | b'D' | b'x'
                 | b'X' | b'e' | b'E' | b'i' | b'I',
             ) => None,
+            // `#:mode` is a Racket keyword: a self-evaluating literal, and the
+            // spelling of every keyword argument in Racket's standard library.
+            // It reads as one atom, so it is not a reader macro at all.
+            Some(b':') if matches!(self.dialect, Dialect::Racket) => None,
+            // `#!fold-case`, `#!no-fold-case`, `#!eof`, `#!default`: R7RS
+            // directives and their Guile/MIT extensions. A structural tool has
+            // nothing to do with them beyond keeping them in the tree as
+            // atoms, which is what `None` achieves.
+            Some(b'!') => None,
             _ => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
         }
     }
@@ -361,6 +417,22 @@ impl DialectReaderPolicy {
     }
 }
 
+/// The Racket language directive, which the reader consumes to end of line.
+pub(crate) const LANG_DIRECTIVE: &str = "#lang";
+
+/// Whether a `#lang` directive starts at `pos`.
+///
+/// The directive must be followed by whitespace: `#language` is not one, and
+/// neither is a bare `#lang` at end of input.
+pub(crate) fn starts_with_lang_directive(bytes: &[u8], pos: usize) -> bool {
+    bytes
+        .get(pos..pos + LANG_DIRECTIVE.len())
+        .is_some_and(|window| window == LANG_DIRECTIVE.as_bytes())
+        && bytes
+            .get(pos + LANG_DIRECTIVE.len())
+            .is_some_and(u8::is_ascii_whitespace)
+}
+
 const fn classify_shared_prefix(
     byte: u8,
     next: Option<u8>,
@@ -428,4 +500,16 @@ const fn classify_quote_prefix(byte: u8, next: Option<u8>) -> Option<ReaderMacro
 
 const fn prefix(semantic: ReaderPrefix, width: usize) -> Option<ReaderMacro> {
     Some(ReaderMacro::Prefix { semantic, width })
+}
+
+/// The language a `#lang` line names, given the line's text.
+///
+/// Lives beside the reader's own directive constants so the parser and the
+/// dialect detector cannot disagree about what counts as one.
+pub(crate) fn lang_directive_language(line: &str) -> Option<&str> {
+    if !starts_with_lang_directive(line.as_bytes(), 0) {
+        return None;
+    }
+    let language = line[LANG_DIRECTIVE.len()..].trim();
+    (!language.is_empty()).then_some(language)
 }

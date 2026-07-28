@@ -58,7 +58,13 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan
     if !executable_reader_context_at_path(&tree, request.dialect, &path)? {
         return Err(RenameAtError::InertReaderContext.into());
     }
-    if selected.text.contains(':') || request.to.as_str().contains(':') {
+    // A `:` means package qualification in Common Lisp, and renaming across
+    // packages is a different operation. In Scheme it is an ordinary
+    // identifier character - `string:trim` and SRFI-style `foo:bar` names are
+    // just names - so refusing them there would reject valid code.
+    if matches!(request.dialect, Dialect::CommonLisp)
+        && (selected.text.contains(':') || request.to.as_str().contains(':'))
+    {
         return Err(RenameAtError::UnsupportedPackageSyntax.into());
     }
     let from =
@@ -74,6 +80,11 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan
         from: &from,
         to: &request.to,
     })?;
+    // Every specialized candidate is a Common Lisp construct: a global
+    // callable rename that follows `#'`/`function` designators, `flet`/
+    // `macrolet` bindings, and `define-symbol-macro`. No other dialect has
+    // them, and a single-namespace dialect's lexical candidate above already
+    // covers call sites. `add_specialized_candidates` enforces that itself.
     add_specialized_candidates(
         &mut candidates,
         SpecializedCandidateContext {

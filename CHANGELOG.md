@@ -56,14 +56,6 @@ for 99% of its cells.
   succeeding, because the lambda-list resolver knew `defn` but not Fennel's
   `fn`. They now check Fennel definitions like every other bracket dialect's.
 
-### Known
-
-- `inspect unused-parameters` reads the body of a Scheme or Racket
-  `(define (name args) body)` as its parameter list, because the parameters
-  live inside the second child rather than in one of their own. The
-  capability matrix records those two cells as `silent` rather than claiming
-  a support that would mislead; deepening Scheme is separate work.
-
 ## [1.2.1] - 2026-07-28
 
 No command, flag, exit code, or JSON field changed in this release: nothing

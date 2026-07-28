@@ -22,12 +22,13 @@ impl<'a> AtomPathIndex<'a> {
     }
 }
 
-/// Reports whether an occurrence sits where a lexical value can be referenced.
+/// Whether an occurrence reads the binding a value rename is renaming.
 ///
-/// In a dialect that resolves call heads in their own namespace, the head of a
-/// form names a function rather than the surrounding `let` binding, so it is
-/// not a value position. In a Lisp-1 the head is an ordinary value reference
-/// and has to be renamed with the rest.
+/// Common Lisp, Emacs Lisp and LFE are Lisp-2s, so head position reads the
+/// *function* namespace and a variable rename must leave it alone. A Lisp-1
+/// has no such split: `(let ((f car)) (f x))` calls the very binding it
+/// introduced, and skipping head position there would rename the definition
+/// while leaving every call site pointing at a name that no longer exists.
 pub fn is_value_position(dialect: Dialect, atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
     if !dialect.separates_function_namespace() {
         return true;

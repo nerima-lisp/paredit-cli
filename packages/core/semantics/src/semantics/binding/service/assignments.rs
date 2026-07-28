@@ -1,6 +1,5 @@
 //! Recording which bindings a form reassigns.
 
-use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::ExpressionView;
 use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
 
@@ -18,7 +17,11 @@ impl Walk<'_> {
     /// propagating a value that never changed. `(setf x 1)` does rebind, and
     /// only the bare-atom shape can tell the two apart.
     pub(super) fn record_assignments(&mut self, view: &ExpressionView, head: &str) {
-        let Some(form) = assignment_form(Dialect::CommonLisp, head) else {
+        // Asked of the walk's dialect, not assumed. Scheme's `set!` was
+        // already in the policy table and unreachable: hardcoding Common Lisp
+        // here meant a Scheme binding could never be recorded as reassigned,
+        // and the value layer would happily propagate through a `set!`.
+        let Some(form) = assignment_form(self.dialect, head) else {
             return;
         };
 

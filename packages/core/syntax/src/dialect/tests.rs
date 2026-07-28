@@ -282,3 +282,54 @@ fn exposes_common_lisp_dependency_and_package_capabilities_by_dialect() {
     assert!(Dialect::CommonLisp.is_common_lisp_asdf_system_definition_head("asdf:defsystem"));
     assert!(!Dialect::EmacsLisp.is_common_lisp_asdf_system_definition_head("defsystem"));
 }
+
+#[test]
+fn a_lang_directive_names_its_language() {
+    assert_eq!(
+        Dialect::lang_directive("#lang racket/base\n(define x 1)\n"),
+        Some("racket/base")
+    );
+    assert_eq!(
+        Dialect::lang_directive(";; banner\n\n#lang typed/racket\n"),
+        Some("typed/racket")
+    );
+}
+
+#[test]
+fn a_lang_directive_needs_the_exact_spelling() {
+    // `#language` is not one, and neither is a bare `#lang` with nothing after
+    // it. Both would otherwise be read as a language named "" or "uage".
+    for source in ["#language racket\n", "#lang\n", "(define x 1)\n", ""] {
+        assert_eq!(Dialect::lang_directive(source), None, "{source:?}");
+    }
+}
+
+#[test]
+fn a_lang_directive_settles_a_dialect_the_extension_leaves_open() {
+    // Reading a `#lang racket` file as R7RS Scheme applies the wrong reader to
+    // `#:keyword` literals and the wrong rules to `struct`.
+    let source = "#lang racket/base\n(define x 1)\n";
+
+    assert_eq!(
+        Dialect::detect_in_source(Some(std::path::Path::new("main.scm")), None, source),
+        Dialect::Racket
+    );
+    assert_eq!(
+        Dialect::detect_in_source(None, None, source),
+        Dialect::Racket
+    );
+}
+
+#[test]
+fn an_explicit_dialect_and_a_decisive_extension_both_outrank_the_directive() {
+    let source = "#lang racket/base\n(define x 1)\n";
+
+    assert_eq!(
+        Dialect::detect_in_source(None, Some(Dialect::Scheme), source),
+        Dialect::Scheme
+    );
+    assert_eq!(
+        Dialect::detect_in_source(Some(std::path::Path::new("core.lisp")), None, source),
+        Dialect::CommonLisp
+    );
+}

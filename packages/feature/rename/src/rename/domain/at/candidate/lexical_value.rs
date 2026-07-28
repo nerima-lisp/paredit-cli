@@ -32,6 +32,8 @@ pub fn binding_candidates(context: BindingCandidateContext<'_>) -> RenameResult<
         from,
         to,
     } = context;
+    // Every dialect `plan_rename_at` accepts has verified rename-binding
+    // semantics; `supports_rename_at_dialect` is what guarantees it.
     let semantic = dialect
         .verify_rename_binding()
         .map_err(|_| RenameAtError::UnsupportedDialect)?;

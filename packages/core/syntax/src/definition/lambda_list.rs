@@ -1,14 +1,58 @@
 use crate::common_lisp::{
     CommonLispLambdaListShape, CommonLispOperator, normalize_common_lisp_operator_head,
 };
+use crate::dialect::Dialect;
+use crate::scheme::{SchemeFormalKind, scheme_formals_in};
 use crate::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::DefinitionCategory;
 
-pub(super) fn definition_lambda_list_child_index(
+/// Where a definition's parameters live: which child holds the lambda list,
+/// and which of that child's children is the first actual parameter.
+pub(super) fn definition_lambda_list_position(
+    dialect: Dialect,
     view: &ExpressionView,
     head: &str,
-) -> Option<usize> {
+) -> Option<(usize, usize)> {
+    if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
+        return scheme_lambda_list_position(view, head);
+    }
+    definition_lambda_list_child_index(view, head).map(|index| (index, 0))
+}
+
+/// Scheme puts the procedure's name inside the lambda list.
+///
+/// `(define (f x y) body)` has no child that is a bare parameter list: child 1
+/// is `(f x y)` and child 2 is the first body form. Resolving the lambda list
+/// the Common Lisp way -- "the list at child 2" -- picked up the *body* and
+/// reported `(+ x y)` as three parameters.
+fn scheme_lambda_list_position(view: &ExpressionView, head: &str) -> Option<(usize, usize)> {
+    match head {
+        // `(define (f x) ...)` binds parameters; `(define x 1)` binds none.
+        // The curried `(define ((f a) b) ...)` is deliberately not reported
+        // here: its parameters span two nesting levels, which this one-node
+        // model cannot express. `scheme::scheme_define_target` reads it.
+        "define" | "define/contract" => {
+            let target = view.children.get(1)?;
+            (target.kind == ExpressionKind::List
+                && target
+                    .children
+                    .first()
+                    .is_some_and(|name| name.kind == ExpressionKind::Atom))
+            .then_some((1, 1))
+        }
+        // `(define-syntax-rule (name pattern ...) template)` has the same
+        // name-inside-the-list shape.
+        "define-syntax-rule" => list_child_index(view, 1).map(|index| (index, 1)),
+        // `(lambda (x y) body)`: child 1 is nothing but parameters. A bare
+        // symbol formals list, `(lambda args body)`, is not a list and so is
+        // not reported -- `scheme::scheme_formals` reads that shape.
+        "lambda" | "λ" => list_child_index(view, 1).map(|index| (index, 0)),
+        _ => None,
+    }
+}
+
+fn definition_lambda_list_child_index(view: &ExpressionView, head: &str) -> Option<usize> {
     if let Some(shape) = CommonLispOperator::from_head(head)
         .and_then(CommonLispOperator::definition_lambda_list_shape)
     {
@@ -59,9 +103,15 @@ pub(super) fn definition_body_start_child_index(
     }
 }
 
-pub(super) fn definition_lambda_parameter_count(lambda_list: &ExpressionView) -> usize {
-    lambda_list
-        .children
+pub(super) fn definition_lambda_parameter_count(
+    dialect: Dialect,
+    parameters: &[ExpressionView],
+) -> usize {
+    if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
+        return scheme_formals_in(parameters).len();
+    }
+
+    parameters
         .iter()
         .filter(|child| match child.kind {
             ExpressionKind::Atom => child
@@ -108,15 +158,20 @@ fn arity_mode_for_marker(text: &str) -> Option<(ArityMode, bool)> {
 /// argument — the overwhelmingly common case — reads as a real arity
 /// mismatch.
 pub(super) fn definition_lambda_parameter_arity(
-    lambda_list: &ExpressionView,
+    dialect: Dialect,
+    parameters: &[ExpressionView],
 ) -> (usize, Option<usize>) {
+    if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
+        return scheme_lambda_parameter_arity(parameters);
+    }
+
     let mut mode = ArityMode::Required;
     let mut required = 0usize;
     let mut optional = 0usize;
     let mut key_count = 0usize;
     let mut unbounded = false;
 
-    for child in &lambda_list.children {
+    for child in parameters {
         if let ExpressionKind::Atom = child.kind {
             if let Some(marker) = child
                 .text
@@ -142,6 +197,35 @@ pub(super) fn definition_lambda_parameter_arity(
         (required, None)
     } else {
         (required, Some(required + optional + key_count * 2))
+    }
+}
+
+/// Scheme's answer to the same question, in Scheme's own vocabulary.
+///
+/// There is no `&optional`. A dotted tail -- `(a b . rest)` -- collects every
+/// remaining argument and so removes the upper bound; Racket's `[x default]`
+/// makes a parameter omissible; and a `#:kw name` pair consumes two argument
+/// slots at the call site while binding one name.
+fn scheme_lambda_parameter_arity(parameters: &[ExpressionView]) -> (usize, Option<usize>) {
+    let mut required = 0usize;
+    let mut optional = 0usize;
+    let mut unbounded = false;
+
+    for formal in scheme_formals_in(parameters) {
+        match formal.kind {
+            SchemeFormalKind::Required => required += 1,
+            SchemeFormalKind::Rest => unbounded = true,
+            // A keyword argument is always omissible at the call site, and
+            // supplying one costs two slots: the keyword and its value.
+            SchemeFormalKind::Optional => optional += 1,
+            SchemeFormalKind::Keyword => optional += 2,
+        }
+    }
+
+    if unbounded {
+        (required, None)
+    } else {
+        (required, Some(required + optional))
     }
 }
 

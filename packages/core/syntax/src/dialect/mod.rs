@@ -18,6 +18,24 @@ mod tests;
 
 use std::path::Path;
 
+use crate::sexpr::reader_policy_lang_directive;
+
+/// Reads the `#lang` line a Racket source may open with.
+///
+/// Racket requires the directive to be the first non-whitespace, non-comment
+/// text in the file, but a leading `;`-comment banner is common enough that
+/// skipping those keeps ordinary files working.
+fn lang_directive(source: &str) -> Option<&str> {
+    for line in source.lines() {
+        let line = line.trim_start();
+        if line.is_empty() || line.starts_with(';') {
+            continue;
+        }
+        return reader_policy_lang_directive(line);
+    }
+    None
+}
+
 /// Selects Lisp-family parsing and refactoring rules for a source file.
 ///
 /// # Examples
@@ -54,6 +72,35 @@ impl Dialect {
         }
         path.and_then(|path| path.extension().and_then(|extension| extension.to_str()))
             .map_or(Self::Unknown, Self::from_extension)
+    }
+
+    /// Resolves the effective dialect, consulting the source for a `#lang`
+    /// line when the extension does not settle it.
+    ///
+    /// An explicit override always wins, and a recognised extension is trusted
+    /// over the file's contents. The directive only breaks ties: a `.scm` or
+    /// extensionless file opening with `#lang racket` is Racket, and reading
+    /// it as R7RS Scheme would apply the wrong reader to `#:keyword` literals
+    /// and the wrong rules to `struct`.
+    #[must_use]
+    pub fn detect_in_source(path: Option<&Path>, explicit: Option<Self>, source: &str) -> Self {
+        let detected = Self::detect(path, explicit);
+        if explicit.is_some() || !matches!(detected, Self::Unknown | Self::Scheme) {
+            return detected;
+        }
+        if lang_directive(source).is_some() {
+            return Self::Racket;
+        }
+        detected
+    }
+
+    /// The language a `#lang` directive names, if the source opens with one.
+    ///
+    /// Returns the bare language path -- `racket/base`, `typed/racket` -- so
+    /// callers can report it without re-parsing the line.
+    #[must_use]
+    pub fn lang_directive(source: &str) -> Option<&str> {
+        lang_directive(source)
     }
 
     /// Maps a lowercase file extension onto the closest supported dialect.
