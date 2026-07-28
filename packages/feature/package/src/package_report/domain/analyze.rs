@@ -85,7 +85,9 @@ pub fn analyze_in_package_form(
     let Some(head) = atom_text(&view.children[0]) else {
         return Ok(None);
     };
-    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::InPackage) {
+    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::InPackage)
+        && !is_clojure_namespace_head(dialect, head)
+    {
         return Ok(None);
     }
 
@@ -103,4 +105,20 @@ pub fn analyze_in_package_form(
         view.span,
         name,
     )))
+}
+
+/// Returns whether a head declares the namespace a Clojure file's forms belong
+/// to.
+///
+/// `ns` and `in-ns` fill the role Common Lisp splits between `defpackage` and
+/// `in-package`, but only the `in-package` half is reported here. The
+/// `defpackage` half — the `:require`/`:use`/`:import` clauses — is already
+/// reported by the dependency layer as `ns-require`/`ns-use`/`ns-import`, so
+/// reporting it again as a package *definition* would both double-count those
+/// edges and expose an `ns` form to the `defpackage` export and nickname
+/// refactors, which cannot rewrite it correctly.
+fn is_clojure_namespace_head(dialect: Dialect, head: &str) -> bool {
+    dialect == Dialect::Clojure
+        && paredit_core_syntax::clojure::ClojureOperator::from_head(head)
+            .is_some_and(paredit_core_syntax::clojure::ClojureOperator::is_namespace_declaration)
 }

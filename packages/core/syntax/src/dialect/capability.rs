@@ -1,3 +1,4 @@
+use crate::clojure::{ClojureOperator, is_clojure_definition_head};
 use crate::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispLetBindingForm, CommonLispLocalCallableForm,
     CommonLispOperator, CommonLispPackageDeclarationForm, CommonLispRuntimeDependencyForm,
@@ -46,17 +47,7 @@ impl Dialect {
                     operator.definition_category().is_some() || operator.is_binder()
                 })
             }
-            Self::Clojure => matches!(
-                head,
-                "ns" | "def"
-                    | "defn"
-                    | "defmacro"
-                    | "defrecord"
-                    | "deftype"
-                    | "defprotocol"
-                    | "defmulti"
-                    | "defmethod"
-            ),
+            Self::Clojure => is_clojure_definition_head(head),
             Self::Hy => matches!(
                 head,
                 "defn" | "defn/a" | "defmacro" | "defclass" | "setv" | "setx" | "require"
@@ -114,7 +105,12 @@ impl Dialect {
             ),
             Self::Lfe => matches!(head, "defun" | "defmacro"),
             Self::Scheme | Self::Racket => matches!(head, "define"),
-            Self::Clojure => matches!(head, "defn" | "defn-" | "defmacro"),
+            // Clojure's private `defn-` takes the same parameter vector as
+            // `defn`. `defmethod` is excluded: see
+            // `ClojureOperator::supports_parameter_refactor`.
+            Self::Clojure => {
+                clojure_operator(head).is_some_and(ClojureOperator::supports_parameter_refactor)
+            }
             Self::Hy => matches!(head, "defn" | "defn/a" | "defmacro"),
             Self::Carp => matches!(head, "defn" | "defndynamic" | "defmacro"),
             Self::Janet => matches!(head, "defn" | "defn-" | "defmacro" | "defmacro-" | "varfn"),
@@ -144,7 +140,10 @@ impl Dialect {
             Self::EmacsLisp => matches!(head, "defun" | "cl-defun" | "defsubst"),
             Self::Lfe => head == "defun",
             Self::Scheme | Self::Racket => head == "define",
-            Self::Clojure | Self::Janet => matches!(head, "defn" | "defn-"),
+            Self::Clojure => {
+                clojure_operator(head).is_some_and(ClojureOperator::is_inline_function_definition)
+            }
+            Self::Janet => matches!(head, "defn" | "defn-"),
             Self::Hy => matches!(head, "defn" | "defn/a"),
             Self::Carp => matches!(head, "defn" | "defndynamic"),
             Self::Fennel => matches!(head, "fn" | "lambda" | "λ"),
@@ -248,10 +247,18 @@ impl Dialect {
         }
 
         match self {
-            Self::Clojure | Self::Hy | Self::Carp if head == "let" => Some(
-                CommonLispValueScopeForm::Let(CommonLispLetBindingForm::Parallel),
+            // Clojure `let` is sequential, not parallel: in
+            // `(let [x 1 y (inc x)] y)` the initializer of `y` sees `x`.
+            Self::Clojure if clojure_operator(head) == Some(ClojureOperator::Let) => Some(
+                CommonLispValueScopeForm::Let(CommonLispLetBindingForm::Sequential),
             ),
-            Self::Clojure | Self::Hy | Self::Carp if head == "fn" => {
+            Self::Clojure if clojure_operator(head) == Some(ClojureOperator::Fn) => {
+                Some(CommonLispValueScopeForm::FunctionLiteral)
+            }
+            Self::Hy | Self::Carp if head == "let" => Some(CommonLispValueScopeForm::Let(
+                CommonLispLetBindingForm::Parallel,
+            )),
+            Self::Hy | Self::Carp if head == "fn" => {
                 Some(CommonLispValueScopeForm::FunctionLiteral)
             }
             Self::Lfe if head == "let" => Some(CommonLispValueScopeForm::Let(
@@ -300,9 +307,14 @@ impl Dialect {
                 "lambda" => Some(CommonLispBindingRefactorForm::LambdaLike),
                 _ => None,
             },
+            // See `common_lisp_value_scope_form_for_head`: Clojure `let` is
+            // sequential, and the two layers must agree.
+            Self::Clojure if clojure_operator(head) == Some(ClojureOperator::Let) => Some(
+                CommonLispBindingRefactorForm::Let(CommonLispLetBindingForm::Sequential),
+            ),
             // Bracketed binding forms all take the same `[name value ...]`
             // pairs, so the resource and conditional binders join `let`.
-            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel
+            Self::Hy | Self::Carp | Self::Janet | Self::Fennel
                 if bracket_let_binding_head(self, head) =>
             {
                 Some(CommonLispBindingRefactorForm::Let(
@@ -454,7 +466,8 @@ impl Dialect {
 
     pub fn supports_inline_let_refactor_head(self, head: &str) -> bool {
         match self {
-            Self::Clojure | Self::Hy | Self::Carp | Self::Janet | Self::Fennel => {
+            Self::Clojure => clojure_operator(head) == Some(ClojureOperator::Let),
+            Self::Hy | Self::Carp | Self::Janet | Self::Fennel => {
                 bracket_let_binding_head(self, head)
             }
             Self::CommonLisp
@@ -496,4 +509,8 @@ fn bracket_let_binding_head(dialect: Dialect, head: &str) -> bool {
         | Dialect::Racket
         | Dialect::Unknown => false,
     }
+}
+
+fn clojure_operator(head: &str) -> Option<ClojureOperator> {
+    ClojureOperator::from_head(head)
 }

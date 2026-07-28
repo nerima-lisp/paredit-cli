@@ -1,3 +1,4 @@
+use crate::clojure::ClojureOperator;
 use crate::common_lisp::{
     CommonLispLambdaListShape, CommonLispOperator, normalize_common_lisp_operator_head,
 };
@@ -16,6 +17,9 @@ pub(super) fn definition_lambda_list_position(
 ) -> Option<(usize, usize)> {
     if matches!(dialect, Dialect::Scheme | Dialect::Racket) {
         return scheme_lambda_list_position(view, head);
+    }
+    if dialect == Dialect::Clojure {
+        return clojure_lambda_list_child_index(view, head).map(|index| (index, 0));
     }
     definition_lambda_list_child_index(view, head).map(|index| (index, 0))
 }
@@ -244,6 +248,53 @@ fn common_lisp_lambda_list_child_index(
             })
         }
     }
+}
+
+/// Locates a Clojure definition's parameter vector.
+///
+/// Clojure cannot share the Common Lisp resolution above. Two differences make
+/// it unsafe:
+///
+/// - `defmethod` puts exactly one dispatch value between the name and the
+///   parameters, and that dispatch value may itself be a vector, as in
+///   `(defmethod encode [:json :pretty] [x] …)`. The Common Lisp `defmethod`
+///   rule — "the first list at or after child 2" — picks the dispatch value,
+///   so a parameter insertion silently rewrote it and changed which calls the
+///   method matched.
+/// - `defn` accepts a docstring and an attribute map before the parameters,
+///   and accepts several `([params] body)` arity clauses instead of one
+///   vector. Only a single parameter vector has one index to report.
+fn clojure_lambda_list_child_index(view: &ExpressionView, head: &str) -> Option<usize> {
+    let operator = ClojureOperator::from_head(head)?;
+    if operator == ClojureOperator::Defmethod {
+        return bracket_child_index(view, 3);
+    }
+    if !matches!(
+        operator,
+        ClojureOperator::Defn | ClojureOperator::DefnPrivate | ClojureOperator::Defmacro
+    ) {
+        return None;
+    }
+
+    // Skip the docstring and attribute map, the only forms allowed between the
+    // name and the parameters.
+    let mut index = 2;
+    while let Some(child) = view.children.get(index) {
+        let is_docstring = child.kind == ExpressionKind::Atom
+            && child.text.as_deref().is_some_and(|t| t.starts_with('"'));
+        let is_attribute_map = child.delimiter == Some(Delimiter::Brace);
+        if !is_docstring && !is_attribute_map {
+            break;
+        }
+        index += 1;
+    }
+    bracket_child_index(view, index)
+}
+
+fn bracket_child_index(view: &ExpressionView, index: usize) -> Option<usize> {
+    view.children
+        .get(index)
+        .and_then(|child| (child.delimiter == Some(Delimiter::Bracket)).then_some(index))
 }
 
 fn list_child_index(view: &ExpressionView, index: usize) -> Option<usize> {

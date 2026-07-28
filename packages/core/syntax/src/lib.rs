@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod clojure;
 pub mod common_lisp;
 pub mod definition;
 pub mod dialect;

@@ -702,13 +702,22 @@ fn definition_shape(
         Dialect::Lfe if head == "defrecord" => named_only(form, DefinitionCategory::Struct),
         Dialect::Lfe if head == "defmodule" => named_only(form, DefinitionCategory::Package),
         Dialect::Scheme | Dialect::Racket => scheme_definition_shape(form, head),
-        Dialect::Clojure | Dialect::Hy if head == "defn" => {
+        // `defn-` is `defn` with the var marked private; the layout is
+        // identical. `declare` is deliberately absent: it names several vars
+        // at once, so no single-name shape describes it.
+        Dialect::Clojure if matches!(head, "defn" | "defn-") => {
+            clojure_defn_shape(form, DefinitionCategory::Function)
+        }
+        Dialect::Hy if head == "defn" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_FUNCTION)
         }
-        Dialect::Clojure | Dialect::Hy if head == "defmacro" => {
+        Dialect::Clojure if head == "defmacro" => {
+            clojure_defn_shape(form, DefinitionCategory::Macro)
+        }
+        Dialect::Hy if head == "defmacro" => {
             direct_callable_shape(form, Delimiter::Bracket, DIRECT_MACRO)
         }
-        Dialect::Clojure if head == "def" => direct_variable_shape(form),
+        Dialect::Clojure if matches!(head, "def" | "defonce") => direct_variable_shape(form),
         Dialect::Hy if matches!(head, "setv" | "setx") => direct_variable_shape(form),
         Dialect::Hy if head == "defclass" => named_only(form, DefinitionCategory::Class),
         // Carp splits its dynamic (compile-time) bindings in two: `defdynamic`
@@ -954,6 +963,29 @@ fn scope_shape(policy: DialectSemanticPolicy, form: &ExpressionView) -> Option<S
         Dialect::Scheme | Dialect::Racket => scheme_scope_shape(form, head),
         Dialect::Clojure if head == "let" => flat_scope(form, FLAT_LET_SCOPE),
         Dialect::Clojure if head == "fn" => clojure_fn_scope(form),
+        // Every one of these takes a `[name init ...]` vector whose
+        // initializers are evaluated in order, exactly like `let`. Clojure has
+        // no parallel binding form, so they all share one shape.
+        Dialect::Clojure
+            if matches!(
+                head,
+                "loop"
+                    | "binding"
+                    | "with-open"
+                    | "with-redefs"
+                    | "with-local-vars"
+                    | "if-let"
+                    | "if-some"
+                    | "when-let"
+                    | "when-some"
+                    | "when-first"
+            ) =>
+        {
+            flat_scope(form, FLAT_LET_SCOPE)
+        }
+        Dialect::Clojure if matches!(head, "defn" | "defn-" | "defmacro") => {
+            clojure_defn_scope(form)
+        }
         // Hy's `for` and `with` take the same bracketed `name value` pairs as
         // its `let`, so all three share the flat-pair layout.
         Dialect::Hy if matches!(head, "let" | "for" | "with") => flat_scope(form, FLAT_LET_SCOPE),
@@ -1241,6 +1273,104 @@ fn clause_scope(
             body_child_index: 1,
         },
     ))
+}
+
+/// Where the callable parts of a Clojure `defn` form sit.
+///
+/// `defn` accepts an optional docstring and an optional attribute map between
+/// the name and the parameters, and it accepts either one parameter vector or
+/// a run of `([params] body)` arity clauses. All eight combinations are
+/// idiomatic, and a docstring in particular is the norm rather than the
+/// exception, so a shape that only recognises `(defn name [params] body)`
+/// misses most real definitions.
+#[derive(Clone, Copy)]
+enum ClojureDefnLayout {
+    /// One parameter vector at this child index; the body follows it.
+    SingleArity { parameters: usize },
+    /// A run of arity clauses starting at this child index.
+    MultiArity { first_clause: usize },
+}
+
+fn clojure_defn_layout(form: &ExpressionView) -> Option<ClojureDefnLayout> {
+    // The name must be a plain symbol; a quasiquoted or otherwise computed
+    // designator has no statically resolvable layout.
+    atom_text(form.children.get(1)?)?;
+
+    // Skip the docstring and attribute map, which are the only things allowed
+    // between the name and the parameters.
+    let mut index = 2;
+    while let Some(child) = form.children.get(index) {
+        let is_docstring = atom_text(child).is_some_and(|text| text.starts_with('"'));
+        let is_attribute_map = is_plain_list(child, Delimiter::Brace);
+        if !is_docstring && !is_attribute_map {
+            break;
+        }
+        index += 1;
+    }
+
+    let first = form.children.get(index)?;
+    if is_plain_list(first, Delimiter::Bracket) {
+        return Some(ClojureDefnLayout::SingleArity { parameters: index });
+    }
+
+    let clauses = form.children.get(index..)?;
+    (!clauses.is_empty()
+        && clauses
+            .iter()
+            .all(|clause| is_arity_clause(clause, Delimiter::Bracket)))
+    .then_some(ClojureDefnLayout::MultiArity {
+        first_clause: index,
+    })
+}
+
+fn clojure_defn_shape(
+    form: &ExpressionView,
+    category: DefinitionCategory,
+) -> Option<DefinitionShape> {
+    let name = Some(RelativeNodePath::Child(1));
+    Some(match clojure_defn_layout(form)? {
+        ClojureDefnLayout::SingleArity { parameters } => DefinitionShape::new(
+            category,
+            name,
+            Some(ParameterShape::new(RelativeNodePath::Child(parameters), 0)),
+            BodyShape::ChildrenFrom(parameters + 1),
+        ),
+        // Each arity clause carries its own parameter list, so no single
+        // `ParameterShape` describes the form.
+        ClojureDefnLayout::MultiArity { first_clause } => DefinitionShape::new(
+            category,
+            name,
+            None,
+            BodyShape::ClauseChildrenFrom {
+                first_clause_index: first_clause,
+                body_child_index: 1,
+            },
+        ),
+    })
+}
+
+/// The lexical scope a `defn` opens over its body.
+///
+/// Unlike `fn`, the name is a namespace-level var rather than a lexical
+/// binding, so it is not part of the binder shape: only the parameters are.
+fn clojure_defn_scope(form: &ExpressionView) -> Option<ScopeShape> {
+    Some(match clojure_defn_layout(form)? {
+        ClojureDefnLayout::SingleArity { parameters } => ScopeShape::new(
+            BinderShape::Parameters(ParameterShape::new(RelativeNodePath::Child(parameters), 0)),
+            BodyShape::ChildrenFrom(parameters + 1),
+        ),
+        ClojureDefnLayout::MultiArity { first_clause } => ScopeShape::new(
+            BinderShape::ParameterClauses {
+                name: None,
+                first_clause_index: first_clause,
+                parameters: ParameterShape::new(RelativeNodePath::Child(0), 0),
+            },
+            BodyShape::ClauseChildrenFrom {
+                first_clause_index: first_clause,
+                body_child_index: 1,
+            },
+        ),
+    })
 }
 
 fn clojure_fn_scope(form: &ExpressionView) -> Option<ScopeShape> {
@@ -2001,6 +2131,76 @@ mod tests {
     }
 
     #[test]
+    fn clojure_private_defn_is_a_definition_at_every_layer() {
+        // `(defn- helper [x y] ...)` used to fall through all three layers:
+        // `inspect outline` marked it as not a definition and `inspect
+        // definitions` undercounted functions by one.
+        let policy = DialectSemanticPolicy::new(Dialect::Clojure);
+        let form = parsed_form("(defn- helper [x y] (+ x y))", Dialect::Clojure);
+
+        assert!(Dialect::Clojure.is_definition_head("defn-"));
+        assert_eq!(
+            crate::definition::definition_shape(Dialect::Clojure, &form, "defn-")
+                .map(|shape| shape.category),
+            Some(DefinitionCategory::Function)
+        );
+
+        let shape = policy
+            .definition_shape(&form)
+            .expect("defn- has a definition shape");
+        assert_eq!(shape.category(), DefinitionCategory::Function);
+        assert_eq!(shape.name(), Some(RelativeNodePath::Child(1)));
+        assert_eq!(
+            shape.parameters(),
+            Some(ParameterShape::new(RelativeNodePath::Child(2), 0))
+        );
+        assert_eq!(shape.body(), BodyShape::ChildrenFrom(3));
+
+        // `defn-` shares `defn`'s layout exactly.
+        let public = parsed_form("(defn helper [x y] (+ x y))", Dialect::Clojure);
+        assert_eq!(policy.definition_shape(&public), Some(shape));
+    }
+
+    #[test]
+    fn clojure_value_definition_shapes_cover_def_and_defonce_but_not_declare() {
+        let policy = DialectSemanticPolicy::new(Dialect::Clojure);
+
+        for source in ["(def answer 42)", "(defonce registry (atom {}))"] {
+            let form = parsed_form(source, Dialect::Clojure);
+            let shape = policy
+                .definition_shape(&form)
+                .unwrap_or_else(|| panic!("{source} has a definition shape"));
+            assert_eq!(shape.category(), DefinitionCategory::Variable, "{source}");
+            assert_eq!(shape.name(), Some(RelativeNodePath::Child(1)), "{source}");
+        }
+
+        // `declare` names several vars at once, so no single-name shape fits.
+        let declare = parsed_form("(declare a b c)", Dialect::Clojure);
+        assert_eq!(policy.definition_shape(&declare), None);
+    }
+
+    #[test]
+    fn clojure_let_scope_is_sequential_because_initializers_see_earlier_names() {
+        // `(let [x 1 y (inc x)] y)` is legal Clojure: `y`'s initializer sees
+        // `x`. Clojure has no parallel `let`, so this must never report
+        // BindingVisibility::Parallel — and the capability layer's
+        // `common_lisp_value_scope_form_for_head` must agree with it.
+        let form = parsed_form("(let [x 1 y (inc x)] y)", Dialect::Clojure);
+        let shape = DialectSemanticPolicy::new(Dialect::Clojure)
+            .scope_shape(&form)
+            .expect("clojure let scope");
+
+        assert_eq!(shape.binders(), FLAT_BINDINGS_SEQUENTIAL);
+        assert!(matches!(
+            shape.binders(),
+            BinderShape::FlatPairs {
+                visibility: BindingVisibility::Sequential,
+                ..
+            }
+        ));
+    }
+
+    #[test]
     fn unknown_dialect_has_no_semantic_shapes() {
         let policy = DialectSemanticPolicy::new(Dialect::Unknown);
         let definition = parsed_form("(defun f (x) x)", Dialect::Unknown);
@@ -2008,5 +2208,159 @@ mod tests {
 
         assert_eq!(policy.definition_shape(&definition), None);
         assert_eq!(policy.scope_shape(&scope), None);
+    }
+}
+
+#[cfg(test)]
+mod clojure_defn_tests {
+    use super::*;
+    use crate::sexpr::SyntaxTree;
+
+    fn clojure_form(source: &str) -> ExpressionView {
+        SyntaxTree::parse_with_dialect(source, Dialect::Clojure)
+            .expect("fixture parses")
+            .root_view()
+            .children
+            .first()
+            .cloned()
+            .expect("fixture has one form")
+    }
+
+    fn policy() -> DialectSemanticPolicy {
+        DialectSemanticPolicy::new(Dialect::Clojure)
+    }
+
+    #[test]
+    fn defn_resolves_with_any_combination_of_docstring_and_attribute_map() {
+        // A docstring is the norm in idiomatic Clojure, so a shape that only
+        // recognises `(defn name [params] body)` misses most definitions.
+        for (source, parameters, body_start) in [
+            ("(defn f [x] x)", 2, 3),
+            (r#"(defn f "doc" [x] x)"#, 3, 4),
+            ("(defn f {:added \"1.0\"} [x] x)", 3, 4),
+            (r#"(defn f "doc" {:added "1.0"} [x] x)"#, 4, 5),
+        ] {
+            let shape = policy()
+                .definition_shape(&clojure_form(source))
+                .unwrap_or_else(|| panic!("no shape for {source}"));
+            assert_eq!(shape.category(), DefinitionCategory::Function, "{source}");
+            assert_eq!(shape.name(), Some(RelativeNodePath::Child(1)), "{source}");
+            assert_eq!(
+                shape.parameters(),
+                Some(ParameterShape::new(RelativeNodePath::Child(parameters), 0)),
+                "{source}"
+            );
+            assert_eq!(
+                shape.body(),
+                BodyShape::ChildrenFrom(body_start),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn multi_arity_defn_reports_clause_bodies_and_no_single_parameter_list() {
+        for (source, first_clause) in [
+            ("(defn f ([x] x) ([x y] y))", 2),
+            (r#"(defn f "doc" ([x] x) ([x y] y))"#, 3),
+        ] {
+            let shape = policy()
+                .definition_shape(&clojure_form(source))
+                .unwrap_or_else(|| panic!("no shape for {source}"));
+            assert_eq!(shape.parameters(), None, "{source}");
+            assert_eq!(
+                shape.body(),
+                BodyShape::ClauseChildrenFrom {
+                    first_clause_index: first_clause,
+                    body_child_index: 1,
+                },
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn defn_opens_a_scope_over_its_parameters_but_does_not_bind_its_own_name() {
+        // The `defn` name is a namespace-level var, not a lexical binding, so
+        // it must not appear in the binder shape the way `(fn add [x] ...)`'s
+        // self-reference does.
+        let shape = policy()
+            .scope_shape(&clojure_form(r#"(defn f "doc" [x] x)"#))
+            .expect("defn scope");
+        assert_eq!(
+            shape.binders(),
+            BinderShape::Parameters(ParameterShape::new(RelativeNodePath::Child(3), 0))
+        );
+        assert_eq!(shape.body(), BodyShape::ChildrenFrom(4));
+
+        let multi = policy()
+            .scope_shape(&clojure_form("(defn f ([x] x) ([x y] y))"))
+            .expect("multi-arity defn scope");
+        assert_eq!(
+            multi.binders(),
+            BinderShape::ParameterClauses {
+                name: None,
+                first_clause_index: 2,
+                parameters: ParameterShape::new(RelativeNodePath::Child(0), 0),
+            }
+        );
+    }
+
+    #[test]
+    fn sequential_binding_forms_share_the_flat_let_shape() {
+        for head in [
+            "loop",
+            "binding",
+            "with-open",
+            "with-redefs",
+            "with-local-vars",
+            "if-let",
+            "if-some",
+            "when-let",
+            "when-some",
+            "when-first",
+        ] {
+            let source = format!("({head} [x 1] x)");
+            let shape = policy()
+                .scope_shape(&clojure_form(&source))
+                .unwrap_or_else(|| panic!("no scope for {head}"));
+            assert_eq!(shape.binders(), FLAT_BINDINGS_SEQUENTIAL, "{head}");
+        }
+    }
+
+    #[test]
+    fn forms_this_tool_cannot_model_exactly_are_declined_rather_than_approximated() {
+        // `doseq`/`for` binding vectors interleave `:let`/`:when`/`:while`
+        // modifier clauses with name/sequence pairs, and `letfn` binds
+        // `(name [params] body)` lists. No current shape expresses either, and
+        // a wrong rename is worse than no rename.
+        for source in [
+            "(doseq [x xs :when (pos? x)] x)",
+            "(for [x xs :let [y (inc x)]] y)",
+            "(letfn [(g [a] a)] (g 1))",
+        ] {
+            assert_eq!(
+                policy().scope_shape(&clojure_form(source)),
+                None,
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_defn_forms_are_declined() {
+        for source in [
+            "(defn)",
+            "(defn f)",
+            "(defn f not-a-vector body)",
+            "(defn [x] x)",
+            "(defn f ([x] x) malformed)",
+        ] {
+            assert_eq!(
+                policy().definition_shape(&clojure_form(source)),
+                None,
+                "{source}"
+            );
+        }
     }
 }

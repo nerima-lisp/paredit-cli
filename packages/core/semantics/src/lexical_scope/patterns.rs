@@ -172,14 +172,21 @@ fn collect_binding_pattern_names(pattern: &ExpressionView, output: &mut Vec<Boun
     while index < pattern.children.len() {
         let child = &pattern.children[index];
         if let Some(marker) = atom_text(child) {
-            if marker == ":keys" {
+            // `:keys`, `:strs`, and `:syms` all bind every symbol in their
+            // vector; they differ only in the key type they look up
+            // (keyword, string, symbol), which does not change what is bound.
+            if is_clojure_keys_shorthand_marker(marker) {
                 if let Some(keys_form) = pattern.children.get(index + 1) {
                     collect_clojure_keys_shorthand_names(keys_form, output);
                 }
                 index += 2;
                 continue;
             }
-            if matches!(marker, ":strs" | ":syms") {
+            // `:or` supplies defaults for names bound elsewhere in the same
+            // pattern. Its map binds nothing: the keys repeat existing names
+            // and the values are arbitrary expressions, so recursing into it
+            // would register literals such as the `1` in `:or {k 1}`.
+            if marker == ":or" {
                 index += 2;
                 continue;
             }
@@ -213,4 +220,21 @@ fn collect_clojure_keys_shorthand_names(keys_form: &ExpressionView, output: &mut
 
 fn is_binding_pattern_marker(name: &str) -> bool {
     name == "_" || name.starts_with('&') || name.starts_with(':')
+}
+
+/// Returns whether a map-destructuring marker introduces a vector of names
+/// bound by shorthand.
+///
+/// Clojure allows the marker to be namespace-qualified, as in
+/// `{:person/keys [name age]}`, which binds `name` and `age` from the
+/// `:person/name` and `:person/age` keys. The auto-resolved `::keys` spelling
+/// works the same way.
+fn is_clojure_keys_shorthand_marker(marker: &str) -> bool {
+    let Some(local) = marker.rsplit('/').next() else {
+        return false;
+    };
+    matches!(
+        local,
+        ":keys" | ":strs" | ":syms" | "keys" | "strs" | "syms"
+    ) && marker.starts_with(':')
 }
