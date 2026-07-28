@@ -392,3 +392,122 @@ proptest! {
         prop_assert_eq!(matches, 1);
     }
 }
+
+/// Clojure fixtures must go through `parse_with_dialect`, not `parse`, so the
+/// test sees the same tree the CLI builds for a `.clj` file.
+fn clojure_report(input: &str) -> DependencyReport {
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("parse fixture");
+    build_dependency_report(&tree, Dialect::Clojure).expect("build dependency report")
+}
+
+fn clojure_targets(input: &str, kind: DependencyKind) -> Vec<String> {
+    clojure_report(input)
+        .dependencies
+        .into_iter()
+        .filter(|dependency| dependency.kind == kind)
+        .map(|dependency| dependency.target)
+        .collect()
+}
+
+#[test]
+fn ns_require_collects_bare_vector_and_prefix_list_libspecs() {
+    let targets = clojure_targets(
+        r"(ns my.app
+            (:require clojure.walk
+                      [clojure.string :as str]
+                      [clojure.set :refer [union]]
+                      [clojure [zip :as zip] edn]))",
+        DependencyKind::NsRequire,
+    );
+
+    assert_eq!(
+        targets,
+        vec![
+            "clojure.walk",
+            "clojure.string",
+            "clojure.set",
+            "clojure.zip",
+            "clojure.edn",
+        ]
+    );
+}
+
+#[test]
+fn ns_import_expands_package_groupings_into_one_class_each() {
+    let targets = clojure_targets(
+        r"(ns my.app
+            (:import java.util.Date
+                     (java.io File InputStream)))",
+        DependencyKind::NsImport,
+    );
+
+    assert_eq!(
+        targets,
+        vec!["java.util.Date", "java.io.File", "java.io.InputStream"]
+    );
+}
+
+#[test]
+fn ns_clauses_map_onto_distinct_dependency_kinds() {
+    let report = clojure_report(
+        r#"(ns my.app
+             (:require [a :as a])
+             (:require-macros [b :as b])
+             (:use [c :only [x]])
+             (:import java.util.Date)
+             (:load "d"))"#,
+    );
+
+    for (kind, target) in [
+        (DependencyKind::NsRequire, "a"),
+        (DependencyKind::NsRequireMacros, "b"),
+        (DependencyKind::NsUse, "c"),
+        (DependencyKind::NsImport, "java.util.Date"),
+    ] {
+        assert!(
+            contains_dependency(&report, kind, target),
+            "{}: {target}",
+            kind.label()
+        );
+    }
+}
+
+#[test]
+fn ns_dependencies_carry_the_declaring_namespace_as_their_source() {
+    let report = clojure_report("(ns my.app (:require [clojure.string :as str]))");
+    let dependency = report
+        .dependencies
+        .iter()
+        .find(|dependency| dependency.kind == DependencyKind::NsRequire)
+        .expect("ns-require dependency");
+
+    assert_eq!(dependency.source.as_deref(), Some("my.app"));
+}
+
+#[test]
+fn ns_docstring_attribute_map_and_gen_class_declare_no_dependencies() {
+    let report = clojure_report(
+        r#"(ns my.app
+             "A docstring that names clojure.string without requiring it."
+             {:author "someone"}
+             (:refer-clojure :exclude [replace])
+             (:gen-class))"#,
+    );
+
+    assert!(report.dependencies.is_empty(), "{:?}", report.dependencies);
+}
+
+#[test]
+fn ns_dependency_collection_is_clojure_only() {
+    let tree = SyntaxTree::parse_with_dialect("(ns my.app (:require a))", Dialect::EmacsLisp)
+        .expect("parse fixture");
+    let report =
+        build_dependency_report(&tree, Dialect::EmacsLisp).expect("build dependency report");
+
+    assert!(
+        !report
+            .dependencies
+            .iter()
+            .any(|dependency| dependency.kind == DependencyKind::NsRequire)
+    );
+}

@@ -11,6 +11,7 @@ use paredit_core_syntax::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path
 use super::types::DependencyReportItem;
 
 mod asdf;
+mod clojure_ns;
 mod forms;
 mod qualified;
 
@@ -77,6 +78,7 @@ fn collect_dependency_items_from_view(
     if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
         forms::collect_list_dependency_items(view, dialect, &path, dependencies);
         asdf::collect_system_dependency_items(view, dialect, &path, dependencies);
+        clojure_ns::collect_ns_dependency_items(view, dialect, &path, dependencies);
     }
 
     qualified::collect_qualified_symbol_dependency(view, &path, local_bindings, dependencies);
