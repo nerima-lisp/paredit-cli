@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-28
+
+No command, flag, exit code, or JSON field changed in this release: the
+capability catalogue is byte-identical to v1.1.0. What changed is the shape of
+the source tree behind it, and — for anyone using the crate as a library — the
+type of every error it can return.
+
+### Changed
+
+- The single crate is now a 24-package Cargo workspace: six `paredit-core-*`
+  packages (syntax, semantics, edit, lint-engine, workspace, cli) and eighteen
+  `paredit-feature-*` packages, with the binary as a thin composition root.
+  The `paredit_cli` façade re-exports every package module, so existing import
+  paths such as `paredit_cli::domain::sexpr` still resolve.
+- The lint engine no longer depends on the rule registry. Rules are supplied
+  through a `RuleCatalog`, which breaks the cycle that previously forced the
+  engine and the 134 rules into one compilation unit.
+- **Breaking for library consumers.** Fallible entry points return typed error
+  enums instead of `anyhow::Result` — `SexprError`, `EditRefusal`, `LintError`,
+  `CliError`, and per-feature equivalents. A caller that names a return type or
+  matches on an error must be updated; `?` into an `anyhow::Result` still
+  compiles unchanged. The CLI's own stderr text is unchanged, because `main`
+  still converts at the boundary.
+- Several types now make invalid states unrepresentable rather than checking
+  for them: inline-function's call selection, split-file's destination, and the
+  refactor manifest's hash and flag comparisons, which are derived rather than
+  stored.
+- The compatibility guide no longer lists the Rust library API as a stable
+  surface. The crate is `publish = false` with no registry release, and the
+  supported interface is the command line — see
+  [Releases and compatibility](https://nerima-lisp.github.io/paredit-cli/releases.html).
+
 ## [1.1.0] - 2026-07-26
 
 No command, flag, exit code, or JSON field changed in this release: the

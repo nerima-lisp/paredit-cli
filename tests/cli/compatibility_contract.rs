@@ -70,28 +70,38 @@ fn compatibility_guide_covers_the_released_major_series() {
 fn compatibility_guide_enumerates_every_stable_surface() {
     let guide = releases_guide();
 
+    // Presence alone is not enough: a surface moved from one list to the other
+    // still "appears in the guide" while promising the opposite of what it did
+    // before. v1.2.0 moved the Rust library API across this line, so the two
+    // halves are checked separately.
+    let (stable, unstable) = guide
+        .split_once("Not stable —")
+        .expect("docs/src/releases.md must keep its stable/not-stable split");
+
     for surface in [
         "**Command paths.**",
         "**Flags.**",
         "**Exit codes.**",
         "**JSON reports.**",
-        "**The Rust library API**",
         "**The Nix interface**",
     ] {
         assert!(
-            guide.contains(surface),
+            stable.contains(surface),
             "docs/src/releases.md must keep the stable surface documented: {surface}"
         );
     }
 
-    for unstable in [
+    for surface in [
         "**Human-readable text output.**",
         "**Diagnostic and error message text**",
         "**Everything below the crate root**",
+        // Not stable since 1.2.0: the crate is `publish = false` and the CLI is
+        // the supported interface, so the library is free to change shape.
+        "**The Rust library API**",
     ] {
         assert!(
-            guide.contains(unstable),
-            "docs/src/releases.md must keep the explicitly unstable surface documented: {unstable}"
+            unstable.contains(surface),
+            "docs/src/releases.md must keep the explicitly unstable surface documented: {surface}"
         );
     }
 }
