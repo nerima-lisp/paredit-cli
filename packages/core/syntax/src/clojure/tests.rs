@@ -207,3 +207,16 @@ fn normalization_leaves_unqualified_and_foreign_heads_untouched() {
     assert_eq!(normalize_clojure_operator_head("my.ns/defn"), "my.ns/defn");
     assert_eq!(normalize_clojure_operator_head("clojure.core/defn"), "defn");
 }
+
+#[test]
+fn callable_definitions_are_parameter_refactor_targets() {
+    let defmethod = ClojureOperator::from_head("defmethod").expect("defmethod is a known operator");
+    assert!(defmethod.is_callable_definition());
+    assert!(defmethod.supports_parameter_refactor());
+
+    for head in ["defn", "defn-", "defmacro"] {
+        let operator = ClojureOperator::from_head(head).expect("known operator");
+        assert!(operator.is_callable_definition(), "{head}");
+        assert!(operator.supports_parameter_refactor(), "{head}");
+    }
+}

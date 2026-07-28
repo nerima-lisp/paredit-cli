@@ -374,9 +374,18 @@ fn clojure_definition_capabilities_come_from_the_clojure_operator_table() {
         assert!(Dialect::Clojure.is_definition_head(head), "head {head}");
     }
 
-    // A `defmethod` carries its parameter vector after the dispatch value, so
-    // it belongs in the parameter refactor set even though it is not inlinable.
+    // A `defmethod` carries its parameter vector after exactly one dispatch
+    // value, which may itself be a vector as in
+    // `(defmethod encode [:json :pretty] [x] …)`. Resolving it needs the
+    // Clojure-specific index in `definition::lambda_list`, not the Common Lisp
+    // "first list at or after child 2" search, which picked the dispatch value.
     assert!(Dialect::Clojure.supports_function_parameter_refactor_head("defmethod"));
+    for head in ["defn", "defn-", "defmacro"] {
+        assert!(
+            Dialect::Clojure.supports_function_parameter_refactor_head(head),
+            "head {head}"
+        );
+    }
     assert!(!Dialect::Clojure.supports_inline_function_refactor_head("defmethod"));
     assert!(!Dialect::Clojure.supports_inline_function_refactor_head("defmacro"));
 

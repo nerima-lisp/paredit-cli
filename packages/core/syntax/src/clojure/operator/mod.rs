@@ -38,13 +38,25 @@ impl ClojureOperator {
     }
 
     /// Returns whether this operator defines a callable with a parameter
-    /// vector, so parameter-list refactors can apply to it.
+    /// vector.
     #[must_use]
     pub const fn is_callable_definition(self) -> bool {
         matches!(
             self,
             Self::Defn | Self::DefnPrivate | Self::Defmacro | Self::Defmethod
         )
+    }
+
+    /// Returns whether a parameter-list refactor applies to this operator.
+    ///
+    /// This matches [`Self::is_callable_definition`]; the two are separate
+    /// because locating the parameter vector is what actually constrains the
+    /// refactor, and that lives in the definition layer. `defmethod` in
+    /// particular hides its parameters behind a dispatch value that may itself
+    /// be a vector.
+    #[must_use]
+    pub const fn supports_parameter_refactor(self) -> bool {
+        self.is_callable_definition()
     }
 
     /// Returns whether this operator defines a macro expander, whose body runs

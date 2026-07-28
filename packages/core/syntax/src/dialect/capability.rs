@@ -106,9 +106,10 @@ impl Dialect {
             Self::Lfe => matches!(head, "defun" | "defmacro"),
             Self::Scheme | Self::Racket => matches!(head, "define"),
             // Clojure's private `defn-` takes the same parameter vector as
-            // `defn`, and `defmethod` carries one after its dispatch value.
+            // `defn`. `defmethod` is excluded: see
+            // `ClojureOperator::supports_parameter_refactor`.
             Self::Clojure => {
-                clojure_operator(head).is_some_and(ClojureOperator::is_callable_definition)
+                clojure_operator(head).is_some_and(ClojureOperator::supports_parameter_refactor)
             }
             Self::Hy => matches!(head, "defn" | "defn/a" | "defmacro"),
             Self::Carp => matches!(head, "defn" | "defndynamic" | "defmacro"),
