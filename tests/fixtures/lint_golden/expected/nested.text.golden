@@ -133,6 +133,15 @@ rule	getf-default-nil	0
 rule	make-array-default-keyword	0
 rule	nested-char-case	0
 rule	list-star-nil	0
+rule	elisp-missing-lexical-binding	0
+rule	elisp-unreachable-lexical-binding	0
+rule	elisp-autoload-cookie-without-form	0
+rule	elisp-defcustom-missing-type	0
+rule	elisp-defcustom-missing-group	0
+rule	elisp-obsolete-cl-alias	0
+rule	elisp-quoted-lambda	0
+rule	elisp-interactive-in-macro	0
+rule	elisp-condition-case-without-handler	0
 finding	redundant-quote	warning	suspicious	fixable=true	nested.lisp	840	quoting number 5 is redundant
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	268	redundant progn: progn wraps a single form; it is equivalent to that form
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	833	redundant progn: progn wraps a single form; it is equivalent to that form

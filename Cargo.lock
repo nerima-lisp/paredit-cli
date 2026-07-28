@@ -664,6 +664,7 @@ dependencies = [
  "paredit-feature-inline",
  "paredit-feature-lint-conditional",
  "paredit-feature-lint-control-flow",
+ "paredit-feature-lint-emacs-lisp",
  "paredit-feature-lint-form-shape",
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-sequence",
@@ -873,6 +874,14 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-emacs-lisp"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]

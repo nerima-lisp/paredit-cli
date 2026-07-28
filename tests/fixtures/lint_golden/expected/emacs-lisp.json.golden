@@ -1,232 +1,124 @@
 {
-  "finding_count": 19,
+  "finding_count": 10,
   "findings": [
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "quoting number 5 is redundant",
-      "path": "nested.lisp",
-      "rule": "redundant-quote",
+      "fixable": false,
+      "message": "no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-missing-lexical-binding",
       "severity": "warning",
       "span": {
-        "end": 842,
-        "start": 840
+        "end": 59,
+        "start": 0
       }
     },
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "redundant progn: progn wraps a single form; it is equivalent to that form",
-      "path": "nested.lisp",
-      "rule": "redundant-progn",
-      "severity": "warning",
+      "fixable": false,
+      "message": "`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-unreachable-lexical-binding",
+      "severity": "error",
       "span": {
-        "end": 282,
-        "start": 268
+        "end": 932,
+        "start": 911
       }
     },
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "redundant progn: progn wraps a single form; it is equivalent to that form",
-      "path": "nested.lisp",
-      "rule": "redundant-progn",
-      "severity": "warning",
+      "fixable": false,
+      "message": "this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-autoload-cookie-without-form",
+      "severity": "error",
       "span": {
-        "end": 843,
-        "start": 833
+        "end": 762,
+        "start": 748
       }
     },
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "redundant progn: progn wraps a single form; it is equivalent to that form",
-      "path": "nested.lisp",
-      "rule": "redundant-progn",
+      "fixable": false,
+      "message": "this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-autoload-cookie-without-form",
+      "severity": "error",
+      "span": {
+        "end": 984,
+        "start": 970
+      }
+    },
+    {
+      "category": "malformed",
+      "fixable": false,
+      "message": "defcustom fixture-option has no :type, so Customize cannot offer a widget for it",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-defcustom-missing-type",
       "severity": "warning",
       "span": {
-        "end": 916,
-        "start": 907
+        "end": 342,
+        "start": 265
+      }
+    },
+    {
+      "category": "malformed",
+      "fixable": false,
+      "message": "defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-defcustom-missing-group",
+      "severity": "warning",
+      "span": {
+        "end": 342,
+        "start": 265
       }
     },
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "progn with 2 forms is nested directly in another progn; splice its forms in",
-      "path": "nested.lisp",
-      "rule": "nested-progn",
-      "severity": "warning",
+      "fixable": false,
+      "message": "`loop` was removed in Emacs 27.1; use `cl-loop`",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-obsolete-cl-alias",
+      "severity": "error",
       "span": {
-        "end": 553,
-        "start": 520
+        "end": 509,
+        "start": 505
       }
     },
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "progn with 2 forms is nested directly in another progn; splice its forms in",
-      "path": "nested.lisp",
-      "rule": "nested-progn",
-      "severity": "warning",
+      "fixable": false,
+      "message": "a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-quoted-lambda",
+      "severity": "error",
       "span": {
-        "end": 552,
-        "start": 541
+        "end": 636,
+        "start": 621
       }
     },
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)",
-      "path": "nested.lisp",
-      "rule": "nested-when",
-      "severity": "warning",
+      "fixable": false,
+      "message": "macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-interactive-in-macro",
+      "severity": "error",
       "span": {
-        "end": 371,
-        "start": 321
+        "end": 431,
+        "start": 418
       }
     },
     {
       "category": "suspicious",
-      "fixable": true,
-      "message": "when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)",
-      "path": "nested.lisp",
-      "rule": "nested-when",
-      "severity": "warning",
+      "fixable": false,
+      "message": "this condition-case has no handler clauses, so it evaluates its body form and catches nothing",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-condition-case-without-handler",
+      "severity": "error",
       "span": {
-        "end": 370,
-        "start": 333
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)",
-      "path": "nested.lisp",
-      "rule": "nested-unless",
-      "severity": "warning",
-      "span": {
-        "end": 468,
-        "start": 412
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "unless whose only body is an unless merges by or; (unless a (unless b c)) is (unless (or a b) c)",
-      "path": "nested.lisp",
-      "rule": "nested-unless",
-      "severity": "warning",
-      "span": {
-        "end": 467,
-        "start": 426
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "and nested in a and flattens; its operands splice in",
-      "path": "nested.lisp",
-      "rule": "nested-boolean",
-      "severity": "warning",
-      "span": {
-        "end": 791,
-        "start": 768
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "or nested in a or flattens; its operands splice in",
-      "path": "nested.lisp",
-      "rule": "nested-boolean",
-      "severity": "warning",
-      "span": {
-        "end": 789,
-        "start": 781
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "nested car/cdr accessors combine into (cadr …)",
-      "path": "nested.lisp",
-      "rule": "nested-cxr",
-      "severity": "warning",
-      "span": {
-        "end": 611,
-        "start": 592
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "nested car/cdr accessors combine into (cddr …)",
-      "path": "nested.lisp",
-      "rule": "nested-cxr",
-      "severity": "warning",
-      "span": {
-        "end": 610,
-        "start": 597
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "progn with 3 forms is a defun body; splice its forms in",
-      "path": "nested.lisp",
-      "rule": "redundant-body-progn",
-      "severity": "warning",
-      "span": {
-        "end": 560,
-        "start": 503
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "progn with 2 forms is a when body; splice its forms in",
-      "path": "nested.lisp",
-      "rule": "redundant-body-progn",
-      "severity": "warning",
-      "span": {
-        "end": 719,
-        "start": 678
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "let with no bindings is just progn; (let () body) is (progn body)",
-      "path": "nested.lisp",
-      "rule": "empty-let",
-      "severity": "warning",
-      "span": {
-        "end": 917,
-        "start": 899
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "let* with 1 binding is just let; sequential scope is unused",
-      "path": "nested.lisp",
-      "rule": "redundant-let-star",
-      "severity": "warning",
-      "span": {
-        "end": 918,
-        "start": 881
-      }
-    },
-    {
-      "category": "suspicious",
-      "fixable": true,
-      "message": "or has a single operand; (or X) is just X",
-      "path": "nested.lisp",
-      "rule": "single-operand-boolean",
-      "severity": "warning",
-      "span": {
-        "end": 281,
-        "start": 275
+        "end": 736,
+        "start": 700
       }
     }
   ],
@@ -329,43 +221,43 @@
     },
     {
       "category": "suspicious",
-      "count": 1,
+      "count": 0,
       "description": "a self-evaluating literal (number/string/char/keyword) quoted redundantly",
       "rule": "redundant-quote"
     },
     {
       "category": "suspicious",
-      "count": 3,
+      "count": 0,
       "description": "a progn that is empty or wraps a single form (progn X is just X)",
       "rule": "redundant-progn"
     },
     {
       "category": "suspicious",
-      "count": 2,
+      "count": 0,
       "description": "a multi-form progn nested directly inside another progn (its forms splice in)",
       "rule": "nested-progn"
     },
     {
       "category": "suspicious",
-      "count": 2,
+      "count": 0,
       "description": "a when whose only body is a when, mergeable by and ((when a (when b c)) is (when (and a b) c))",
       "rule": "nested-when"
     },
     {
       "category": "suspicious",
-      "count": 2,
+      "count": 0,
       "description": "an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c))",
       "rule": "nested-unless"
     },
     {
       "category": "suspicious",
-      "count": 2,
+      "count": 0,
       "description": "a same-operator and/or nested in an and/or, which flattens ((or a (or b c)) is (or a b c))",
       "rule": "nested-boolean"
     },
     {
       "category": "suspicious",
-      "count": 2,
+      "count": 0,
       "description": "nested car/cdr accessors that combine into one ((car (cdr x)) is (cadr x))",
       "rule": "nested-cxr"
     },
@@ -389,13 +281,13 @@
     },
     {
       "category": "suspicious",
-      "count": 2,
+      "count": 0,
       "description": "a multi-form progn used as a when/unless/let/defun/... body (its forms splice in)",
       "rule": "redundant-body-progn"
     },
     {
       "category": "suspicious",
-      "count": 1,
+      "count": 0,
       "description": "a let with an empty binding list, which is just progn ((let () body) is (progn body))",
       "rule": "empty-let"
     },
@@ -407,7 +299,7 @@
     },
     {
       "category": "suspicious",
-      "count": 1,
+      "count": 0,
       "description": "a let* with zero or one binding, which is just let (no sequential scope in play)",
       "rule": "redundant-let-star"
     },
@@ -701,7 +593,7 @@
     },
     {
       "category": "suspicious",
-      "count": 1,
+      "count": 0,
       "description": "a single-operand and/or ((and X) and (or X) are just X)",
       "rule": "single-operand-boolean"
     },
@@ -1037,55 +929,55 @@
     },
     {
       "category": "suspicious",
-      "count": 0,
+      "count": 1,
       "description": "an Emacs Lisp file whose first line does not set lexical-binding",
       "rule": "elisp-missing-lexical-binding"
     },
     {
       "category": "suspicious",
-      "count": 0,
+      "count": 1,
       "description": "a lexical-binding setting outside the first line, which Emacs never reads",
       "rule": "elisp-unreachable-lexical-binding"
     },
     {
       "category": "suspicious",
-      "count": 0,
+      "count": 2,
       "description": "a ;;;###autoload cookie with no top-level form after it",
       "rule": "elisp-autoload-cookie-without-form"
     },
     {
       "category": "malformed",
-      "count": 0,
+      "count": 1,
       "description": "a defcustom with no :type, which leaves Customize editing a raw sexp",
       "rule": "elisp-defcustom-missing-type"
     },
     {
       "category": "malformed",
-      "count": 0,
+      "count": 1,
       "description": "a defcustom with no :group, which leaves the option out of the group tree",
       "rule": "elisp-defcustom-missing-group"
     },
     {
       "category": "suspicious",
-      "count": 0,
+      "count": 1,
       "description": "an unprefixed cl.el name, removed in Emacs 27.1",
       "rule": "elisp-obsolete-cl-alias"
     },
     {
       "category": "suspicious",
-      "count": 0,
+      "count": 1,
       "description": "a quoted lambda, which is a list rather than a closure under lexical binding",
       "rule": "elisp-quoted-lambda"
     },
     {
       "category": "suspicious",
-      "count": 0,
+      "count": 1,
       "description": "an (interactive ...) inside a macro definition, which cannot be a command",
       "rule": "elisp-interactive-in-macro"
     },
     {
       "category": "suspicious",
-      "count": 0,
+      "count": 1,
       "description": "a condition-case with no handler clauses, which catches nothing",
       "rule": "elisp-condition-case-without-handler"
     }

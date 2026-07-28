@@ -58,7 +58,7 @@ re-exports rather than code. A contract test enforces that, with a short
 allowlist for the **composition root**: modules that enumerate or aggregate
 several features and therefore belong in neither core nor a feature.
 
-The lint `REGISTRY` is the canonical example. It names all 134 rules, and every
+The lint `REGISTRY` is the canonical example. It names all 143 rules, and every
 rule depends on the engine; putting the registry in either would be a cycle. So
 the engine takes a `RuleCatalog` as an argument and never learns which rules
 exist, the rules never learn the registry does, and the registry sits in the
@@ -121,13 +121,20 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-The 134 rules live in six themed packages, split by the Lisp syntax they are
-about: `feature/lint-{conditional,sequence,numeric,control-flow,form-shape,string-char}`.
+The 143 rules live in seven themed packages. Six are split by the Lisp syntax
+they are about —
+`feature/lint-{conditional,sequence,numeric,control-flow,form-shape,string-char}`
+— and the seventh, `feature/lint-emacs-lisp`, by *dialect*: its rules are
+about Emacs Lisp's own file conventions (`lexical-binding`, `;;;###autoload`,
+`defcustom` options, the `cl.el` names Emacs 27 removed) rather than about
+S-expression shape, so none of them has a Common Lisp counterpart to share a
+theme with. A rule declares its `dialect_scope`, and the dispatcher skips one
+whose scope excludes the file's dialect before walking anything.
 Each rule is one directory holding `rule.rs` (what the registry registers),
 `domain.rs` (the detection), `usecase.rs`, and `cli/` (its own `inspect`
 subcommand).
 
-**`REGISTRY` is in neither.** It names all 134 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 143 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

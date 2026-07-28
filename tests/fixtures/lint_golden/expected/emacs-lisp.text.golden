@@ -1,4 +1,4 @@
-finding_count	1
+finding_count	10
 rule	self-assignment	0
 rule	duplicate-setf-places	0
 rule	setf-arity	0
@@ -15,7 +15,7 @@ rule	modify-macro-arity	0
 rule	duplicate-parameters	0
 rule	duplicate-lambda-list-keyword	0
 rule	lambda-list-keyword-order	0
-rule	redundant-quote	1
+rule	redundant-quote	0
 rule	redundant-progn	0
 rule	nested-progn	0
 rule	nested-when	0
@@ -133,13 +133,22 @@ rule	getf-default-nil	0
 rule	make-array-default-keyword	0
 rule	nested-char-case	0
 rule	list-star-nil	0
-rule	elisp-missing-lexical-binding	0
-rule	elisp-unreachable-lexical-binding	0
-rule	elisp-autoload-cookie-without-form	0
-rule	elisp-defcustom-missing-type	0
-rule	elisp-defcustom-missing-group	0
-rule	elisp-obsolete-cl-alias	0
-rule	elisp-quoted-lambda	0
-rule	elisp-interactive-in-macro	0
-rule	elisp-condition-case-without-handler	0
-finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant
+rule	elisp-missing-lexical-binding	1
+rule	elisp-unreachable-lexical-binding	1
+rule	elisp-autoload-cookie-without-form	2
+rule	elisp-defcustom-missing-type	1
+rule	elisp-defcustom-missing-group	1
+rule	elisp-obsolete-cl-alias	1
+rule	elisp-quoted-lambda	1
+rule	elisp-interactive-in-macro	1
+rule	elisp-condition-case-without-handler	1
+finding	elisp-missing-lexical-binding	warning	suspicious	fixable=false	emacs-lisp.el	0	no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`
+finding	elisp-unreachable-lexical-binding	error	suspicious	fixable=false	emacs-lisp.el	911	`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding
+finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	748	this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload
+finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	970	this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it
+finding	elisp-defcustom-missing-type	warning	malformed	fixable=false	emacs-lisp.el	265	defcustom fixture-option has no :type, so Customize cannot offer a widget for it
+finding	elisp-defcustom-missing-group	warning	malformed	fixable=false	emacs-lisp.el	265	defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order
+finding	elisp-obsolete-cl-alias	error	suspicious	fixable=false	emacs-lisp.el	505	`loop` was removed in Emacs 27.1; use `cl-loop`
+finding	elisp-quoted-lambda	error	suspicious	fixable=false	emacs-lisp.el	621	a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope
+finding	elisp-interactive-in-macro	error	suspicious	fixable=false	emacs-lisp.el	418	macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant
+finding	elisp-condition-case-without-handler	error	suspicious	fixable=false	emacs-lisp.el	700	this condition-case has no handler clauses, so it evaluates its body form and catches nothing

@@ -4,54 +4,254 @@
     {
       "results": [
         {
-          "fixes": [
-            {
-              "artifactChanges": [
-                {
-                  "artifactLocation": {
-                    "uri": "suppressed.lisp"
-                  },
-                  "replacements": [
-                    {
-                      "deletedRegion": {
-                        "byteLength": 2,
-                        "byteOffset": 338
-                      },
-                      "insertedContent": {
-                        "text": "6"
-                      }
-                    }
-                  ]
-                }
-              ],
-              "description": {
-                "text": "Remove the redundant quote"
-              }
-            }
-          ],
           "level": "warning",
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "suppressed.lisp"
+                  "uri": "emacs-lisp.el"
                 },
                 "region": {
-                  "byteLength": 2,
-                  "byteOffset": 338,
-                  "startColumn": 7,
-                  "startLine": 9
+                  "byteLength": 59,
+                  "byteOffset": 0,
+                  "startColumn": 1,
+                  "startLine": 1
                 }
               }
             }
           ],
           "message": {
-            "text": "quoting number 6 is redundant"
+            "text": "no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`"
           },
           "partialFingerprints": {
-            "primaryLocationLineHash": "fnv1a64:3a6afadbfea1e1ed:0"
+            "primaryLocationLineHash": "fnv1a64:1a9ab02b5ba5ee91:0"
           },
-          "ruleId": "redundant-quote"
+          "ruleId": "elisp-missing-lexical-binding"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 21,
+                  "byteOffset": 911,
+                  "startColumn": 1,
+                  "startLine": 36
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:e7da63da042f503c:0"
+          },
+          "ruleId": "elisp-unreachable-lexical-binding"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 14,
+                  "byteOffset": 748,
+                  "startColumn": 3,
+                  "startLine": 28
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:db17ae6e6733fcfc:0"
+          },
+          "ruleId": "elisp-autoload-cookie-without-form"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 14,
+                  "byteOffset": 970,
+                  "startColumn": 1,
+                  "startLine": 40
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:db17ae6e6733fcfc:1"
+          },
+          "ruleId": "elisp-autoload-cookie-without-form"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 77,
+                  "byteOffset": 265,
+                  "startColumn": 1,
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "defcustom fixture-option has no :type, so Customize cannot offer a widget for it"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:cbbc553bbb93971f:0"
+          },
+          "ruleId": "elisp-defcustom-missing-type"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 77,
+                  "byteOffset": 265,
+                  "startColumn": 1,
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:d17a6c91b6493d32:0"
+          },
+          "ruleId": "elisp-defcustom-missing-group"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 4,
+                  "byteOffset": 505,
+                  "startColumn": 4,
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "`loop` was removed in Emacs 27.1; use `cl-loop`"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:8123b7140348beab:0"
+          },
+          "ruleId": "elisp-obsolete-cl-alias"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 15,
+                  "byteOffset": 621,
+                  "startColumn": 3,
+                  "startLine": 21
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:e73bb58661019248:0"
+          },
+          "ruleId": "elisp-quoted-lambda"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 13,
+                  "byteOffset": 418,
+                  "startColumn": 3,
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:4a300b73107118f7:0"
+          },
+          "ruleId": "elisp-interactive-in-macro"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
+                  "byteLength": 36,
+                  "byteOffset": 700,
+                  "startColumn": 3,
+                  "startLine": 25
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this condition-case has no handler clauses, so it evaluates its body form and catches nothing"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fnv1a64:a88726d108867fc9:0"
+          },
+          "ruleId": "elisp-condition-case-without-handler"
         }
       ],
       "tool": {

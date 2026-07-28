@@ -115,9 +115,9 @@ pub const WARNING_RULES: [&str; warning_count()] = {
 
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-const _: () = assert!(RULE_COUNT == 134);
+const _: () = assert!(RULE_COUNT == 143);
 const _: () = assert!(fixable_count() == 88);
-const _: () = assert!(warning_count() == 93);
+const _: () = assert!(warning_count() == 96);
 
 fn meta_of(name: &str) -> Option<&'static crate::domain::lint::model::RuleMeta> {
     REGISTRY
