@@ -212,11 +212,22 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
     assert!(unanswered.is_empty(), "unanswered cells: {unanswered:?}");
 
     // Common Lisp is the dialect the analysis layer is written against, so it
-    // is the one dialect for which nothing is silent or unsupported.
+    // is the one dialect for which nothing is silent or unsupported — barring
+    // the commands whose subject is another dialect entirely. `inspect
+    // elisp-file` reads the `lexical-binding` header and the autoload cookies
+    // of an Emacs Lisp file; there is nothing for it to say about a `.lisp`
+    // one, and it says nothing rather than refusing.
+    const DIALECT_SPECIFIC: [&str; 1] = ["inspect elisp-file"];
+
     for (cell, status) in &cells {
-        if cell.ends_with("|common-lisp") {
-            assert_eq!(status, "supported", "{cell}");
+        let Some(path) = cell.strip_suffix("|common-lisp") else {
+            continue;
+        };
+        if DIALECT_SPECIFIC.contains(&path) {
+            assert_eq!(status, "silent", "{cell}");
+            continue;
         }
+        assert_eq!(status, "supported", "{cell}");
     }
 }
 
@@ -242,7 +253,7 @@ fn schema_v3_summarises_how_deep_each_dialect_goes() {
             .values()
             .map(|count| count.as_u64().expect("count"))
             .sum();
-        assert_eq!(total, 275, "{dialect} counts do not cover every command");
+        assert_eq!(total, 276, "{dialect} counts do not cover every command");
 
         // The summary has to agree with the matrix it summarises.
         for (status, count) in by_status {

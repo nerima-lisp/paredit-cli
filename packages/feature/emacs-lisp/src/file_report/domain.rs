@@ -112,6 +112,16 @@ pub struct EmacsLispFilePolicy {
     pub violations: Vec<String>,
 }
 
+/// Whether this report has anything to say about `dialect`.
+///
+/// Every fact it collects is an Emacs Lisp one, so it answers nothing
+/// anywhere else. Exposed so the capability matrix can state that rather than
+/// inferring it from a tier — the matrix and the runtime then cannot disagree.
+#[must_use]
+pub const fn supports_emacs_lisp_file_report_dialect(dialect: Dialect) -> bool {
+    matches!(dialect, Dialect::EmacsLisp)
+}
+
 /// Reads one parsed file.
 ///
 /// `source` is required and not incidental: the lexical-binding header and the
@@ -136,7 +146,7 @@ pub fn collect_emacs_lisp_file_facts(
     // Every fact below is an Emacs Lisp one. Reporting them for a `.lisp`
     // file would invent a `lexical-binding` answer for a dialect that has no
     // such concept.
-    if dialect != Dialect::EmacsLisp {
+    if !supports_emacs_lisp_file_report_dialect(dialect) {
         return facts;
     }
 
