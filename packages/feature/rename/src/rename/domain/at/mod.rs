@@ -20,7 +20,10 @@ pub use types::{RenameAtNamespace, RenameAtPlan, RenameAtRequest};
 
 #[must_use]
 pub const fn supports_rename_at_dialect(dialect: Dialect) -> bool {
-    matches!(dialect, Dialect::CommonLisp)
+    matches!(
+        dialect,
+        Dialect::CommonLisp | Dialect::Scheme | Dialect::Racket
+    )
 }
 
 pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan> {
@@ -48,13 +51,20 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan
     if !executable_reader_context_at_path(&tree, request.dialect, &path)? {
         return Err(RenameAtError::InertReaderContext.into());
     }
-    if selected.text.contains(':') || request.to.as_str().contains(':') {
+    // A `:` means package qualification in Common Lisp, and renaming across
+    // packages is a different operation. In Scheme it is an ordinary
+    // identifier character - `string:trim` and SRFI-style `foo:bar` names are
+    // just names - so refusing them there would reject valid code.
+    if matches!(request.dialect, Dialect::CommonLisp)
+        && (selected.text.contains(':') || request.to.as_str().contains(':'))
+    {
         return Err(RenameAtError::UnsupportedPackageSyntax.into());
     }
     let from =
         SymbolName::new(selected.text.to_owned()).map_err(|_| BindingSelectionError::NotASymbol)?;
     let root_view = tree.root_view();
     let mut candidates = binding_candidates(
+        request.dialect,
         &tree,
         &root_view,
         atom_paths,
@@ -63,7 +73,13 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan
         &from,
         &request.to,
     )?;
-    add_specialized_candidates(
+    // Every specialized candidate is a Common Lisp construct: a global
+    // callable rename that follows `#'`/`function` designators, `flet`/
+    // `macrolet` bindings, and `define-symbol-macro`. Scheme has none of them,
+    // and its single namespace means the lexical candidate above already
+    // covers call sites.
+    if matches!(request.dialect, Dialect::CommonLisp) {
+        add_specialized_candidates(
         &mut candidates,
         SpecializedCandidateContext {
             input: request.input,
@@ -76,7 +92,8 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan
             from: &from,
             to: &request.to,
         },
-    )?;
+        )?;
+    }
 
     let candidate = match candidates.len() {
         0 => return Err(RenameAtError::Unresolved.into()),

@@ -18,12 +18,16 @@ pub fn binding_groups(
         Dialect::Clojure | Dialect::Hy | Dialect::Carp | Dialect::Janet | Dialect::Fennel => {
             vector_let_binding_groups(binding_form, input)
         }
-        Dialect::CommonLisp
-        | Dialect::EmacsLisp
-        | Dialect::Lfe
-        | Dialect::Scheme
-        | Dialect::Racket
-        | Dialect::Unknown => list_pair_let_binding_groups(binding_form, input),
+        // R6RS 4.2.1 makes `[` and `]` interchangeable with parens, and
+        // `(let ([x 1]) x)` is the ordinary spelling in Racket, so a Scheme
+        // binding entry may use either delimiter -- independently of the one
+        // the surrounding list uses.
+        Dialect::Scheme | Dialect::Racket => {
+            scheme_pair_let_binding_groups(binding_form, input)
+        }
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Lfe | Dialect::Unknown => {
+            list_pair_let_binding_groups(binding_form, input)
+        }
     }
 }
 
@@ -105,6 +109,55 @@ fn vector_let_binding_groups(
             })
         })
         .collect()
+}
+
+/// A Scheme `((name value) ...)` binding list, in either delimiter.
+///
+/// Structurally the same as [`list_pair_let_binding_groups`]; the difference
+/// is only which delimiters count as a container. Kept separate rather than
+/// relaxing that function, because Common Lisp really does reject `[x 1]` and
+/// a shared relaxation would stop it reporting the malformed binding.
+fn scheme_pair_let_binding_groups(
+    binding_form: &ExpressionView,
+    input: &str,
+) -> RenameResult<Vec<BindingGroup>> {
+    if !is_scheme_binding_container(binding_form) {
+        return Err(BindingListError::ExpectedListPairLet.into());
+    }
+
+    binding_form
+        .children
+        .iter()
+        .map(|pair| {
+            if !is_scheme_binding_container(pair) {
+                if pair.kind != ExpressionKind::Atom {
+                    return Err(BindingListError::BindingNotANameOrPair.into());
+                }
+                let names = binding_pattern_name_spans(pair, input);
+                if names.len() != 1 {
+                    return Err(BindingListError::BareBindingNotSingle.into());
+                }
+                return Ok(BindingGroup { names, value: None });
+            }
+            if pair.children.is_empty() || pair.children.len() > 2 {
+                return Err(BindingListError::BindingPairWrongArity.into());
+            }
+            let names = binding_pattern_name_spans(&pair.children[0], input);
+            if names.is_empty() {
+                return Err(BindingListError::PatternBindsNothing.into());
+            }
+            Ok(BindingGroup {
+                names,
+                value: pair.children.get(1).cloned(),
+            })
+        })
+        .collect()
+}
+
+fn is_scheme_binding_container(view: &ExpressionView) -> bool {
+    view.kind == ExpressionKind::List
+        && matches!(view.delimiter, Some(Delimiter::Paren | Delimiter::Bracket))
+        && view.reader_prefixes.is_empty()
 }
 
 fn list_pair_let_binding_groups(

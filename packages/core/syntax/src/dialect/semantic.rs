@@ -824,8 +824,26 @@ fn scheme_scope_shape(form: &ExpressionView, head: &str) -> Option<ScopeShape> {
         SchemeBindingForm::NamedLet => scheme_named_let_scope(form),
         SchemeBindingForm::Lambda => scheme_lambda_scope(form),
         SchemeBindingForm::CaseLambda => scheme_case_lambda_scope(form),
-        SchemeBindingForm::LetValues(_)
-        | SchemeBindingForm::Do
+        // `(let-values (((a b) producer) ...) body ...)` fits the ordinary
+        // binding-list shape: the bound position is a formals list rather than
+        // one name, and the destructuring readers already return every name in
+        // a pattern.
+        SchemeBindingForm::LetValues(kind) => scheme_list_scope(
+            form,
+            2,
+            ScopeShape::new(
+                scheme_binding_list(scheme_visibility(kind)),
+                BodyShape::ChildrenFrom(2),
+            ),
+        ),
+        // `do` carries a *step* form per entry -- `(i 0 (+ i 1))` -- and this
+        // model has room for one initializer. Reporting the entry as an
+        // ordinary binding would drop the step from a rename and silently
+        // produce code referring to a name that no longer exists, so `do` is
+        // declined here and handled exactly by the reference query.
+        SchemeBindingForm::Do
+        // `guard` binds its variable over the clauses but not over the guarded
+        // body, which no `BodyShape` can express.
         | SchemeBindingForm::Guard
         // `parameterize` opens no lexical scope at all.
         | SchemeBindingForm::DynamicBinding => None,
@@ -1440,18 +1458,39 @@ mod tests {
     fn scheme_forms_this_model_cannot_express_report_no_shape() {
         // Each of these binds, and each binds in a way `BinderShape` has no
         // vocabulary for. Returning an approximate shape would be worse than
-        // returning none: the reference query handles all of them exactly.
+        // returning none -- a rename driven by one would drop occurrences and
+        // emit code naming a variable that no longer exists -- and the
+        // reference query handles all of them exactly.
         let policy = DialectSemanticPolicy::new(Dialect::Scheme);
 
         for source in [
-            "(let-values (((a b) (values 1 2))) a)",
+            // A step form per entry, and room for one initializer.
             "(do ((i 0 (+ i 1))) ((= i 3) i))",
+            // Bound over the clauses but not over the guarded body.
             "(guard (e (#t e)) (raise 1))",
+            // Binds nothing lexically at all.
             "(parameterize ((p 1)) (p))",
         ] {
             let form = parsed_form(source, Dialect::Scheme);
             assert_eq!(policy.scope_shape(&form), None, "{source}");
         }
+    }
+
+    #[test]
+    fn scheme_let_values_reuses_the_ordinary_binding_list_shape() {
+        // The bound position is a formals list rather than one name, which the
+        // destructuring readers already handle: every name in a pattern comes
+        // back, so `(a b)` binds both.
+        let policy = DialectSemanticPolicy::new(Dialect::Scheme);
+        let form = parsed_form("(let-values (((a b) (values 1 2))) a)", Dialect::Scheme);
+
+        assert_eq!(
+            policy.scope_shape(&form),
+            Some(ScopeShape::new(
+                scheme_binding_list(BindingVisibility::Parallel),
+                BodyShape::ChildrenFrom(2),
+            ))
+        );
     }
 
     #[test]
