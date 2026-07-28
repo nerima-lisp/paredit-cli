@@ -1,5 +1,6 @@
+use crate::error::CallBindingError;
 use crate::inline_function::usecase::{
-    InlineFunctionPlan, InlineFunctionRequest, plan_inline_function,
+    InlineCallSelection, InlineFunctionPlan, InlineFunctionRequest, plan_inline_function,
 };
 use anyhow::Result;
 use clap::Args;
@@ -52,13 +53,27 @@ pub fn inline_function(args: InlineFunctionArgs) -> Result<()> {
         anyhow::bail!("--write requires --file");
     }
 
+    // `--all-calls` and `--call-path` are mutually exclusive. The check lives
+    // here, at the argument boundary where it is an argument problem, because
+    // InlineCallSelection has no way to represent "both" for the domain to
+    // reject later.
+    if args.all_calls && !args.call_paths.is_empty() {
+        return Err(CallBindingError::AllCallsAndCallPath {
+            command: "inline-function",
+        }
+        .into());
+    }
+
     let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;
     let plan = plan_inline_function(InlineFunctionRequest {
         input: &input.text,
         dialect,
         definition_path: args.definition_path,
-        call_paths: args.call_paths,
-        all_calls: args.all_calls,
+        calls: if args.all_calls {
+            InlineCallSelection::AllCalls
+        } else {
+            InlineCallSelection::Paths(args.call_paths)
+        },
         remove_definition: args.remove_definition,
         allow_duplicate_evaluation: args.allow_duplicate_evaluation,
         allow_drop_arguments: args.allow_drop_arguments,

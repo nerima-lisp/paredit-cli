@@ -1,5 +1,6 @@
 use super::super::calls::inline_function_symbol_reference_eq;
 use super::*;
+use crate::inline_function::domain::InlineCallSelection;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SyntaxTree;
 
@@ -28,8 +29,7 @@ fn unsupported_dialects_fail_before_malformed_input_is_parsed() {
             input: "(",
             dialect,
             definition_path: path("0"),
-            call_paths: vec![path("1")],
-            all_calls: false,
+            calls: InlineCallSelection::Paths(vec![path("1")]),
             remove_definition: false,
             allow_duplicate_evaluation: false,
             allow_drop_arguments: false,
@@ -52,8 +52,7 @@ fn emacs_lisp_macro_definitions_remain_unsupported() {
         input: "(defmacro helper (x) `(+ ,x 1))\n(helper 2)",
         dialect: Dialect::EmacsLisp,
         definition_path: path("0"),
-        call_paths: vec![path("1")],
-        all_calls: false,
+        calls: InlineCallSelection::Paths(vec![path("1")]),
         remove_definition: false,
         allow_duplicate_evaluation: false,
         allow_drop_arguments: false,

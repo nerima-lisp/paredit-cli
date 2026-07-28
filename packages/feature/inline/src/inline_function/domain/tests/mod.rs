@@ -1,3 +1,4 @@
+use crate::inline_function::domain::InlineCallSelection;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::Path;
 
@@ -23,8 +24,7 @@ fn default_inline_request(input: &str) -> InlineFunctionRequest<'_> {
         input,
         dialect: Dialect::CommonLisp,
         definition_path: path("0"),
-        call_paths: vec![path("1.1")],
-        all_calls: false,
+        calls: InlineCallSelection::Paths(vec![path("1.1")]),
         remove_definition: false,
         allow_duplicate_evaluation: false,
         allow_drop_arguments: false,
@@ -44,8 +44,7 @@ fn all_calls_request(input: &str, dialect: Dialect) -> InlineFunctionRequest<'_>
         input,
         dialect,
         definition_path: path("0"),
-        call_paths: Vec::new(),
-        all_calls: true,
+        calls: InlineCallSelection::AllCalls,
         remove_definition: false,
         allow_duplicate_evaluation: false,
         allow_drop_arguments: false,

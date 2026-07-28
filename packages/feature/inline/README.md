@@ -70,6 +70,29 @@ else.
 
 `#[non_exhaustive]` is deliberately absent (§9.4).
 
+### Why `InlineFunctionRequest` takes `InlineCallSelection`
+
+It used to carry `call_paths: Vec<Path>` beside `all_calls: bool`, and one of
+those combinations is rejected outright — `--all-calls` together with
+`--call-path` answers "accepts either --all-calls or repeated --call-path, not
+both". A rule enforced at runtime over a state the type permits is a rule that
+can be forgotten. `InlineCallSelection::{AllCalls, Paths}` has no way to write
+the rejected state down, so the check now lives once, at the argument
+boundary, where it is an argument problem.
+
+`all_calls` is still reported: it is derived from the selection rather than
+stored beside it.
+
+### Errors
+
+`InlineError` divides the 221 refusal sites by what a caller can do. The one
+worth knowing about is `UnsupportedLambdaList`: seventy-four of the messages
+are the lambda-list and destructuring reader saying some version of "this
+parameter list is more complex than inlining handles", and they mean one thing
+to a caller. The construct that was too complex is the payload; the kind is
+the type. `InlineSafetyError` is the opposite — inlining that would *change
+meaning*, and the only family a caller can deliberately override.
+
 ## Layout
 
 Slice-first, per §3.1:

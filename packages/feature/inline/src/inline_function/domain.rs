@@ -33,7 +33,8 @@ use rewrite::{apply_byte_span_edits, expand_definition_removal};
 use substitution::substitute_inline_function_body;
 use syntax::spans_overlap;
 pub use types::{
-    InlineFunctionCallPlan, InlineFunctionParameterPlan, InlineFunctionPlan, InlineFunctionRequest,
+    InlineCallSelection, InlineFunctionCallPlan, InlineFunctionParameterPlan, InlineFunctionPlan,
+    InlineFunctionRequest,
 };
 
 #[derive(Debug)]
@@ -69,8 +70,8 @@ pub fn plan_inline_function(
     let call_paths = resolve_function_call_paths(
         &tree,
         request.dialect,
-        request.call_paths,
-        request.all_calls,
+        request.calls.explicit_paths(),
+        request.calls.is_all_calls(),
         definition_span,
         &function_name,
         "inline-function",
@@ -131,7 +132,7 @@ pub fn plan_inline_function(
         dialect: request.dialect,
         definition_path: request.definition_path,
         call_paths,
-        all_calls: request.all_calls,
+        all_calls: request.calls.is_all_calls(),
         definition_span,
         call_spans,
         function_name,
