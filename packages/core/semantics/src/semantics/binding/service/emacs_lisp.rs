@@ -88,13 +88,18 @@ impl EmacsLispDynamicScope {
     /// costs a "this binding is never used" claim about a name whose whole
     /// purpose is to be read by a callee.
     fn visit(&mut self, view: &ExpressionView) {
-        if view.kind == ExpressionKind::List
-            && let Some(head) = view.children.first().and_then(head_text)
-            && EmacsLispOperator::from_head(head)
-                .is_some_and(EmacsLispOperator::declares_dynamic_variable)
-            && let Some(name) = view.children.get(1).and_then(head_text)
-        {
-            self.declared.insert(name.to_owned());
+        if view.kind == ExpressionKind::List {
+            let declares = view
+                .children
+                .first()
+                .and_then(head_text)
+                .and_then(EmacsLispOperator::from_head)
+                .is_some_and(EmacsLispOperator::declares_dynamic_variable);
+            if declares {
+                if let Some(name) = view.children.get(1).and_then(head_text) {
+                    self.declared.insert(name.to_owned());
+                }
+            }
         }
 
         for child in &view.children {
@@ -374,8 +379,10 @@ impl Walk<'_> {
         // The result form runs after the loop but with the variable still
         // bound — in `dolist` it is the idiomatic place to read the
         // accumulator the body pushed onto.
-        if has_result_form && let Some(result) = spec_form.children.get(2) {
-            self.form(result, inner, 0);
+        if has_result_form {
+            if let Some(result) = spec_form.children.get(2) {
+                self.form(result, inner, 0);
+            }
         }
         self.body(&view.children[body_start.min(view.children.len())..], inner);
         self.stack.rewind(depth);
@@ -432,10 +439,12 @@ impl Walk<'_> {
         let sequential = visibility.is_sequential();
 
         for spec in &binding_form.children {
-            if sequential && let Some(init) = variable_spec_child(spec, 1) {
-                self.form(init, inner, 0);
-            } else if !sequential && let Some(init) = variable_spec_child(spec, 1) {
-                self.form(init, scope, 0);
+            if let Some(init) = variable_spec_child(spec, 1) {
+                // A sequential `cl-do*` evaluates each initializer with the
+                // preceding variables already bound; a parallel `cl-do`
+                // evaluates all of them outside the scope it opens.
+                let init_scope = if sequential { inner } else { scope };
+                self.form(init, init_scope, 0);
             }
             if sequential {
                 self.declare_variable_spec_name(view, inner, head, spec);
@@ -894,22 +903,23 @@ fn collect_pcase_names(pattern: &ExpressionView, output: &mut Vec<BoundName>) {
                 // A prefixed atom: `,x` in a backquoted template binds `x`.
                 if let (Some(text), Some(span)) =
                     (pattern.text.as_deref(), atom_symbol_span(pattern))
-                    && is_bindable_pcase_name(text)
                 {
+                    if is_bindable_pcase_name(text) {
+                        output.push(BoundName {
+                            name: text.to_owned(),
+                            span,
+                        });
+                    }
+                }
+                return;
+            };
+            if is_bindable_pcase_name(text) {
+                if let Some(span) = atom_symbol_span(pattern) {
                     output.push(BoundName {
                         name: text.to_owned(),
                         span,
                     });
                 }
-                return;
-            };
-            if is_bindable_pcase_name(text)
-                && let Some(span) = atom_symbol_span(pattern)
-            {
-                output.push(BoundName {
-                    name: text.to_owned(),
-                    span,
-                });
             }
         }
         ExpressionKind::List | ExpressionKind::Root => {
