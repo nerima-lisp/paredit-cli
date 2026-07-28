@@ -2,7 +2,7 @@ mod local_callable;
 mod shared;
 mod top_level;
 
-use anyhow::Result;
+use crate::error::{CallSelectionError, FunctionParameterResult};
 
 use crate::function_parameter::domain::definition::FunctionParameterDefinitionScope;
 use paredit_core_syntax::common_lisp::CommonLispLocalCallableForm;
@@ -20,15 +20,17 @@ pub struct FunctionCallPathRequest<'a> {
     pub definition_span: ByteSpan,
     pub definition_scope: FunctionParameterDefinitionScope,
     pub function_name: &'a SymbolName,
-    pub command: &'a str,
+    pub command: &'static str,
 }
 
-pub fn resolve_function_call_paths(request: FunctionCallPathRequest<'_>) -> Result<Vec<Path>> {
+pub fn resolve_function_call_paths(
+    request: FunctionCallPathRequest<'_>,
+) -> FunctionParameterResult<Vec<Path>> {
     if request.all_calls && !request.explicit_call_paths.is_empty() {
-        anyhow::bail!(
-            "{} accepts either --all-calls or repeated --call-path, not both",
-            request.command
-        );
+        return Err(CallSelectionError::AllCallsAndCallPath {
+            command: request.command,
+        }
+        .into());
     }
 
     if request.all_calls {
@@ -39,20 +41,20 @@ pub fn resolve_function_call_paths(request: FunctionCallPathRequest<'_>) -> Resu
             request.function_name,
         )?;
         if call_paths.is_empty() {
-            anyhow::bail!(
-                "{} --all-calls found no same-file calls for {}",
-                request.command,
-                request.function_name
-            );
+            return Err(CallSelectionError::NoSameFileCalls {
+                command: request.command,
+                function: request.function_name.to_string(),
+            }
+            .into());
         }
         return Ok(call_paths);
     }
 
     if request.explicit_call_paths.is_empty() {
-        anyhow::bail!(
-            "{} requires at least one --call-path or --all-calls",
-            request.command
-        );
+        return Err(CallSelectionError::NoCallSelector {
+            command: request.command,
+        }
+        .into());
     }
 
     validate_explicit_function_call_paths(
@@ -75,8 +77,8 @@ fn validate_explicit_function_call_paths(
     definition_span: ByteSpan,
     definition_scope: FunctionParameterDefinitionScope,
     function_name: &SymbolName,
-    command: &str,
-) -> Result<()> {
+    command: &'static str,
+) -> FunctionParameterResult<()> {
     let discoverable_call_paths = match definition_scope {
         FunctionParameterDefinitionScope::TopLevel => {
             discover_function_call_paths(tree, dialect, definition_span, function_name)?
@@ -99,22 +101,36 @@ fn validate_explicit_function_call_paths(
         if view.kind != paredit_core_syntax::sexpr::ExpressionKind::List
             || view.delimiter != Some(paredit_core_syntax::sexpr::Delimiter::Paren)
         {
-            anyhow::bail!("{command} --call-path {call_path} must select a function call list");
+            return Err(CallSelectionError::NotACallList {
+                command,
+                path: call_path.to_string(),
+            }
+            .into());
         }
 
         if !super::matches_function_call_view(&view, function_name) {
             let Some(head) = crate::function_parameter::domain::list_edit::list_head(&view) else {
-                anyhow::bail!("{command} --call-path {call_path} must select a function call list");
+                return Err(CallSelectionError::NotACallList {
+                    command,
+                    path: call_path.to_string(),
+                }
+                .into());
             };
-            anyhow::bail!(
-                "{command} --call-path {call_path} head '{head}' does not match selected definition '{function_name}'"
-            );
+            return Err(CallSelectionError::HeadMismatch {
+                command,
+                path: call_path.to_string(),
+                head: head.to_string(),
+                function: function_name.to_string(),
+            }
+            .into());
         }
 
         if !discoverable_call_paths.iter().any(|path| path == call_path) {
-            anyhow::bail!(
-                "{command} --call-path {call_path} resolves to a call shadowed by a local callable binding or overlaps the selected definition"
-            );
+            return Err(CallSelectionError::ShadowedOrInert {
+                command,
+                path: call_path.to_string(),
+            }
+            .into());
         }
     }
 

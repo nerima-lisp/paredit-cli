@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::FunctionParameterResult;
 
 use crate::function_parameter::domain::MissingArgumentPolicy;
 use crate::function_parameter::domain::calls::{
@@ -22,7 +22,7 @@ pub fn remove_call_argument_edit(
     call_argument_offset: usize,
     parameter: &RemoveParameterMetadata,
     missing_argument_policy: MissingArgumentPolicy,
-) -> Result<RemoveCallEdit> {
+) -> FunctionParameterResult<RemoveCallEdit> {
     let (span, removed_argument, edit) =
         if let Some(keyword) = parameter.parameter_keyword.as_deref() {
             remove_keyword_function_parameter_call_edit(

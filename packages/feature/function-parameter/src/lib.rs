@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod error;
 pub mod function_parameter;
 
 // The contract with the composition root (section 4.2): each slice that
@@ -10,3 +11,8 @@ pub use function_parameter::cli::{MoveFunctionParameterArgs, move_function_param
 pub use function_parameter::cli::{RemoveFunctionParameterArgs, remove_function_parameter};
 pub use function_parameter::cli::{ReorderFunctionParametersArgs, reorder_function_parameters};
 pub use function_parameter::cli::{SwapFunctionParametersArgs, swap_function_parameters};
+
+pub use error::{
+    CallArgumentError, CallSelectionError, DefinitionShapeError, FunctionParameterError,
+    FunctionParameterResult, LambdaListError, ListEditError, ParameterSelectionError,
+};

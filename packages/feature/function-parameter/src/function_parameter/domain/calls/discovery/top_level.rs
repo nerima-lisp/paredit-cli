@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::FunctionParameterResult;
 
 use crate::function_parameter::domain::calls::matches_function_call_view;
 use crate::function_parameter::domain::list_edit::{list_head, spans_overlap};
@@ -166,7 +166,7 @@ pub fn discover_function_call_paths(
     dialect: Dialect,
     definition_span: paredit_core_syntax::sexpr::ByteSpan,
     function_name: &SymbolName,
-) -> Result<Vec<Path>> {
+) -> FunctionParameterResult<Vec<Path>> {
     let mut call_paths = Vec::new();
     let context = FunctionCallTraversal {
         dialect,

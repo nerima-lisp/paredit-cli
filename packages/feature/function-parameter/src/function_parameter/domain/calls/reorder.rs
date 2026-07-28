@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{CallArgumentError, FunctionParameterResult};
 
 use crate::function_parameter::domain::list_edit::SpanEdit;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SymbolName};
@@ -15,8 +15,8 @@ pub fn reorder_function_parameter_call_edit(
     call_argument_offset: usize,
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
-    command: &str,
-) -> Result<ReorderArgumentEdit> {
+    command: &'static str,
+) -> FunctionParameterResult<ReorderArgumentEdit> {
     let call = resolve_function_call_view(view, function_name, call_argument_offset, command)?;
 
     let mut reordered_arguments = call.view.children[call.argument_offset + 1..]
@@ -79,8 +79,8 @@ fn reorder_positional_arguments(
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
     reordered_arguments: &mut [String],
-    command: &str,
-) -> Result<()> {
+    command: &'static str,
+) -> FunctionParameterResult<()> {
     let positional_parameters = parameters
         .iter()
         .filter(|parameter| parameter.group != ParameterGroup::Keyword)
@@ -92,14 +92,15 @@ fn reorder_positional_arguments(
     let positional_argument_count = positional_parameters.len();
     let argument_count = reordered_arguments.len();
     if argument_count < positional_argument_count {
-        anyhow::bail!(
-            "{command} call to '{}' at {}..{} has {} arguments but needs at least {} positional arguments",
-            function_name,
-            view.span.start().get(),
-            view.span.end().get(),
-            argument_count,
-            positional_argument_count
-        );
+        return Err(CallArgumentError::TooFewArguments {
+            command,
+            function: function_name.to_string(),
+            start: view.span.start().get(),
+            end: view.span.end().get(),
+            actual: argument_count,
+            needed: positional_argument_count,
+        }
+        .into());
     }
 
     let original_positional_arguments = reordered_arguments[..positional_argument_count].to_vec();
@@ -109,17 +110,18 @@ fn reorder_positional_arguments(
         .filter(|&index| parameters[index].group != ParameterGroup::Keyword)
         .collect::<Vec<_>>();
     for (new_index, old_index) in positional_relative_order.into_iter().enumerate() {
-        let old_call_index = parameters[old_index]
-            .call_index
-            .with_context(|| {
-                format!(
-                    "{command} metadata for '{}' at {}..{} is missing call_index for positional parameter '{}'",
-                    function_name,
-                    view.span.start().get(),
-                    view.span.end().get(),
-                    parameters[old_index].name
-                )
-            })?;
+        let old_call_index =
+            parameters[old_index]
+                .call_index
+                .ok_or_else(|| CallArgumentError::MetadataMissing {
+                    command,
+                    function: function_name.to_string(),
+                    start: view.span.start().get(),
+                    end: view.span.end().get(),
+                    field: "call_index",
+                    kind: "positional",
+                    parameter: parameters[old_index].name.to_string(),
+                })?;
         reordered_arguments[new_index] = original_positional_arguments[old_call_index].clone();
     }
 
@@ -132,8 +134,8 @@ fn reorder_keyword_arguments(
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
     reordered_arguments: &mut Vec<String>,
-    command: &str,
-) -> Result<()> {
+    command: &'static str,
+) -> FunctionParameterResult<()> {
     let keyword_parameters = parameters
         .iter()
         .filter(|parameter| parameter.group == ParameterGroup::Keyword)
@@ -142,36 +144,39 @@ fn reorder_keyword_arguments(
         return Ok(());
     }
 
-    let positional_prefix_count = keyword_parameters[0]
-        .positional_prefix_count
-        .with_context(|| {
-            format!(
-                "{command} metadata for '{}' at {}..{} is missing positional_prefix_count for keyword parameter '{}'",
-                function_name,
-                view.span.start().get(),
-                view.span.end().get(),
-                keyword_parameters[0].name
-            )
-        })?;
+    let positional_prefix_count =
+        keyword_parameters[0]
+            .positional_prefix_count
+            .ok_or_else(|| CallArgumentError::MetadataMissing {
+                command,
+                function: function_name.to_string(),
+                start: view.span.start().get(),
+                end: view.span.end().get(),
+                field: "positional_prefix_count",
+                kind: "keyword",
+                parameter: keyword_parameters[0].name.to_string(),
+            })?;
     if reordered_arguments.len() < positional_prefix_count {
-        anyhow::bail!(
-            "{command} call to '{}' at {}..{} has {} arguments but needs at least {} positional arguments before keyword arguments",
-            function_name,
-            view.span.start().get(),
-            view.span.end().get(),
-            reordered_arguments.len(),
-            positional_prefix_count
-        );
+        return Err(CallArgumentError::TooFewBeforeKeywords {
+            command,
+            function: function_name.to_string(),
+            start: view.span.start().get(),
+            end: view.span.end().get(),
+            actual: reordered_arguments.len(),
+            needed: positional_prefix_count,
+        }
+        .into());
     }
 
     let keyword_items = reordered_arguments.split_off(positional_prefix_count);
     if keyword_items.len() % 2 != 0 {
-        anyhow::bail!(
-            "{command} call to '{}' at {}..{} has an incomplete keyword argument list",
-            function_name,
-            view.span.start().get(),
-            view.span.end().get()
-        );
+        return Err(CallArgumentError::IncompleteKeywordList {
+            command,
+            function: function_name.to_string(),
+            start: view.span.start().get(),
+            end: view.span.end().get(),
+        }
+        .into());
     }
 
     let mut known_pairs = std::collections::BTreeMap::new();
@@ -187,13 +192,14 @@ fn reorder_keyword_arguments(
                 .insert(keyword.clone(), vec![keyword.clone(), value.clone()])
                 .is_some()
             {
-                anyhow::bail!(
-                    "{command} call to '{}' at {}..{} contains duplicate keyword argument {}",
-                    function_name,
-                    view.span.start().get(),
-                    view.span.end().get(),
-                    keyword
-                );
+                return Err(CallArgumentError::DuplicateKeyword {
+                    command,
+                    function: function_name.to_string(),
+                    start: view.span.start().get(),
+                    end: view.span.end().get(),
+                    keyword: keyword.to_string(),
+                }
+                .into());
             }
         } else {
             unknown_pairs.push(keyword.clone());
@@ -207,14 +213,16 @@ fn reorder_keyword_arguments(
         .filter(|&index| parameters[index].group == ParameterGroup::Keyword)
         .collect::<Vec<_>>();
     for old_index in keyword_relative_order {
-        let keyword = parameters[old_index].keyword.as_deref().with_context(|| {
-            format!(
-                "{command} metadata for '{}' at {}..{} is missing keyword name for parameter '{}'",
-                function_name,
-                view.span.start().get(),
-                view.span.end().get(),
-                parameters[old_index].name
-            )
+        let keyword = parameters[old_index].keyword.as_deref().ok_or_else(|| {
+            CallArgumentError::MetadataMissing {
+                command,
+                function: function_name.to_string(),
+                start: view.span.start().get(),
+                end: view.span.end().get(),
+                field: "keyword name",
+                kind: "",
+                parameter: parameters[old_index].name.to_string(),
+            }
         })?;
         if let Some(pair) = known_pairs.remove(keyword) {
             reordered_arguments.extend(pair);

@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{CallSelectionError, FunctionParameterResult};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -16,7 +18,7 @@ use metadata::resolve_remove_parameter_metadata;
 
 pub fn plan_remove_function_parameter(
     request: RemoveFunctionParameterRequest<'_>,
-) -> Result<RemoveFunctionParameterPlan> {
+) -> FunctionParameterResult<RemoveFunctionParameterPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target = parse_remove_function_parameter_definition(
@@ -44,9 +46,11 @@ pub fn plan_remove_function_parameter(
     for call_path in &call_paths {
         let call_selection = tree.select_path(call_path)?;
         if spans_overlap(target.definition_span, call_selection.span()) {
-            anyhow::bail!(
-                "remove-function-parameter call path {call_path} overlaps the selected definition"
-            );
+            return Err(CallSelectionError::OverlapsDefinition {
+                command: "remove-function-parameter",
+                path: call_path.to_string(),
+            }
+            .into());
         }
         let call_edit = remove_call_argument_edit(
             request.input,
@@ -67,8 +71,12 @@ pub fn plan_remove_function_parameter(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("remove-function-parameter output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "remove-function-parameter",
+            source,
+        }
+    })?;
 
     let changed = rewritten != request.input;
     Ok(RemoveFunctionParameterPlan {

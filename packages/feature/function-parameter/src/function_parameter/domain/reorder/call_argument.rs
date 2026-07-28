@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{CallArgumentError, FunctionParameterResult, ParameterSelectionError};
 
 use crate::function_parameter::domain::calls::resolve_function_call_view;
 use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
@@ -11,8 +11,8 @@ pub fn ensure_positional_arguments_available(
     call_argument_offset: usize,
     parameters: &[ReorderableParameter],
     required_indices: &[usize],
-    command: &str,
-) -> Result<()> {
+    command: &'static str,
+) -> FunctionParameterResult<()> {
     let call = resolve_function_call_view(view, function_name, call_argument_offset, command)?;
     let positional_parameters = parameters
         .iter()
@@ -31,21 +31,20 @@ pub fn ensure_positional_arguments_available(
         let positional_index = positional_parameters
             .iter()
             .position(|candidate| candidate.item_index == parameters[*index].item_index)
-            .with_context(|| {
-                format!(
-                    "{command} parameter '{}' is not aligned with reorderable positional arguments",
-                    parameters[*index].name
-                )
+            .ok_or_else(|| ParameterSelectionError::NotAlignedWithPositional {
+                command,
+                name: parameters[*index].name.to_string(),
             })?;
         if argument_count <= positional_index {
-            anyhow::bail!(
-                "{command} call to '{}' at {}..{} has {} arguments but needs at least {} positional arguments",
-                function_name,
-                call.view.span.start().get(),
-                call.view.span.end().get(),
-                argument_count,
-                positional_index + 1
-            );
+            return Err(CallArgumentError::TooFewArguments {
+                command,
+                function: function_name.to_string(),
+                start: call.view.span.start().get(),
+                end: call.view.span.end().get(),
+                actual: argument_count,
+                needed: positional_index + 1,
+            }
+            .into());
         }
     }
 
@@ -58,8 +57,8 @@ pub fn argument_for_parameter(
     function_name: &SymbolName,
     call_argument_offset: usize,
     parameter: &ReorderableParameter,
-    command: &str,
-) -> Result<String> {
+    command: &'static str,
+) -> FunctionParameterResult<String> {
     let call = resolve_function_call_view(view, function_name, call_argument_offset, command)?;
 
     if let Some(call_index) = parameter.call_index {
@@ -67,13 +66,11 @@ pub fn argument_for_parameter(
             .view
             .children
             .get(call.argument_offset + call_index + 1)
-            .with_context(|| {
-                format!(
-                    "{command} call at {}..{} does not have argument at parameter index {}",
-                    call.view.span.start().get(),
-                    call.view.span.end().get(),
-                    call_index
-                )
+            .ok_or_else(|| CallArgumentError::UnnamedMissingArgumentAtIndex {
+                command,
+                start: call.view.span.start().get(),
+                end: call.view.span.end().get(),
+                index: call_index,
             })?;
         return Ok(argument.span.slice(input).to_owned());
     }
@@ -81,17 +78,18 @@ pub fn argument_for_parameter(
     let keyword = parameter
         .keyword
         .as_deref()
-        .with_context(|| format!("{command} keyword parameter must have keyword metadata"))?;
-    let prefix = parameter.positional_prefix_count.with_context(|| {
-        format!("{command} keyword parameter must have positional prefix metadata")
-    })?;
+        .ok_or(CallArgumentError::KeywordMetadataMissing { command })?;
+    let prefix = parameter
+        .positional_prefix_count
+        .ok_or(CallArgumentError::PositionalPrefixMetadataMissing { command })?;
     let keyword_items = &call.view.children[call.argument_offset + prefix + 1..];
     if keyword_items.len() % 2 != 0 {
-        anyhow::bail!(
-            "{command} call at {}..{} has an incomplete keyword argument list",
-            call.view.span.start().get(),
-            call.view.span.end().get()
-        );
+        return Err(CallArgumentError::UnnamedIncompleteKeywordList {
+            command,
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+        }
+        .into());
     }
     for pair in keyword_items.chunks(2) {
         if pair[0].span.slice(input) == keyword {
@@ -99,10 +97,11 @@ pub fn argument_for_parameter(
         }
     }
 
-    anyhow::bail!(
-        "{command} call at {}..{} does not contain keyword argument {}",
-        call.view.span.start().get(),
-        call.view.span.end().get(),
-        keyword
-    )
+    Err(CallArgumentError::UnnamedKeywordMissing {
+        command,
+        start: call.view.span.start().get(),
+        end: call.view.span.end().get(),
+        keyword: keyword.to_string(),
+    }
+    .into())
 }

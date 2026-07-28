@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{CallSelectionError, FunctionParameterResult, ParameterSelectionError};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -24,9 +26,9 @@ use super::types::{SwapFunctionParametersPlan, SwapFunctionParametersRequest};
 
 pub fn plan_swap_function_parameters(
     request: SwapFunctionParametersRequest<'_>,
-) -> Result<SwapFunctionParametersPlan> {
+) -> FunctionParameterResult<SwapFunctionParametersPlan> {
     if request.left_name == request.right_name {
-        anyhow::bail!("swap-function-parameters requires two distinct parameter names");
+        return Err(ParameterSelectionError::SwapNeedsDistinctNames.into());
     }
 
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
@@ -96,9 +98,11 @@ pub fn plan_swap_function_parameters(
         let call_selection = tree.select_path(call_path)?;
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
-            anyhow::bail!(
-                "swap-function-parameters call path {call_path} overlaps the selected definition"
-            );
+            return Err(CallSelectionError::OverlapsDefinition {
+                command: "swap-function-parameters",
+                path: call_path.to_string(),
+            }
+            .into());
         }
         ensure_positional_arguments_available(
             &call_view,
@@ -144,8 +148,12 @@ pub fn plan_swap_function_parameters(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("swap-function-parameters output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "swap-function-parameters",
+            source,
+        }
+    })?;
 
     let changed = rewritten != request.input;
     Ok(SwapFunctionParametersPlan {

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::FunctionParameterResult;
 
 use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
 
@@ -49,7 +49,7 @@ impl DefinitionInsertionPlan<'_> {
         &self,
         target: &FunctionParameterTarget,
         request: &AddFunctionParameterRequest<'_>,
-    ) -> Result<SpanEdit> {
+    ) -> FunctionParameterResult<SpanEdit> {
         match self {
             Self::ExistingKeyword(keyword_insertion) => insertion_edit_for_list_item(
                 &target.parameter_container,
@@ -94,7 +94,7 @@ impl DefinitionInsertionPlan<'_> {
         call_argument_offset: usize,
         argument: &str,
         insert: FunctionParameterInsert,
-    ) -> Result<SpanEdit> {
+    ) -> FunctionParameterResult<SpanEdit> {
         match self {
             Self::ExistingKeyword(keyword_insertion) => add_keyword_function_parameter_call_edit(
                 call_view,

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{FunctionParameterResult, LambdaListError, ParameterSelectionError};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, SymbolName};
@@ -16,8 +16,8 @@ pub fn parameter_locations(
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
     allow_specialized_required_parameters: bool,
-    operation: &str,
-) -> Result<Vec<ParameterLocation>> {
+    operation: &'static str,
+) -> FunctionParameterResult<Vec<ParameterLocation>> {
     match parameter_form.kind {
         ExpressionKind::List => parameter_locations_from_children(
             dialect,
@@ -26,7 +26,7 @@ pub fn parameter_locations(
             allow_specialized_required_parameters,
             operation,
         ),
-        _ => anyhow::bail!("{operation} function parameter form must be a list or vector"),
+        _ => Err(LambdaListError::NotAListOrVector { operation }.into()),
     }
 }
 
@@ -35,8 +35,8 @@ fn parameter_locations_from_children(
     children: &[ExpressionView],
     protected_prefix_count: usize,
     allow_specialized_required_parameters: bool,
-    operation: &str,
-) -> Result<Vec<ParameterLocation>> {
+    operation: &'static str,
+) -> FunctionParameterResult<Vec<ParameterLocation>> {
     let mut locations = Vec::with_capacity(children.len().saturating_sub(protected_prefix_count));
     let mut call_index = 0usize;
     let mut positional = true;
@@ -50,7 +50,7 @@ fn parameter_locations_from_children(
     for (item_index, child) in children.iter().enumerate().skip(protected_prefix_count) {
         if is_dotted_list_separator(child) {
             if !supports_common_lisp_lambda_list {
-                anyhow::bail!("{operation} dotted lambda-list separators are not supported");
+                return Err(LambdaListError::DottedNotSupported { operation }.into());
             }
             if section != ParameterSection::Required
                 || !positional
@@ -58,26 +58,25 @@ fn parameter_locations_from_children(
                 || keyword_parameters
                 || !accepts_parameters
             {
-                anyhow::bail!(
-                    "{operation} dotted lambda-list separator must follow required parameters"
-                );
+                return Err(LambdaListError::DottedAfterRequired { operation }.into());
             }
             if locations.is_empty() {
-                anyhow::bail!(
-                    "{operation} dotted lambda-list separator must follow at least one parameter"
-                );
+                return Err(LambdaListError::DottedNeedsParameter { operation }.into());
             }
             let tail_index = item_index + 1;
-            let tail = children.get(tail_index).with_context(|| {
-                format!("{operation} dotted lambda-list separator must be followed by a parameter")
-            })?;
-            let tail_name = atom_text(tail)
-                .with_context(|| format!("{operation} dotted lambda-list tail must be a symbol"))?;
-            SymbolName::new(tail_name.to_owned()).with_context(|| {
-                format!("{operation} found invalid parameter symbol '{tail_name}'")
+            let tail = children
+                .get(tail_index)
+                .ok_or(LambdaListError::DottedSeparatorNeedsParameter { operation })?;
+            let tail_name =
+                atom_text(tail).ok_or(LambdaListError::DottedTailNotASymbol { operation })?;
+            SymbolName::new(tail_name.to_owned()).map_err(|_| {
+                ParameterSelectionError::InvalidSymbolFor {
+                    operation,
+                    name: tail_name.to_owned(),
+                }
             })?;
             if tail_index + 1 != children.len() {
-                anyhow::bail!("{operation} dotted lambda-list tail must be the final parameter");
+                return Err(LambdaListError::DottedTailNotFinal { operation }.into());
             }
             locations.push(ParameterLocation {
                 name: tail_name.to_owned(),
@@ -90,9 +89,11 @@ fn parameter_locations_from_children(
         }
         if let Some(marker) = atom_text(child).filter(|name| name.starts_with('&')) {
             if !supports_common_lisp_lambda_list {
-                anyhow::bail!(
-                    "{operation} function parameter modifiers are not supported: {marker}"
-                );
+                return Err(LambdaListError::ModifierNotSupported {
+                    operation,
+                    marker: marker.to_string(),
+                }
+                .into());
             }
             match marker {
                 "&optional" => {
@@ -118,9 +119,7 @@ fn parameter_locations_from_children(
                 }
                 "&allow-other-keys" => {
                     if !keyword_parameters {
-                        anyhow::bail!(
-                            "{operation} lambda-list marker &allow-other-keys is only supported after &key"
-                        );
+                        return Err(LambdaListError::AllowOtherKeysWithoutKey { operation }.into());
                     }
                     accepts_parameters = false;
                     positional = false;
@@ -128,15 +127,19 @@ fn parameter_locations_from_children(
                     keyword_parameters = false;
                     section = ParameterSection::Other;
                 }
-                _ => anyhow::bail!("{operation} unsupported lambda-list marker: {marker}"),
+                _ => {
+                    return Err(LambdaListError::UnsupportedMarker {
+                        operation,
+                        marker: marker.to_string(),
+                    }
+                    .into());
+                }
             }
             continue;
         }
 
         if !accepts_parameters {
-            anyhow::bail!(
-                "{operation} does not support parameters after &allow-other-keys before another lambda-list marker"
-            );
+            return Err(LambdaListError::ParametersAfterAllowOtherKeys { operation }.into());
         }
         let allow_specialized_required =
             allow_specialized_required_parameters && positional && !allow_lambda_list_spec;
@@ -146,12 +149,12 @@ fn parameter_locations_from_children(
             keyword_parameters,
             allow_specialized_required,
         )
-        .with_context(|| format!("{operation} currently supports only simple parameters"))?;
-        SymbolName::new(binding.name.to_owned()).with_context(|| {
-            format!(
-                "{operation} found invalid parameter symbol '{}'",
-                binding.name
-            )
+        .ok_or(LambdaListError::OnlySimpleParameters { operation })?;
+        SymbolName::new(binding.name.to_owned()).map_err(|_| {
+            ParameterSelectionError::InvalidSymbolFor {
+                operation,
+                name: binding.name.to_string(),
+            }
         })?;
         let call_index_for_parameter = positional.then_some(call_index);
         let keyword_argument = binding.keyword.map(|keyword| KeywordArgumentLocation {

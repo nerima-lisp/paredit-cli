@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{FunctionParameterResult, LambdaListError};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ExpressionView, SymbolName};
@@ -14,7 +14,7 @@ pub fn keyword_parameter_insertion(
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
     new_parameter: &SymbolName,
-) -> Result<Option<KeywordParameterInsertion>> {
+) -> FunctionParameterResult<Option<KeywordParameterInsertion>> {
     if !dialect.supports_common_lisp_lambda_list_refactor_model() {
         return Ok(None);
     }
@@ -38,7 +38,7 @@ pub fn keyword_parameter_insertion(
             match marker {
                 "&key" => {
                     if first_item_index.is_some() {
-                        anyhow::bail!("add-function-parameter found duplicate &key marker");
+                        return Err(LambdaListError::DuplicateKeyMarker.into());
                     }
                     positional_call_arguments = false;
                     in_keyword_section = true;
@@ -90,7 +90,7 @@ pub fn optional_parameter_insertion(
     dialect: Dialect,
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
-) -> Result<Option<OptionalParameterInsertion>> {
+) -> FunctionParameterResult<Option<OptionalParameterInsertion>> {
     if !dialect.supports_common_lisp_lambda_list_refactor_model() {
         return Ok(None);
     }
@@ -113,7 +113,7 @@ pub fn optional_parameter_insertion(
         if let Some(marker) = atom_text(child).filter(|name| name.starts_with('&')) {
             if marker == "&optional" {
                 if first_item_index.is_some() {
-                    anyhow::bail!("add-function-parameter found duplicate &optional marker");
+                    return Err(LambdaListError::DuplicateOptionalMarker.into());
                 }
                 in_optional_section = true;
                 first_item_index = Some(item_index + 1);
@@ -149,7 +149,7 @@ pub fn positional_parameter_insertion(
     dialect: Dialect,
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
-) -> Result<Option<PositionalParameterInsertion>> {
+) -> FunctionParameterResult<Option<PositionalParameterInsertion>> {
     if !dialect.supports_common_lisp_lambda_list_refactor_model() {
         return Ok(None);
     }

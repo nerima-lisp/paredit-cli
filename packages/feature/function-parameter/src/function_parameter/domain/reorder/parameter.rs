@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{FunctionParameterResult, ParameterSelectionError};
 
 use paredit_core_syntax::sexpr::SymbolName;
 
@@ -23,16 +23,16 @@ pub struct ReorderableParameter {
 
 pub fn reorderable_parameters(
     parameters: &[ParameterLocation],
-    operation: &str,
-) -> Result<Vec<ReorderableParameter>> {
+    operation: &'static str,
+) -> FunctionParameterResult<Vec<ReorderableParameter>> {
     let parameters = parameters
         .iter()
         .map(|parameter| {
-            let name = SymbolName::new(parameter.name.clone()).with_context(|| {
-                format!(
-                    "{operation} found invalid parameter symbol '{}'",
-                    parameter.name
-                )
+            let name = SymbolName::new(parameter.name.clone()).map_err(|_| {
+                ParameterSelectionError::InvalidSymbolFor {
+                    operation,
+                    name: parameter.name.to_string(),
+                }
             })?;
             if let Some(keyword_argument) = parameter.keyword_argument.as_ref() {
                 return Ok(Some(ReorderableParameter {
@@ -74,19 +74,20 @@ pub fn reorderable_parameters(
                 });
             }
 
-            Ok(match parameter.section {
-                ParameterSection::Other => None,
+            match parameter.section {
+                ParameterSection::Other => Ok(None),
                 ParameterSection::Required
                 | ParameterSection::Optional
                 | ParameterSection::Keyword => {
-                    anyhow::bail!(
-                        "{operation} does not support reordering parameter '{}' because it is not a direct call argument",
-                        parameter.name
-                    )
+                    Err(ParameterSelectionError::NotADirectCallArgument {
+                        operation,
+                        name: parameter.name.to_string(),
+                    }
+                    .into())
                 }
-            })
+            }
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<FunctionParameterResult<Vec<_>>>()?;
 
     Ok(parameters.into_iter().flatten().collect())
 }
@@ -95,14 +96,16 @@ pub fn ensure_parameter_is_reorderable(
     parameters: &[ReorderableParameter],
     item_index: usize,
     parameter_name: &SymbolName,
-    operation: &str,
-) -> Result<usize> {
+    operation: &'static str,
+) -> FunctionParameterResult<usize> {
     parameters
         .iter()
         .position(|candidate| candidate.item_index == item_index)
-        .with_context(|| {
-            format!(
-                "{operation} does not support reordering parameter '{parameter_name}' because it is not a direct call argument"
-            )
+        .ok_or_else(|| {
+            ParameterSelectionError::NotADirectCallArgument {
+                operation,
+                name: parameter_name.to_string(),
+            }
+            .into()
         })
 }

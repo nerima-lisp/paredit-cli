@@ -34,7 +34,7 @@ pub use types::{
 pub fn list_lambda_list_parameter_names(
     dialect: paredit_core_syntax::dialect::Dialect,
     parameter_form: &paredit_core_syntax::sexpr::ExpressionView,
-) -> anyhow::Result<Vec<String>> {
+) -> crate::error::FunctionParameterResult<Vec<String>> {
     definition::parameter_locations(dialect, parameter_form, 0, true, "list-parameters").map(
         |locations| {
             locations

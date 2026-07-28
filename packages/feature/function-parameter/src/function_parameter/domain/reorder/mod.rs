@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{CallSelectionError, FunctionParameterResult, ParameterSelectionError};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -27,9 +29,9 @@ mod parameter;
 
 pub fn plan_reorder_function_parameters(
     request: ReorderFunctionParametersRequest<'_>,
-) -> Result<ReorderFunctionParametersPlan> {
+) -> FunctionParameterResult<ReorderFunctionParametersPlan> {
     if request.parameter_order.is_empty() {
-        anyhow::bail!("reorder-function-parameters requires at least one --parameter");
+        return Err(ParameterSelectionError::ReorderNeedsParameter.into());
     }
 
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
@@ -81,9 +83,11 @@ pub fn plan_reorder_function_parameters(
         let call_selection = tree.select_path(call_path)?;
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
-            anyhow::bail!(
-                "reorder-function-parameters call path {call_path} overlaps the selected definition"
-            );
+            return Err(CallSelectionError::OverlapsDefinition {
+                command: "reorder-function-parameters",
+                path: call_path.to_string(),
+            }
+            .into());
         }
         let (call_span, reordered_argument, edit) = reorder_function_parameter_call_edit(
             request.input,
@@ -105,8 +109,12 @@ pub fn plan_reorder_function_parameters(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("reorder-function-parameters output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "reorder-function-parameters",
+            source,
+        }
+    })?;
 
     let changed = rewritten != request.input;
     Ok(ReorderFunctionParametersPlan {

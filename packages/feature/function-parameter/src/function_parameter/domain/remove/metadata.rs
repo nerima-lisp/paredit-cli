@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::FunctionParameterResult;
 
 use crate::function_parameter::domain::RemoveFunctionParameterRequest;
 use crate::function_parameter::domain::definition::{
@@ -19,7 +19,7 @@ pub struct RemoveParameterMetadata {
 pub fn resolve_remove_parameter_metadata(
     target: &FunctionParameterTarget,
     request: &RemoveFunctionParameterRequest<'_>,
-) -> Result<RemoveParameterMetadata> {
+) -> FunctionParameterResult<RemoveParameterMetadata> {
     let parameter =
         find_unique_parameter_location(target, &request.name, "remove-function-parameter")?;
     let parameter_item_index = parameter.item_index;

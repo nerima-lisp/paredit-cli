@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{CallSelectionError, FunctionParameterResult};
 
 use crate::function_parameter::domain::list_edit::atom_text;
 use paredit_core_syntax::common_lisp::{
@@ -16,21 +16,24 @@ pub fn matches_function_call_view(view: &ExpressionView, function_name: &SymbolN
 pub fn ensure_matching_function_call(
     view: &ExpressionView,
     function_name: &SymbolName,
-    command: &str,
-) -> Result<()> {
+    command: &'static str,
+) -> FunctionParameterResult<()> {
     if !matches_function_call_view(view, function_name) {
         if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-            anyhow::bail!("{command} call selection must be a function call list");
+            return Err(CallSelectionError::SelectionNotACallList { command }.into());
         }
         let head = atom_text(
             view.children
                 .first()
-                .with_context(|| format!("{command} call must not be empty"))?,
+                .ok_or(CallSelectionError::CallEmpty { command })?,
         )
-        .with_context(|| format!("{command} call must start with an atom"))?;
-        anyhow::bail!(
-            "{command} call head '{head}' does not match selected definition '{function_name}'"
-        );
+        .ok_or(CallSelectionError::CallHeadNotAnAtom { command })?;
+        return Err(CallSelectionError::SelectionHeadMismatch {
+            command,
+            head: head.to_string(),
+            function: function_name.to_string(),
+        }
+        .into());
     }
 
     Ok(())
@@ -45,8 +48,8 @@ pub fn resolve_function_call_view<'a>(
     view: &'a ExpressionView,
     function_name: &SymbolName,
     call_argument_offset: usize,
-    command: &str,
-) -> Result<FunctionCallView<'a>> {
+    command: &'static str,
+) -> FunctionParameterResult<FunctionCallView<'a>> {
     ensure_matching_function_call(view, function_name, command)?;
 
     if direct_function_call_head(view)
@@ -61,9 +64,9 @@ pub fn resolve_function_call_view<'a>(
     let place = view
         .children
         .get(1)
-        .with_context(|| format!("{command} setf call must contain a place form"))?;
+        .ok_or(CallSelectionError::SetfMissingPlace { command })?;
     if place.kind != ExpressionKind::List || place.delimiter != Some(Delimiter::Paren) {
-        anyhow::bail!("{command} setf place must be a function call list");
+        return Err(CallSelectionError::SetfPlaceNotACallList { command }.into());
     }
     Ok(FunctionCallView {
         view: place,

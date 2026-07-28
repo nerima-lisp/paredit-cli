@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{CallSelectionError, FunctionParameterResult, ParameterSelectionError};
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -20,7 +22,7 @@ use super::types::{MoveFunctionParameterPlan, MoveFunctionParameterRequest};
 
 pub fn plan_move_function_parameter(
     request: MoveFunctionParameterRequest<'_>,
-) -> Result<MoveFunctionParameterPlan> {
+) -> FunctionParameterResult<MoveFunctionParameterPlan> {
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target =
@@ -41,11 +43,11 @@ pub fn plan_move_function_parameter(
     )?;
     let parameter_count = reorderable_parameters.len();
     if request.to_index >= parameter_count {
-        anyhow::bail!(
-            "move-function-parameter target index {} is out of bounds for {} parameters",
-            request.to_index,
-            parameter_count
-        );
+        return Err(ParameterSelectionError::TargetIndexOutOfBounds {
+            index: request.to_index,
+            count: parameter_count,
+        }
+        .into());
     }
     let mut new_parameter_order = old_parameter_order
         .iter()
@@ -88,9 +90,11 @@ pub fn plan_move_function_parameter(
         let call_selection = tree.select_path(call_path)?;
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
-            anyhow::bail!(
-                "move-function-parameter call path {call_path} overlaps the selected definition"
-            );
+            return Err(CallSelectionError::OverlapsDefinition {
+                command: "move-function-parameter",
+                path: call_path.to_string(),
+            }
+            .into());
         }
         let moved_argument = argument_for_parameter(
             request.input,
@@ -120,8 +124,12 @@ pub fn plan_move_function_parameter(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("move-function-parameter output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "move-function-parameter",
+            source,
+        }
+    })?;
 
     let changed = rewritten != request.input;
     Ok(MoveFunctionParameterPlan {

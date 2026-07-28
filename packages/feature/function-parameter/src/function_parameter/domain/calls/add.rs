@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{CallArgumentError, FunctionParameterResult};
 
 use crate::function_parameter::domain::FunctionParameterInsert;
 use crate::function_parameter::domain::list_edit::{atom_text, insertion_edit_for_list_item};
@@ -12,7 +12,7 @@ pub fn add_function_parameter_call_edit(
     call_argument_offset: usize,
     argument: &str,
     insert: FunctionParameterInsert,
-) -> Result<(ByteSpan, String)> {
+) -> FunctionParameterResult<(ByteSpan, String)> {
     let call = resolve_function_call_view(
         view,
         function_name,
@@ -29,7 +29,7 @@ pub fn add_positional_function_parameter_call_edit(
     call_argument_offset: usize,
     argument: &str,
     argument_index: usize,
-) -> Result<(ByteSpan, String)> {
+) -> FunctionParameterResult<(ByteSpan, String)> {
     let call = resolve_function_call_view(
         view,
         function_name,
@@ -39,13 +39,15 @@ pub fn add_positional_function_parameter_call_edit(
 
     let insertion_item_index = call.argument_offset + argument_index + 1;
     if insertion_item_index > call.view.children.len() {
-        anyhow::bail!(
-            "add-function-parameter call to '{}' at {}..{} does not have {} positional argument(s) before rest arguments",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            argument_index
-        );
+        return Err(CallArgumentError::MissingPositional {
+            command: "add-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            count: argument_index,
+            before: "rest arguments",
+        }
+        .into());
     }
 
     insertion_edit_for_list_item(
@@ -63,7 +65,7 @@ pub fn add_optional_function_parameter_call_edit(
     argument: &str,
     positional_prefix_count: usize,
     argument_index: usize,
-) -> Result<(ByteSpan, String)> {
+) -> FunctionParameterResult<(ByteSpan, String)> {
     let call = resolve_function_call_view(
         view,
         function_name,
@@ -86,24 +88,28 @@ pub fn add_optional_function_parameter_call_edit(
         .unwrap_or(call.view.children.len())
         .saturating_sub(call.argument_offset + 1);
     if argument_index > positional_argument_count {
-        anyhow::bail!(
-            "add-function-parameter call to '{}' at {}..{} does not have {} positional argument(s) before optional argument",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            argument_index
-        );
+        return Err(CallArgumentError::MissingPositional {
+            command: "add-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            count: argument_index,
+            before: "optional argument",
+        }
+        .into());
     }
 
     let insertion_item_index = call.argument_offset + argument_index + 1;
     if insertion_item_index > call.view.children.len() {
-        anyhow::bail!(
-            "add-function-parameter call to '{}' at {}..{} does not have {} positional argument(s) before optional argument",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            argument_index
-        );
+        return Err(CallArgumentError::MissingPositional {
+            command: "add-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            count: argument_index,
+            before: "optional argument",
+        }
+        .into());
     }
 
     insertion_edit_for_list_item(
@@ -122,7 +128,7 @@ pub fn add_keyword_function_parameter_call_edit(
     argument: &str,
     positional_prefix_count: usize,
     insert: FunctionParameterInsert,
-) -> Result<(ByteSpan, String)> {
+) -> FunctionParameterResult<(ByteSpan, String)> {
     let call = resolve_function_call_view(
         view,
         function_name,
@@ -132,33 +138,37 @@ pub fn add_keyword_function_parameter_call_edit(
 
     let first_keyword_item_index = call.argument_offset + positional_prefix_count + 1;
     if first_keyword_item_index > call.view.children.len() {
-        anyhow::bail!(
-            "add-function-parameter call to '{}' at {}..{} does not have {} positional argument(s) before keyword arguments",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            positional_prefix_count
-        );
+        return Err(CallArgumentError::MissingPositional {
+            command: "add-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            count: positional_prefix_count,
+            before: "keyword arguments",
+        }
+        .into());
     }
 
     let mut item_index = first_keyword_item_index;
     while item_index < call.view.children.len() {
         if atom_text(&call.view.children[item_index]).is_some_and(|text| text == keyword) {
-            anyhow::bail!(
-                "add-function-parameter call to '{}' at {}..{} already contains keyword argument {}",
-                function_name,
-                call.view.span.start().get(),
-                call.view.span.end().get(),
-                keyword
-            );
+            return Err(CallArgumentError::KeywordAlreadyPresent {
+                command: "add-function-parameter",
+                function: function_name.to_string(),
+                start: call.view.span.start().get(),
+                end: call.view.span.end().get(),
+                keyword: keyword.to_string(),
+            }
+            .into());
         }
         if item_index + 1 >= call.view.children.len() {
-            anyhow::bail!(
-                "add-function-parameter call to '{}' at {}..{} has keyword argument without a value",
-                function_name,
-                call.view.span.start().get(),
-                call.view.span.end().get()
-            );
+            return Err(CallArgumentError::KeywordWithoutValue {
+                command: "add-function-parameter",
+                function: function_name.to_string(),
+                start: call.view.span.start().get(),
+                end: call.view.span.end().get(),
+            }
+            .into());
         }
         item_index += 2;
     }

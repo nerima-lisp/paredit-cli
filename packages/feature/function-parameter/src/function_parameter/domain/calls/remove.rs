@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{CallArgumentError, FunctionParameterResult};
 
 use crate::function_parameter::domain::MissingArgumentPolicy;
 use crate::function_parameter::domain::list_edit::{
@@ -17,7 +17,7 @@ pub fn remove_function_parameter_call_edit(
     call_argument_offset: usize,
     parameter_index: usize,
     missing_argument_policy: MissingArgumentPolicy,
-) -> Result<RemoveArgumentEdit> {
+) -> FunctionParameterResult<RemoveArgumentEdit> {
     let call = resolve_function_call_view(
         view,
         function_name,
@@ -30,13 +30,14 @@ pub fn remove_function_parameter_call_edit(
         if missing_argument_policy.allows_missing_argument() {
             return Ok((call.view.span, None, None));
         }
-        anyhow::bail!(
-            "remove-function-parameter call to '{}' at {}..{} does not have argument at parameter index {}",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            parameter_index
-        );
+        return Err(CallArgumentError::MissingArgumentAtIndex {
+            command: "remove-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            index: parameter_index,
+        }
+        .into());
     };
     let removed_argument = argument.span.slice(input).to_owned();
     let edit = removal_edit_for_list_item(input, call.view, argument_item_index)?;
@@ -51,7 +52,7 @@ pub fn remove_keyword_function_parameter_call_edit(
     keyword: &str,
     positional_prefix_count: usize,
     missing_argument_policy: MissingArgumentPolicy,
-) -> Result<RemoveArgumentEdit> {
+) -> FunctionParameterResult<RemoveArgumentEdit> {
     let call = resolve_function_call_view(
         view,
         function_name,
@@ -64,13 +65,14 @@ pub fn remove_keyword_function_parameter_call_edit(
         if missing_argument_policy.allows_missing_argument() {
             return Ok((call.view.span, None, None));
         }
-        anyhow::bail!(
-            "remove-function-parameter call to '{}' at {}..{} does not have keyword argument {}",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            keyword
-        );
+        return Err(CallArgumentError::KeywordMissing {
+            command: "remove-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            keyword: keyword.to_string(),
+        }
+        .into());
     }
 
     let mut found_keyword_item_index = None;
@@ -79,13 +81,14 @@ pub fn remove_keyword_function_parameter_call_edit(
         if atom_text(&call.view.children[item_index]).is_some_and(|text| text == keyword)
             && found_keyword_item_index.replace(item_index).is_some()
         {
-            anyhow::bail!(
-                "remove-function-parameter call to '{}' at {}..{} contains duplicate keyword argument {}",
-                function_name,
-                call.view.span.start().get(),
-                call.view.span.end().get(),
-                keyword
-            );
+            return Err(CallArgumentError::DuplicateKeyword {
+                command: "remove-function-parameter",
+                function: function_name.to_string(),
+                start: call.view.span.start().get(),
+                end: call.view.span.end().get(),
+                keyword: keyword.to_string(),
+            }
+            .into());
         }
         item_index += 2;
     }
@@ -94,23 +97,25 @@ pub fn remove_keyword_function_parameter_call_edit(
         if missing_argument_policy.allows_missing_argument() {
             return Ok((call.view.span, None, None));
         }
-        anyhow::bail!(
-            "remove-function-parameter call to '{}' at {}..{} does not have keyword argument {}",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            keyword
-        );
+        return Err(CallArgumentError::KeywordMissing {
+            command: "remove-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            keyword: keyword.to_string(),
+        }
+        .into());
     };
     let value_item_index = keyword_item_index + 1;
     let Some(value) = call.view.children.get(value_item_index) else {
-        anyhow::bail!(
-            "remove-function-parameter call to '{}' at {}..{} has keyword {} without a value",
-            function_name,
-            call.view.span.start().get(),
-            call.view.span.end().get(),
-            keyword
-        );
+        return Err(CallArgumentError::NamedKeywordWithoutValue {
+            command: "remove-function-parameter",
+            function: function_name.to_string(),
+            start: call.view.span.start().get(),
+            end: call.view.span.end().get(),
+            keyword: keyword.to_string(),
+        }
+        .into());
     };
 
     let keyword_item = &call.view.children[keyword_item_index];

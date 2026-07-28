@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{FunctionParameterResult, ListEditError};
 
 use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView};
 
@@ -11,12 +11,12 @@ pub fn insertion_edit_for_list_item(
     protected_prefix_count: usize,
     value: &str,
     insert: FunctionParameterInsert,
-) -> Result<SpanEdit> {
+) -> FunctionParameterResult<SpanEdit> {
     if container.kind != ExpressionKind::List || container.delimiter.is_none() {
-        anyhow::bail!("add-function-parameter insertion target must be a list");
+        return Err(ListEditError::InsertionTargetNotAList.into());
     }
     if container.span.len() < 2 {
-        anyhow::bail!("add-function-parameter insertion target has an invalid span");
+        return Err(ListEditError::InsertionTargetInvalidSpan.into());
     }
 
     let item_start = protected_prefix_count.min(container.children.len());
@@ -55,12 +55,12 @@ pub fn removal_edit_for_list_item(
     input: &str,
     container: &ExpressionView,
     item_index: usize,
-) -> Result<SpanEdit> {
+) -> FunctionParameterResult<SpanEdit> {
     if container.kind != ExpressionKind::List || container.delimiter.is_none() {
-        anyhow::bail!("remove-function-parameter removal target must be a list");
+        return Err(ListEditError::RemovalTargetNotAList.into());
     }
     if item_index >= container.children.len() {
-        anyhow::bail!("remove-function-parameter removal item index {item_index} is out of bounds");
+        return Err(ListEditError::RemovalIndexOutOfBounds { index: item_index }.into());
     }
 
     let item = &container.children[item_index];
@@ -71,7 +71,7 @@ pub fn removal_edit_for_list_item(
             .checked_sub(2)
             .and_then(|index| container.children.get(index))
         else {
-            anyhow::bail!("remove-function-parameter dotted tail must follow a parameter binding");
+            return Err(ListEditError::DottedTailWithoutBinding.into());
         };
         ByteSpan::new(previous.span.end(), item.span.end())
     } else if item_index == 0 {
@@ -99,7 +99,10 @@ fn first_newline_or(input: &str, start: usize, end: usize) -> usize {
         .map_or(end, |offset| start + offset)
 }
 
-pub fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<String> {
+pub fn apply_byte_span_edits(
+    input: &str,
+    mut edits: Vec<SpanEdit>,
+) -> FunctionParameterResult<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 
@@ -110,14 +113,16 @@ pub fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<St
     Ok(output)
 }
 
-pub fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Result<()> {
+pub fn ensure_non_overlapping_spans(
+    spans: impl IntoIterator<Item = ByteSpan>,
+) -> FunctionParameterResult<()> {
     let mut previous_end = None;
     for span in spans {
         let start = span.start().get();
         let end = span.end().get();
         if let Some(previous_end) = previous_end {
             if start < previous_end {
-                anyhow::bail!("refusing overlapping rewrite spans");
+                return Err(ListEditError::OverlappingRewriteSpans.into());
             }
         }
         previous_end = Some(end);

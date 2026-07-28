@@ -1,4 +1,9 @@
-use anyhow::{Context, Result};
+use paredit_core_edit::DocumentRefusal;
+
+use crate::error::{
+    CallSelectionError, FunctionParameterError, FunctionParameterResult, LambdaListError,
+    ListEditError,
+};
 use paredit_core_syntax::dialect::Dialect;
 
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -19,7 +24,7 @@ use definition_insertion::{DefinitionInsertionPlan, resolve_definition_insertion
 
 pub fn plan_add_function_parameter(
     request: AddFunctionParameterRequest<'_>,
-) -> Result<AddFunctionParameterPlan> {
+) -> FunctionParameterResult<AddFunctionParameterPlan> {
     let argument = validate_argument(&request.argument, request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
@@ -31,9 +36,7 @@ pub fn plan_add_function_parameter(
     )?;
     let insertion_plan = resolve_definition_insertion_plan(&target, &request);
     if target.has_lambda_list_marker && insertion_plan.is_none() {
-        anyhow::bail!(
-            "add-function-parameter currently supports only flat positional parameter lists, existing Common Lisp required parameter sections before lambda-list markers, existing Common Lisp &optional parameter lists, or existing Common Lisp &key parameter lists"
-        );
+        return Err(LambdaListError::AddOnlyFlatOrMarkers.into());
     }
     let resolved_section = insertion_plan
         .as_ref()
@@ -67,9 +70,11 @@ pub fn plan_add_function_parameter(
         let call_selection = tree.select_path(call_path)?;
         let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
-            anyhow::bail!(
-                "add-function-parameter call path {call_path} overlaps the selected definition"
-            );
+            return Err(CallSelectionError::OverlapsDefinition {
+                command: "add-function-parameter",
+                path: call_path.to_string(),
+            }
+            .into());
         }
         let edit = if let Some(insertion_plan) = insertion_plan.as_ref() {
             insertion_plan.call_edit(
@@ -96,8 +101,12 @@ pub fn plan_add_function_parameter(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
-        .context("add-function-parameter output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect).map_err(|source| {
+        DocumentRefusal::OutputNotAnSexprDocument {
+            operation: "add-function-parameter",
+            source,
+        }
+    })?;
 
     let changed = rewritten != request.input;
     Ok(AddFunctionParameterPlan {
@@ -118,15 +127,15 @@ pub fn plan_add_function_parameter(
     })
 }
 
-fn validate_argument(argument: &str, dialect: Dialect) -> Result<String> {
+fn validate_argument(argument: &str, dialect: Dialect) -> FunctionParameterResult<String> {
     let argument = argument.trim().to_owned();
     if argument.is_empty() {
-        anyhow::bail!("--argument must not be empty");
+        return Err(ListEditError::ArgumentEmpty.into());
     }
     let argument_tree = SyntaxTree::parse_with_dialect(&argument, dialect)
-        .context("add-function-parameter argument is not a valid S-expression")?;
+        .map_err(|source| FunctionParameterError::ArgumentDoesNotParse { source })?;
     if argument_tree.root_children().len() != 1 {
-        anyhow::bail!("--argument must contain exactly one top-level S-expression");
+        return Err(ListEditError::ArgumentNotOneForm.into());
     }
     Ok(argument)
 }

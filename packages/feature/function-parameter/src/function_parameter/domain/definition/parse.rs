@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{DefinitionShapeError, FunctionParameterResult, ParameterSelectionError};
 
 use paredit_core_syntax::common_lisp::{CommonLispOperator, common_lisp_symbol_reference_eq};
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
@@ -18,7 +18,7 @@ pub fn parse_remove_function_parameter_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
-) -> Result<FunctionParameterTarget> {
+) -> FunctionParameterResult<FunctionParameterTarget> {
     parse_function_parameter_definition(dialect, tree, path, None, "remove-function-parameter")
 }
 
@@ -26,7 +26,7 @@ pub fn parse_move_function_parameter_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
-) -> Result<FunctionParameterTarget> {
+) -> FunctionParameterResult<FunctionParameterTarget> {
     parse_function_parameter_definition(dialect, tree, path, None, "move-function-parameter")
 }
 
@@ -34,7 +34,7 @@ pub fn parse_swap_function_parameters_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
-) -> Result<FunctionParameterTarget> {
+) -> FunctionParameterResult<FunctionParameterTarget> {
     parse_function_parameter_definition(dialect, tree, path, None, "swap-function-parameters")
 }
 
@@ -42,7 +42,7 @@ pub fn parse_reorder_function_parameters_definition(
     dialect: Dialect,
     tree: &SyntaxTree,
     path: &Path,
-) -> Result<FunctionParameterTarget> {
+) -> FunctionParameterResult<FunctionParameterTarget> {
     parse_function_parameter_definition(dialect, tree, path, None, "reorder-function-parameters")
 }
 
@@ -51,7 +51,7 @@ pub fn parse_add_function_parameter_definition(
     tree: &SyntaxTree,
     path: &Path,
     new_parameter: &SymbolName,
-) -> Result<FunctionParameterTarget> {
+) -> FunctionParameterResult<FunctionParameterTarget> {
     parse_function_parameter_definition(
         dialect,
         tree,
@@ -66,8 +66,8 @@ fn parse_function_parameter_definition(
     tree: &SyntaxTree,
     path: &Path,
     new_parameter: Option<&SymbolName>,
-    operation: &str,
-) -> Result<FunctionParameterTarget> {
+    operation: &'static str,
+) -> FunctionParameterResult<FunctionParameterTarget> {
     let view = tree.select_path(path)?.view();
     if let Some(target) =
         parse_local_callable_binding_definition(dialect, tree, path, &view, new_parameter)?
@@ -76,14 +76,14 @@ fn parse_function_parameter_definition(
     }
 
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-        anyhow::bail!("{operation} definition selection must be a function definition list");
+        return Err(DefinitionShapeError::NotADefinitionList { operation }.into());
     }
     if view.children.len() < 3 {
-        anyhow::bail!("{operation} definition must include a name and parameters");
+        return Err(DefinitionShapeError::MissingNameOrParameters { operation }.into());
     }
 
     let head = atom_text(&view.children[0])
-        .with_context(|| format!("{operation} definition must start with a definition atom"))?;
+        .ok_or(DefinitionShapeError::HeadNotADefinitionAtom { operation })?;
     let shape = definition_shape(dialect, &view, head);
     let recognized_common_lisp_head = matches!(dialect, Dialect::CommonLisp | Dialect::Unknown)
         && CommonLispOperator::from_head(head).is_some();
@@ -93,10 +93,10 @@ fn parse_function_parameter_definition(
             shape.category.is_callable() && shape.lambda_list(&view).is_some()
         });
     if !supports_head && !supports_generic_callable_shape {
-        anyhow::bail!(
-            "{}",
-            unsupported_function_parameter_definition_message(head, operation)
-        );
+        return Err(DefinitionShapeError::UnsupportedDefinitionForm {
+            message: unsupported_function_parameter_definition_message(head, operation),
+        }
+        .into());
     }
 
     let (
@@ -106,16 +106,15 @@ fn parse_function_parameter_definition(
         protected_prefix_count,
         allow_specialized_required_parameters,
     ) = if head == "define" {
-        let signature = view.children.get(1).context(
-            "scheme define selection must include a signature list: (define (name args...) body)",
-        )?;
+        let signature = view
+            .children
+            .get(1)
+            .ok_or(DefinitionShapeError::SchemeDefineMissingSignature)?;
         if signature.kind != ExpressionKind::List || signature.delimiter != Some(Delimiter::Paren) {
-            anyhow::bail!(
-                "{operation} currently supports scheme procedure defines, not variable defines"
-            );
+            return Err(DefinitionShapeError::SchemeVariableDefine { operation }.into());
         }
-        let name = atom_child(signature, 0)
-            .context("scheme define signature must start with a function name")?;
+        let name =
+            atom_child(signature, 0).ok_or(DefinitionShapeError::SchemeSignatureMissingName)?;
         (
             SymbolName::new(name.to_owned())?,
             signature.clone(),
@@ -124,13 +123,10 @@ fn parse_function_parameter_definition(
             false,
         )
     } else if shape.is_some_and(|shape| shape.category == DefinitionCategory::Method) {
-        let name =
-            atom_child(&view, 1).context("function definition must include a symbol name")?;
+        let name = atom_child(&view, 1).ok_or(DefinitionShapeError::MissingSymbolName)?;
         let params = shape
             .and_then(|shape| shape.lambda_list(&view))
-            .with_context(|| {
-                format!("{operation} defmethod definition must include a specialized lambda list")
-            })?;
+            .ok_or(DefinitionShapeError::DefmethodMissingSpecializedLambdaList { operation })?;
         (
             SymbolName::new(name.to_owned())?,
             params.clone(),
@@ -139,19 +135,16 @@ fn parse_function_parameter_definition(
             true,
         )
     } else {
-        let name =
-            atom_child(&view, 1).context("function definition must include a symbol name")?;
+        let name = atom_child(&view, 1).ok_or(DefinitionShapeError::MissingSymbolName)?;
         let params = view
             .children
             .get(2)
-            .context("function definition must include a parameter list")?;
+            .ok_or(DefinitionShapeError::MissingParameterList)?;
         if matches!(dialect, Dialect::CommonLisp | Dialect::Unknown)
             && CommonLispOperator::from_head(head) == Some(CommonLispOperator::Defsetf)
             && (params.kind != ExpressionKind::List || params.delimiter != Some(Delimiter::Paren))
         {
-            anyhow::bail!(
-                "{operation} does not support short-form defsetf; select a long-form defsetf with an accessor lambda list"
-            );
+            return Err(DefinitionShapeError::ShortFormDefsetf { operation }.into());
         }
         (
             SymbolName::new(name.to_owned())?,
@@ -202,16 +195,19 @@ fn parse_function_parameter_definition(
 
     if let Some(new_parameter) = new_parameter {
         if new_parameter.as_str().starts_with(['&', ':']) {
-            anyhow::bail!(
-                "add-function-parameter found invalid parameter symbol '{new_parameter}'"
-            );
+            return Err(ParameterSelectionError::InvalidSymbol {
+                name: new_parameter.to_string(),
+            }
+            .into());
         }
         if parameters.iter().any(|parameter| {
             common_lisp_symbol_reference_eq(&parameter.name, new_parameter.as_str())
         }) {
-            anyhow::bail!(
-                "add-function-parameter parameter '{new_parameter}' already exists in {function_name}"
-            );
+            return Err(ParameterSelectionError::AlreadyExists {
+                name: new_parameter.to_string(),
+                function: function_name.to_string(),
+            }
+            .into());
         }
     }
 
@@ -236,7 +232,7 @@ fn parse_local_callable_binding_definition(
     path: &Path,
     view: &ExpressionView,
     new_parameter: Option<&SymbolName>,
-) -> Result<Option<FunctionParameterTarget>> {
+) -> FunctionParameterResult<Option<FunctionParameterTarget>> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return Ok(None);
     }
@@ -280,16 +276,19 @@ fn parse_local_callable_binding_definition(
     }
 
     let function_name =
-        atom_child(view, 0).context("local callable binding must include a symbol name")?;
+        atom_child(view, 0).ok_or(DefinitionShapeError::LocalCallableMissingName)?;
     let parameter_container = view
         .children
         .get(1)
-        .context("local callable binding must include a lambda list")?
+        .ok_or(DefinitionShapeError::LocalCallableMissingLambdaList)?
         .clone();
     if parameter_container.kind != ExpressionKind::List
         || parameter_container.delimiter != Some(Delimiter::Paren)
     {
-        anyhow::bail!("{head} binding must include a parenthesized lambda list");
+        return Err(DefinitionShapeError::BindingLambdaListNotParenthesized {
+            head: head.to_string(),
+        }
+        .into());
     }
 
     let function_name = SymbolName::new(function_name.to_owned())?;
@@ -335,7 +334,7 @@ fn parse_local_callable_binding_definition(
     }))
 }
 
-fn operation_name_for_local_callable_form(head: &str) -> &str {
+fn operation_name_for_local_callable_form(head: &str) -> &'static str {
     match head {
         "flet" => "flet binding",
         "labels" => "labels binding",
@@ -345,6 +344,9 @@ fn operation_name_for_local_callable_form(head: &str) -> &str {
     }
 }
 
-fn unsupported_function_parameter_definition_message(head: &str, operation: &str) -> String {
+fn unsupported_function_parameter_definition_message(
+    head: &str,
+    operation: &'static str,
+) -> String {
     format!("{operation} does not support definition head: {head}")
 }
