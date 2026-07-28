@@ -28,7 +28,7 @@ pub(super) enum Namespace {
 }
 
 impl Namespace {
-    fn admits(self, dialect: Dialect, kind: BindingKind) -> bool {
+    const fn admits(self, dialect: Dialect, kind: BindingKind) -> bool {
         // Scheme is a Lisp-1: `(let ((f car)) (f x))` calls the *variable* `f`,
         // and `(letrec ((f (lambda ...))) f)` reads the same binding it calls.
         // Splitting the namespaces there would leave every local procedure's
@@ -168,7 +168,10 @@ mod tests {
         stack.push(BindingId::new(0), "f", BindingKind::Function);
         stack.push(BindingId::new(1), "x", BindingKind::Variable);
 
-        assert_eq!(stack.resolve("f", Namespace::Value), Some(BindingId::new(0)));
+        assert_eq!(
+            stack.resolve("f", Namespace::Value),
+            Some(BindingId::new(0))
+        );
         assert_eq!(
             stack.resolve("x", Namespace::Function),
             Some(BindingId::new(1))

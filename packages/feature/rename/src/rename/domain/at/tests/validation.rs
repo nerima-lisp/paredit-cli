@@ -157,7 +157,10 @@ fn support_predicate_accepts_the_dialects_with_a_binding_table() {
     // `verify_rename_binding` accepts. Every other one has no way to prove
     // which occurrences belong to the selected binding.
     for dialect in [Dialect::CommonLisp, Dialect::Scheme, Dialect::Racket] {
-        assert!(super::super::supports_rename_at_dialect(dialect), "{dialect:?}");
+        assert!(
+            super::super::supports_rename_at_dialect(dialect),
+            "{dialect:?}"
+        );
     }
 
     for dialect in [
@@ -167,7 +170,10 @@ fn support_predicate_accepts_the_dialects_with_a_binding_table() {
         Dialect::Fennel,
         Dialect::Unknown,
     ] {
-        assert!(!super::super::supports_rename_at_dialect(dialect), "{dialect:?}");
+        assert!(
+            !super::super::supports_rename_at_dialect(dialect),
+            "{dialect:?}"
+        );
     }
 }
 

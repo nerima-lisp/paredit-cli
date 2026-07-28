@@ -22,9 +22,7 @@ pub fn binding_groups(
         // `(let ([x 1]) x)` is the ordinary spelling in Racket, so a Scheme
         // binding entry may use either delimiter -- independently of the one
         // the surrounding list uses.
-        Dialect::Scheme | Dialect::Racket => {
-            scheme_pair_let_binding_groups(binding_form, input)
-        }
+        Dialect::Scheme | Dialect::Racket => scheme_pair_let_binding_groups(binding_form, input),
         Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Lfe | Dialect::Unknown => {
             list_pair_let_binding_groups(binding_form, input)
         }

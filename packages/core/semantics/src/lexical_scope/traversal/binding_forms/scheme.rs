@@ -18,9 +18,7 @@ use paredit_core_syntax::scheme::{
     SchemeBindingForm, SchemeDefineTarget, SchemeDefinitionForm, SchemeLetKind, SchemeOperator,
     scheme_define_target, scheme_formal_defaults_in, scheme_formals_in, scheme_identifier_text,
 };
-use paredit_core_syntax::sexpr::{
-    ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName,
-};
+use paredit_core_syntax::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::body::collect_body_forms;
 use super::super::lambda_lists::collect_lambda_list_references_from;
@@ -85,7 +83,14 @@ fn collect_binding_form(
             true
         }
         SchemeBindingForm::NamedLet => {
-            collect_named_let(dialect, view, SchemeLetKind::Parallel, symbol, input, output);
+            collect_named_let(
+                dialect,
+                view,
+                SchemeLetKind::Parallel,
+                symbol,
+                input,
+                output,
+            );
             true
         }
         SchemeBindingForm::LetValues(kind) => {
@@ -295,7 +300,8 @@ fn collect_do(
     }
 
     let shadowed = binding_form.children.iter().any(|spec| {
-        specification_name(spec).is_some_and(|name| symbol_name_matches(dialect, name, symbol.as_str()))
+        specification_name(spec)
+            .is_some_and(|name| symbol_name_matches(dialect, name, symbol.as_str()))
     });
     if shadowed {
         return;
@@ -585,8 +591,7 @@ fn formals_names(formals: &ExpressionView) -> Vec<String> {
 
 /// The name a `do` variable specification binds: `x` or `(x init step)`.
 fn specification_name(spec: &ExpressionView) -> Option<&str> {
-    scheme_identifier_text(spec)
-        .or_else(|| spec.children.first().and_then(scheme_identifier_text))
+    scheme_identifier_text(spec).or_else(|| spec.children.first().and_then(scheme_identifier_text))
 }
 
 /// Whether a node can hold binding entries.

@@ -62,9 +62,7 @@ pub(super) const fn definition_form(operator: SchemeOperator) -> Option<SchemeDe
     })
 }
 
-pub(super) const fn definition_category(
-    operator: SchemeOperator,
-) -> Option<DefinitionCategory> {
+pub(super) const fn definition_category(operator: SchemeOperator) -> Option<DefinitionCategory> {
     Some(match operator {
         // `(define x 1)` and `(define (f) 1)` share a head, so the category a
         // `define` really has depends on the form's own shape. Variable is the

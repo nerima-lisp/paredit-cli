@@ -652,10 +652,9 @@ fn scheme_definition_shape(form: &ExpressionView, head: &str) -> Option<Definiti
         }
         SchemeDefinitionForm::DefineSyntax => scheme_define_syntax_shape(form),
         SchemeDefinitionForm::DefineSyntaxRule => scheme_define_syntax_rule_shape(form),
-        SchemeDefinitionForm::DefineRecordType => scheme_named_definition_shape(
-            form,
-            DefinitionCategory::Struct,
-        ),
+        SchemeDefinitionForm::DefineRecordType => {
+            scheme_named_definition_shape(form, DefinitionCategory::Struct)
+        }
         SchemeDefinitionForm::Struct | SchemeDefinitionForm::DefineStruct => {
             scheme_named_definition_shape(form, DefinitionCategory::Struct)
         }
@@ -899,7 +898,10 @@ fn scheme_case_lambda_scope(form: &ExpressionView) -> Option<ScopeShape> {
 fn valid_scheme_lambda_clause(clause: &ExpressionView) -> bool {
     scheme_binding_container(clause)
         && clause.children.len() >= 2
-        && clause.children.first().is_some_and(scheme_binding_container)
+        && clause
+            .children
+            .first()
+            .is_some_and(scheme_binding_container)
 }
 
 const fn scheme_visibility(kind: SchemeLetKind) -> BindingVisibility {
@@ -1503,7 +1505,9 @@ mod tests {
         let syntax_rule = parsed_form("(define-syntax-rule (swap a b) body)", Dialect::Scheme);
 
         assert_eq!(
-            policy.definition_shape(&record).map(DefinitionShape::category),
+            policy
+                .definition_shape(&record)
+                .map(DefinitionShape::category),
             Some(DefinitionCategory::Struct)
         );
 

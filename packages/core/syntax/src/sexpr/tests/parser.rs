@@ -966,7 +966,10 @@ fn a_lang_directive_is_read_as_a_line_directive_not_a_dispatch() {
 
         assert_eq!(root.children.len(), 1, "{dialect:?}");
         assert_eq!(
-            root.children[0].children.first().and_then(|head| head.text.as_deref()),
+            root.children[0]
+                .children
+                .first()
+                .and_then(|head| head.text.as_deref()),
             Some("define"),
             "{dialect:?}"
         );
@@ -980,10 +983,12 @@ fn a_lang_directive_is_kept_as_trivia_rather_than_dropped() {
     // it in the leading trivia, ahead of the first form.
     let source = "#lang racket/base\n(define x 1)\n";
     let tree = SyntaxTree::parse_with_dialect(source, Dialect::Racket).expect("parse");
-    let first = tree.root_view().children.first().cloned().expect("one form");
+    let first = tree
+        .root_view()
+        .children
+        .first()
+        .cloned()
+        .expect("one form");
 
-    assert_eq!(
-        &source[..first.span.start().get()],
-        "#lang racket/base\n"
-    );
+    assert_eq!(&source[..first.span.start().get()], "#lang racket/base\n");
 }

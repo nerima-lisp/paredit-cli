@@ -38,16 +38,15 @@ pub fn is_scheme_identifier_text(text: &str) -> bool {
 pub fn is_scheme_identifier(view: &ExpressionView) -> bool {
     view.kind == ExpressionKind::Atom
         && view.reader_prefixes.is_empty()
-        && view
-            .text
-            .as_deref()
-            .is_some_and(is_scheme_identifier_text)
+        && view.text.as_deref().is_some_and(is_scheme_identifier_text)
 }
 
 /// The identifier text of an expression, or `None` if it is not one.
 #[must_use]
 pub fn scheme_identifier_text(view: &ExpressionView) -> Option<&str> {
-    is_scheme_identifier(view).then(|| view.text.as_deref()).flatten()
+    is_scheme_identifier(view)
+        .then_some(view.text.as_deref())
+        .flatten()
 }
 
 /// Whether the token reads as a number rather than a symbol.

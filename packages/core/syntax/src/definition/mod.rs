@@ -119,6 +119,7 @@ impl DefinitionShape {
         self.lambda_list_first_parameter_index
     }
 
+    #[must_use]
     pub fn lambda_parameter_count(self, view: &ExpressionView) -> Option<usize> {
         self.lambda_parameters(view)
             .map(|parameters| definition_lambda_parameter_count(self.dialect, parameters))
@@ -128,6 +129,7 @@ impl DefinitionShape {
     /// lambda list accepts; MAXIMUM is `None` when unbounded. See
     /// DEFINITION_LAMBDA_PARAMETER_ARITY for why this differs from
     /// LAMBDA_PARAMETER_COUNT's flat total.
+    #[must_use]
     pub fn lambda_parameter_arity(self, view: &ExpressionView) -> Option<(usize, Option<usize>)> {
         self.lambda_parameters(view)
             .map(|parameters| definition_lambda_parameter_arity(self.dialect, parameters))

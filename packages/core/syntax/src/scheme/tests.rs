@@ -105,10 +105,7 @@ fn an_ordinary_procedure_head_has_no_registered_semantics() {
 #[test]
 fn fixed_formals_bind_every_parameter_in_order() {
     assert_eq!(formal_names("(a b c)"), vec!["a", "b", "c"]);
-    assert_eq!(
-        formal_kinds("(a b c)"),
-        vec![SchemeFormalKind::Required; 3]
-    );
+    assert_eq!(formal_kinds("(a b c)"), vec![SchemeFormalKind::Required; 3]);
 }
 
 #[test]
@@ -154,10 +151,7 @@ fn racket_keyword_parameter_binds_the_name_after_the_keyword_token() {
         vec!["a", "mode"]
     );
     assert_eq!(
-        parsed
-            .iter()
-            .map(|formal| formal.kind)
-            .collect::<Vec<_>>(),
+        parsed.iter().map(|formal| formal.kind).collect::<Vec<_>>(),
         vec![SchemeFormalKind::Required, SchemeFormalKind::Keyword]
     );
 }
@@ -230,10 +224,16 @@ fn curried_define_reports_parameters_in_application_order() {
 fn define_target_skips_the_name_when_reporting_parameters() {
     let target = parsed_form("(f a . rest)");
     let resolved = scheme_define_target(&target).expect("procedure target");
-    let names: Vec<_> = scheme_formals_in(&resolved.parameters().into_iter().cloned().collect::<Vec<_>>())
-        .into_iter()
-        .map(|formal| formal.name)
-        .collect();
+    let names: Vec<_> = scheme_formals_in(
+        &resolved
+            .parameters()
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>(),
+    )
+    .into_iter()
+    .map(|formal| formal.name)
+    .collect();
 
     assert_eq!(names, vec!["a", "rest"]);
 }

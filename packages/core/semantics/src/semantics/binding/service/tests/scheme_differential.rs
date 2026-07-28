@@ -287,14 +287,12 @@ impl Context {
                 (_, ReaderPrefix::Quote) => Self::Data,
                 (Self::Code, ReaderPrefix::Quasiquote) => Self::Template(1),
                 (Self::Template(depth), ReaderPrefix::Quasiquote) => Self::Template(depth + 1),
-                (
-                    Self::Template(1),
-                    ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing,
-                ) => Self::Code,
-                (
-                    Self::Template(depth),
-                    ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing,
-                ) => Self::Template(depth - 1),
+                (Self::Template(1), ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing) => {
+                    Self::Code
+                }
+                (Self::Template(depth), ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing) => {
+                    Self::Template(depth - 1)
+                }
                 (context, _) => context,
             };
         }

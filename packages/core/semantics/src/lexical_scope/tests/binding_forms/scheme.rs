@@ -97,7 +97,8 @@ fn let_star_values_exposes_earlier_producers() {
 
 #[test]
 fn do_loop_variables_shadow_the_step_test_and_body_but_not_the_initializer() {
-    let shadowed = "(list outer (do ((outer 0 (+ outer 1))) ((= outer 3) outer) (use outer)) outer)";
+    let shadowed =
+        "(list outer (do ((outer 0 (+ outer 1))) ((= outer 3) outer) (use outer)) outer)";
     // Only the two wrapping occurrences survive: the initializer `0` names
     // nothing, and every other occurrence is the loop variable.
     assert_eq!(outer_reference_count(shadowed), 2);
@@ -189,7 +190,10 @@ fn a_recursive_call_in_a_define_body_is_not_treated_as_shadowed() {
     // recursive call vanished from the reference set.
     let input = "(define (outer n) (outer (- n 1)))";
 
-    assert_eq!(reference_texts_for(Dialect::Scheme, input, "outer"), vec!["outer"]);
+    assert_eq!(
+        reference_texts_for(Dialect::Scheme, input, "outer"),
+        vec!["outer"]
+    );
 }
 
 #[test]
@@ -208,7 +212,10 @@ fn curried_define_binds_the_parameters_of_every_level() {
 fn a_variable_define_evaluates_its_value_in_the_enclosing_scope() {
     let input = "(define x outer)";
 
-    assert_eq!(reference_texts_for(Dialect::Scheme, input, "outer"), vec!["outer"]);
+    assert_eq!(
+        reference_texts_for(Dialect::Scheme, input, "outer"),
+        vec!["outer"]
+    );
 }
 
 #[test]

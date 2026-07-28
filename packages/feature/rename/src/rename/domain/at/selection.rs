@@ -35,11 +35,7 @@ pub fn is_common_lisp_value_position(atom_paths: AtomPathIndex<'_>, span: ByteSp
 /// `(let ((f car)) (f x))` calls the very binding it introduced, and skipping
 /// head position there would rename the definition while leaving every call
 /// site pointing at a name that no longer exists.
-pub fn is_value_position(
-    dialect: Dialect,
-    atom_paths: AtomPathIndex<'_>,
-    span: ByteSpan,
-) -> bool {
+pub fn is_value_position(dialect: Dialect, atom_paths: AtomPathIndex<'_>, span: ByteSpan) -> bool {
     match dialect {
         Dialect::Scheme | Dialect::Racket => true,
         _ => is_common_lisp_value_position(atom_paths, span),

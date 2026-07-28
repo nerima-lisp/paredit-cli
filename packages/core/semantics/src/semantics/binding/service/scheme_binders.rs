@@ -217,14 +217,7 @@ impl Walk<'_> {
         self.scheme_declare_groups(view, scope, inner, head, &groups, let_kind, binding_kind);
         // Declared after the initializers so it cannot capture them, and
         // before the body so a recursive call resolves to it.
-        self.declare(
-            view,
-            inner,
-            head,
-            &loop_name,
-            BindingKind::Function,
-            None,
-        );
+        self.declare(view, inner, head, &loop_name, BindingKind::Function, None);
         self.body(view.children.get(3..).unwrap_or_default(), inner);
         self.stack.rewind(depth);
     }

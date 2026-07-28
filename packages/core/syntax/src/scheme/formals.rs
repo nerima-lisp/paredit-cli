@@ -156,8 +156,10 @@ pub fn scheme_formals_are_readable(formals: &ExpressionView) -> bool {
     match formals.kind {
         ExpressionKind::Atom => formals.reader_prefixes.is_empty(),
         ExpressionKind::List => {
-            matches!(formals.delimiter, Some(Delimiter::Paren | Delimiter::Bracket))
-                && formals.reader_prefixes.is_empty()
+            matches!(
+                formals.delimiter,
+                Some(Delimiter::Paren | Delimiter::Bracket)
+            ) && formals.reader_prefixes.is_empty()
                 && formals.children.iter().all(|child| match child.kind {
                     ExpressionKind::Atom => true,
                     ExpressionKind::List => child

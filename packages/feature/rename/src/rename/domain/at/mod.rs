@@ -80,18 +80,18 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> RenameResult<RenameAtPlan
     // covers call sites.
     if matches!(request.dialect, Dialect::CommonLisp) {
         add_specialized_candidates(
-        &mut candidates,
-        SpecializedCandidateContext {
-            input: request.input,
-            dialect: request.dialect,
-            tree: &tree,
-            root_view: &root_view,
-            atom_paths,
-            path: &path,
-            selected_span: selected.span,
-            from: &from,
-            to: &request.to,
-        },
+            &mut candidates,
+            SpecializedCandidateContext {
+                input: request.input,
+                dialect: request.dialect,
+                tree: &tree,
+                root_view: &root_view,
+                atom_paths,
+                path: &path,
+                selected_span: selected.span,
+                from: &from,
+                to: &request.to,
+            },
         )?;
     }
 

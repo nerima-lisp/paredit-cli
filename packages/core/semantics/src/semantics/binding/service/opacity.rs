@@ -83,7 +83,10 @@ mod tests {
         // Leaving it unregistered made the enclosing scope opaque for a form
         // that has no run-time semantics at all.
         assert!(head_has_registered_semantics(Dialect::CommonLisp, "ignore"));
-        assert!(head_has_registered_semantics(Dialect::CommonLisp, "OPTIMIZE"));
+        assert!(head_has_registered_semantics(
+            Dialect::CommonLisp,
+            "OPTIMIZE"
+        ));
         assert!(head_has_registered_semantics(Dialect::CommonLisp, "speed"));
     }
 
@@ -92,7 +95,13 @@ mod tests {
         // `my-with-thing` could expand into `(setq x …)`; nothing in the
         // source rules that out. `with-open-file` is a standard *macro* whose
         // expansion this layer does not model, so it stays opaque too.
-        assert!(!head_has_registered_semantics(Dialect::CommonLisp, "my-with-thing"));
-        assert!(!head_has_registered_semantics(Dialect::CommonLisp, "app:helper"));
+        assert!(!head_has_registered_semantics(
+            Dialect::CommonLisp,
+            "my-with-thing"
+        ));
+        assert!(!head_has_registered_semantics(
+            Dialect::CommonLisp,
+            "app:helper"
+        ));
     }
 }

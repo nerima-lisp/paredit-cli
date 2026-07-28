@@ -41,9 +41,11 @@ impl Dialect {
             // list. The previous six-entry list omitted `define-values`,
             // `define-record-type` and every `letrec` flavour, so a file using
             // them looked as though it defined nothing.
-            Self::Scheme | Self::Racket => SchemeOperator::from_head(head).is_some_and(|operator| {
-                operator.definition_category().is_some() || operator.is_binder()
-            }),
+            Self::Scheme | Self::Racket => {
+                SchemeOperator::from_head(head).is_some_and(|operator| {
+                    operator.definition_category().is_some() || operator.is_binder()
+                })
+            }
             Self::Clojure => matches!(
                 head,
                 "ns" | "def"

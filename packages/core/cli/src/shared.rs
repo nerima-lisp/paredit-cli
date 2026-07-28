@@ -261,11 +261,7 @@ pub fn resolve_target<'a>(
 /// where reading Racket as R7RS Scheme applies the wrong reader to `#:keyword`
 /// literals and the wrong rules to `struct`.
 pub fn detect_dialect(input: &SourceInput, explicit: Option<DialectArg>) -> Dialect {
-    Dialect::detect_in_source(
-        input.file.as_deref(),
-        explicit.map(Into::into),
-        &input.text,
-    )
+    Dialect::detect_in_source(input.file.as_deref(), explicit.map(Into::into), &input.text)
 }
 
 pub fn require_output_file(file: Option<&PathBuf>) -> CliResult<&PathBuf> {

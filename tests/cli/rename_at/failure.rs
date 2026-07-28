@@ -36,7 +36,7 @@ fn cli_rename_at_rejects_unsupported_dialects_without_writing() {
                 predicate::str::contains(
                     "rename-at currently supports Common Lisp, Scheme, and Racket only",
                 )
-                    .and(predicate::str::contains("failed to parse input").not()),
+                .and(predicate::str::contains("failed to parse input").not()),
             );
 
         assert_eq!(
