@@ -33,7 +33,7 @@ nix fmt
 
 ## The verification gate
 
-Pull requests run exactly one command, and the same command works locally:
+Locally the gate is one command:
 
 ```sh
 nix flake check
@@ -45,17 +45,58 @@ It builds and runs every check the project defines:
 | --- | --- |
 | `treefmt` | Rust, Nix, and Lisp sources are canonically formatted |
 | `actionlint` | GitHub Actions workflows are well-formed |
-| `clippy` | No clippy warnings with `-D warnings` |
+| `clippy` | No clippy warnings with `-D warnings`, across all targets and features |
 | `nextest` | The full test suite under cargo-nextest |
-| `package` | The crate builds and its `cargo test` suite passes |
+| `msrv` | The workspace still compiles on the declared MSRV toolchain |
+| `package` | The release binary builds |
 | `documentation` | The MkDocs (Material) site builds to a valid `index.html` |
 | `lint-format-integration` | The `paredit-lint` / `paredit-format` gates behave end to end |
 
+Each check is defined exactly once, and each one is the only place its work
+happens. `package` does not run the test suite — that is `nextest`'s job — and
+`msrv` stops at `cargo check`, because "does it still compile on 1.85" is the
+only question it exists to answer. Duplicating either would compile every test
+target a second time under `lto = "fat"`, for no coverage the other checks do
+not already give.
+
+### How CI runs it
+
+CI does not run `nix flake check` as one command. A `plan` job runs
+`nix flake check --no-build`, which instantiates every flake output — packages,
+apps, devShells, overlays, formatter, checks — without building any of them,
+and then reads `lib.<system>.ciCheckNames` out of the flake to produce a job
+matrix. Every check then builds on a runner of its own.
+
+The reason is that a GitHub runner has four cores. Run as one command, Nix can
+only interleave the checks on those four cores, so the gate costs the *sum* of
+its checks; fanned out, it costs the *maximum*. The matrix comes from the flake
+rather than from `ci.yml` so that adding a check to `mkCoreChecks` is enough to
+get it verified.
+
+### Where the build artifacts come from
+
+The Rust checks are [crane](https://github.com/ipetkov/crane) derivations
+sharing pre-built `cargoArtifacts`:
+
+```text
+depsRelease ─▶ package                dev/release profiles are separate
+depsDev     ─▶ clippy, nextest        artifacts, shared within a profile
+depsMsrv    ─▶ msrv                   pinned MSRV toolchain
+```
+
+A `deps` derivation compiles the 181 locked dependencies from dummified
+sources, so its hash depends on `Cargo.lock` and the member manifests and not
+on any `.rs` file. A pull request that only edits Rust sources therefore
+substitutes all three from the binary cache instead of recompiling the
+dependency graph once per check.
+
 ### Which host CI verifies
 
-CI runs the gate on Linux only. `nix flake check` evaluates the checks for the
-host it runs on, so the two legs of the old matrix shared no work: a macOS
-runner was a second full verification rather than an extension of the first.
+CI runs the gate on Linux only. A flake check is evaluated for the host it runs
+on, so the two legs of the old host matrix shared no work: a macOS runner was a
+second full verification rather than an extension of the first. (The per-check
+matrix above is a different axis — it splits one host's checks across runners
+rather than repeating all of them on a second host.)
 
 **Darwin is therefore unverified in CI, and that is a real gap rather than a
 free simplification.** Most of the crate is portable, and the 237 `cfg(unix)`

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The Rust flake checks are [crane](https://github.com/ipetkov/crane)
+  derivations sharing pre-built dependency artifacts, instead of four
+  independent `buildRustPackage` derivations that each recompiled the whole
+  dependency graph. Consumers of `packages.default` or `overlays.default` get
+  the same binary; what changed is that building it no longer runs the test
+  suite, which now belongs to `checks.<system>.nextest` alone. `flake.nix`
+  gains a `crane` input, and `lib.<system>.ciCheckNames` is exported so CI can
+  derive its job matrix from the checks rather than restating them.
+- `checks.<system>.msrv` stops at `cargo check --all-targets` instead of
+  building and testing the whole workspace under the MSRV toolchain. It
+  verifies the same thing — that the declared MSRV still compiles the
+  workspace — without a third full run of the test suite.
+- The `dev` profile emits line tables instead of full debug information.
+  Backtraces still resolve every frame to `file:line`; use
+  `RUSTFLAGS=-Cdebuginfo=2` when step-debugging.
+
 ## [1.2.0] - 2026-07-28
 
 No command, flag, exit code, or JSON field changed in this release: the
