@@ -4,6 +4,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-missing-lexical-binding/48686428ba8a57d0/0",
       "message": "no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`",
       "path": "emacs-lisp.el",
       "rule": "elisp-missing-lexical-binding",
@@ -16,6 +17,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-unreachable-lexical-binding/7bec796cbb2809fb/0",
       "message": "`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding",
       "path": "emacs-lisp.el",
       "rule": "elisp-unreachable-lexical-binding",
@@ -28,6 +30,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-autoload-cookie-without-form/1d02fc8f50fffe50/0",
       "message": "this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload",
       "path": "emacs-lisp.el",
       "rule": "elisp-autoload-cookie-without-form",
@@ -40,6 +43,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-autoload-cookie-without-form/1d02fc8f50fffe50/1",
       "message": "this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it",
       "path": "emacs-lisp.el",
       "rule": "elisp-autoload-cookie-without-form",
@@ -52,6 +56,7 @@
     {
       "category": "malformed",
       "fixable": false,
+      "id": "elisp-defcustom-missing-type/9fccc736d0e46b79/0",
       "message": "defcustom fixture-option has no :type, so Customize cannot offer a widget for it",
       "path": "emacs-lisp.el",
       "rule": "elisp-defcustom-missing-type",
@@ -64,6 +69,7 @@
     {
       "category": "malformed",
       "fixable": false,
+      "id": "elisp-defcustom-missing-group/9fccc736d0e46b79/0",
       "message": "defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order",
       "path": "emacs-lisp.el",
       "rule": "elisp-defcustom-missing-group",
@@ -76,6 +82,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-obsolete-cl-alias/cdece4ad70d57deb/0",
       "message": "`loop` was removed in Emacs 27.1; use `cl-loop`",
       "path": "emacs-lisp.el",
       "rule": "elisp-obsolete-cl-alias",
@@ -88,6 +95,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-quoted-lambda/d01b8b8f281f7655/0",
       "message": "a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope",
       "path": "emacs-lisp.el",
       "rule": "elisp-quoted-lambda",
@@ -100,6 +108,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-interactive-in-macro/b042d29eb1a42a48/0",
       "message": "macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant",
       "path": "emacs-lisp.el",
       "rule": "elisp-interactive-in-macro",
@@ -112,6 +121,7 @@
     {
       "category": "suspicious",
       "fixable": false,
+      "id": "elisp-condition-case-without-handler/e02bbaeea25cf9c0/0",
       "message": "this condition-case has no handler clauses, so it evaluates its body form and catches nothing",
       "path": "emacs-lisp.el",
       "rule": "elisp-condition-case-without-handler",
@@ -926,6 +936,138 @@
       "count": 0,
       "description": "a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b))",
       "rule": "list-star-nil"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a (length …) call used only to decide whether a sequence is empty, which walks the whole sequence",
+      "rule": "length-emptiness-test"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a loop that grows a sequence by appending to its own accumulated value, which is quadratic",
+      "rule": "quadratic-accumulation"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a loop that linearly searches the same collection on every round, which is quadratic",
+      "rule": "linear-search-in-loop"
+    },
+    {
+      "category": "allocation",
+      "count": 0,
+      "description": "a copy-seq/copy-list result passed to an operator that only reads it, so the copy is garbage",
+      "rule": "unnecessary-copy"
+    },
+    {
+      "category": "allocation",
+      "count": 0,
+      "description": "a fresh copy fed to a destructive operator, where one non-destructive operator does both",
+      "rule": "copy-before-destructive"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a symbol from an implementation's own package, outside any reader conditional guarding it",
+      "rule": "implementation-package-symbol"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a filesystem call given a string that spells one host's path syntax",
+      "rule": "unportable-pathname"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a (code-char N) call with a literal code, which assumes ASCII and hides which character it means",
+      "rule": "ascii-code-char"
+    },
+    {
+      "category": "numeric-precision",
+      "count": 0,
+      "description": "an exact equality test against a float literal, whose result depends on rounding upstream",
+      "rule": "float-equality"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a function body assigning to a *special-looking* global, which is shared mutable state",
+      "rule": "global-mutation-in-function"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a conditional that tests a place and then assigns to the same place, which another thread can interleave",
+      "rule": "check-then-act"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "an eval, intern, or read-from-string whose argument is not a literal the source shows",
+      "rule": "eval-of-non-constant"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a read of external data with no enclosing *read-eval* nil binding, so #. in the input executes",
+      "rule": "read-without-read-eval-guard"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a subprocess launched with a command line built by format or concatenate, which a value can escape",
+      "rule": "subprocess-string-building"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a let-bound (open …) stream with no unwind-protect, so a non-local exit leaks the handle",
+      "rule": "unclosed-stream"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a with-open-file whose last body form is the stream, which the form has already closed",
+      "rule": "stream-escapes-with-open-file"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a handler-case clause on a broad condition type whose body discards the condition entirely",
+      "rule": "handler-case-swallows-error"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a handler-case clause whose condition type an earlier clause already covers, so it never runs",
+      "rule": "unreachable-handler-clause"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "an (ignore x) declaration whose variable the body uses, or which names no parameter at all",
+      "rule": "ignore-declaration-conflict"
+    },
+    {
+      "category": "declaration",
+      "count": 0,
+      "description": "an optimize declaration naming one quality twice with different values",
+      "rule": "contradictory-optimize"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a defclass slot option that is not one of the standard ones, or an :initarg that is not a keyword",
+      "rule": "defclass-slot-option"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a defmethod whose required-parameter count differs from its defgeneric in the same file",
+      "rule": "method-lambda-list-mismatch"
     },
     {
       "category": "suspicious",

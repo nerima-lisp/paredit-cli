@@ -133,6 +133,28 @@ rule	getf-default-nil	0
 rule	make-array-default-keyword	0
 rule	nested-char-case	0
 rule	list-star-nil	0
+rule	length-emptiness-test	0
+rule	quadratic-accumulation	0
+rule	linear-search-in-loop	0
+rule	unnecessary-copy	0
+rule	copy-before-destructive	0
+rule	implementation-package-symbol	0
+rule	unportable-pathname	0
+rule	ascii-code-char	0
+rule	float-equality	0
+rule	global-mutation-in-function	0
+rule	check-then-act	0
+rule	eval-of-non-constant	0
+rule	read-without-read-eval-guard	0
+rule	subprocess-string-building	0
+rule	unclosed-stream	0
+rule	stream-escapes-with-open-file	0
+rule	handler-case-swallows-error	0
+rule	unreachable-handler-clause	0
+rule	ignore-declaration-conflict	0
+rule	contradictory-optimize	0
+rule	defclass-slot-option	0
+rule	method-lambda-list-mismatch	0
 rule	elisp-missing-lexical-binding	0
 rule	elisp-unreachable-lexical-binding	0
 rule	elisp-autoload-cookie-without-form	0
@@ -142,4 +164,4 @@ rule	elisp-obsolete-cl-alias	0
 rule	elisp-quoted-lambda	0
 rule	elisp-interactive-in-macro	0
 rule	elisp-condition-case-without-handler	0
-finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant
+finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0

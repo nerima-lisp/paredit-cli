@@ -1,18 +1,22 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::lint_report::{
-    CATEGORIES, LintFinding, LintPolicyOptions, LintSuppressions, RuleFixFor, Severity,
-    collect_lint_findings, collect_lint_findings_and_fixes, collect_lint_fixes_for,
-    evaluate_lint_policy, lint_gate_violations, resolve_active_rules, rule_category, rule_severity,
-    summarize_lint_findings,
+    CATEGORIES, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, LintSuppressions,
+    RULES, RuleFilter, RuleFixFor, RulePreset, RuleSettings, RuleTag, RuleTimings, Severity,
+    SeverityOverrides, apply_severity_override, collect_lint_findings, evaluate_lint_policy,
+    lint_gate_violations, overridden_rule_severity, resolve_active_rules, rule_category,
+    rule_setting, rule_tags, rule_timing_report, run_lint_pass, summarize_lint_findings,
 };
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 use crate::presentation::cli::lint_report::args::LintReportArgs;
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
 use crate::presentation::cli::lint_report::render::{
-    LintFileFix, LintFix, LintFixPlanEntry, LintReplacement, LintSarifResult, LintStats,
-    print_lint_fix_plan, print_lint_fix_report, print_lint_github_annotation, print_lint_report,
-    print_lint_rule_catalog, print_lint_sarif, print_lint_stats, print_lint_unused_suppressions,
+    FindingIds, LintFileFix, LintFix, LintFixPlanEntry, LintReplacement, LintSarifResult,
+    LintStats, LintSuppressionRemoval, LintTiming, print_lint_docs, print_lint_explanation,
+    print_lint_fix_plan, print_lint_fix_report, print_lint_github_annotation, print_lint_presets,
+    print_lint_report, print_lint_rule_catalog, print_lint_sarif, print_lint_stats,
+    print_lint_suppression_removal, print_lint_tags, print_lint_timings,
+    print_lint_unused_suppressions,
 };
 use crate::presentation::cli::shared::{
     apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree, stable_text_hash,
@@ -60,11 +64,18 @@ fn line_fingerprint(
     fingerprint
 }
 
-/// Drops findings silenced by an inline `; paredit:ignore` directive in the
+/// Drops findings silenced by an inline `paredit:ignore` directive in the
 /// file's own source, so a suppression comment applies uniformly across every
 /// output mode (report, SARIF, GitHub, and fix).
-fn retain_unsuppressed(findings: Vec<LintFinding>, text: &str) -> Vec<LintFinding> {
-    let suppressions = LintSuppressions::parse(text);
+///
+/// The tree is what resolves `paredit:ignore-next-form` to the span of the form
+/// it protects; without it that scope would degrade to one line.
+fn retain_unsuppressed(
+    findings: Vec<LintFinding>,
+    text: &str,
+    tree: &SyntaxTree,
+) -> Vec<LintFinding> {
+    let suppressions = LintSuppressions::parse_in_tree(text, tree);
     if suppressions.is_empty() {
         return findings;
     }
@@ -73,6 +84,32 @@ fn retain_unsuppressed(findings: Vec<LintFinding>, text: &str) -> Vec<LintFindin
         .filter(|finding| {
             let (line, _) = line_and_column(text, finding.span.start().get());
             !suppressions.is_suppressed(finding.rule, line)
+        })
+        .collect()
+}
+
+/// The content-derived id of each finding, in the order they are reported.
+///
+/// The occurrence counter that disambiguates two findings with the same rule
+/// and the same normalized form text is scoped per `(path, rule, fingerprint)`,
+/// so it is assigned here — where the whole file's findings are in hand —
+/// rather than by each rule, which sees one node at a time.
+fn assign_finding_ids(findings: &[LintFinding], text: &str) -> Vec<String> {
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    findings
+        .iter()
+        .map(|finding| {
+            let form = text
+                .get(finding.span.start().get()..finding.span.end().get())
+                .unwrap_or_default();
+            // Key on the id a zero occurrence would produce: two findings
+            // collide exactly when that string matches, which is the same test
+            // `FindingId` itself applies.
+            let base = FindingId::new(finding.rule, form, 0);
+            let occurrence = seen.entry(base.as_str().to_owned()).or_insert(0);
+            let id = FindingId::new(finding.rule, form, *occurrence);
+            *occurrence += 1;
+            id.as_str().to_owned()
         })
         .collect()
 }
@@ -95,9 +132,13 @@ fn finding_content_hash(text: &str, finding: &LintFinding) -> String {
 /// above a severity). Returns `None` when neither gate trips. Shared by the
 /// SARIF and GitHub paths; the default report uses `evaluate_lint_policy`, which
 /// applies the same two rules.
-fn gate_message(finding_rules: &[&'static str], args: &LintReportArgs) -> Option<String> {
+fn gate_message(
+    finding_rules: &[&'static str],
+    args: &LintReportArgs,
+    overrides: &SeverityOverrides,
+) -> Option<String> {
     let options = LintPolicyOptions::new(args.fail_on_finding, args.fail_on.map(Severity::from));
-    let violations = lint_gate_violations(options, finding_rules);
+    let violations = lint_gate_violations(overrides, options, finding_rules);
     (!violations.is_empty()).then(|| violations.join("; "))
 }
 
@@ -147,27 +188,22 @@ fn collect_lint_fixes(
     tree: &crate::domain::sexpr::SyntaxTree,
     text: &str,
     active: &[&str],
+    settings: &RuleSettings,
 ) -> Result<FixMap> {
-    Ok(fix_map(collect_lint_fixes_for(
-        file, dialect, tree, text, active,
-    )?))
-}
-
-/// The findings and the fix map for one file, from a single dispatch pass.
-///
-/// `--sarif` and `--fix-plan` want both, and used to ask for them separately —
-/// two walks of every file where `--fix` has always needed one. The domain
-/// answers both from the same walk; this only reshapes its fix list into the
-/// map both paths index by.
-fn collect_lint_findings_and_fix_map(
-    file: &std::path::Path,
-    dialect: crate::domain::dialect::Dialect,
-    tree: &crate::domain::sexpr::SyntaxTree,
-    text: &str,
-    active: &[&str],
-) -> Result<(Vec<LintFinding>, FixMap)> {
-    let (findings, fixes) = collect_lint_findings_and_fixes(file, dialect, tree, text, active)?;
-    Ok((findings, fix_map(fixes)))
+    Ok(fix_map(
+        run_lint_pass(
+            file,
+            dialect,
+            tree,
+            text,
+            LintPassRequest {
+                active,
+                settings: Some(settings),
+                measure: false,
+            },
+        )?
+        .fixes,
+    ))
 }
 
 /// Fixes keyed by `(rule, finding start, finding end)`, which is how the
@@ -197,11 +233,114 @@ fn fix_map(fixes: Vec<RuleFixFor>) -> FixMap {
     map
 }
 
+/// The `--deny`/`--warn` promotions and demotions this run asked for.
+///
+/// Resolved before any file is read, so a typo'd rule or category name fails
+/// the run rather than quietly changing nothing — the whole point of the flag
+/// is to change what fails CI.
+fn resolve_severity_overrides(args: &LintReportArgs) -> Result<SeverityOverrides> {
+    let mut overrides = SeverityOverrides::new();
+    for selector in &args.warn {
+        apply_severity_override(&mut overrides, selector, Severity::Warning)?;
+    }
+    // `--deny` is applied second so it wins a same-selector tie, matching the
+    // reading that the stricter flag is the deliberate one.
+    for selector in &args.deny {
+        apply_severity_override(&mut overrides, selector, Severity::Error)?;
+    }
+    Ok(overrides)
+}
+
+/// Parses every `--rule-arg <rule>.<key>=<value>` against the rules' declared
+/// knobs.
+///
+/// Each part is checked: the rule must exist, it must declare that key, and the
+/// value must be an integer. A silently ignored override would leave a CI gate
+/// running with a threshold nobody set.
+fn resolve_rule_settings(args: &LintReportArgs) -> Result<RuleSettings> {
+    let mut settings = RuleSettings::new();
+    for argument in &args.rule_args {
+        let (target, value) = argument.split_once('=').ok_or_else(|| {
+            anyhow::anyhow!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")
+        })?;
+        let (rule, key) = target.rsplit_once('.').ok_or_else(|| {
+            anyhow::anyhow!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")
+        })?;
+        if !RULES.contains(&rule) {
+            anyhow::bail!("unknown lint rule {rule:?} in --rule-arg {argument:?}");
+        }
+        let Some(declared) = rule_setting(rule, key) else {
+            let valid: Vec<&str> = crate::application::usecase::lint_report::rule_settings(rule)
+                .iter()
+                .map(|setting| setting.key())
+                .collect();
+            anyhow::bail!(
+                "lint rule {rule:?} has no setting {key:?}; valid settings: {}",
+                if valid.is_empty() {
+                    "(none)".to_owned()
+                } else {
+                    valid.join(", ")
+                }
+            );
+        };
+        let parsed: i64 = value.parse().with_context(|| {
+            format!(
+                "--rule-arg {argument:?} needs an integer value (the default is {})",
+                declared.default()
+            )
+        })?;
+        settings.set(rule, key, parsed);
+    }
+    Ok(settings)
+}
+
 pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<()> {
-    // Resolve the selected rules first so `--list-rules` can honor the same
-    // `--rule`/`--exclude`/`--category` selectors as a scan (validation of rule
-    // and category names happens here, before any file is read).
-    let active = resolve_active_rules(&args.rules, &args.exclude, &args.categories)?;
+    // Resolve the selected rules first so the catalogue-only modes honor the
+    // same `--rule`/`--exclude`/`--category`/`--tag`/`--preset` selectors as a
+    // scan. Every name is validated here, before any file is read.
+    let filter = RuleFilter {
+        only: &args.rules,
+        exclude: &args.exclude,
+        categories: &args.categories,
+        tags: &args.tags,
+        preset: args.preset.into(),
+        experimental: args.experimental,
+    };
+    let active = resolve_active_rules(&filter)?;
+    let overrides = resolve_severity_overrides(&args)?;
+    let settings = resolve_rule_settings(&args)?;
+
+    if let Some(rule) = &args.explain {
+        if !RULES.contains(&rule.as_str()) {
+            anyhow::bail!(
+                "unknown lint rule {rule:?}; run `inspect lint --list-rules` for the catalogue"
+            );
+        }
+        return print_lint_explanation(rule, args.output);
+    }
+
+    if args.list_presets {
+        let counts = RulePreset::ALL
+            .into_iter()
+            .map(|preset| {
+                let scoped = RuleFilter {
+                    preset,
+                    experimental: args.experimental,
+                    ..RuleFilter::default()
+                };
+                resolve_active_rules(&scoped).map(|rules| (preset, rules.len()))
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        return print_lint_presets(&counts, args.output);
+    }
+
+    if args.list_tags {
+        return print_lint_tags(args.output);
+    }
+
+    if args.docs {
+        return print_lint_docs(&active);
+    }
 
     if args.list_rules {
         return print_lint_rule_catalog(&active, args.output);
@@ -209,16 +348,24 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
 
     let files = expand_input_files(&args.files, args.dialect)?;
 
+    if args.timings {
+        return lint_report_timings(&args, &files, &active, &settings);
+    }
+
     if args.sarif {
-        return lint_report_sarif(&args, &files, &active);
+        return lint_report_sarif(&args, &files, &active, &overrides, &settings);
     }
 
     if args.github {
-        return lint_report_github(&args, &files, &active);
+        return lint_report_github(&args, &files, &active, &overrides);
     }
 
     if args.stats {
-        return lint_report_stats(&args, &files, &active);
+        return lint_report_stats(&args, &files, &active, &overrides);
+    }
+
+    if args.remove_unused_suppressions {
+        return lint_report_remove_unused_suppressions(&args, &files);
     }
 
     if args.report_unused_suppressions {
@@ -230,33 +377,55 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     }
 
     if args.fix_plan {
-        return lint_report_fix_plan(&args, &files, &active);
+        return lint_report_fix_plan(&args, &files, &active, &settings);
     }
 
     if args.fix {
-        return lint_report_fix(&args, &files, &active);
+        return lint_report_fix(&args, &files, &active, &settings);
     }
 
     let baseline = load_baseline(&args)?;
     let mut findings = Vec::new();
+    let mut ids: FindingIds = Vec::new();
 
     for file in &files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let file_findings = collect_lint_findings(file, dialect, &tree)?;
-        let file_findings = retain_unsuppressed(file_findings, &input.text);
+        let file_findings = run_lint_pass(
+            file,
+            dialect,
+            &tree,
+            &input.text,
+            LintPassRequest {
+                active: &[],
+                settings: Some(&settings),
+                measure: false,
+            },
+        )?
+        .findings;
+        let file_findings = retain_unsuppressed(file_findings, &input.text, &tree);
         let file_findings = retain_unbaselined(file_findings, &input.text, baseline.as_ref());
-        findings.extend(file_findings);
+        // Ids are assigned per file, against that file's source, and the
+        // summary keeps the findings in the order they arrive — so the two
+        // lists stay aligned as long as `summarize_lint_findings` only ever
+        // filters, which it does.
+        let kept: Vec<LintFinding> = file_findings
+            .into_iter()
+            .filter(|finding| active.contains(&finding.rule))
+            .collect();
+        ids.extend(assign_finding_ids(&kept, &input.text));
+        findings.extend(kept);
     }
 
     let summary = summarize_lint_findings(findings, &active);
     let policy = evaluate_lint_policy(
+        &overrides,
         LintPolicyOptions::new(args.fail_on_finding, args.fail_on.map(Severity::from)),
         &summary,
     );
     let policy_passed = policy.passed;
     let policy_message = policy.violations.join("; ");
 
-    print_lint_report(&summary, &policy, args.output)?;
+    print_lint_report(&summary, &policy, &ids, &overrides, args.output)?;
 
     if !policy_passed {
         return Err(crate::presentation::cli::gate::gate_failure(format!(
@@ -267,6 +436,143 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     Ok(())
 }
 
+/// Reports what each rule cost across the scanned files, slowest first.
+///
+/// Findings are computed and thrown away: the point is the clock, and running
+/// the real pass is the only way to measure the real cost. Files are scanned
+/// with every rule the selection admits, so the numbers describe the run the
+/// caller would otherwise have made.
+fn lint_report_timings(
+    args: &LintReportArgs,
+    files: &[std::path::PathBuf],
+    active: &[&str],
+    settings: &RuleSettings,
+) -> Result<()> {
+    let mut total: Option<RuleTimings> = None;
+
+    for file in files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let result = run_lint_pass(
+            file,
+            dialect,
+            &tree,
+            &input.text,
+            LintPassRequest {
+                active,
+                settings: Some(settings),
+                measure: true,
+            },
+        )?;
+        let Some(measured) = result.timings else {
+            continue;
+        };
+        match &mut total {
+            Some(accumulated) => accumulated.merge(&measured),
+            None => total = Some(measured),
+        }
+    }
+
+    let Some(total) = total else {
+        return print_lint_timings(&[], 0, files.len(), args.output);
+    };
+    let total_micros = total.total().as_micros();
+    let mut rows: Vec<LintTiming> = rule_timing_report(&total)
+        .into_iter()
+        .filter(|(rule, _, invocations)| *invocations > 0 && active.contains(rule))
+        .map(|(rule, elapsed, invocations)| {
+            let micros = elapsed.as_micros();
+            LintTiming {
+                rule,
+                micros,
+                invocations,
+                #[allow(clippy::cast_precision_loss)]
+                share: if total_micros == 0 {
+                    0.0
+                } else {
+                    (micros as f64 / total_micros as f64) * 100.0
+                },
+            }
+        })
+        .collect();
+    // Slowest first, ties broken by name so two runs of the same input print
+    // the same table.
+    rows.sort_by(|a, b| b.micros.cmp(&a.micros).then(a.rule.cmp(b.rule)));
+
+    print_lint_timings(&rows, total_micros, files.len(), args.output)
+}
+
+/// Deletes the `paredit:ignore` directives that silence nothing, and narrows
+/// the ones only partly stale, writing each changed file through the rollback
+/// writer.
+///
+/// Detection runs against *all* rules — independent of `--rule`/`--exclude` —
+/// for the same reason [`lint_report_unused_suppressions`] does: an ignore is
+/// stale only when the file has no finding it could have silenced, and a
+/// narrowed rule selection would make perfectly live ignores look dead and
+/// delete them.
+fn lint_report_remove_unused_suppressions(
+    args: &LintReportArgs,
+    files: &[std::path::PathBuf],
+) -> Result<()> {
+    let mut changed = Vec::new();
+    let mut removed_total = 0;
+
+    for file in files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let present = findings_by_line(file, dialect, &tree, &input.text)?;
+        let suppressions = LintSuppressions::parse_in_tree(&input.text, &tree);
+        let edits = suppressions.removal_edits(&present);
+        if edits.is_empty() {
+            continue;
+        }
+
+        let mut text = input.text.clone();
+        // Back to front, so an earlier edit's offsets stay valid.
+        for edit in edits.iter().rev() {
+            text.replace_range(edit.start..edit.end, &edit.text);
+        }
+        // Removing a comment cannot unbalance a form, but the guard is what
+        // makes that a checked fact rather than an assumption.
+        SyntaxTree::parse_with_dialect(&text, dialect)
+            .context("refusing to edit: source with suppressions removed does not reparse")?;
+
+        let directives: Vec<(usize, Vec<String>)> = edits
+            .iter()
+            .map(|edit| {
+                (
+                    edit.comment_line,
+                    edit.removed_rules.clone().unwrap_or_default(),
+                )
+            })
+            .collect();
+        removed_total += directives.len();
+        changed.push(LintSuppressionRemoval {
+            path: file.display().to_string(),
+            removed: directives.len(),
+            directives,
+        });
+        write_file_with_rollback(file.clone(), text)?;
+    }
+
+    print_lint_suppression_removal(&changed, removed_total, args.output)
+}
+
+/// Line -> the rules that reported a finding there, across every rule.
+fn findings_by_line(
+    file: &std::path::Path,
+    dialect: crate::domain::dialect::Dialect,
+    tree: &SyntaxTree,
+    text: &str,
+) -> Result<std::collections::HashMap<usize, std::collections::HashSet<&'static str>>> {
+    let mut present: std::collections::HashMap<usize, std::collections::HashSet<&'static str>> =
+        std::collections::HashMap::new();
+    for finding in collect_lint_findings(file, dialect, tree)? {
+        let (line, _) = line_and_column(text, finding.span.start().get());
+        present.entry(line).or_default().insert(finding.rule);
+    }
+    Ok(present)
+}
+
 /// Emits findings from the active rules as SARIF 2.1.0, computing each
 /// finding's line/column from its source file, then applies the same
 /// `--fail-on-finding` gate as the standard report.
@@ -274,6 +580,8 @@ fn lint_report_sarif(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
+    overrides: &SeverityOverrides,
+    settings: &RuleSettings,
 ) -> Result<()> {
     let baseline = load_baseline(args)?;
     let mut results = Vec::new();
@@ -284,14 +592,26 @@ fn lint_report_sarif(
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (findings, fixes) =
-            collect_lint_findings_and_fix_map(file, dialect, &tree, &input.text, active)?;
-        let findings = retain_unsuppressed(findings, &input.text);
+        let pass = run_lint_pass(
+            file,
+            dialect,
+            &tree,
+            &input.text,
+            LintPassRequest {
+                active,
+                settings: Some(settings),
+                measure: false,
+            },
+        )?;
+        let fixes = fix_map(pass.fixes);
+        let findings = retain_unsuppressed(pass.findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
-        for finding in findings {
-            if !active.contains(&finding.rule) {
-                continue;
-            }
+        let findings: Vec<LintFinding> = findings
+            .into_iter()
+            .filter(|finding| active.contains(&finding.rule))
+            .collect();
+        let ids = assign_finding_ids(&findings, &input.text);
+        for (index, finding) in findings.into_iter().enumerate() {
             let start = finding.span.start().get();
             let end = finding.span.end().get();
             let (start_line, start_column) = line_and_column(&input.text, start);
@@ -307,15 +627,16 @@ fn lint_report_sarif(
                 byte_offset: start,
                 byte_length: end.saturating_sub(start),
                 fingerprint,
+                finding_id: ids.get(index).cloned().unwrap_or_default(),
                 fix,
             });
         }
     }
 
     let finding_rules: Vec<&'static str> = results.iter().map(|result| result.rule).collect();
-    print_lint_sarif(&results)?;
+    print_lint_sarif(&results, overrides)?;
 
-    if let Some(message) = gate_message(&finding_rules, args) {
+    if let Some(message) = gate_message(&finding_rules, args, overrides) {
         return Err(crate::presentation::cli::gate::gate_failure(format!(
             "lint-report policy failed: {message}"
         )));
@@ -334,21 +655,33 @@ fn lint_report_fix_plan(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
+    settings: &RuleSettings,
 ) -> Result<()> {
     let baseline = load_baseline(args)?;
     let mut entries = Vec::new();
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (findings, fixes) =
-            collect_lint_findings_and_fix_map(file, dialect, &tree, &input.text, active)?;
-        let suppressions = LintSuppressions::parse(&input.text);
-        let findings = retain_unsuppressed(findings, &input.text);
+        let pass = run_lint_pass(
+            file,
+            dialect,
+            &tree,
+            &input.text,
+            LintPassRequest {
+                active,
+                settings: Some(settings),
+                measure: false,
+            },
+        )?;
+        let fixes = fix_map(pass.fixes);
+        let findings = retain_unsuppressed(pass.findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
-        for finding in findings {
-            if !active.contains(&finding.rule) {
-                continue;
-            }
+        let findings: Vec<LintFinding> = findings
+            .into_iter()
+            .filter(|finding| active.contains(&finding.rule))
+            .collect();
+        let ids = assign_finding_ids(&findings, &input.text);
+        for (index, finding) in findings.into_iter().enumerate() {
             let start = finding.span.start().get();
             let end = finding.span.end().get();
             // A fix is keyed by (rule, form-span); a finding without one is a
@@ -356,19 +689,12 @@ fn lint_report_fix_plan(
             let Some(fix) = fixes.get(&(finding.rule, start, end)).cloned() else {
                 continue;
             };
-            // Skip a fix the suppression scan would silence, so the plan lists
-            // exactly what `--fix` would apply.
-            if !suppressions.is_empty() {
-                let (line, _) = line_and_column(&input.text, start);
-                if suppressions.is_suppressed(finding.rule, line) {
-                    continue;
-                }
-            }
             entries.push(LintFixPlanEntry {
                 rule: finding.rule,
                 path: finding.path.display().to_string(),
                 byte_offset: start,
                 byte_length: end.saturating_sub(start),
+                finding_id: ids.get(index).cloned().unwrap_or_default(),
                 fix,
             });
         }
@@ -395,13 +721,28 @@ const MAX_FIX_PASSES: usize = 64;
 /// keeps green by having no auto-fixable lint left. Otherwise each rewrite is
 /// reparsed and persisted with `write_file_with_rollback`, so a malformed result
 /// can never overwrite good source.
+/// A rule's position in the registry, used as the last tie-break when two
+/// rules offer a fix for the exact same span.
+///
+/// Without it the winner came out of a `HashMap` iteration, so two runs over
+/// the same file could rewrite it differently — a determinism hole in the one
+/// command that writes to disk.
+fn registration_rank(rule: &str) -> usize {
+    RULES
+        .iter()
+        .position(|name| *name == rule)
+        .unwrap_or(RULES.len())
+}
+
 fn lint_report_fix(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
+    settings: &RuleSettings,
 ) -> Result<()> {
     let mut file_fixes = Vec::new();
     let mut fixes_applied = 0;
+    let mut fix_conflicts = 0;
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
@@ -410,38 +751,58 @@ fn lint_report_fix(
         let mut per_rule: std::collections::BTreeMap<&'static str, usize> =
             std::collections::BTreeMap::new();
         let mut applied = 0;
+        // How often two fixes wanted overlapping regions in one pass. The
+        // shadowed one is not lost — the next pass re-offers it once the outer
+        // form has been rewritten — so this measures contention, not backlog.
+        let mut conflicts = 0;
 
         for _ in 0..MAX_FIX_PASSES {
-            let mut fixes = collect_lint_fixes(file, dialect, &tree, &text, active)?;
+            let mut fixes = collect_lint_fixes(file, dialect, &tree, &text, active, settings)?;
             // Re-parse suppressions each pass: line numbers shift as edits land,
             // but the directive comment and its form move together.
-            let suppressions = LintSuppressions::parse(&text);
+            let suppressions = LintSuppressions::parse_in_tree(&text, &tree);
             if !suppressions.is_empty() {
                 fixes.retain(|(rule, start, _end), _| {
                     let (line, _) = line_and_column(&text, *start);
                     !suppressions.is_suppressed(rule, line)
                 });
             }
+            if args.no_destructive_fixes {
+                fixes.retain(|(rule, _, _), _| !rule_tags(rule).contains(RuleTag::Destructive));
+            }
             if fixes.is_empty() {
                 break;
             }
 
-            // Choose a non-overlapping subset, preferring the earliest-starting
-            // (outermost) fix on any overlap; nested fixes it shadows are caught
-            // on the next pass once the outer form has been rewritten.
-            // Each candidate occupies its finding span [start, end); its edits
-            // (one, or several for a multi-region fix) all fall within it.
+            // Choose a non-overlapping subset, preferring the *outermost* fix on
+            // any overlap; nested fixes it shadows are caught on the next pass
+            // once the outer form has been rewritten. Each candidate occupies
+            // its finding span [start, end); its edits (one, or several for a
+            // multi-region fix) all fall within it.
+            //
+            // The sort key is total and derived only from the data, so the
+            // choice is the same on every run: earliest start first, then the
+            // widest span (the enclosing form), then registry order for two
+            // rules that report the identical span.
             let mut candidates: Vec<(&'static str, usize, usize, Vec<LintReplacement>)> = fixes
                 .into_iter()
                 .map(|((rule, start, end), fix)| (rule, start, end, fix.replacements))
                 .collect();
-            candidates.sort_by_key(|(_, start, end, _)| (*start, *end));
+            candidates.sort_by_key(|(rule, start, end, _)| {
+                (
+                    *start,
+                    std::cmp::Reverse(*end),
+                    registration_rank(rule),
+                    *rule,
+                )
+            });
 
             let mut edits = Vec::new();
             let mut chosen_rules = Vec::new();
             let mut last_end = 0;
             for (rule, start, end, replacements) in candidates {
                 if start < last_end {
+                    conflicts += 1;
                     continue;
                 }
                 last_end = end;
@@ -466,6 +827,7 @@ fn lint_report_fix(
                 applied += 1;
             }
         }
+        fix_conflicts += conflicts;
 
         if applied > 0 && text != input.text {
             if args.diff {
@@ -509,7 +871,7 @@ fn lint_report_fix(
         return Ok(());
     }
 
-    print_lint_fix_report(&file_fixes, fixes_applied, args.output)
+    print_lint_fix_report(&file_fixes, fixes_applied, fix_conflicts, args.output)
 }
 
 /// Writes the current findings (for the active rules, after suppression) to a
@@ -525,8 +887,11 @@ fn lint_report_write_baseline(
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let findings =
-            retain_unsuppressed(collect_lint_findings(file, dialect, &tree)?, &input.text);
+        let findings = retain_unsuppressed(
+            collect_lint_findings(file, dialect, &tree)?,
+            &input.text,
+            &tree,
+        );
         for finding in findings {
             if !active.contains(&finding.rule) {
                 continue;
@@ -571,6 +936,7 @@ fn lint_report_stats(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
+    overrides: &SeverityOverrides,
 ) -> Result<()> {
     let baseline = load_baseline(args)?;
     let mut by_rule: std::collections::BTreeMap<&'static str, usize> =
@@ -579,8 +945,11 @@ fn lint_report_stats(
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let findings =
-            retain_unsuppressed(collect_lint_findings(file, dialect, &tree)?, &input.text);
+        let findings = retain_unsuppressed(
+            collect_lint_findings(file, dialect, &tree)?,
+            &input.text,
+            &tree,
+        );
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let mut file_had_finding = false;
         for finding in findings {
@@ -601,7 +970,7 @@ fn lint_report_stats(
     let mut error_count = 0;
     let mut warning_count = 0;
     for (rule, count) in &by_rule {
-        match rule_severity(rule) {
+        match overridden_rule_severity(overrides, rule) {
             Severity::Error => error_count += count,
             Severity::Warning => warning_count += count,
         }
@@ -649,16 +1018,9 @@ fn lint_report_unused_suppressions(
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        // Line -> the rules that reported a finding there (across every rule).
-        let mut present: std::collections::HashMap<usize, std::collections::HashSet<&'static str>> =
-            std::collections::HashMap::new();
-        for finding in collect_lint_findings(file, dialect, &tree)? {
-            let (line, _) = line_and_column(&input.text, finding.span.start().get());
-            present.entry(line).or_default().insert(finding.rule);
-        }
-
-        let suppressions = LintSuppressions::parse(&input.text);
-        for unused in suppressions.unused_directives(&present) {
+        let present = findings_by_line(file, dialect, &tree, &input.text)?;
+        let suppressions = LintSuppressions::parse_in_tree(&input.text, &tree);
+        for unused in suppressions.unused_directives(&present, args.require_suppression_reason) {
             entries.push((file.display().to_string(), unused));
         }
     }
@@ -683,14 +1045,18 @@ fn lint_report_github(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
+    overrides: &SeverityOverrides,
 ) -> Result<()> {
     let baseline = load_baseline(args)?;
     let mut finding_rules: Vec<&'static str> = Vec::new();
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let findings =
-            retain_unsuppressed(collect_lint_findings(file, dialect, &tree)?, &input.text);
+        let findings = retain_unsuppressed(
+            collect_lint_findings(file, dialect, &tree)?,
+            &input.text,
+            &tree,
+        );
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         for finding in findings {
             if !active.contains(&finding.rule) {
@@ -704,11 +1070,12 @@ fn lint_report_github(
                 column,
                 finding.rule,
                 &finding.message,
+                overridden_rule_severity(overrides, finding.rule),
             );
         }
     }
 
-    if let Some(message) = gate_message(&finding_rules, args) {
+    if let Some(message) = gate_message(&finding_rules, args, overrides) {
         return Err(crate::presentation::cli::gate::gate_failure(format!(
             "lint-report policy failed: {message}"
         )));
@@ -820,6 +1187,9 @@ mod tests {
             "(equal w nil)\n",         // nil-comparison
             "(eq n 7)\n",              // eq-number-comparison
             "(eq c #\\a)\n",           // eq-char-comparison
+            "(length (copy-list ucx))\n", // unnecessary-copy
+            "(nreverse (copy-list cbd))\n", // copy-before-destructive
+            "(code-char 65)\n",        // ascii-code-char
             "(if a b c d)\n",          // if-arity — NOT fixable
         );
         let tree =
@@ -832,6 +1202,7 @@ mod tests {
             &tree,
             source,
             &active,
+            &RuleSettings::new(),
         )
         .expect("collect fixes");
 

@@ -8,7 +8,9 @@
 //! below pin each derived length so that gaining or losing a rule is a
 //! deliberate change.
 
-use crate::domain::lint::model::{RuleCategory, Severity};
+use crate::domain::lint::model::{
+    RuleCategory, RuleExplanation, RuleSetting, RuleTag, RuleTags, Severity,
+};
 
 use super::{REGISTRY, RULE_COUNT};
 
@@ -113,11 +115,72 @@ pub const WARNING_RULES: [&str; warning_count()] = {
     names
 };
 
+/// The tag names accepted by `--tag`.
+pub const TAGS: [&str; RuleTag::ALL.len()] = {
+    let mut names = [""; RuleTag::ALL.len()];
+    let mut index = 0;
+    while index < RuleTag::ALL.len() {
+        names[index] = RuleTag::ALL[index].as_str();
+        index += 1;
+    }
+    names
+};
+
+const fn tagged_count(tag: RuleTag) -> usize {
+    let mut count = 0;
+    let mut index = 0;
+    while index < RULE_COUNT {
+        if REGISTRY[index].meta().has_tag(tag) {
+            count += 1;
+        }
+        index += 1;
+    }
+    count
+}
+
+/// The rules `--preset` keeps out of every rung but `all`, unless
+/// `--experimental` is passed. Published so a caller can see what it is opting
+/// into before opting in.
+pub const EXPERIMENTAL_RULES: [&str; tagged_count(RuleTag::Experimental)] = {
+    let mut names = [""; tagged_count(RuleTag::Experimental)];
+    let mut written = 0;
+    let mut index = 0;
+    while index < RULE_COUNT {
+        let meta = REGISTRY[index].meta();
+        if meta.has_tag(RuleTag::Experimental) {
+            names[written] = meta.name().as_str();
+            written += 1;
+        }
+        index += 1;
+    }
+    names
+};
+
+/// The rules only `--preset pedantic` (and `all`) admits: correct, but
+/// opinionated enough to be noise on a codebase that has not adopted the
+/// convention.
+pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
+    let mut names = [""; tagged_count(RuleTag::Pedantic)];
+    let mut written = 0;
+    let mut index = 0;
+    while index < RULE_COUNT {
+        let meta = REGISTRY[index].meta();
+        if meta.has_tag(RuleTag::Pedantic) {
+            names[written] = meta.name().as_str();
+            written += 1;
+        }
+        index += 1;
+    }
+    names
+};
+
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-const _: () = assert!(RULE_COUNT == 143);
-const _: () = assert!(fixable_count() == 88);
-const _: () = assert!(warning_count() == 96);
+const _: () = assert!(RULE_COUNT == 169);
+const _: () = assert!(fixable_count() == 91);
+const _: () = assert!(warning_count() == 113);
+const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
+const _: () = assert!(PEDANTIC_RULES.len() == 4);
 
 fn meta_of(name: &str) -> Option<&'static crate::domain::lint::model::RuleMeta> {
     REGISTRY
@@ -150,6 +213,54 @@ pub fn rule_is_fixable(name: &str) -> bool {
 #[must_use]
 pub fn rule_severity(name: &str) -> Severity {
     meta_of(name).map_or(Severity::Error, |meta| meta.severity())
+}
+
+/// The orthogonal properties of a rule; empty for an unknown name and for the
+/// majority of rules, which carry none.
+#[must_use]
+pub fn rule_tags(name: &str) -> RuleTags {
+    meta_of(name).map_or(RuleTags::NONE, |meta| meta.tags())
+}
+
+/// The long-form documentation `--explain` prints, or `None` when the rule
+/// supplies only its one-line description.
+#[must_use]
+pub fn rule_explanation(name: &str) -> Option<RuleExplanation> {
+    meta_of(name).and_then(|meta| meta.explanation())
+}
+
+/// The tunable knobs a rule declares, empty for the rules that have none and
+/// for an unknown name.
+#[must_use]
+pub fn rule_settings(name: &str) -> &'static [RuleSetting] {
+    meta_of(name).map_or(&[], |meta| meta.settings())
+}
+
+/// The knob `key` of `rule`, or `None` — the lookup `--rule-arg` validates
+/// against before a run starts.
+#[must_use]
+pub fn rule_setting(rule: &str, key: &str) -> Option<RuleSetting> {
+    meta_of(rule).and_then(|meta| meta.setting(key))
+}
+
+/// The dialects a rule reports on, as wire names. Part of `--explain` because
+/// "why did this rule find nothing?" is most often answered by the file's
+/// dialect, not by the rule's logic.
+#[must_use]
+pub fn rule_dialects(name: &str) -> Vec<&'static str> {
+    use crate::domain::dialect::Dialect;
+    REGISTRY
+        .iter()
+        .find(|entry| entry.meta().name().as_str() == name)
+        .map(|entry| {
+            let scope = entry.rule().dialect_scope();
+            Dialect::ALL
+                .iter()
+                .filter(|dialect| scope.includes(**dialect))
+                .map(|dialect| dialect.label())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

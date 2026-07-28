@@ -24,6 +24,7 @@
             "text": "no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-missing-lexical-binding/48686428ba8a57d0/0",
             "primaryLocationLineHash": "fnv1a64:1a9ab02b5ba5ee91:0"
           },
           "ruleId": "elisp-missing-lexical-binding"
@@ -49,6 +50,7 @@
             "text": "`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-unreachable-lexical-binding/7bec796cbb2809fb/0",
             "primaryLocationLineHash": "fnv1a64:e7da63da042f503c:0"
           },
           "ruleId": "elisp-unreachable-lexical-binding"
@@ -74,6 +76,7 @@
             "text": "this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-autoload-cookie-without-form/1d02fc8f50fffe50/0",
             "primaryLocationLineHash": "fnv1a64:db17ae6e6733fcfc:0"
           },
           "ruleId": "elisp-autoload-cookie-without-form"
@@ -99,6 +102,7 @@
             "text": "this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-autoload-cookie-without-form/1d02fc8f50fffe50/1",
             "primaryLocationLineHash": "fnv1a64:db17ae6e6733fcfc:1"
           },
           "ruleId": "elisp-autoload-cookie-without-form"
@@ -124,6 +128,7 @@
             "text": "defcustom fixture-option has no :type, so Customize cannot offer a widget for it"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-defcustom-missing-type/9fccc736d0e46b79/0",
             "primaryLocationLineHash": "fnv1a64:cbbc553bbb93971f:0"
           },
           "ruleId": "elisp-defcustom-missing-type"
@@ -149,6 +154,7 @@
             "text": "defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-defcustom-missing-group/9fccc736d0e46b79/0",
             "primaryLocationLineHash": "fnv1a64:d17a6c91b6493d32:0"
           },
           "ruleId": "elisp-defcustom-missing-group"
@@ -174,6 +180,7 @@
             "text": "`loop` was removed in Emacs 27.1; use `cl-loop`"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-obsolete-cl-alias/cdece4ad70d57deb/0",
             "primaryLocationLineHash": "fnv1a64:8123b7140348beab:0"
           },
           "ruleId": "elisp-obsolete-cl-alias"
@@ -199,6 +206,7 @@
             "text": "a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-quoted-lambda/d01b8b8f281f7655/0",
             "primaryLocationLineHash": "fnv1a64:e73bb58661019248:0"
           },
           "ruleId": "elisp-quoted-lambda"
@@ -224,6 +232,7 @@
             "text": "macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-interactive-in-macro/b042d29eb1a42a48/0",
             "primaryLocationLineHash": "fnv1a64:4a300b73107118f7:0"
           },
           "ruleId": "elisp-interactive-in-macro"
@@ -249,6 +258,7 @@
             "text": "this condition-case has no handler clauses, so it evaluates its body form and catches nothing"
           },
           "partialFingerprints": {
+            "pareditFindingId": "elisp-condition-case-without-handler/e02bbaeea25cf9c0/0",
             "primaryLocationLineHash": "fnv1a64:a88726d108867fc9:0"
           },
           "ruleId": "elisp-condition-case-without-handler"
@@ -263,7 +273,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a setq/setf/psetq/psetf that assigns a place to itself"
@@ -274,7 +285,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a setf/setq/psetf/psetq that assigns the same variable more than once ((setf a 1 a 2))"
@@ -285,7 +297,8 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a setq/setf/psetq/psetf with an odd argument count"
@@ -296,7 +309,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a setq/psetq place that is not a variable (a list, literal, or constant)"
@@ -307,7 +321,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a setf/setq that manually increments a variable ((setf x (1+ x)) is (incf x))"
@@ -318,7 +333,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a setf/setq that manually conses onto a variable ((setf x (cons e x)) is (push e x))"
@@ -329,7 +345,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a setf/setq that manually adjoins onto a variable ((setf x (adjoin e x)) is (pushnew e x))"
@@ -340,7 +357,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an incf/decf with an explicit delta of 1, the default ((incf x 1) is (incf x))"
@@ -351,7 +369,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an incf/decf with a negative literal delta, which flips the operator ((incf x -1) is (decf x))"
@@ -362,7 +381,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a return/return-from with an explicit nil result, the default ((return nil) is (return))"
@@ -373,7 +393,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a cons onto nil or a list literal ((cons a nil) is (list a); (cons a (list b)) is (list a b))"
@@ -384,7 +405,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a (reverse (reverse x)), a wasteful obfuscated copy ((reverse (reverse x)) is (copy-seq x))"
@@ -395,7 +417,8 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an incf/decf/push/pop call with the wrong number of arguments"
@@ -406,7 +429,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a lambda list that names the same parameter more than once"
@@ -417,7 +441,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a lambda list that repeats a lambda-list keyword (&optional, &key, ...)"
@@ -428,7 +453,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "lambda-list keywords out of the canonical &optional/&rest/&key/&aux order"
@@ -439,7 +465,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a self-evaluating literal (number/string/char/keyword) quoted redundantly"
@@ -450,7 +477,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a progn that is empty or wraps a single form (progn X is just X)"
@@ -461,7 +489,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a multi-form progn nested directly inside another progn (its forms splice in)"
@@ -472,7 +501,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a when whose only body is a when, mergeable by and ((when a (when b c)) is (when (and a b) c))"
@@ -483,7 +513,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an unless whose only body is an unless, mergeable by or ((unless a (unless b c)) is (unless (or a b) c))"
@@ -494,7 +525,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a same-operator and/or nested in an and/or, which flattens ((or a (or b c)) is (or a b c))"
@@ -505,7 +537,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "nested car/cdr accessors that combine into one ((car (cdr x)) is (cadr x))"
@@ -516,7 +549,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an nth with a small constant index that has an ordinal accessor ((nth 0 x) is (first x))"
@@ -527,7 +561,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an nthcdr with a zero count, which returns the list unchanged ((nthcdr 0 x) is x)"
@@ -538,7 +573,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an nthcdr with a 1-4 count that has a named cdr accessor ((nthcdr 2 x) is (cddr x))"
@@ -549,7 +585,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a multi-form progn used as a when/unless/let/defun/... body (its forms splice in)"
@@ -560,7 +597,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a let with an empty binding list, which is just progn ((let () body) is (progn body))"
@@ -571,7 +609,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a three-argument if whose else branch is a redundant literal nil ((if c x nil) is (if c x))"
@@ -582,7 +621,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a let* with zero or one binding, which is just let (no sequential scope in play)"
@@ -593,7 +633,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a funcall of a sharp-quoted symbol ((funcall #'foo a b) is just (foo a b))"
@@ -604,7 +645,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a (the t form) type declaration, which is vacuous and is just form (t matches every object)"
@@ -615,7 +657,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a funcall of a lambda form, which applies directly ((funcall (lambda (x) x) a) is ((lambda (x) x) a))"
@@ -626,7 +669,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a lambda form with a redundant #' prefix (#'(lambda (x) x) is (lambda (x) x))"
@@ -637,7 +681,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an identity call, which returns its argument unchanged ((identity x) is just x)"
@@ -648,7 +693,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an apply of a sharp-quoted symbol to a literal list ((apply #'foo (list a b)) is (foo a b))"
@@ -659,7 +705,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eql-defaulting call with an explicit :test #'eql, the default ((find x l :test #'eql) is (find x l))"
@@ -670,7 +717,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a :key-taking call with an explicit :key #'identity/nil, the default ((sort xs #'< :key #'identity) is (sort xs #'<))"
@@ -681,7 +729,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a when/unless whose test is a (not X)/(null X) negation (flip the macro instead)"
@@ -692,7 +741,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a not/null of a two-argument numeric comparison ((not (= a b)) is (/= a b))"
@@ -703,7 +753,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a three-argument if with a negated test ((if (not c) a b) is (if c b a))"
@@ -714,7 +765,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an if whose test and then are the same atom ((if x x y) is (or x y))"
@@ -725,7 +777,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a three-argument if with then=nil and else=t ((if test nil t) is (not test))"
@@ -736,7 +789,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a +/- of a literal 1 with a shorthand ((+ x 1) is (1+ x); (- x 1) is (1- x))"
@@ -747,7 +801,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a two-argument if with no else branch ((if test then) is (when test then))"
@@ -758,7 +813,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a comparison whose two operands are structurally identical"
@@ -769,7 +825,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eq/eql/equal/equalp comparison against nil ((eq x nil) is just (null x))"
@@ -780,7 +837,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eq/eql/equal/equalp comparison against t (only matches the symbol T, not any true value)"
@@ -791,7 +849,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an if whose then and else branches are structurally identical"
@@ -802,7 +861,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an if whose test is the literal t or nil ((if t a b) is a; (if nil a b) is b)"
@@ -813,7 +873,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a when/unless with a literal t/nil test ((when t b) is (progn b); (when nil b) is nil)"
@@ -824,7 +885,8 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an if with the wrong number of arguments (Common Lisp if takes 2 or 3)"
@@ -835,7 +897,8 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a the special form without exactly two arguments (a type and a form)"
@@ -846,7 +909,8 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eq/eql/equal/equalp call without exactly two arguments"
@@ -857,7 +921,8 @@
               "properties": {
                 "category": "arity",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an nth/elt/gethash/getf/... accessor with the wrong number of arguments"
@@ -868,7 +933,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a one-element append that is just a cons ((append (list x) rest) is (cons x rest))"
@@ -879,7 +945,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a (format nil \"~A\"/\"~S\" x), which is (princ-to-string x)/(prin1-to-string x)"
@@ -890,7 +957,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a (format t \"~%\"), which is just (terpri) (write a newline to standard output)"
@@ -901,7 +969,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a quotient op with a redundant divisor of 1 ((floor x 1) is (floor x))"
@@ -912,7 +981,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a case/ecase/ccase key repeated across more than one clause"
@@ -923,7 +993,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a case/ecase/ccase clause with a quoted key ('a matches quote and a, not a)"
@@ -934,7 +1005,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a case/ecase/ccase clause with a bare nil key, which is the empty key list and never matches (use ((nil) …))"
@@ -945,7 +1017,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a typecase/etypecase/ctypecase clause with a bare nil type, which is the empty type and never matches (use null)"
@@ -956,7 +1029,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a case/typecase clause that is not a non-empty list"
@@ -967,7 +1041,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a case/typecase clause after a t/otherwise catch-all that can never run"
@@ -978,7 +1053,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an ecase/ccase/etypecase/ctypecase with a forbidden t/otherwise clause"
@@ -989,7 +1065,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a cond test expression repeated across more than one clause"
@@ -1000,7 +1077,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a cond clause after a t catch-all that can never run"
@@ -1011,7 +1089,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a cond clause that is not a non-empty list"
@@ -1022,7 +1101,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a parallel let that binds the same variable more than once"
@@ -1033,7 +1113,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a let/let* binding that is neither a symbol nor a (var value) pair"
@@ -1044,7 +1125,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a let/let*/do/do* binding whose variable is a constant (nil, t, or a keyword)"
@@ -1055,7 +1137,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a dolist/dotimes spec that is not a (var form [result]) list"
@@ -1066,7 +1149,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eval-when with an invalid situation (not :compile-toplevel/:load-toplevel/:execute)"
@@ -1077,7 +1161,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an and/or that lists the same operand more than once"
@@ -1088,7 +1173,8 @@
               "properties": {
                 "category": "dead-code",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an and/or whose non-final constant operand makes later operands dead"
@@ -1099,7 +1185,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an and/or with a redundant identity operand (t in and, nil in or; (and a t b) is (and a b))"
@@ -1110,7 +1197,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an and/or of all negations, collapsible by De Morgan ((and (not a) (not b)) is (not (or a b)))"
@@ -1121,7 +1209,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a single-operand and/or ((and X) and (or X) are just X)"
@@ -1132,7 +1221,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a single-argument append/nconc/list*, which returns its argument unchanged ((append x) is x)"
@@ -1143,7 +1233,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a single-operand +/* ((+ X) and (* X) are just X)"
@@ -1154,7 +1245,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eq/eql compared against a string literal (never reliably eql)"
@@ -1165,7 +1257,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eq/eql compared against a quoted list literal (never reliably eql)"
@@ -1176,7 +1269,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a member/assoc/find/substitute/adjoin/... searching for a string/list literal without :test (default eql won't match)"
@@ -1187,7 +1281,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eq compared against a number literal (eq on numbers is unreliable)"
@@ -1198,7 +1293,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an eq compared against a character literal (eq on characters is unreliable; use eql/char=)"
@@ -1209,7 +1305,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a numeric comparison (< > <= >= = /=) with one argument (always true; missing an operand?)"
@@ -1220,7 +1317,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a =/</> comparison against 0 with a dedicated predicate ((= x 0) is (zerop x))"
@@ -1231,7 +1329,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a cond with one non-t clause that has a body ((cond (test a b)) is (when test a b))"
@@ -1242,7 +1341,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a cond with one t clause that has a body ((cond (t a b)) is (progn a b))"
@@ -1253,7 +1353,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a multiple-value-bind of one variable ((multiple-value-bind (x) f body) is (let ((x f)) body))"
@@ -1264,7 +1365,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a format call whose first argument is a string literal (nil/t/stream destination is missing)"
@@ -1275,7 +1377,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an incf/decf/push/pop/pushnew/setf/psetf whose place is a self-evaluating literal (cannot be modified)"
@@ -1286,7 +1389,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a destructive call (nreverse/sort/delete/nsubstitute/nconc/...) on a quoted list literal (undefined behavior)"
@@ -1297,7 +1401,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a character function (char=/char-code/alpha-char-p/...) applied to a string literal (type error)"
@@ -1308,7 +1413,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a when/unless/dolist/dotimes with no body (the test/spec runs, then nothing happens)"
@@ -1319,7 +1425,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an arithmetic form with a redundant identity operand ((+ x 0), (* x 1), (- x 0), (/ x 1))"
@@ -1330,7 +1437,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "negation written the long way ((- 0 x) and (* x -1) are (- x))"
@@ -1341,7 +1449,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a two-argument list*, which is just a cons ((list* a b) is (cons a b))"
@@ -1352,7 +1461,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a values-list of a list constructor ((values-list (list a b)) is (values a b))"
@@ -1363,7 +1473,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a prog1 wrapping a single form, which is just that form ((prog1 x) is x)"
@@ -1374,7 +1485,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a subseq from index 0, a whole-sequence copy ((subseq seq 0) is (copy-seq seq))"
@@ -1385,7 +1497,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a car of an nthcdr, which is nth ((car (nthcdr n x)) is (nth n x))"
@@ -1396,7 +1509,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a car of a reverse, a wasteful full copy ((car (reverse x)) is (car (last x)))"
@@ -1407,7 +1521,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a two-argument append with a nil tail, a fresh copy ((append x nil) is (copy-list x))"
@@ -1418,7 +1533,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a multiple-value-list of a values form ((multiple-value-list (values a b)) is (list a b))"
@@ -1429,7 +1545,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a typep against a type with a dedicated predicate ((typep x 'string) is (stringp x))"
@@ -1440,7 +1557,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a coerce to type t, which returns the object unchanged ((coerce x t) is x)"
@@ -1451,7 +1569,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a gethash with an explicit nil default, the default ((gethash k h nil) is (gethash k h))"
@@ -1462,7 +1581,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a make-hash-table with an explicit :test 'eql, the default ((make-hash-table :test 'eql) is (make-hash-table))"
@@ -1473,7 +1593,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a division-family form with a literal 0 divisor, a guaranteed division-by-zero ((/ x 0))"
@@ -1484,7 +1605,8 @@
               "properties": {
                 "category": "duplicate",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a make-* call passing the same keyword argument twice ((make-instance 'c :x 1 :x 2))"
@@ -1495,7 +1617,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a quoted designator in a defpackage clause, which defpackage does not evaluate ((:export 'foo))"
@@ -1506,7 +1629,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an incf/decf with an explicit step of 0, a no-op ((incf x 0))"
@@ -1517,7 +1641,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a three-argument if with then=nil ((if c nil e) is (unless c e))"
@@ -1528,7 +1653,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a two-form prog2, which is just progn ((prog2 a b) is (progn a b))"
@@ -1539,7 +1665,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a handler-case with no handler clauses, which is just its body ((handler-case x) is x)"
@@ -1550,7 +1677,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an unwind-protect with no cleanup forms, which is just its body ((unwind-protect x) is x)"
@@ -1561,7 +1689,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a bounded-sequence call with an explicit :start 0, the default ((find x seq :start 0) is (find x seq))"
@@ -1572,7 +1701,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a bounded-sequence call with an explicit :end nil, the default ((find x seq :end nil) is (find x seq))"
@@ -1583,7 +1713,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a sequence call with an explicit :from-end nil, the default ((find x seq :from-end nil) is (find x seq))"
@@ -1594,7 +1725,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a remove/delete/substitute call with an explicit :count nil, the default ((remove x seq :count nil) is (remove x seq))"
@@ -1605,7 +1737,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a string= of two same-case-folded operands ((string= (string-downcase a) (string-downcase b)) is (string-equal a b))"
@@ -1616,7 +1749,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a char= of two same-case-folded operands ((char= (char-downcase a) (char-downcase b)) is (char-equal a b))"
@@ -1627,7 +1761,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "nested string case ops where the outer dominates ((string-upcase (string-downcase s)) is (string-upcase s))"
@@ -1638,7 +1773,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a code-char of a char-code, a round-trip that is just the character ((code-char (char-code c)) is c)"
@@ -1649,7 +1785,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a last call with an explicit count of 1, the default ((last x 1) is (last x))"
@@ -1660,7 +1797,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a butlast/nbutlast call with an explicit count of 1, the default ((butlast x 1) is (butlast x))"
@@ -1671,7 +1809,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a make-list call with an explicit :initial-element nil, the default ((make-list n :initial-element nil) is (make-list n))"
@@ -1682,7 +1821,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a parse-integer call with an explicit :radix 10, the default ((parse-integer s :radix 10) is (parse-integer s))"
@@ -1693,7 +1833,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a getf call with an explicit nil default, the default ((getf p k nil) is (getf p k))"
@@ -1704,7 +1845,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a make-array call with an explicit :adjustable nil or :fill-pointer nil, the default ((make-array n :adjustable nil) is (make-array n))"
@@ -1715,7 +1857,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "nested char case ops where the outer dominates ((char-upcase (char-downcase c)) is (char-upcase c))"
@@ -1726,10 +1869,438 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": true,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a list* with a nil tail, a spelled-out list ((list* a b nil) is (list a b))"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`length` traverses the whole sequence. Comparing its result against 0 asks an O(n) question whose answer the first element already gives, and never terminates on a circular list."
+              },
+              "id": "length-emptiness-test",
+              "properties": {
+                "category": "performance",
+                "fixable": false,
+                "rationale": "`length` traverses the whole sequence. Comparing its result against 0 asks an O(n) question whose answer the first element already gives, and never terminates on a circular list.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (length …) call used only to decide whether a sequence is empty, which walks the whole sequence"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`append` and `nconc` copy or walk their first argument. Passing the accumulator as that argument on every round re-walks everything gathered so far, so building n elements costs O(n²). Pushing onto the front and reversing once at the end costs O(n)."
+              },
+              "id": "quadratic-accumulation",
+              "properties": {
+                "category": "performance",
+                "fixable": false,
+                "rationale": "`append` and `nconc` copy or walk their first argument. Passing the accumulator as that argument on every round re-walks everything gathered so far, so building n elements costs O(n²). Pushing onto the front and reversing once at the end costs O(n).",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop that grows a sequence by appending to its own accumulated value, which is quadratic"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`member`, `assoc`, `find`, and `position` walk their sequence. Calling one inside a loop on a collection the loop does not change multiplies the two lengths, where hoisting the collection into a hash table before the loop makes each lookup constant."
+              },
+              "id": "linear-search-in-loop",
+              "properties": {
+                "category": "performance",
+                "fixable": false,
+                "rationale": "`member`, `assoc`, `find`, and `position` walk their sequence. Calling one inside a loop on a collection the loop does not change multiplies the two lengths, where hoisting the collection into a hash table before the loop makes each lookup constant.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop that linearly searches the same collection on every round, which is quadratic"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A `copy-*` call exists to keep a caller's sequence safe from mutation. When the value goes straight into an operator specified never to modify its argument, nothing is being protected and the copy is allocated only to be discarded."
+              },
+              "id": "unnecessary-copy",
+              "properties": {
+                "category": "allocation",
+                "fixable": true,
+                "rationale": "A `copy-*` call exists to keep a caller's sequence safe from mutation. When the value goes straight into an operator specified never to modify its argument, nothing is being protected and the copy is allocated only to be discarded.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a copy-seq/copy-list result passed to an operator that only reads it, so the copy is garbage"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Copying a sequence so that a destructive operator may safely destroy the copy is exactly what the operator's non-destructive twin does, in one pass instead of two."
+              },
+              "id": "copy-before-destructive",
+              "properties": {
+                "category": "allocation",
+                "fixable": true,
+                "rationale": "Copying a sequence so that a destructive operator may safely destroy the copy is exactly what the operator's non-destructive twin does, in one pass instead of two.",
+                "severity": "warning",
+                "tags": [
+                  "destructive"
+                ]
+              },
+              "shortDescription": {
+                "text": "a fresh copy fed to a destructive operator, where one non-destructive operator does both"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A constructor whose arguments do not depend on the loop produces an equivalent object every round. Building it once before the loop replaces n allocations with one."
+              },
+              "id": "loop-invariant-allocation",
+              "properties": {
+                "category": "allocation",
+                "fixable": false,
+                "rationale": "A constructor whose arguments do not depend on the loop produces an equivalent object every round. Building it once before the loop replaces n allocations with one.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "an allocation inside a loop whose arguments never mention the loop, so every round builds the same object"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A symbol qualified with an implementation's package does not exist in any other implementation, so a file naming one fails to read there rather than failing to work. Guarding it with a reader conditional is what makes the dependency explicit and the file portable."
+              },
+              "id": "implementation-package-symbol",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "rationale": "A symbol qualified with an implementation's package does not exist in any other implementation, so a file naming one fails to read there rather than failing to work. Guarding it with a reader conditional is what makes the dependency explicit and the file portable.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a symbol from an implementation's own package, outside any reader conditional guarding it"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A namestring is parsed by the host's pathname syntax, so a backslash separator, a drive letter, or an absolute root means something on one platform and something else — or nothing — on another. `make-pathname` and `merge-pathnames` name a file without naming a filesystem."
+              },
+              "id": "unportable-pathname",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "rationale": "A namestring is parsed by the host's pathname syntax, so a backslash separator, a drive letter, or an absolute root means something on one platform and something else — or nothing — on another. `make-pathname` and `merge-pathnames` name a file without naming a filesystem.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a filesystem call given a string that spells one host's path syntax"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "The standard does not fix the mapping from character codes to characters, so a numeric literal names a different character on an implementation that does not use ASCII — and names nothing recognisable to a reader on any implementation."
+              },
+              "id": "ascii-code-char",
+              "properties": {
+                "category": "portability",
+                "fixable": true,
+                "rationale": "The standard does not fix the mapping from character codes to characters, so a numeric literal names a different character on an implementation that does not use ASCII — and names nothing recognisable to a reader on any implementation.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (code-char N) call with a literal code, which assumes ASCII and hides which character it means"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Binary floating point cannot represent most decimal fractions exactly, so a value that should equal 0.1 usually differs from the literal `0.1` in the last bits. The comparison then succeeds or fails according to the rounding of every operation that produced it."
+              },
+              "id": "float-equality",
+              "properties": {
+                "category": "numeric-precision",
+                "fixable": false,
+                "rationale": "Binary floating point cannot represent most decimal fractions exactly, so a value that should equal 0.1 usually differs from the literal `0.1` in the last bits. The comparison then succeeds or fails according to the rounding of every operation that produced it.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an exact equality test against a float literal, whose result depends on rounding upstream"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A special variable is visible to every thread and every caller, so assigning to one from inside a function makes the function's result depend on call history and its behaviour under concurrency undefined without external synchronisation."
+              },
+              "id": "global-mutation-in-function",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "rationale": "A special variable is visible to every thread and every caller, so assigning to one from inside a function makes the function's result depend on call history and its behaviour under concurrency undefined without external synchronisation.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a function body assigning to a *special-looking* global, which is shared mutable state"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Reading a shared place, deciding on the result, and then writing it is three operations. A second thread that runs between the read and the write sees the same 'not present' answer, and one of the two writes is silently lost."
+              },
+              "id": "check-then-act",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "rationale": "Reading a shared place, deciding on the result, and then writing it is three operations. A second thread that runs between the read and the write sees the same 'not present' answer, and one of the two writes is silently lost.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a conditional that tests a place and then assigns to the same place, which another thread can interleave"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "These operators turn data into code or into symbols. When the data is computed, nothing in the source says what will run or what will be interned, and any path from outside the program to that argument is a path to arbitrary execution or to unbounded symbol-table growth."
+              },
+              "id": "eval-of-non-constant",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "These operators turn data into code or into symbols. When the data is computed, nothing in the source says what will run or what will be interned, and any path from outside the program to that argument is a path to arbitrary execution or to unbounded symbol-table growth.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an eval, intern, or read-from-string whose argument is not a literal the source shows"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`*read-eval*` is true by default, so `read` executes any `#.(…)` in its input as part of reading it. Data from outside the program therefore becomes code before the program has inspected one form of it."
+              },
+              "id": "read-without-read-eval-guard",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "`*read-eval*` is true by default, so `read` executes any `#.(…)` in its input as part of reading it. Data from outside the program therefore becomes code before the program has inspected one form of it.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a read of external data with no enclosing *read-eval* nil binding, so #. in the input executes"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A command line assembled from strings is parsed by a shell, so any interpolated value that contains a shell metacharacter becomes syntax rather than data. Passing the program and its arguments as separate list elements removes the shell from the path."
+              },
+              "id": "subprocess-string-building",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "A command line assembled from strings is parsed by a shell, so any interpolated value that contains a shell metacharacter becomes syntax rather than data. Passing the program and its arguments as separate list elements removes the shell from the path.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a subprocess launched with a command line built by format or concatenate, which a value can escape"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A `close` in the straight-line body runs only when the body completes normally. Any condition signalled, `return-from`, or `throw` between the `open` and the `close` skips it and leaks the file handle. `with-open-file` closes on every exit path."
+              },
+              "id": "unclosed-stream",
+              "properties": {
+                "category": "resource",
+                "fixable": false,
+                "rationale": "A `close` in the straight-line body runs only when the body completes normally. Any condition signalled, `return-from`, or `throw` between the `open` and the `close` skips it and leaks the file handle. `with-open-file` closes on every exit path.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a let-bound (open …) stream with no unwind-protect, so a non-local exit leaks the handle"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`with-open-file` closes its stream as the body exits, so the value the body returns is a closed stream. Every operation the caller performs on it fails."
+              },
+              "id": "stream-escapes-with-open-file",
+              "properties": {
+                "category": "resource",
+                "fixable": false,
+                "rationale": "`with-open-file` closes its stream as the body exits, so the value the body returns is a closed stream. Every operation the caller performs on it fails.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a with-open-file whose last body form is the stream, which the form has already closed"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A handler on `error` catches every failure the body can signal, including ones written after the handler. A body that returns a constant leaves the caller unable to tell failure from a legitimate result, and leaves no record that anything went wrong."
+              },
+              "id": "handler-case-swallows-error",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "A handler on `error` catches every failure the body can signal, including ones written after the handler. A body that returns a constant leaves the caller unable to tell failure from a legitimate result, and leaves no record that anything went wrong.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a handler-case clause on a broad condition type whose body discards the condition entirely"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`handler-case` selects the first clause whose type the condition is of. A clause on a supertype therefore shadows every later clause on one of its subtypes, and the narrower handler — which is the one somebody thought about — never runs."
+              },
+              "id": "unreachable-handler-clause",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "`handler-case` selects the first clause whose type the condition is of. A clause on a supertype therefore shadows every later clause on one of its subtypes, and the narrower handler — which is the one somebody thought about — never runs.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a handler-case clause whose condition type an earlier clause already covers, so it never runs"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Nothing in the syntax of a *use* site distinguishes a special variable from a lexical one, or a constant from either. The earmuff conventions are what carry that, and they carry it only while they are applied without exception."
+              },
+              "id": "definition-naming",
+              "properties": {
+                "category": "naming",
+                "fixable": false,
+                "rationale": "Nothing in the syntax of a *use* site distinguishes a special variable from a lexical one, or a constant from either. The earmuff conventions are what carry that, and they carry it only while they are applied without exception.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "a defconstant/defvar/defparameter whose name lacks the +constant+ or *special* marker"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A caller decides whether to copy an argument from the callee's name. A function that applies a destructive operator to a parameter, under a name with no `n` prefix and no `!` suffix, tells the caller the opposite of the truth."
+              },
+              "id": "destructive-function-naming",
+              "properties": {
+                "category": "naming",
+                "fixable": false,
+                "rationale": "A caller decides whether to copy an argument from the callee's name. A function that applies a destructive operator to a parameter, under a name with no `n` prefix and no `!` suffix, tells the caller the opposite of the truth.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "a function that destructively modifies one of its own parameters but is not named for it"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A Common Lisp docstring lives in the image, not only in the file: `(documentation 'f 'function)` and `describe` read it at runtime. A definition without one cannot be explained from the REPL."
+              },
+              "id": "missing-docstring",
+              "properties": {
+                "category": "documentation",
+                "fixable": false,
+                "rationale": "A Common Lisp docstring lives in the image, not only in the file: `(documentation 'f 'function)` and `describe` read it at runtime. A definition without one cannot be explained from the REPL.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "a definition with no docstring, so `documentation` and `describe` have nothing to report"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`(declare (ignore x))` states that the body will not refer to `x`. A body that refers to it anyway makes the two statements contradict, which most implementations diagnose; a declaration naming something the lambda list does not bind silences nothing and hides the parameter that really is unused."
+              },
+              "id": "ignore-declaration-conflict",
+              "properties": {
+                "category": "declaration",
+                "fixable": false,
+                "rationale": "`(declare (ignore x))` states that the body will not refer to `x`. A body that refers to it anyway makes the two statements contradict, which most implementations diagnose; a declaration naming something the lambda list does not bind silences nothing and hides the parameter that really is unused.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an (ignore x) declaration whose variable the body uses, or which names no parameter at all"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "The standard does not say which of two values for the same optimization quality a compiler takes, so a declaration that gives both means something different on every implementation — and usually something different from what its author intended."
+              },
+              "id": "contradictory-optimize",
+              "properties": {
+                "category": "declaration",
+                "fixable": false,
+                "rationale": "The standard does not say which of two values for the same optimization quality a compiler takes, so a declaration that gives both means something different on every implementation — and usually something different from what its author intended.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an optimize declaration naming one quality twice with different values"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "The standard slot options are a closed set. An option outside it is either ignored — so the slot silently lacks the initform, reader, or type it appears to declare — or signalled, depending on the implementation."
+              },
+              "id": "defclass-slot-option",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "rationale": "The standard slot options are a closed set. An option outside it is either ignored — so the slot silently lacks the initform, reader, or type it appears to declare — or signalled, depending on the implementation.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defclass slot option that is not one of the standard ones, or an :initarg that is not a keyword"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A method's lambda list must be congruent with its generic function's: same number of required parameters, same number of optionals, and `&rest`/`&key` present in both or neither. `defmethod` signals when it is not, so the file fails to load."
+              },
+              "id": "method-lambda-list-mismatch",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "rationale": "A method's lambda list must be congruent with its generic function's: same number of required parameters, same number of optionals, and `&rest`/`&key` present in both or neither. `defmethod` signals when it is not, so the file fails to load.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defmethod whose required-parameter count differs from its defgeneric in the same file"
               }
             },
             {
@@ -1737,7 +2308,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an Emacs Lisp file whose first line does not set lexical-binding"
@@ -1748,7 +2320,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a lexical-binding setting outside the first line, which Emacs never reads"
@@ -1759,7 +2332,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a ;;;###autoload cookie with no top-level form after it"
@@ -1770,7 +2344,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a defcustom with no :type, which leaves Customize editing a raw sexp"
@@ -1781,7 +2356,8 @@
               "properties": {
                 "category": "malformed",
                 "fixable": false,
-                "severity": "warning"
+                "severity": "warning",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a defcustom with no :group, which leaves the option out of the group tree"
@@ -1792,7 +2368,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an unprefixed cl.el name, removed in Emacs 27.1"
@@ -1803,7 +2380,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a quoted lambda, which is a list rather than a closure under lexical binding"
@@ -1814,7 +2392,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "an (interactive ...) inside a macro definition, which cannot be a command"
@@ -1825,7 +2404,8 @@
               "properties": {
                 "category": "suspicious",
                 "fixable": false,
-                "severity": "error"
+                "severity": "error",
+                "tags": []
               },
               "shortDescription": {
                 "text": "a condition-case with no handler clauses, which catches nothing"

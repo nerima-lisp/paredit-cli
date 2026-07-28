@@ -48,6 +48,28 @@ pub enum RuleSelectionError {
 
     #[error("unknown lint category {name:?}; valid categories: {valid}")]
     UnknownCategory { name: String, valid: String },
+
+    #[error("unknown lint tag {name:?}; valid tags: {valid}")]
+    UnknownTag { name: String, valid: String },
+
+    #[error("unknown lint preset {name:?}; valid presets: {valid}")]
+    UnknownPreset { name: String, valid: String },
+
+    /// A `--rule-arg` naming a knob the rule does not declare.
+    ///
+    /// Separate from `UnknownRule` because the remedy differs: the rule exists
+    /// and the caller is close, so the message lists *that rule's* knobs rather
+    /// than all 143 rule names.
+    #[error("lint rule {rule:?} has no setting {key:?}; valid settings: {valid}")]
+    UnknownRuleSetting {
+        rule: String,
+        key: String,
+        valid: String,
+    },
+
+    /// A `--rule-arg` that is not `<rule>.<key>=<value>`.
+    #[error("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")]
+    MalformedRuleArgument { argument: String },
 }
 
 #[cfg(test)]

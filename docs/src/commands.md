@@ -206,9 +206,56 @@ discovery, impact analysis, and preflight checks.
 | `eql-list-comparison` | Report eq/eql calls that compare against a quoted list literal (never reliably eql). |
 | `eql-search-literal` | Report `member`/`assoc`/`find`/`position`/`count`/`remove`/`delete`/`adjoin`/`pushnew` (item first) and `substitute`/`nsubstitute`/`subst`/`nsubst` (item second) searching for a string or quoted-list literal with no `:test`; the default `eql` never matches a string/list literal — add `:test #'equal`. |
 | `setf-arity` | Report setq/setf/psetq/psetf forms with an odd argument count (a place missing its value). |
-| `lint` | Run every within-file logic-bug lint at once and report all findings, tagged by rule and category. Each finding is self-describing — it carries its `severity`, `category`, and a `fixable` flag inline (so an agent can triage and decide whether to run `--fix` without cross-referencing `--list-rules`). `--list-rules` prints the rule catalog with categories, descriptions, a `severity` (`error` for likely/certain bugs, `warning` for redundant/non-idiomatic style), and a `fixable` flag marking the rules `--fix` can repair — and it honors the same `--rule`/`--exclude`/`--category` selectors, so `--list-rules --category dead-code` lists just that group; `--rule`/`--exclude` select rules; `--category` selects a whole group (arity, dead-code, duplicate, malformed, suspicious); `--sarif` emits a SARIF 2.1.0 log for CI code scanning (with stable fingerprints and one-click `fixes` for every rule `--list-rules` marks fixable); `--github` emits GitHub Actions `::error::` annotations for inline PR review; `--fix` applies those auto-fixes in place, iterating to a fixpoint (so nested redundancies collapse fully) and reporting the per-file/per-rule counts; add `--diff` to preview the changes as a unified diff without writing, or `--check` to write nothing and exit 3 when any auto-fix is still pending (a CI gate that stays green only when fixable lint has been cleaned up — distinct from `--fail-on-finding`, which also gates on report-only findings). `--check` and `--diff` combine (show the diff and fail). `--fix-plan` instead emits the machine-readable fix plan — each fixable finding's exact byte-region replacements as JSON (or tab-separated text) — without writing, so an editor or agent can preview or apply fixes one at a time (honoring the same suppressions and `--baseline` as `--fix`). Findings can be silenced in source with an inline `; paredit:ignore [rule…]` comment: on its own line it suppresses the next line, trailing after code it suppresses that line, and with no rule names it suppresses every rule — honored uniformly across the report, SARIF, GitHub, and `--fix` outputs. `--fail-on <error\|warning>` gates only on findings at or above a severity (so CI can block on bugs while still reporting style warnings), and SARIF `level` reflects each finding's severity. `--stats` prints a lint-debt rollup instead of individual findings — finding counts by severity, by category, and by rule, plus files-scanned/files-with-findings — honoring the same `--rule`/`--category`/`--baseline` filters. `--report-unused-suppressions` instead reports any `; paredit:ignore` that silences no finding (a stale ignore or a typo'd rule name) and exits 3 if any are found, keeping the ignore list honest in CI. For adopting the linter on an existing codebase, `--write-baseline <file>` snapshots today's findings and `--baseline <file>` then suppresses those known findings (matched by rule and trimmed-line content, so they survive line shifts) — reporting and gating only on new findings, across the default, `--sarif`, and `--github` outputs. |
+| `lint` | Run every within-file logic-bug lint at once and report all findings, tagged by rule and category. Each finding is self-describing — it carries its `severity`, `category`, and a `fixable` flag inline (so an agent can triage and decide whether to run `--fix` without cross-referencing `--list-rules`). `--list-rules` prints the rule catalog with categories, descriptions, a `severity` (`error` for likely/certain bugs, `warning` for redundant/non-idiomatic style), and a `fixable` flag marking the rules `--fix` can repair — and it honors the same `--rule`/`--exclude`/`--category` selectors, so `--list-rules --category dead-code` lists just that group; `--rule`/`--exclude` select rules; `--category` selects a whole group (see `--list-rules` for the current set); `--sarif` emits a SARIF 2.1.0 log for CI code scanning (with stable fingerprints and one-click `fixes` for every rule `--list-rules` marks fixable); `--github` emits GitHub Actions `::error::` annotations for inline PR review; `--fix` applies those auto-fixes in place, iterating to a fixpoint (so nested redundancies collapse fully) and reporting the per-file/per-rule counts; add `--diff` to preview the changes as a unified diff without writing, or `--check` to write nothing and exit 3 when any auto-fix is still pending (a CI gate that stays green only when fixable lint has been cleaned up — distinct from `--fail-on-finding`, which also gates on report-only findings). `--check` and `--diff` combine (show the diff and fail). `--fix-plan` instead emits the machine-readable fix plan — each fixable finding's exact byte-region replacements as JSON (or tab-separated text) — without writing, so an editor or agent can preview or apply fixes one at a time (honoring the same suppressions and `--baseline` as `--fix`). Findings can be silenced in source with an inline `; paredit:ignore [rule…]` comment: on its own line it suppresses the next line, trailing after code it suppresses that line, and with no rule names it suppresses every rule — honored uniformly across the report, SARIF, GitHub, and `--fix` outputs. `--fail-on <error\|warning>` gates only on findings at or above a severity (so CI can block on bugs while still reporting style warnings), and SARIF `level` reflects each finding's severity. `--stats` prints a lint-debt rollup instead of individual findings — finding counts by severity, by category, and by rule, plus files-scanned/files-with-findings — honoring the same `--rule`/`--category`/`--baseline` filters. `--report-unused-suppressions` instead reports any `; paredit:ignore` that silences no finding (a stale ignore or a typo'd rule name) and exits 3 if any are found, keeping the ignore list honest in CI. For adopting the linter on an existing codebase, `--write-baseline <file>` snapshots today's findings and `--baseline <file>` then suppresses those known findings (matched by rule and trimmed-line content, so they survive line shifts) — reporting and gating only on new findings, across the default, `--sarif`, and `--github` outputs. |
 
 Most reports accept `--output json` for machine-readable results.
+
+### Choosing and tuning lint rules
+
+With 169 rules, `inspect lint` needs more than an on/off switch per rule. The
+flags below are about the rule *set* rather than about any one rule, and all of
+them work with `--list-rules` as well as with a scan — so a run can be
+inspected before it is made.
+
+| Flag | What it does |
+| --- | --- |
+| `--preset <minimal\|recommended\|pedantic\|all>` | How wide a net to cast. `minimal` is error-severity rules only; `recommended` (the default) is every stable, non-opinionated rule; `pedantic` adds the naming and documentation conventions; `all` adds the experimental ones. `--list-presets` prints the ladder with the size of each rung. |
+| `--experimental` | Adds the experimental rules to whichever preset is in force, rather than jumping to `all`. |
+| `--tag <TAG>` | Runs only rules carrying *every* named tag. Tags are orthogonal to categories: `experimental`, `pedantic`, `destructive`, `semantic`, `style`, `cross-file`. `--list-tags` prints each with the rules that carry it. |
+| `--deny <RULE\|CATEGORY>` / `--warn <RULE\|CATEGORY>` | Reports the named rules (or every rule in the named categories) at error or warning severity, whatever they ship as. This changes the `--fail-on` gate, the SARIF `level`, and whether `--github` emits `::error` or `::warning` — not only the printed word. Use `--exclude` to silence a rule entirely. |
+| `--rule-arg <RULE.KEY=VALUE>` | Retunes one rule's threshold. The rule must declare the key, so a typo fails the run before any file is read; `--explain <rule>` lists the knobs a rule has. |
+| `--explain <RULE>` | Prints everything known about one rule: its category, severity, tags, dialects, why it fires, a before/after example, what it deliberately leaves alone, and its tunable settings. |
+| `--docs` | Emits the whole rule reference as Markdown, one section per rule grouped by category, generated from the same metadata the report reads. |
+| `--timings` | Reports what each rule cost and how often it ran, slowest first, instead of the findings. Measurement is not free, so it is opt-in. |
+| `--no-destructive-fixes` | With `--fix`, holds back the fixes tagged `destructive` — the few whose rewrite can change runtime behaviour rather than only spelling. |
+
+Every finding also carries a content-derived `id` (in the JSON report, the fix
+plan, and as a SARIF `pareditFindingId` fingerprint). It is derived from the
+rule and a whitespace-normalized prefix of the reported form, so it survives
+reformatting and unrelated edits above it — which is what makes it usable as a
+key for baselines and suppression tooling.
+
+### Suppressing findings in source
+
+Three scopes, each spelled as a comment:
+
+| Directive | Scope |
+| --- | --- |
+| `; paredit:ignore [rule…]` | One line: its own if code precedes the comment, otherwise the next. |
+| `;; paredit:ignore-next-form [rule…]` | Every line of the next top-level form, however many it spans. |
+| `;; paredit:ignore-file [rule…]` | Every line of the file. |
+
+With no rule names a directive silences every rule in its scope. Anything after
+`--` is a free-text reason; `--require-suppression-reason` turns a missing one
+into a reported problem, so a project can insist that every silenced finding
+says why.
+
+`--report-unused-suppressions` reports the directives that silence nothing (a
+stale ignore or a typo'd rule name) and exits 3 if any are found.
+`--remove-unused-suppressions` is its write side: it deletes those directives
+in place and *narrows* the partly stale ones, keeping the rule names that are
+still doing work — so cleaning up a typo cannot silently un-suppress a finding
+somebody meant to ignore.
 
 ## Edit
 
