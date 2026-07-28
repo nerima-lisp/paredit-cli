@@ -21,6 +21,15 @@ path = "src/main.rs"
 lto = "fat"
 codegen-units = 1
 
+# The dev profile is what `clippy --all-targets` and `cargo nextest run` build,
+# in CI and locally. Full DWARF for 25 member crates plus the ~240-module
+# `tests/cli.rs` integration binary dominates link time and buys nothing that a
+# panic backtrace uses: line tables still resolve every frame to `file:line`,
+# which is the only debug information the test suite ever reports from.
+# Step-debugging a specific crate is still available with `RUSTFLAGS=-Cdebuginfo=2`.
+[profile.dev]
+debug = "line-tables-only"
+
 [dependencies]
 # Extracted core packages (Phase 1 onwards).
 paredit-core-syntax = { path = "packages/core/syntax" }

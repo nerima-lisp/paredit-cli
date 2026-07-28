@@ -196,6 +196,46 @@ fn ci_runs_the_flake_checks_and_audits_dependencies() {
     }
 }
 
+/// CI fans the checks out over one job each, and takes the list of them from
+/// the flake rather than restating it in `ci.yml`.
+///
+/// This has a silent failure mode that nothing else would catch. If `ci.yml`
+/// stops reading `ciCheckNames` — or the flake stops exporting it — the matrix
+/// does not error out, it just shrinks or empties, and a run with no checks in
+/// it is still a green run. The same goes for the `--no-build` evaluation pass:
+/// without it, nothing verifies the flake outputs that are not `checks`
+/// (`packages`, `apps`, `devShells`, `overlays`, `formatter`), because the
+/// matrix only ever builds `checks.<system>.*`.
+///
+/// So the two halves of the gate are pinned here: the fan-out reaches the
+/// checks, and its source of truth is the flake.
+#[test]
+fn ci_derives_its_check_matrix_from_the_flake() {
+    let workflow = fs::read_to_string(".github/workflows/ci.yml").expect("read CI workflow");
+    let flake = fs::read_to_string("flake.nix").expect("read flake.nix");
+
+    assert!(
+        workflow.contains("nix flake check --no-build"),
+        "CI must keep evaluating the flake outputs the check matrix never builds"
+    );
+    assert!(
+        workflow.contains(".#checks.x86_64-linux.${{ matrix.check }}"),
+        "the CI matrix must build the flake checks themselves"
+    );
+    for needle in ["ciCheckNames", "fromJSON(needs.plan.outputs.checks)"] {
+        assert!(
+            workflow.contains(needle),
+            "CI must take its check matrix from the flake, not from a hand-kept \
+             list that can silently shrink: {needle}"
+        );
+    }
+    assert!(
+        flake.contains("ciCheckNames = builtins.attrNames (mkCoreChecks system);"),
+        "flake.nix must keep exporting the check list CI fans out over, derived \
+         from the checks themselves"
+    );
+}
+
 #[test]
 fn external_github_actions_are_immutably_pinned() {
     let action = fs::read_to_string("action.yml").expect("read action.yml");

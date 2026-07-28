@@ -12,16 +12,24 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: Verify
-    # `nix flake check` builds 11 derivations, several of which compile the
-    # whole 24-package workspace under a different toolchain or flag set. It
-    # took 26m56s here on a warm Cachix cache; a cold cache (any commit whose
-    # source hash Cachix has not seen) exceeds 30 minutes and the job is
-    # cancelled mid-check, which reads as a spurious failure. 60 leaves room
-    # for a cold run without letting a genuinely hung build burn an hour.
-    timeout-minutes: 60
+  # Evaluation gate and matrix source in one job.
+  #
+  # `nix flake check --no-build` instantiates every output for this host -
+  # packages, apps, devShells, overlays, formatter and the checks themselves -
+  # without building any of them, so the structural verification a plain
+  # `nix flake check` used to provide survives the fan-out below at a cost of
+  # seconds rather than half an hour.
+  #
+  # The matrix is then read out of the flake instead of being restated here. A
+  # check added to `mkCoreChecks` is verified by the next run with no edit to
+  # this file, and the `checks.{default,formatting,docs}` conformance aliases -
+  # which are duplicate store paths, not extra work - stay out of it.
+  plan:
+    name: Evaluate flake
+    timeout-minutes: 15
     runs-on: ubuntu-latest
+    outputs:
+      checks: ${{ steps.enumerate.outputs.names }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -30,8 +38,47 @@ jobs:
         with:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Run host-specific flake checks
-        run: nix flake check
+      - name: Evaluate every flake output
+        run: nix flake check --no-build
+      - name: Enumerate the checks to fan out over
+        id: enumerate
+        run: |
+          set -euo pipefail
+          names="$(nix eval --json '.#lib.x86_64-linux.ciCheckNames')"
+          echo "fanning out over: $names"
+          printf 'names=%s\n' "$names" >> "$GITHUB_OUTPUT"
+
+  # One runner per check. These used to share a single four-core runner, where
+  # Nix could only interleave them; giving each its own runner turns the sum of
+  # their build times into the maximum of them.
+  #
+  # `fail-fast: false` so that a formatting failure does not cancel the test run
+  # and hide a second, unrelated failure behind it.
+  #
+  # The timeout is back to 30 minutes, and it is a different 30 minutes than
+  # the one that used to be too tight. It now bounds a single check rather than
+  # all of them in sequence: the slowest here was 7m20s on a cache that had
+  # never seen this commit's derivations, so 30 leaves a 4x margin while still
+  # cutting a genuinely hung build off well short of an hour.
+  check:
+    name: Verify (${{ matrix.check }})
+    needs: plan
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ${{ fromJSON(needs.plan.outputs.checks) }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Build the check
+        run: nix build --no-link --print-build-logs ".#checks.x86_64-linux.${{ matrix.check }}"
 
   supply-chain:
     name: Supply-chain audit
