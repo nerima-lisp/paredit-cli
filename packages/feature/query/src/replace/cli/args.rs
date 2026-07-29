@@ -47,6 +47,14 @@ pub struct QueryReplaceArgs {
     /// visible to whoever wrote the comment.
     #[arg(long)]
     pub allow_comment_loss: bool,
+    /// Rewrite matches that sit inside quoted data.
+    ///
+    /// Off by default. `'(a (if x y nil) b)` is a *list literal*: it has the
+    /// shape the pattern matches, and rewriting it changes the program's data
+    /// rather than its code. Both spellings read, so nothing downstream can
+    /// tell them apart.
+    #[arg(long)]
+    pub include_quoted: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,

@@ -16,7 +16,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::selector::{Pattern, SkipReason, Template, apply_plan, plan_rewrite};
+use paredit_core_syntax::selector::{
+    Pattern, RewriteAllowances, SkipReason, Template, apply_plan, plan_rewrite,
+};
 use paredit_core_syntax::sexpr::SyntaxTree;
 
 use crate::recipe::Migration;
@@ -75,7 +77,7 @@ pub fn run_migration(
     dialect: Dialect,
     source: &str,
     migration: &Migration,
-    allow_comment_loss: bool,
+    allow: RewriteAllowances,
 ) -> Result<FileOutcome> {
     if !migration.covers(dialect) {
         return Ok(FileOutcome {
@@ -106,7 +108,7 @@ pub fn run_migration(
                 path.display()
             )
         })?;
-        let plan = plan_rewrite(&tree, &pattern, &template, dialect, allow_comment_loss);
+        let plan = plan_rewrite(&tree, &pattern, &template, dialect, allow);
         steps.push(StepOutcome {
             query: step.query.clone(),
             rewrite: step.rewrite.clone(),
@@ -153,7 +155,11 @@ impl MigrationTotals {
 }
 
 /// The skip reasons, listed so a report can print the zeroes too.
-pub const SKIP_REASONS: [SkipReason; 2] = [SkipReason::Overlapping, SkipReason::CommentLoss];
+pub const SKIP_REASONS: [SkipReason; 3] = [
+    SkipReason::Overlapping,
+    SkipReason::CommentLoss,
+    SkipReason::Quoted,
+];
 
 #[cfg(test)]
 mod tests {
@@ -181,7 +187,7 @@ mod tests {
             Dialect::CommonLisp,
             "(if (not p) a nil)",
             &nil_conditionals(),
-            false,
+            RewriteAllowances::default(),
         )
         .expect("run");
         assert_eq!(outcome.rewritten.as_deref(), Some("(unless p a)"));
@@ -196,7 +202,7 @@ mod tests {
             Dialect::CommonLisp,
             "(if p a nil)",
             &nil_conditionals(),
-            false,
+            RewriteAllowances::default(),
         )
         .expect("run");
         assert_eq!(outcome.rewritten.as_deref(), Some("(when p a)"));
@@ -209,7 +215,7 @@ mod tests {
             Dialect::EmacsLisp,
             "(if p a nil)",
             &nil_conditionals(),
-            false,
+            RewriteAllowances::default(),
         )
         .expect("run");
         assert!(outcome.out_of_scope);
@@ -224,7 +230,7 @@ mod tests {
             Dialect::CommonLisp,
             "(when p a)",
             &nil_conditionals(),
-            false,
+            RewriteAllowances::default(),
         )
         .expect("run");
         assert!(!outcome.is_touched());
@@ -238,7 +244,7 @@ mod tests {
             Dialect::CommonLisp,
             "(if p a nil)\n(if (not q) b nil)\n",
             &nil_conditionals(),
-            false,
+            RewriteAllowances::default(),
         )
         .expect("run")
         .rewritten
@@ -248,7 +254,7 @@ mod tests {
             Dialect::CommonLisp,
             &once,
             &nil_conditionals(),
-            false,
+            RewriteAllowances::default(),
         )
         .expect("run");
         assert!(!twice.is_touched(), "recipe is not idempotent: {once}");
@@ -265,7 +271,7 @@ mod tests {
             Dialect::EmacsLisp,
             "(incf counter)\n(funcall 'incf)\n",
             &migration,
-            false,
+            RewriteAllowances::default(),
         )
         .expect("run");
         assert_eq!(

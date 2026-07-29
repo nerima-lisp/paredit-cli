@@ -29,7 +29,7 @@ use anyhow::Result;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::shared::{emit_document, read_input_dialect_and_tree};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::selector::{Pattern, Template};
+use paredit_core_syntax::selector::{Pattern, RewriteAllowances, Template};
 
 use crate::replace::cli::args::QueryReplaceArgs;
 use crate::replace::cli::render::print_replace_report;
@@ -45,19 +45,16 @@ pub fn query_replace(args: QueryReplaceArgs) -> Result<()> {
     // file four hundred sends the caller looking at the wrong thing.
     template.check_against(&pattern)?;
 
+    let allow = RewriteAllowances {
+        comment_loss: args.allow_comment_loss,
+        quoted: args.include_quoted,
+    };
     let files = selected_files(&args.input, &args.roots)?;
     let mut rewrites: Vec<(FileRewrite, _)> = Vec::with_capacity(files.len());
     for file in &files {
         let (input, file_dialect, tree) =
             read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let rewrite = build_file_rewrite(
-            file,
-            file_dialect,
-            &tree,
-            &pattern,
-            &template,
-            args.allow_comment_loss,
-        );
+        let rewrite = build_file_rewrite(file, file_dialect, &tree, &pattern, &template, allow);
         rewrites.push((rewrite, (input, file_dialect)));
     }
 

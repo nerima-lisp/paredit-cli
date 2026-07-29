@@ -649,6 +649,7 @@ that still parses and is still wrong:
 | --- | --- |
 | `overlapping` | An enclosing match was rewritten. Run the command again to reach the nested one. |
 | `comment-loss` | A comment inside the match is carried by no capture the template uses, so the rewrite would delete it. `--allow-comment-loss` overrides. |
+| `quoted` | The match is inside quoted data. `'(a (if x y nil) b)` is a *list literal*: it has the shape the pattern matches, and rewriting it changes the program's data rather than its code. `--include-quoted` overrides. |
 
 Both are counted in every output format, including when the count is zero, so
 "37 matched, 35 rewritten" is never something to discover by reading a diff.
@@ -731,8 +732,10 @@ paredit migrate run elisp-cl-lib --diff lisp/
 paredit migrate run nil-conditionals --check .   # exit 3 when not yet applied
 ```
 
-`migrate run` skips the same two situations `query replace` does, for the same
-reasons, and reports them the same way.
+`migrate run` skips the same three situations `query replace` does, for the
+same reasons, and reports them the same way — the quote guard most of all, since
+`nil-conditionals` over a file holding `'(a (if x y nil))` would otherwise
+rewrite a data literal.
 
 ## Config
 

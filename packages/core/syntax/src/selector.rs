@@ -39,6 +39,7 @@ pub use resolve::{
     RangeExtent, RelativeStep, SelectorRequest, SelectorTarget, SelectorTerm, resolve, target_text,
 };
 pub use rewrite::{
-    Replacement, RewritePlan, SkipReason, SkippedMatch, Template, apply_plan, plan_rewrite,
+    Replacement, RewriteAllowances, RewritePlan, SkipReason, SkippedMatch, Template, apply_plan,
+    plan_rewrite,
 };
 pub use stable_id::{STABLE_ID_PREFIX, StableSelectorId, stable_id_for_path, stable_selector_ids};

@@ -247,6 +247,68 @@ fn allow_comment_loss_is_what_lets_that_rewrite_through() {
     );
 }
 
+/// `'(a (if x y nil) b)` is a list *literal*. It has the shape the pattern
+/// matches, and rewriting it produces a different list — which reads perfectly,
+/// so no reparse guard can catch it. The match is one level under the quote,
+/// where a check of the node's own reader prefixes would miss it.
+#[test]
+fn replace_refuses_a_match_inside_quoted_data() {
+    let source = "(defparameter *forms* '(a (if x y nil) b))\n";
+    let dir = workspace("query-replace-quoted", &[("a.lisp", source)]);
+    let output = paredit()
+        .args([
+            "query",
+            "replace",
+            "--query",
+            "(if ?t ?a nil)",
+            "--rewrite",
+            "(when ?t ?a)",
+            "--write",
+        ])
+        .arg(&dir)
+        .output()
+        .expect("run query replace");
+    assert!(output.status.success());
+
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).expect("json");
+    assert_eq!(report["summary"]["replacements"], 0);
+    let quoted = report["skippedByReason"]
+        .as_array()
+        .expect("reasons")
+        .iter()
+        .find(|reason| reason["reason"] == "quoted")
+        .expect("quoted is always reported, including as a zero");
+    assert_eq!(quoted["count"], 1);
+    assert_eq!(
+        fs::read_to_string(dir.join("a.lisp")).expect("read back"),
+        source
+    );
+}
+
+#[test]
+fn include_quoted_is_what_lets_a_data_rewrite_through() {
+    let source = "(defparameter *forms* '(a (if x y nil) b))\n";
+    let dir = workspace("query-replace-include-quoted", &[("a.lisp", source)]);
+    paredit()
+        .args([
+            "query",
+            "replace",
+            "--query",
+            "(if ?t ?a nil)",
+            "--rewrite",
+            "(when ?t ?a)",
+            "--include-quoted",
+            "--write",
+        ])
+        .arg(&dir)
+        .assert()
+        .success();
+    assert_eq!(
+        fs::read_to_string(dir.join("a.lisp")).expect("read back"),
+        "(defparameter *forms* '(a (when x y) b))\n"
+    );
+}
+
 #[test]
 fn a_template_naming_an_unbound_capture_fails_before_reading_any_file() {
     let dir = workspace("query-replace-unbound", &[("a.lisp", ONE_ARMED)]);

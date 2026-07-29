@@ -17,8 +17,8 @@
 //!
 //! # What is deliberately refused
 //!
-//! Two hazards do not announce themselves, because both leave source that
-//! still parses:
+//! Three hazards do not announce themselves, because all three leave source
+//! that still parses:
 //!
 //! - **Overlapping matches.** The matcher is pre-order and reports a nested
 //!   `(let …)` inside an outer one. Rewriting both would splice a replacement
@@ -30,12 +30,20 @@
 //!   live outside the node tree, the result still parses and the loss is
 //!   invisible. Such a match is skipped by default; a caller who means it says
 //!   so.
+//! - **Quoted data.** `'(a (if x y nil) b)` is a *list literal*. It has the
+//!   shape `(if ?t ?a nil)` matches, and rewriting it to `'(a (when x y) b)`
+//!   changes the program's data rather than its code — two different lists,
+//!   both of which read. A match strictly inside a quote is skipped by
+//!   default. A match whose *own* node carries the quote is not: writing the
+//!   prefix in the pattern is naming it.
 //!
 //! Both are reported as [`SkipReason`]s rather than folded into a total, so a
 //! caller can say *why* a match it expected to see did not appear.
 
 use crate::dialect::Dialect;
-use crate::sexpr::{ByteSpan, ExpressionKind, ExpressionPath, ExpressionView, SyntaxTree};
+use crate::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionPath, ExpressionView, ReaderPrefix, SyntaxTree,
+};
 
 use super::error::RewriteError;
 use super::matcher::{Capture, PatternMatch, match_all};
@@ -174,6 +182,9 @@ pub enum SkipReason {
     Overlapping,
     /// The rewrite would delete a comment that no capture carries over.
     CommentLoss,
+    /// The match sits inside quoted data, where a rewrite changes a literal
+    /// rather than a program.
+    Quoted,
 }
 
 impl SkipReason {
@@ -183,6 +194,7 @@ impl SkipReason {
         match self {
             Self::Overlapping => "overlapping",
             Self::CommentLoss => "comment-loss",
+            Self::Quoted => "quoted",
         }
     }
 
@@ -196,6 +208,11 @@ impl SkipReason {
             Self::CommentLoss => {
                 "a comment inside the match is carried by no capture; \
                  pass --allow-comment-loss to rewrite it anyway"
+            }
+            Self::Quoted => {
+                "the match is inside quoted data, where a rewrite changes a \
+                 literal rather than a program; pass --include-quoted to \
+                 rewrite it anyway"
             }
         }
     }
@@ -250,18 +267,31 @@ impl RewritePlan {
     }
 }
 
+/// What a caller is willing to rewrite anyway.
+///
+/// A struct rather than two `bool` parameters, because `plan_rewrite(.., true,
+/// false)` at a call site says nothing about which guard was waived, and these
+/// are exactly the two decisions a reviewer needs to see.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RewriteAllowances {
+    /// Rewrite a match even when it deletes a comment no capture carries.
+    pub comment_loss: bool,
+    /// Rewrite a match inside quoted data, changing a literal.
+    pub quoted: bool,
+}
+
 /// Plans every rewrite `pattern` and `template` make over `tree`.
 ///
-/// `allow_comment_loss` opts out of the comment guard described in the module
-/// documentation. It defaults to off at every call site in this repository;
-/// a caller turning it on is choosing to lose the comments.
+/// `allow` opts out of the guards described in the module documentation. Both
+/// default to off at every call site in this repository; a caller turning one
+/// on is choosing the loss it names.
 #[must_use]
 pub fn plan_rewrite(
     tree: &SyntaxTree,
     pattern: &Pattern,
     template: &Template,
     dialect: Dialect,
-    allow_comment_loss: bool,
+    allow: RewriteAllowances,
 ) -> RewritePlan {
     let source = tree.source();
     let used: Vec<String> = template.capture_names();
@@ -271,6 +301,14 @@ pub fn plan_rewrite(
     // disjoint, never partially overlapping, which is what makes a single
     // high-water mark a complete overlap test.
     let mut applied_end = 0usize;
+    // Computed once per document rather than per match: the walk is the whole
+    // tree either way, and a pattern that matches a thousand forms would
+    // otherwise walk it a thousand times.
+    let quoted = if allow.quoted {
+        Vec::new()
+    } else {
+        quoted_spans(tree)
+    };
 
     for found in match_all(tree, pattern, dialect) {
         if found.span.start().get() < applied_end {
@@ -281,7 +319,15 @@ pub fn plan_rewrite(
             });
             continue;
         }
-        if !allow_comment_loss && drops_a_comment(tree, &found, &used) {
+        if quoted.contains(&found.span) {
+            plan.skipped.push(SkippedMatch {
+                path: found.path,
+                span: found.span,
+                reason: SkipReason::Quoted,
+            });
+            continue;
+        }
+        if !allow.comment_loss && drops_a_comment(tree, &found, &used) {
             plan.skipped.push(SkippedMatch {
                 path: found.path,
                 span: found.span,
@@ -320,6 +366,77 @@ pub fn apply_plan(source: &str, plan: &RewritePlan) -> String {
         out.replace_range(start..end, &replacement.after);
     }
     out
+}
+
+/// Every node that sits inside quoted data, by span.
+///
+/// One walk carrying the context down, rather than a per-node prefix check.
+/// Inspecting only a node's own prefixes answers "is this form quoted" and
+/// loses the answer one level deeper, which is how `'(a (+ 1 2))` gets folded
+/// to `'(a 3)` — the arithmetic is data and the node holding it carries no
+/// prefix of its own.
+///
+/// Quasiquote is tracked with the same flag and `,` / `,@` clear it, because a
+/// `` `(a ,(if x y nil)) `` unquote *is* code again and refusing to rewrite it
+/// would be a different wrong answer.
+fn quoted_spans(tree: &SyntaxTree) -> Vec<ByteSpan> {
+    fn opens_data(view: &ExpressionView) -> Option<bool> {
+        if view.reader_prefixes.iter().any(|prefix| {
+            matches!(
+                prefix,
+                ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing
+            )
+        }) {
+            return Some(false);
+        }
+        if view
+            .reader_prefixes
+            .iter()
+            .any(|prefix| matches!(prefix, ReaderPrefix::Quote | ReaderPrefix::Quasiquote))
+        {
+            return Some(true);
+        }
+        // The spelled-out forms the reader macros abbreviate. A file that
+        // writes `(quote (a b))` means exactly what `'(a b)` means.
+        match head_symbol(view)? {
+            "quote" | "quasiquote" | "backquote" => Some(true),
+            "unquote" | "unquote-splicing" => Some(false),
+            _ => None,
+        }
+    }
+
+    let mut quoted = Vec::new();
+    // Bound rather than chained: `root_view` returns an owned tree whose
+    // `Drop` would otherwise run while the walk still borrows into it.
+    let root = tree.root_view();
+    let mut pending: Vec<(&ExpressionView, bool)> =
+        root.children.iter().map(|child| (child, false)).collect();
+    while let Some((view, inside)) = pending.pop() {
+        let opens = opens_data(view);
+        // A node that opens a *code* context is code, however deep inside a
+        // quasiquote it sits: `,(f x)` is evaluated. Marking it quoted because
+        // its ancestors are would refuse the one form in the template that a
+        // caller writing `,(f ?x)` was pointing at.
+        if inside && opens != Some(false) {
+            quoted.push(view.span);
+        }
+        let below = opens.unwrap_or(inside);
+        pending.extend(view.children.iter().map(|child| (child, below)));
+    }
+    quoted
+}
+
+/// A paren list's head symbol, for the spelled-out `(quote …)` forms.
+fn head_symbol(view: &ExpressionView) -> Option<&str> {
+    if view.kind != ExpressionKind::List {
+        return None;
+    }
+    let head = view.children.first()?;
+    if head.kind != ExpressionKind::Atom {
+        return None;
+    }
+    let text = head.text.as_deref()?;
+    Some(&text[head.symbol_offset.min(text.len())..])
 }
 
 /// Whether rewriting `found` would delete a comment.
@@ -396,21 +513,21 @@ mod tests {
     use super::*;
 
     fn plan(source: &str, query: &str, rewrite: &str) -> (SyntaxTree, RewritePlan) {
-        plan_allowing(source, query, rewrite, false)
+        plan_allowing(source, query, rewrite, RewriteAllowances::default())
     }
 
     fn plan_allowing(
         source: &str,
         query: &str,
         rewrite: &str,
-        allow_comment_loss: bool,
+        allow: RewriteAllowances,
     ) -> (SyntaxTree, RewritePlan) {
         let dialect = Dialect::CommonLisp;
         let tree = SyntaxTree::parse_with_dialect(source, dialect).expect("parse source");
         let pattern = Pattern::parse(query, dialect).expect("parse pattern");
         let template = Template::parse(rewrite, dialect).expect("parse template");
         template.check_against(&pattern).expect("template checks");
-        let plan = plan_rewrite(&tree, &pattern, &template, dialect, allow_comment_loss);
+        let plan = plan_rewrite(&tree, &pattern, &template, dialect, allow);
         (tree, plan)
     }
 
@@ -504,7 +621,11 @@ mod tests {
     #[test]
     fn allow_comment_loss_rewrites_and_loses_the_comment() {
         let source = "(if a\n    b ; drop me\n    nil)";
-        let (tree, plan) = plan_allowing(source, "(if ?t ?a nil)", "(when ?t ?a)", true);
+        let allow = RewriteAllowances {
+            comment_loss: true,
+            ..RewriteAllowances::default()
+        };
+        let (tree, plan) = plan_allowing(source, "(if ?t ?a nil)", "(when ?t ?a)", allow);
         let after = apply_plan(tree.source(), &plan);
         assert_eq!(after, "(when a b)");
     }
@@ -543,6 +664,69 @@ mod tests {
             rewritten("(f (a))", "(f ?x:list)", "(g ?x:list)"),
             "(g (a))"
         );
+    }
+
+    /// `'(a (if x y nil) b)` is a list literal. Rewriting the `if` inside it
+    /// produces a *different list*, and the result reads perfectly — so
+    /// nothing downstream can catch it. One level deeper than the top-level
+    /// quote a naive prefix check would notice.
+    #[test]
+    fn a_match_inside_quoted_data_is_refused() {
+        let (_, plan) = plan("'(a (if x y nil) b)", "(if ?t ?a nil)", "(when ?t ?a)");
+        assert!(plan.is_empty());
+        assert_eq!(plan.skipped_for(SkipReason::Quoted), 1);
+    }
+
+    #[test]
+    fn the_spelled_out_quote_form_counts_as_quoted_too() {
+        let (_, plan) = plan("(quote (a (if x y nil)))", "(if ?t ?a nil)", "(when ?t ?a)");
+        assert_eq!(plan.skipped_for(SkipReason::Quoted), 1);
+    }
+
+    /// An unquote inside a quasiquote is code again. Refusing to rewrite it
+    /// would be a different wrong answer from rewriting the data around it.
+    ///
+    /// The match is one level under the `,` rather than on it, because the
+    /// matcher is prefix-strict: `(if ?t ?a nil)` does not match
+    /// `,(if x y nil)` at all, which is a separate correct behaviour.
+    #[test]
+    fn an_unquoted_form_inside_a_quasiquote_is_still_code() {
+        let (tree, plan) = plan("`(a ,(f (if x y nil)))", "(if ?t ?a nil)", "(when ?t ?a)");
+        assert_eq!(plan.replacements.len(), 1);
+        assert_eq!(apply_plan(tree.source(), &plan), "`(a ,(f (when x y)))");
+    }
+
+    /// The quasiquote around it does not make an unquoted form data, so a
+    /// pattern that names the `,` explicitly still reaches its form.
+    #[test]
+    fn a_pattern_naming_the_unquote_itself_reaches_it() {
+        let (tree, plan) = plan("`(a ,(if x y nil))", ",(if ?t ?a nil)", ",(when ?t ?a)");
+        assert_eq!(plan.replacements.len(), 1);
+        assert_eq!(apply_plan(tree.source(), &plan), "`(a ,(when x y))");
+    }
+
+    /// A pattern that writes the prefix itself has named the quote, so the
+    /// node carrying it is not "inside" anything.
+    #[test]
+    fn a_match_that_carries_the_quote_itself_is_not_refused() {
+        let (tree, plan) = plan("(f '(a b))", "'(a b)", "'(c d)");
+        assert_eq!(plan.replacements.len(), 1);
+        assert_eq!(apply_plan(tree.source(), &plan), "(f '(c d))");
+    }
+
+    #[test]
+    fn include_quoted_is_what_lets_a_data_rewrite_through() {
+        let allow = RewriteAllowances {
+            quoted: true,
+            ..RewriteAllowances::default()
+        };
+        let (tree, plan) = plan_allowing(
+            "'(a (if x y nil) b)",
+            "(if ?t ?a nil)",
+            "(when ?t ?a)",
+            allow,
+        );
+        assert_eq!(apply_plan(tree.source(), &plan), "'(a (when x y) b)");
     }
 
     #[test]

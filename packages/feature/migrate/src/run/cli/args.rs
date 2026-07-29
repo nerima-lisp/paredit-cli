@@ -92,6 +92,10 @@ pub struct MigrateRunArgs {
     /// carries over.
     #[arg(long)]
     pub allow_comment_loss: bool,
+    /// Rewrite matches that sit inside quoted data, changing a literal rather
+    /// than code.
+    #[arg(long)]
+    pub include_quoted: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,

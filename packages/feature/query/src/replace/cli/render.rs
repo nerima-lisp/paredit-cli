@@ -14,7 +14,11 @@ use crate::replace::usecase::{FileRewrite, RewriteTotals};
 /// A skip count that only appears when it is non-zero reads as "this cannot
 /// happen" until the day it does. Printing `comment_loss 0` is what makes
 /// `comment_loss 4` a number the caller was already looking at.
-const SKIP_REASONS: [SkipReason; 2] = [SkipReason::Overlapping, SkipReason::CommentLoss];
+const SKIP_REASONS: [SkipReason; 3] = [
+    SkipReason::Overlapping,
+    SkipReason::CommentLoss,
+    SkipReason::Quoted,
+];
 
 pub fn print_replace_report(
     files: &[FileRewrite],

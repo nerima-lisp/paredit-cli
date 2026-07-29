@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 
 use paredit_core_cli::shared::{emit_document, read_input_dialect_and_tree};
+use paredit_core_syntax::selector::RewriteAllowances;
 
 use crate::catalog::{self, DEFAULT_RECIPE_DIRECTORY};
 use crate::run::cli::args::{
@@ -50,6 +51,10 @@ fn explain(args: MigrateExplainArgs) -> Result<()> {
 fn run(args: MigrateRunArgs) -> Result<()> {
     let entries = catalog::resolve(&recipe_directory(&args.source))?;
     let entry = catalog::find(&entries, &args.recipe)?;
+    let allow = RewriteAllowances {
+        comment_loss: args.allow_comment_loss,
+        quoted: args.include_quoted,
+    };
     let files = selected_files(&args.input, &args.roots)?;
 
     let mut outcomes: Vec<(FileOutcome, _)> = Vec::with_capacity(files.len());
@@ -60,7 +65,7 @@ fn run(args: MigrateRunArgs) -> Result<()> {
             dialect,
             tree.source(),
             &entry.migration,
-            args.allow_comment_loss,
+            allow,
         )?;
         outcomes.push((outcome, (input, dialect)));
     }

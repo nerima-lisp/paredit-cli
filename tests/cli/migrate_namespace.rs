@@ -108,6 +108,24 @@ fn a_recipe_skips_the_dialects_it_is_not_correct_for_and_says_how_many() {
     );
 }
 
+/// A recipe carries the same quote guard `query replace` does, and needs it
+/// more: `nil-conditionals` over a file holding `'(a (if x y nil))` would
+/// silently edit a data literal.
+#[test]
+fn a_recipe_leaves_quoted_data_alone() {
+    let source = "(defparameter *forms* '(a (if x y nil)))\n";
+    let dir = workspace("migrate-quoted", &[("a.lisp", source)]);
+    paredit()
+        .args(["migrate", "run", "nil-conditionals", "--write"])
+        .arg(&dir)
+        .assert()
+        .success();
+    assert_eq!(
+        fs::read_to_string(dir.join("a.lisp")).expect("read back"),
+        source
+    );
+}
+
 #[test]
 fn run_writes_nothing_without_write_and_check_gates() {
     let source = "(if q b nil)\n";

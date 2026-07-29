@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::selector::{
-    LineIndex, Pattern, SkipReason, Template, apply_plan, plan_rewrite,
+    LineIndex, Pattern, RewriteAllowances, SkipReason, Template, apply_plan, plan_rewrite,
 };
 use paredit_core_syntax::sexpr::SyntaxTree;
 
@@ -59,9 +59,9 @@ pub fn build_file_rewrite(
     tree: &SyntaxTree,
     pattern: &Pattern,
     template: &Template,
-    allow_comment_loss: bool,
+    allow: RewriteAllowances,
 ) -> FileRewrite {
-    let plan = plan_rewrite(tree, pattern, template, dialect, allow_comment_loss);
+    let plan = plan_rewrite(tree, pattern, template, dialect, allow);
     let source = tree.source();
     let index = LineIndex::new(source);
     let locate = |offset: usize| index.position_of(source, offset);
@@ -148,7 +148,7 @@ mod tests {
             &tree,
             &Pattern::parse(query, dialect).expect("pattern"),
             &Template::parse(template, dialect).expect("template"),
-            false,
+            RewriteAllowances::default(),
         )
     }
 
