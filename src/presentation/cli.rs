@@ -62,6 +62,7 @@ use paredit_feature_lisp_analysis::read_conditional_report::cli as read_conditio
 use paredit_feature_lisp_analysis::read_time_eval_report::cli as read_time_eval_report;
 use paredit_feature_lisp_analysis::readtable_case_report::cli as readtable_case_report;
 use paredit_feature_lisp_analysis::restart_report::cli as restart_report;
+use paredit_feature_migrate::{MigrateCommand, migrate};
 use paredit_feature_project_inventory::api_diff_report::cli as api_diff_report;
 use paredit_feature_project_inventory::api_surface_report::cli as api_surface_report;
 use paredit_feature_project_inventory::blame_report::cli as blame_report;
@@ -72,6 +73,9 @@ use paredit_feature_project_inventory::serial_consistency_report::cli as serial_
 use paredit_feature_project_inventory::symbol_index_report::cli as symbol_index_report;
 use paredit_feature_project_inventory::test_map_report::cli as test_map_report;
 use paredit_feature_project_inventory::unreachable_expression_report::cli as unreachable_expression_report;
+use paredit_feature_query::count_report::cli as query_count;
+use paredit_feature_query::find_report::cli as query_find;
+use paredit_feature_query::replace::cli as query_replace;
 use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
@@ -89,6 +93,7 @@ mod duplicate_export_report;
 mod duplicate_method_report;
 mod duplicate_slot_report;
 mod emacs_lisp_file_report;
+mod fix;
 mod lint_report;
 mod semantic_coverage_report;
 mod shadowed_binding_report;

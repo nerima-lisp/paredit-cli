@@ -1,14 +1,28 @@
 # Command model
 
-Every source-facing command belongs to one of three namespaces. This gives
-automation a stable first decision: inspect, edit, or refactor.
+A source-facing command belongs to one of six namespaces. The first three
+split by *what a change costs to undo*, which is the decision automation has
+to make first:
 
 - `paredit inspect` reads and reports without writing.
 - `paredit edit` transforms one selected form; stdout by default, `--diff`
   for a unified diff, `--write` to update the file in place.
 - `paredit refactor` plans, previews, verifies, and applies semantic changes.
 
-Two namespaces sit outside that decision because they report on the tool
+The other three split by *what the caller is trying to do*, over a file set
+rather than one form:
+
+- `paredit query` searches, counts, and rewrites by S-expression pattern.
+  The pattern language is the same one `--query` selects with; here it is the
+  command rather than the selector, and its reach is the workspace.
+- `paredit fix` applies the lint auto-fixes. Every leaf was already a flag on
+  `inspect lint`; the older spellings still work. What changed is the address:
+  a command that writes source now lives under a name that says it writes.
+- `paredit migrate` runs a named, ordered, dialect-scoped codemod recipe.
+  Where `query replace` takes one pattern from the command line, a recipe is a
+  reviewed artifact with several steps in a fixed order and a declared scope.
+
+Two namespaces sit outside both decisions because they report on the tool
 rather than on source:
 
 - `paredit config` inspects, validates, and scaffolds the layered
@@ -592,6 +606,133 @@ plan/preview/verify/apply lifecycle.
 | `convert-if-to-when` | Convert a Common Lisp or Emacs Lisp `if` without a meaningful else to `when`. |
 | `convert-if-to-unless` | Convert a Common Lisp or Emacs Lisp `if` with a literal `nil` then branch to `unless`. |
 | `remove-unused-binding` | Plan or remove one unused local let binding. |
+
+## Query
+
+`paredit query` promotes the `--query` pattern language from a *selector* —
+one of eight ways to name the form another command should act on — to a
+capability of its own. The difference is reach and direction: a selector names
+a form in one named file, and these ask about a whole workspace and can
+rewrite what they find.
+
+| Command | Purpose |
+| --- | --- |
+| `find` | Report every form in the workspace whose shape matches `--query`, with its captures, path, and stable selector id. |
+| `count` | Count matches per pattern and per file, for several `--query` patterns side by side. |
+| `replace` | Rewrite every match with a `--rewrite` template. Prints the plan by default; `--diff` previews, `--write` applies. |
+
+All three take the full workspace input surface (`--since`, `--from-git`,
+`--include`, …), so `query find --query '(eq ?x ?x)' --fail-on-match --since
+origin/main .` is a CI gate on a shape a branch introduced.
+
+```sh
+# Where does this shape appear?
+paredit query find --query '(defun ?name ...)' src/
+
+# How is a migration progressing?
+paredit query count --query '(if ?t ?a nil)' --query '(when ?t ?a)' src/
+
+# Rewrite it. Nothing is written without --write.
+paredit query replace --query '(if ?t ?a nil)' --rewrite '(when ?t ?a)' --diff src/
+paredit query replace --query '(old-name ?args...)' --rewrite '(new-name ?args...)' --write src/
+```
+
+### What `query replace` refuses
+
+The rewrite is a splice of verbatim source: `?name` in the template is
+replaced by exactly the bytes the pattern's `?name` matched, so a captured
+`1.0d0` stays a double float and a captured string keeps its escapes. Two
+situations are refused rather than rewritten, because both would leave source
+that still parses and is still wrong:
+
+| skipped as | why |
+| --- | --- |
+| `overlapping` | An enclosing match was rewritten. Run the command again to reach the nested one. |
+| `comment-loss` | A comment inside the match is carried by no capture the template uses, so the rewrite would delete it. `--allow-comment-loss` overrides. |
+
+Both are counted in every output format, including when the count is zero, so
+"37 matched, 35 rewritten" is never something to discover by reading a diff.
+
+A rewrite reflows the matched form onto the template's own layout. Running
+`paredit edit format --write` afterwards is usual.
+
+## Fix
+
+`paredit fix` is the write side of `inspect lint`, under a name that says it
+writes. It reimplements nothing: each leaf builds the arguments its
+`inspect lint` spelling would have produced and runs the same engine.
+
+| Command | Purpose | Was |
+| --- | --- | --- |
+| `apply` | Apply every available auto-fix in place and report what changed. | `inspect lint --fix` |
+| `check` | Write nothing; exit 3 if any auto-fix is still pending. | `inspect lint --fix --check` |
+| `plan` | Emit the machine-readable fix plan without writing. | `inspect lint --fix-plan` |
+| `list` | List the rules that carry an auto-fix. | `inspect lint --list-rules --fixable` |
+
+All four take the rule-selection flags (`--rule`, `--category`, `--exclude`,
+`--tag`, `--preset`, `--experimental`, `--custom-rules`) and
+`--no-destructive-fixes`. The flags that shape a *report* rather than a fix
+run — `--emit`, `--baseline`, `--stats`, `--timings`, `--fail-on` — stay on
+`inspect lint`, which is where they mean something.
+
+```sh
+paredit fix list
+paredit fix apply --diff src/
+paredit fix apply --rule redundant-progn --no-destructive-fixes --write src/
+paredit fix check src/          # exit 3 when fixable lint is outstanding
+```
+
+## Migrate
+
+`paredit migrate` runs a *recipe*: a named list of `--query`/`--rewrite` steps
+in a fixed order, scoped to the dialects the rewrite is correct for. Both
+properties are why this is not just repeated `query replace` invocations:
+
+- **Order.** `(if (not p) a nil)` should become `(unless p a)`, not
+  `(when (not p) a)`. Which one it becomes depends entirely on which step runs
+  first, and the recipe fixes that once.
+- **Scope.** `(incf x)` → `(cl-incf x)` modernizes Emacs Lisp and *breaks*
+  Common Lisp, where `incf` is the correct spelling. A recipe skips every file
+  outside its `:dialects` and reports how many, so a run that changed nothing
+  says why.
+
+| Command | Purpose |
+| --- | --- |
+| `list` | List the recipes this run can reach, with each one's step count, dialect scope, and origin. |
+| `explain` | Print one recipe's steps and notes before running it. |
+| `run` | Apply a recipe's steps in order. Prints the plan by default; `--diff` previews, `--write` applies. |
+
+Shipped recipes:
+
+| Recipe | Dialects | What it does |
+| --- | --- | --- |
+| `elisp-cl-lib` | `emacs-lisp` | cl.el's unprefixed names to their cl-lib `cl-` spellings. Deliberately excludes `flet`/`labels` (cl.el's were dynamic, cl-lib's are lexical) and `first`…`tenth` (which may be locally defined). |
+| `nil-conditionals` | `common-lisp`, `emacs-lisp` | One-armed `if` with a `nil` else-branch to `when` and `unless`. |
+
+A project writes its own in `.paredit/migrations/*.lisp` — beside
+`.paredit/rules`, where the custom lint rules live — in the same Lisp form the
+built-ins use, and a project recipe of the same name shadows a built-in:
+
+```lisp
+(defmigration nil-conditionals
+  :description "one-armed `if' with a nil else-branch to `when' and `unless'"
+  :dialects (common-lisp emacs-lisp)
+  :steps ((:query (if (not ?test) ?then nil)
+           :rewrite (unless ?test ?then)
+           :note "first, so the general step below cannot claim a negated test")
+          (:query (if ?test ?then nil)
+           :rewrite (when ?test ?then))))
+```
+
+```sh
+paredit migrate list
+paredit migrate explain elisp-cl-lib
+paredit migrate run elisp-cl-lib --diff lisp/
+paredit migrate run nil-conditionals --check .   # exit 3 when not yet applied
+```
+
+`migrate run` skips the same two situations `query replace` does, for the same
+reasons, and reports them the same way.
 
 ## Config
 

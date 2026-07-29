@@ -68,6 +68,8 @@ paredit-feature-lisp-analysis = { path = "packages/feature/lisp-analysis" }
 paredit-feature-project-inventory = { path = "packages/feature/project-inventory" }
 paredit-feature-semantic-report = { path = "packages/feature/semantic-report" }
 paredit-feature-selector = { path = "packages/feature/selector" }
+paredit-feature-query = { path = "packages/feature/query" }
+paredit-feature-migrate = { path = "packages/feature/migrate" }
 paredit-feature-refactor-workflow = { path = "packages/feature/refactor-workflow" }
 paredit-feature-lint-string-char = { path = "packages/feature/lint-string-char" }
 paredit-feature-lint-control-flow = { path = "packages/feature/lint-control-flow" }

@@ -138,6 +138,15 @@ character literals, bracket forms, and `#lang` rules behave the way the same
 text behaves in a file. Common Lisp folds case and package qualifiers; the
 other dialects do not.
 
+**Beyond one file.** As a *selector*, `--query` names a form in the file
+`--file` points at. The same language is also a command in its own right: see
+[`paredit query`](commands.md#query) for searching a whole workspace
+(`query find`), counting several patterns side by side (`query count`), and
+rewriting matches through a `--rewrite` template (`query replace`). The
+template writes captures back by name — `--query '(if ?t ?a nil)' --rewrite
+'(when ?t ?a)'` — splicing the captured source verbatim, so a captured literal
+survives byte for byte.
+
 ## Stable ids: `--id`
 
 `paredit inspect resolve` prints a 16-character id per match. Unlike a path,

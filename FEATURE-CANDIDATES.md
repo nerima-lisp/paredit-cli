@@ -508,15 +508,52 @@
 
 ---
 
-## O. 新しい名前空間の可能性（3 件）
+## O. 新しい名前空間の可能性（3 件）— **実装済み**
 
 現在の 3 名前空間（inspect / edit / refactor）は「読む / 1 形を変える / 意味を変える」という良い分割。ただし 275 コマンドが `inspect` に 130 集中しており、再分割の余地がある。
 
-| # | 候補 | 概要 |
-| --- | --- | --- |
-| O1 | `paredit query` | パターン検索専用の名前空間（L1 の受け皿）。`inspect` の 130 コマンドから検索系を分離 |
-| O2 | `paredit fix` | lint の自動修正専用。現在 `inspect lint --fix` に埋もれていて発見しづらい |
-| O3 | `paredit migrate` | 大規模なコード近代化専用（非推奨 API の一括置換など）。`refactor` の workspace 系と役割が近いので統合も選択肢 |
+| # | 候補 | 概要 | 状態 |
+| --- | --- | --- | --- |
+| O1 | `paredit query` | パターン検索専用の名前空間（L1 の受け皿）。`inspect` の 130 コマンドから検索系を分離 | **完了** — `query find` / `query count` / `query replace` |
+| O2 | `paredit fix` | lint の自動修正専用。現在 `inspect lint --fix` に埋もれていて発見しづらい | **完了** — `fix apply` / `fix check` / `fix plan` / `fix list` |
+| O3 | `paredit migrate` | 大規模なコード近代化専用（非推奨 API の一括置換など）。`refactor` の workspace 系と役割が近いので統合も選択肢 | **完了** — `migrate list` / `migrate explain` / `migrate run` |
+
+### 実装で確定した設計判断
+
+**再分割の軸は「機構」ではなく「意図」だった。** 既存の 3 名前空間は *取り消しコスト*
+で割れている（読むだけ / 1 形 / 意味）。追加した 3 つは *利用者が何をしたいか* で割れて
+いる（探す / 直す / 近代化する）。`inspect` から検索系コマンドを移設する案は採らなかった
+— 130 のうち検索系はほぼ無く、実体は「lint ルール 1 個 = コマンド 1 個」のレポート群
+だったため。代わりに `--query` を*セレクタ*の座から引き上げ、ワークスペース規模の能力に
+した。
+
+**`query replace` が唯一の新規能力。** 他は既存能力の再アドレス（`fix` は
+`inspect lint --fix` の別名で、同じ engine を同じ引数で呼ぶ）。パターン → テンプレート
+の構造置換は本リポジトリのどこにも無かった。実装は
+`packages/core/syntax/src/selector/rewrite.rs`（core に置いたのは `migrate` と共有する
+ため。feature → feature 依存を作らずに済む）。
+
+**書き戻しは*常に原文のバイト列*。** 捕捉した値を印字し直す実装は `1.0d0` を `1` に、
+文字列中の改行を文字 `n` に変える（[[report-to-edit-commands-need-adversarial-review]]
+と同じ罠）。テンプレートの `?name` は捕捉スパンの原文スライスで置換する。
+
+**再パース検査では足りない 2 つの黙示的破壊を明示的に拒否する。**
+
+| 拒否 | なぜ再パースで気づけないか |
+| --- | --- |
+| `overlapping` | 入れ子の match を両方書き換えると、片方が捨てた領域に他方を差し込む。結果は妥当な Lisp になる |
+| `comment-loss` | コメントはノード木の外にあるため、消しても構文的には無傷 |
+
+どちらも件数を必ず出力する（0 件でも出す）。
+
+### この作業で見つかった構造的重複（未着手）
+
+**パターン言語が 2 実装ある。** `packages/core/syntax/src/selector/pattern.rs`（`--query`
+用、kind 制約・中間 `...`・リーダマクロ対応）と
+`packages/feature/lint-custom/src/pattern.rs`（`defrule :pattern` 用、末尾 `...` のみ・
+kind 無し）。後者は前者の真部分集合であり、`:fix` テンプレートは今回の `Template` と
+同じ役割を果たしている。C15 と L1 を「同じ基盤で設計すべき組」と本書が挙げている通りだが、
+**実装上は既に分裂している**。統合は 170 ルールのカスタムルール経路に触れるため別途。
 
 ---
 

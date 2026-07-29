@@ -20,6 +20,9 @@ interface, and integration guides — is published at
 paredit inspect <report> [args]    # read-only inventory, validation, analysis
 paredit edit <transform> [args]    # one structural edit (stdout, --diff, or --write)
 paredit refactor <workflow> [args] # plan, preview, verify, and apply changes
+paredit query <find|count|replace> # search and rewrite by S-expression pattern
+paredit fix <apply|check|plan|list> # apply the lint auto-fixes
+paredit migrate <list|explain|run> # run a named, dialect-scoped codemod recipe
 paredit config <command>           # inspect and validate the layered paredit.toml
 paredit generate <generator> [args] # generate new source: defpackage, defsystem, tests, ...
 paredit lsp                        # Language Server Protocol server over stdio
@@ -44,6 +47,12 @@ paredit refactor plan --symbol old-name src/example.lisp
 # coordinate, or by shape. `inspect resolve` shows what a selector matches.
 paredit inspect resolve --file src/example.lisp --query '(defun ?name ...)'
 paredit edit wrap --file src/example.lisp --name parse-header --diff
+
+# The same pattern language, applied to the whole workspace -- and rewritten.
+paredit query find --query '(eq ?x ?x)' --fail-on-match src/
+paredit query replace --query '(if ?t ?a nil)' --rewrite '(when ?t ?a)' --diff src/
+paredit migrate run elisp-cl-lib --diff lisp/
+paredit fix apply src/
 ```
 
 ## Install

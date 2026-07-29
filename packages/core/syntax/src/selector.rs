@@ -27,14 +27,18 @@ pub mod matcher;
 mod normalize;
 pub mod pattern;
 pub mod resolve;
+pub mod rewrite;
 pub mod stable_id;
 
-pub use error::{PatternError, SelectorError, SelectorResult};
+pub use error::{PatternError, RewriteError, SelectorError, SelectorResult};
 pub use line_index::{LineIndex, LinePosition};
 pub use matcher::{Capture, PatternMatch, match_all};
 pub use normalize::normalized_form_text;
 pub use pattern::{CaptureKind, Pattern};
 pub use resolve::{
     RangeExtent, RelativeStep, SelectorRequest, SelectorTarget, SelectorTerm, resolve, target_text,
+};
+pub use rewrite::{
+    Replacement, RewritePlan, SkipReason, SkippedMatch, Template, apply_plan, plan_rewrite,
 };
 pub use stable_id::{STABLE_ID_PREFIX, StableSelectorId, stable_id_for_path, stable_selector_ids};
