@@ -23,13 +23,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The one-argument-identity n-ary list operators.
 const LIST_OP_HEADS: [&str; 3] = ["append", "nconc", "list*"];
@@ -42,52 +44,58 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct SingleOperandListOpItem {
-    pub path: PathBuf,
     /// The span of the whole `(op x)` form.
     pub span: ByteSpan,
-    /// The span of the sole argument `x` (for reconstructing the fix).
+    /// The 1-based line the form starts on.
+    pub line: usize,
+    /// The span of the sole argument `x`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to splice
+    /// the argument in over the whole form, and neither renderer ever printed
+    /// it.
     pub arg_span: ByteSpan,
     /// The operator name (`append`/`nconc`/`list*`), for the finding message.
     pub head: String,
 }
 
-#[derive(Debug)]
-pub struct SingleOperandListOpSummary {
-    pub list_op_form_count: usize,
-    pub violations: Vec<SingleOperandListOpItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SingleOperandListOpPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SingleOperandListOpPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SingleOperandListOpItem {
+    /// One tag for every finding. The operator is *not* the tag: it is
+    /// `list_head`'s text, so it carries the source's own casing — an
+    /// `(APPEND xs)` reports `APPEND` — which makes it data to print rather
+    /// than a class to filter on.
+    fn kind(&self) -> &'static str {
+        "single-operand"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SingleOperandListOpPolicy {
-    pub fail_on_violation: bool,
-    pub list_op_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.head.clone()]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("head", json!(self.head))]
+    }
+
+    /// The same sentence the `single-operand-list-op` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        let head = &self.head;
+        format!("{head} of one argument returns it unchanged; ({head} x) is x")
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     list_op_form_count: &mut usize,
     violations: &mut Vec<SingleOperandListOpItem>,
 ) {
@@ -112,74 +120,83 @@ pub fn examine_form(
     }
 
     violations.push(SingleOperandListOpItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         arg_span: arg.span,
         head: head.to_owned(),
     });
 }
 
-/// Collects every single-argument `append`/`nconc`/`list*` across a whole file,
-/// along with the total number of such forms scanned.
-pub fn collect_single_operand_list_ops(
+/// Collects every single-argument `append`/`nconc`/`list*` in one file, with
+/// the number of such forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every list op here does something" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_single_operand_list_op_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SingleOperandListOpItem>)> {
+) -> LintResult<FileFindings<SingleOperandListOpItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("list_op_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut list_op_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(subview, path, &mut list_op_form_count, &mut violations);
+            examine_form(subview, source, &mut list_op_form_count, &mut violations);
         });
     }
-    Ok((list_op_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("list_op_form_count", json!(list_op_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_single_operand_list_ops(
-    list_op_form_count: usize,
-    violations: Vec<SingleOperandListOpItem>,
-) -> SingleOperandListOpSummary {
-    SingleOperandListOpSummary {
-        list_op_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_single_operand_list_op_policy(
-    options: SingleOperandListOpPolicyOptions,
-    summary: &SingleOperandListOpSummary,
-) -> SingleOperandListOpPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SingleOperandListOpPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        list_op_form_count: summary.list_op_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn forms(input: &str) -> (usize, Vec<SingleOperandListOpItem>) {
+    fn report(input: &str) -> FileFindings<SingleOperandListOpItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_single_operand_list_ops(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect single-operand list ops")
+        build_single_operand_list_op_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build single-operand list op report")
+    }
+
+    /// The `(list_op_form_count, violations)` pair the report is built from.
+    fn forms(input: &str) -> (u64, Vec<SingleOperandListOpItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "list_op_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("list_op_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -251,32 +268,46 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(append xs)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_single_operand_list_ops(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect single-operand list ops");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_single_operand_list_op_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build single-operand list op report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("list_op_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = forms("(append xs)");
-        let summary = summarize_single_operand_list_ops(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(append a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_single_operand_list_op_policy(
-            SingleOperandListOpPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(defun f (xs)\n  (nconc xs))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "single-operand");
+        assert_eq!(finding.json_fields(), vec![("head", json!("nconc"))]);
+        assert_eq!(finding.text_columns(), vec!["nconc".to_owned()]);
+    }
 
-        let strict = evaluate_single_operand_list_op_policy(
-            SingleOperandListOpPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    /// The operator is reported as written, which is why it is a column rather
+    /// than the kind.
+    #[test]
+    fn the_operator_keeps_the_source_casing() {
+        let report = report("(APPEND xs)");
+        assert_eq!(report.findings[0].head, "APPEND");
+    }
+
+    #[test]
+    fn the_summary_counts_every_list_op_scanned_not_only_the_flagged_ones() {
+        let report = report("(append xs)\n(append a b)\n(nconc items)\n");
+        assert_eq!(report.summary, vec![("list_op_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

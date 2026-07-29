@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare integer `0` literal (no reader prefixes, so `#x0`
 /// and a prefixed `,0` are excluded; `0.0` is a different spelling, excluded).
@@ -39,50 +41,60 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct SubseqZeroItem {
-    pub path: PathBuf,
     /// The span of the whole `(subseq seq 0)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the sequence operand (for reconstructing the fix).
     pub sequence_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct SubseqZeroSummary {
-    pub subseq_form_count: usize,
-    pub violations: Vec<SubseqZeroItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SubseqZeroPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SubseqZeroPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SubseqZeroItem {
+    /// One tag for every finding: this report has a single shape to describe, a
+    /// whole-sequence copy written as a slice from index 0.
+    fn kind(&self) -> &'static str {
+        "whole-sequence-copy"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SubseqZeroPolicy {
-    pub fail_on_violation: bool,
-    pub subseq_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// None: the old text row carried the path and the offset, both of which
+    /// the envelope prints itself.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// `sequence_span` is the rewrite's input, but the old JSON published it,
+    /// so a consumer reconstructing `(copy-seq …)` from this report keeps it.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "sequence_span",
+            json!({
+                "start": self.sequence_span.start().get(),
+                "end": self.sequence_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `subseq-zero` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "a subseq from index 0 copies the whole sequence; (subseq seq 0) is (copy-seq seq)"
+            .to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     subseq_form_count: &mut usize,
     violations: &mut Vec<SubseqZeroItem>,
 ) {
@@ -108,73 +120,82 @@ pub fn examine(
     }
 
     violations.push(SubseqZeroItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         sequence_span: sequence.span,
     });
 }
 
-/// Collects every `(subseq seq 0)` across a whole file, along with the total
-/// number of `subseq` forms scanned.
-pub fn collect_subseq_zeros(
+/// Collects every `(subseq seq 0)` in one file, with the number of `subseq`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every `subseq` here is a real slice" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_subseq_zero_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SubseqZeroItem>)> {
+) -> LintResult<FileFindings<SubseqZeroItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("subseq_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut subseq_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut subseq_form_count, &mut violations);
+            examine(subview, source, &mut subseq_form_count, &mut violations);
         });
     }
-    Ok((subseq_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("subseq_form_count", json!(subseq_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_subseq_zeros(
-    subseq_form_count: usize,
-    violations: Vec<SubseqZeroItem>,
-) -> SubseqZeroSummary {
-    SubseqZeroSummary {
-        subseq_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_subseq_zero_policy(
-    options: SubseqZeroPolicyOptions,
-    summary: &SubseqZeroSummary,
-) -> SubseqZeroPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SubseqZeroPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        subseq_form_count: summary.subseq_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn subseqs(input: &str) -> (usize, Vec<SubseqZeroItem>) {
+    fn report(input: &str) -> FileFindings<SubseqZeroItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_subseq_zeros(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect subseq zeros")
+        build_subseq_zero_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build subseq zero report")
+    }
+
+    /// The `(subseq_form_count, violations)` pair the report is built from.
+    fn subseqs(input: &str) -> (u64, Vec<SubseqZeroItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "subseq_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("subseq_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -233,26 +254,46 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(subseq x 0)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_subseq_zeros(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect subseq zeros");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_subseq_zero_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build subseq zero report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("subseq_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = subseqs("(subseq x 0)");
-        let summary = summarize_subseq_zeros(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(subseq x 1)").dialect_modelled);
+    }
 
-        let quiet = evaluate_subseq_zero_policy(SubseqZeroPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_sequence_span() {
+        let report = report("(defun f (x)\n  (subseq x 0))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "whole-sequence-copy");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "sequence_span",
+                json!({
+                    "start": finding.sequence_span.start().get(),
+                    "end": finding.sequence_span.end().get(),
+                })
+            )]
+        );
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_subseq_zero_policy(SubseqZeroPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_subseq_scanned_not_only_the_flagged_ones() {
+        let report = report("(subseq x 0)\n(subseq x 0 5)\n(subseq y 0)\n");
+        assert_eq!(report.summary, vec![("subseq_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

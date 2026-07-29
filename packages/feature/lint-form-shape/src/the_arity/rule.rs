@@ -42,7 +42,7 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut the_form_count = 0;
         let mut items = Vec::new();
-        examine_the(view, context.path(), &mut the_form_count, &mut items);
+        examine_the(view, context.source(), &mut the_form_count, &mut items);
         for item in items {
             let span = item.span;
 

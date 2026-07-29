@@ -20,15 +20,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// CL type names that have a dedicated total predicate exactly equivalent to
 /// `(typep x 'TYPE)`. Each pair is a CLHS-guaranteed equivalence.
@@ -94,52 +96,69 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct TypepPredicateItem {
-    pub path: PathBuf,
     /// The span of the whole `(typep x 'TYPE)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The dedicated predicate name to rewrite to (`stringp`, `null`, ...).
     pub predicate: &'static str,
     /// The span of the object operand `x`.
     pub object_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct TypepPredicateSummary {
-    pub typep_form_count: usize,
-    pub violations: Vec<TypepPredicateItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct TypepPredicatePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl TypepPredicatePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for TypepPredicateItem {
+    /// The dedicated predicate, so `(typep x 'string)` and `(typep x 'null)`
+    /// are separable without parsing JSON.
+    ///
+    /// It is a tag rather than data: it comes from `TYPE_PREDICATES`, a closed
+    /// table of canonical names, not from the spelling in the source — a
+    /// `(TYPEP x 'STRING)` and a `(typep x 'string)` both report `stringp`.
+    fn kind(&self) -> &'static str {
+        self.predicate
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct TypepPredicatePolicy {
-    pub fail_on_violation: bool,
-    pub typep_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// None: the one column the old text row carried was the predicate, and it
+    /// now leads every row as the kind.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("predicate", json!(self.predicate)),
+            (
+                "object_span",
+                json!({
+                    "start": self.object_span.start().get(),
+                    "end": self.object_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `typep-predicate` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "typep against this type has a dedicated predicate; use ({} x)",
+            self.predicate
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     typep_form_count: &mut usize,
     violations: &mut Vec<TypepPredicateItem>,
 ) {
@@ -166,74 +185,83 @@ pub fn examine(
     };
 
     violations.push(TypepPredicateItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         predicate,
         object_span: object.span,
     });
 }
 
-/// Collects every `(typep x 'TYPE)` with a dedicated predicate across a whole
-/// file, along with the total number of `typep` forms scanned.
-pub fn collect_typep_predicates(
+/// Collects every `(typep x 'TYPE)` with a dedicated predicate in one file,
+/// with the number of `typep` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no replaceable `typep` here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_typep_predicate_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<TypepPredicateItem>)> {
+) -> LintResult<FileFindings<TypepPredicateItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("typep_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut typep_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut typep_form_count, &mut violations);
+            examine(subview, source, &mut typep_form_count, &mut violations);
         });
     }
-    Ok((typep_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("typep_form_count", json!(typep_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_typep_predicates(
-    typep_form_count: usize,
-    violations: Vec<TypepPredicateItem>,
-) -> TypepPredicateSummary {
-    TypepPredicateSummary {
-        typep_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_typep_predicate_policy(
-    options: TypepPredicatePolicyOptions,
-    summary: &TypepPredicateSummary,
-) -> TypepPredicatePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    TypepPredicatePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        typep_form_count: summary.typep_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn typeps(input: &str) -> (usize, Vec<TypepPredicateItem>) {
+    fn report(input: &str) -> FileFindings<TypepPredicateItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_typep_predicates(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect typep predicates")
+        build_typep_predicate_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build typep predicate report")
+    }
+
+    /// The `(typep_form_count, violations)` pair the report is built from.
+    fn typeps(input: &str) -> (u64, Vec<TypepPredicateItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "typep_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("typep_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -305,29 +333,51 @@ mod tests {
         assert_eq!(violations[0].predicate, "stringp");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(typep x 'string)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_typep_predicates(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect typep predicates");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_typep_predicate_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build typep predicate report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("typep_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = typeps("(typep x 'string)");
-        let summary = summarize_typep_predicates(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(typep x 'fixnum)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_typep_predicate_policy(TypepPredicatePolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_predicate_and_its_object_span() {
+        let report = report("(defun f (obj)\n  (typep obj 'string))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "stringp");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("predicate", json!("stringp")),
+                (
+                    "object_span",
+                    json!({
+                        "start": finding.object_span.start().get(),
+                        "end": finding.object_span.end().get(),
+                    })
+                ),
+            ]
+        );
+        // The predicate leads the row as the kind, so no column repeats it.
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_typep_predicate_policy(TypepPredicatePolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_typep_scanned_not_only_the_flagged_ones() {
+        let report = report("(typep x 'string)\n(typep x 'fixnum)\n(typep x 'list)\n");
+        assert_eq!(report.summary, vec![("typep_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }
