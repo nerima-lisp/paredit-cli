@@ -53,6 +53,37 @@ impl From<PresetArg> for RulePreset {
     }
 }
 
+/// The interoperability formats `inspect lint` can render its findings in.
+///
+/// A separate option from `--output` rather than more variants on it, because
+/// `--output` also governs a dozen catalogue-only modes — `--explain`,
+/// `--list-rules`, `--stats`, `--timings` — none of which produce a finding
+/// list and none of which have anything to put in a JUnit testcase. `--emit`
+/// applies only to a scan.
+///
+/// `sarif` and `github` are the same output the older `--sarif` and `--github`
+/// flags produce; those stay, since scripts and the shipped GitHub Action pass
+/// them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(in crate::presentation::cli) enum EmitFormat {
+    /// SARIF 2.1.0, with the full rule catalogue and the available auto-fixes.
+    Sarif,
+    /// GitHub Actions workflow commands, rendered inline on the pull request.
+    Github,
+    /// JUnit XML, for the test-report panel of a CI system.
+    Junit,
+    /// Code Climate issue JSON, which GitLab Code Quality consumes.
+    CodeClimate,
+    /// RFC 4180 comma-separated values, for a spreadsheet.
+    Csv,
+    /// Tab-separated values with a header row, for `cut`/`awk`.
+    Tsv,
+    /// A standalone HTML page, shareable without the tool.
+    Html,
+    /// A Markdown table, for a pull request comment or an issue.
+    Markdown,
+}
+
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct LintReportArgs {
     /// Files to scan. Not required with the catalogue-only modes
@@ -78,10 +109,20 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// exit. Ignores --output; the payload is the document.
     #[arg(long)]
     pub(in crate::presentation::cli::lint_report) docs: bool,
+    /// Render findings in an interchange format instead of --output's
+    /// (sarif, github, junit, code-climate, csv, tsv, html, markdown).
+    #[arg(long, value_enum, value_name = "FORMAT", conflicts_with_all = [
+        "list_rules", "list_presets", "list_tags", "explain", "docs", "sarif",
+        "github", "fix", "fix_plan", "stats", "timings", "test_rules",
+        "report_unused_suppressions", "write_baseline", "remove_unused_suppressions",
+    ])]
+    pub(in crate::presentation::cli::lint_report) emit: Option<EmitFormat>,
     /// Emit findings as SARIF 2.1.0 for CI code scanning (ignores --output).
+    /// Equivalent to `--emit sarif`.
     #[arg(long, conflicts_with = "list_rules")]
     pub(in crate::presentation::cli::lint_report) sarif: bool,
-    /// Emit findings as GitHub Actions annotations (::error::) for inline PR review.
+    /// Emit findings as GitHub Actions annotations (::error::) for inline PR
+    /// review. Equivalent to `--emit github`.
     #[arg(long, conflicts_with_all = ["list_rules", "sarif"])]
     pub(in crate::presentation::cli::lint_report) github: bool,
     /// Apply available auto-fixes in place and report what changed (see

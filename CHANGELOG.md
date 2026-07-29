@@ -16,6 +16,86 @@ model, a binding table, nine lint rules, and a per-file report.
 
 ### Added
 
+- **Six new ways to choose which files get analysed.** Discovery was a
+  directory walk with four booleans and an exact-path exclude list. It could
+  not be told to respect `.gitignore`, to take the file set from a build
+  definition, or to look only at what a pull request changed. The flags now
+  divide into *selectors*, which decide where the candidate list comes from,
+  and *filters*, which narrow whatever the selector produced:
+  - `--since <git-ref>` — only the files that differ from a ref, which is the
+    single biggest lever on CI time. Deleted files drop out, a rename reports
+    its destination, and an unresolvable ref is an error rather than an empty
+    change set that would let a gate pass without examining anything.
+  - `--from-git` — the file set from `git ls-files`.
+  - `--from-manifest` — the project's own build definition: ASDF `defsystem`
+    `:components` (through `:module` and `:pathname`, in declaration order),
+    `deps.edn`, `shadow-cljs.edn`, `project.clj`, and an Emacs Lisp
+    `Package-Requires` header. A named component missing from disk is reported
+    rather than silently dropped.
+  - `--paths-from <FILE|->` — a list you computed yourself, newline- or
+    NUL-separated.
+  - `--from-archive <ARCHIVE|-> --extract-to <DIR>` — an uncompressed tar, from
+    a file or stdin. Compression and transport stay with the shell, which keeps
+    an HTTP client, a TLS stack and a decompressor out of a tool trusted with
+    your source tree. Extraction refuses rather than sanitises absolute paths,
+    `..` components, symlinks, hardlinks, devices, and overwriting.
+  - `--cache-dir <DIR>` — reuse a previous scan. Keyed on everything that can
+    change the selection and validated against the tree, so a stale entry is a
+    miss rather than a wrong answer.
+- **Filters:** `--include` / `--exclude-glob` in `gitignore(5)` syntax,
+  `.gitignore` and `.pareditignore` honoured by default (`--no-gitignore`,
+  `--no-pareditignore`, `--no-ignore`, and three `PAREDIT_NO_*` environment
+  variables), and `--follow-symlinks`. Ignore precedence follows git exactly:
+  the deeper file wins, the last matching pattern within a file wins, a
+  repository boundary cuts the stack, and a root named on the command line is
+  never ignore-filtered.
+- **`paredit inspect sources`.** Runs selection and stops, reporting which rule
+  dropped every file that did not make it. It parses nothing, which makes it
+  the cheapest way to answer "did that CI run find nothing, or did my pattern
+  find nothing".
+- Discovery reports repository boundaries, so a run over several checkouts
+  groups its result per repository instead of flattening them.
+- **Six new ways to select a form.** `--path` and `--at` were the only two,
+  and both cost a round trip to build: an agent had to run `inspect outline`,
+  read a path out of it, and hope nothing moved in between. Every command that
+  takes a target now also accepts:
+  - `--query '(defun ?name ...)'` — an S-expression pattern, written in the
+    file's own dialect and read with its own reader. `_` matches one form,
+    `?name` binds one, `...` matches a run, `?body...` binds a run. Captures
+    may be constrained (`?x:list`, `?x:number`, …), a repeated name is a
+    back-reference (`(eq ?x ?x)` finds self-comparisons), and `--capture name`
+    selects the bound sub-form rather than the whole match.
+  - `--name <symbol>` — the definition of that name, at any nesting depth.
+  - `--line-column LINE[:COLUMN]` — a 1-based editor coordinate, columns
+    counted in characters. The column defaults to 1.
+  - `--id <id>` — a content-addressed id that keeps naming the same form after
+    edits elsewhere in the file, where a `--path` would not.
+  - `--from` / `--to` — a contiguous range of siblings, each end given as a
+    compact selector (`0.2`, `at:120`, `name:foo`, `query:(defun ?n ...)`).
+  - `--parent` / `--child N` / `--sibling ±N` — relative moves over any of the
+    above, applied up-across-down.
+  - `--select <selector>` — any of the above in one flag, using the compact
+    grammar. This is how the richer selectors reach the eight commands whose
+    own flags already claim these names (`refactor introduce-let --name` is
+    the new binding's name, `rename-binding --from`/`--to` are symbols):
+    `introduce-let`, `inline-let`, `remove-unused-binding`,
+    `thread-expression`, `unthread-expression`, `unwrap-call`,
+    `extract-function`, `extract-constant` now take `--path`, `--at`, and
+    `--select`. They also report the *resolved* path in their JSON plan where
+    they previously reported `null` for `--at`.
+- **`--all`.** A selector naming more than one form is now refused by default
+  rather than resolving to the first match; `--all` turns the refusal into a
+  fan-out. Edits apply right to left with a re-parse between them, and stop
+  with a refusal if one edit disturbs a match still to come.
+- **`paredit inspect resolve`.** Reports what a selector names — path, byte
+  span, start and end line/column, kind, head, stable id, preview, and every
+  pattern capture — without acting on it. Never refuses an ambiguous selector,
+  since seeing all the matches is how you decide whether to narrow.
+  `--fail-on-empty` makes "no match" an exit code for scripts.
+- `inspect form` accepts the whole selector surface, so
+  `inspect form --name parse-header` turns a name into a path in one call. Its
+  JSON now reports the *resolved* path for `--at` and the other coordinate
+  selectors, where it previously reported `null`.
 - `inspect capabilities --schema-version 3` reports a `dialect_contract` in
   which every one of the 2760 command/dialect cells is answered. Previously
   2720 of them said `unknown`. Cells gain a fourth status, `silent`: the

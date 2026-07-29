@@ -3,14 +3,14 @@ use crate::remove_unused_binding::usecase::{
 };
 use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_cli::shared::require_output_file;
-use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::resolve_compact_target;
 use paredit_core_cli::shared::write_file_with_rollback;
-use paredit_core_syntax::sexpr::Path;
 use paredit_core_syntax::sexpr::SymbolName;
 use serde_json::json;
 use std::path::PathBuf;
@@ -21,10 +21,8 @@ pub struct RemoveUnusedBindingArgs {
     file: Option<PathBuf>,
     #[arg(long)]
     dialect: Option<DialectArg>,
-    #[arg(long)]
-    path: Option<Path>,
-    #[arg(long)]
-    at: Option<usize>,
+    #[command(flatten)]
+    selector: CompactSelectorArgs,
     #[arg(long)]
     name: Option<SymbolName>,
     #[arg(long)]
@@ -54,11 +52,17 @@ pub fn remove_unused_binding(args: RemoveUnusedBindingArgs) -> Result<()> {
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let target = resolve_compact_target(
+        &tree,
+        dialect,
+        &args.selector,
+        "refactor remove-unused-binding",
+    )?;
+    let selection = tree.select_path(&target.path)?;
     let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
         input: &input.text,
         dialect,
-        path: args.path,
+        path: Some(target.path),
         target: selection.view(),
         name: args.name.as_ref(),
         all_bindings: args.all_bindings,

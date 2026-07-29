@@ -89,6 +89,8 @@ fn cli_reports_selected_form_structure_for_agents() {
     .stdout(predicate::str::contains("\"symbol\": \"x\""));
 }
 
+/// `--at` now reports the path it landed on rather than `null`, which is what
+/// makes `inspect form --at` a way of turning a byte offset into a path.
 #[test]
 fn cli_reports_form_by_byte_offset() {
     let mut cmd = paredit();
@@ -96,7 +98,7 @@ fn cli_reports_form_by_byte_offset() {
         .write_stdin("(defun add (x y) (+ x y))")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"path\": null"))
+        .stdout(predicate::str::contains("\"path\": \"0.3\""))
         .stdout(predicate::str::contains("\"head\": \"+\""))
         .stdout(predicate::str::contains("\"childCount\": 3"));
 }

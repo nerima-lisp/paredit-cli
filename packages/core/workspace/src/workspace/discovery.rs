@@ -11,8 +11,14 @@ use cap_std::fs::Dir;
 #[cfg(unix)]
 use cap_std::fs::{OpenOptions, OpenOptionsExt};
 
+use super::cache::CachedDiscovery;
 use super::filters::{is_generated_workspace_path, is_hidden_workspace_path};
-use super::types::{WorkspaceDiscovery, WorkspaceDiscoveryOptions, WorkspaceLimits};
+use super::ignore::{IgnoreCache, IgnoreStack};
+use super::types::{
+    DirectoryFingerprint, WorkspaceDiscovery, WorkspaceDiscoveryOptions, WorkspaceLimits,
+    WorkspaceRootCapability,
+};
+use super::vcs::{find_repository_root, is_repository_root};
 use crate::fs_identity::FilesystemIdentity;
 use paredit_core_syntax::dialect::Dialect;
 
@@ -265,12 +271,146 @@ pub(super) fn read_bounded<R: Read>(
     Ok(content)
 }
 
+/// Opens one directory capability per canonical root.
+///
+/// Every read this package performs goes through one of these rather than
+/// through an ambient path, which is what bounds a run to the roots it was
+/// given. Factored out of the walk so a cache hit can re-open them without
+/// re-walking: the capabilities are the one part of a discovery that cannot
+/// be serialised, and re-opening them is O(roots) where the walk is O(tree).
+fn open_root_capabilities(
+    canonical_roots: &[PathBuf],
+) -> std::result::Result<Vec<WorkspaceRootCapability>, WorkspaceError> {
+    canonical_roots
+        .iter()
+        .map(|root| {
+            let capability_base = if root.is_file() {
+                root.parent().ok_or_else(|| WorkspaceError::Io {
+                    context: format!("workspace file root has no parent: {}", root.display()),
+                    source: std::io::Error::other(""),
+                })?
+            } else {
+                root.as_path()
+            };
+            let ambient_metadata =
+                fs::metadata(capability_base).map_err(|source| WorkspaceError::Io {
+                    context: format!(
+                        "failed to inspect ambient workspace root {}",
+                        capability_base.display()
+                    ),
+                    source,
+                })?;
+            let dir =
+                Dir::open_ambient_dir(capability_base, ambient_authority()).map_err(|source| {
+                    WorkspaceError::Io {
+                        context: format!("failed to open workspace root {}", root.display()),
+                        source,
+                    }
+                })?;
+            let capability_metadata = dir.dir_metadata().map_err(|source| WorkspaceError::Io {
+                context: format!(
+                    "failed to inspect workspace root capability {}",
+                    capability_base.display()
+                ),
+                source,
+            })?;
+            let identity = FilesystemIdentity::from_cap(&capability_metadata).ok_or(
+                WorkspaceError::Unavailable("workspace root capability identity is unavailable"),
+            )?;
+            let root_is_unchanged = ambient_metadata.is_dir()
+                && FilesystemIdentity::from_std(&ambient_metadata) == Some(identity);
+            if !root_is_unchanged {
+                return Err(WorkspaceRefusal::RootChanged {
+                    path: capability_base.to_path_buf(),
+                }
+                .into());
+            }
+            Ok((
+                root.clone(),
+                capability_base.to_path_buf(),
+                std::sync::Arc::new(dir),
+                identity,
+            ))
+        })
+        .collect()
+}
+
+/// Rebuilds a full discovery from a cache entry, without walking the tree.
+///
+/// A cache hit restores the file list and the counters, but a
+/// [`WorkspaceDiscovery`] also owns the directory capabilities every read goes
+/// through, and those cannot be serialised. They are re-opened here — which
+/// also re-checks that each root is still the directory it was — so a cached
+/// result supports `read_file` exactly as a fresh one does. Without this the
+/// cache would only serve commands that never read a file, which is the one
+/// command for which scanning was already cheap.
+pub fn rehydrate_cached_discovery(
+    options: &WorkspaceDiscoveryOptions,
+    cached: &CachedDiscovery,
+) -> std::result::Result<WorkspaceDiscovery, WorkspaceError> {
+    // Canonicalised and deduplicated exactly as the walk does, so a hit and a
+    // miss resolve `read_file` against the same capability set.
+    let mut canonical_roots = options
+        .roots
+        .iter()
+        .map(|root| {
+            fs::canonicalize(root).map_err(|source| WorkspaceError::Io {
+                context: format!("failed to resolve workspace root {}", root.display()),
+                source,
+            })
+        })
+        .collect::<std::result::Result<Vec<_>, WorkspaceError>>()?;
+    canonical_roots.sort();
+    canonical_roots.dedup();
+    let root_dirs = open_root_capabilities(&canonical_roots)?;
+    Ok(WorkspaceDiscovery {
+        files: cached.files.clone(),
+        canonical_files: cached.canonical_files.iter().cloned().collect(),
+        skipped_unknown_count: cached.skipped_count("unknown"),
+        skipped_hidden_count: cached.skipped_count("hidden"),
+        skipped_generated_count: cached.skipped_count("generated"),
+        skipped_symlink_count: cached.skipped_count("symlink"),
+        skipped_excluded_count: cached.skipped_count("excluded"),
+        canonical_roots,
+        root_dirs,
+        visited_entry_count: cached.visited_entry_count,
+        ..WorkspaceDiscovery::default()
+    })
+}
+
 pub fn discover_workspace_files(
     options: &WorkspaceDiscoveryOptions,
 ) -> std::result::Result<WorkspaceDiscovery, WorkspaceError> {
     discover_workspace_files_with_limits(options, WorkspaceLimits::default())
 }
 
+/// Discovers over a root list that is itself an already-selected file set.
+///
+/// The ordinary root limit (1,024) bounds a hand-written command line, where
+/// more than a few roots is a mistake. `--since`, `--paths-from` and
+/// `--from-git` are not hand-written: they hand over the exact file list some
+/// other tool produced, which for a large refactoring commit is thousands of
+/// entries. Those lists are already bounded at their own source, and the file
+/// limit still applies to the result, so the only bound this relaxes is the one
+/// that was measuring the wrong thing.
+pub fn discover_workspace_files_from_list(
+    options: &WorkspaceDiscoveryOptions,
+) -> std::result::Result<WorkspaceDiscovery, WorkspaceError> {
+    let default = WorkspaceLimits::default();
+    discover_workspace_files_with_limits(
+        options,
+        WorkspaceLimits {
+            max_roots: default.max_files,
+            ..default
+        },
+    )
+}
+
+/// Discovers with caller-supplied bounds.
+///
+/// Public since `--max-file-bytes` and its siblings: a CI container with a
+/// 512 MB budget has to be able to say so, and the defaults are sized for a
+/// workstation.
 pub fn discover_workspace_files_with_limits(
     options: &WorkspaceDiscoveryOptions,
     limits: WorkspaceLimits,
@@ -322,59 +462,7 @@ pub fn discover_workspace_files_with_limits(
         .iter()
         .map(|root| root.canonical.clone())
         .collect();
-    discovery.root_dirs = discovery
-        .canonical_roots
-        .iter()
-        .map(|root| {
-            let capability_base = if root.is_file() {
-                root.parent().ok_or_else(|| WorkspaceError::Io {
-                    context: format!("workspace file root has no parent: {}", root.display()),
-                    source: std::io::Error::other(""),
-                })?
-            } else {
-                root.as_path()
-            };
-            let ambient_metadata =
-                fs::metadata(capability_base).map_err(|source| WorkspaceError::Io {
-                    context: format!(
-                        "failed to inspect ambient workspace root {}",
-                        capability_base.display()
-                    ),
-                    source,
-                })?;
-            let dir =
-                Dir::open_ambient_dir(capability_base, ambient_authority()).map_err(|source| {
-                    WorkspaceError::Io {
-                        context: format!("failed to open workspace root {}", root.display()),
-                        source,
-                    }
-                })?;
-            let capability_metadata = dir.dir_metadata().map_err(|source| WorkspaceError::Io {
-                context: format!(
-                    "failed to inspect workspace root capability {}",
-                    capability_base.display()
-                ),
-                source,
-            })?;
-            let identity = FilesystemIdentity::from_cap(&capability_metadata).ok_or(
-                WorkspaceError::Unavailable("workspace root capability identity is unavailable"),
-            )?;
-            let root_is_unchanged = ambient_metadata.is_dir()
-                && FilesystemIdentity::from_std(&ambient_metadata) == Some(identity);
-            if !root_is_unchanged {
-                return Err(WorkspaceRefusal::RootChanged {
-                    path: capability_base.to_path_buf(),
-                }
-                .into());
-            }
-            Ok((
-                root.clone(),
-                capability_base.to_path_buf(),
-                std::sync::Arc::new(dir),
-                identity,
-            ))
-        })
-        .collect::<std::result::Result<Vec<_>, WorkspaceError>>()?;
+    discovery.root_dirs = open_root_capabilities(&discovery.canonical_roots)?;
 
     let covering_directories = resolved_roots
         .iter()
@@ -398,28 +486,207 @@ pub fn discover_workspace_files_with_limits(
             )
         })
         .collect::<Vec<_>>();
+    let mut ignore_cache = IgnoreCache::new();
     for (root, scan_root) in &scan_roots {
+        let mut context = TraversalContext::new(root, scan_root, &excludes.current_dir);
+        context.prime_ignore_stack(options, &mut discovery, &mut ignore_cache)?;
         collect_workspace_files(
             root,
             scan_root,
             0,
             options,
             &excludes,
+            &mut context,
+            &mut ignore_cache,
             &mut discovery,
             &mut seen,
         )?;
     }
 
     discovery.files.sort();
+    for files in discovery.repositories.values_mut() {
+        files.sort();
+    }
+    discovery.files_outside_repositories.sort();
+    // A file-list run primes the ignore stack once per root, so one `.gitignore`
+    // is legitimately visited thousands of times. The report wants the set of
+    // files that governed the result, not how often each was consulted.
+    discovery.ignore_files_read.sort();
+    discovery.ignore_files_read.dedup();
     Ok(discovery)
 }
 
+/// A directory's identity at the moment it was listed.
+struct DirectoryStamp {
+    path: PathBuf,
+    modified: Option<std::time::SystemTime>,
+}
+
+/// The state a traversal carries down one scan root.
+///
+/// Everything here is per-root rather than per-run: two roots in different
+/// checkouts get different ignore stacks and different repository answers, and
+/// sharing either between them is how a monorepo run starts reporting one
+/// project's rules against another's files.
+struct TraversalContext {
+    /// The absolute, lexically normalised scan root, for glob matching.
+    root_absolute: PathBuf,
+    current_dir: PathBuf,
+    ignore: IgnoreStack,
+    /// Canonical directories on the current ancestor chain, for symlink loops.
+    ancestors: Vec<PathBuf>,
+    /// The repository containing the directory currently being walked.
+    repository: Option<PathBuf>,
+}
+
+impl TraversalContext {
+    fn new(root: &Path, scan_root: &ScanRoot, current_dir: &Path) -> Self {
+        let _ = root;
+        Self {
+            root_absolute: scan_root.lexical.clone(),
+            current_dir: current_dir.to_path_buf(),
+            ignore: IgnoreStack::new(),
+            ancestors: Vec::new(),
+            repository: None,
+        }
+    }
+
+    fn absolute(&self, path: &Path) -> PathBuf {
+        if path.is_absolute() {
+            lexically_normalize(path)
+        } else {
+            lexically_normalize(&self.current_dir.join(path))
+        }
+    }
+
+    /// Loads the ignore files between the enclosing repository root and the
+    /// scan root.
+    ///
+    /// Without this, `paredit inspect lint src/` inside a repository would
+    /// ignore the repository's own top-level `.gitignore`, and the same command
+    /// would select a different file set depending on which directory it was
+    /// pointed at — the kind of inconsistency that gets blamed on the analysis
+    /// rather than on the traversal.
+    fn prime_ignore_stack(
+        &mut self,
+        options: &WorkspaceDiscoveryOptions,
+        discovery: &mut WorkspaceDiscovery,
+        cache: &mut IgnoreCache,
+    ) -> std::result::Result<(), WorkspaceError> {
+        let start = if self.root_absolute.is_dir() {
+            self.root_absolute.clone()
+        } else {
+            self.root_absolute
+                .parent()
+                .map_or_else(|| self.root_absolute.clone(), Path::to_path_buf)
+        };
+        self.repository = find_repository_root(&start).map(|root| root.path);
+
+        if !options.ignore.is_enabled() {
+            return Ok(());
+        }
+
+        let Some(repository) = self.repository.clone() else {
+            return Ok(());
+        };
+        // Ancestors from the repository root down to, but not including, the
+        // directory the traversal itself will enter first.
+        let mut chain = Vec::new();
+        let mut current = start.parent();
+        while let Some(directory) = current {
+            // Stop at the repository, and never step above it: a `.gitignore`
+            // in a parent directory that happens to sit above the checkout is
+            // not this project's, and git would not read it either.
+            if !directory.starts_with(&repository) {
+                break;
+            }
+            chain.push(directory.to_path_buf());
+            if directory == repository {
+                break;
+            }
+            current = directory.parent();
+        }
+        chain.reverse();
+
+        for directory in chain {
+            let is_root = directory == repository;
+            let before = self.ignore.depth();
+            self.ignore
+                .enter_directory(&directory, options.ignore, is_root, cache)?;
+            record_ignore_files(&self.ignore, before, discovery);
+        }
+        Ok(())
+    }
+}
+
+fn record_ignore_files(stack: &IgnoreStack, before: usize, discovery: &mut WorkspaceDiscovery) {
+    for layer in stack.layers().iter().skip(before) {
+        if let Some(origin) = layer.origin() {
+            discovery.ignore_files_read.push(origin.to_path_buf());
+        }
+    }
+}
+
+/// Renders `path` relative to the scan root as `/`-separated text.
+///
+/// Returns `None` for a path outside the root or with a non-UTF-8 component:
+/// in both cases there is no text a pattern could have been written against, so
+/// treating it as unmatched keeps the file rather than dropping it invisibly.
+fn relative_to_root(root: &Path, absolute: &Path) -> Option<String> {
+    let relative = absolute.strip_prefix(root).ok()?;
+    let mut rendered = String::new();
+    for component in relative.components() {
+        let text = component.as_os_str().to_str()?;
+        if !rendered.is_empty() {
+            rendered.push('/');
+        }
+        rendered.push_str(text);
+    }
+    (!rendered.is_empty()).then_some(rendered)
+}
+
+/// Whether the command-line globs reject `absolute`.
+///
+/// `--exclude-glob` always wins: a caller that writes both is narrowing, and
+/// letting an `--include` re-admit an explicitly excluded path would make the
+/// pair order-dependent.
+fn rejected_by_globs(
+    options: &WorkspaceDiscoveryOptions,
+    context: &TraversalContext,
+    absolute: &Path,
+    is_directory: bool,
+) -> bool {
+    let Some(relative) = relative_to_root(&context.root_absolute, absolute) else {
+        return false;
+    };
+    if options.exclude_globs.is_match(&relative, is_directory) {
+        return true;
+    }
+    if options.include_globs.is_empty() {
+        return false;
+    }
+    if is_directory {
+        // A directory is kept whenever anything below it could still match;
+        // `--include '**/*.lisp'` must not prune the directories that hold the
+        // files it is asking for.
+        return !options.include_globs.is_match(&relative, true)
+            && !options.include_globs.could_match_descendant(&relative);
+    }
+    !options.include_globs.is_match(&relative, false)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one traversal frame: path, root, depth, and the four collaborators it threads"
+)]
 fn collect_workspace_files(
     path: &Path,
     scan_root: &ScanRoot,
     depth: usize,
     options: &WorkspaceDiscoveryOptions,
     excludes: &ExcludeIndex,
+    context: &mut TraversalContext,
+    ignore_cache: &mut IgnoreCache,
     discovery: &mut WorkspaceDiscovery,
     seen: &mut BTreeSet<PathBuf>,
 ) -> std::result::Result<(), WorkspaceError> {
@@ -433,31 +700,83 @@ fn collect_workspace_files(
         source,
     })?;
 
-    if metadata.file_type().is_symlink() {
-        discovery.skipped_symlink_count += 1;
-        return Ok(());
-    }
+    let mut followed_canonical = None;
+    let metadata = if metadata.file_type().is_symlink() {
+        if !options.symlinks.follows() {
+            discovery.skipped_symlink_count += 1;
+            return Ok(());
+        }
+        let Ok(canonical) = fs::canonicalize(path) else {
+            // A broken link resolves to nothing; there is no target to read.
+            discovery.skipped_symlink_count += 1;
+            return Ok(());
+        };
+        if !discovery
+            .canonical_roots
+            .iter()
+            .any(|root| canonical.starts_with(root))
+        {
+            discovery.skipped_symlink_escaped_count += 1;
+            return Ok(());
+        }
+        if context.ancestors.contains(&canonical) {
+            discovery.skipped_symlink_cycle_count += 1;
+            return Ok(());
+        }
+        followed_canonical = Some(canonical);
+        fs::metadata(path).map_err(|source| WorkspaceError::Io {
+            context: format!("failed to inspect the target of {}", path.display()),
+            source,
+        })?
+    } else {
+        metadata
+    };
 
     if metadata.is_dir() {
-        collect_workspace_directory(path, scan_root, depth, options, excludes, discovery, seen)?;
+        let modified = metadata.modified().ok();
+        collect_workspace_directory(
+            path,
+            scan_root,
+            depth,
+            options,
+            excludes,
+            context,
+            ignore_cache,
+            discovery,
+            seen,
+            followed_canonical,
+            modified,
+        )?;
         return Ok(());
     }
 
     if metadata.is_file() {
-        collect_workspace_file(path, options, discovery, seen)?;
+        // A followed symlink is recorded by its target: every later read goes
+        // through a root capability and refuses a non-regular file, which a
+        // link path is.
+        let selected = followed_canonical.as_deref().unwrap_or(path);
+        collect_workspace_file(selected, path, depth, options, context, discovery, seen)?;
     }
 
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one traversal frame: path, root, depth, and the collaborators it threads"
+)]
 fn collect_workspace_directory(
     path: &Path,
     scan_root: &ScanRoot,
     depth: usize,
     options: &WorkspaceDiscoveryOptions,
     excludes: &ExcludeIndex,
+    context: &mut TraversalContext,
+    ignore_cache: &mut IgnoreCache,
     discovery: &mut WorkspaceDiscovery,
     seen: &mut BTreeSet<PathBuf>,
+    followed_canonical: Option<PathBuf>,
+    modified: Option<std::time::SystemTime>,
 ) -> std::result::Result<(), WorkspaceError> {
     if !options.include_hidden && is_hidden_workspace_path(path) {
         discovery.skipped_hidden_count += 1;
@@ -469,6 +788,22 @@ fn collect_workspace_directory(
         return Ok(());
     }
 
+    let absolute = context.absolute(path);
+    // Depth zero is the root the caller named. Git does not apply ignore rules
+    // to a path given explicitly on the command line, and neither does this:
+    // being told to scan a directory is a stronger signal than a pattern that
+    // happens to cover it.
+    if depth > 0 {
+        if context.ignore.is_ignored(&absolute, true) {
+            discovery.skipped_ignored_count += 1;
+            return Ok(());
+        }
+        if rejected_by_globs(options, context, &absolute, true) {
+            discovery.skipped_glob_count += 1;
+            return Ok(());
+        }
+    }
+
     if options
         .max_depth
         .is_some_and(|max_depth| depth >= max_depth)
@@ -476,6 +811,73 @@ fn collect_workspace_directory(
         return Ok(());
     }
 
+    let repository_boundary = is_repository_root(&absolute);
+    let previous_repository = context.repository.clone();
+    if repository_boundary {
+        context.repository = Some(absolute.clone());
+    }
+    let layers_before = context.ignore.depth();
+    let ignore_scope = context.ignore.enter_directory(
+        &absolute,
+        options.ignore,
+        repository_boundary,
+        ignore_cache,
+    )?;
+    record_ignore_files(&context.ignore, layers_before, discovery);
+    // Loop detection compares canonical paths, so the entry pushed here has to
+    // be canonical too. A lexical path never equals the canonicalised target of
+    // a link — on a platform where `/tmp` is itself a symlink, every comparison
+    // silently fails and the walk recurses until it runs out of stack.
+    if options.symlinks.follows() {
+        let canonical = match followed_canonical {
+            Some(canonical) => Some(canonical),
+            None => fs::canonicalize(path).ok(),
+        };
+        context
+            .ancestors
+            .push(canonical.unwrap_or_else(|| absolute.clone()));
+    }
+
+    let result = walk_directory_entries(
+        path,
+        scan_root,
+        depth,
+        options,
+        excludes,
+        context,
+        ignore_cache,
+        discovery,
+        seen,
+        DirectoryStamp {
+            path: absolute.clone(),
+            modified,
+        },
+    );
+
+    if options.symlinks.follows() {
+        context.ancestors.pop();
+    }
+    context.ignore.restore(ignore_scope);
+    context.repository = previous_repository;
+    result
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one traversal frame: path, root, depth, and the collaborators it threads"
+)]
+fn walk_directory_entries(
+    path: &Path,
+    scan_root: &ScanRoot,
+    depth: usize,
+    options: &WorkspaceDiscoveryOptions,
+    excludes: &ExcludeIndex,
+    context: &mut TraversalContext,
+    ignore_cache: &mut IgnoreCache,
+    discovery: &mut WorkspaceDiscovery,
+    seen: &mut BTreeSet<PathBuf>,
+    stamp: DirectoryStamp,
+) -> std::result::Result<(), WorkspaceError> {
     let mut entries = Vec::new();
     for entry in fs::read_dir(path).map_err(|source| WorkspaceError::Io {
         context: format!("failed to list {}", path.display()),
@@ -505,6 +907,18 @@ fn collect_workspace_directory(
         );
     }
     entries.sort();
+    // Recorded from metadata the traversal already read, so a run without a
+    // cache pays nothing for it. A directory's mtime plus its entry count is
+    // what tells a later run whether anything was added, removed or renamed
+    // here — a file's *contents* changing does not affect which files exist.
+    discovery.directory_stamps.push(DirectoryFingerprint {
+        path: stamp.path,
+        modified_nanos: stamp
+            .modified
+            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|elapsed| elapsed.as_nanos()),
+        entry_count: entries.len(),
+    });
 
     for entry in entries {
         collect_workspace_files(
@@ -513,6 +927,8 @@ fn collect_workspace_directory(
             depth + 1,
             options,
             excludes,
+            context,
+            ignore_cache,
             discovery,
             seen,
         )?;
@@ -523,13 +939,28 @@ fn collect_workspace_directory(
 
 fn collect_workspace_file(
     path: &Path,
+    traversal_path: &Path,
+    depth: usize,
     options: &WorkspaceDiscoveryOptions,
+    context: &mut TraversalContext,
     discovery: &mut WorkspaceDiscovery,
     seen: &mut BTreeSet<PathBuf>,
 ) -> std::result::Result<(), WorkspaceError> {
     if !options.include_hidden && is_hidden_workspace_path(path) {
         discovery.skipped_hidden_count += 1;
         return Ok(());
+    }
+
+    let absolute = context.absolute(traversal_path);
+    if depth > 0 {
+        if context.ignore.is_ignored(&absolute, false) {
+            discovery.skipped_ignored_count += 1;
+            return Ok(());
+        }
+        if rejected_by_globs(options, context, &absolute, false) {
+            discovery.skipped_glob_count += 1;
+            return Ok(());
+        }
     }
 
     let dialect = Dialect::detect(Some(path), None);
@@ -587,6 +1018,16 @@ fn collect_workspace_file(
         discovery.discovered_bytes = total;
         discovery.canonical_files.insert(canonical);
         discovery.files.push(path.to_path_buf());
+        match context.repository.clone() {
+            Some(repository) => discovery
+                .repositories
+                .entry(repository)
+                .or_default()
+                .push(path.to_path_buf()),
+            None => discovery
+                .files_outside_repositories
+                .push(path.to_path_buf()),
+        }
     }
     Ok(())
 }

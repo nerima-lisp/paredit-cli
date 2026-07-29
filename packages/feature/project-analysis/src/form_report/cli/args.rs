@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use paredit_core_cli::args::{DialectArg, OutputFormat};
-use paredit_core_syntax::sexpr::Path;
+use paredit_core_cli::args::{DialectArg, OutputFormat, SelectorArgs};
 
 #[derive(Debug, Args)]
 pub struct FormReportArgs {
@@ -13,12 +12,8 @@ pub struct FormReportArgs {
     /// Override extension-based dialect detection.
     #[arg(long)]
     pub dialect: Option<DialectArg>,
-    /// Selected expression path, such as 0.2.1.
-    #[arg(long, conflicts_with = "at")]
-    pub path: Option<Path>,
-    /// Byte offset inside the selected expression.
-    #[arg(long, conflicts_with = "path")]
-    pub at: Option<usize>,
+    #[command(flatten)]
+    pub selector: SelectorArgs,
     /// Include the selected source text in the report.
     #[arg(long)]
     pub include_source: bool,

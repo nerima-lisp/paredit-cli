@@ -3,10 +3,13 @@ use anyhow::Result;
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 use crate::class_hierarchy_report::cli::args::ClassHierarchyReportArgs;
-use crate::class_hierarchy_report::cli::render::print_shadowed_slot_report;
+use crate::class_hierarchy_report::cli::render::{
+    class_hierarchy_drawing, print_shadowed_slot_report,
+};
 use crate::class_hierarchy_report::usecase::{
     build_class_hierarchy_report, evaluate_fail_on_shadowed_slot_policy,
 };
+use paredit_core_cli::report::graph::print_graph;
 
 pub fn class_hierarchy_report(args: ClassHierarchyReportArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
@@ -21,7 +24,10 @@ pub fn class_hierarchy_report(args: ClassHierarchyReportArgs) -> Result<()> {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_shadowed_slot_report(&reports, &policy, args.output)?;
+    match args.graph {
+        Some(format) => print_graph(&class_hierarchy_drawing(&reports), format),
+        None => print_shadowed_slot_report(&reports, &policy, args.output)?,
+    }
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

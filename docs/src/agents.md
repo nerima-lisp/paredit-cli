@@ -20,6 +20,57 @@ each with nested `commands` and an `args` array. Every arg entry carries
 `long`, `short`, `kind` (`option`, `flag`, or `positional`), `help`,
 `required`, `repeatable`, `default_values`, and `possible_values`.
 
+## Connect over MCP
+
+```sh
+paredit mcp               # a Model Context Protocol server, over stdio
+paredit mcp --read-only   # …that refuses every command which would write
+```
+
+The server offers a handful of tools — `paredit_check`, `paredit_outline`,
+`paredit_lint`, `paredit_format`, `paredit_diff`, `paredit_capabilities` — plus
+`paredit_run`, which takes any command's argument vector. **It deliberately does
+not expose one tool per command.** There are 314 of them; that many descriptions
+costs thousands of tokens of context before the agent has read a line of code,
+and it makes selection harder rather than easier. The catalog is available as
+the `paredit://capabilities` resource, and `paredit_run` reaches everything in
+it.
+
+Three things worth knowing:
+
+- **`--read-only` is a promise, not a report.** A command carrying `--write`,
+  `--fix`, or `--apply` is refused before the process starts.
+- **Exit code 3 is a result, not an error.** A `--fail-on-*` gate reporting
+  what it found comes back with `isError: false` and
+  `structuredContent.gate_failed: true`, so an agent does not retry a command
+  that worked.
+- **Each call re-executes the binary**, so a tool's behaviour is byte-identical
+  to the same command typed at a shell.
+
+Resources: `paredit://capabilities` (the catalog), `paredit://capabilities-schema`
+(its JSON Schema), and `paredit://lint-rules` (the full rule reference as
+Markdown).
+
+## Type the catalog
+
+The catalog conforms to a published JSON Schema (draft 2020-12), which the same
+command emits:
+
+```sh
+paredit inspect capabilities --emit schema                     # for the v1 catalog
+paredit inspect capabilities --emit schema --schema-version 3  # for the v3 catalog
+```
+
+Generate types from it, or validate a response against it before parsing. The
+schema is versioned with the catalog and is *strict* — `additionalProperties`
+is `false` throughout — so a version 1 schema rejects a version 3 document
+rather than quietly accepting a field it does not know. Ask for the schema whose
+version matches the `schema_version` in the document you hold, not the newest
+one.
+
+A test in this repository runs the live catalog through the emitted schema at
+every version, so the two cannot drift.
+
 ## Discover how deep a dialect goes
 
 `--schema-version 3` adds a `dialect_contract`: every command crossed with

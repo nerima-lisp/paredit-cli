@@ -61,6 +61,7 @@ use paredit_feature_project_inventory::serial_consistency_report::cli as serial_
 use paredit_feature_project_inventory::symbol_index_report::cli as symbol_index_report;
 use paredit_feature_project_inventory::test_map_report::cli as test_map_report;
 use paredit_feature_project_inventory::unreachable_expression_report::cli as unreachable_expression_report;
+use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
@@ -68,6 +69,8 @@ use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;
 use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
 use paredit_feature_similarity::similarity_report::cli as similarity_report;
+use paredit_feature_structural_diff::structural_diff::cli as structural_diff;
+use paredit_feature_structural_diff::structural_patch::cli as structural_patch;
 mod dispatch;
 mod duplicate_export_report;
 mod duplicate_method_report;
@@ -143,7 +146,17 @@ pub fn run() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    match dispatch::dispatch(cli.command) {
+    // The protocol servers own their own exit status, and are therefore taken
+    // before dispatch. A session normally ends with the client closing the
+    // pipe, and routing that through the `Result` path below would report every
+    // clean shutdown as an error.
+    let command = match cli.command {
+        Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
+        Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
+        Command::Serve(args) => return crate::presentation::serve::serve(args),
+        command => command,
+    };
+    match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("Error: {}", terminal_safe_error_chain(&error));
@@ -363,12 +376,14 @@ use paredit_feature_project_analysis::package_cycle_report::cli as package_cycle
 use paredit_feature_project_analysis::reachability_report::cli as reachability_report;
 use paredit_feature_project_analysis::redefinition_report::cli as redefinition_report;
 use paredit_feature_project_analysis::signature_report::cli as signature_report;
+use paredit_feature_project_analysis::source_report::cli as source_report;
 use paredit_feature_project_analysis::struct_cycle_report::cli as struct_cycle_report;
 use paredit_feature_project_analysis::system_cycle_report::cli as system_cycle_report;
 use paredit_feature_project_analysis::undefined_package_report::cli as undefined_package_report;
 use paredit_feature_project_analysis::unused_local_callable_report::cli as unused_local_callable_report;
 use paredit_feature_project_analysis::workspace_report::cli as workspace_report;
 use paredit_feature_refactor_workflow::refactor::cli as refactor;
+use paredit_feature_refactor_workflow::refactor_step::cli as refactor_step;
 use paredit_feature_remove_unused::definition_movement::cli as definition_movement;
 use paredit_feature_remove_unused::definition_removal::cli as definition_removal;
 use paredit_feature_remove_unused::definition_report::cli as definition_report;

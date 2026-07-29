@@ -46,7 +46,9 @@ paredit-core-semantics = { path = "packages/core/semantics" }
 paredit-core-edit = { path = "packages/core/edit" }
 paredit-core-lint-engine = { path = "packages/core/lint-engine" }
 paredit-core-cli = { path = "packages/core/cli" }
+paredit-core-jsonrpc = { path = "packages/core/jsonrpc" }
 paredit-feature-similarity = { path = "packages/feature/similarity" }
+paredit-feature-structural-diff = { path = "packages/feature/structural-diff" }
 paredit-feature-extract = { path = "packages/feature/extract" }
 paredit-feature-inline = { path = "packages/feature/inline" }
 paredit-feature-form-transform = { path = "packages/feature/form-transform" }
@@ -63,6 +65,7 @@ paredit-feature-code-metrics = { path = "packages/feature/code-metrics" }
 paredit-feature-lisp-analysis = { path = "packages/feature/lisp-analysis" }
 paredit-feature-project-inventory = { path = "packages/feature/project-inventory" }
 paredit-feature-semantic-report = { path = "packages/feature/semantic-report" }
+paredit-feature-selector = { path = "packages/feature/selector" }
 paredit-feature-refactor-workflow = { path = "packages/feature/refactor-workflow" }
 paredit-feature-lint-string-char = { path = "packages/feature/lint-string-char" }
 paredit-feature-lint-control-flow = { path = "packages/feature/lint-control-flow" }

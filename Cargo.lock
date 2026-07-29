@@ -652,6 +652,7 @@ dependencies = [
  "libc",
  "paredit-core-cli",
  "paredit-core-edit",
+ "paredit-core-jsonrpc",
  "paredit-core-lint-engine",
  "paredit-core-safety",
  "paredit-core-semantics",
@@ -684,8 +685,10 @@ dependencies = [
  "paredit-feature-refactor-workflow",
  "paredit-feature-remove-unused",
  "paredit-feature-rename",
+ "paredit-feature-selector",
  "paredit-feature-semantic-report",
  "paredit-feature-similarity",
+ "paredit-feature-structural-diff",
  "predicates",
  "proptest",
  "serde_json",
@@ -721,6 +724,14 @@ dependencies = [
  "paredit-core-semantics",
  "paredit-core-syntax",
  "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-core-jsonrpc"
+version = "1.2.1"
+dependencies = [
+ "serde_json",
  "thiserror",
 ]
 
@@ -773,6 +784,7 @@ dependencies = [
  "libc",
  "paredit-core-syntax",
  "proptest",
+ "serde_json",
  "thiserror",
 ]
 
@@ -1150,6 +1162,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-selector"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
 name = "paredit-feature-semantic-report"
 version = "1.2.1"
 dependencies = [
@@ -1173,6 +1196,18 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-structural-diff"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]
