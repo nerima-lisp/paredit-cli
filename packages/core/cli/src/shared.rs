@@ -11,7 +11,9 @@ use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SexprResult, SymbolName, SyntaxTree,
 };
-use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{
+    IgnoreOptions, WorkspaceDiscoveryOptions, discover_workspace_files,
+};
 
 #[path = "diff.rs"]
 mod diff;
@@ -433,6 +435,11 @@ pub fn expand_input_files(
                 include_generated: false,
                 max_depth: None,
                 exclude: Vec::new(),
+                // These commands take explicit paths and have no input flags of
+                // their own, so the environment is the only place a caller can
+                // say "look at the generated files too".
+                ignore: IgnoreOptions::from_environment(),
+                ..WorkspaceDiscoveryOptions::default()
             })?;
             for discovered in discovery.into_files() {
                 push_unique_path(&mut expanded, &mut seen, discovered);

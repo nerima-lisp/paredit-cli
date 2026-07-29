@@ -35,6 +35,45 @@ model, a binding table, nine lint rules, and a per-file report.
   number of atoms renamed, and whether that renaming is a bijection. An
   inconsistent Type-2 renaming is the shape a copy-paste bug takes when one
   occurrence of a variable was missed.
+- **Six new ways to choose which files get analysed.** Discovery was a
+  directory walk with four booleans and an exact-path exclude list. It could
+  not be told to respect `.gitignore`, to take the file set from a build
+  definition, or to look only at what a pull request changed. The flags now
+  divide into *selectors*, which decide where the candidate list comes from,
+  and *filters*, which narrow whatever the selector produced:
+  - `--since <git-ref>` — only the files that differ from a ref, which is the
+    single biggest lever on CI time. Deleted files drop out, a rename reports
+    its destination, and an unresolvable ref is an error rather than an empty
+    change set that would let a gate pass without examining anything.
+  - `--from-git` — the file set from `git ls-files`.
+  - `--from-manifest` — the project's own build definition: ASDF `defsystem`
+    `:components` (through `:module` and `:pathname`, in declaration order),
+    `deps.edn`, `shadow-cljs.edn`, `project.clj`, and an Emacs Lisp
+    `Package-Requires` header. A named component missing from disk is reported
+    rather than silently dropped.
+  - `--paths-from <FILE|->` — a list you computed yourself, newline- or
+    NUL-separated.
+  - `--from-archive <ARCHIVE|-> --extract-to <DIR>` — an uncompressed tar, from
+    a file or stdin. Compression and transport stay with the shell, which keeps
+    an HTTP client, a TLS stack and a decompressor out of a tool trusted with
+    your source tree. Extraction refuses rather than sanitises absolute paths,
+    `..` components, symlinks, hardlinks, devices, and overwriting.
+  - `--cache-dir <DIR>` — reuse a previous scan. Keyed on everything that can
+    change the selection and validated against the tree, so a stale entry is a
+    miss rather than a wrong answer.
+- **Filters:** `--include` / `--exclude-glob` in `gitignore(5)` syntax,
+  `.gitignore` and `.pareditignore` honoured by default (`--no-gitignore`,
+  `--no-pareditignore`, `--no-ignore`, and three `PAREDIT_NO_*` environment
+  variables), and `--follow-symlinks`. Ignore precedence follows git exactly:
+  the deeper file wins, the last matching pattern within a file wins, a
+  repository boundary cuts the stack, and a root named on the command line is
+  never ignore-filtered.
+- **`paredit inspect sources`.** Runs selection and stops, reporting which rule
+  dropped every file that did not make it. It parses nothing, which makes it
+  the cheapest way to answer "did that CI run find nothing, or did my pattern
+  find nothing".
+- Discovery reports repository boundaries, so a run over several checkouts
+  groups its result per repository instead of flattening them.
 - **Six new ways to select a form.** `--path` and `--at` were the only two,
   and both cost a round trip to build: an agent had to run `inspect outline`,
   read a path out of it, and hope nothing moved in between. Every command that

@@ -125,6 +125,38 @@ pub enum ArgumentError {
     #[error("--write requires --file")]
     WriteRequiresFile,
 
+    #[error(
+        "pass only one of --since, --from-git, --from-manifest, --from-archive or \
+         --paths-from: each replaces the file set, and combining them would let one \
+         win silently"
+    )]
+    ConflictingInputSelectors,
+
+    #[error("invalid {flag} pattern {pattern}: {reason}")]
+    InvalidGlob {
+        flag: &'static str,
+        pattern: String,
+        reason: String,
+    },
+
+    #[error("--since requires a git repository containing the scanned roots")]
+    SinceRequiresRepository,
+
+    #[error(
+        "--from-manifest found no readable manifest: expected a .asd, deps.edn, \
+         shadow-cljs.edn or project.clj beside the scanned roots"
+    )]
+    NoManifestFound,
+
+    #[error("--paths-from produced no path inside the scanned roots")]
+    EmptyPathList,
+
+    #[error("--from-archive requires --extract-to <DIR>")]
+    ArchiveRequiresDestination,
+
+    #[error("--from-archive extracted no file inside the scanned roots")]
+    EmptyArchive,
+
     /// One `--all` match was disturbed by an edit applied to a later one.
     ///
     /// Reachable only for edits that reach outside their own form — slurp and

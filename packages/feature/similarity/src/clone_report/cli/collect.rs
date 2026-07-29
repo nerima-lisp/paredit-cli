@@ -14,7 +14,7 @@ use anyhow::Result;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SyntaxTree;
-use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::WorkspaceDiscovery;
 
 use crate::similarity_report::cli::types::ErrorPolicy;
 use crate::similarity_report::domain::{
@@ -63,7 +63,7 @@ pub struct SourceCorpus {
     pub errors: Vec<CorpusFileError>,
 }
 
-/// Discovery options for one root set, with `include_generated` overridable.
+/// Discovery for one root set, with `include_generated` overridable.
 ///
 /// The reference corpus of `clone-external` is the one place where scanning
 /// `vendor/` and `target/` is the point rather than a mistake.
@@ -78,7 +78,7 @@ pub fn collect_candidates(
     args: &CloneDiscoveryArgs,
     options: &SimilarityReportOptions,
 ) -> Result<CandidateCorpus> {
-    collect_candidates_with_generated(roots, args, options, args.include_generated)
+    collect_candidates_with_generated(roots, args, options, args.input.include_generated)
 }
 
 pub fn collect_candidates_with_generated(
@@ -139,7 +139,7 @@ pub fn collect_sources(roots: &[PathBuf], args: &CloneDiscoveryArgs) -> Result<S
     let scan = Scan {
         roots,
         args,
-        include_generated: args.include_generated,
+        include_generated: args.input.include_generated,
     };
     let (files, summary, discovery) = discover(&scan)?;
 
@@ -160,21 +160,22 @@ pub fn collect_sources(roots: &[PathBuf], args: &CloneDiscoveryArgs) -> Result<S
     })
 }
 
-fn discover(
-    scan: &Scan<'_>,
-) -> Result<(
-    Vec<PathBuf>,
-    DiscoverySummary,
-    paredit_core_workspace::workspace::WorkspaceDiscovery,
-)> {
-    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
-        roots: scan.roots.to_vec(),
-        include_unknown: scan.args.include_unknown || scan.args.dialect.is_some(),
-        include_hidden: scan.args.include_hidden,
-        include_generated: scan.include_generated,
-        max_depth: scan.args.max_depth,
-        exclude: scan.args.exclude.clone(),
-    })?;
+fn discover(scan: &Scan<'_>) -> Result<(Vec<PathBuf>, DiscoverySummary, WorkspaceDiscovery)> {
+    // Every input selector and filter comes from the shared flag block, so
+    // `--since`, `--paths-from`, `--include` and the cache work here exactly as
+    // they do for `inspect similarity`. Only the two overrides this slice
+    // genuinely needs are applied on top.
+    let resolved = scan.args.input.resolve(scan.roots)?;
+    let mut options = resolved.options;
+    options.include_unknown = scan.args.input.include_unknown || scan.args.dialect.is_some();
+    options.include_generated = scan.include_generated;
+    let (discovery, _cache_outcome) =
+        scan.args
+            .input
+            .scan(&paredit_core_cli::workspace_args::ResolvedWorkspaceInput {
+                options,
+                ..resolved
+            })?;
     let summary = DiscoverySummary {
         scanned_files: discovery.files().len(),
         skipped_unknown: discovery.skipped_unknown_count(),
