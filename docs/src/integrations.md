@@ -1,5 +1,45 @@
 # Integrations
 
+## Editors: `paredit lsp`
+
+```sh
+paredit lsp    # a Language Server Protocol server, over stdio
+```
+
+Point any LSP client at it. The server speaks LSP 3.17 and needs no
+configuration; it detects each document's dialect from its URI and content, the
+same way the CLI does from a path.
+
+| Request | What it maps to |
+| --- | --- |
+| `publishDiagnostics` | The `inspect lint` recommended preset |
+| `textDocument/codeAction` | The auto-fixes `inspect lint --fix` would apply |
+| `textDocument/documentSymbol` | `inspect outline` |
+| `textDocument/selectionRange` | The chain of enclosing S-expressions |
+| `textDocument/foldingRange` | Every multi-line list |
+| `textDocument/documentHighlight` | The exact atom occurrences of the symbol at the caret |
+| `textDocument/formatting` | `edit format`, at the editor's own tab size |
+| `textDocument/rename` | `refactor rename-at` |
+
+**`selectionRange` is the one worth binding a key to.** Expanding a selection
+outward through balanced expressions is how a person navigates Lisp, and it is
+the request a general-purpose language server answers worst and this one
+answers from the tree it already has. In VS Code it is *Expand Selection*
+(`⌃⇧⌘→`); in Neovim, `vim.lsp.buf.selection_range()`.
+
+Two behaviours are deliberate and worth knowing:
+
+- **An unbalanced buffer reports only its parse failure.** While a paren is
+  momentarily open, every rule is looking at a recovered tree, and a screen of
+  findings that vanish when you type `)` is the behaviour that makes people
+  turn a language server off.
+- **Rename is single-file.** It dispatches to `rename-at`, which resolves the
+  namespace and lexical scope of whatever is under the caret — and that answer
+  is about the document it read. A rename that should cross files is
+  `refactor rename-symbol` over the workspace, which has its own preview and
+  verification; widening the editor request to it would rewrite files you never
+  opened.
+
 ## Report output formats
 
 Every report whose output is a list of located findings accepts the same set of

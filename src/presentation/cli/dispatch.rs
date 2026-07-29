@@ -868,6 +868,8 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 remove_unused_binding::remove_unused_binding(args)?;
             }
         },
+        // Handled in `run`, before dispatch, because it owns its exit status.
+        Command::Lsp(_) => unreachable!("the lsp server is dispatched from run"),
         Command::Completions { shell } => {
             use clap::CommandFactory;
             let mut root = super::Cli::command();

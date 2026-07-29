@@ -771,6 +771,8 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: RefactorCommand,
     },
+    /// Run a Language Server Protocol server over stdio.
+    Lsp(crate::presentation::lsp::LspArgs),
     /// Print a shell completion script to stdout.
     Completions {
         /// Shell to generate a completion script for.

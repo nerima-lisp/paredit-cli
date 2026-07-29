@@ -106,6 +106,12 @@ struct Cli {
 #[must_use]
 pub fn run() -> ExitCode {
     let cli = Cli::parse();
+    // The protocol servers own their own exit status. A language server session
+    // normally ends with the editor closing the pipe, and routing that through
+    // the `Result` path below would report every clean shutdown as an error.
+    if let Command::Lsp(args) = cli.command {
+        return crate::presentation::lsp::lsp(args);
+    }
     match dispatch::dispatch(cli.command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {

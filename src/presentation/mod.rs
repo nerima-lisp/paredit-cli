@@ -1,4 +1,5 @@
-//! CLI presentation adapters that map commands, flags, and output modes onto
-//! application services.
+//! Presentation adapters that map delivery mechanisms — the command line, and
+//! the protocol servers — onto application services.
 
 pub mod cli;
+pub(crate) mod lsp;

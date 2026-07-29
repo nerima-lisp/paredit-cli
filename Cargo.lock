@@ -652,6 +652,7 @@ dependencies = [
  "libc",
  "paredit-core-cli",
  "paredit-core-edit",
+ "paredit-core-jsonrpc",
  "paredit-core-lint-engine",
  "paredit-core-semantics",
  "paredit-core-syntax",
@@ -719,6 +720,14 @@ dependencies = [
  "paredit-core-semantics",
  "paredit-core-syntax",
  "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-core-jsonrpc"
+version = "1.2.1"
+dependencies = [
+ "serde_json",
  "thiserror",
 ]
 
