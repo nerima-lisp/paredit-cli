@@ -74,7 +74,7 @@ use super::{
     unused_local_callable_report, unused_nickname_report, unused_package_report,
     unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
     value_propagation_report, values_list_of_list_report, verbose_negation_report,
-    workspace_report, zero_divisor_report,
+    workspace_report, writability_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -561,6 +561,8 @@ pub(super) enum InspectCommand {
     UndefinedPackages(undefined_package_report::args::UndefinedPackageReportArgs),
     /// Report whether a byte offset is code, a string, a comment, a delimiter, or reader sugar.
     ContextAt(context_report::args::ContextAtArgs),
+    /// Report whether a write to --file would succeed, without writing anything.
+    Writability(writability_report::args::WritabilityReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source

@@ -85,6 +85,7 @@ mod lint_report;
 mod shadowed_binding_report;
 mod symbol_report;
 mod unused_parameter_report;
+mod writability_report;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
