@@ -176,8 +176,18 @@ impl Shape {
                 .map(|index| DENSE_FORMS[index % DENSE_FORMS.len()])
                 .collect::<Vec<_>>()
                 .join("\n"),
+            // The docstring is load-bearing. `collect_lint_findings` runs
+            // *every* registered rule, not the `recommended` preset, so the
+            // pedantic `missing-docstring` fired on every form here — which
+            // made this fixture stop being clean, and `cargo bench` fail
+            // outright, from the moment that rule was added. Nothing noticed
+            // because the benchmarks were not run by CI; they are now.
             Self::Clean => (0..form_count)
-                .map(|index| format!("(defun clean-fn-{index} (a b) (+ a (* b 2)))"))
+                .map(|index| {
+                    format!(
+                        "(defun clean-fn-{index} (a b)\n  \"Return A plus twice B.\"\n  (+ a (* b 2)))"
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("\n"),
         }

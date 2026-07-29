@@ -11,7 +11,6 @@ use std::io::{self, ErrorKind, IsTerminal, Read};
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
-#[cfg(any(unix, test))]
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{ArgumentError, CliError, CliResult, IoRefusal, WriteTargetError};
@@ -29,7 +28,23 @@ const UNIQUE_SIBLING_ATTEMPTS: usize = 128;
 const CLEANUP_QUARANTINE_NAME: &str = ".paredit.cleanup";
 #[cfg(unix)]
 const CLEANUP_QUARANTINE_MODE: u32 = 0o700;
-pub const MAX_SOURCE_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+/// The compiled-in ceiling on one document read.
+///
+/// Still the default and no longer the only possible value: a run may lower it
+/// with `--max-input-bytes` or `PAREDIT_MAX_INPUT_BYTES`, which is what
+/// [`max_source_input_bytes`] resolves. Kept public and unchanged because it
+/// is the documented default and several callers quote it as such.
+pub const MAX_SOURCE_INPUT_BYTES: u64 = paredit_core_safety::limits::DEFAULT_MAX_INPUT_BYTES;
+
+/// The ceiling on one document read that this invocation actually applies.
+///
+/// Every production read goes through here rather than through the constant,
+/// so lowering the bound reaches stdin, a named file, and a manifest source
+/// alike without each of them being told separately.
+#[must_use]
+pub fn max_source_input_bytes() -> u64 {
+    paredit_core_safety::limits::effective().max_input_bytes
+}
 
 #[cfg(all(test, unix))]
 type BeforeExistingFileOpenHook = (PathBuf, Box<dyn FnOnce()>);
@@ -372,7 +387,7 @@ pub fn read_input(file: Option<PathBuf>) -> CliResult<SourceInput> {
             // event at this point gives per-file progress across the tool
             // without any command's loop knowing progress exists.
             crate::progress::file_read(&path);
-            let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES)?;
+            let text = read_text_file_with_limit(&path, max_source_input_bytes())?;
             Ok(SourceInput {
                 text,
                 file: Some(path),
@@ -383,7 +398,7 @@ pub fn read_input(file: Option<PathBuf>) -> CliResult<SourceInput> {
             if stdin.is_terminal() {
                 return Err(ArgumentError::NoInput.into());
             }
-            let text = read_text_with_limit(&mut stdin, MAX_SOURCE_INPUT_BYTES, "stdin")?;
+            let text = read_text_with_limit(&mut stdin, max_source_input_bytes(), "stdin")?;
             Ok(SourceInput { text, file: None })
         }
     }
@@ -398,14 +413,37 @@ pub fn read_input_and_dialect(
     Ok((input, dialect))
 }
 
+/// Reads, resolves the dialect for, and parses one input.
+///
+/// This is where the process deadline is checked. Every multi-file report in
+/// this tool calls it once per file, so one check here bounds all ~130 of them
+/// without each workflow having to remember a budget it was never given.
+/// Checking *before* the read means an exhausted budget stops work rather than
+/// paying for one more parse to discover it has already stopped.
 pub fn read_input_dialect_and_tree(
     file: Option<PathBuf>,
     explicit: Option<DialectArg>,
 ) -> CliResult<(SourceInput, Dialect, SyntaxTree)> {
+    let deadline = paredit_core_safety::deadline::effective();
+    if deadline.is_armed() {
+        let scope = match file.as_deref() {
+            Some(path) => format!("reading {}", path.display()),
+            None => "reading stdin".to_owned(),
+        };
+        let completed = READS_COMPLETED.fetch_add(1, Ordering::Relaxed);
+        deadline
+            .check(scope, usize::try_from(completed).unwrap_or(usize::MAX))
+            .map_err(CliError::from)?;
+    }
+
     let (input, dialect) = read_input_and_dialect(file, explicit)?;
     let tree = parse_document(&input, dialect)?;
     Ok((input, dialect, tree))
 }
+
+/// How many inputs this process has parsed, reported by a timeout so "timed
+/// out" can be read as "timed out after 412 files".
+static READS_COMPLETED: AtomicU64 = AtomicU64::new(0);
 
 /// Parses a source document with its resolved dialect, naming the input and
 /// the error's line/column in the context. The underlying [`ParseError`] keeps
@@ -457,7 +495,7 @@ pub fn read_file_or_empty(path: &FsPath) -> CliResult<(SourceInput, bool)> {
             SourceInput {
                 text: read_text_with_limit(
                     file,
-                    MAX_SOURCE_INPUT_BYTES,
+                    max_source_input_bytes(),
                     &path.display().to_string(),
                 )?,
                 file: Some(path.to_path_buf()),
@@ -3143,6 +3181,228 @@ mod tests {
         assert!(cleanup_errors.is_empty(), "{cleanup_errors:?}");
 
         fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    // --- multi-file atomicity ---
+    //
+    // The writer stages every file, then applies every file, and rolls back on
+    // the way out of either phase. Section I item I3 of the feature catalogue
+    // asks for "transaction and rollback" across a multi-file write, and the
+    // implementation has always had it; what was missing is a statement of the
+    // property that fails when someone reorders those two phases. The three
+    // tests below are that statement, one per phase where a batch can die.
+
+    /// A file that would not reparse kills the batch before any file is even
+    /// staged. Central invariant: paredit never persists an unbalanced
+    /// document, and never half-persists a balanced one alongside it.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_containing_an_unparsable_output_writes_nothing() {
+        let directory = test_directory("batch-unparsable");
+        let good = directory.join("good.lisp");
+        let bad = directory.join("bad.lisp");
+        fs::write(&good, "(a)\n").expect("write first target");
+        fs::write(&bad, "(b)\n").expect("write second target");
+
+        let error = write_files_with_rollback([
+            (good.clone(), "(a2)\n".to_owned()),
+            (bad.clone(), "(unbalanced\n".to_owned()),
+        ])
+        .expect_err("an unparsable member must fail the batch");
+
+        assert!(
+            error.to_string().contains("does not reparse"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(fs::read_to_string(&good).expect("read first"), "(a)\n");
+        assert_eq!(fs::read_to_string(&bad).expect("read second"), "(b)\n");
+        assert_eq!(directory_entry_names(&directory), ["bad.lisp", "good.lisp"]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// A member that cannot be staged aborts the batch and removes the staging
+    /// artifacts of the members that were staged before it.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_that_fails_while_staging_leaves_no_file_touched() {
+        let directory = test_directory("batch-stage-failure");
+        let good = directory.join("good.lisp");
+        let link_target = directory.join("elsewhere.lisp");
+        let symlinked = directory.join("linked.lisp");
+        fs::write(&good, "(a)\n").expect("write first target");
+        fs::write(&link_target, "(b)\n").expect("write link target");
+        std::os::unix::fs::symlink(&link_target, &symlinked).expect("create symlink target");
+
+        let error = write_files_with_rollback([
+            (good.clone(), "(a2)\n".to_owned()),
+            (symlinked.clone(), "(b2)\n".to_owned()),
+        ])
+        .expect_err("a symlinked target must fail the batch");
+
+        assert!(
+            error.to_string().contains("refusing to write symlink"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(fs::read_to_string(&good).expect("read first"), "(a)\n");
+        assert_eq!(
+            fs::read_to_string(&link_target).expect("read link target"),
+            "(b)\n"
+        );
+        assert_eq!(
+            source_entry_names(&directory),
+            ["elsewhere.lisp", "good.lisp", "linked.lisp"],
+            "staging artifacts from the aborted batch must be gone"
+        );
+        assert_eq!(
+            directory_entry_names(&directory.join(CLEANUP_QUARANTINE_NAME)),
+            Vec::<String>::new(),
+            "the quarantine may outlive the batch, but nothing may be left in it"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// The batch order is not the failure order. Whichever member fails, every
+    /// other member must be untouched — so the property is checked with the
+    /// refused file first as well as last.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_whose_first_member_fails_leaves_the_rest_untouched() {
+        let directory = test_directory("batch-first-fails");
+        let good = directory.join("good.lisp");
+        let link_target = directory.join("elsewhere.lisp");
+        let symlinked = directory.join("linked.lisp");
+        fs::write(&good, "(a)\n").expect("write target");
+        fs::write(&link_target, "(b)\n").expect("write link target");
+        std::os::unix::fs::symlink(&link_target, &symlinked).expect("create symlink target");
+
+        write_files_with_rollback([
+            (symlinked.clone(), "(b2)\n".to_owned()),
+            (good.clone(), "(a2)\n".to_owned()),
+        ])
+        .expect_err("a symlinked target must fail the batch");
+
+        assert_eq!(fs::read_to_string(&good).expect("read target"), "(a)\n");
+        assert_eq!(
+            fs::read_to_string(&link_target).expect("read link target"),
+            "(b)\n"
+        );
+        assert_eq!(
+            source_entry_names(&directory),
+            ["elsewhere.lisp", "good.lisp", "linked.lisp"]
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// The phase that actually distinguishes a transaction from a loop: the
+    /// first file has already been published when the second fails to apply,
+    /// and the first must be put back from its backup.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_that_fails_while_applying_rolls_the_published_files_back() {
+        let directory = test_directory("batch-apply-failure");
+        let first = directory.join("first.lisp");
+        let second = directory.join("second.lisp");
+        fs::write(&first, "(a)\n").expect("write first target");
+        fs::write(&second, "(b)\n").expect("write second target");
+
+        let expected = |path: &FsPath, content: &str| {
+            ExpectedWriteTarget::from_metadata_and_content(
+                &fs::metadata(path).expect("read target metadata"),
+                content,
+            )
+            .expect("build expected write target")
+        };
+        let first_expected = expected(&first, "(a)\n");
+        let second_expected = expected(&second, "(b)\n");
+
+        // Fires between the two applies: the second target's content changes
+        // under the writer, so the digest its publication guard carries no
+        // longer matches and the apply refuses — with the first file already
+        // published. Changing the content in place rather than replacing the
+        // inode keeps the failure to the apply phase; a new inode would also
+        // block the *cleanup* of the second file, which is a different
+        // property (and one the surrounding tests already cover).
+        let hook_second = second.clone();
+        let _guard = install_before_existing_target_replace_hook(second.clone(), move || {
+            fs::write(&hook_second, "(concurrent)\n").expect("rewrite second target in place");
+        });
+
+        let error = write_files_with_rollback_expected([
+            (first.clone(), "(a2)\n".to_owned(), first_expected),
+            (second.clone(), "(b2)\n".to_owned(), second_expected),
+        ])
+        .expect_err("a target changed under the writer must fail the batch");
+
+        assert!(
+            error.chain().contains("failed to write"),
+            "unexpected error: {}",
+            error.chain()
+        );
+        assert_eq!(
+            fs::read_to_string(&first).expect("read first"),
+            "(a)\n",
+            "the already-published file must be rolled back, not left rewritten"
+        );
+        assert_eq!(
+            fs::read_to_string(&second).expect("read second"),
+            "(concurrent)\n",
+            "the concurrently written content must be preserved"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// Two entries naming the same file have no well-defined result, so the
+    /// batch is refused rather than resolved by ordering.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_naming_one_file_twice_is_refused() {
+        let directory = test_directory("batch-duplicate");
+        let target = directory.join("target.lisp");
+        fs::write(&target, "(a)\n").expect("write target");
+
+        let error = write_files_with_rollback([
+            (target.clone(), "(a2)\n".to_owned()),
+            (target.clone(), "(a3)\n".to_owned()),
+        ])
+        .expect_err("a duplicate target must fail the batch");
+
+        assert!(
+            error.to_string().contains("duplicate write target"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(fs::read_to_string(&target).expect("read target"), "(a)\n");
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// Sorted file names in a directory.
+    #[cfg(unix)]
+    fn directory_entry_names(directory: &FsPath) -> Vec<String> {
+        let mut names = fs::read_dir(directory)
+            .expect("read directory")
+            .map(|entry| {
+                entry
+                    .expect("read directory entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    /// The same, minus the cleanup quarantine.
+    ///
+    /// The quarantine directory deliberately outlives the batch that created
+    /// it: removing it would race with a second `paredit` recovering artifacts
+    /// in the same tree. What must not survive is anything *inside* it, or any
+    /// `.paredit-*` staging or backup sibling beside the sources.
+    #[cfg(unix)]
+    fn source_entry_names(directory: &FsPath) -> Vec<String> {
+        directory_entry_names(directory)
+            .into_iter()
+            .filter(|name| name != CLEANUP_QUARANTINE_NAME)
+            .collect()
     }
 
     #[test]

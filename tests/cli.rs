@@ -171,6 +171,8 @@ mod exhaustive_case_otherwise_report;
 mod explicit_nil_return_report;
 #[path = "cli/explicit_step_delta_report.rs"]
 mod explicit_step_delta_report;
+#[path = "cli/external_diagnostics.rs"]
+mod external_diagnostics;
 #[path = "cli/extract_constant/mod.rs"]
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]
@@ -233,6 +235,8 @@ mod lambda_list_keyword_order_report;
 mod last_default_count_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/lint_cache.rs"]
+mod lint_cache;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
 #[path = "cli/lint_report_golden.rs"]
@@ -247,6 +251,8 @@ mod list_star_to_cons_report;
 mod literal_place_report;
 #[path = "cli/lsp_server.rs"]
 mod lsp_server;
+#[path = "cli/macro_constructed_symbols.rs"]
+mod macro_constructed_symbols;
 #[path = "cli/make_array_default_keyword_report.rs"]
 mod make_array_default_keyword_report;
 #[path = "cli/make_hash_table_test_report.rs"]
@@ -323,6 +329,8 @@ mod package_boundary_report;
 mod package_conflict_report;
 #[path = "cli/package_cycle_report.rs"]
 mod package_cycle_report;
+#[path = "cli/parallel_analysis.rs"]
+mod parallel_analysis;
 #[path = "cli/paredit_parity.rs"]
 mod paredit_parity;
 #[path = "cli/parse_integer_default_radix_report.rs"]
@@ -401,6 +409,8 @@ mod refactor_manifest;
 mod refactor_preview;
 #[path = "cli/refactor_step.rs"]
 mod refactor_step;
+#[path = "cli/refactor_undo.rs"]
+mod refactor_undo;
 #[path = "cli/refactor_workspace/mod.rs"]
 mod refactor_workspace;
 #[path = "cli/remove_unused_binding/mod.rs"]
@@ -419,6 +429,10 @@ mod repair_unclosed_lists;
 mod replace_forms;
 #[path = "cli/report_interop.rs"]
 mod report_interop;
+#[path = "cli/resource_budget.rs"]
+mod resource_budget;
+#[path = "cli/round_trip_property.rs"]
+mod round_trip_property;
 #[path = "cli/run_controls.rs"]
 mod run_controls;
 #[path = "cli/selector.rs"]
@@ -523,6 +537,8 @@ mod verbose_negation_report;
 mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]
 mod workspace_report;
+#[path = "cli/write_scope.rs"]
+mod write_scope;
 #[path = "cli/zero_divisor_report.rs"]
 mod zero_divisor_report;
 

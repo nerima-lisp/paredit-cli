@@ -1,0 +1,42 @@
+# Excluded from the root workspace on purpose: `[workspace]` below makes this
+# its own root, so `cargo build --workspace` and the Nix build never see the
+# libFuzzer dependency or the nightly-only `-Z sanitizer` flags it needs.
+#
+# The invariants these targets check are the same ones tests/parser_robustness.rs
+# checks on stable. This directory exists for the depth a coverage-guided fuzzer
+# reaches and a property generator does not.
+[package]
+name = "paredit-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+paredit-core-syntax = { path = "../packages/core/syntax" }
+
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "format_idempotence"
+path = "fuzz_targets/format_idempotence.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "edit_at_offset"
+path = "fuzz_targets/edit_at_offset.rs"
+test = false
+doc = false
+bench = false

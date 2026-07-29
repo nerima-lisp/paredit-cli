@@ -23,8 +23,8 @@ use paredit_core_cli::report::FindingSeverity;
 use paredit_core_cli::report::interop::{self, Flattened, Row};
 
 use crate::presentation::cli::shared::{
-    apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree, stable_text_hash,
-    unified_diff, write_file_with_rollback,
+    analyze_files, apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree,
+    stable_text_hash, unified_diff, write_file_with_rollback,
 };
 
 /// The 1-based line and byte-based column of a byte offset in `text`.
@@ -404,23 +404,69 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     let mut findings = Vec::new();
     let mut ids: FindingIds = Vec::new();
 
-    for file in &files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let file_findings = run_lint_pass(
-            file,
-            dialect,
-            &tree,
-            &input.text,
-            LintPassRequest {
-                active: &[],
-                settings: Some(&settings),
-                measure: false,
-            },
-        )?
-        .findings;
-        let file_findings = merge_custom(file_findings, &custom, file, &tree, &input.text);
-        let file_findings = retain_unsuppressed(file_findings, &input.text, &tree);
-        let file_findings = retain_unbaselined(file_findings, &input.text, baseline.as_ref());
+    let cache = open_lint_cache(&args)?;
+    // Everything about this request, other than the file's own bytes, that can
+    // change what the rules report. Getting this wrong is the one way a
+    // content-addressed cache can be wrong, so it is derived from the resolved
+    // values rather than from the flags the caller typed.
+    let discriminator = lint_cache_discriminator(&active, &custom, &settings);
+    let statistics = std::sync::Mutex::new(paredit_core_safety::cache::CacheStatistics::default());
+
+    // The 170-rule pass over each file is the heaviest per-file work in this
+    // tool and has no dependency between files, so it runs on every core.
+    // `analyze_files` returns results in input order, which is what keeps the
+    // report byte-identical however the workers were scheduled.
+    let per_file = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
+        // The cached value is the *pre-baseline* finding set: a baseline is a
+        // filter over the answer, not part of the question, so changing one
+        // must not throw the analysis away.
+        let key = cache
+            .as_ref()
+            .map(|cache| cache.key("lint", &discriminator, &input.text));
+
+        let unfiltered = match key
+            .as_deref()
+            .and_then(|key| cache.as_ref().and_then(|cache| cache.get(key)))
+            .as_ref()
+            .and_then(|cached| decode_cached_findings(cached, file))
+        {
+            Some(cached) => {
+                if let Ok(mut statistics) = statistics.lock() {
+                    statistics.hits += 1;
+                }
+                cached
+            }
+            None => {
+                let computed = run_lint_pass(
+                    file,
+                    dialect,
+                    tree,
+                    &input.text,
+                    LintPassRequest {
+                        active: &[],
+                        settings: Some(&settings),
+                        measure: false,
+                    },
+                )?
+                .findings;
+                let computed = merge_custom(computed, &custom, file, tree, &input.text);
+                let computed = retain_unsuppressed(computed, &input.text, tree);
+                if let (Some(cache), Some(key)) = (cache.as_ref(), key.as_deref()) {
+                    let written = cache.put(key, &encode_cached_findings(&computed));
+                    if let Ok(mut statistics) = statistics.lock() {
+                        statistics.misses += 1;
+                        if !written {
+                            statistics.write_failures += 1;
+                        }
+                    }
+                } else if let Ok(mut statistics) = statistics.lock() {
+                    statistics.misses += 1;
+                }
+                computed
+            }
+        };
+
+        let file_findings = retain_unbaselined(unfiltered, &input.text, baseline.as_ref());
         // Ids are assigned per file, against that file's source, and the
         // summary keeps the findings in the order they arrive — so the two
         // lists stay aligned as long as `summarize_lint_findings` only ever
@@ -429,8 +475,31 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
             .into_iter()
             .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
-        ids.extend(assign_finding_ids(&kept, &input.text));
+        let file_ids = assign_finding_ids(&kept, &input.text);
+        Ok((kept, file_ids))
+    })?;
+
+    for (kept, file_ids) in per_file {
+        ids.extend(file_ids);
         findings.extend(kept);
+    }
+
+    // Reported on stderr rather than in the JSON: the cache is an execution
+    // detail, and putting it in the report would make the report depend on
+    // whether a cache was configured — which is exactly what a cache must
+    // never change.
+    if cache.is_some() {
+        if let Ok(statistics) = statistics.lock() {
+            eprintln!(
+                "cache: {} hit(s), {} miss(es){}",
+                statistics.hits,
+                statistics.misses,
+                match statistics.write_failures {
+                    0 => String::new(),
+                    failures => format!(", {failures} unwritable"),
+                }
+            );
+        }
     }
 
     let summary = summarize_lint_findings(findings, &active_with_custom(&active, &custom));
@@ -459,6 +528,10 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
 /// the real pass is the only way to measure the real cost. Files are scanned
 /// with every rule the selection admits, so the numbers describe the run the
 /// caller would otherwise have made.
+///
+/// Deliberately serial, unlike the report and SARIF paths. Sixteen workers
+/// contending for memory bandwidth measure the machine rather than the rules,
+/// and a per-rule cost that changes with `--jobs` is not a per-rule cost.
 fn lint_report_timings(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
@@ -608,12 +681,16 @@ fn lint_report_sarif(
     let mut fingerprint_seen: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
 
-    for file in files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+    // The analysis is parallel; the *fingerprint* assignment is not, and must
+    // not be. `fingerprint_seen` counts occurrences across the whole run, so a
+    // finding's suffix depends on how many identical-looking lines preceded it
+    // — which is only well defined in file order. Computing per file in
+    // parallel and numbering afterwards keeps both properties.
+    let per_file = analyze_files(files, args.dialect, |file, dialect, tree, input| {
         let pass = run_lint_pass(
             file,
             dialect,
-            &tree,
+            tree,
             &input.text,
             LintPassRequest {
                 active,
@@ -622,21 +699,25 @@ fn lint_report_sarif(
             },
         )?;
         let mut fixes = fix_map(pass.fixes);
-        let findings = merge_custom(pass.findings, custom, file, &tree, &input.text);
-        custom_fixes(custom, file, &tree, &input.text, &mut fixes);
-        let findings = retain_unsuppressed(findings, &input.text, &tree);
+        let findings = merge_custom(pass.findings, custom, file, tree, &input.text);
+        custom_fixes(custom, file, tree, &input.text, &mut fixes);
+        let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let findings: Vec<LintFinding> = findings
             .into_iter()
             .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
         let ids = assign_finding_ids(&findings, &input.text);
+        Ok((findings, ids, fixes, input.text.clone()))
+    })?;
+
+    for (findings, ids, fixes, text) in per_file {
         for (index, finding) in findings.into_iter().enumerate() {
             let start = finding.span.start().get();
             let end = finding.span.end().get();
-            let (start_line, start_column) = line_and_column(&input.text, start);
+            let (start_line, start_column) = line_and_column(&text, start);
             let fingerprint =
-                line_fingerprint(finding.rule, &input.text, start_line, &mut fingerprint_seen);
+                line_fingerprint(finding.rule, &text, start_line, &mut fingerprint_seen);
             let fix = fixes.get(&(finding.rule, start, end)).cloned();
             results.push(LintSarifResult {
                 rule: finding.rule,
@@ -1183,32 +1264,40 @@ fn lint_report_github(
     let baseline = load_baseline(args)?;
     let mut finding_rules: Vec<&'static str> = Vec::new();
 
-    for file in files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+    // Analysed in parallel, *printed* serially: an annotation stream that
+    // interleaved by thread would be unreadable and, worse, unstable between
+    // runs. The split is the general shape for adopting `analyze_files` in a
+    // command that emits as it goes — compute per file, emit in file order.
+    let annotated = analyze_files(files, args.dialect, |file, dialect, tree, input| {
         let findings = merge_custom(
-            collect_lint_findings(file, dialect, &tree)?,
+            collect_lint_findings(file, dialect, tree)?,
             custom,
             file,
-            &tree,
+            tree,
             &input.text,
         );
-        let findings = retain_unsuppressed(findings, &input.text, &tree);
+        let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
-        for finding in findings {
-            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
-                continue;
-            }
-            finding_rules.push(finding.rule);
-            let (line, column) = line_and_column(&input.text, finding.span.start().get());
-            print_lint_github_annotation(
-                &finding.path.display().to_string(),
-                line,
-                column,
-                finding.rule,
-                &finding.message,
-                meta.severity(finding.rule),
-            );
-        }
+        Ok(findings
+            .into_iter()
+            .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
+            .map(|finding| {
+                let (line, column) = line_and_column(&input.text, finding.span.start().get());
+                (finding, line, column)
+            })
+            .collect::<Vec<_>>())
+    })?;
+
+    for (finding, line, column) in annotated.into_iter().flatten() {
+        finding_rules.push(finding.rule);
+        print_lint_github_annotation(
+            &finding.path.display().to_string(),
+            line,
+            column,
+            finding.rule,
+            &finding.message,
+            meta.severity(finding.rule),
+        );
     }
 
     if let Some(message) = gate_message(&finding_rules, args, meta.overrides()) {
@@ -1218,6 +1307,121 @@ fn lint_report_github(
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// The incremental cache.
+//
+// A lint pass runs 170 rules over every file, every time; on a re-run almost
+// all of that is spent rediscovering that nothing changed. The cache is
+// content-addressed, so a hit means "this exact question was answered", never
+// "a file with this name was seen". See `paredit_core_safety::cache`.
+// ---------------------------------------------------------------------------
+
+/// Opens the cache the caller asked for, or `None`.
+///
+/// A cache directory that cannot be created is an error rather than a silent
+/// fallback: the caller asked for a cache, and a run that quietly does not use
+/// one looks identical to a run that does, only slower — which is the hardest
+/// kind of configuration mistake to notice.
+fn open_lint_cache(
+    args: &LintReportArgs,
+) -> Result<Option<paredit_core_safety::cache::AnalysisCache>> {
+    args.cache_dir
+        .as_deref()
+        .map(|root| {
+            paredit_core_safety::cache::AnalysisCache::open(root, env!("CARGO_PKG_VERSION"))
+                .with_context(|| format!("opening lint cache {}", root.display()))
+        })
+        .transpose()
+}
+
+/// Everything other than the file's bytes that changes what the rules report.
+///
+/// The active rule *names* rather than the flags that selected them: `--preset
+/// recommended` and an explicit `--rule` list that happens to name the same
+/// rules are the same question and should share an entry. The custom rules are
+/// keyed by their source, since a project can edit a rule without renaming it.
+fn lint_cache_discriminator(
+    active: &[&str],
+    custom: &CustomRules,
+    settings: &RuleSettings,
+) -> String {
+    let mut parts = vec![format!("rules={}", active.join(","))];
+    parts.push(format!(
+        "settings={}",
+        settings
+            .entries()
+            .map(|(rule, key, value)| format!("{rule}.{key}={value}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    ));
+    // Custom rules are keyed by name *and* by what each one reports on a
+    // canonical probe, so editing a rule's pattern without renaming it changes
+    // the key. Name alone would let an edited rule serve stale findings.
+    parts.push(format!(
+        "custom={}",
+        stable_text_hash(&custom.test().join("\n"))
+    ));
+    parts.join("|")
+}
+
+/// A file's findings, in the cache's on-disk form.
+///
+/// **The path is deliberately not stored.** The key is the file's *content*,
+/// so two files with identical bytes share one entry — which is correct and
+/// is the reason a renamed or copied file hits. Storing the path in the value
+/// would then serve whichever duplicate wrote the entry first, and every other
+/// copy would be reported under the wrong name. A 1065-file corpus containing
+/// 135 duplicates surfaced exactly that, as findings whose path belonged to a
+/// different file.
+///
+/// The path is context, not result. It is re-attached on decode from the file
+/// actually being reported.
+///
+/// `rule` is a `&'static str` in memory and a string on disk, so decoding has
+/// to map it back onto the registry — a cached name that no longer exists
+/// makes the whole entry a miss rather than a finding with a dangling rule.
+fn encode_cached_findings(findings: &[LintFinding]) -> serde_json::Value {
+    serde_json::json!({
+        "findings": findings
+            .iter()
+            .map(|finding| serde_json::json!({
+                "rule": finding.rule,
+                "start": finding.span.start().get(),
+                "end": finding.span.end().get(),
+                "message": finding.message,
+            }))
+            .collect::<Vec<_>>(),
+    })
+}
+
+/// Reads a cached entry back, or `None` when anything about it is unusable.
+fn decode_cached_findings(
+    value: &serde_json::Value,
+    path: &std::path::Path,
+) -> Option<Vec<LintFinding>> {
+    value
+        .get("findings")?
+        .as_array()?
+        .iter()
+        .map(|entry| {
+            let name = entry.get("rule")?.as_str()?;
+            // The `&'static str` the rest of the pipeline expects, and the
+            // check that this build still has the rule. A cached name that no
+            // longer exists makes the whole entry a miss, which is the right
+            // answer: the analysis that produced it is not this one.
+            let rule = RULES.iter().copied().find(|candidate| *candidate == name)?;
+            let start = usize::try_from(entry.get("start")?.as_u64()?).ok()?;
+            let end = usize::try_from(entry.get("end")?.as_u64()?).ok()?;
+            Some(LintFinding {
+                rule,
+                path: path.to_path_buf(),
+                span: ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end)),
+                message: entry.get("message")?.as_str()?.to_owned(),
+            })
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------

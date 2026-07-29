@@ -343,7 +343,15 @@
           includes = lispIncludes;
           # Test fixtures are byte-exact parser inputs; formatting them would
           # change the spans the tests assert on.
-          excludes = [ "tests/fixtures/*" ];
+          #
+          # A fuzz corpus is the same argument at its strongest: a seed's whole
+          # value is its exact bytes, and a crasher artifact that a formatter
+          # rewrote has stopped reproducing the crash it was saved for.
+          excludes = [
+            "tests/fixtures/*"
+            "fuzz/corpus/*"
+            "fuzz/artifacts/*"
+          ];
         };
       };
 

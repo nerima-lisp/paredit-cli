@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 225] = [
+const INTROSPECTION_COMMANDS: [&str; 226] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -200,6 +200,7 @@ const INTROSPECTION_COMMANDS: [&str; 225] = [
     "inspect symbol-index",
     "inspect keyword-arity",
     "inspect unreachable-expressions",
+    "inspect external-diagnostics",
     "inspect external-systems",
     "inspect licenses",
     "inspect serial-consistency",
@@ -409,7 +410,7 @@ const STRUCTURAL_COMMANDS: [&str; 29] = [
     "edit unescape-string",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 80] = [
+const SEMANTIC_COMMANDS: [&str; 81] = [
     "refactor step",
     "refactor patch",
     "refactor plan",
@@ -418,6 +419,7 @@ const SEMANTIC_COMMANDS: [&str; 80] = [
     "refactor check",
     "refactor status",
     "refactor apply",
+    "refactor undo",
     "refactor diff",
     "refactor workspace-plan",
     "refactor workspace-preview",
@@ -556,7 +558,7 @@ const SCOPE_TIER_REPORTS: [&str; 33] = [
 
 /// Refactor plumbing that moves whole forms or drives the manifest workflow.
 /// None of it reads an operator name, so it is complete for every dialect.
-const SYNTAX_TIER_REFACTORS: [&str; 16] = [
+const SYNTAX_TIER_REFACTORS: [&str; 17] = [
     "refactor step",
     "refactor patch",
     "refactor plan",
@@ -565,6 +567,7 @@ const SYNTAX_TIER_REFACTORS: [&str; 16] = [
     "refactor check",
     "refactor status",
     "refactor apply",
+    "refactor undo",
     "refactor diff",
     "refactor workspace-plan",
     "refactor workspace-preview",

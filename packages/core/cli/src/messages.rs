@@ -63,6 +63,7 @@ pub enum Message {
     RepairPartialWrite,
     RepairBackupLeftover,
     RepairReadTheReport,
+    RepairRaiseBudget,
     RepairConvertEncoding,
     RepairSpanBoundaries,
     RepairDropDryRun,
@@ -173,6 +174,9 @@ impl Message {
             }
             Self::RepairReadTheReport => {
                 "the report was printed before this; the gate named in the message is what tripped"
+            }
+            Self::RepairRaiseBudget => {
+                "nothing is wrong with the input; re-run with a larger --timeout-ms, or without one"
             }
             Self::RepairConvertEncoding => {
                 "this tool reads UTF-8 only; convert the file's encoding first"
@@ -304,6 +308,9 @@ impl Message {
             }
             Self::RepairReadTheReport => {
                 "レポートはこの前に出力済みです。メッセージが示すゲートが作動しました"
+            }
+            Self::RepairRaiseBudget => {
+                "入力に問題はありません。--timeout-ms を大きくするか、指定せずに再実行してください"
             }
             Self::RepairConvertEncoding => {
                 "本ツールは UTF-8 のみを読みます。先にファイルの文字コードを変換してください"

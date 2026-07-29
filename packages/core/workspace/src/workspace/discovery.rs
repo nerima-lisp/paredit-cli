@@ -406,7 +406,12 @@ pub fn discover_workspace_files_from_list(
     )
 }
 
-pub(super) fn discover_workspace_files_with_limits(
+/// Discovers with caller-supplied bounds.
+///
+/// Public since `--max-file-bytes` and its siblings: a CI container with a
+/// 512 MB budget has to be able to say so, and the defaults are sized for a
+/// workstation.
+pub fn discover_workspace_files_with_limits(
     options: &WorkspaceDiscoveryOptions,
     limits: WorkspaceLimits,
 ) -> std::result::Result<WorkspaceDiscovery, WorkspaceError> {

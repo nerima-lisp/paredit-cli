@@ -12,8 +12,11 @@ repository.workspace = true
 [dependencies]
 paredit-core-syntax = { path = "../syntax" }
 paredit-core-semantics = { path = "../semantics" }
+# The wall-clock budget the walk checks between nodes. One rule over one
+# pathological file is the only place a lint run can become unbounded.
+paredit-core-safety = { path = "../safety" }
 # No anyhow. A lint rule's only legitimate failure is a path that does not
-# resolve, and LintError says so; see src/error.rs.
+# resolve or a budget that ran out, and LintError says so; see src/error.rs.
 thiserror.workspace = true
 
 [dev-dependencies]

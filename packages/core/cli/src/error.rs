@@ -299,6 +299,15 @@ pub enum CliError {
     /// *not* treat as "the operation did not happen". The files are written.
     #[error("writes committed successfully, but backup cleanup failed: {details}")]
     BackupCleanupAfterCommit { details: String },
+
+    /// The wall-clock budget ran out before the work did.
+    ///
+    /// Distinct from every other variant because nothing is wrong with the
+    /// input: the same command with a larger budget, or none, would succeed.
+    /// A caller re-reading this as a defect in the source would be drawing the
+    /// wrong conclusion, so the type says which it is.
+    #[error(transparent)]
+    TimedOut(#[from] paredit_core_safety::deadline::TimeoutError),
 }
 
 impl CliError {

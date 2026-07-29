@@ -62,6 +62,9 @@ pub fn print_refactor_apply_result(
                 );
             }
             print_decision_summary(decision.summary());
+            for (key, value) in result.write_scope.text_rows() {
+                println!("{key}\t{}", safe_text!(value));
+            }
             println!("applied\t{}", result.summary.applied);
             println!("files\t{}", result.summary.file_count);
             println!("changed_file_count\t{}", result.summary.changed_file_count);
@@ -116,6 +119,7 @@ pub fn print_refactor_apply_result(
                 "next_action": decision.next_action.label(),
                 "manifest_policy_passed": result.manifest_policy_passed,
                 "manifest_outputs_parse": result.manifest_outputs_parse,
+                "write_scope": result.write_scope.to_json(),
                 "blocked_reasons": blocked_reason_labels(&decision.blocked_reasons),
                 "steps": decision_steps_json(decision.steps()),
                 "decision_summary": decision_summary_json(decision.summary()),

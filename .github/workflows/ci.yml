@@ -106,3 +106,41 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Reject vulnerable or unmaintained dependencies
         run: nix develop --command cargo audit --deny warnings
+
+  # Benchmarks the merge base and this branch on the *same runner, minutes
+  # apart*, and fails on a regression beyond the threshold.
+  #
+  # Comparing against a stored number would not work. Criterion's absolute
+  # values are a property of the machine as much as of the code — a different
+  # runner model, a noisy neighbour, or thermal state moves them by tens of
+  # percent — so a gate built on remembered numbers fires constantly and means
+  # nothing. Two revisions measured back to back on one runner is the only
+  # comparison that survives that, and it is what scripts/bench-compare.sh
+  # arranges.
+  #
+  # `continue-on-error` on purpose: a performance regression is information for
+  # the reviewer, not grounds for blocking a correctness fix. The job's failure
+  # is visible in the checks list without gating the merge.
+  benchmark:
+    name: Benchmark against the merge base
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          # The full history: the script needs the merge base as a real
+          # revision it can check out into a worktree.
+          fetch-depth: 0
+      - uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Compare this branch against its merge base
+        run: |
+          set -euo pipefail
+          base="$(git merge-base HEAD "origin/${{ github.base_ref }}")"
+          echo "merge base: $base"
+          nix develop --command ./scripts/bench-compare.sh "$base"

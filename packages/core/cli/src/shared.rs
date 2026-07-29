@@ -12,7 +12,7 @@ use paredit_core_syntax::sexpr::{
     SexprResult, SymbolName, SyntaxTree,
 };
 use paredit_core_workspace::workspace::{
-    IgnoreOptions, WorkspaceDiscoveryOptions, discover_workspace_files,
+    IgnoreOptions, WorkspaceDiscoveryOptions, WorkspaceLimits, discover_workspace_files_with_limits,
 };
 
 #[path = "diff.rs"]
@@ -106,15 +106,10 @@ pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) ->
     Ok(output)
 }
 
-#[must_use]
-pub fn stable_text_hash(text: &str) -> String {
-    let mut hash = 0xcbf2_9ce4_8422_2325u64;
-    for byte in text.as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    format!("fnv1a64:{hash:016x}")
-}
+// Re-exported rather than defined here since the undo journal started
+// comparing against the same digest. Two spellings of one hash would agree
+// until the day one of them changed.
+pub use paredit_core_safety::hash::stable_text_hash;
 
 #[must_use]
 pub fn bounded_preview(text: &str, max_bytes: usize) -> String {
@@ -461,23 +456,27 @@ pub fn expand_input_files(
     let mut seen = BTreeSet::new();
     let runtime = crate::runtime::current();
 
+    let limits = workspace_limits();
     for input in inputs {
         if input.is_dir() {
-            let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
-                roots: vec![input.clone()],
-                include_unknown: dialect.is_some(),
-                include_hidden: runtime.include_hidden,
-                include_generated: runtime.include_generated,
-                max_depth: runtime.max_depth,
-                exclude: runtime.exclude_paths.clone(),
-                // These commands take explicit paths and have no input flags of
-                // their own, so `[paths]` in `paredit.toml` and the environment
-                // are the only places a caller can say "look at the generated
-                // files too". The environment narrows what the file allowed,
-                // which is the precedence every other setting follows.
-                ignore: runtime.ignore_options(IgnoreOptions::from_environment()),
-                ..WorkspaceDiscoveryOptions::default()
-            })?;
+            let discovery = discover_workspace_files_with_limits(
+                &WorkspaceDiscoveryOptions {
+                    roots: vec![input.clone()],
+                    include_unknown: dialect.is_some(),
+                    include_hidden: runtime.include_hidden,
+                    include_generated: runtime.include_generated,
+                    max_depth: runtime.max_depth,
+                    exclude: runtime.exclude_paths.clone(),
+                    // These commands take explicit paths and have no input flags of
+                    // their own, so `[paths]` in `paredit.toml` and the environment
+                    // are the only places a caller can say "look at the generated
+                    // files too". The environment narrows what the file allowed,
+                    // which is the precedence every other setting follows.
+                    ignore: runtime.ignore_options(IgnoreOptions::from_environment()),
+                    ..WorkspaceDiscoveryOptions::default()
+                },
+                limits,
+            )?;
             let files = discovery.into_files();
             crate::progress::discovered(files.len(), input);
             for discovered in files {
@@ -489,6 +488,133 @@ pub fn expand_input_files(
     }
 
     Ok(expanded)
+}
+
+/// Reads, parses, and analyzes a list of files, using every available core.
+///
+/// The shape every multi-file report in this tool has is
+/// "read, parse, analyze, collect" per file, with no dependency between files.
+/// That is embarrassingly parallel and was entirely serial; on a large tree
+/// the parse alone dominates, and it was being done on one core.
+///
+/// Three properties make this safe to substitute for the loop it replaces:
+///
+/// - **Order is preserved.** Results come back in input order regardless of
+///   which thread finished first, so the report's bytes do not depend on
+///   scheduling. That is the same-input-same-output contract, and it is the
+///   reason the results are collected into pre-indexed slots rather than
+///   pushed as they arrive.
+/// - **The first failure by input order wins.** A run over ten files where
+///   files 2 and 7 both fail must report file 2, every time — not whichever
+///   thread lost the race.
+/// - **One worker is the serial path.** With `--jobs 1`, or a list short
+///   enough not to be worth a thread, no thread is spawned at all. A caller
+///   debugging a panic gets the original stack.
+///
+/// `std::thread::scope` rather than a work-stealing pool: the work is a flat
+/// map over a known list, and a scoped spawn needs no dependency, no runtime,
+/// and no `'static` bound on the closure.
+/// The closure returns `anyhow::Result` rather than `CliResult` because every
+/// workflow that would call this already does, and an analysis is free to fail
+/// for reasons the I/O layer has no vocabulary for.
+pub fn analyze_files<T, F>(
+    files: &[PathBuf],
+    dialect: Option<DialectArg>,
+    analyze: F,
+) -> anyhow::Result<Vec<T>>
+where
+    T: Send,
+    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> anyhow::Result<T> + Sync,
+{
+    let workers = worker_count(files.len());
+    if workers <= 1 {
+        return files
+            .iter()
+            .map(|file| analyze_one(file, dialect, &analyze))
+            .collect();
+    }
+
+    // Static partition into contiguous chunks. A work-stealing queue would
+    // balance an uneven file-size distribution better; it would also need a
+    // dependency, a mutex on the hot path, and a reason to believe the
+    // imbalance costs more than the contention. Contiguous chunks of a sorted
+    // file list are close to even in practice, and each worker writes only its
+    // own slice — which is what makes the whole thing sound without a lock.
+    let mut results = files
+        .iter()
+        .map(|_| None::<anyhow::Result<T>>)
+        .collect::<Vec<_>>();
+    let per_worker = files.len().div_ceil(workers);
+    let analyze = &analyze;
+
+    std::thread::scope(|scope| {
+        for (chunk_index, slots) in results.chunks_mut(per_worker).enumerate() {
+            let start = chunk_index * per_worker;
+            scope.spawn(move || {
+                for (offset, slot) in slots.iter_mut().enumerate() {
+                    // `files` is borrowed immutably by every worker; the
+                    // mutable half is the disjoint slice each one owns.
+                    if let Some(file) = files.get(start + offset) {
+                        *slot = Some(analyze_one(file, dialect, analyze));
+                    }
+                }
+            });
+        }
+    });
+
+    // Collected in input order, so the report's bytes do not depend on which
+    // worker finished first, and the first failure by input order is the one
+    // reported.
+    results
+        .into_iter()
+        .map(|slot| slot.expect("every slot is filled before the scope ends"))
+        .collect()
+}
+
+fn analyze_one<T, F>(file: &PathBuf, dialect: Option<DialectArg>, analyze: &F) -> anyhow::Result<T>
+where
+    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> anyhow::Result<T>,
+{
+    let (input, resolved, tree) = read_input_dialect_and_tree(Some(file.clone()), dialect)?;
+    analyze(file, resolved, &tree, &input)
+}
+
+/// How many workers to use for `count` files.
+///
+/// A thread costs more than parsing a handful of small files, so a short list
+/// stays serial. `--jobs` is the caller's override and 0 means "as many as the
+/// machine has".
+fn worker_count(count: usize) -> usize {
+    const PARALLEL_THRESHOLD: usize = 8;
+
+    if count < PARALLEL_THRESHOLD {
+        return 1;
+    }
+    let requested = paredit_core_safety::limits::effective_jobs();
+    let available = if requested == 0 {
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+    } else {
+        requested
+    };
+    available.min(count).max(1)
+}
+
+/// Restates this invocation's bounds in the traversal's own vocabulary.
+///
+/// The two types are separate on purpose: `ResourceLimits` is what a caller
+/// asked for and `WorkspaceLimits` is what a traversal enforces, and the
+/// traversal has no business knowing that a command line exists. This is the
+/// one place they meet.
+#[must_use]
+pub fn workspace_limits() -> WorkspaceLimits {
+    let limits = paredit_core_safety::limits::effective();
+    WorkspaceLimits {
+        max_roots: limits.max_roots,
+        max_entries: limits.max_entries,
+        max_files: limits.max_files,
+        max_file_bytes: limits.max_file_bytes,
+        max_total_bytes: limits.max_total_bytes,
+    }
 }
 
 fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: PathBuf) {

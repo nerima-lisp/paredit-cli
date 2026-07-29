@@ -130,12 +130,22 @@ pub fn plan_convert_cond_to_if(
     }
 
     let mut replacement = None;
-    for clause in clauses.iter().rev() {
+    for (index, clause) in clauses.iter().enumerate().rev() {
         let test = clause.children[0].span.slice(request.input);
         let consequent = clause.children[1].span.slice(request.input);
-        replacement = Some(match replacement {
-            Some(else_form) => format!("(if {test} {consequent} {else_form})"),
-            None => format!("(if {test} {consequent})"),
+
+        // A trailing catch-all becomes the `else` branch rather than a nested
+        // `(if t ...)`. Nesting it is correct and does two unhelpful things:
+        // it emits a constant test, which this tool's own `constant-if-test`
+        // rule reports, and it makes the conversion pair non-terminating —
+        // `if → cond` writes a catch-all clause, so a round trip added a level
+        // of nesting every time it ran.
+        let is_final_catch_all =
+            index + 1 == clauses.len() && is_catch_all_test(&clause.children[0], request.input);
+        replacement = Some(match (replacement, is_final_catch_all) {
+            (None, true) => consequent.to_owned(),
+            (None, false) => format!("(if {test} {consequent})"),
+            (Some(else_form), _) => format!("(if {test} {consequent} {else_form})"),
         });
     }
     let replacement = replacement.ok_or(ShapeRefusal::ClausesEmpty {
@@ -152,6 +162,39 @@ pub fn plan_convert_cond_to_if(
         changed: rewritten != request.input,
         rewritten,
     })
+}
+
+/// Whether a `cond` clause's test always succeeds.
+///
+/// Recognises the three spellings this tool and the surrounding ecosystem
+/// actually produce: bare `t`, the reader-prefixed `'t`, and the fully written
+/// `(quote t)` that `convert-if-to-cond` emits. Recognising *only* what could
+/// be proved constant in general is not the goal — an unrecognised catch-all
+/// simply keeps the old nested-`if` output, which stays correct.
+///
+/// Deliberately not extended to arbitrary non-nil literals. `(cond (42 x))` is
+/// a catch-all too, and reading it as one would rewrite code whose author may
+/// have meant something else by it.
+fn is_catch_all_test(test: &ExpressionView, input: &str) -> bool {
+    let is_t = |text: &str| common_lisp_symbol_reference_eq(text, "t");
+
+    match test.kind {
+        // `t` and `'t`: the same atom, distinguished by its reader prefix,
+        // which `atom_symbol_text` looks past.
+        ExpressionKind::Atom => atom_symbol_text(test).is_some_and(is_t),
+        // `(quote t)`, written out.
+        ExpressionKind::List => {
+            test.reader_prefixes.is_empty()
+                && test.children.len() == 2
+                && atom_symbol_text(&test.children[0])
+                    .is_some_and(|head| common_lisp_symbol_reference_eq(head, "quote"))
+                && atom_symbol_text(&test.children[1]).is_some_and(is_t)
+        }
+        _ => {
+            let _ = input;
+            false
+        }
+    }
 }
 
 pub fn require_supported_dialect(dialect: Dialect, operation: &'static str) -> EditResult<()> {
@@ -212,23 +255,93 @@ fn parse_output(rewritten: &str, dialect: Dialect, operation: &'static str) -> E
 mod tests {
     use super::*;
 
+    /// `if → cond → if` is now the identity, not merely parseable.
+    ///
+    /// It used to produce `(if ready yes (if (quote t) no))`: correct, and one
+    /// level deeper than it started. Since `if → cond` writes the catch-all
+    /// clause that `cond → if` now recognises, the old behaviour meant a caller
+    /// alternating the two conversions grew the form without bound.
     #[test]
-    fn if_cond_round_trip_preserves_parseability_for_both_dialects() {
+    fn if_cond_round_trip_is_the_identity_for_both_dialects() {
         for dialect in [Dialect::CommonLisp, Dialect::EmacsLisp] {
-            let if_plan = plan_convert_if_to_cond(ConvertIfToCondRequest {
-                input: "(if ready yes no)",
-                dialect,
-                path: "0".parse().expect("path"),
-            })
-            .expect("if plan");
-            let cond_plan = plan_convert_cond_to_if(ConvertCondToIfRequest {
-                input: &if_plan.rewritten,
-                dialect,
+            for input in ["(if ready yes no)", "(if ready yes)"] {
+                let if_plan = plan_convert_if_to_cond(ConvertIfToCondRequest {
+                    input,
+                    dialect,
+                    path: "0".parse().expect("path"),
+                })
+                .expect("if plan");
+                let cond_plan = plan_convert_cond_to_if(ConvertCondToIfRequest {
+                    input: &if_plan.rewritten,
+                    dialect,
+                    path: "0".parse().expect("path"),
+                })
+                .expect("cond plan");
+                assert_eq!(cond_plan.rewritten, input, "round-tripping {input}");
+            }
+        }
+    }
+
+    /// Every spelling of the catch-all a `cond` is likely to carry.
+    #[test]
+    fn a_trailing_catch_all_clause_becomes_the_else_branch() {
+        for (input, expected) in [
+            ("(cond (ready yes) (t no))", "(if ready yes no)"),
+            ("(cond (ready yes) ('t no))", "(if ready yes no)"),
+            ("(cond (ready yes) ((quote t) no))", "(if ready yes no)"),
+            // Upper case: Common Lisp reads `T` and `t` as the same symbol.
+            ("(cond (ready yes) (T no))", "(if ready yes no)"),
+        ] {
+            let plan = plan_convert_cond_to_if(ConvertCondToIfRequest {
+                input,
+                dialect: Dialect::CommonLisp,
                 path: "0".parse().expect("path"),
             })
             .expect("cond plan");
-            assert_eq!(cond_plan.rewritten, "(if ready yes (if (quote t) no))");
+            assert_eq!(plan.rewritten, expected, "converting {input}");
         }
+    }
+
+    /// A catch-all that is not last is a real test position: the clauses after
+    /// it are unreachable, and rewriting it as an `else` would silently delete
+    /// them.
+    #[test]
+    fn a_catch_all_before_the_last_clause_stays_a_test() {
+        let plan = plan_convert_cond_to_if(ConvertCondToIfRequest {
+            input: "(cond (t first) (ready second))",
+            dialect: Dialect::CommonLisp,
+            path: "0".parse().expect("path"),
+        })
+        .expect("cond plan");
+
+        assert_eq!(plan.rewritten, "(if t first (if ready second))");
+    }
+
+    /// A single catch-all clause is the whole form: `(cond (t x))` is `x`.
+    #[test]
+    fn a_lone_catch_all_clause_reduces_to_its_consequent() {
+        let plan = plan_convert_cond_to_if(ConvertCondToIfRequest {
+            input: "(cond (t (run)))",
+            dialect: Dialect::CommonLisp,
+            path: "0".parse().expect("path"),
+        })
+        .expect("cond plan");
+
+        assert_eq!(plan.rewritten, "(run)");
+    }
+
+    /// Only `t` counts. A non-nil literal is a catch-all in the language and
+    /// not necessarily one in the author's intent, so it is left alone.
+    #[test]
+    fn a_non_t_constant_test_is_not_treated_as_a_catch_all() {
+        let plan = plan_convert_cond_to_if(ConvertCondToIfRequest {
+            input: "(cond (ready yes) (42 no))",
+            dialect: Dialect::CommonLisp,
+            path: "0".parse().expect("path"),
+        })
+        .expect("cond plan");
+
+        assert_eq!(plan.rewritten, "(if ready yes (if 42 no))");
     }
 
     #[test]

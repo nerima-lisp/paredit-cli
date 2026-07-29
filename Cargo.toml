@@ -13,9 +13,18 @@ readme = "README.md"
 keywords = ["lisp", "paredit", "refactoring", "cli", "sexp"]
 categories = ["command-line-utilities", "development-tools"]
 
+# `bench = false` on both, so `cargo bench -- <criterion args>` reaches the
+# Criterion targets. Cargo benches every target whose `bench` flag is true,
+# including the library and the binary, and their default libtest harness has
+# no benchmarks to run and rejects `--save-baseline` outright — which made
+# `scripts/bench-compare.sh` fail before it measured anything.
+[lib]
+bench = false
+
 [[bin]]
 name = "paredit"
 path = "src/main.rs"
+bench = false
 
 [profile.release]
 lto = "fat"
@@ -45,6 +54,7 @@ paredit-feature-extract = { path = "packages/feature/extract" }
 paredit-feature-inline = { path = "packages/feature/inline" }
 paredit-feature-form-transform = { path = "packages/feature/form-transform" }
 paredit-core-workspace = { path = "packages/core/workspace" }
+paredit-core-safety = { path = "packages/core/safety" }
 
 paredit-feature-binding = { path = "packages/feature/binding" }
 paredit-feature-change-summary = { path = "packages/feature/change-summary" }
@@ -72,6 +82,7 @@ paredit-feature-lint-convention = { path = "packages/feature/lint-convention" }
 paredit-feature-lint-custom = { path = "packages/feature/lint-custom" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
+paredit-feature-external-check = { path = "packages/feature/external-check" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"
@@ -118,6 +129,12 @@ workspace = true
 # Note that Cargo rejects a glob matching nothing, so this line can only exist
 # while at least one packages/*/* member does.
 members = ["packages/*/*"]
+# `fuzz/` is a cargo-fuzz package: it needs a nightly toolchain and links
+# libFuzzer, neither of which belongs in `cargo build --workspace` or the Nix
+# build. It declares its own `[workspace]` as well, so this line is belt and
+# braces — but the failure without it is "package is not included in the
+# workspace", which stops every build rather than only the fuzz one.
+exclude = ["fuzz"]
 
 # Required, not cosmetic. This workspace has a root package, so a bare
 # `cargo test` / `cargo nextest run` would otherwise build only the root and

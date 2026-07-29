@@ -644,6 +644,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Restarts(args) => {
                 restart_report::workflow::restart_report(args)?;
             }
+            command::InspectCommand::ExternalDiagnostics(args) => {
+                external_diagnostics_report::workflow::external_diagnostics_report(args)?;
+            }
             command::InspectCommand::Types(args) => type_report::workflow::type_report(args)?,
             command::InspectCommand::Narrowing(args) => {
                 narrowing_report::workflow::narrowing_report(args)?;
@@ -725,6 +728,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::Check(args) => refactor::workflow::refactor_check(args)?,
             command::RefactorCommand::Status(args) => refactor::workflow::refactor_status(args)?,
             command::RefactorCommand::Apply(args) => refactor::workflow::refactor_apply(args)?,
+            command::RefactorCommand::Undo(args) => refactor::workflow::refactor_undo(args)?,
             command::RefactorCommand::Diff(args) => refactor::workflow::refactor_diff(args)?,
             command::RefactorCommand::Patch(args) => {
                 structural_patch::workflow::structural_patch(args)?;

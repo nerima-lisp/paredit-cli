@@ -15,7 +15,10 @@ pub mod vcs;
 pub use archive::{ArchiveRefusal, ExtractedArchive, extract_tar, extract_tar_path};
 pub use cache::{CacheOutcome, CachedDiscovery, DiscoveryCache, skip_counter_names};
 pub use discovery::rehydrate_cached_discovery;
-pub use discovery::{discover_workspace_files, discover_workspace_files_from_list};
+pub use discovery::{
+    discover_workspace_files, discover_workspace_files_from_list,
+    discover_workspace_files_with_limits,
+};
 pub use error::{WorkspaceError, WorkspaceLimit, WorkspaceRefusal, WorkspaceResult};
 pub use glob::{GlobDecision, GlobParseError, GlobPattern, GlobSet};
 pub use ignore::{
@@ -30,6 +33,7 @@ pub use manifest::{
 };
 pub use types::{
     DirectoryFingerprint, SymlinkPolicy, WorkspaceDiscovery, WorkspaceDiscoveryOptions,
+    WorkspaceLimits,
 };
 pub use vcs::{
     GitRefusal, RepositoryRoot, SinceOptions, changed_paths_since, find_repository_root,

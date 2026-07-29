@@ -146,6 +146,9 @@ pub enum ErrorCode {
     EnvironmentUnavailable,
     EnvironmentRollbackFailed,
     EnvironmentCleanupAfterCommit,
+    /// The wall-clock budget ran out. Nothing is wrong with the input: the
+    /// same command with a larger `--timeout-ms`, or none, would succeed.
+    EnvironmentTimeout,
 
     GateFailed,
     Internal,
@@ -197,6 +200,7 @@ impl ErrorCode {
             Self::EnvironmentUnavailable => "environment.unavailable",
             Self::EnvironmentRollbackFailed => "environment.rollback-failed",
             Self::EnvironmentCleanupAfterCommit => "environment.cleanup-after-commit",
+            Self::EnvironmentTimeout => "environment.timeout",
 
             Self::GateFailed => "gate.failed",
             Self::Internal => "internal.unclassified",
@@ -246,7 +250,8 @@ impl ErrorCode {
             | Self::EnvironmentWorkspaceLimit
             | Self::EnvironmentUnavailable
             | Self::EnvironmentRollbackFailed
-            | Self::EnvironmentCleanupAfterCommit => Category::Environment,
+            | Self::EnvironmentCleanupAfterCommit
+            | Self::EnvironmentTimeout => Category::Environment,
 
             Self::GateFailed => Category::Gate,
             Self::Internal => Category::Internal,
@@ -268,7 +273,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 39] = [
+    pub const ALL: [Self; 40] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -306,6 +311,7 @@ impl ErrorCode {
         Self::EnvironmentUnavailable,
         Self::EnvironmentRollbackFailed,
         Self::EnvironmentCleanupAfterCommit,
+        Self::EnvironmentTimeout,
         Self::GateFailed,
         Self::Internal,
     ];
@@ -477,6 +483,7 @@ const fn classify_cli(error: &CliError) -> ErrorCode {
         }
         CliError::WriteTarget(_) => ErrorCode::RefusalWriteTarget,
         CliError::BackupCleanupAfterCommit { .. } => ErrorCode::EnvironmentCleanupAfterCommit,
+        CliError::TimedOut(_) => ErrorCode::EnvironmentTimeout,
     }
 }
 
@@ -703,6 +710,10 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
         ErrorCode::GateFailed => vec![Repair::new("inspect-first", Message::RepairReadTheReport)],
 
         ErrorCode::InputNotUtf8 => vec![Repair::new("fix-source", Message::RepairConvertEncoding)],
+
+        ErrorCode::EnvironmentTimeout => {
+            vec![Repair::new("raise-budget", Message::RepairRaiseBudget)]
+        }
 
         ErrorCode::EnvironmentIo | ErrorCode::EnvironmentUnavailable | ErrorCode::Internal => {
             // Nothing specific to say, and inventing something would cost a

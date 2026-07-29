@@ -7,4 +7,5 @@ pub mod plan;
 pub mod preview;
 pub mod root;
 pub mod status;
+pub mod undo;
 pub mod verification;

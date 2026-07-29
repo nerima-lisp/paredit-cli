@@ -1,0 +1,23 @@
+[package]
+name = "paredit-feature-external-check"
+description = "Cross-checking a refactor against an external Lisp implementation's own diagnostics"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-cli = { path = "../../core/cli" }
+paredit-core-safety = { path = "../../core/safety" }
+anyhow.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

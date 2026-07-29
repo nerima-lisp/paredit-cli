@@ -126,20 +126,44 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// Appends the closing delimiters an unclosed document needs.
+    ///
+    /// The result is checked before it is returned, which is not defensive
+    /// programming but a correctness requirement: appending to the end of the
+    /// input is wrong whenever the input *ends inside a line comment*. A file
+    /// truncated after `(+ x 1) ; note` takes the appended `)` into the
+    /// comment, and the "repaired" document is exactly as unclosed as before.
+    /// That is a realistic input — a half-saved buffer — and the old behaviour
+    /// returned it as a success.
+    ///
+    /// So there are two candidates: the delimiters appended directly, and the
+    /// delimiters on a line of their own. The first is preferred because it is
+    /// the minimal edit; the second is what a trailing line comment needs. If
+    /// neither parses, the original error is returned rather than a document
+    /// that merely looks repaired.
     pub(in crate::sexpr) fn repair_unclosed_lists(
         &mut self,
     ) -> std::result::Result<String, ParseError> {
         match self.parse() {
             Ok(_) => Ok(self.input.to_owned()),
-            Err(ParseError::UnclosedList(_)) => {
-                let mut repaired = self.input.to_owned();
+            Err(error @ ParseError::UnclosedList(_)) => {
+                let mut closers = String::new();
                 for node_id in self.stack.iter().skip(1).rev() {
                     let delimiter = self.nodes[node_id.get()]
                         .delimiter
                         .expect("parser stack contains only lists after the root");
-                    repaired.push(delimiter.close());
+                    closers.push(delimiter.close());
                 }
-                Ok(repaired)
+
+                let appended = format!("{}{closers}", self.input);
+                if Parser::new(&appended).parse().is_ok() {
+                    return Ok(appended);
+                }
+                let on_its_own_line = format!("{}\n{closers}", self.input);
+                if Parser::new(&on_its_own_line).parse().is_ok() {
+                    return Ok(on_its_own_line);
+                }
+                Err(error)
             }
             Err(error) => Err(error),
         }
