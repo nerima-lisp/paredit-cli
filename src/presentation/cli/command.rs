@@ -56,8 +56,8 @@ use super::{
     redundant_if_nil_report, redundant_let_star_report, redundant_prog1_report,
     redundant_progn_report, redundant_quote_report, redundant_start_zero_report,
     redundant_the_report, refactor, remove_unused_binding, remove_unused_control, rename,
-    rename_control, replace_forms, restart_report, self_assignment_report, self_comparison_report,
-    serial_consistency_report, setf_arity_report, setq_non_variable_report,
+    rename_control, replace_forms, resolve_report, restart_report, self_assignment_report,
+    self_comparison_report, serial_consistency_report, setf_arity_report, setq_non_variable_report,
     shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
     similarity_report, single_arg_comparison_report, single_clause_cond_report,
     single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
@@ -94,6 +94,8 @@ pub(super) enum InspectCommand {
     Outline(AnalyzeArgs),
     /// Report one selected form with local structure for agent refactor planning.
     Form(form_report::args::FormReportArgs),
+    /// Report which forms a selector names, with paths, coordinates and stable ids.
+    Resolve(resolve_report::args::ResolveReportArgs),
     /// Find exact atom occurrences without touching strings or comments.
     FindSymbol(symbol_report::args::SymbolQueryArgs),
     /// Report exact atom occurrences across explicit files for rename planning.

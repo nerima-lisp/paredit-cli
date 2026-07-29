@@ -42,6 +42,7 @@ discovery, impact analysis, and preflight checks.
 | `capabilities` | Print a machine-readable catalog of every command, flag, default, and enum value. |
 | `outline` | Print top-level forms with paths, spans, and definition hints. |
 | `form` | Report one selected form with local structure for refactor planning. |
+| `resolve` | Report which forms a selector names, with paths, line/column coordinates, stable selector ids, and pattern captures. Resolves `--query` / `--name` / `--line-column` / `--id` / `--from`+`--to` without acting on them. |
 | `find-symbol` | Find exact atom occurrences without touching strings or comments. |
 | `symbols` | Report exact atom occurrences across explicit files for rename planning. |
 | `calls` | Report list-head call sites across explicit files for arity refactor planning. |

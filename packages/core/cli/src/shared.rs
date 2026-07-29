@@ -3,9 +3,10 @@ use std::collections::BTreeSet;
 use std::fmt::{self, Display, Write};
 use std::path::PathBuf;
 
-use crate::args::{DialectArg, EditTargetArgs, SourceInput};
+use crate::args::{CompactSelectorArgs, DialectArg, EditTargetArgs, SelectorArgs, SourceInput};
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::selector::{SelectorError, SelectorTarget, resolve as resolve_selector};
 use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SexprResult, SymbolName, SyntaxTree,
@@ -199,6 +200,125 @@ pub fn matching_symbol_occurrences(tree: &SyntaxTree, symbol: &SymbolName) -> Ve
         .collect()
 }
 
+/// Resolves a selector into the forms it names, in source order.
+///
+/// The one entry point for every selector kind. Callers that can only act on
+/// a single form use [`resolve_one`]; callers that can fan out
+/// (`--all`) keep the whole list.
+pub fn resolve_targets(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    selector: &SelectorArgs,
+) -> CliResult<Vec<SelectorTarget>> {
+    let request = selector.to_request(dialect)?;
+    Ok(resolve_selector(tree, dialect, &request)?)
+}
+
+/// Resolves a selector that must name exactly one whole form.
+///
+/// Two things are refused here rather than silently collapsed to a first
+/// form, because for a command that acts on one form both would be a wrong
+/// action rather than a failed one:
+///
+/// - a `--from`/`--to` range or a multi-form rest capture, and
+/// - `--all` on a selector that matched several forms. `--all` is meaningful
+///   only where the caller can fan out; passing it to a single-form command
+///   would otherwise quietly discard every match but the first.
+pub fn resolve_one_target(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    selector: &SelectorArgs,
+    command: &str,
+) -> CliResult<SelectorTarget> {
+    let request = selector.to_request(dialect)?;
+    let targets = resolve_selector(tree, dialect, &request)?;
+    exactly_one_target(targets, &request.describe(), command)
+}
+
+/// Resolves a [`CompactSelectorArgs`] into the one form it names.
+///
+/// The `--path` / `--at` / `--select` counterpart of [`resolve_one_target`],
+/// for the commands whose own flags already claim `--name` and `--from`.
+pub fn resolve_compact_target(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    selector: &CompactSelectorArgs,
+    command: &str,
+) -> CliResult<SelectorTarget> {
+    let request = selector.to_request(dialect)?;
+    let targets = resolve_selector(tree, dialect, &request)?;
+    exactly_one_target(targets, &request.describe(), command)
+}
+
+fn exactly_one_target(
+    targets: Vec<SelectorTarget>,
+    selector: &str,
+    command: &str,
+) -> CliResult<SelectorTarget> {
+    let count = targets.len();
+    let target = targets
+        .into_iter()
+        .next()
+        // Unreachable while `resolve` refuses an empty result, which it does;
+        // stated as a refusal rather than an index so the invariant cannot
+        // become a panic if that ever changes.
+        .ok_or_else(|| SelectorError::NoMatch {
+            selector: selector.to_owned(),
+        })?;
+    if count > 1 {
+        return Err(SelectorError::Ambiguous {
+            selector: selector.to_owned(),
+            count,
+        }
+        .into());
+    }
+    require_single_form(&target, command)?;
+    Ok(target)
+}
+
+/// [`resolve_compact_target`] as a [`Selection`], for callers that only edit.
+pub fn resolve_compact<'a>(
+    tree: &'a SyntaxTree,
+    dialect: Dialect,
+    selector: &CompactSelectorArgs,
+    command: &str,
+) -> CliResult<Selection<'a>> {
+    let target = resolve_compact_target(tree, dialect, selector, command)?;
+    Ok(tree.select_path(&target.path)?)
+}
+
+/// [`resolve_one_target`] as a [`Selection`], for callers that only edit.
+pub fn resolve_one<'a>(
+    tree: &'a SyntaxTree,
+    dialect: Dialect,
+    selector: &SelectorArgs,
+    command: &str,
+) -> CliResult<Selection<'a>> {
+    let target = resolve_one_target(tree, dialect, selector, command)?;
+    Ok(tree.select_path(&target.path)?)
+}
+
+fn require_single_form(target: &SelectorTarget, command: &str) -> CliResult<()> {
+    let count = target.form_count();
+    if count > 1 {
+        return Err(SelectorError::RangeUnsupported {
+            command: command.to_owned(),
+            count,
+        }
+        .into());
+    }
+    Ok(())
+}
+
+/// Runs one structural edit over every form the selector names.
+///
+/// Matches are applied **right to left**, and each application re-parses the
+/// document it produced. That ordering is what makes `--all` safe without a
+/// span-remapping pass: an edit never moves the text before it, so the spans
+/// still to be visited are still correct. Each one is re-resolved by offset
+/// and checked against the span it had, so an edit that *did* disturb a later
+/// match — `slurp-forward` swallowing the next match, say — stops with a
+/// refusal instead of rewriting the wrong form.
 pub fn edit_target(
     args: EditTargetArgs,
     f: fn(&str, &SyntaxTree, Selection<'_>) -> SexprResult<String>,
@@ -206,10 +326,33 @@ pub fn edit_target(
     let target = args.target;
     let (input, dialect) = read_input_and_dialect(target.file, target.dialect)?;
     let tree = parse_document(&input, dialect)?;
-    let selection = resolve_target(&tree, target.path.as_ref(), target.at)?;
-    let rewritten = f(&input.text, &tree, selection)?;
-    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    emit_document(&input, dialect, args.write, args.diff, rewritten)
+    let targets = resolve_targets(&tree, dialect, &target.selector)?;
+    for resolved in &targets {
+        require_single_form(resolved, "this edit")?;
+    }
+
+    let mut spans = targets
+        .iter()
+        .map(|resolved| resolved.span)
+        .collect::<Vec<_>>();
+    spans.sort_by_key(ByteSpan::start);
+
+    let mut current = input.text.clone();
+    for span in spans.into_iter().rev() {
+        let tree = SyntaxTree::parse_with_dialect(&current, dialect)
+            .map_err(|_| IoRefusal::RewriteDoesNotReparse)?;
+        let selection = tree.select_at(span.start().get())?;
+        if selection.span() != span {
+            return Err(ArgumentError::AllMatchShifted {
+                start: span.start().get(),
+            }
+            .into());
+        }
+        let rewritten = f(&current, &tree, selection)?;
+        current = Edit::normalize_changed_line_trivia(&current, rewritten, dialect)?;
+    }
+
+    emit_document(&input, dialect, args.write, args.diff, current)
 }
 
 /// Print the rewritten document to stdout, or with `write` persist it back to

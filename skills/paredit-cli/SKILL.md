@@ -39,6 +39,7 @@ version: 1.3.0
     <command>paredit inspect agent-report --file f.lisp --output json</command>
     <command>paredit inspect outline --file f.lisp --output json</command>
     <command>paredit inspect form --file f.lisp --path 0 --include-source --output json</command>
+    <command>paredit inspect resolve --file f.lisp --query '(defun ?name ...)' --output json</command>
     <command>paredit inspect workspace --output json .</command>
   </group>
 
@@ -214,6 +215,17 @@ paredit refactor workspace-execute --from old-name --to new-name --write --outpu
     </example>
   </pattern>
 
+  <pattern name="selector_first_edit">
+    <description>Resolve a selector before acting on it. Cheaper than a wrong edit, and it returns a stable id that survives the edits a --path would not.</description>
+    <example>
+paredit inspect resolve --file f.lisp --query '(defun ?name ...)' --output json
+paredit inspect resolve --file f.lisp --name parse-header --output json
+paredit edit select --file f.lisp --name parse-header --child 1
+paredit edit wrap --file f.lisp --id 672ed5e165259604 --diff
+paredit edit kill --file f.lisp --query '(cleanup ?x)' --all --diff
+    </example>
+  </pattern>
+
   <pattern name="safe_removal">
     <description>Only remove definitions after confirming they have no external references.</description>
     <example>
@@ -235,6 +247,7 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   <branch condition="Canonicalizing a conditional">Use the exact convert-if/cond/when/unless command for the source and target forms</branch>
   <branch condition="Renaming or removing a block/tag target">Use rename-block/rename-tag or remove-unused-block/remove-unused-tag so target scope is respected</branch>
   <branch condition="Relocating top-level forms">Use move-definition, move-form, or split-file</branch>
+  <branch condition="You know what the form looks like but not where it is">Use --query (S-expression pattern), --name (definition name), or --line-column; run `inspect resolve` first to see what it matches</branch>
   <branch condition="One-off structural edit at a specific path">Use a structural primitive (replace, wrap, splice, raise, slurp/barf)</branch>
   <branch condition="Consolidating duplicated or near-duplicated code">Use `inspect duplicates` for exact shapes and `inspect similarity` for near-duplicates, then replacement-plan/replace-forms or extract-function/extract-constant</branch>
   <branch condition="Deleting dead code">Use `inspect unused-definitions` first, only then remove-unused-definitions --write</branch>
@@ -245,6 +258,8 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   <practice priority="critical">For structural primitives (`paredit edit ...`), preview with --diff, then re-run with --write; never redirect stdout into the source file</practice>
   <practice priority="critical">Prefer --output json for anything other than a single human-inspected file; it is the stable, parseable contract</practice>
   <practice priority="high">Use --path for deterministic scripted edits; use --at (byte offset) when a prior report or grep result already gives an offset</practice>
+  <practice priority="high">Prefer --name or --query over building a --path by hand: they skip the outline round trip. Run `inspect resolve` first when a pattern is new, and pass --all deliberately — an ambiguous selector is refused, not silently narrowed to the first match</practice>
+  <practice priority="medium">Across a multi-step refactor, carry the stable id from `inspect resolve` rather than a --path: an insertion above the form renumbers every path below it, and the id keeps naming the same form</practice>
   <practice priority="high">Use --fail-on-* and --require-* gates (e.g. --fail-on-blocking-gate, --require-definitions 1) so a plan command exits non-zero instead of silently under-matching</practice>
   <practice priority="high">Branch on exit codes: 0 success, 1 hard failure (parse/IO/refused write), 2 usage error, 3 policy gate tripped after the report was printed — on 3, read the report and decide; on 1-2, fix the invocation</practice>
   <practice priority="high">Treat a refused transform as a safety result: planners conservatively reject capture, shadowing, target ambiguity, evaluation-order changes, and unsupported shapes</practice>
