@@ -14,7 +14,9 @@ fn cli_reports_an_if_with_identical_branches() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"identical_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"if_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("(foo x)"));
 }
 
@@ -32,7 +34,7 @@ fn cli_finds_an_if_nested_in_a_function_body() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"identical_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
 
 #[test]
@@ -49,7 +51,50 @@ fn cli_does_not_flag_different_branches() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"identical_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "the one two-armed `if` here
+        // differs" from "no two-armed `if` at all".
+        .stdout(predicate::str::contains("\"if_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("identical-if-branch-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn pick [test] (if test 1 1))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "identical-if-branches", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_identical_if_branches_emits_sarif() {
+    let dir = fresh_temp_dir("identical-if-branch-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(if test (foo x) (foo x))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "identical-if-branches", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/identical-if-branches/identical-if-branches\"",
+        ))
+        .stdout(predicate::str::contains(
+            "if branches are identical: (foo x)",
+        ));
 }
 
 #[test]
@@ -85,5 +130,5 @@ fn cli_identical_if_branches_passes_gate_when_clean() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"identical_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
 }

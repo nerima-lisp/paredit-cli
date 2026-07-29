@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal atom `expected` (`nil` or `t`), with no
 /// reader prefixes.
@@ -38,50 +40,61 @@ fn is_bare_literal(view: &ExpressionView, expected: &str) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct IfNotItem {
-    pub path: PathBuf,
     /// The span of the whole `(if test nil t)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the test, copied verbatim into `(not …)`.
+    ///
+    /// The rewrite's input, but the report has always published it, so it stays
+    /// in the JSON: a consumer holding the file can slice the test out of it.
     pub test_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct IfNotSummary {
-    pub if_form_count: usize,
-    pub violations: Vec<IfNotItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct IfNotPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl IfNotPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for IfNotItem {
+    /// The rule's own name. This rule matches exactly one shape, so there is no
+    /// discriminator to draw a narrower kind from.
+    fn kind(&self) -> &'static str {
+        "if-not"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct IfNotPolicy {
-    pub fail_on_violation: bool,
-    pub if_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the path and line the envelope already prints: the old
+    /// text row carried only those two. The `message` override is what carries
+    /// the finding's meaning here.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "test_span",
+            json!({
+                "start": self.test_span.start().get(),
+                "end": self.test_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `if-not` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "if with then=nil and else=t is a negation; (if test nil t) is (not test)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<IfNotItem>,
 ) {
@@ -104,67 +117,82 @@ pub fn examine_if(
     }
 
     violations.push(IfNotItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         test_span: view.children[1].span,
     });
 }
 
-/// Collects every `(if test nil t)` across a whole file, along with the total
-/// number of `if` forms scanned.
-pub fn collect_if_nots(
+/// Collects every `(if test nil t)` in one file, with the number of `if` forms
+/// scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no negation written this way here" for
+/// Common Lisp and "nothing was looked for" for Fennel, and the two read
+/// identically without the flag.
+pub fn build_if_not_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<IfNotItem>)> {
+) -> LintResult<FileFindings<IfNotItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("if_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, path, &mut if_form_count, &mut violations);
+            examine_if(subview, source, &mut if_form_count, &mut violations);
         });
     }
-    Ok((if_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("if_form_count", json!(if_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_if_nots(if_form_count: usize, violations: Vec<IfNotItem>) -> IfNotSummary {
-    IfNotSummary {
-        if_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_if_not_policy(options: IfNotPolicyOptions, summary: &IfNotSummary) -> IfNotPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    IfNotPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        if_form_count: summary.if_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn ifs(input: &str) -> (usize, Vec<IfNotItem>) {
+    fn report(input: &str) -> FileFindings<IfNotItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_if_nots(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect if-not")
+        build_if_not_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build if-not report")
+    }
+
+    /// The `(if_form_count, violations)` pair the report is built from.
+    fn ifs(input: &str) -> (u64, Vec<IfNotItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "if_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("if_form_count in the summary");
+        (count, report.findings)
     }
 
     fn test_src<'a>(source: &'a str, item: &IfNotItem) -> &'a str {
@@ -226,26 +254,48 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(if x nil t)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_if_nots(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect if-not");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_if_not_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build if-not report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("if_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = ifs("(if x nil t)");
-        let summary = summarize_if_nots(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(if x a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_if_not_policy(IfNotPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The test span is the rewrite's input, but the report has always
+    /// published it, so it has to survive the move onto the envelope.
+    #[test]
+    fn a_finding_carries_its_line_and_its_test_span() {
+        let report = report("(defun f (x)\n  (if x nil t))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "if-not");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "test_span",
+                json!({
+                    "start": finding.test_span.start().get(),
+                    "end": finding.test_span.end().get(),
+                })
+            )]
+        );
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_if_not_policy(IfNotPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_if_scanned_not_only_the_flagged_ones() {
+        let report = report("(if x nil t)\n(if x t nil)\n(if x a b)\n");
+        assert_eq!(report.summary, vec![("if_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

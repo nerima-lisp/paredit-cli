@@ -20,15 +20,17 @@
 //! Reuses the shared whole-tree walk from
 //! [`paredit_core_syntax::view_query::for_each_subview`].
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether a child form can change how many argument forms actually reach the
 /// evaluator, making a static arity count unreliable. Two cases matter:
@@ -55,48 +57,49 @@ fn is_arity_ambiguous_child(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct IfArityItem {
-    pub path: PathBuf,
+    /// The span of the whole misarity `if` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     pub argument_count: usize,
 }
 
-#[derive(Debug)]
-pub struct IfAritySummary {
-    pub if_form_count: usize,
-    pub violations: Vec<IfArityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct IfArityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl IfArityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for IfArityItem {
+    /// The rule's own name. The discriminator here is a *number* of arguments,
+    /// which is unbounded and not identifier-like, so it stays a JSON field and
+    /// a column rather than becoming the kind.
+    fn kind(&self) -> &'static str {
+        "if-arity"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct IfArityPolicy {
-    pub fail_on_violation: bool,
-    pub if_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("arguments={}", self.argument_count)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("argument_count", json!(self.argument_count))]
+    }
+
+    /// The same sentence the `if-arity` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!("if takes 2 or 3 arguments but has {}", self.argument_count)
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<IfArityItem>,
 ) {
@@ -118,76 +121,85 @@ pub fn examine_if(
     let argument_count = view.children.len() - 1;
     if !(2..=3).contains(&argument_count) {
         violations.push(IfArityItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             argument_count,
         });
     }
 }
 
-/// Collects every misarity `if` form across a whole file, along with the total
-/// number of `if` forms scanned.
-pub fn collect_if_arity_violations(
+/// Collects every misarity `if` form in one file, with the number of `if` forms
+/// scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every `if` here takes 2 or 3 arguments"
+/// for Common Lisp and "nothing was looked for" for Emacs Lisp — whose `if` has
+/// an implicit-progn else — and the two read identically without the flag.
+pub fn build_if_arity_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<IfArityItem>)> {
+) -> LintResult<FileFindings<IfArityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("if_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, path, &mut if_form_count, &mut violations);
+            examine_if(subview, source, &mut if_form_count, &mut violations);
         });
     }
-    Ok((if_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("if_form_count", json!(if_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_if_arity(
-    if_form_count: usize,
-    violations: Vec<IfArityItem>,
-) -> IfAritySummary {
-    IfAritySummary {
-        if_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_if_arity_policy(
-    options: IfArityPolicyOptions,
-    summary: &IfAritySummary,
-) -> IfArityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    IfArityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        if_form_count: summary.if_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<IfArityItem>) {
+    fn report(input: &str) -> FileFindings<IfArityItem> {
         // Use the dialect-aware parse the CLI path uses: it groups Common Lisp
         // `#+`/`#-` reader conditionals differently than the default reader.
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_if_arity_violations(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect if arity violations")
+        build_if_arity_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build if arity report")
+    }
+
+    /// The `(if_form_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<IfArityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "if_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("if_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -242,28 +254,39 @@ mod tests {
         assert_eq!(items[0].argument_count, 4);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         // Emacs Lisp `if` has an implicit-progn else, so this is valid there.
         let tree = SyntaxTree::parse_with_dialect("(if a b c d)", Dialect::EmacsLisp)
             .expect("parse input");
-        let (if_form_count, items) =
-            collect_if_arity_violations(&PathBuf::from("app.el"), Dialect::EmacsLisp, &tree)
-                .expect("collect if arity violations");
-        assert_eq!(if_form_count, 0);
-        assert!(items.is_empty());
+        let report = build_if_arity_report(Path::new("app.el"), Dialect::EmacsLisp, &tree)
+            .expect("build if arity report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("if_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (if_form_count, items) = violations("(if a b c d)");
-        let summary = summarize_if_arity(if_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(if a b c)").dialect_modelled);
+    }
 
-        let quiet = evaluate_if_arity_policy(IfArityPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_argument_count() {
+        let report = report("(defun f (x)\n  (if x 1 2 3))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "if-arity");
+        assert_eq!(finding.json_fields(), vec![("argument_count", json!(4))]);
+        assert_eq!(finding.text_columns(), vec!["arguments=4".to_owned()]);
+    }
 
-        let strict = evaluate_if_arity_policy(IfArityPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_if_scanned_not_only_the_flagged_ones() {
+        let report = report("(if a b c d)\n(if a b)\n(if a b c)\n");
+        assert_eq!(report.summary, vec![("if_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

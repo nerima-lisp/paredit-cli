@@ -15,59 +15,62 @@
 //! a malformed `if` with extra trailing forms is left alone rather than
 //! guessed at.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone)]
 pub struct IdenticalIfBranchItem {
-    pub path: PathBuf,
+    /// The span of the whole `(if test then else)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     pub branch: String,
 }
 
-#[derive(Debug)]
-pub struct IdenticalIfBranchSummary {
-    pub if_form_count: usize,
-    pub identical: Vec<IdenticalIfBranchItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct IdenticalIfBranchPolicyOptions {
-    fail_on_identical: bool,
-}
-
-impl IdenticalIfBranchPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_identical: bool) -> Self {
-        Self { fail_on_identical }
+impl Finding for IdenticalIfBranchItem {
+    /// The rule's own name rather than the repeated branch: a branch is an
+    /// arbitrary expression, so there is no closed set of `&'static str` names
+    /// to draw a kind from. The branch itself stays a JSON field and a column.
+    fn kind(&self) -> &'static str {
+        "identical-if-branches"
     }
 
-    #[must_use]
-    pub const fn fail_on_identical(self) -> bool {
-        self.fail_on_identical
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct IdenticalIfBranchPolicy {
-    pub fail_on_identical: bool,
-    pub if_form_count: usize,
-    pub identical_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("branch={}", self.branch)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("branch", json!(self.branch))]
+    }
+
+    /// The same sentence the `identical-if-branches` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!("if branches are identical: {}", self.branch)
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     if_form_count: &mut usize,
     identical: &mut Vec<IdenticalIfBranchItem>,
 ) {
@@ -83,74 +86,84 @@ pub fn examine_if(
     let else_branch = &view.children[3];
     if expressions_structurally_equal(then_branch, else_branch) {
         identical.push(IdenticalIfBranchItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             branch: render_expression(then_branch),
         });
     }
 }
 
-/// Collects every `if` whose two branches are structurally identical across a
-/// whole file, along with the total number of two-armed `if` forms scanned.
-pub fn collect_identical_if_branches(
+/// Collects every `if` whose two branches are structurally identical in one
+/// file, with the number of two-armed `if` forms scanned as the denominator
+/// beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no `if` here repeats itself" for Common
+/// Lisp and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_identical_if_branch_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<IdenticalIfBranchItem>)> {
+) -> LintResult<FileFindings<IdenticalIfBranchItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("if_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut if_form_count = 0;
     let mut identical = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, path, &mut if_form_count, &mut identical);
+            examine_if(subview, source, &mut if_form_count, &mut identical);
         });
     }
-    Ok((if_form_count, identical))
-}
 
-#[must_use]
-pub const fn summarize_identical_if_branches(
-    if_form_count: usize,
-    identical: Vec<IdenticalIfBranchItem>,
-) -> IdenticalIfBranchSummary {
-    IdenticalIfBranchSummary {
-        if_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
         identical,
-    }
+        vec![("if_form_count", json!(if_form_count))],
+    ))
 }
 
-#[must_use]
-pub fn evaluate_identical_if_branch_policy(
-    options: IdenticalIfBranchPolicyOptions,
-    summary: &IdenticalIfBranchSummary,
-) -> IdenticalIfBranchPolicy {
-    let identical_count = summary.identical.len();
-    let mut violations = Vec::new();
-    if options.fail_on_identical() && identical_count > 0 {
-        violations.push(format!("identical_count {identical_count} exceeds 0"));
-    }
-
-    IdenticalIfBranchPolicy {
-        fail_on_identical: options.fail_on_identical(),
-        if_form_count: summary.if_form_count,
-        identical_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn branches(input: &str) -> (usize, Vec<IdenticalIfBranchItem>) {
+    fn report(input: &str) -> FileFindings<IdenticalIfBranchItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_identical_if_branches(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect identical if branches")
+        build_identical_if_branch_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build identical if branch report")
+    }
+
+    /// The `(if_form_count, identical)` pair the report is built from.
+    fn branches(input: &str) -> (u64, Vec<IdenticalIfBranchItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "if_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("if_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -188,32 +201,38 @@ mod tests {
         assert_eq!(identical.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(if test a a)").expect("parse input");
-        let (if_form_count, identical) =
-            collect_identical_if_branches(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect identical if branches");
-        assert_eq!(if_form_count, 0);
-        assert!(identical.is_empty());
+        let report =
+            build_identical_if_branch_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build identical if branch report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("if_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (if_form_count, items) = branches("(if test a a)");
-        let summary = summarize_identical_if_branches(if_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(if test a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_identical_if_branch_policy(
-            IdenticalIfBranchPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.identical_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_branch() {
+        let report = report("(defun f (test x)\n  (if test (g x) (g x)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "identical-if-branches");
+        assert_eq!(finding.json_fields(), vec![("branch", json!("(g x)"))]);
+        assert_eq!(finding.text_columns(), vec!["branch=(g x)".to_owned()]);
+    }
 
-        let strict = evaluate_identical_if_branch_policy(
-            IdenticalIfBranchPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_two_armed_if_scanned_not_only_the_flagged_ones() {
+        let report = report("(if test a a)\n(if test a b)\n");
+        assert_eq!(report.summary, vec![("if_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
