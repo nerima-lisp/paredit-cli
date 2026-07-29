@@ -257,6 +257,7 @@ use paredit_feature_project_analysis::package_cycle_report::cli as package_cycle
 use paredit_feature_project_analysis::reachability_report::cli as reachability_report;
 use paredit_feature_project_analysis::redefinition_report::cli as redefinition_report;
 use paredit_feature_project_analysis::signature_report::cli as signature_report;
+use paredit_feature_project_analysis::source_report::cli as source_report;
 use paredit_feature_project_analysis::struct_cycle_report::cli as struct_cycle_report;
 use paredit_feature_project_analysis::system_cycle_report::cli as system_cycle_report;
 use paredit_feature_project_analysis::undefined_package_report::cli as undefined_package_report;

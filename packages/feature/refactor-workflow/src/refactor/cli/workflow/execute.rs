@@ -16,17 +16,10 @@ use crate::refactor::usecase::execute::{
 };
 use crate::refactor::usecase::preview::RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions;
 use anyhow::Result;
-use paredit_core_workspace::workspace::WorkspaceDiscoveryOptions;
 
 pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> Result<()> {
-    let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
-        roots: args.roots.clone(),
-        include_unknown: args.include_unknown,
-        include_hidden: args.include_hidden,
-        include_generated: args.include_generated,
-        max_depth: args.max_depth,
-        exclude: Vec::new(),
-    })?;
+    let resolved = args.input.resolve(&args.roots)?;
+    let workspace = discover_workspace_refactor_scope(args.roots.clone(), &resolved)?;
     let paths = workspace.paths;
 
     let mut preview = build_refactor_preview(BuildRefactorPreviewRequest {

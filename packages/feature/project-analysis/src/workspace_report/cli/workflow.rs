@@ -9,6 +9,7 @@ use crate::workspace_report::usecase::workflow::build_workspace_report;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_workspace::workspace::{
     WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
+    discover_workspace_files_from_list,
 };
 
 use super::args::WorkspaceReportArgs;
@@ -16,33 +17,39 @@ use super::render::print_workspace_report;
 
 pub fn workspace_report(args: WorkspaceReportArgs) -> Result<()> {
     let output = args.output;
+    // Resolution runs here, not in the use case: `--since` shells out to git and
+    // `--paths-from -` reads stdin, and a use case that did either would stop
+    // being testable without a filesystem and a repository.
+    let resolved = args.input.resolve(&args.roots)?;
     let request = WorkspaceReportRequest {
         roots: args.roots,
-        include_unknown: args.include_unknown,
-        include_hidden: args.include_hidden,
-        include_generated: args.include_generated,
-        max_depth: args.max_depth,
+        include_unknown: args.input.include_unknown,
+        include_hidden: args.input.include_hidden,
+        include_generated: args.input.include_generated,
+        max_depth: args.input.max_depth,
     };
-    let mut source = CliWorkspaceReportSource::default();
+    let mut source = CliWorkspaceReportSource {
+        options: resolved.options,
+        from_list: resolved.from_list,
+        discovery: None,
+    };
     let plan = build_workspace_report(&mut source, request)?;
     print_workspace_report(&plan, output)
 }
 
-#[derive(Default)]
 struct CliWorkspaceReportSource {
+    options: WorkspaceDiscoveryOptions,
+    from_list: bool,
     discovery: Option<WorkspaceDiscovery>,
 }
 
 impl WorkspaceReportSourcePort for CliWorkspaceReportSource {
-    fn discover(&mut self, request: &WorkspaceReportRequest) -> Result<WorkspaceInventory> {
-        let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
-            roots: request.roots.clone(),
-            include_unknown: request.include_unknown,
-            include_hidden: request.include_hidden,
-            include_generated: request.include_generated,
-            max_depth: request.max_depth,
-            exclude: Vec::new(),
-        })?;
+    fn discover(&mut self, _request: &WorkspaceReportRequest) -> Result<WorkspaceInventory> {
+        let discovery = if self.from_list {
+            discover_workspace_files_from_list(&self.options)?
+        } else {
+            discover_workspace_files(&self.options)?
+        };
         let inventory = WorkspaceInventory {
             files: discovery.files().to_vec(),
             skipped_unknown_count: discovery.skipped_unknown_count(),

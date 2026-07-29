@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::discovery::{
     ExcludeIndex, READ_CHUNK_BYTES, discover_workspace_files_with_limits, read_bounded,
 };
-use super::types::WorkspaceLimits;
+use super::types::{SymlinkPolicy, WorkspaceLimits};
 
 #[test]
 fn discovery_skips_unknown_hidden_and_generated_paths_by_default() -> Result<()> {
@@ -37,6 +37,7 @@ fn discovery_skips_unknown_hidden_and_generated_paths_by_default() -> Result<()>
         include_generated: false,
         max_depth: None,
         exclude: Vec::new(),
+        ..WorkspaceDiscoveryOptions::default()
     })?;
 
     assert_eq!(discovery.files, vec![root.join("main.lisp")]);
@@ -71,6 +72,7 @@ fn discovery_can_include_unknown_hidden_and_generated_paths() -> Result<()> {
         include_generated: true,
         max_depth: None,
         exclude: Vec::new(),
+        ..WorkspaceDiscoveryOptions::default()
     })?;
 
     assert_eq!(
@@ -110,6 +112,7 @@ fn discovery_excludes_files_and_directory_subtrees_by_component() -> Result<()> 
         include_generated: false,
         max_depth: None,
         exclude: vec![excluded_file, excluded_dir],
+        ..WorkspaceDiscoveryOptions::default()
     })?;
 
     assert_eq!(
@@ -135,6 +138,7 @@ fn discovery_can_exclude_an_explicit_root() -> Result<()> {
         include_generated: false,
         max_depth: None,
         exclude: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
     })?;
 
     assert!(discovery.files.is_empty());
@@ -159,6 +163,7 @@ fn discovery_lexically_normalizes_nonexistent_exclude_aliases() -> Result<()> {
         include_generated: false,
         max_depth: None,
         exclude: vec![root.join("missing").join("..").join("excluded.lisp")],
+        ..WorkspaceDiscoveryOptions::default()
     })?;
 
     assert_eq!(discovery.files, vec![root.join("keep.lisp")]);
@@ -244,6 +249,7 @@ fn secure_read_rejects_a_path_outside_discovered_roots() -> Result<()> {
         include_generated: false,
         max_depth: None,
         exclude: Vec::new(),
+        ..WorkspaceDiscoveryOptions::default()
     })?;
 
     let error = discovery.read_file(&outside_file).unwrap_err();
@@ -273,6 +279,7 @@ fn secure_read_rejects_a_discovered_file_replaced_by_symlink() -> Result<()> {
         include_generated: false,
         max_depth: None,
         exclude: Vec::new(),
+        ..WorkspaceDiscoveryOptions::default()
     })?;
     fs::remove_file(&discovered_file)?;
     std::os::unix::fs::symlink(&outside_file, &discovered_file)?;
@@ -401,6 +408,7 @@ fn discovery_rejects_too_many_input_roots_before_resolving_them() {
         include_generated: false,
         max_depth: None,
         exclude: Vec::new(),
+        ..WorkspaceDiscoveryOptions::default()
     };
 
     let error = discover_workspace_files_with_limits(&options, constrained).unwrap_err();
@@ -712,6 +720,7 @@ fn workspace_options(root: PathBuf) -> WorkspaceDiscoveryOptions {
         include_generated: false,
         max_depth: None,
         exclude: Vec::new(),
+        ..WorkspaceDiscoveryOptions::default()
     }
 }
 
@@ -739,4 +748,364 @@ fn unique_temp_dir(name: &str) -> PathBuf {
         "paredit-cli-workspace-{name}-{}-{nanos}",
         std::process::id()
     ))
+}
+
+// --- F1/F2: ignore files ---------------------------------------------------
+
+/// Makes `root` look like a repository root without running git.
+///
+/// Only the presence of `.git` matters to the traversal, and creating it as a
+/// directory keeps these tests free of a git dependency.
+fn mark_repository(root: &std::path::Path) -> Result<()> {
+    fs::create_dir_all(root.join(".git"))?;
+    Ok(())
+}
+
+#[test]
+fn gitignore_excludes_files_and_prunes_directories() -> Result<()> {
+    let root = unique_temp_dir("gitignore");
+    fs::create_dir_all(root.join("generated"))?;
+    mark_repository(&root)?;
+    fs::write(root.join(".gitignore"), "generated/\n*.fasl.lisp\n")?;
+    fs::write(root.join("main.lisp"), "(defun main () nil)")?;
+    fs::write(root.join("cache.fasl.lisp"), "(defun cached () nil)")?;
+    fs::write(
+        root.join("generated").join("out.lisp"),
+        "(defun out () nil)",
+    )?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(discovery.files, vec![root.join("main.lisp")]);
+    assert_eq!(discovery.skipped_ignored_count, 2);
+    assert_eq!(
+        discovery.ignore_files_read,
+        vec![root.join(".gitignore")],
+        "the repository's own ignore file is the only one in scope"
+    );
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn a_nested_gitignore_can_reinclude_what_the_root_dropped() -> Result<()> {
+    let root = unique_temp_dir("gitignore-nested");
+    fs::create_dir_all(root.join("src"))?;
+    mark_repository(&root)?;
+    fs::write(root.join(".gitignore"), "*.lisp\n")?;
+    fs::write(root.join("src").join(".gitignore"), "!keep.lisp\n")?;
+    fs::write(root.join("src").join("keep.lisp"), "(defun keep () nil)")?;
+    fs::write(root.join("src").join("drop.lisp"), "(defun drop () nil)")?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(discovery.files, vec![root.join("src").join("keep.lisp")]);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn a_root_gitignore_still_applies_when_a_subdirectory_is_scanned() -> Result<()> {
+    let root = unique_temp_dir("gitignore-primed");
+    fs::create_dir_all(root.join("src"))?;
+    mark_repository(&root)?;
+    fs::write(root.join(".gitignore"), "drop.lisp\n")?;
+    fs::write(root.join("src").join("keep.lisp"), "(defun keep () nil)")?;
+    fs::write(root.join("src").join("drop.lisp"), "(defun drop () nil)")?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.join("src")],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(discovery.files, vec![root.join("src").join("keep.lisp")]);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn pareditignore_outranks_gitignore_at_the_same_level() -> Result<()> {
+    let root = unique_temp_dir("pareditignore");
+    mark_repository(&root)?;
+    // Committed on purpose, so git does not ignore it, but not worth analysing.
+    fs::write(root.join(".gitignore"), "\n")?;
+    fs::write(root.join(".pareditignore"), "vendored.lisp\n")?;
+    fs::write(root.join("main.lisp"), "(defun main () nil)")?;
+    fs::write(root.join("vendored.lisp"), "(defun vendored () nil)")?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(discovery.files, vec![root.join("main.lisp")]);
+    assert_eq!(discovery.skipped_ignored_count, 1);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn ignore_files_can_be_switched_off_entirely() -> Result<()> {
+    let root = unique_temp_dir("ignore-off");
+    mark_repository(&root)?;
+    fs::write(root.join(".gitignore"), "*.lisp\n")?;
+    fs::write(root.join("main.lisp"), "(defun main () nil)")?;
+
+    let discovery = discover_workspace_files(
+        &WorkspaceDiscoveryOptions {
+            roots: vec![root.clone()],
+            ..WorkspaceDiscoveryOptions::default()
+        }
+        .without_ignore_files(),
+    )?;
+
+    assert_eq!(discovery.files, vec![root.join("main.lisp")]);
+    assert_eq!(discovery.skipped_ignored_count, 0);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn an_explicitly_named_root_is_never_ignore_filtered() -> Result<()> {
+    let root = unique_temp_dir("ignore-explicit-root");
+    fs::create_dir_all(root.join("generated"))?;
+    mark_repository(&root)?;
+    fs::write(root.join(".gitignore"), "generated/\n")?;
+    fs::write(
+        root.join("generated").join("out.lisp"),
+        "(defun out () nil)",
+    )?;
+
+    // Pointing at the ignored directory is a stronger statement than the
+    // pattern that covers it, exactly as `git add -f` is.
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.join("generated")],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(
+        discovery.files,
+        vec![root.join("generated").join("out.lisp")]
+    );
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn a_nested_repository_does_not_inherit_the_outer_ignore_rules() -> Result<()> {
+    let root = unique_temp_dir("nested-repo");
+    let inner = root.join("nested").join("inner");
+    fs::create_dir_all(&inner)?;
+    mark_repository(&root)?;
+    mark_repository(&inner)?;
+    fs::write(root.join(".gitignore"), "*.lisp\n")?;
+    fs::write(root.join("outer.lisp"), "(defun outer () nil)")?;
+    fs::write(inner.join("inner.lisp"), "(defun inner () nil)")?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(discovery.files, vec![inner.join("inner.lisp")]);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+// --- F3: command-line globs ------------------------------------------------
+
+#[test]
+fn include_globs_select_and_exclude_globs_override_them() -> Result<()> {
+    let root = unique_temp_dir("globs");
+    fs::create_dir_all(root.join("src").join("nested"))?;
+    fs::create_dir_all(root.join("test"))?;
+    fs::write(root.join("src").join("a.lisp"), "(defun a () nil)")?;
+    fs::write(
+        root.join("src").join("nested").join("b.lisp"),
+        "(defun b () nil)",
+    )?;
+    fs::write(root.join("src").join("skip.lisp"), "(defun skip () nil)")?;
+    fs::write(root.join("test").join("t.lisp"), "(defun t () nil)")?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        include_globs: GlobSet::parse_file("src/**\n")?,
+        exclude_globs: GlobSet::parse_file("**/skip.lisp\n")?,
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(
+        discovery.files,
+        vec![
+            root.join("src").join("a.lisp"),
+            root.join("src").join("nested").join("b.lisp"),
+        ]
+    );
+    assert!(discovery.skipped_glob_count >= 2);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn an_include_glob_does_not_prune_the_directories_holding_its_matches() -> Result<()> {
+    let root = unique_temp_dir("glob-descend");
+    fs::create_dir_all(root.join("a").join("b").join("c"))?;
+    fs::write(
+        root.join("a").join("b").join("c").join("deep.lisp"),
+        "(defun deep () nil)",
+    )?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        include_globs: GlobSet::parse_file("a/**/deep.lisp\n")?,
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(
+        discovery.files,
+        vec![root.join("a").join("b").join("c").join("deep.lisp")]
+    );
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+// --- F9: repository grouping -----------------------------------------------
+
+#[test]
+fn discovered_files_are_grouped_by_the_repository_that_contains_them() -> Result<()> {
+    let root = unique_temp_dir("multi-repo");
+    let first = root.join("first");
+    let second = root.join("second");
+    fs::create_dir_all(&first)?;
+    fs::create_dir_all(&second)?;
+    fs::create_dir_all(root.join("loose"))?;
+    mark_repository(&first)?;
+    mark_repository(&second)?;
+    fs::write(first.join("a.lisp"), "(defun a () nil)")?;
+    fs::write(second.join("b.lisp"), "(defun b () nil)")?;
+    fs::write(root.join("loose").join("c.lisp"), "(defun c () nil)")?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    let canonical_root = fs::canonicalize(&root)?;
+    assert_eq!(discovery.repositories.len(), 2);
+    assert!(
+        discovery
+            .repositories
+            .contains_key(&canonical_root.join("first"))
+            || discovery.repositories.contains_key(&first),
+        "repository keys are the directory holding .git: {:?}",
+        discovery.repositories.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        discovery.files_outside_repositories,
+        vec![root.join("loose").join("c.lisp")]
+    );
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+// --- F12: symlink policy ---------------------------------------------------
+
+#[cfg(unix)]
+#[test]
+fn following_symlinks_traverses_a_link_inside_the_roots() -> Result<()> {
+    let root = unique_temp_dir("symlink-follow");
+    fs::create_dir_all(root.join("real"))?;
+    fs::write(root.join("real").join("a.lisp"), "(defun a () nil)")?;
+    std::os::unix::fs::symlink(root.join("real"), root.join("link"))?;
+
+    let skipped = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+    assert_eq!(skipped.files, vec![root.join("real").join("a.lisp")]);
+    assert_eq!(skipped.skipped_symlink_count, 1);
+
+    let followed = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        symlinks: SymlinkPolicy::Follow,
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+    // The link and the real directory reach the same file, and canonical
+    // deduplication keeps the result a set: the traversal reports whichever
+    // path it reached first, not both.
+    assert_eq!(followed.files.len(), 1);
+    assert_eq!(
+        fs::canonicalize(&followed.files[0])?,
+        fs::canonicalize(root.join("real").join("a.lisp"))?
+    );
+    assert_eq!(followed.skipped_symlink_count, 0);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn following_symlinks_refuses_a_target_outside_the_roots() -> Result<()> {
+    let root = unique_temp_dir("symlink-escape");
+    let outside = unique_temp_dir("symlink-escape-target");
+    fs::create_dir_all(&root)?;
+    fs::create_dir_all(&outside)?;
+    fs::write(outside.join("secret.lisp"), "(defun secret () nil)")?;
+    std::os::unix::fs::symlink(&outside, root.join("escape"))?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        symlinks: SymlinkPolicy::Follow,
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert!(discovery.files.is_empty());
+    assert_eq!(discovery.skipped_symlink_escaped_count, 1);
+
+    fs::remove_dir_all(root)?;
+    fs::remove_dir_all(outside)?;
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn following_symlinks_stops_at_a_loop_instead_of_recursing() -> Result<()> {
+    let root = unique_temp_dir("symlink-loop");
+    fs::create_dir_all(root.join("a"))?;
+    fs::write(root.join("a").join("x.lisp"), "(defun x () nil)")?;
+    // `a/self` points back at `a`, which an unguarded walk descends forever.
+    std::os::unix::fs::symlink(root.join("a"), root.join("a").join("self"))?;
+
+    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        symlinks: SymlinkPolicy::Follow,
+        ..WorkspaceDiscoveryOptions::default()
+    })?;
+
+    assert_eq!(discovery.files.len(), 1);
+    assert_eq!(
+        fs::canonicalize(&discovery.files[0])?,
+        fs::canonicalize(root.join("a").join("x.lisp"))?
+    );
+    assert_eq!(discovery.skipped_symlink_cycle_count, 1);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
 }

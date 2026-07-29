@@ -54,13 +54,13 @@ use super::{
     sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
     single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
     single_operand_boolean_report, single_operand_list_op_report, single_value_bind_report,
-    split_let, split_let_star, step_zero_report, string_case_fold_report, struct_cycle_report,
-    subseq_zero_report, symbol_report, system_conflict_report, system_cycle_report,
-    t_comparison_report, the_arity_report, thread_expression, typecase_nil_key_report,
-    typep_predicate_report, undefined_package_report, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unthread_expression, unused_export_report,
-    unused_local_callable_report, unused_nickname_report, unused_package_report,
-    unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
+    source_report, split_let, split_let_star, step_zero_report, string_case_fold_report,
+    struct_cycle_report, subseq_zero_report, symbol_report, system_conflict_report,
+    system_cycle_report, t_comparison_report, the_arity_report, thread_expression,
+    typecase_nil_key_report, typep_predicate_report, undefined_package_report,
+    unreachable_case_clause_report, unreachable_cond_clause_report, unthread_expression,
+    unused_export_report, unused_local_callable_report, unused_nickname_report,
+    unused_package_report, unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
     values_list_of_list_report, verbose_negation_report, workspace_report, zero_divisor_report,
 };
 use clap::Subcommand;
@@ -99,6 +99,8 @@ pub(super) enum InspectCommand {
     Impact(impact_report::args::ImpactReportArgs),
     /// Discover Lisp sources under roots and report parse/refactor inventory.
     Workspace(workspace_report::args::WorkspaceReportArgs),
+    /// Report which files an analysis would select, and which rule dropped the rest.
+    Sources(source_report::args::SourceReportArgs),
     /// Report package, system, load, and qualified-symbol dependencies across explicit files.
     Dependencies(dependency_report::args::DependencyReportArgs),
     /// Report Common Lisp package declarations across explicit files.

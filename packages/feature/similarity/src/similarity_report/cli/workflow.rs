@@ -8,6 +8,7 @@ use crate::similarity_report::usecase::{
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_workspace::workspace::{
     WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
+    discover_workspace_files_from_list,
 };
 
 use super::args::SimilarityReportArgs;
@@ -25,13 +26,14 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         args.max_comparisons,
         args.max_results,
     )?;
+    let resolved = args.input.resolve(&args.roots)?;
     let request = SimilarityReportRequest {
         roots: args.roots.clone(),
-        include_unknown: args.include_unknown,
-        include_hidden: args.include_hidden,
-        include_generated: args.include_generated,
-        max_depth: args.max_depth,
-        exclude: args.exclude.clone(),
+        include_unknown: args.input.include_unknown,
+        include_hidden: args.input.include_hidden,
+        include_generated: args.input.include_generated,
+        max_depth: args.input.max_depth,
+        exclude: args.input.exclude.clone(),
         forced_dialect: args.dialect.map(Into::into),
         options,
         error_policy: args.error_policy.into(),
@@ -42,7 +44,11 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         },
     };
 
-    let mut source = CliSimilarityReportSource::default();
+    let mut source = CliSimilarityReportSource {
+        options: resolved.options,
+        from_list: resolved.from_list,
+        discovery: None,
+    };
     let plan = build_similarity_report(&mut source, request)?;
     print_similarity_report(&plan, &args)?;
 
@@ -71,8 +77,9 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
     }
 }
 
-#[derive(Default)]
 struct CliSimilarityReportSource {
+    options: WorkspaceDiscoveryOptions,
+    from_list: bool,
     discovery: Option<WorkspaceDiscovery>,
 }
 
@@ -81,14 +88,17 @@ impl SimilarityReportSourcePort for CliSimilarityReportSource {
         &mut self,
         request: &SimilarityReportRequest,
     ) -> anyhow::Result<SimilarityInventory> {
-        let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
-            roots: request.roots.clone(),
-            include_unknown: request.include_unknown || request.forced_dialect.is_some(),
-            include_hidden: request.include_hidden,
-            include_generated: request.include_generated,
-            max_depth: request.max_depth,
-            exclude: request.exclude.clone(),
-        })?;
+        // `--dialect` forces every file to be parsed with one dialect, so an
+        // unknown extension is no longer a reason to skip a file.
+        let options = WorkspaceDiscoveryOptions {
+            include_unknown: self.options.include_unknown || request.forced_dialect.is_some(),
+            ..self.options.clone()
+        };
+        let discovery = if self.from_list {
+            discover_workspace_files_from_list(&options)?
+        } else {
+            discover_workspace_files(&options)?
+        };
         let inventory = SimilarityInventory {
             files: discovery
                 .files()

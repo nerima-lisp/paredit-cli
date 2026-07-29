@@ -14,7 +14,6 @@ use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::stable_text_hash;
 use paredit_core_cli::shared::write_artifact_with_rollback;
 use paredit_core_syntax::sexpr::SymbolName;
-use paredit_core_workspace::workspace::WorkspaceDiscoveryOptions;
 use serde_json::json;
 use std::path::Path as FsPath;
 use std::path::PathBuf;
@@ -48,14 +47,8 @@ pub fn refactor_preview(args: RefactorPreviewArgs) -> Result<()> {
 }
 
 pub fn workspace_refactor_preview(args: WorkspaceRefactorPreviewArgs) -> Result<()> {
-    let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
-        roots: args.roots.clone(),
-        include_unknown: args.include_unknown,
-        include_hidden: args.include_hidden,
-        include_generated: args.include_generated,
-        max_depth: args.max_depth,
-        exclude: Vec::new(),
-    })?;
+    let resolved = args.input.resolve(&args.roots)?;
+    let workspace = discover_workspace_refactor_scope(args.roots.clone(), &resolved)?;
 
     emit_refactor_preview(RefactorPreviewEmission {
         paths: &workspace.paths,
