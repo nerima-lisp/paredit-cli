@@ -6,7 +6,63 @@ use serde_json::json;
 
 use crate::call_graph_report::usecase::{CallGraphFile, CallGraphNode, CallGraphPolicy};
 use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::report::graph::{EdgeStyle, Graph, NodeShape};
 use paredit_core_syntax::sexpr::SymbolName;
+
+/// Draws the call graph: one node per callable, one edge per call site.
+///
+/// Nodes are grouped by the file that defines them, which is the grouping a
+/// reader of a call graph is actually looking for — "what does this file talk
+/// to" — and the only one available without a package model. A callee with no
+/// definition in the scanned set is drawn open and dashed, because the edge is
+/// real but its far end was never verified.
+///
+/// Parallel edges are collapsed: three calls to the same callee from the same
+/// caller are one arrow labelled `×3`. A picture with three identical arrows
+/// says nothing the label does not.
+pub fn call_graph_drawing(reports: &[CallGraphFile], symbol: Option<&SymbolName>) -> Graph {
+    let mut graph = Graph::new(match symbol {
+        Some(symbol) => format!("inspect call-graph — {}", symbol.as_str()),
+        None => "inspect call-graph".to_owned(),
+    });
+
+    for report in reports {
+        let group = report.path.display().to_string();
+        for definition in &report.definitions {
+            if let Some(name) = &definition.name {
+                graph.add_node(name.clone(), NodeShape::Definition, Some(group.clone()));
+            }
+        }
+    }
+
+    let mut counts: BTreeMap<(String, String, bool), usize> = BTreeMap::new();
+    for edge in reports.iter().flat_map(|report| &report.edges) {
+        let caller = edge.caller.clone().unwrap_or_else(|| TOP_LEVEL.to_owned());
+        *counts
+            .entry((caller, edge.callee.clone(), edge.internal))
+            .or_default() += 1;
+    }
+    for ((caller, callee, internal), count) in counts {
+        if caller == TOP_LEVEL {
+            graph.add_node(TOP_LEVEL, NodeShape::Container, None);
+        }
+        graph.add_edge(
+            caller,
+            callee,
+            (count > 1).then(|| format!("×{count}")),
+            if internal {
+                EdgeStyle::Internal
+            } else {
+                EdgeStyle::External
+            },
+        );
+    }
+
+    graph
+}
+
+/// The synthetic caller for a call written outside any definition.
+const TOP_LEVEL: &str = "<top-level>";
 
 pub fn print_call_graph_report(
     reports: &[CallGraphFile],

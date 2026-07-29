@@ -12,6 +12,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Capabilities(args) => capabilities::capabilities(args)?,
             command::InspectCommand::Outline(args) => analysis_report::workflow::outline(args)?,
             command::InspectCommand::Form(args) => form_report::workflow::form_report(args)?,
+            command::InspectCommand::Resolve(args) => {
+                resolve_report::workflow::resolve_report(args)?;
+            }
             command::InspectCommand::FindSymbol(args) => {
                 symbol_report::workflow::find_symbol(args)?;
             }
@@ -27,6 +30,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Workspace(args) => {
                 workspace_report::workflow::workspace_report(args)?;
             }
+            command::InspectCommand::Sources(args) => {
+                source_report::workflow::source_report(args)?;
+            }
             command::InspectCommand::Dependencies(args) => {
                 dependency_report::workflow::dependency_report(args)?;
             }
@@ -39,6 +45,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?;
+            }
+            command::InspectCommand::Diff(args) => {
+                structural_diff::workflow::structural_diff(args)?;
             }
             command::InspectCommand::DuplicateSetfPlaces(args) => {
                 duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?;
@@ -701,6 +710,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::Status(args) => refactor::workflow::refactor_status(args)?,
             command::RefactorCommand::Apply(args) => refactor::workflow::refactor_apply(args)?,
             command::RefactorCommand::Diff(args) => refactor::workflow::refactor_diff(args)?,
+            command::RefactorCommand::Patch(args) => {
+                structural_patch::workflow::structural_patch(args)?;
+            }
+            command::RefactorCommand::Step(args) => {
+                refactor_step::workflow::refactor_step(args)?;
+            }
             command::RefactorCommand::WorkspacePlan(args) => {
                 refactor::workflow::workspace_refactor_plan(args)?;
             }
@@ -889,6 +904,11 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 remove_unused_binding::remove_unused_binding(args)?;
             }
         },
+        // Handled in `run`, before dispatch, because they own their exit
+        // status: a closed pipe is how a protocol session normally ends.
+        Command::Lsp(_) | Command::Mcp(_) | Command::Serve(_) => {
+            unreachable!("the protocol servers are dispatched from run")
+        }
         Command::Completions { shell } => {
             use clap::CommandFactory;
             let mut root = super::Cli::command();

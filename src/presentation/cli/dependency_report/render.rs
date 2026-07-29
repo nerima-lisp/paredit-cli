@@ -6,6 +6,56 @@ use serde_json::json;
 use crate::application::usecase::dependency_report::DependencyKind;
 use crate::presentation::cli::OutputFormat;
 use crate::presentation::cli::dependency_report::types::DependencyReportFile;
+use paredit_core_cli::report::graph::{EdgeStyle, Graph, NodeShape};
+
+/// Draws the dependency graph: one node per package, system, or file, one edge
+/// per declared dependency.
+///
+/// The source of an edge is the declaring package where one is known and the
+/// file otherwise, because a `defpackage` in a file with no `in-package` still
+/// has an owner and it is the file. Every target is drawn open: a dependency
+/// names something outside the declaring unit by construction, and nothing in
+/// this report establishes that the named thing was found.
+pub fn dependency_drawing(reports: &[DependencyReportFile]) -> Graph {
+    let mut graph = Graph::new("inspect dependencies");
+    let mut seen: BTreeMap<(String, String, DependencyKind), usize> = BTreeMap::new();
+
+    for report in reports {
+        let source_label = report
+            .package
+            .clone()
+            .unwrap_or_else(|| report.path.display().to_string());
+        graph.add_node(
+            source_label.clone(),
+            if report.package.is_some() {
+                NodeShape::Definition
+            } else {
+                NodeShape::Container
+            },
+            None,
+        );
+        for dependency in &report.dependencies {
+            let source = dependency
+                .source
+                .clone()
+                .unwrap_or_else(|| source_label.clone());
+            *seen
+                .entry((source, dependency.target.clone(), dependency.kind))
+                .or_default() += 1;
+        }
+    }
+
+    for ((source, target, kind), count) in seen {
+        let label = if count > 1 {
+            format!("{} ×{count}", kind.label())
+        } else {
+            kind.label().to_owned()
+        };
+        graph.add_edge(source, target, Some(label), EdgeStyle::External);
+    }
+
+    graph
+}
 
 pub fn print_dependency_report(
     reports: &[DependencyReportFile],

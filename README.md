@@ -20,6 +20,9 @@ interface, and integration guides — is published at
 paredit inspect <report> [args]    # read-only inventory, validation, analysis
 paredit edit <transform> [args]    # one structural edit (stdout, --diff, or --write)
 paredit refactor <workflow> [args] # plan, preview, verify, and apply changes
+paredit lsp                        # Language Server Protocol server over stdio
+paredit mcp                        # Model Context Protocol server over stdio (agents)
+paredit serve                      # resident analysis server over HTTP/JSON-RPC
 paredit completions <shell>        # shell completion scripts (bash/zsh/fish/...)
 ```
 
@@ -33,6 +36,11 @@ command list. For machine-readable discovery, run
 paredit inspect check --file src/example.lisp
 paredit edit wrap --file src/example.lisp --path 0.2 --diff
 paredit refactor plan --symbol old-name src/example.lisp
+
+# Name a form without counting parentheses: by definition name, by editor
+# coordinate, or by shape. `inspect resolve` shows what a selector matches.
+paredit inspect resolve --file src/example.lisp --query '(defun ?name ...)'
+paredit edit wrap --file src/example.lisp --name parse-header --diff
 ```
 
 ## Install

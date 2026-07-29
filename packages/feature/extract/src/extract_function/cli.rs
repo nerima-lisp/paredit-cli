@@ -3,13 +3,14 @@ use crate::extract_function::usecase::{
 };
 use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::MoveInsert;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_cli::shared::require_output_file;
-use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::resolve_compact_target;
 use paredit_core_cli::shared::write_file_with_rollback;
 use paredit_core_syntax::sexpr::Path;
 use paredit_core_syntax::sexpr::SymbolName;
@@ -24,12 +25,8 @@ pub struct ExtractFunctionArgs {
     /// Override extension-based dialect detection.
     #[arg(long)]
     dialect: Option<DialectArg>,
-    /// Select by child index path, for example 0.2.1.
-    #[arg(long, conflicts_with = "at")]
-    path: Option<Path>,
-    /// Select the smallest expression containing byte offset.
-    #[arg(long, conflicts_with = "path")]
-    at: Option<usize>,
+    #[command(flatten)]
+    selector: CompactSelectorArgs,
     /// New top-level function name.
     #[arg(long)]
     name: SymbolName,
@@ -65,7 +62,9 @@ pub fn extract_function(args: ExtractFunctionArgs) -> Result<()> {
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let target =
+        resolve_compact_target(&tree, dialect, &args.selector, "refactor extract-function")?;
+    let selection = tree.select_path(&target.path)?;
     let explicit_params = args
         .params
         .iter()
@@ -74,7 +73,7 @@ pub fn extract_function(args: ExtractFunctionArgs) -> Result<()> {
     let plan = plan_extract_function(ExtractFunctionRequest {
         input: &input.text,
         selection,
-        path: args.path,
+        path: Some(target.path),
         dialect,
         name: args.name,
         explicit_params,

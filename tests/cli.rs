@@ -33,6 +33,8 @@ mod call_graph_report;
 mod call_report;
 #[path = "cli/capabilities_contract.rs"]
 mod capabilities_contract;
+#[path = "cli/capabilities_schema.rs"]
+mod capabilities_schema;
 #[path = "cli/car_nthcdr_report.rs"]
 mod car_nthcdr_report;
 #[path = "cli/car_reverse_report.rs"]
@@ -183,6 +185,8 @@ mod function_parameter;
 mod getf_default_nil_report;
 #[path = "cli/gethash_default_report.rs"]
 mod gethash_default_report;
+#[path = "cli/graph_output.rs"]
+mod graph_output;
 #[path = "cli/handler_case_no_clauses_report.rs"]
 mod handler_case_no_clauses_report;
 #[path = "cli/help_contract.rs"]
@@ -229,6 +233,8 @@ mod list_star_nil_report;
 mod list_star_to_cons_report;
 #[path = "cli/literal_place_report.rs"]
 mod literal_place_report;
+#[path = "cli/lsp_server.rs"]
+mod lsp_server;
 #[path = "cli/make_array_default_keyword_report.rs"]
 mod make_array_default_keyword_report;
 #[path = "cli/make_hash_table_test_report.rs"]
@@ -249,6 +255,8 @@ mod manual_incf_report;
 mod manual_push_report;
 #[path = "cli/manual_pushnew_report.rs"]
 mod manual_pushnew_report;
+#[path = "cli/mcp_server.rs"]
+mod mcp_server;
 #[path = "cli/merge_nested_flet.rs"]
 mod merge_nested_flet;
 #[path = "cli/merge_nested_let_star.rs"]
@@ -379,6 +387,8 @@ mod refactor_entrypoint_contract;
 mod refactor_manifest;
 #[path = "cli/refactor_preview.rs"]
 mod refactor_preview;
+#[path = "cli/refactor_step.rs"]
+mod refactor_step;
 #[path = "cli/refactor_workspace/mod.rs"]
 mod refactor_workspace;
 #[path = "cli/remove_unused_binding/mod.rs"]
@@ -395,12 +405,18 @@ mod rename_control;
 mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
+#[path = "cli/report_interop.rs"]
+mod report_interop;
+#[path = "cli/selector.rs"]
+mod selector;
 #[path = "cli/self_assignment_report.rs"]
 mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]
 mod self_comparison_report;
 #[path = "cli/semantic_report.rs"]
 mod semantic_report;
+#[path = "cli/serve_daemon.rs"]
+mod serve_daemon;
 #[path = "cli/setf_arity_report.rs"]
 mod setf_arity_report;
 #[path = "cli/setq_non_variable_report.rs"]
@@ -431,6 +447,8 @@ mod single_value_bind_report;
 mod skill_contract;
 #[path = "cli/sort_definitions.rs"]
 mod sort_definitions;
+#[path = "cli/source_report.rs"]
+mod source_report;
 #[path = "cli/split_file.rs"]
 mod split_file;
 #[path = "cli/split_let_star.rs"]
@@ -441,6 +459,8 @@ mod step_zero_report;
 mod string_case_fold_report;
 #[path = "cli/struct_cycle_report.rs"]
 mod struct_cycle_report;
+#[path = "cli/structural_diff.rs"]
+mod structural_diff;
 #[path = "cli/subseq_zero_report.rs"]
 mod subseq_zero_report;
 #[path = "cli/symbol_report.rs"]

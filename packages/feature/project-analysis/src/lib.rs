@@ -14,6 +14,7 @@ pub mod package_cycle_report;
 pub mod reachability_report;
 pub mod redefinition_report;
 pub mod signature_report;
+pub mod source_report;
 pub mod struct_cycle_report;
 pub mod system_cycle_report;
 pub mod system_order;
@@ -37,6 +38,7 @@ pub use package_cycle_report::cli::{PackageCycleReportArgs, package_cycle_report
 pub use reachability_report::cli::{ReachabilityReportArgs, reachability_report};
 pub use redefinition_report::cli::{RedefinitionReportArgs, redefinition_report};
 pub use signature_report::cli::{SignatureReportArgs, signature_report};
+pub use source_report::cli::{SourceReportArgs, source_report};
 pub use struct_cycle_report::cli::{StructCycleReportArgs, struct_cycle_report};
 pub use system_cycle_report::cli::{SystemCycleReportArgs, system_cycle_report};
 pub use undefined_package_report::cli::{UndefinedPackageReportArgs, undefined_package_report};

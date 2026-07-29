@@ -147,7 +147,8 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 216] = [
+const INTROSPECTION_COMMANDS: [&str; 219] = [
+    "inspect diff",
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -155,6 +156,7 @@ const INTROSPECTION_COMMANDS: [&str; 216] = [
     "inspect capabilities",
     "inspect outline",
     "inspect form",
+    "inspect resolve",
     "inspect find-symbol",
     "inspect symbols",
     "inspect calls",
@@ -162,6 +164,7 @@ const INTROSPECTION_COMMANDS: [&str; 216] = [
     "inspect call-graph",
     "inspect impact",
     "inspect workspace",
+    "inspect sources",
     "inspect dependencies",
     "inspect packages",
     "inspect definitions",
@@ -400,7 +403,9 @@ const STRUCTURAL_COMMANDS: [&str; 29] = [
     "edit unescape-string",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 78] = [
+const SEMANTIC_COMMANDS: [&str; 80] = [
+    "refactor step",
+    "refactor patch",
     "refactor plan",
     "refactor verify",
     "refactor preview",
@@ -489,8 +494,9 @@ const SEMANTIC_COMMANDS: [&str; 78] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 10] = [
+const SYNTAX_TIER_REPORTS: [&str; 12] = [
     "inspect context-at",
+    "inspect diff",
     "inspect elisp-file",
     "inspect check",
     "inspect dialect",
@@ -500,11 +506,13 @@ const SYNTAX_TIER_REPORTS: [&str; 10] = [
     "inspect form",
     "inspect find-symbol",
     "inspect workspace",
+    "inspect sources",
 ];
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 27] = [
+const SCOPE_TIER_REPORTS: [&str; 28] = [
+    "inspect resolve",
     "inspect test-map",
     "inspect symbol-index",
     "inspect unreachable-expressions",
@@ -536,7 +544,9 @@ const SCOPE_TIER_REPORTS: [&str; 27] = [
 
 /// Refactor plumbing that moves whole forms or drives the manifest workflow.
 /// None of it reads an operator name, so it is complete for every dialect.
-const SYNTAX_TIER_REFACTORS: [&str; 14] = [
+const SYNTAX_TIER_REFACTORS: [&str; 16] = [
+    "refactor step",
+    "refactor patch",
     "refactor plan",
     "refactor verify",
     "refactor preview",

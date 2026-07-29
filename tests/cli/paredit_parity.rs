@@ -77,7 +77,7 @@ fn unwrap_prefix_peels_one_level_and_all_peels_every_level() {
     );
     assert_eq!(
         edit(
-            &["edit", "unwrap-prefix", "--path", "0.1", "--all"],
+            &["edit", "unwrap-prefix", "--path", "0.1", "--all-prefixes"],
             "(list '#'f)"
         ),
         "(list f)"
@@ -351,6 +351,70 @@ fn kill_to_ring_stores_exactly_what_it_removed() {
 }
 
 #[test]
+fn kill_to_ring_keeps_all_and_pushes_in_source_order() {
+    // `--to-ring` must not cost `kill` the selector layer's `--all`, and the
+    // ring's newest entry should be the last form killed in the file.
+    let dir = fresh_temp_dir("kill-ring-all");
+    let ring = dir.join("ring.json");
+    let source = dir.join("source.lisp");
+    fs::write(
+        &source,
+        "(progn\n  (cleanup a)\n  (keep b)\n  (cleanup c))\n",
+    )
+    .expect("write");
+
+    paredit()
+        .args([
+            "edit",
+            "kill",
+            "--dialect",
+            "common-lisp",
+            "--query",
+            "(cleanup ?x)",
+            "--all",
+            "--to-ring",
+            "--write",
+            "--ring",
+        ])
+        .arg(&ring)
+        .arg("--file")
+        .arg(&source)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&source).expect("read source"),
+        "(progn\n  (keep b))\n"
+    );
+    let stored: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&ring).expect("read ring")).expect("ring is JSON");
+    assert_eq!(stored["entries"][0]["text"], "(cleanup c)");
+    assert_eq!(stored["entries"][1]["text"], "(cleanup a)");
+}
+
+#[test]
+fn the_new_commands_accept_the_selectors_the_selector_layer_added() {
+    // `TargetArgs` carries `SelectorArgs`, so `--name` and friends reach every
+    // command added here without each one restating them.
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "navigate",
+                "--dialect",
+                "common-lisp",
+                "--name",
+                "f",
+                "--direction",
+                "down",
+            ],
+            "(defun f (x) x)\n(defun g (y) y)\n"
+        ),
+        "0.0\n"
+    );
+}
+
+#[test]
 fn yank_reports_an_index_the_ring_does_not_have() {
     let dir = fresh_temp_dir("kill-ring-empty");
     paredit()
@@ -555,7 +619,9 @@ fn transpose_requires_a_second_address() {
         .write_stdin("(a b c)")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("--with-path or --with-at"));
+        .stderr(predicate::str::contains(
+            "--with-path, --with-at or --with-select",
+        ));
 }
 
 // --- the whole namespace still writes through the guarded path ---

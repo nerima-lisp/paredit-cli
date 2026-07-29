@@ -21,6 +21,13 @@ the entire surface in one call, run:
 paredit inspect capabilities --output json
 ```
 
+Commands that take roots rather than explicit files share one set of input
+selectors and filters — `--since`, `--from-git`, `--from-manifest`,
+`--paths-from`, `--from-archive`, `--include`, `--exclude-glob`,
+`--no-gitignore` and the rest. See [Choosing Files](workspace-inputs.md), and
+run `paredit inspect sources` to see exactly which files a given combination
+selects.
+
 ## Inspect
 
 `paredit inspect` never writes source files. Prefer these commands for
@@ -35,6 +42,7 @@ discovery, impact analysis, and preflight checks.
 | `capabilities` | Print a machine-readable catalog of every command, flag, default, and enum value. |
 | `outline` | Print top-level forms with paths, spans, and definition hints. |
 | `form` | Report one selected form with local structure for refactor planning. |
+| `resolve` | Report which forms a selector names, with paths, line/column coordinates, stable selector ids, and pattern captures. Resolves `--query` / `--name` / `--line-column` / `--id` / `--from`+`--to` without acting on them. |
 | `find-symbol` | Find exact atom occurrences without touching strings or comments. |
 | `symbols` | Report exact atom occurrences across explicit files for rename planning. |
 | `calls` | Report list-head call sites across explicit files for arity refactor planning. |
@@ -42,11 +50,13 @@ discovery, impact analysis, and preflight checks.
 | `call-graph` | Report internal and optional external call graph edges. |
 | `impact` | Report refactoring impact risks for one symbol across explicit files. |
 | `workspace` | Discover Lisp sources under roots and report parse/refactor inventory. |
+| `sources` | Report which files an analysis would select, and which rule dropped the rest. |
 | `dependencies` | Report package, system, load, and qualified-symbol dependencies. |
 | `packages` | Report Common Lisp package declarations across explicit files. |
 | `definitions` | Report definition-like top-level forms across explicit files. |
 | `unused-definitions` | Report definitions with no external exact atom references. |
 | `duplicates` | Report repeated structural S-expression shapes across explicit files. |
+| `diff` | Compare two documents by their parse rather than their lines: which forms were inserted, deleted, or replaced, and at what path. Whitespace, indentation, and comments are not part of the comparison, so a reformatted file reports no changes and an edited argument reports as that argument instead of as the whole wrapped line. `--max-depth` hides the deep edits and leaves the shape changes; `--fail-on-change` gates on the two documents differing structurally. **The blind spot is stated in every run's output:** an empty structural diff does not mean the files are identical, only that the programs are. |
 | `similarity` | Report structurally similar S-expression forms across explicit files. |
 | `lets` | Report local let bindings and inline safety for refactor planning. |
 | `complexity` | Report per-definition nesting depth and size metrics for refactor prioritization. |
@@ -245,7 +255,10 @@ discovery, impact analysis, and preflight checks.
 | `setf-arity` | Report setq/setf/psetq/psetf forms with an odd argument count (a place missing its value). |
 | `lint` | Run every within-file logic-bug lint at once and report all findings, tagged by rule and category. Each finding is self-describing — it carries its `severity`, `category`, and a `fixable` flag inline (so an agent can triage and decide whether to run `--fix` without cross-referencing `--list-rules`). `--list-rules` prints the rule catalog with categories, descriptions, a `severity` (`error` for likely/certain bugs, `warning` for redundant/non-idiomatic style), and a `fixable` flag marking the rules `--fix` can repair — and it honors the same `--rule`/`--exclude`/`--category` selectors, so `--list-rules --category dead-code` lists just that group; `--rule`/`--exclude` select rules; `--category` selects a whole group (see `--list-rules` for the current set); `--sarif` emits a SARIF 2.1.0 log for CI code scanning (with stable fingerprints and one-click `fixes` for every rule `--list-rules` marks fixable); `--github` emits GitHub Actions `::error::` annotations for inline PR review; `--fix` applies those auto-fixes in place, iterating to a fixpoint (so nested redundancies collapse fully) and reporting the per-file/per-rule counts; add `--diff` to preview the changes as a unified diff without writing, or `--check` to write nothing and exit 3 when any auto-fix is still pending (a CI gate that stays green only when fixable lint has been cleaned up — distinct from `--fail-on-finding`, which also gates on report-only findings). `--check` and `--diff` combine (show the diff and fail). `--fix-plan` instead emits the machine-readable fix plan — each fixable finding's exact byte-region replacements as JSON (or tab-separated text) — without writing, so an editor or agent can preview or apply fixes one at a time (honoring the same suppressions and `--baseline` as `--fix`). Findings can be silenced in source with an inline `; paredit:ignore [rule…]` comment: on its own line it suppresses the next line, trailing after code it suppresses that line, and with no rule names it suppresses every rule — honored uniformly across the report, SARIF, GitHub, and `--fix` outputs. `--fail-on <error\|warning>` gates only on findings at or above a severity (so CI can block on bugs while still reporting style warnings), and SARIF `level` reflects each finding's severity. `--stats` prints a lint-debt rollup instead of individual findings — finding counts by severity, by category, and by rule, plus files-scanned/files-with-findings — honoring the same `--rule`/`--category`/`--baseline` filters. `--report-unused-suppressions` instead reports any `; paredit:ignore` that silences no finding (a stale ignore or a typo'd rule name) and exits 3 if any are found, keeping the ignore list honest in CI. For adopting the linter on an existing codebase, `--write-baseline <file>` snapshots today's findings and `--baseline <file>` then suppresses those known findings (matched by rule and trimmed-line content, so they survive line shifts) — reporting and gating only on new findings, across the default, `--sarif`, and `--github` outputs. |
 
-Most reports accept `--output json` for machine-readable results.
+Most reports accept `--output json` for machine-readable results. Reports whose
+output is a list of located findings accept the interchange formats as well —
+`sarif`, `junit`, `code-climate`, `csv`, `tsv`, `html`, `markdown`, and
+`github` — see [Report output formats](./integrations.md#report-output-formats).
 
 ### Choosing and tuning lint rules
 
@@ -370,7 +383,7 @@ Mutating commands also accept:
 | `copy` | Print the selected S-expression together with the own-line comment block written above it. `--to-ring` pushes it onto the kill ring. |
 | `yank` | Paste a kill ring entry `--placement before\|after\|replace` the selection. `--index` picks the entry, newest first. |
 | `wrap` | Wrap the selected S-expression. `--delimiter paren\|bracket\|brace\|doublequote` chooses the delimiter; `doublequote` produces a string literal and escapes the selection's own quotes and backslashes. `--prefix quote\|quasiquote\|unquote\|unquote-splicing\|sharp-quote` attaches reader sugar instead. |
-| `unwrap-prefix` | Remove the selected expression's outermost reader prefix, or every one of them with `--all`. |
+| `unwrap-prefix` | Remove the selected expression's outermost reader prefix, or every one of them with `--all-prefixes`. |
 | `splice` | Remove one list pair while keeping its children. |
 | `split` | Split the enclosing list in two immediately before the selected expression. |
 | `join` | Join the selected list with its next sibling list, or two adjacent string literals, into one form. |
@@ -384,7 +397,7 @@ Mutating commands also accept:
 | `slurp-backward` | Pull the previous sibling into the selected list. |
 | `barf-forward` | Push the last child out of the selected list. |
 | `barf-backward` | Push the first child out of the selected list. |
-| `transpose` | Exchange the selection with any other expression in the same list, adjacent or not, addressed by `--with-path` / `--with-at`. |
+| `transpose` | Exchange the selection with any other expression in the same list, adjacent or not. The partner is addressed by `--with-path`, `--with-at`, or `--with-select` — its own flag names, because the primary selector already claims `--path`, `--at` and `--select`. |
 | `navigate` | Print the `--path` that `--direction forward\|backward\|up\|down` lands on. Text output is the bare path, so it composes directly into the next command. |
 | `delete-forward` | Delete the character at `--at`, refusing anything that would unbalance the document. An empty `()` or `""` is deleted as a pair. |
 | `delete-backward` | Delete the character before `--at`, under the same rules. |
@@ -440,6 +453,8 @@ plan/preview/verify/apply lifecycle.
 | `status` | Summarize a preview manifest into agent-safe next actions. |
 | `apply` | Apply a previously generated preview manifest with hash guards. |
 | `diff` | Render a verified diff from a preview manifest without writing files. |
+| `step` | Walk a preview manifest one edit at a time, taking only the steps you accept. `refactor apply` is all-or-nothing, which is right for applying and wrong for reviewing: a reader who disagrees with one of forty edits would otherwise have to discard the manifest. Steps are numbered in source order and each carries its line, the text it replaces, and the source line it sits on. `--accept`/`--skip` take a selector (`all`, `3`, `1,4`, `2-5`); `--interactive` reads one `y`/`n`/`a`/`q` decision per step from stdin. `--diff` previews, `--write` applies, `--fail-on-partial` gates a script that took a subset by accident. Both hash guards still apply, and a subset that would not parse is refused before anything is written. |
+| `patch` | Carry the difference between two versions of one file (`--from`/`--to`, neither written) onto a third (`--apply-to`), matching each change by structure rather than by position — so it lands whatever the target's formatting and wherever in the file the form sits. Each change is reported as `applied`, `not-found` (the target never had the form), `ambiguous` (several sites match; `--all` applies to all of them), or `unportable` (a top-level insertion, which names no existing form to anchor on). Plans by default; `--diff` previews, `--write` applies, `--fail-on-unapplied` gates on a partial port. A patch that would produce source this tool cannot parse is refused before anything is written. |
 | `workspace-plan` | Discover Lisp sources under roots and build a gated refactor plan. |
 | `workspace-preview` | Discover sources and preview exact refactoring rewrites. |
 | `workspace-execute` | Execute a workspace refactor with preview gates and post-write verification. |

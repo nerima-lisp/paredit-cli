@@ -5,6 +5,7 @@ use clap::{Args, ValueEnum};
 use paredit_core_syntax::sexpr::SymbolName;
 
 use paredit_core_cli::args::{DialectArg, OutputFormat};
+use paredit_core_cli::workspace_args::WorkspaceInputArgs;
 
 #[derive(Debug, Args)]
 #[command(
@@ -14,18 +15,9 @@ pub struct WorkspaceRefactorPreviewArgs {
     /// Files or directories to scan recursively.
     #[arg(required = true)]
     pub roots: Vec<PathBuf>,
-    /// Include files whose extension does not identify a known Lisp dialect.
-    #[arg(long)]
-    pub include_unknown: bool,
-    /// Include hidden directories and files.
-    #[arg(long)]
-    pub include_hidden: bool,
-    /// Include generated or dependency directories such as target and node_modules.
-    #[arg(long)]
-    pub include_generated: bool,
-    /// Maximum directory recursion depth from each root directory.
-    #[arg(long)]
-    pub max_depth: Option<usize>,
+    /// Every input selector and filter this tool understands.
+    #[command(flatten)]
+    pub input: WorkspaceInputArgs,
     /// Exact symbol to replace in the preview.
     #[arg(long)]
     pub from: SymbolName,

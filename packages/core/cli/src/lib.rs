@@ -7,6 +7,7 @@ pub mod kill_ring;
 // `io`, `diff` and `macos_acl` are `shared`'s submodules, declared there with
 // `#[path]` so they can sit as sibling files. `macos_acl` is macOS-only.
 pub mod shared;
+pub mod workspace_args;
 
 /// Renders a value through [`shared::terminal_safe`], which strips control
 /// sequences so untrusted source text cannot drive a terminal.

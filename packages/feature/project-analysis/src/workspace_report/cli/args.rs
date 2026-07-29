@@ -3,27 +3,23 @@ use std::path::PathBuf;
 use clap::Args;
 
 use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::workspace_args::WorkspaceInputArgs;
 
 #[derive(Debug, Args)]
 #[command(
-    after_help = "Examples:\n  paredit inspect workspace .\n  paredit inspect workspace --include-hidden --max-depth 2 ."
+    after_help = "Examples:\n  paredit inspect workspace .\n  paredit inspect workspace --include-hidden --max-depth 2 .\n  paredit inspect workspace --since origin/main .\n  paredit inspect workspace --exclude-glob 'vendor/**' ."
 )]
 pub struct WorkspaceReportArgs {
     /// Files or directories to scan recursively.
     #[arg(required = true)]
     pub roots: Vec<PathBuf>,
-    /// Include files whose extension does not identify a known Lisp dialect.
-    #[arg(long)]
-    pub include_unknown: bool,
-    /// Include hidden directories and files.
-    #[arg(long)]
-    pub include_hidden: bool,
-    /// Include generated or dependency directories such as target and node_modules.
-    #[arg(long)]
-    pub include_generated: bool,
-    /// Maximum directory recursion depth from each root directory.
-    #[arg(long)]
-    pub max_depth: Option<usize>,
+    /// Every input selector and filter this tool understands.
+    ///
+    /// Flattened rather than restated: `--include-unknown`, `--include-hidden`,
+    /// `--include-generated` and `--max-depth` used to be declared here, and a
+    /// private copy is how one command's default drifts from the others'.
+    #[command(flatten)]
+    pub input: WorkspaceInputArgs,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,
