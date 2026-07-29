@@ -79,7 +79,27 @@ if [ "${#bench_targets[@]}" -eq 0 ]; then
 fi
 
 printf 'bench-compare: measuring baseline\n'
-(cd "$worktree" && cargo bench --quiet --package paredit-cli "${bench_targets[@]}" -- --save-baseline bench-compare-base "${bench_args[@]}" >/dev/null)
+# A baseline that cannot be benchmarked is not evidence about this branch.
+#
+# It happens for real and not rarely: the branch adds a benchmark the baseline
+# does not have, or — as on the change that introduced this script — the branch
+# *fixes* a benchmark that was broken on the baseline. Failing here would report
+# the branch as regressed for having repaired something, and the only way to
+# clear it would be to merge the fix first, which is the thing being gated.
+#
+# So: say so, loudly, and exit without a verdict. A missing comparison is
+# visible in the log; a wrong one is not.
+if ! (cd "$worktree" && cargo bench --quiet --package paredit-cli "${bench_targets[@]}" -- --save-baseline bench-compare-base "${bench_args[@]}" >/dev/null); then
+  cat <<MESSAGE >&2
+
+bench-compare: the baseline ($baseline_ref) could not be benchmarked.
+
+This is not a verdict on the working tree. It usually means the branch adds or
+repairs a benchmark that the baseline does not have or cannot run. Nothing was
+compared.
+MESSAGE
+  exit 0
+fi
 
 printf 'bench-compare: measuring working tree\n'
 cargo bench --quiet --package paredit-cli "${bench_targets[@]}" -- --baseline bench-compare-base "${bench_args[@]}" >/dev/null
