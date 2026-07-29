@@ -14,14 +14,20 @@ fn cli_flags_two_arg_list_star() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"list_star_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // Both operand spans the rewrite copies from, which the old report
+        // published.
+        .stdout(predicate::str::contains("\"car_span\""))
+        .stdout(predicate::str::contains("\"cdr_span\""));
 }
 
 #[test]
 fn cli_does_not_flag_three_args() {
     let dir = fresh_temp_dir("list-star-to-cons-report-clean");
     let file = dir.join("a.lisp");
-    fs::write(&file, "(list* a b c)\n").expect("write a.lisp");
+    fs::write(&file, "(list* a b c)\n(list* x)\n").expect("write a.lisp");
 
     let mut cmd = paredit();
     cmd.arg("inspect")
@@ -31,7 +37,56 @@ fn cli_does_not_flag_three_args() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no two-argument shape among two
+        // `list*` forms" from "no `list*` form at all".
+        .stdout(predicate::str::contains("\"list_star_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("list-star-to-cons-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(list* a b)\n").expect("write a.clj");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("list-star-to-cons")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_list_star_to_cons_emits_sarif() {
+    let dir = fresh_temp_dir("list-star-to-cons-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list* a b)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("list-star-to-cons")
+        .arg("--output")
+        .arg("sarif")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/list-star-to-cons/list-star-to-cons\"",
+        ))
+        .stdout(predicate::str::contains(
+            "a two-argument list* is just a cons; (list* a b) is (cons a b)",
+        ));
 }
 
 #[test]

@@ -14,8 +14,13 @@ fn cli_flags_nth_zero() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"ordinal\": \"first\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"nth_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"ordinal\": \"first\""))
+        // The ordinal is also the finding's kind, so it leads every text row
+        // and namespaces the SARIF rule id.
+        .stdout(predicate::str::contains("\"kind\": \"first\""));
 }
 
 #[test]
@@ -32,7 +37,57 @@ fn cli_does_not_flag_large_or_variable_index() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no constant index in two `nth`
+        // forms" from "no `nth` form at all"; `elt` is not an `nth`.
+        .stdout(predicate::str::contains("\"nth_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("nth-constant-index-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(nth 0 xs)\n").expect("write a.clj");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("nth-constant-index")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_nth_constant_index_emits_sarif() {
+    let dir = fresh_temp_dir("nth-constant-index-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(nth 2 row)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("nth-constant-index")
+        .arg("--output")
+        .arg("sarif")
+        .arg(&file)
+        .assert()
+        .success()
+        // The ordinal is the kind, so each ordinal gets its own rule id.
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/nth-constant-index/third\"",
+        ))
+        .stdout(predicate::str::contains(
+            "nth with a constant index; use (third …)",
+        ));
 }
 
 #[test]

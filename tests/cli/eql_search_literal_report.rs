@@ -14,8 +14,11 @@ fn cli_flags_member_of_a_string_literal() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"operator\": \"member\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"search_call_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"operator\": \"member\""))
+        .stdout(predicate::str::contains("\"literal\": \"\\\"x\\\"\""));
 }
 
 #[test]
@@ -32,7 +35,7 @@ fn cli_flags_assoc_of_a_quoted_list() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"operator\": \"assoc\""));
 }
 
@@ -56,9 +59,13 @@ fn cli_flags_substitute_old_value_and_adjoin() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 2"))
+        .stdout(predicate::str::contains("\"finding_count\": 2"))
+        .stdout(predicate::str::contains("\"search_call_count\": 3"))
         .stdout(predicate::str::contains("\"operator\": \"substitute\""))
-        .stdout(predicate::str::contains("\"operator\": \"adjoin\""));
+        .stdout(predicate::str::contains("\"operator\": \"adjoin\""))
+        // Per-file grouping now carries a line for each finding, so the second
+        // and third rows are separable without counting bytes.
+        .stdout(predicate::str::contains("\"line\": 2"));
 }
 
 #[test]
@@ -80,7 +87,56 @@ fn cli_does_not_flag_when_test_is_given_or_item_is_atomic() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no bad search among three search
+        // calls" from "no search call at all".
+        .stdout(predicate::str::contains("\"search_call_count\": 3"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("eql-search-literal-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(member \"x\" items)\n").expect("write a.clj");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("eql-search-literal")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_eql_search_literal_emits_sarif() {
+    let dir = fresh_temp_dir("eql-search-literal-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(member \"x\" items)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("eql-search-literal")
+        .arg("--output")
+        .arg("sarif")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/eql-search-literal/eql-search-literal\"",
+        ))
+        .stdout(predicate::str::contains(
+            "with the default eql test; add :test",
+        ));
 }
 
 #[test]
@@ -117,5 +173,5 @@ fn cli_eql_search_literal_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
