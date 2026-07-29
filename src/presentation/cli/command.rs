@@ -583,6 +583,8 @@ pub(super) enum EditCommand {
     Kill(KillArgs),
     /// Print the selected S-expression with the comment block written above it.
     Copy(CopyArgs),
+    /// Write a second copy of the selected S-expression immediately after it, without using the kill ring.
+    Duplicate(EditTargetArgs),
     /// Paste a kill ring entry beside, or over, the selected S-expression.
     Yank(YankArgs),
     /// Wrap the selected S-expression in a delimiter pair, a string, or a reader prefix.

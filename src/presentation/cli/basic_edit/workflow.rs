@@ -192,6 +192,14 @@ pub(in crate::presentation::cli) fn split(args: EditTargetArgs) -> Result<()> {
     Ok(edit_target(args, Edit::split)?)
 }
 
+/// Writes a second copy of the selected form immediately after it.
+///
+/// `edit copy --to-ring` followed by `edit yank --placement after` reaches the
+/// same result in two calls, at the cost of whatever was on the kill ring.
+pub(in crate::presentation::cli) fn duplicate(args: EditTargetArgs) -> Result<()> {
+    Ok(edit_target(args, Edit::duplicate)?)
+}
+
 pub(in crate::presentation::cli) fn join(args: EditTargetArgs) -> Result<()> {
     Ok(edit_target(args, Edit::join)?)
 }

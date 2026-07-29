@@ -378,11 +378,12 @@ const INTROSPECTION_COMMANDS: [&str; 226] = [
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
 
-const STRUCTURAL_COMMANDS: [&str; 29] = [
+const STRUCTURAL_COMMANDS: [&str; 30] = [
     "edit select",
     "edit replace",
     "edit kill",
     "edit copy",
+    "edit duplicate",
     "edit yank",
     "edit wrap",
     "edit unwrap-prefix",

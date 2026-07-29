@@ -426,6 +426,73 @@ fn yank_reports_an_index_the_ring_does_not_have() {
         .stderr(predicate::str::contains("--index 3 is out of range"));
 }
 
+// --- D42: duplicate, the kill-ring-free half of copy + yank ---
+
+#[test]
+fn duplicate_writes_a_second_copy_after_the_form() {
+    assert_eq!(
+        edit(
+            &["edit", "duplicate", "--path", "0.1"],
+            "(progn\n  (f y)\n  (g z))\n"
+        ),
+        "(progn\n  (f y)\n  (f y)\n  (g z))\n"
+    );
+}
+
+#[test]
+fn duplicate_carries_the_comment_block_copy_would_have_taken() {
+    assert_eq!(
+        edit(
+            &["edit", "duplicate", "--path", "0.1"],
+            "(progn\n  ;; explain\n  (f y)\n  (g z))\n"
+        ),
+        "(progn\n  ;; explain\n  (f y)\n  ;; explain\n  (f y)\n  (g z))\n"
+    );
+}
+
+#[test]
+fn duplicate_of_an_inline_form_stays_on_the_line() {
+    assert_eq!(
+        edit(&["edit", "duplicate", "--path", "0.1"], "(list a b)\n"),
+        "(list a a b)\n"
+    );
+}
+
+#[test]
+fn duplicate_leaves_the_kill_ring_alone() {
+    let dir = fresh_temp_dir("duplicate-ring");
+    let ring = dir.join("ring.json");
+    let source = dir.join("source.lisp");
+    fs::write(&source, "(progn\n  (f y)\n  (g z))\n").expect("write source");
+
+    // Put something on the ring, then duplicate: the ring entry must survive.
+    paredit()
+        .args(["edit", "kill", "--path", "0.2", "--to-ring", "--ring"])
+        .arg(&ring)
+        .arg("--file")
+        .arg(&source)
+        .arg("--write")
+        .assert()
+        .success();
+    let after_kill = fs::read_to_string(&ring).expect("read ring after kill");
+
+    paredit()
+        .args(["edit", "duplicate", "--path", "0.1", "--write", "--file"])
+        .arg(&source)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&ring).expect("read ring after duplicate"),
+        after_kill,
+        "duplicate must not push, pop, or reorder the kill ring"
+    );
+    assert_eq!(
+        fs::read_to_string(&source).expect("read source"),
+        "(progn\n  (f y)\n  (f y))\n"
+    );
+}
+
 // --- K9: reindent ---
 
 #[test]

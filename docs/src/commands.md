@@ -392,6 +392,7 @@ Mutating commands also accept:
 | `replace` | Replace the selected S-expression with replacement text. |
 | `kill` | Remove the selected S-expression. `--to-ring` pushes it onto the kill ring first. |
 | `copy` | Print the selected S-expression together with the own-line comment block written above it. `--to-ring` pushes it onto the kill ring. |
+| `duplicate` | Write a second copy of the selected S-expression immediately after it, carrying its own-line comment block along and following the same layout rule `yank` does — a form on its own line gets one, a form sharing a line stays inline. `copy --to-ring` then `yank --placement after` reaches the same result in two calls, at the cost of whatever was on the kill ring; this touches neither. |
 | `yank` | Paste a kill ring entry `--placement before\|after\|replace` the selection. `--index` picks the entry, newest first. |
 | `wrap` | Wrap the selected S-expression. `--delimiter paren\|bracket\|brace\|doublequote` chooses the delimiter; `doublequote` produces a string literal and escapes the selection's own quotes and backslashes. `--prefix quote\|quasiquote\|unquote\|unquote-splicing\|sharp-quote` attaches reader sugar instead. |
 | `unwrap-prefix` | Remove the selected expression's outermost reader prefix, or every one of them with `--all-prefixes`. |
