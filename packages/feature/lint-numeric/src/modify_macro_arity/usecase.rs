@@ -2,7 +2,30 @@
 //! detection across explicit files.
 
 pub use crate::modify_macro_arity::domain::{
-    ModifyMacroArityItem, ModifyMacroArityPolicy, ModifyMacroArityPolicyOptions,
-    ModifyMacroAritySummary, collect_modify_macro_arity_violations,
-    evaluate_modify_macro_arity_policy, expected_arity_phrase, summarize_modify_macro_arity,
+    ModifyMacroArityItem, build_modify_macro_arity_report, expected_arity_phrase,
 };
+
+use paredit_core_cli::report::{FileFindings, ReportPolicy};
+
+/// Evaluates this report's gate.
+///
+/// Armed by a flag rather than always on. A wrong argument count fails at
+/// macroexpansion, but it is a build-breaking finding only in a project that
+/// has decided it is.
+#[must_use]
+pub fn evaluate_fail_on_violation_policy(
+    fail_on_violation: bool,
+    reports: &[FileFindings<ModifyMacroArityItem>],
+) -> ReportPolicy {
+    ReportPolicy::fail_on_any(
+        fail_on_violation.then_some("--fail-on-violation"),
+        reports,
+        |report| {
+            format!(
+                "{} has {} misarity modify-macro call(s)",
+                report.path.display(),
+                report.findings.len()
+            )
+        },
+    )
+}

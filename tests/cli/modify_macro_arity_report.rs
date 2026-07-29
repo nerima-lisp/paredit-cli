@@ -14,8 +14,13 @@ fn cli_reports_incf_with_too_many_arguments() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"call_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"incf\""))
+        .stdout(predicate::str::contains("\"argument_count\": 3"))
+        .stdout(predicate::str::contains("\"min_arity\": 1"))
+        .stdout(predicate::str::contains("\"max_arity\": 2"))
         .stdout(predicate::str::contains("\"1 or 2\""));
 }
 
@@ -33,7 +38,50 @@ fn cli_does_not_flag_valid_calls() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "four calls, all well-formed" from
+        // "no modify-macro call at all".
+        .stdout(predicate::str::contains("\"call_count\": 4"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_modify_macro_arity_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("modify-macro-arity-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn bump [x] (incf x 1 2))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "modify-macro-arity", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_modify_macro_arity_emits_sarif() {
+    let dir = fresh_temp_dir("modify-macro-arity-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(pop)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "modify-macro-arity", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/modify-macro-arity/pop\"",
+        ))
+        .stdout(predicate::str::contains(
+            "pop takes exactly 1 argument(s) but has 0",
+        ));
 }
 
 #[test]
@@ -50,7 +98,7 @@ fn cli_does_not_flag_a_reader_conditional_argument() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
 #[test]
@@ -67,7 +115,7 @@ fn cli_flags_push_with_too_few_arguments() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"exactly 2\""));
 }
 
@@ -105,5 +153,5 @@ fn cli_modify_macro_arity_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }

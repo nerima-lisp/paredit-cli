@@ -14,7 +14,10 @@ fn cli_flags_plus_one() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"arithmetic_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"1+\""))
         .stdout(predicate::str::contains("\"shorthand\": \"1+\""));
 }
 
@@ -33,7 +36,50 @@ fn cli_does_not_flag_one_minus_x_float_or_non_one() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "three +/- forms, none a unit
+        // step" from "no arithmetic at all".
+        .stdout(predicate::str::contains("\"arithmetic_form_count\": 3"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_one_step_arithmetic_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("one-step-arithmetic-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn bump [i] (+ i 1))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "one-step-arithmetic", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_one_step_arithmetic_emits_sarif() {
+    let dir = fresh_temp_dir("one-step-arithmetic-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(- count 1)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "one-step-arithmetic", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/one-step-arithmetic/1-\"",
+        ))
+        .stdout(predicate::str::contains(
+            "add/subtract of 1 has a shorthand; use 1-",
+        ));
 }
 
 #[test]

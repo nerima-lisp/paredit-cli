@@ -1,6 +1,28 @@
 //! Self-comparison (`(eq x x)`) detection across explicit files.
 
-pub use crate::self_comparison::domain::{
-    SelfComparisonItem, SelfComparisonPolicy, SelfComparisonPolicyOptions, SelfComparisonSummary,
-    collect_self_comparisons, evaluate_self_comparison_policy, summarize_self_comparisons,
-};
+pub use crate::self_comparison::domain::{SelfComparisonItem, build_self_comparison_report};
+
+use paredit_core_cli::report::{FileFindings, ReportPolicy};
+
+/// Evaluates this report's gate.
+///
+/// Armed by a flag rather than always on. A comparison of a value with itself
+/// is a dead test, but it is a build-breaking finding only in a project that
+/// has decided it is.
+#[must_use]
+pub fn evaluate_fail_on_violation_policy(
+    fail_on_violation: bool,
+    reports: &[FileFindings<SelfComparisonItem>],
+) -> ReportPolicy {
+    ReportPolicy::fail_on_any(
+        fail_on_violation.then_some("--fail-on-violation"),
+        reports,
+        |report| {
+            format!(
+                "{} has {} self comparison(s)",
+                report.path.display(),
+                report.findings.len()
+            )
+        },
+    )
+}

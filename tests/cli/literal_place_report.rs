@@ -14,7 +14,10 @@ fn cli_flags_incf_of_a_literal() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"modify_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"incf\""))
         .stdout(predicate::str::contains("\"operator\": \"incf\""))
         .stdout(predicate::str::contains("\"place\": \"5\""));
 }
@@ -39,7 +42,7 @@ fn cli_flags_setf_and_psetf_literal_places() {
         .assert()
         .success()
         // (setf 5 x) and (psetf ... :k ...) flag; the valid setf does not.
-        .stdout(predicate::str::contains("\"violation_count\": 2"))
+        .stdout(predicate::str::contains("\"finding_count\": 2"))
         .stdout(predicate::str::contains("\"operator\": \"setf\""))
         .stdout(predicate::str::contains("\"operator\": \"psetf\""));
 }
@@ -58,7 +61,7 @@ fn cli_flags_push_into_a_literal_place() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"operator\": \"push\""));
 }
 
@@ -80,7 +83,50 @@ fn cli_does_not_flag_variable_or_accessor_places() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no literal place in three modify
+        // macros" from "no modify macro at all".
+        .stdout(predicate::str::contains("\"modify_form_count\": 3"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_literal_place_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("literal-place-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn bump [] (incf 5))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "literal-place", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_literal_place_emits_sarif() {
+    let dir = fresh_temp_dir("literal-place-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun f () (incf 5))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "literal-place", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/literal-place/incf\"",
+        ))
+        .stdout(predicate::str::contains(
+            "incf place 5 is a literal and cannot be modified",
+        ));
 }
 
 #[test]
@@ -117,5 +163,5 @@ fn cli_literal_place_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
