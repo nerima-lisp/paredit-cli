@@ -250,6 +250,22 @@ the `REPORT` table to the job's step summary, unconditionally — every
 benchmark's change, not only the ones over threshold, so the reviewer sees
 the whole picture in the PR's Checks tab instead of having to open the log.
 
+#### What the benchmarks are built with
+
+`[profile.bench]` in `Cargo.toml` overrides the release profile's `lto = "fat"`
+and `codegen-units = 1` with thin LTO over four codegen units. Those release
+settings are serial: measured cold at the four-way parallelism a GitHub runner
+has, the two Criterion targets take 523s wall against 578s of CPU — a
+parallelism of 1.1, three cores idle — where thin LTO takes 128s. The script
+builds twice, once per revision, so that was the larger half of an 18-minute
+CI job.
+
+Fat LTO earns its cost in the binary that ships and nothing here: a comparison
+of two revisions needs both sides built the *same* way, not maximally. The
+script exports the same two settings as `CARGO_PROFILE_BENCH_*`, so a baseline
+predating this profile is still built to match rather than being measured under
+the old one and reported as a difference in the code.
+
 ### Mutation testing
 
 ```sh

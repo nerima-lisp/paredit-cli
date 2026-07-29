@@ -133,6 +133,22 @@ if [ "${#bench_targets[@]}" -eq 0 ]; then
   exit 2
 fi
 
+# Both revisions are built with *this* script's bench profile, whatever each
+# one's own Cargo.toml happens to declare.
+#
+# The baseline is an older checkout, and before `[profile.bench]` existed it
+# inherited `[profile.release]` — fat LTO, one codegen unit. A comparison
+# across that boundary would have built the two sides with different
+# optimisation and then reported the difference as a change in the code, which
+# is the one thing this script exists to avoid. Pinning the profile here makes
+# it a property of the comparison rather than of the revision, which is also
+# what lets an old tag be compared at all.
+#
+# A caller who wants to measure something else still can; these only fill in a
+# default. See `[profile.bench]` in Cargo.toml for why these values.
+export CARGO_PROFILE_BENCH_LTO="${CARGO_PROFILE_BENCH_LTO:-thin}"
+export CARGO_PROFILE_BENCH_CODEGEN_UNITS="${CARGO_PROFILE_BENCH_CODEGEN_UNITS:-4}"
+
 printf 'bench-compare: measuring baseline\n'
 # A baseline that cannot be benchmarked is not evidence about this branch.
 #

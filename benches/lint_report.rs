@@ -7,7 +7,15 @@ use paredit_cli::domain::dialect::Dialect;
 use paredit_cli::domain::lint_report::collect_lint_findings;
 use paredit_cli::domain::sexpr::SyntaxTree;
 
-const FORM_COUNTS: [usize; 3] = [64, 256, 1024];
+/// The two ends of the range, and deliberately nothing between them.
+///
+/// Every entry here is a benchmark, and `scripts/bench-compare.sh` pays for it
+/// twice — once per revision — at roughly four seconds each. A middle point
+/// earns that only if a regression could hide at 256 forms while leaving both
+/// 64 and 1024 alone, and none can: a constant-factor regression moves every
+/// size, and a complexity regression moves the large one hardest. 256 was
+/// interpolation between two points already measured.
+const FORM_COUNTS: [usize; 2] = [64, 1024];
 
 /// One triggering form per rule, lifted verbatim from
 /// `tests/fixtures/lint_golden/broad.lisp` (the golden fixture that pins one

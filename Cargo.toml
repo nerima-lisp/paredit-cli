@@ -30,6 +30,36 @@ bench = false
 lto = "fat"
 codegen-units = 1
 
+# Without a `[profile.bench]`, `cargo bench` inherits `[profile.release]` — so
+# every benchmark run rebuilt the whole workspace under fat LTO and one codegen
+# unit, and `scripts/bench-compare.sh` does that twice, once per revision. In
+# the CI benchmark job that was roughly 800 of its 1082 seconds; the actual
+# measuring was about 200.
+#
+# Those two settings are not merely expensive, they are *serial*. Cold builds of
+# the two Criterion targets, at the four-way parallelism a GitHub runner has:
+#
+#   lto = "fat",  codegen-units = 1    523s wall, 578s user   <- 1.1x parallel
+#   lto = "thin", codegen-units = 16   174s wall, 627s user
+#   lto = false,  codegen-units = 16   137s wall, 497s user
+#   lto = "thin", codegen-units = 4    128s wall, 470s user
+#
+# One codegen unit behind a whole-program LTO pass leaves three of the runner's
+# four cores idle for the entire build.
+#
+# Fat LTO earns that cost in the binary that ships. It earns nothing here. The
+# gate compares two revisions built the same way on the same machine minutes
+# apart, so what it needs from the profile is that both sides receive the
+# *same* optimisation — not the last few percent of it. Thin LTO still inlines
+# across crate boundaries, which matters because the benchmarked paths run from
+# `paredit_cli::application` down into the core packages: `lto = false` is
+# faster still, and it would change what is being measured. Four codegen units
+# beat sixteen on four cores because fewer, larger units duplicate less
+# inlining work — and, being larger, optimise slightly better besides.
+[profile.bench]
+lto = "thin"
+codegen-units = 4
+
 # The dev profile is what `clippy --all-targets` and `cargo nextest run` build,
 # in CI and locally. Full DWARF for 25 member crates plus the ~240-module
 # `tests/cli.rs` integration binary dominates link time and buys nothing that a
