@@ -22,11 +22,14 @@ fn converts_all_four_conditional_forms() {
         "(when ok one two)",
         "(if ok (progn one two))",
     );
+    // A one-form body needs no `progn`: an `if` branch already takes exactly
+    // one form. Emitting it anyway generated code that `redundant-progn`
+    // reports, and made `if ↔ unless` gain a level on every round trip.
     converted(
         "convert-unless-to-if",
         "emacs-lisp",
         "(unless ok no)",
-        "(if ok nil (progn no))",
+        "(if ok nil no)",
     );
     converted(
         "convert-if-to-when",

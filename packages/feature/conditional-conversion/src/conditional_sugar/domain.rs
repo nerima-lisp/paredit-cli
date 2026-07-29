@@ -131,19 +131,12 @@ pub fn plan_convert_when_to_if(
         return Err(ConditionalShapeError::WhenHasNoTest.into());
     }
     let test = form.children[1].span.slice(request.input);
-    let body = form.children[2..]
-        .iter()
-        .map(|view| view.span.slice(request.input))
-        .collect::<Vec<_>>()
-        .join(" ");
+    let body = sequenced_body(&form, request.input);
     finish(
         request,
         &form,
         form.children.len() - 2,
-        format!(
-            "(if {test} (progn{}{body}))",
-            if body.is_empty() { "" } else { " " }
-        ),
+        format!("(if {test} {body})"),
     )
 }
 
@@ -155,20 +148,45 @@ pub fn plan_convert_unless_to_if(
         return Err(ConditionalShapeError::UnlessHasNoTest.into());
     }
     let test = form.children[1].span.slice(request.input);
-    let body = form.children[2..]
-        .iter()
-        .map(|view| view.span.slice(request.input))
-        .collect::<Vec<_>>()
-        .join(" ");
+    let body = sequenced_body(&form, request.input);
     finish(
         request,
         &form,
         form.children.len() - 2,
-        format!(
-            "(if {test} nil (progn{}{body}))",
-            if body.is_empty() { "" } else { " " }
-        ),
+        format!("(if {test} nil {body})"),
     )
+}
+
+/// Renders a `when`/`unless` body as the single form an `if` branch accepts.
+///
+/// `if` takes one form per branch and `when` takes a sequence, so a body of two
+/// or more forms needs a `progn` to fit. A body of *one* form does not, and
+/// wrapping it anyway had two costs worth naming:
+///
+/// - It generated code this tool's own `redundant-progn` rule reports. A
+///   refactor whose output fails the linter in the same repository is telling
+///   the user two different things.
+/// - It made the conversion pair non-terminating under repeated use.
+///   `if → when` keeps the `then` form verbatim, so `(if p (progn a))` became
+///   `(when p (progn a))` became `(if p (progn (progn a)))`, gaining a level on
+///   every round trip. An agent looping over conversions grew the file without
+///   bound.
+///
+/// An empty body still yields `(progn)`, which is the only spelling of "no
+/// forms" that an `if` branch can hold.
+fn sequenced_body(form: &ExpressionView, input: &str) -> String {
+    let body = &form.children[2..];
+    match body {
+        [single] => single.span.slice(input).to_owned(),
+        _ => {
+            let forms = body
+                .iter()
+                .map(|view| view.span.slice(input))
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("(progn{}{forms})", if forms.is_empty() { "" } else { " " })
+        }
+    }
 }
 
 pub fn plan_convert_if_to_when(
