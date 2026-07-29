@@ -54,33 +54,91 @@ pub type LintResult<T = ()> = std::result::Result<T, LintError>;
 /// response is to print the valid names rather than to abandon a pass.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RuleSelectionError {
-    #[error("unknown lint rule {name:?}; valid rules: {valid}")]
-    UnknownRule { name: String, valid: String },
+    #[error("unknown lint rule {name:?}; valid rules: {valid}{suggestion}")]
+    UnknownRule {
+        name: String,
+        valid: String,
+        /// `; did you mean "x"?`, or empty when nothing was close enough.
+        /// Baked into the message at construction — see [`did_you_mean`] —
+        /// rather than left for a caller to compute, so every consumer of
+        /// this error (text, JSON, a wrapping tool) sees the same hint.
+        suggestion: String,
+    },
 
-    #[error("unknown lint category {name:?}; valid categories: {valid}")]
-    UnknownCategory { name: String, valid: String },
+    #[error("unknown lint category {name:?}; valid categories: {valid}{suggestion}")]
+    UnknownCategory {
+        name: String,
+        valid: String,
+        suggestion: String,
+    },
 
-    #[error("unknown lint tag {name:?}; valid tags: {valid}")]
-    UnknownTag { name: String, valid: String },
+    #[error("unknown lint tag {name:?}; valid tags: {valid}{suggestion}")]
+    UnknownTag {
+        name: String,
+        valid: String,
+        suggestion: String,
+    },
 
-    #[error("unknown lint preset {name:?}; valid presets: {valid}")]
-    UnknownPreset { name: String, valid: String },
+    #[error("unknown lint preset {name:?}; valid presets: {valid}{suggestion}")]
+    UnknownPreset {
+        name: String,
+        valid: String,
+        suggestion: String,
+    },
 
     /// A `--rule-arg` naming a knob the rule does not declare.
     ///
     /// Separate from `UnknownRule` because the remedy differs: the rule exists
     /// and the caller is close, so the message lists *that rule's* knobs rather
     /// than all 143 rule names.
-    #[error("lint rule {rule:?} has no setting {key:?}; valid settings: {valid}")]
+    #[error("lint rule {rule:?} has no setting {key:?}; valid settings: {valid}{suggestion}")]
     UnknownRuleSetting {
         rule: String,
         key: String,
         valid: String,
+        suggestion: String,
     },
 
     /// A `--rule-arg` that is not `<rule>.<key>=<value>`.
     #[error("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")]
     MalformedRuleArgument { argument: String },
+}
+
+/// `; did you mean "closest"?` when `name` is close to one of `candidates`,
+/// else an empty string.
+///
+/// Distance threshold of 3 matches the same trick already used for
+/// `paredit.toml` keys and rule names in `paredit-core-config`: close enough
+/// to catch a typo, far enough not to suggest an unrelated rule for a name
+/// that shares no real resemblance to anything registered.
+#[must_use]
+pub fn did_you_mean<'a>(candidates: impl IntoIterator<Item = &'a str>, name: &str) -> String {
+    candidates
+        .into_iter()
+        .map(|candidate| (levenshtein(candidate, name), candidate))
+        .filter(|(distance, _)| *distance <= 3 && *distance > 0)
+        .min_by_key(|(distance, candidate)| (*distance, *candidate))
+        .map_or(String::new(), |(_, candidate)| {
+            format!("; did you mean {candidate:?}?")
+        })
+}
+
+fn levenshtein(left: &str, right: &str) -> usize {
+    let left: Vec<char> = left.chars().collect();
+    let right: Vec<char> = right.chars().collect();
+    let mut previous: Vec<usize> = (0..=right.len()).collect();
+    let mut current = vec![0; right.len() + 1];
+    for (row, left_char) in left.iter().enumerate() {
+        current[0] = row + 1;
+        for (column, right_char) in right.iter().enumerate() {
+            let substitution = usize::from(left_char != right_char);
+            current[column + 1] = (previous[column] + substitution)
+                .min(previous[column + 1] + 1)
+                .min(current[column] + 1);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    previous[right.len()]
 }
 
 #[cfg(test)]
@@ -89,12 +147,16 @@ mod tests {
 
     /// The wording is a CLI contract: `tests/cli/lint_report.rs` asserts on
     /// these prefixes, so the conversion to a typed error must not reword them.
+    /// An empty `suggestion` contributes nothing to the rendering, which is
+    /// what keeps this contract intact for a caller that builds the variant
+    /// directly rather than through [`did_you_mean`].
     #[test]
     fn selection_errors_render_exactly_as_before() {
         assert_eq!(
             RuleSelectionError::UnknownRule {
                 name: "no-such-rule".to_owned(),
                 valid: "if-arity, empty-body".to_owned(),
+                suggestion: String::new(),
             }
             .to_string(),
             r#"unknown lint rule "no-such-rule"; valid rules: if-arity, empty-body"#
@@ -103,10 +165,42 @@ mod tests {
             RuleSelectionError::UnknownCategory {
                 name: "no-such".to_owned(),
                 valid: "arity, dead-code".to_owned(),
+                suggestion: String::new(),
             }
             .to_string(),
             r#"unknown lint category "no-such"; valid categories: arity, dead-code"#
         );
+    }
+
+    /// The suggestion is exercised end to end: a name one edit away from a
+    /// registered rule gets a hint appended, spelled the same way the
+    /// existing config-key and lint-rule "did you mean" hints are spelled.
+    #[test]
+    fn a_name_one_edit_away_gets_a_suggestion() {
+        let error = RuleSelectionError::UnknownRule {
+            name: "if-ariti".to_owned(),
+            valid: "if-arity, empty-body".to_owned(),
+            suggestion: did_you_mean(["if-arity", "empty-body"], "if-ariti"),
+        };
+        assert_eq!(
+            error.to_string(),
+            r#"unknown lint rule "if-ariti"; valid rules: if-arity, empty-body; did you mean "if-arity"?"#
+        );
+    }
+
+    /// A name with no close match gets no suggestion rather than a wrong one.
+    #[test]
+    fn a_name_with_no_close_match_gets_no_suggestion() {
+        assert_eq!(did_you_mean(["if-arity", "empty-body"], "no-such-rule"), "");
+    }
+
+    /// The candidate itself is never "suggested" as a fix for itself — a
+    /// distance of zero means the name already matched, which is a different
+    /// code path than `UnknownRule` entirely, but the helper should still
+    /// refuse to echo an exact match back as a "did you mean".
+    #[test]
+    fn an_exact_match_produces_no_suggestion() {
+        assert_eq!(did_you_mean(["if-arity"], "if-arity"), "");
     }
 
     /// A rule failure keeps its cause reachable instead of flattening it, so a

@@ -16,7 +16,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::error::RuleSelectionError;
+use crate::error::{RuleSelectionError, did_you_mean};
 use crate::model::Severity;
 use crate::rule::RuleCatalog;
 
@@ -63,13 +63,11 @@ impl SeverityOverrides {
         if matched {
             return Ok(());
         }
+        let known: Vec<&str> = catalog.names().chain(catalog.categories()).collect();
         Err(RuleSelectionError::UnknownRule {
+            suggestion: did_you_mean(known.iter().copied(), selector),
             name: selector.to_owned(),
-            valid: catalog
-                .names()
-                .chain(catalog.categories())
-                .collect::<Vec<_>>()
-                .join(", "),
+            valid: known.join(", "),
         })
     }
 
@@ -230,12 +228,18 @@ mod tests {
         let error = overrides
             .apply(catalog(), "redundant-quotes", Severity::Error)
             .expect_err("typo must not pass silently");
-        let RuleSelectionError::UnknownRule { name, valid } = error else {
+        let RuleSelectionError::UnknownRule {
+            name,
+            valid,
+            suggestion,
+        } = error
+        else {
             panic!("expected an unknown-rule error");
         };
         assert_eq!(name, "redundant-quotes");
         assert!(valid.contains("redundant-quote"));
         assert!(valid.contains("suspicious"));
+        assert_eq!(suggestion, r#"; did you mean "redundant-quote"?"#);
     }
 
     #[test]

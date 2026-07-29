@@ -209,6 +209,36 @@ model, a binding table, nine lint rules, and a per-file report.
   resolution-rate floor; a new bundled corpus and baseline test
   (`tests/semantic_coverage_baseline.rs`) pin today's rate so a future change
   cannot quietly narrow it.
+- Every reported failure names the byte position it is about, when it has
+  one: `--output json`'s error envelope carries an `offset` field, and the
+  text rendering shows a `rustc`-style caret under the source line. A parse
+  failure always has one; a handful of `inspect`/`edit` selection failures
+  (`--at` past the document, an invalid byte span) do too. A shape refusal
+  like "cannot raise a top-level expression" is not about one place in the
+  source, so it reports `null` rather than a guess.
+- Every error code now links to its own documentation section
+  (`docs/src/errors.md`, one page cataloguing all forty), surfaced as
+  `doc_url` in the JSON error envelope. A contract test ties the two together
+  so a code cannot be added without documenting it.
+- An unknown `--rule`, `--deny`/`--warn` selector, `--category`, `--tag`, or
+  `--rule-arg` key now offers a "did you mean" suggestion when one registered
+  name is a close edit away, the same way `paredit.toml` already does for
+  configuration keys.
+- A configuration file this tool ignored or rejected at startup is now
+  reported as a structured JSON warning (`"status": "warning"`) when the
+  command that follows defaults to `--output json`, matching the JSON
+  contract errors already keep. Text-mode output is unchanged.
+- `inspect check` reports every syntax error in a document, not only the
+  first: `SyntaxTree::find_parse_errors` recovers after a failure by
+  resuming at the next line that starts a top-level form and keeps scanning,
+  so a file with three unrelated problems is now one round trip instead of
+  three. The existing singular `error` field is unchanged; `errors` is the
+  new, additive array carrying all of them, each with its own byte offset.
+- A lint run over many files no longer discards every result when one file
+  fails to parse. `paredit inspect lint`, `--sarif`, and `--github` now
+  report findings from every file that *did* analyze cleanly, name the ones
+  that did not in a new `partial_failures` field (and on stderr), and only
+  fail outright when nothing in the request could be analyzed at all.
 
 ### Fixed
 

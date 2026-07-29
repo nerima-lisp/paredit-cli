@@ -588,3 +588,34 @@ paredit config show --changed-only --output text
 paredit config show --key lint.preset
 paredit config init --dry-run
 ```
+
+## Generate
+
+`paredit generate` produces new Common Lisp source from analysis this tool
+already does elsewhere, rather than transforming a form that already exists —
+the direction `edit` and `refactor` do not cover. Common Lisp only: every
+generator refuses a non-Common-Lisp dialect.
+
+| Command | Purpose |
+| --- | --- |
+| `defpackage` | Generate a `defpackage` form from a file's own definitions (export) and qualified symbol references (`:use`). |
+| `defsystem` | Generate an ASDF `defsystem` form from a directory of Lisp sources: one `(:file ...)` per source, `:depends-on` inferred from packages used but not defined in the directory. |
+| `tests` | Generate a `deftest` skeleton for every definition `inspect test-map` reports as untested. |
+| `accessors` | Add `:accessor` to every `defclass` slot that has neither `:accessor`, `:reader`, nor `:writer`. |
+| `defgeneric` | Generate a `defgeneric` for a name whose `defmethod` forms have no declaration, from the methods' congruent required arity. |
+| `docstring` | Insert a docstring template at the position Common Lisp expects it: after the lambda list, at the fixed value slot, before a `defstruct`'s slots, or as a `(:documentation ...)` option. |
+
+`defpackage`, `defgeneric`, `accessors`, and `docstring` print a plan by
+default; `--write` applies it to `--file` and `--diff` previews it as a
+unified diff. `defsystem` and `tests` operate on a directory or a list of
+files and write with `--write` to `<directory>/<name>.asd` or `--into <FILE>`
+respectively.
+
+```sh
+paredit generate defpackage --file src/app.lisp --write
+paredit generate defsystem . --write
+paredit generate tests src/app.lisp --into tests/app-tests.lisp --write
+paredit generate accessors --file src/point.lisp --select name:point --write
+paredit generate defgeneric --file src/app.lisp --write
+paredit generate docstring --file src/app.lisp --select name:render --write
+```

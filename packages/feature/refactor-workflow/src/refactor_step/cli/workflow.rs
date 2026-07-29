@@ -2,6 +2,7 @@ use std::io::BufRead;
 
 use anyhow::{Context, Result};
 
+use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::shared::{
     apply_byte_span_edits, read_text_file_with_limit, stable_text_hash, unified_diff,
     write_file_with_rollback,
@@ -69,10 +70,17 @@ pub fn refactor_step(args: RefactorStepArgs) -> Result<()> {
     let coherent = selection_is_coherent(&steps, &selection);
 
     if args.diff {
+        let painter = Painter::stdout();
         for (index, file) in changed.iter().enumerate() {
             let rewritten = rewrite(&sources[index], &steps, &selection, index)?;
             if rewritten != sources[index] {
-                print!("{}", unified_diff(&file.path, &sources[index], &rewritten));
+                print!(
+                    "{}",
+                    colorize_diff(
+                        painter,
+                        &unified_diff(&file.path, &sources[index], &rewritten)
+                    )
+                );
             }
         }
         return gate(&args, coherent, selection.count(), steps.len());

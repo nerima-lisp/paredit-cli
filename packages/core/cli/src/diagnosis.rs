@@ -22,7 +22,7 @@ use std::fmt;
 
 use paredit_core_syntax::selector::error::SelectorError;
 use paredit_core_syntax::sexpr::{
-    ParseError, PathError, SelectionError, SexprError, StructureError, SymbolError,
+    ParseError, PathError, SelectionError, SexprError, SpanError, StructureError, SymbolError,
 };
 use paredit_core_workspace::workspace::WorkspaceError;
 use serde_json::{Value as Json, json};
@@ -271,6 +271,20 @@ impl ErrorCode {
         }
     }
 
+    /// The documentation page explaining this code, with the label as the
+    /// page's own anchor.
+    ///
+    /// Built from the label rather than a second table, so a code and its
+    /// anchor cannot drift from each other — `tests/cli/errors_doc.rs` checks
+    /// that the anchor this produces actually exists in `docs/src/errors.md`.
+    #[must_use]
+    pub fn doc_url(self) -> String {
+        format!(
+            "https://nerima-lisp.github.io/paredit-cli/errors/#{}",
+            self.label()
+        )
+    }
+
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
     pub const ALL: [Self; 40] = [
@@ -410,6 +424,14 @@ pub struct Diagnosis {
     /// The message chain, outermost first, as the human rendering shows it.
     pub message: String,
     pub repairs: Vec<Repair>,
+    /// The byte position the failure names, when it names one.
+    ///
+    /// Populated from whichever typed variant already carries a position —
+    /// [`ParseError`] always does, a handful of [`StructureError`] and
+    /// [`SelectionError`] variants do — rather than by adding a span to every
+    /// variant. A caller holding the source text can render a caret under it;
+    /// [`render_caret`] does exactly that for the CLI's own stderr output.
+    pub offset: Option<usize>,
 }
 
 impl Diagnosis {
@@ -425,6 +447,8 @@ impl Diagnosis {
             // routinely carries a path the caller did not choose.
             "message": crate::shared::terminal_safe(&self.message).to_string(),
             "repairs": self.repairs.iter().map(Repair::to_json).collect::<Vec<_>>(),
+            "offset": self.offset,
+            "doc_url": self.code.doc_url(),
         })
     }
 }
@@ -436,9 +460,103 @@ pub fn diagnose(error: &anyhow::Error, context: &Context) -> Diagnosis {
     let code = classify(error);
     Diagnosis {
         repairs: repairs(code, error, context),
+        offset: extract_offset(error),
         code,
         message,
     }
+}
+
+/// The byte position `error` names, when it names one at all.
+///
+/// Most failures are not about one place in the source — `RaiseTopLevel` is a
+/// shape refusal, not a location — so this returns `None` far more often than
+/// [`classify`] does.
+fn extract_offset(error: &anyhow::Error) -> Option<usize> {
+    if let Some(sexpr) = error.downcast_ref::<SexprError>() {
+        return offset_of_sexpr(sexpr);
+    }
+    if let Some(parse) = error.downcast_ref::<ParseError>() {
+        return Some(parse.position());
+    }
+    error.downcast_ref::<CliError>().and_then(offset_of_cli)
+}
+
+const fn offset_of_cli(error: &CliError) -> Option<usize> {
+    match error {
+        CliError::Sexpr(sexpr) => offset_of_sexpr(sexpr),
+        CliError::Parse { source, .. } => Some(source.position()),
+        _ => None,
+    }
+}
+
+const fn offset_of_sexpr(error: &SexprError) -> Option<usize> {
+    match error {
+        SexprError::Structure(structure) => offset_of_structure(structure),
+        SexprError::Selection(selection) | SexprError::EditSelection { source: selection } => {
+            offset_of_selection(selection)
+        }
+        SexprError::Parse(parse) => Some(parse.position()),
+        SexprError::Path(PathError::InvalidSegment { .. }) | SexprError::Symbol(_) => None,
+    }
+}
+
+const fn offset_of_structure(error: &StructureError) -> Option<usize> {
+    match error {
+        StructureError::NotInsideStringLiteral { offset }
+        | StructureError::OffsetOutsideDocument { offset, .. }
+        | StructureError::NothingToDelete { offset } => Some(*offset),
+        _ => None,
+    }
+}
+
+const fn offset_of_selection(error: &SelectionError) -> Option<usize> {
+    match error {
+        SelectionError::NoExpressionAtOffset { offset } => Some(*offset),
+        // The start and end of an invalid span are not the same position, but
+        // either is a reasonable place to point a caret: both lie on or past
+        // the boundary that made the span invalid.
+        SelectionError::InvalidSpan {
+            source: SpanError::StartExceedsEnd { start, .. },
+        } => Some(*start),
+        SelectionError::InvalidSpan {
+            source: SpanError::EndExceedsInput { end, .. },
+        } => Some(*end),
+        SelectionError::InvalidSpan {
+            source: SpanError::NotCharBoundary,
+        }
+        | SelectionError::SourceMismatch
+        | SelectionError::TreeMismatch
+        | SelectionError::PathNotReachable { .. }
+        | SelectionError::PathSegmentOutOfRange { .. } => None,
+    }
+}
+
+/// Renders a caret under the byte position `offset` names, rustc/miette
+/// style: the source line the offset falls on, then a second line of spaces
+/// and a `^` under the exact column.
+///
+/// `None` when `offset` does not land inside `source` — a stale offset from a
+/// file that changed underneath the command should not panic or point at the
+/// wrong line, it should render nothing.
+#[must_use]
+pub fn render_caret(source: &str, offset: usize) -> Option<String> {
+    if offset > source.len() || !source.is_char_boundary(offset) {
+        return None;
+    }
+    let line_start = source[..offset].rfind('\n').map_or(0, |index| index + 1);
+    let line_end = source[offset..]
+        .find('\n')
+        .map_or(source.len(), |index| offset + index);
+    let line_number = source[..line_start].matches('\n').count() + 1;
+    let column = source[line_start..offset].chars().count() + 1;
+    let line = &source[line_start..line_end];
+
+    let gutter = format!("{line_number}");
+    let indent = " ".repeat(gutter.len());
+    let caret_indent = " ".repeat(column.saturating_sub(1));
+    Some(format!(
+        "{indent} |\n{gutter} | {line}\n{indent} | {caret_indent}^"
+    ))
 }
 
 fn classify(error: &anyhow::Error) -> ErrorCode {
@@ -989,5 +1107,87 @@ mod tests {
         assert_eq!(json["retryable"], false);
         assert_eq!(json["exit_code"], 1);
         assert!(!json["repairs"].as_array().expect("repairs").is_empty());
+        assert!(json["offset"].is_null());
+        assert_eq!(
+            json["doc_url"],
+            "https://nerima-lisp.github.io/paredit-cli/errors/#argument.no-input"
+        );
+    }
+
+    /// A parse failure always names a position: every `ParseError` variant
+    /// carries one, so the diagnosis should surface it without a caller
+    /// having to know which variant it was.
+    #[test]
+    fn a_parse_failure_carries_its_byte_offset() {
+        let diagnosis = diagnose_of(CliError::Parse {
+            origin: "a.lisp".to_owned(),
+            location: "1".to_owned(),
+            source: ParseError::UnclosedList(7),
+        });
+        assert_eq!(diagnosis.offset, Some(7));
+        assert_eq!(diagnosis.to_json()["offset"], 7);
+    }
+
+    /// Most failures are not about one place in the source, and the offset
+    /// should say so plainly rather than guessing.
+    #[test]
+    fn a_shape_refusal_carries_no_offset() {
+        let diagnosis = diagnose_of(CliError::from(SexprError::from(
+            StructureError::RaiseTopLevel,
+        )));
+        assert_eq!(diagnosis.offset, None);
+    }
+
+    #[test]
+    fn a_no_expression_at_offset_failure_carries_the_offset_it_named() {
+        let diagnosis = diagnose_of(CliError::from(SexprError::from(
+            SelectionError::NoExpressionAtOffset { offset: 11 },
+        )));
+        assert_eq!(diagnosis.offset, Some(11));
+    }
+
+    #[test]
+    fn the_caret_points_at_the_right_line_and_column() {
+        let source = "(foo\n  (bar))\n";
+        // Byte 7 is the '(' that opens "(bar))", on the second line, third column.
+        let rendered = render_caret(source, 7).expect("offset is inside the source");
+        assert_eq!(rendered, "  |\n2 |   (bar))\n  |   ^");
+    }
+
+    #[test]
+    fn a_caret_on_the_first_line_needs_no_leading_newline_scan() {
+        let source = "(foo bar)";
+        // Byte 5 is the 'b' in "bar", on the only line, sixth column.
+        let rendered = render_caret(source, 5).expect("offset is inside the source");
+        assert_eq!(rendered, "  |\n1 | (foo bar)\n  |      ^");
+    }
+
+    #[test]
+    fn a_caret_past_the_end_of_the_source_renders_nothing() {
+        assert_eq!(render_caret("(foo)", 999), None);
+    }
+
+    #[test]
+    fn a_caret_not_on_a_char_boundary_renders_nothing() {
+        // "é" is two UTF-8 bytes; offset 1 lands inside it.
+        assert_eq!(render_caret("é", 1), None);
+    }
+
+    /// `doc_url` promises an anchor exists at `docs/src/errors.md`. Checked
+    /// against the file itself — via `include_str!`, so this runs regardless
+    /// of the test binary's working directory — rather than trusted, so a
+    /// code added without its documentation section fails here instead of
+    /// producing a dead link.
+    #[test]
+    fn every_error_code_has_a_documented_anchor() {
+        let doc = include_str!("../../../../docs/src/errors.md");
+        for code in ErrorCode::ALL {
+            let anchor = format!("{{ #{} }}", code.label());
+            assert!(
+                doc.contains(&anchor),
+                "docs/src/errors.md is missing an anchor for {}: expected `{anchor}`",
+                code.label()
+            );
+        }
     }
 }

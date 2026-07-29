@@ -59,6 +59,8 @@ mod code_char_char_code_report;
 mod code_metrics_report;
 #[path = "cli/coerce_to_t_report.rs"]
 mod coerce_to_t_report;
+#[path = "cli/commands_doc_sync_contract.rs"]
+mod commands_doc_sync_contract;
 #[path = "cli/compatibility_contract.rs"]
 mod compatibility_contract;
 #[path = "cli/completions_contract.rs"]
@@ -179,6 +181,8 @@ mod extract_constant;
 mod extract_function;
 #[path = "cli/extract_local_function/mod.rs"]
 mod extract_local_function;
+#[path = "cli/feature_dependency_contract.rs"]
+mod feature_dependency_contract;
 #[path = "cli/flatten_progn.rs"]
 mod flatten_progn;
 #[path = "cli/form_report.rs"]
@@ -195,6 +199,8 @@ mod format_to_string_report;
 mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
+#[path = "cli/generate.rs"]
+mod generate;
 #[path = "cli/getf_default_nil_report.rs"]
 mod getf_default_nil_report;
 #[path = "cli/gethash_default_report.rs"]

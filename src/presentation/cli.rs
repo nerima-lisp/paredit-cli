@@ -37,6 +37,12 @@ use paredit_feature_form_transform::replace_forms::cli as replace_forms;
 use paredit_feature_form_transform::thread_expression::cli as thread_expression;
 use paredit_feature_form_transform::unthread_expression::cli as unthread_expression;
 use paredit_feature_form_transform::unwrap_call::cli as unwrap_call;
+use paredit_feature_generate::generate_accessors::cli as generate_accessors;
+use paredit_feature_generate::generate_defgeneric::cli as generate_defgeneric;
+use paredit_feature_generate::generate_defpackage::cli as generate_defpackage;
+use paredit_feature_generate::generate_defsystem::cli as generate_defsystem;
+use paredit_feature_generate::generate_docstring::cli as generate_docstring;
+use paredit_feature_generate::generate_tests::cli as generate_tests;
 use paredit_feature_inline::inline_function::cli as inline_function;
 use paredit_feature_inline::inline_lambda::cli as inline_lambda;
 use paredit_feature_inline::inline_let::cli as inline_let;
@@ -115,6 +121,15 @@ struct Cli {
     /// operations long enough that silence looks like a hang.
     #[arg(long, global = true)]
     progress: bool,
+    /// Whether text output may use ANSI color. `auto` follows the
+    /// destination terminal and `NO_COLOR`/`CLICOLOR_FORCE`.
+    #[arg(long, global = true, value_enum)]
+    color: Option<paredit_core_cli::color::ColorMode>,
+    /// Delegate stdout to `$PAGER` (falling back to `less`) when it is a
+    /// terminal. Never on by default: unlike `--color`, this changes the
+    /// interaction itself.
+    #[arg(long, global = true)]
+    paginate: bool,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -174,12 +189,21 @@ pub fn run() -> ExitCode {
         Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
         Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
         Command::Serve(args) => return crate::presentation::serve::serve(args),
+        Command::Tui(args) => return crate::presentation::tui::tui(args),
         command => command,
     };
-    match dispatch::dispatch(command) {
+
+    #[cfg(unix)]
+    let pager = paredit_core_cli::pager::maybe_start();
+    let exit_code = match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_failure(&error, &invocation),
+    };
+    #[cfg(unix)]
+    if let Some(pager) = pager {
+        pager.finish();
     }
+    exit_code
 }
 
 /// Whether this run may not write.
@@ -264,25 +288,32 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
             serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
         );
     } else {
+        let painter = paredit_core_cli::color::Painter::stderr();
         eprintln!(
             "{} [{}]: {}",
-            messages::say(messages::Message::ErrorPrefix),
+            painter.red(messages::say(messages::Message::ErrorPrefix)),
             diagnosis.code,
             terminal_safe_error_chain(error)
         );
+        // Best-effort: the file may have moved or changed since the failure,
+        // in which case there is nothing to point a caret at and this simply
+        // prints no excerpt rather than a wrong one.
+        if let Some(caret) = caret_for_failure(&diagnosis, context.file.as_deref()) {
+            eprintln!("{caret}");
+        }
         for repair in &diagnosis.repairs {
             match &repair.command {
                 Some(command) => {
                     eprintln!(
                         "  {}: {} — {}",
-                        messages::say(messages::Message::RepairPrefix),
+                        painter.cyan(messages::say(messages::Message::RepairPrefix)),
                         repair.detail(),
                         terminal_safe(command)
                     );
                 }
                 None => eprintln!(
                     "  {}: {}",
-                    messages::say(messages::Message::RepairPrefix),
+                    painter.cyan(messages::say(messages::Message::RepairPrefix)),
                     repair.detail()
                 ),
             }
@@ -290,6 +321,50 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
     }
 
     ExitCode::from(diagnosis.code.exit_code())
+}
+
+/// The caret excerpt for a failure, when it named a byte position and a file
+/// to read it from.
+///
+/// Re-reads the file rather than reusing whatever the command already had in
+/// memory: by the time a failure is reported, that buffer is gone, and a
+/// second read is the same trade the rest of the repair suggestions already
+/// make (`RepairRereadFile` and friends). A read that fails - the file moved,
+/// permissions changed - is silently swallowed: the error already printed is
+/// the operative one, and a second, unrelated I/O failure here would only
+/// obscure it.
+fn caret_for_failure(diagnosis: &diagnosis::Diagnosis, file: Option<&str>) -> Option<String> {
+    let offset = diagnosis.offset?;
+    let source = std::fs::read_to_string(file?).ok()?;
+    diagnosis::render_caret(&source, offset)
+}
+
+/// Prints a warning — the run continues, but not quite as asked — in the
+/// format this invocation was already going to be read in.
+///
+/// Mirrors [`report_failure`]'s JSON/text split for the same reason: a
+/// caller that asked for `--output json` should not have to fall back to
+/// parsing English stderr to learn a configuration file was ignored. Text
+/// mode is unchanged from before this existed - `"Warning: {message}"` on
+/// stderr - so this only adds a reading, never removes one.
+fn report_warning(message: &str, argv: &[String]) {
+    use clap::CommandFactory;
+
+    let root = Cli::command();
+    if argv::effective_output_format(argv, &root).as_deref() == Some("json") {
+        let envelope = json!({
+            "schema_version": 1,
+            "status": "warning",
+            "command": argv::resolve_leaf(argv, &root).map(|(_, path)| path),
+            "warning": { "message": terminal_safe(message).to_string() },
+        });
+        eprintln!(
+            "{}",
+            serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
+        );
+    } else {
+        eprintln!("Warning: {}", terminal_safe(message));
+    }
 }
 
 /// Reads the configuration, installs what acts below the argument layer, and
@@ -307,10 +382,13 @@ fn bootstrap() -> Cli {
     let loaded = match config::workflow::load(&config::args::ConfigLocationArgs::default()) {
         Ok(loaded) => loaded,
         Err(error) => {
-            eprintln!(
-                "Warning: {}: {}",
-                messages::say(messages::Message::ConfigIgnored),
-                terminal_safe_error_chain(&error)
+            report_warning(
+                &format!(
+                    "{}: {:#}",
+                    messages::say(messages::Message::ConfigIgnored),
+                    error
+                ),
+                &argv,
             );
             return Cli::parse_from(argv);
         }
@@ -320,16 +398,20 @@ fn bootstrap() -> Cli {
     let raw: Vec<String> = std::env::args().collect();
     runtime.dry_run = is_dry_run(&raw);
     runtime.progress = raw.iter().any(|token| token == "--progress");
+    runtime.paginate = raw.iter().any(|token| token == "--paginate");
+    if let Some(mode) = argv::long_flag_value(&raw, "color")
+        .as_deref()
+        .and_then(paredit_core_cli::color::ColorMode::from_label)
+    {
+        runtime.color = mode;
+    }
     paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file
     // that `config check` would reject turns a fixable diagnostic into a
     // baffling error about flags the caller never typed.
     if loaded.has_errors() {
-        eprintln!(
-            "Warning: {}",
-            messages::say(messages::Message::ConfigHasErrors)
-        );
+        report_warning(messages::say(messages::Message::ConfigHasErrors), &argv);
         return Cli::parse_from(argv);
     }
 
@@ -351,9 +433,12 @@ fn bootstrap() -> Cli {
                 .map(|injection| injection.key)
                 .collect::<Vec<_>>()
                 .join(", ");
-            eprintln!(
-                "Warning: {}: {dropped}",
-                messages::say(messages::Message::ConfigKeysNotApplied)
+            report_warning(
+                &format!(
+                    "{}: {dropped}",
+                    messages::say(messages::Message::ConfigKeysNotApplied)
+                ),
+                &argv,
             );
             Cli::parse_from(argv)
         }
