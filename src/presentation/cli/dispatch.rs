@@ -870,7 +870,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         },
         // Handled in `run`, before dispatch, because they own their exit
         // status: a closed pipe is how a protocol session normally ends.
-        Command::Lsp(_) | Command::Mcp(_) => {
+        Command::Lsp(_) | Command::Mcp(_) | Command::Serve(_) => {
             unreachable!("the protocol servers are dispatched from run")
         }
         Command::Completions { shell } => {

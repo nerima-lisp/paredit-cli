@@ -409,6 +409,8 @@ mod self_assignment_report;
 mod self_comparison_report;
 #[path = "cli/semantic_report.rs"]
 mod semantic_report;
+#[path = "cli/serve_daemon.rs"]
+mod serve_daemon;
 #[path = "cli/setf_arity_report.rs"]
 mod setf_arity_report;
 #[path = "cli/setq_non_variable_report.rs"]

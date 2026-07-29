@@ -4,3 +4,4 @@
 pub mod cli;
 pub(crate) mod lsp;
 pub(crate) mod mcp;
+pub(crate) mod serve;

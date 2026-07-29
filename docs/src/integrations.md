@@ -40,6 +40,47 @@ Two behaviours are deliberate and worth knowing:
   verification; widening the editor request to it would rewrite files you never
   opened.
 
+## A resident analysis server: `paredit serve`
+
+```sh
+paredit serve                        # binds a free loopback port, prints it
+paredit serve --addr 127.0.0.1:7654
+```
+
+The address and a session token go to **stderr** so stdout stays clean:
+
+```
+paredit serve listening on http://127.0.0.1:54321
+token: 9f3c…
+```
+
+Every request is a JSON-RPC 2.0 POST to `/` carrying
+`Authorization: Bearer <token>`.
+
+| Method | Params | Answers |
+| --- | --- | --- |
+| `paredit/version` | — | Name and version |
+| `paredit/analyze` | `path` | Dialect, outline, and lint findings in one call |
+| `paredit/outline` | `path` | The outline alone |
+| `paredit/lint` | `path` | The findings alone |
+| `paredit/invalidate` | `path?` | Drops one cached file, or all of them |
+| `paredit/cache` | — | Entries, hits, misses |
+
+**Why run it.** A CLI invocation reads and parses a file every time. Over a
+repository and a loop that parse is the dominant cost and it is entirely
+repeated: the file did not change between the outline call and the lint call.
+The cache is keyed on the file's modification time and length — one `stat`
+rather than a read — so an edit invalidates it and nothing else does. A rewrite
+that preserves both is the case `paredit/invalidate` exists for.
+
+**Why the token.** A long-lived HTTP server on a developer's machine faces two
+attacks, and the token in a *header* answers both. Every local process can reach
+a loopback port, and this server reads files. And a page in the user's browser
+can POST to `127.0.0.1` across origins — but it cannot set an `Authorization`
+header without a CORS preflight this server never approves, which is why the
+token is not accepted in the URL or a cookie. Binding off loopback needs
+`--allow-remote`; prefer an SSH tunnel.
+
 ## Report output formats
 
 Every report whose output is a list of located findings accepts the same set of

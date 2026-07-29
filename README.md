@@ -22,6 +22,7 @@ paredit edit <transform> [args]    # one structural edit (stdout, --diff, or --w
 paredit refactor <workflow> [args] # plan, preview, verify, and apply changes
 paredit lsp                        # Language Server Protocol server over stdio
 paredit mcp                        # Model Context Protocol server over stdio (agents)
+paredit serve                      # resident analysis server over HTTP/JSON-RPC
 paredit completions <shell>        # shell completion scripts (bash/zsh/fish/...)
 ```
 

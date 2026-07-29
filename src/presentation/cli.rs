@@ -113,6 +113,7 @@ pub fn run() -> ExitCode {
     let command = match cli.command {
         Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
         Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
+        Command::Serve(args) => return crate::presentation::serve::serve(args),
         command => command,
     };
     match dispatch::dispatch(command) {
