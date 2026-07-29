@@ -198,6 +198,22 @@ const BINDINGS: &[Binding] = &[
         scope: Scope::Anywhere,
         omit_when: None,
     },
+    Binding {
+        key: "output.verbosity",
+        flag: "verbosity",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "output.max-tokens",
+        flag: "max-tokens",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        // Zero is how the schema spells "no budget", and the flag spells that
+        // as absence.
+        omit_when: Some("0"),
+    },
 ];
 
 /// One flag the configuration contributed, for reporting.
@@ -337,8 +353,13 @@ impl Binding {
             return None;
         }
         let resolved = settings.resolved(self.key)?;
-        if let (Some(sentinel), Value::String(text)) = (self.omit_when, &resolved.value) {
-            if text == sentinel {
+        if let Some(sentinel) = self.omit_when {
+            let written = match &resolved.value {
+                Value::String(text) => text.clone(),
+                Value::Integer(number) => number.to_string(),
+                other => other.to_string(),
+            };
+            if written == sentinel {
                 return None;
             }
         }
@@ -588,6 +609,27 @@ mod tests {
             &[("lint.fail-on", Value::String("never".to_owned()))],
         );
         assert!(!result.contains(&"--fail-on".to_owned()), "{result:?}");
+    }
+
+    /// The sentinel has to work for whatever type the key holds, not only for
+    /// a string: `output.max-tokens = 0` spells "no budget" as an integer.
+    #[test]
+    fn an_integer_sentinel_is_recognised_too() {
+        let result = run(
+            &["inspect", "agent-report", "--file", "a.lisp"],
+            &[("output.max-tokens", Value::Integer(0))],
+        );
+        assert!(!result.contains(&"--max-tokens".to_owned()), "{result:?}");
+
+        let result = run(
+            &["inspect", "agent-report", "--file", "a.lisp"],
+            &[("output.max-tokens", Value::Integer(4096))],
+        );
+        assert!(
+            result
+                .windows(2)
+                .any(|pair| pair == ["--max-tokens", "4096"])
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use super::{
-    accessor_arity_report, api_diff_report, api_surface_report, append_list_to_cons_report,
-    append_nil_report,
+    accessor_arity_report, analysis_report, api_diff_report, api_surface_report,
+    append_list_to_cons_report, append_nil_report,
     args::{
         AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
     },
@@ -87,7 +87,7 @@ pub(super) enum InspectCommand {
     /// Print parse, dialect, and structural metrics for agent planning.
     Stats(AnalyzeArgs),
     /// Print a complete JSON report for AI coding agent refactor planning.
-    AgentReport(AnalyzeArgs),
+    AgentReport(analysis_report::args::AgentReportArgs),
     /// Print a machine-readable catalog of every command, flag, default, and enum value.
     Capabilities(capabilities::CapabilitiesArgs),
     /// Print top-level forms with paths, spans, and definition hints.

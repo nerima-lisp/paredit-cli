@@ -11,6 +11,8 @@
 //! now produce reports of this shape, and a copy per package is three places
 //! for the output contract to drift.
 
+pub mod budget;
+pub mod next_command;
 pub mod render;
 
 use std::path::PathBuf;

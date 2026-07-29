@@ -81,6 +81,78 @@ accepts `--fail-on-no-change`, which turns a zero-match rename from a silent
 no-op into an exit-1 failure — pass it whenever you expect the rename to do
 something.
 
+## Fitting a report in a context window
+
+`inspect agent-report` takes three flags that matter when the report has to
+share a budget with everything else you are holding.
+
+**`--verbosity quiet | normal | detailed`.** `quiet` drops the outline and atom
+lists and keeps every count, so you still learn the file's shape — how many
+top-level forms, how many definitions, how many atoms — and can decide whether
+the detail is worth asking for. `detailed` adds the document digest and the
+distinct-atom count. `normal` is the default and is unchanged.
+
+**`--max-tokens <N>`.** An approximate ceiling. Lists are trimmed from the end,
+so what remains is a prefix in source order, and the report says exactly what
+went:
+
+```json
+"truncation": {
+  "truncated": true,
+  "budget_tokens": 1500,
+  "approximate_tokens": 1498,
+  "arrays": [{ "key": "atoms", "kept": 25, "total": 812, "dropped": 787 }]
+}
+```
+
+The counts in `metrics` are never trimmed: they are how you learn what you are
+missing. Atoms are given up before the outline, because an outline entry
+carries far more per token and a specific atom can be fetched directly with
+`inspect find-symbol`. A budget that is met leaves the report byte-identical to
+one produced without the flag. A budget the envelope cannot meet is reported
+honestly rather than faked.
+
+**`--since <FILE>`.** Compare against a previous `--output json` report from the
+same command and add a `delta`:
+
+```json
+"delta": {
+  "comparable": true,
+  "unchanged": false,
+  "outline": {
+    "added":   [{ "head": "defun", "name": "new", "path": "0" }],
+    "removed": [],
+    "moved":   [{ "name": "defun f", "from": "0", "to": "1" }]
+  },
+  "atom_occurrences": { "previous": 9, "current": 13 }
+}
+```
+
+Definitions are matched on `head` plus `name`, not on path. That is what makes
+`moved` meaningful: inserting one definition at the top of a file is one
+addition and *n* moves, not *n+1* additions — and `from`/`to` is exactly what
+you need to update stored `--path` selectors. `comparable` is `false` when the
+baseline was written at `--verbosity quiet` and has no outline to compare
+against.
+
+## What to run next
+
+Reports carry a `next_commands` array when their own contents justify one:
+
+```json
+"next_commands": [
+  {
+    "command": "paredit inspect lint --output json src/core.lisp",
+    "why": "2 definition-like forms are present; lint reports logic bugs in them"
+  }
+]
+```
+
+Each `command` runs exactly as written, paths quoted where they need it. The
+field is absent — not empty — when the report has nothing to suggest, so
+"nothing to suggest" and "we did not look" stay distinguishable. Suggestions
+are derived from what the report found, never emitted unconditionally.
+
 ## Error identity and repairs
 
 An exit code says *that* a command failed. Every failure also carries a stable
