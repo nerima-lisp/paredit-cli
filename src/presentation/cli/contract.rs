@@ -147,7 +147,8 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 217] = [
+const INTROSPECTION_COMMANDS: [&str; 218] = [
+    "inspect diff",
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -389,7 +390,9 @@ const STRUCTURAL_COMMANDS: [&str; 17] = [
     "edit barf-backward",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 78] = [
+const SEMANTIC_COMMANDS: [&str; 80] = [
+    "refactor step",
+    "refactor patch",
     "refactor plan",
     "refactor verify",
     "refactor preview",
@@ -478,7 +481,8 @@ const SEMANTIC_COMMANDS: [&str; 78] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 10] = [
+const SYNTAX_TIER_REPORTS: [&str; 11] = [
+    "inspect diff",
     "inspect elisp-file",
     "inspect check",
     "inspect dialect",
@@ -526,7 +530,9 @@ const SCOPE_TIER_REPORTS: [&str; 28] = [
 
 /// Refactor plumbing that moves whole forms or drives the manifest workflow.
 /// None of it reads an operator name, so it is complete for every dialect.
-const SYNTAX_TIER_REFACTORS: [&str; 14] = [
+const SYNTAX_TIER_REFACTORS: [&str; 16] = [
+    "refactor step",
+    "refactor patch",
     "refactor plan",
     "refactor verify",
     "refactor preview",

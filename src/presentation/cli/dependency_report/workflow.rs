@@ -3,9 +3,12 @@ use anyhow::Result;
 use crate::application::usecase::definition_report::collect_definition_forms;
 use crate::application::usecase::dependency_report::build_dependency_report;
 use crate::presentation::cli::dependency_report::{
-    args::DependencyReportArgs, render::print_dependency_report, types::DependencyReportFile,
+    args::DependencyReportArgs,
+    render::{dependency_drawing, print_dependency_report},
+    types::DependencyReportFile,
 };
 use crate::presentation::cli::read_input_dialect_and_tree;
+use paredit_core_cli::report::graph::print_graph;
 
 pub fn dependency_report(args: DependencyReportArgs) -> Result<()> {
     let mut reports = Vec::with_capacity(args.files.len());
@@ -23,5 +26,11 @@ pub fn dependency_report(args: DependencyReportArgs) -> Result<()> {
         });
     }
 
-    print_dependency_report(&reports, args.output)
+    match args.graph {
+        Some(format) => {
+            print_graph(&dependency_drawing(&reports), format);
+            Ok(())
+        }
+        None => print_dependency_report(&reports, args.output),
+    }
 }

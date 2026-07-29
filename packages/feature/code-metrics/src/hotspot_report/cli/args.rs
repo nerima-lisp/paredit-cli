@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use paredit_core_cli::args::{DialectArg, OutputFormat};
+use paredit_core_cli::args::{DialectArg, ReportFormat};
 
 #[derive(Debug, Args)]
 pub struct HotspotReportArgs {
@@ -19,6 +19,6 @@ pub struct HotspotReportArgs {
     #[arg(long, value_name = "SCORE")]
     pub max_score: Option<usize>,
     /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub output: OutputFormat,
+    #[arg(long, value_enum, default_value_t = ReportFormat::Json)]
+    pub output: ReportFormat,
 }

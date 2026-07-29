@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod refactor;
+pub mod refactor_step;
 
 // The contract with the composition root (section 4.2): each slice that
 // owns a subcommand publishes its `clap` argument type and the function
@@ -15,3 +16,4 @@ pub use refactor::cli::{VerifyRefactorArgs, verify_refactor};
 pub use refactor::cli::{WorkspaceRefactorExecuteArgs, workspace_refactor_execute};
 pub use refactor::cli::{WorkspaceRefactorPlanArgs, workspace_refactor_plan};
 pub use refactor::cli::{WorkspaceRefactorPreviewArgs, workspace_refactor_preview};
+pub use refactor_step::cli::{RefactorStepArgs, refactor_step};

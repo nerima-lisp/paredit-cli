@@ -23,7 +23,7 @@ fn top_level_public_modules_keep_docs_rs_responsibility_docs() {
         ),
         (
             "src/presentation/mod.rs",
-            "//! CLI presentation adapters that map commands, flags, and output modes onto",
+            "//! Presentation adapters that map delivery mechanisms — the command line, and",
         ),
         (
             "packages/core/syntax/src/sexpr.rs",
