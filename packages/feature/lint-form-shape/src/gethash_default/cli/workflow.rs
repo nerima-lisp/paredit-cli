@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::gethash_default::cli::args::GethashDefaultReportArgs;
 use crate::gethash_default::cli::render::print_gethash_default_report;
@@ -8,7 +8,7 @@ use crate::gethash_default::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn gethash_default_report(args: GethashDefaultReportArgs) -> Result<()> {
+pub fn gethash_default_report(args: GethashDefaultReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut gethash_form_count = 0;

@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -9,7 +9,7 @@ use super::args::WritabilityReportArgs;
 /// Reports whether a write to `args.file` would succeed, without writing
 /// anything. See [`check_writable`] for what "would succeed" reuses from the
 /// real write path.
-pub(in crate::presentation::cli) fn writability(args: WritabilityReportArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn writability(args: WritabilityReportArgs) -> CliResult<()> {
     let display_path = args.file.display().to_string();
     let check = check_writable(args.file);
 
@@ -40,9 +40,13 @@ pub(in crate::presentation::cli) fn writability(args: WritabilityReportArgs) -> 
     if check.writable {
         Ok(())
     } else {
-        bail!(
-            "{display_path} is not writable: {}",
-            check.reason.unwrap_or_else(|| "unknown reason".to_owned())
-        );
+        Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalWriteTarget,
+            format!(
+                "{display_path} is not writable: {}",
+                check.reason.unwrap_or_else(|| "unknown reason".to_owned())
+            ),
+        )
+        .into())
     }
 }

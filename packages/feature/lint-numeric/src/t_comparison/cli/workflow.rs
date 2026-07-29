@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::t_comparison::cli::args::TComparisonReportArgs;
 use crate::t_comparison::cli::render::print_t_comparison_report;
@@ -8,7 +8,7 @@ use crate::t_comparison::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn t_comparison_report(args: TComparisonReportArgs) -> Result<()> {
+pub fn t_comparison_report(args: TComparisonReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut comparison_form_count = 0;

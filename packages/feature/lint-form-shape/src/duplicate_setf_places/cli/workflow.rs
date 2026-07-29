@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::duplicate_setf_places::cli::args::DuplicateSetfPlaceReportArgs;
 use crate::duplicate_setf_places::cli::render::print_duplicate_setf_place_report;
@@ -8,7 +8,7 @@ use crate::duplicate_setf_places::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn duplicate_setf_place_report(args: DuplicateSetfPlaceReportArgs) -> Result<()> {
+pub fn duplicate_setf_place_report(args: DuplicateSetfPlaceReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut assignment_form_count = 0;

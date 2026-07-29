@@ -1,9 +1,9 @@
 use super::super::super::types::preview::RefactorPreview;
 use crate::refactor::usecase::execute::RefactorWriteRefusal;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::shared::write_files_with_rollback;
 
-pub fn write_refactor_preview(preview: &mut RefactorPreview) -> Result<()> {
+pub fn write_refactor_preview(preview: &mut RefactorPreview) -> CliResult<()> {
     let write_plan = preview.write_plan();
 
     if !write_plan.write_requested() {
@@ -12,9 +12,11 @@ pub fn write_refactor_preview(preview: &mut RefactorPreview) -> Result<()> {
 
     if let Some(refusal) = write_plan.refusal() {
         match refusal {
-            RefactorWriteRefusal::UnparsableOutputs { count } => anyhow::bail!(
-                "refactor write refused because {count} rewritten output file(s) failed to parse"
-            ),
+            RefactorWriteRefusal::UnparsableOutputs { count } => return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+    format!("refactor write refused because {count} rewritten output file(s) failed to parse"),
+)
+.into()),
         }
     }
 
@@ -33,7 +35,7 @@ pub fn write_refactor_preview(preview: &mut RefactorPreview) -> Result<()> {
     preview
         .summary
         .set_written_file_count(preview.files.iter().filter(|file| file.written).count())
-        .map_err(anyhow::Error::msg)?;
+        .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message })?;
 
     Ok(())
 }

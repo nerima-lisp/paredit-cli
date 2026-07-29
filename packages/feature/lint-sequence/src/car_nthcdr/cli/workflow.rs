@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::car_nthcdr::cli::args::CarNthcdrReportArgs;
 use crate::car_nthcdr::cli::render::print_car_nthcdr_report;
@@ -7,7 +7,7 @@ use crate::car_nthcdr::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn car_nthcdr_report(args: CarNthcdrReportArgs) -> Result<()> {
+pub fn car_nthcdr_report(args: CarNthcdrReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut car_form_count = 0;

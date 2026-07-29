@@ -31,4 +31,7 @@ macro_rules! safe_text {
 
 pub mod report;
 
-pub use error::{ArgumentError, CleanupFailure, CliError, CliResult, IoRefusal, WriteTargetError};
+pub use error::{
+    ArgumentError, CleanupFailure, CliError, CliResult, CommandFailure, CommandResult, IoRefusal,
+    WriteTargetError,
+};

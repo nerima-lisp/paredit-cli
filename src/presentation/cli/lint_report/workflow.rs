@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::{CliError, CliResult, CommandResult};
 
 use crate::application::usecase::lint_report::{
     CATEGORIES, Date, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, LintSuppressions,
@@ -51,15 +51,18 @@ fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
 /// them did. There is no partial report to produce, so this is the one case
 /// where a lint run still fails outright — naming the first failure by input
 /// order, the same file a fully serial run would have stopped on first.
-fn total_failure(failures: Vec<FileFailure>) -> anyhow::Error {
+fn total_failure(failures: Vec<FileFailure>) -> paredit_core_cli::error::FeatureRefusal {
     let first = failures
         .into_iter()
         .next()
         .expect("total failure has at least one failure");
-    anyhow::anyhow!(
-        "failed to analyze {}: {}",
-        first.file.display(),
-        first.message
+    paredit_core_cli::error::FeatureRefusal::message(
+        paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+        format!(
+            "failed to analyze {}: {}",
+            first.file.display(),
+            first.message
+        ),
     )
 }
 
@@ -182,12 +185,14 @@ fn gate_message(
 }
 
 /// Loads the `--baseline` file, or `None` when the flag is absent.
-fn load_baseline(args: &LintReportArgs) -> Result<Option<LintBaseline>> {
+fn load_baseline(args: &LintReportArgs) -> CliResult<Option<LintBaseline>> {
     match &args.baseline {
         None => Ok(None),
         Some(path) => {
-            let text = std::fs::read_to_string(path)
-                .with_context(|| format!("reading baseline file {}", path.display()))?;
+            let text = std::fs::read_to_string(path).map_err(CliError::io(format!(
+                "reading baseline file {}",
+                path.display()
+            )))?;
             Ok(Some(LintBaseline::parse(&text)?))
         }
     }
@@ -228,7 +233,7 @@ fn collect_lint_fixes(
     text: &str,
     active: &[&str],
     settings: &RuleSettings,
-) -> Result<FixMap> {
+) -> CliResult<FixMap> {
     Ok(fix_map(
         run_lint_pass(
             file,
@@ -277,7 +282,7 @@ fn fix_map(fixes: Vec<RuleFixFor>) -> FixMap {
 /// Resolved before any file is read, so a typo'd rule or category name fails
 /// the run rather than quietly changing nothing — the whole point of the flag
 /// is to change what fails CI.
-fn resolve_severity_overrides(args: &LintReportArgs) -> Result<SeverityOverrides> {
+fn resolve_severity_overrides(args: &LintReportArgs) -> CliResult<SeverityOverrides> {
     let mut overrides = SeverityOverrides::new();
     for selector in &args.warn {
         apply_severity_override(&mut overrides, selector, Severity::Warning)?;
@@ -296,19 +301,29 @@ fn resolve_severity_overrides(args: &LintReportArgs) -> Result<SeverityOverrides
 /// Each part is checked: the rule must exist, it must declare that key, and the
 /// value must be an integer. A silently ignored override would leave a CI gate
 /// running with a threshold nobody set.
-fn resolve_rule_settings(args: &LintReportArgs) -> Result<RuleSettings> {
+fn resolve_rule_settings(args: &LintReportArgs) -> CliResult<RuleSettings> {
     let mut settings = RuleSettings::new();
     for argument in &args.rule_args {
         let (target, value) = argument.split_once('=').ok_or_else(|| {
-            anyhow::anyhow!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")
+            paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+                format!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>"),
+            )
         })?;
         let (rule, key) = target.rsplit_once('.').ok_or_else(|| {
-            anyhow::anyhow!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")
+            paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+                format!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>"),
+            )
         })?;
         if !RULES.contains(&rule) {
             let suggestion =
                 paredit_core_lint_engine::error::did_you_mean(RULES.iter().copied(), rule);
-            anyhow::bail!("unknown lint rule {rule:?} in --rule-arg {argument:?}{suggestion}");
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+                format!("unknown lint rule {rule:?} in --rule-arg {argument:?}{suggestion}"),
+            )
+            .into());
         }
         let Some(declared) = rule_setting(rule, key) else {
             let valid: Vec<&str> = crate::application::usecase::lint_report::rule_settings(rule)
@@ -317,27 +332,34 @@ fn resolve_rule_settings(args: &LintReportArgs) -> Result<RuleSettings> {
                 .collect();
             let suggestion =
                 paredit_core_lint_engine::error::did_you_mean(valid.iter().copied(), key);
-            anyhow::bail!(
-                "lint rule {rule:?} has no setting {key:?}; valid settings: {}{suggestion}",
-                if valid.is_empty() {
-                    "(none)".to_owned()
-                } else {
-                    valid.join(", ")
-                }
-            );
-        };
-        let parsed: i64 = value.parse().with_context(|| {
-            format!(
-                "--rule-arg {argument:?} needs an integer value (the default is {})",
-                declared.default()
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+                format!(
+                    "lint rule {rule:?} has no setting {key:?}; valid settings: {}{suggestion}",
+                    if valid.is_empty() {
+                        "(none)".to_owned()
+                    } else {
+                        valid.join(", ")
+                    }
+                ),
             )
-        })?;
+            .into());
+        };
+        let parsed: i64 =
+            value
+                .parse()
+                .map_err(|_| paredit_core_cli::ArgumentError::FlagCombination {
+                    message: format!(
+                        "--rule-arg {argument:?} needs an integer value (the default is {})",
+                        declared.default()
+                    ),
+                })?;
         settings.set(rule, key, parsed);
     }
     Ok(settings)
 }
 
-pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> CommandResult {
     // Resolve the selected rules first so the catalogue-only modes honor the
     // same `--rule`/`--exclude`/`--category`/`--tag`/`--preset` selectors as a
     // scan. Every name is validated here, before any file is read.
@@ -365,11 +387,13 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
         if !RULES.contains(&rule.as_str()) {
             let suggestion =
                 paredit_core_lint_engine::error::did_you_mean(RULES.iter().copied(), rule);
-            anyhow::bail!(
-                "unknown lint rule {rule:?}; run `inspect lint --list-rules` for the catalogue{suggestion}"
-            );
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+    format!("unknown lint rule {rule:?}; run `inspect lint --list-rules` for the catalogue{suggestion}"),
+)
+.into());
         }
-        return print_lint_explanation(rule, args.output);
+        return Ok(print_lint_explanation(rule, args.output)?);
     }
 
     if args.list_presets {
@@ -384,26 +408,31 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
                 resolve_active_rules(&scoped).map(|rules| (preset, rules.len()))
             })
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        return print_lint_presets(&counts, args.output);
+        return Ok(print_lint_presets(&counts, args.output)?);
     }
 
     if args.list_tags {
-        return print_lint_tags(args.output);
+        return Ok(print_lint_tags(args.output)?);
     }
 
     if args.docs {
-        return print_lint_docs(&active);
+        return Ok(print_lint_docs(&active)?);
     }
 
     if args.list_rules {
-        return print_lint_rule_catalog(&active, &custom, args.fixable, args.output);
+        return Ok(print_lint_rule_catalog(
+            &active,
+            &custom,
+            args.fixable,
+            args.output,
+        )?);
     }
 
     let files = expand_input_files(&args.files, args.dialect)?;
     let files = filter_suppressed_paths(files, &args.suppress_paths);
 
     if args.timings {
-        return lint_report_timings(&args, &files, &active, &settings);
+        return Ok(lint_report_timings(&args, &files, &active, &settings)?);
     }
 
     if args.sarif || args.emit == Some(EmitFormat::Sarif) {
@@ -419,11 +448,11 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     }
 
     if args.stats {
-        return lint_report_stats(&args, &files, &active, &meta, &custom);
+        return Ok(lint_report_stats(&args, &files, &active, &meta, &custom)?);
     }
 
     if args.remove_unused_suppressions {
-        return lint_report_remove_unused_suppressions(&args, &files);
+        return Ok(lint_report_remove_unused_suppressions(&args, &files)?);
     }
 
     if args.report_unused_suppressions {
@@ -435,15 +464,17 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     }
 
     if args.report_suppressions {
-        return lint_report_suppressions(&args, &files);
+        return Ok(lint_report_suppressions(&args, &files)?);
     }
 
     if let Some(out_path) = args.write_baseline.clone() {
-        return lint_report_write_baseline(&args, &files, &active, &out_path);
+        return Ok(lint_report_write_baseline(
+            &args, &files, &active, &out_path,
+        )?);
     }
 
     if args.fix_plan {
-        return lint_report_fix_plan(&args, &files, &active, &settings);
+        return Ok(lint_report_fix_plan(&args, &files, &active, &settings)?);
     }
 
     if args.fix {
@@ -526,10 +557,10 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
             .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
         let file_ids = assign_finding_ids(&kept, &input.text);
-        Ok((kept, file_ids))
+        CliResult::Ok((kept, file_ids))
     });
     if analysis.is_total_failure() {
-        return Err(total_failure(analysis.failed));
+        return Err(total_failure(analysis.failed).into());
     }
     note_partial_failures(&analysis.failed);
     let file_failures = analysis.failed;
@@ -592,7 +623,7 @@ fn lint_report_timings(
     files: &[std::path::PathBuf],
     active: &[&str],
     settings: &RuleSettings,
-) -> Result<()> {
+) -> CliResult<()> {
     let mut total: Option<RuleTimings> = None;
 
     for file in files {
@@ -658,7 +689,7 @@ fn lint_report_timings(
 fn lint_report_remove_unused_suppressions(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
-) -> Result<()> {
+) -> CliResult<()> {
     let mut changed = Vec::new();
     let mut removed_total = 0;
 
@@ -678,8 +709,12 @@ fn lint_report_remove_unused_suppressions(
         }
         // Removing a comment cannot unbalance a form, but the guard is what
         // makes that a checked fact rather than an assumption.
-        SyntaxTree::parse_with_dialect(&text, dialect)
-            .context("refusing to edit: source with suppressions removed does not reparse")?;
+        SyntaxTree::parse_with_dialect(&text, dialect).map_err(|_| {
+            paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+                "refusing to edit: source with suppressions removed does not reparse",
+            )
+        })?;
 
         let directives: Vec<(usize, Vec<String>)> = edits
             .iter()
@@ -708,7 +743,7 @@ fn findings_by_line(
     dialect: crate::domain::dialect::Dialect,
     tree: &SyntaxTree,
     text: &str,
-) -> Result<std::collections::HashMap<usize, std::collections::HashSet<&'static str>>> {
+) -> CliResult<std::collections::HashMap<usize, std::collections::HashSet<&'static str>>> {
     let mut present: std::collections::HashMap<usize, std::collections::HashSet<&'static str>> =
         std::collections::HashMap::new();
     for finding in collect_lint_findings(file, dialect, tree)? {
@@ -728,7 +763,7 @@ fn lint_report_sarif(
     meta: &RuleMetaResolver<'_>,
     custom: &CustomRules,
     settings: &RuleSettings,
-) -> Result<()> {
+) -> CommandResult {
     let baseline = load_baseline(args)?;
     let mut results = Vec::new();
     // Disambiguates identical (rule, line-content) fingerprints so two findings
@@ -763,10 +798,10 @@ fn lint_report_sarif(
             .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
         let ids = assign_finding_ids(&findings, &input.text);
-        Ok((findings, ids, fixes, input.text.clone()))
+        CliResult::Ok((findings, ids, fixes, input.text.clone()))
     });
     if analysis.is_total_failure() {
-        return Err(total_failure(analysis.failed));
+        return Err(total_failure(analysis.failed).into());
     }
     note_partial_failures(&analysis.failed);
 
@@ -816,7 +851,7 @@ fn lint_report_fix_plan(
     files: &[std::path::PathBuf],
     active: &[&str],
     settings: &RuleSettings,
-) -> Result<()> {
+) -> CliResult<()> {
     let baseline = load_baseline(args)?;
     let mut entries = Vec::new();
 
@@ -900,7 +935,7 @@ fn lint_report_fix(
     active: &[&str],
     custom: &CustomRules,
     settings: &RuleSettings,
-) -> Result<()> {
+) -> CommandResult {
     let mut file_fixes = Vec::new();
     let mut fixes_applied = 0;
     let mut fix_conflicts = 0;
@@ -981,8 +1016,12 @@ fn lint_report_fix(
 
             let rewritten = apply_byte_span_edits(&text, edits)?;
             // Guard the rewrite before adopting it, mirroring the write path.
-            tree = SyntaxTree::parse_with_dialect(&rewritten, dialect)
-                .context("refusing to fix: rewritten source does not reparse")?;
+            tree = SyntaxTree::parse_with_dialect(&rewritten, dialect).map_err(|_| {
+                paredit_core_cli::error::FeatureRefusal::message(
+                    paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+                    "refusing to fix: rewritten source does not reparse",
+                )
+            })?;
             text = rewritten;
             for rule in chosen_rules {
                 *per_rule.entry(rule).or_insert(0) += 1;
@@ -1039,7 +1078,12 @@ fn lint_report_fix(
         return Ok(());
     }
 
-    print_lint_fix_report(&file_fixes, fixes_applied, fix_conflicts, args.output)
+    Ok(print_lint_fix_report(
+        &file_fixes,
+        fixes_applied,
+        fix_conflicts,
+        args.output,
+    )?)
 }
 
 /// Writes the current findings (for the active rules, after suppression) to a
@@ -1050,7 +1094,7 @@ fn lint_report_write_baseline(
     files: &[std::path::PathBuf],
     active: &[&str],
     out_path: &std::path::Path,
-) -> Result<()> {
+) -> CliResult<()> {
     let mut entries = Vec::new();
 
     for file in files {
@@ -1074,8 +1118,9 @@ fn lint_report_write_baseline(
 
     let baseline = LintBaseline::from_entries(entries);
     let entry_count = baseline.len();
-    std::fs::write(out_path, baseline.to_json()?)
-        .with_context(|| format!("writing baseline file {}", out_path.display()))?;
+    std::fs::write(out_path, baseline.to_json()?).map_err(paredit_core_cli::CliError::io(
+        format!("writing baseline file {}", out_path.display()),
+    ))?;
 
     match args.output {
         crate::presentation::cli::OutputFormat::Text => {
@@ -1106,7 +1151,7 @@ fn lint_report_stats(
     active: &[&str],
     meta: &RuleMetaResolver<'_>,
     custom: &CustomRules,
-) -> Result<()> {
+) -> CliResult<()> {
     let baseline = load_baseline(args)?;
     let mut by_rule: std::collections::BTreeMap<&'static str, usize> =
         std::collections::BTreeMap::new();
@@ -1185,7 +1230,7 @@ fn lint_report_stats(
 fn lint_report_unused_suppressions(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
-) -> Result<()> {
+) -> CommandResult {
     let mut entries = Vec::new();
 
     for file in files {
@@ -1217,7 +1262,7 @@ fn lint_report_unused_suppressions(
 fn lint_report_expired_suppressions(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
-) -> Result<()> {
+) -> CommandResult {
     let today = Date::today();
     let mut entries = Vec::new();
 
@@ -1246,7 +1291,7 @@ fn lint_report_expired_suppressions(
 /// not — the full survey `--report-suppressions` provides, one step past
 /// `--report-unused-suppressions`'s stale-only view. Always exits 0: a survey,
 /// not a gate.
-fn lint_report_suppressions(args: &LintReportArgs, files: &[std::path::PathBuf]) -> Result<()> {
+fn lint_report_suppressions(args: &LintReportArgs, files: &[std::path::PathBuf]) -> CliResult<()> {
     let mut entries = Vec::new();
 
     for file in files {
@@ -1313,7 +1358,7 @@ fn lint_report_interop(
     active: &[&str],
     meta: &RuleMetaResolver<'_>,
     custom: &CustomRules,
-) -> Result<()> {
+) -> CommandResult {
     let baseline = load_baseline(args)?;
     let mut rows = Vec::new();
     let mut finding_rules: Vec<&'static str> = Vec::new();
@@ -1410,7 +1455,7 @@ fn lint_report_github(
     active: &[&str],
     meta: &RuleMetaResolver<'_>,
     custom: &CustomRules,
-) -> Result<()> {
+) -> CommandResult {
     let baseline = load_baseline(args)?;
     let mut finding_rules: Vec<&'static str> = Vec::new();
 
@@ -1428,17 +1473,19 @@ fn lint_report_github(
         );
         let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
-        Ok(findings
-            .into_iter()
-            .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
-            .map(|finding| {
-                let (line, column) = line_and_column(&input.text, finding.span.start().get());
-                (finding, line, column)
-            })
-            .collect::<Vec<_>>())
+        CliResult::Ok(
+            findings
+                .into_iter()
+                .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
+                .map(|finding| {
+                    let (line, column) = line_and_column(&input.text, finding.span.start().get());
+                    (finding, line, column)
+                })
+                .collect::<Vec<_>>(),
+        )
     });
     if analysis.is_total_failure() {
-        return Err(total_failure(analysis.failed));
+        return Err(total_failure(analysis.failed).into());
     }
     note_partial_failures(&analysis.failed);
 
@@ -1480,12 +1527,15 @@ fn lint_report_github(
 /// kind of configuration mistake to notice.
 fn open_lint_cache(
     args: &LintReportArgs,
-) -> Result<Option<paredit_core_safety::cache::AnalysisCache>> {
+) -> CliResult<Option<paredit_core_safety::cache::AnalysisCache>> {
     args.cache_dir
         .as_deref()
         .map(|root| {
             paredit_core_safety::cache::AnalysisCache::open(root, env!("CARGO_PKG_VERSION"))
-                .with_context(|| format!("opening lint cache {}", root.display()))
+                .map_err(paredit_core_cli::CliError::io(format!(
+                    "opening lint cache {}",
+                    root.display()
+                )))
         })
         .transpose()
 }
@@ -1660,7 +1710,7 @@ fn active_with_custom(active: &[&'static str], custom: &CustomRules) -> Vec<&'st
 /// A separate mode rather than part of a scan: a rule file is code, and code
 /// nobody can check goes wrong quietly. Exits 3 on any failure so CI can keep
 /// a project's own rules correct the same way it keeps its own tests correct.
-fn lint_report_test_rules(custom: &CustomRules) -> Result<()> {
+fn lint_report_test_rules(custom: &CustomRules) -> CommandResult {
     let failures = custom.test();
     let rule_count = custom.ruleset().rules.len();
     let test_count = custom.ruleset().tests.len();

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::eval_when_situation::cli::args::EvalWhenSituationReportArgs;
 use crate::eval_when_situation::cli::render::print_eval_when_situation_report;
@@ -8,7 +8,7 @@ use crate::eval_when_situation::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn eval_when_situation_report(args: EvalWhenSituationReportArgs) -> Result<()> {
+pub fn eval_when_situation_report(args: EvalWhenSituationReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut eval_when_form_count = 0;

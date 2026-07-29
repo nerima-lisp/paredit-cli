@@ -2,8 +2,8 @@ use crate::error::CallBindingError;
 use crate::inline_function::usecase::{
     InlineCallSelection, InlineFunctionPlan, InlineFunctionRequest, plan_inline_function,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -48,9 +48,9 @@ pub struct InlineFunctionArgs {
     output: OutputFormat,
 }
 
-pub fn inline_function(args: InlineFunctionArgs) -> Result<()> {
+pub fn inline_function(args: InlineFunctionArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     // `--all-calls` and `--call-path` are mutually exclusive. The check lives
@@ -92,7 +92,7 @@ fn print_inline_function_plan(
     plan: &InlineFunctionPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

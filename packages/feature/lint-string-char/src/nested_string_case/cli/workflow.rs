@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nested_string_case::cli::args::NestedStringCaseReportArgs;
 use crate::nested_string_case::cli::render::print_nested_string_case_report;
@@ -8,7 +8,7 @@ use crate::nested_string_case::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nested_string_case_report(args: NestedStringCaseReportArgs) -> Result<()> {
+pub fn nested_string_case_report(args: NestedStringCaseReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut string_case_form_count = 0;

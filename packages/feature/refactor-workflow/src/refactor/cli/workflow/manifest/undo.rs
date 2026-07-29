@@ -25,7 +25,7 @@ use super::super::super::types::root::{RefactorRootGuard, RefactorRootReport};
 use super::super::super::types::undo::{
     RefactorUndoFileResult, RefactorUndoResult, RefactorUndoSummary,
 };
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 use paredit_core_cli::shared::{
     ExpectedWriteTarget, write_files_with_rollback_expected,
     write_files_with_rollback_expected_anchored,
@@ -34,16 +34,23 @@ use paredit_core_safety::journal::UndoJournal;
 use std::path::{Path as FsPath, PathBuf};
 
 /// Reads a journal, reports what it can restore, and with `--write` restores it.
-pub fn refactor_undo(args: RefactorUndoArgs) -> Result<()> {
+pub fn refactor_undo(args: RefactorUndoArgs) -> CliResult<()> {
     let text = paredit_core_cli::shared::read_text_file_with_limit(
         &args.journal,
         paredit_core_cli::shared::MAX_SOURCE_INPUT_BYTES,
     )
-    .with_context(|| format!("failed to read undo journal {}", args.journal.display()))?;
-    let value: serde_json::Value = serde_json::from_str(&text)
-        .with_context(|| format!("undo journal {} is not JSON", args.journal.display()))?;
-    let journal = UndoJournal::from_json(&value)
-        .with_context(|| format!("undo journal {} is unusable", args.journal.display()))?;
+    .map_err(crate::error::RefactorContext::new(format!(
+        "failed to read undo journal {}",
+        args.journal.display()
+    )))?;
+    let value: serde_json::Value =
+        serde_json::from_str(&text).map_err(|source| paredit_core_cli::CliError::Json {
+            context: format!("undo journal {} is not JSON", args.journal.display()),
+            source,
+        })?;
+    let journal = UndoJournal::from_json(&value).map_err(crate::error::RefactorContext::new(
+        format!("undo journal {} is unusable", args.journal.display()),
+    ))?;
 
     let root_guard = args
         .root
@@ -69,14 +76,18 @@ pub fn refactor_undo(args: RefactorUndoArgs) -> Result<()> {
     print_refactor_undo_result(&result, args.output)?;
 
     if args.write && !result.can_apply() {
-        anyhow::bail!(
-            "refactor undo refused: {}",
-            if result.summary.changed_file_count == 0 {
-                "the journal records no change to reverse".to_owned()
-            } else {
-                result.blocked_summary()
-            }
-        );
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
+            format!(
+                "refactor undo refused: {}",
+                if result.summary.changed_file_count == 0 {
+                    "the journal records no change to reverse".to_owned()
+                } else {
+                    result.blocked_summary()
+                }
+            ),
+        )
+        .into());
     }
 
     Ok(())
@@ -92,17 +103,22 @@ pub fn refactor_undo(args: RefactorUndoArgs) -> Result<()> {
 pub fn restore_from_journal(
     journal: &UndoJournal,
     root_guard: Option<&RefactorRootGuard>,
-) -> Result<usize> {
+) -> CliResult<usize> {
     let plan = plan_undo(journal, root_guard)?;
-    anyhow::ensure!(
-        plan.blocked.is_empty(),
-        "cannot restore: {}",
-        plan.blocked
-            .iter()
-            .map(|(path, reason)| format!("{}: {reason}", path.display()))
-            .collect::<Vec<_>>()
-            .join("; ")
-    );
+    if !plan.blocked.is_empty() {
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
+            format!(
+                "cannot restore: {}",
+                plan.blocked
+                    .iter()
+                    .map(|(path, reason)| format!("{}: {reason}", path.display()))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
+        )
+        .into());
+    }
     let restored = plan.restores.len();
     commit_restores(plan.restores, root_guard)?;
     Ok(restored)
@@ -180,7 +196,7 @@ impl UndoPlan {
 ///
 /// Every entry is examined even after one is found to be blocked, so a report
 /// names all the files that drifted rather than only the first.
-fn plan_undo(journal: &UndoJournal, root_guard: Option<&RefactorRootGuard>) -> Result<UndoPlan> {
+fn plan_undo(journal: &UndoJournal, root_guard: Option<&RefactorRootGuard>) -> CliResult<UndoPlan> {
     let mut plan = UndoPlan {
         restores: Vec::new(),
         blocked: Vec::new(),
@@ -213,7 +229,10 @@ fn plan_undo(journal: &UndoJournal, root_guard: Option<&RefactorRootGuard>) -> R
 }
 
 /// Writes every restore in one transaction.
-fn commit_restores(restores: Vec<Restore>, root_guard: Option<&RefactorRootGuard>) -> Result<()> {
+fn commit_restores(
+    restores: Vec<Restore>,
+    root_guard: Option<&RefactorRootGuard>,
+) -> CliResult<()> {
     if restores.is_empty() {
         return Ok(());
     }
@@ -224,7 +243,7 @@ fn commit_restores(restores: Vec<Restore>, root_guard: Option<&RefactorRootGuard
                 .map(|(path, content, expected)| {
                     root_guard.anchored_manifest_write(path, content, expected)
                 })
-                .collect::<Result<Vec<_>>>()?;
+                .collect::<CliResult<Vec<_>>>()?;
             write_files_with_rollback_expected_anchored(anchored)?;
         }
         None => write_files_with_rollback_expected(restores)?,

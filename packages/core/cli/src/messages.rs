@@ -65,12 +65,14 @@ pub enum Message {
     RepairReadTheReport,
     RepairRaiseBudget,
     RepairConvertEncoding,
+    RepairOtherDialect,
+    RepairFlagCombination,
+    RepairListAvailableNames,
     RepairSpanBoundaries,
     RepairDropDryRun,
     RepairUsePreviewFlag,
     RepairDropEncodingForWrite,
     RepairKillRingIndex,
-    RepairListAvailableNames,
     RepairNarrowSelector,
     RepairWidenSelector,
     RepairShowMatches,
@@ -131,10 +133,6 @@ impl Message {
             Self::RepairKillRingIndex => {
                 "read the ring file, or pass --index 0 for the most recent entry"
             }
-            Self::RepairListAvailableNames => {
-                "the message lists the names this build accepts; list them again with the \
-                 namespace's own `list` command"
-            }
             Self::RepairSelectByPath => "select by path instead of by offset, with --path <a.b.c>",
             Self::RepairRereadFile => {
                 "the file changed since it was read; read it again and redo the operation"
@@ -186,6 +184,16 @@ impl Message {
             }
             Self::RepairConvertEncoding => {
                 "pass --encoding <label> (e.g. shift_jis, euc-jp) naming the file's actual encoding — or, if one was already given, its label is wrong — or convert the file to UTF-8 first"
+            }
+            Self::RepairOtherDialect => {
+                "this command is not defined for this file's dialect; nothing about the file needs fixing, so do not retry it here"
+            }
+            Self::RepairFlagCombination => {
+                "these flags do not combine as given; run the command with --help for which ones go together"
+            }
+            Self::RepairListAvailableNames => {
+                "the message lists the names this build accepts; list them again with the \
+                 namespace's own `list` command"
             }
             Self::RepairSpanBoundaries => {
                 "the span does not lie on character boundaries of the current source"
@@ -268,10 +276,6 @@ impl Message {
             Self::RepairKillRingIndex => {
                 "kill ring ファイルを確認するか、最新の項目を指す --index 0 を渡してください"
             }
-            Self::RepairListAvailableNames => {
-                "利用できる名前はメッセージ中に列挙されています。名前空間の `list` \
-                 コマンドでも一覧できます"
-            }
             Self::RepairSelectByPath => {
                 "バイト位置ではなくパスで選択してください（--path <a.b.c>）"
             }
@@ -328,6 +332,16 @@ impl Message {
             Self::RepairConvertEncoding => {
                 "--encoding <label>（例: shift_jis、euc-jp）でファイルの実際の文字コードを指定してください。指定済みならその値が誤っている可能性があります。あるいは先にファイルを UTF-8 に変換してください"
             }
+            Self::RepairOtherDialect => {
+                "このコマンドはこのファイルの方言には対応していません。ファイル側に問題はないため、同じファイルで再試行しないでください"
+            }
+            Self::RepairFlagCombination => {
+                "指定されたフラグの組み合わせは無効です。--help で併用可能な組み合わせを確認してください"
+            }
+            Self::RepairListAvailableNames => {
+                "利用できる名前はメッセージ中に列挙されています。名前空間の `list` \
+                 コマンドでも一覧できます"
+            }
             Self::RepairSpanBoundaries => "範囲が現在のソースの文字境界に一致していません",
             Self::RepairDropDryRun => {
                 "書き込みを行うには --dry-run を外してください（PAREDIT_DRY_RUN も解除）"
@@ -371,7 +385,7 @@ impl Message {
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 56] = [
+    pub const ALL: [Self; 58] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -411,6 +425,9 @@ impl Message {
         Self::RepairBackupLeftover,
         Self::RepairReadTheReport,
         Self::RepairConvertEncoding,
+        Self::RepairOtherDialect,
+        Self::RepairFlagCombination,
+        Self::RepairListAvailableNames,
         Self::RepairSpanBoundaries,
         Self::RepairDropDryRun,
         Self::RepairUsePreviewFlag,
@@ -427,7 +444,6 @@ impl Message {
         Self::RepairNoInputsProduced,
         Self::RepairArchiveDestination,
         Self::RepairKillRingIndex,
-        Self::RepairListAvailableNames,
     ];
 }
 

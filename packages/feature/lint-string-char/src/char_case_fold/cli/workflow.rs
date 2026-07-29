@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::char_case_fold::cli::args::CharCaseFoldReportArgs;
 use crate::char_case_fold::cli::render::print_char_case_fold_report;
@@ -8,7 +8,7 @@ use crate::char_case_fold::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn char_case_fold_report(args: CharCaseFoldReportArgs) -> Result<()> {
+pub fn char_case_fold_report(args: CharCaseFoldReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut compare_form_count = 0;

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::shared::{
     apply_byte_span_edits, read_input_dialect_and_tree, resolve_compact_target, unified_diff,
@@ -13,13 +13,17 @@ use crate::generate_docstring::cli::args::GenerateDocstringArgs;
 use crate::generate_docstring::cli::render::print_docstring_plan;
 use crate::generate_docstring::usecase::{DocstringOutcome, plan_docstring};
 
-pub fn generate_docstring(args: GenerateDocstringArgs) -> Result<()> {
+pub fn generate_docstring(args: GenerateDocstringArgs) -> CliResult<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     if dialect != Dialect::CommonLisp {
-        anyhow::bail!(
-            "generate docstring supports only Common Lisp, found {}",
-            dialect.label()
-        );
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputDialectUnsupported,
+            format!(
+                "generate docstring supports only Common Lisp, found {}",
+                dialect.label()
+            ),
+        )
+        .into());
     }
     let target = resolve_compact_target(&tree, dialect, &args.selector, "generate docstring")?;
     let selection = tree.select_path(&target.path)?;
@@ -33,13 +37,21 @@ pub fn generate_docstring(args: GenerateDocstringArgs) -> Result<()> {
                 &input.text,
                 vec![(ByteSpan::new(offset, offset), plan.insertion_text.clone())],
             )?;
-            SyntaxTree::parse_with_dialect(&rewritten, dialect)
-                .context("the generated docstring would leave the file unparseable")?;
+            SyntaxTree::parse_with_dialect(&rewritten, dialect).map_err(|source| {
+                crate::error::GeneratedOutputWouldNotParse {
+                    summary: "the generated docstring would leave the file unparseable",
+                    source,
+                }
+            })?;
             rewritten
         }
         DocstringOutcome::AlreadyDocumented => input.text.clone(),
         DocstringOutcome::Unsupported { reason } => {
-            anyhow::bail!("generate docstring cannot document the selected form: {reason}");
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+                format!("generate docstring cannot document the selected form: {reason}"),
+            )
+            .into());
         }
     };
 
@@ -54,7 +66,10 @@ pub fn generate_docstring(args: GenerateDocstringArgs) -> Result<()> {
 
     let mut written = false;
     if args.write && rewritten != input.text {
-        let file = input.file.as_ref().context("--write requires --file")?;
+        let file = input
+            .file
+            .as_ref()
+            .ok_or(paredit_core_cli::ArgumentError::WriteRequiresFile)?;
         write_file_with_rollback(file.clone(), rewritten.clone())?;
         written = true;
     }

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::make_hash_table_test::cli::args::MakeHashTableTestReportArgs;
 use crate::make_hash_table_test::cli::render::print_make_hash_table_test_report;
@@ -8,7 +8,7 @@ use crate::make_hash_table_test::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn make_hash_table_test_report(args: MakeHashTableTestReportArgs) -> Result<()> {
+pub fn make_hash_table_test_report(args: MakeHashTableTestReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut make_hash_table_form_count = 0;

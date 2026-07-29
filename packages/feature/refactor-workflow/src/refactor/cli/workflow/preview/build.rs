@@ -5,7 +5,7 @@ use crate::refactor::usecase::preview::{
     RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions, RefactorPreviewSummary,
     evaluate_refactor_preview_policy, refactor_preview_edits,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::shared::apply_byte_span_edits;
 use paredit_core_cli::shared::bounded_preview;
@@ -32,7 +32,9 @@ pub struct BuildRefactorPreviewRequest<'a> {
     pub workspace: Option<WorkspaceRefactorPlanDiscovery>,
 }
 
-pub fn build_refactor_preview(request: BuildRefactorPreviewRequest<'_>) -> Result<RefactorPreview> {
+pub fn build_refactor_preview(
+    request: BuildRefactorPreviewRequest<'_>,
+) -> CliResult<RefactorPreview> {
     let mut files = Vec::with_capacity(request.paths.len());
     let mut total_definitions = 0usize;
     let mut total_target_occurrences = 0usize;
@@ -102,10 +104,14 @@ pub fn build_refactor_preview(request: BuildRefactorPreviewRequest<'_>) -> Resul
     }
 
     if request.mode == RefactorPreviewMode::Function && total_definitions == 0 {
-        anyhow::bail!(
-            "function '{}' was not found in callable definitions",
-            request.from.as_str()
-        );
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::SelectionNoMatch,
+            format!(
+                "function '{}' was not found in callable definitions",
+                request.from.as_str()
+            ),
+        )
+        .into());
     }
 
     let changed_files = files

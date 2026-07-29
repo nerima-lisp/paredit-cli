@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::application::usecase::definition_report::collect_definition_forms;
 use crate::application::usecase::dependency_report::build_dependency_report;
@@ -10,7 +10,7 @@ use crate::presentation::cli::dependency_report::{
 use crate::presentation::cli::read_input_dialect_and_tree;
 use paredit_core_cli::report::graph::print_graph;
 
-pub fn dependency_report(args: DependencyReportArgs) -> Result<()> {
+pub fn dependency_report(args: DependencyReportArgs) -> CliResult<()> {
     let mut reports = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

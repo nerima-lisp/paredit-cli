@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redefinition_report::cli::args::RedefinitionReportArgs;
 use crate::redefinition_report::cli::render::print_redefinition_report;
@@ -8,7 +8,7 @@ use crate::redefinition_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn redefinition_report(args: RedefinitionReportArgs) -> Result<()> {
+pub fn redefinition_report(args: RedefinitionReportArgs) -> CommandResult {
     let mut declared = Vec::new();
 
     for file in &args.files {

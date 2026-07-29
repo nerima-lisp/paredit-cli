@@ -18,8 +18,6 @@ cap-std.workspace = true
 libc.workspace = true
 
 [dev-dependencies]
-# The test harness still returns anyhow::Result; production code does not.
-anyhow.workspace = true
 proptest.workspace = true
 
 # Mandatory: without it this package silently opts out of the workspace lint

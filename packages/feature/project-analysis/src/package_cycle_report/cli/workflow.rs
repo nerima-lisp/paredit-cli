@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::package_cycle_report::cli::args::PackageCycleReportArgs;
 use crate::package_cycle_report::cli::render::print_package_cycle_report;
@@ -8,7 +8,7 @@ use crate::package_cycle_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn package_cycle_report(args: PackageCycleReportArgs) -> Result<()> {
+pub fn package_cycle_report(args: PackageCycleReportArgs) -> CommandResult {
     let mut edges = Vec::new();
 
     for file in &args.files {

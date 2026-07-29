@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::presentation::cli::shared::{matching_symbol_occurrences, read_input_dialect_and_tree};
 
@@ -6,14 +6,14 @@ use super::args::{SymbolQueryArgs, SymbolReportArgs};
 use super::render::{print_symbol_occurrences, print_symbol_report};
 use super::types::{SymbolOccurrenceContext, SymbolReportFile, SymbolReportOccurrence};
 
-pub(in crate::presentation::cli) fn find_symbol(args: SymbolQueryArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn find_symbol(args: SymbolQueryArgs) -> CommandResult {
     let (_, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let occurrence_count = matching_symbol_occurrences(&tree, &args.symbol).len();
     print_symbol_occurrences(&tree, dialect, &args.symbol, args.output)?;
     require_occurrences(occurrence_count, args.require_occurrences)
 }
 
-fn require_occurrences(found: usize, required: Option<usize>) -> Result<()> {
+fn require_occurrences(found: usize, required: Option<usize>) -> CommandResult {
     match required {
         Some(minimum) if found < minimum => {
             Err(crate::presentation::cli::gate::gate_failure(format!(
@@ -24,7 +24,7 @@ fn require_occurrences(found: usize, required: Option<usize>) -> Result<()> {
     }
 }
 
-pub(in crate::presentation::cli) fn symbol_report(args: SymbolReportArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn symbol_report(args: SymbolReportArgs) -> CommandResult {
     let mut reports = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

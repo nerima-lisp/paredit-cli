@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::identity_arithmetic::cli::args::IdentityArithmeticReportArgs;
 use crate::identity_arithmetic::cli::render::print_identity_arithmetic_report;
@@ -8,7 +8,7 @@ use crate::identity_arithmetic::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn identity_arithmetic_report(args: IdentityArithmeticReportArgs) -> Result<()> {
+pub fn identity_arithmetic_report(args: IdentityArithmeticReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut arithmetic_form_count = 0;

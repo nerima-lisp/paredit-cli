@@ -8,7 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use paredit_core_cli::shared::{emit_document, read_input_dialect_and_tree};
 use paredit_core_syntax::selector::RewriteAllowances;
@@ -22,10 +22,10 @@ use crate::run::usecase::{FileOutcome, MigrationTotals, run_migration};
 use crate::scan::selected_files;
 
 /// Dispatches the namespace's three leaves.
-pub fn migrate(command: MigrateCommand) -> Result<()> {
+pub fn migrate(command: MigrateCommand) -> CommandResult {
     match command {
-        MigrateCommand::List(args) => list(args),
-        MigrateCommand::Explain(args) => explain(args),
+        MigrateCommand::List(args) => Ok(list(args)?),
+        MigrateCommand::Explain(args) => Ok(explain(args)?),
         MigrateCommand::Run(args) => run(*args),
     }
 }
@@ -37,18 +37,18 @@ fn recipe_directory(source: &RecipeSourceArgs) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(DEFAULT_RECIPE_DIRECTORY))
 }
 
-fn list(args: MigrateListArgs) -> Result<()> {
+fn list(args: MigrateListArgs) -> CliResult<()> {
     let entries = catalog::resolve(&recipe_directory(&args.source))?;
     print_list(&entries, args.output)
 }
 
-fn explain(args: MigrateExplainArgs) -> Result<()> {
+fn explain(args: MigrateExplainArgs) -> CliResult<()> {
     let entries = catalog::resolve(&recipe_directory(&args.source))?;
     let entry = catalog::find(&entries, &args.recipe)?;
     print_explain(&entry, args.output)
 }
 
-fn run(args: MigrateRunArgs) -> Result<()> {
+fn run(args: MigrateRunArgs) -> CommandResult {
     let entries = catalog::resolve(&recipe_directory(&args.source))?;
     let entry = catalog::find(&entries, &args.recipe)?;
     let allow = RewriteAllowances {

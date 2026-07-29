@@ -1,8 +1,8 @@
 use crate::extract_constant::usecase::{
     ExtractConstantInsert, ExtractConstantPlan, ExtractConstantRequest, plan_extract_constant,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::MoveInsert;
@@ -37,7 +37,7 @@ pub struct ExtractConstantArgs {
     output: OutputFormat,
 }
 
-pub fn extract_constant(args: ExtractConstantArgs) -> Result<()> {
+pub fn extract_constant(args: ExtractConstantArgs) -> CliResult<()> {
     validate_args(&args)?;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let target =
@@ -67,20 +67,28 @@ pub fn extract_constant(args: ExtractConstantArgs) -> Result<()> {
     print_plan(&plan, written, args.output)
 }
 
-fn validate_args(args: &ExtractConstantArgs) -> Result<()> {
+fn validate_args(args: &ExtractConstantArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     if args.insert == MoveInsert::Append && args.anchor_path.is_some() {
-        anyhow::bail!("--anchor-path is only valid with --insert before or --insert after");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--anchor-path is only valid with --insert before or --insert after",
+        )
+        .into());
     }
     if matches!(args.insert, MoveInsert::Before | MoveInsert::After) && args.anchor_path.is_none() {
-        anyhow::bail!("--insert before/after requires --anchor-path");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--insert before/after requires --anchor-path",
+        )
+        .into());
     }
     Ok(())
 }
 
-fn print_plan(plan: &ExtractConstantPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(plan: &ExtractConstantPlan, written: bool, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

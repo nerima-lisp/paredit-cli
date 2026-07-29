@@ -10,7 +10,7 @@
 //! file would let `--query '(defun'` be reported as a failure of the four
 //! hundredth file rather than of the command line.
 
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
@@ -22,7 +22,7 @@ use crate::find_report::cli::render::print_find_report;
 use crate::find_report::usecase::{build_find_report, evaluate_find_policy};
 use crate::scan::selected_files;
 
-pub fn query_find(args: QueryFindArgs) -> Result<()> {
+pub fn query_find(args: QueryFindArgs) -> CommandResult {
     let pattern = Pattern::parse(&args.query, pattern_dialect(args.dialect))?;
     let files = selected_files(&args.input, &args.roots)?;
 

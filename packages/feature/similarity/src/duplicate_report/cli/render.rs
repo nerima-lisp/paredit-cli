@@ -1,7 +1,7 @@
 use crate::duplicate_report::usecase::{
     DuplicateFormReport, DuplicateShapeReport, ReplacementPlanBatch,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -9,7 +9,7 @@ use serde_json::json;
 pub fn print_duplicate_report(
     reports: &[DuplicateShapeReport],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let form_count = reports
         .iter()
         .map(|report| report.forms.len())
@@ -78,7 +78,7 @@ pub fn print_duplicate_report(
 pub fn print_replacement_plan(
     batches: &[ReplacementPlanBatch],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let form_count = batches
         .iter()
         .map(|batch| replacement_forms(batch).len())

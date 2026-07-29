@@ -11,13 +11,13 @@ use super::super::super::types::diff::{
 };
 use super::super::super::types::manifest::RefactorApplyManifestHeader;
 use super::super::super::types::root::{RefactorRootGuard, RefactorRootReport};
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 use paredit_core_cli::shared::apply_byte_span_edits;
 use paredit_core_cli::shared::stable_text_hash;
 use paredit_core_cli::shared::unified_diff;
 use paredit_core_syntax::sexpr::SyntaxTree;
 
-pub fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
+pub fn refactor_diff(args: RefactorDiffArgs) -> CliResult<()> {
     let loaded_manifest =
         read_refactor_manifest_file(&args.manifest, args.expect_manifest_hash.as_deref())?;
     let manifest = parse_refactor_apply_manifest(&loaded_manifest.value)?;
@@ -35,9 +35,11 @@ pub fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
             read_refactor_manifest_source(&file.path, root_guard.as_ref())?;
         source_bytes = source_bytes.saturating_add(input.len() as u64);
         if source_bytes > MAX_MANIFEST_SOURCE_TOTAL_BYTES {
-            anyhow::bail!(
-                "refusing manifest sources: cumulative input exceeds {MAX_MANIFEST_SOURCE_TOTAL_BYTES} bytes"
-            );
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::RefusalInputTooLarge,
+    format!("refusing manifest sources: cumulative input exceeds {MAX_MANIFEST_SOURCE_TOTAL_BYTES} bytes"),
+)
+.into());
         }
         let input_hash = stable_text_hash(&input);
         let edits = file
@@ -45,8 +47,9 @@ pub fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
             .iter()
             .map(|edit| (edit.span, edit.replacement.clone()))
             .collect::<Vec<_>>();
-        validate_manifest_edits(&input, &edits)
-            .with_context(|| format!("manifest edits are invalid for {}", file.path.display()))?;
+        validate_manifest_edits(&input, &edits).map_err(crate::error::RefactorContext::new(
+            format!("manifest edits are invalid for {}", file.path.display()),
+        ))?;
         let rewritten = apply_byte_span_edits(&input, edits)?;
         let output_hash = stable_text_hash(&rewritten);
         let output_parse_ok = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).is_ok();
@@ -122,15 +125,17 @@ pub fn refactor_diff(args: RefactorDiffArgs) -> Result<()> {
     print_refactor_diff_result(&result, args.output)?;
 
     if !can_apply {
-        anyhow::bail!(
-            "refactor diff validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::GateFailed,
+    format!("refactor diff validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
             result.manifest_policy_passed,
             result.manifest_outputs_parse,
             result.summary.stale_file_count,
             result.summary.output_hash_mismatch_count,
             result.summary.parse_error_count,
-            result.summary.manifest_flag_mismatch_count
-        );
+            result.summary.manifest_flag_mismatch_count),
+)
+.into());
     }
 
     Ok(())

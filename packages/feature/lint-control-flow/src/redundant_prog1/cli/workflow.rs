@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_prog1::cli::args::RedundantProg1ReportArgs;
 use crate::redundant_prog1::cli::render::print_redundant_prog1_report;
@@ -8,7 +8,7 @@ use crate::redundant_prog1::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_prog1_report(args: RedundantProg1ReportArgs) -> Result<()> {
+pub fn redundant_prog1_report(args: RedundantProg1ReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut prog1_form_count = 0;

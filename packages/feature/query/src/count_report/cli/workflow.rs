@@ -6,7 +6,7 @@
 //! only means anything when both were counted over the same file set in the
 //! same run.
 
-use anyhow::Result;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_syntax::dialect::Dialect;
@@ -17,7 +17,7 @@ use crate::count_report::cli::render::print_count_report;
 use crate::count_report::usecase::{CountedPattern, build_count_report, tally_file};
 use crate::scan::selected_files;
 
-pub fn query_count(args: QueryCountArgs) -> Result<()> {
+pub fn query_count(args: QueryCountArgs) -> CommandResult {
     let dialect = args.dialect.map_or(Dialect::CommonLisp, Dialect::from);
     let patterns = args
         .query
@@ -28,7 +28,7 @@ pub fn query_count(args: QueryCountArgs) -> Result<()> {
                 pattern: Pattern::parse(text, dialect)?,
             })
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<CliResult<Vec<_>>>()?;
 
     let files = selected_files(&args.input, &args.roots)?;
     let mut tallies = Vec::with_capacity(files.len());

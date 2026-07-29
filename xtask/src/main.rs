@@ -15,12 +15,13 @@
 
 mod case;
 mod checklist;
+mod error;
 mod fs_util;
 mod new_command;
 mod new_lint_rule;
 mod repo;
 
-use anyhow::Result;
+use crate::error::Result;
 use clap::{Parser, Subcommand};
 
 use case::Name;

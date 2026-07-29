@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_code_char_char_code_report(
     summary: &CodeCharCharCodeSummary,
     policy: &CodeCharCharCodePolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("code_char_form_count\t{}", summary.code_char_form_count);

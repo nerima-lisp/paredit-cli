@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::if_to_unless::cli::args::IfToUnlessReportArgs;
 use crate::if_to_unless::cli::render::print_if_to_unless_report;
@@ -8,7 +8,7 @@ use crate::if_to_unless::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn if_to_unless_report(args: IfToUnlessReportArgs) -> Result<()> {
+pub fn if_to_unless_report(args: IfToUnlessReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;

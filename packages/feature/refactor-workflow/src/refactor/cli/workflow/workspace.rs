@@ -1,5 +1,5 @@
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::workspace_args::{ResolvedWorkspaceInput, WorkspaceInputArgs};
 use std::path::PathBuf;
 
@@ -21,7 +21,7 @@ pub fn discover_workspace_refactor_scope(
     input: &WorkspaceInputArgs,
     roots: Vec<PathBuf>,
     resolved: &ResolvedWorkspaceInput,
-) -> Result<WorkspaceRefactorScope> {
+) -> CliResult<WorkspaceRefactorScope> {
     let (discovery, _) = input.scan(resolved)?;
     let skipped_unknown_count = discovery.skipped_unknown_count();
     let skipped_hidden_count = discovery.skipped_hidden_count();

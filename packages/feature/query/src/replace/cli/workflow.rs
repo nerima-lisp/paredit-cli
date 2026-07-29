@@ -24,7 +24,7 @@
 //! command carries it out. The reviewable artifact is the plan, which is why
 //! it prints by default.
 
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::shared::{emit_document, read_input_dialect_and_tree};
@@ -36,7 +36,7 @@ use crate::replace::cli::render::print_replace_report;
 use crate::replace::usecase::{FileRewrite, RewriteTotals, build_file_rewrite};
 use crate::scan::selected_files;
 
-pub fn query_replace(args: QueryReplaceArgs) -> Result<()> {
+pub fn query_replace(args: QueryReplaceArgs) -> CommandResult {
     let dialect = pattern_dialect(args.dialect);
     let pattern = Pattern::parse(&args.query, dialect)?;
     let template = Template::parse(&args.rewrite, dialect)?;

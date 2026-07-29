@@ -1,15 +1,18 @@
-use anyhow::Result;
+use crate::error::{RenameError, RenamePlanError};
+use paredit_core_cli::{CliResult, CommandResult};
 
 use crate::rename::usecase::{self as rename_usecase, RenameTarget};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{Path, SymbolName, SyntaxTree};
 
-pub fn rename_target(path: Option<Path>, at: Option<usize>) -> Result<RenameTarget> {
+pub fn rename_target(path: Option<Path>, at: Option<usize>) -> CliResult<RenameTarget> {
     match (path, at) {
         (Some(path), None) => Ok(RenameTarget::Path(path)),
         (None, Some(offset)) => Ok(RenameTarget::Offset(offset)),
-        (None, None) => anyhow::bail!("target required: pass --path or --at"),
-        (Some(_), Some(_)) => anyhow::bail!("pass only one of --path or --at"),
+        // The two argument errors core already names, rather than two
+        // sentences that happen to match theirs.
+        (None, None) => Err(paredit_core_cli::ArgumentError::TargetRequired.into()),
+        (Some(_), Some(_)) => Err(paredit_core_cli::ArgumentError::TargetAmbiguous.into()),
     }
 }
 
@@ -18,7 +21,7 @@ pub fn collect_callable_definition_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<rename_usecase::RenameFunctionOccurrence>> {
+) -> CliResult<Vec<rename_usecase::RenameFunctionOccurrence>> {
     Ok(rename_usecase::collect_callable_definition_renames(
         tree, dialect, from, to,
     )?)
@@ -29,13 +32,17 @@ pub fn collect_function_call_head_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
-) -> Result<Vec<rename_usecase::RenameFunctionOccurrence>> {
+) -> CliResult<Vec<rename_usecase::RenameFunctionOccurrence>> {
     Ok(rename_usecase::collect_function_call_head_renames(
         tree, dialect, from, to,
     )?)
 }
 
-pub fn ensure_rename_changed(fail_on_no_change: bool, changed: bool, command: &str) -> Result<()> {
+pub fn ensure_rename_changed(
+    fail_on_no_change: bool,
+    changed: bool,
+    command: &str,
+) -> CommandResult {
     if fail_on_no_change && !changed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
             "{command} policy failed: no occurrence changed"
@@ -103,18 +110,18 @@ pub struct CallableRenameCommand<'a> {
 /// rename-macrolet, and rename-local-function.
 pub fn run_callable_rename(
     command: CallableRenameCommand<'_>,
-    plan: impl Fn(&str, Dialect) -> Result<CallableRenamePlanData>,
-) -> Result<()> {
-    use anyhow::Context;
-
+    plan: impl Fn(&str, Dialect) -> Result<CallableRenamePlanData, RenameError>,
+) -> CommandResult {
     let mut pending = Vec::with_capacity(command.files.len());
     let mut definition_count = 0usize;
 
     for file in command.files {
         let (input, dialect) =
             paredit_core_cli::shared::read_input_and_dialect(Some(file.clone()), command.dialect)?;
-        let plan_data = plan(&input.text, dialect).with_context(|| {
-            format!("failed to plan {} for {}", command.command, file.display())
+        let plan_data = plan(&input.text, dialect).map_err(|source| RenamePlanError {
+            operation: (command.command).to_string(),
+            path: file.display().to_string(),
+            source,
         })?;
         definition_count += plan_data.definitions.len();
         pending.push(super::types::PendingCallableRenameFile {
@@ -128,7 +135,13 @@ pub fn run_callable_rename(
     }
 
     if definition_count == 0 {
-        anyhow::bail!("{}", command.missing_definition_error);
+        // Every caller's `missing_definition_error` says "no definition of
+        // this kind matched", which is a selection failure, not a defect.
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::SelectionNoMatch,
+            command.missing_definition_error,
+        )
+        .into());
     }
 
     let written_files = pending

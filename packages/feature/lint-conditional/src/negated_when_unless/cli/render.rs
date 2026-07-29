@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_negated_when_unless_report(
     summary: &NegatedWhenUnlessSummary,
     policy: &NegatedWhenUnlessPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("conditional_form_count\t{}", summary.conditional_form_count);

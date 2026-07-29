@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
 
@@ -10,6 +10,6 @@ pub fn print_debt_report(
     reports: &[FileFindings<DebtFinding>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     print_report("inspect debt-score", reports, policy, output)
 }

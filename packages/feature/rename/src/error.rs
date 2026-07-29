@@ -337,3 +337,58 @@ impl From<SexprError> for RenameError {
 
 /// The result type the rename passes return.
 pub type RenameResult<T> = std::result::Result<T, RenameError>;
+
+/// States which documented error code each rename refusal earns.
+/// Which documented error code a rename refusal earns.
+///
+/// Public because `paredit-feature-inline` delegates its own renames here and
+/// therefore has to answer the same question. Answering it twice is how the
+/// two answers drift apart.
+#[must_use]
+pub const fn code_of(error: &RenameError) -> paredit_core_cli::diagnosis::ErrorCode {
+    match error {
+        RenameError::Edit(edit) => paredit_core_cli::diagnosis::code_for_edit_refusal(edit),
+
+        RenameError::Binding(_)
+        | RenameError::BindingList(_)
+        | RenameError::CallSite(_)
+        | RenameError::SemanticShape(_)
+        | RenameError::Control(_)
+        | RenameError::RenameAt(_)
+        | RenameError::ReaderConditional(_) => {
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused
+        }
+
+        RenameError::Parse(_) => paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+        RenameError::Symbol(_) => paredit_core_cli::diagnosis::ErrorCode::InputSymbolInvalid,
+
+        // Nothing about the file needs fixing; this command does not apply to it.
+        RenameError::RequiresKnownDialect { .. }
+        | RenameError::BindingRenameUnsupportedDialect { .. } => {
+            paredit_core_cli::diagnosis::ErrorCode::InputDialectUnsupported
+        }
+    }
+}
+
+paredit_core_cli::impl_classified_refusal!(RenameError, |error| code_of(error));
+
+/// A rename command could not plan its edit for one file.
+///
+/// The CLI layer's error, adding what the planner cannot know: *which file*.
+/// Five commands spelled it as
+/// `.with_context(|| format!("failed to plan {op} for {path}"))`, which §9.2.1
+/// says to keep as context rather than explode into a variant per call site —
+/// so it is one variant with `operation` threaded, as `paredit-core-edit` and
+/// `paredit-feature-package` both do it.
+#[derive(Debug, Error)]
+#[error("failed to plan {operation} for {path}")]
+pub struct RenamePlanError {
+    pub operation: String,
+    pub path: String,
+    #[source]
+    pub source: RenameError,
+}
+
+// The file name is context. The code is still whatever the planner refused
+// with, so it is delegated rather than decided a second time.
+paredit_core_cli::impl_classified_refusal!(RenamePlanError, |error| code_of(&error.source));

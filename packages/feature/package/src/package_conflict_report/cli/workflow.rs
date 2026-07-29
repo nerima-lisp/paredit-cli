@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::package_conflict_report::cli::args::PackageConflictReportArgs;
 use crate::package_conflict_report::cli::render::print_package_conflict_report;
@@ -8,7 +8,7 @@ use crate::package_conflict_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn package_conflict_report(args: PackageConflictReportArgs) -> Result<()> {
+pub fn package_conflict_report(args: PackageConflictReportArgs) -> CommandResult {
     let mut declared = Vec::new();
 
     for file in &args.files {

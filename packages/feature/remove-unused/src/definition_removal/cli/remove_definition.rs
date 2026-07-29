@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use super::args::RemoveDefinitionArgs;
 use super::render::print_remove_definition_plan;
@@ -11,7 +11,7 @@ use crate::remove_definition::usecase::{
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub fn remove_definition(args: RemoveDefinitionArgs) -> Result<()> {
+pub fn remove_definition(args: RemoveDefinitionArgs) -> CliResult<()> {
     let output = args.output;
     let request = RemoveDefinitionRequest {
         file: args.file,
@@ -30,7 +30,9 @@ struct CliDefinitionSource {
 }
 
 impl DefinitionSourcePort for CliDefinitionSource {
-    fn load(&mut self, file: &Path) -> Result<LoadedDefinitionSource> {
+    type Error = paredit_core_cli::CliError;
+
+    fn load(&mut self, file: &Path) -> CliResult<LoadedDefinitionSource> {
         let (input, dialect) =
             read_input_and_dialect(Some(file.to_path_buf()), self.dialect.take())?;
         Ok(LoadedDefinitionSource {
@@ -39,10 +41,7 @@ impl DefinitionSourcePort for CliDefinitionSource {
         })
     }
 
-    fn write(&mut self, file: &Path, content: &str) -> Result<()> {
-        Ok(write_file_with_rollback(
-            file.to_path_buf(),
-            content.to_owned(),
-        )?)
+    fn write(&mut self, file: &Path, content: &str) -> CliResult<()> {
+        write_file_with_rollback(file.to_path_buf(), content.to_owned())
     }
 }

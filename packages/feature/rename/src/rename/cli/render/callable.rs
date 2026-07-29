@@ -1,7 +1,7 @@
 //! Shared renderer for the callable rename family (rename-function,
 //! rename-macrolet, rename-local-function): identical report shape,
 //! identical text/JSON output keys.
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -16,7 +16,7 @@ pub fn print_callable_rename_report(
     to: &SymbolName,
     write: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let definition_count = reports
         .iter()
         .map(|report| report.definitions.len())

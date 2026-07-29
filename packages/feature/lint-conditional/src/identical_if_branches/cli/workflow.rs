@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::identical_if_branches::cli::args::IdenticalIfBranchReportArgs;
 use crate::identical_if_branches::cli::render::print_identical_if_branch_report;
@@ -8,7 +8,7 @@ use crate::identical_if_branches::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn identical_if_branch_report(args: IdenticalIfBranchReportArgs) -> Result<()> {
+pub fn identical_if_branch_report(args: IdenticalIfBranchReportArgs) -> CommandResult {
     let mut if_form_count = 0;
     let mut identical = Vec::new();
 

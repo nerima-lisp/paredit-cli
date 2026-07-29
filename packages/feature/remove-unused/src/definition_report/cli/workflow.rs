@@ -1,6 +1,6 @@
-use anyhow::Result;
 use paredit_core_cli::args::SourceInput;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::{CliResult, CommandResult};
 use paredit_core_syntax::sexpr::SyntaxTree;
 use std::collections::BTreeSet;
 use std::fs;
@@ -14,7 +14,7 @@ use crate::definition_report::usecase::{
 };
 use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-pub fn definition_report(args: DefinitionReportArgs) -> Result<()> {
+pub fn definition_report(args: DefinitionReportArgs) -> CliResult<()> {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -26,7 +26,7 @@ pub fn definition_report(args: DefinitionReportArgs) -> Result<()> {
     print_definition_report(&reports, args.output)
 }
 
-pub fn unused_definition_report(args: UnusedDefinitionReportArgs) -> Result<()> {
+pub fn unused_definition_report(args: UnusedDefinitionReportArgs) -> CommandResult {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
     let mut parsed = Vec::with_capacity(files.len());
 
@@ -63,7 +63,7 @@ pub fn unused_definition_report(args: UnusedDefinitionReportArgs) -> Result<()> 
 fn expand_definition_report_inputs(
     files: &[PathBuf],
     dialect: Option<paredit_core_cli::args::DialectArg>,
-) -> Result<Vec<PathBuf>> {
+) -> CliResult<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
 
@@ -100,7 +100,7 @@ fn push_unique(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: 
 fn load_definition_input(
     file: &Path,
     dialect: Option<paredit_core_cli::args::DialectArg>,
-) -> Result<(
+) -> CliResult<(
     PathBuf,
     SourceInput,
     paredit_core_syntax::dialect::Dialect,

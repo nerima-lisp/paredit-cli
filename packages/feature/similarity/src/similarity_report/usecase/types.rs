@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
@@ -36,11 +35,25 @@ pub struct DiscoveredSimilarityFile {
     pub dialect: Dialect,
 }
 
+/// The outside world, as this use case needs it.
+///
+/// `discover` returned `anyhow::Result`, justified by the port's purpose: the
+/// use case must not know what an adapter can fail with. The reasoning is
+/// right; `anyhow::Error` was the wrong way to say it. It does not express
+/// "some error I do not name" — it expresses "no error type at all", and the
+/// classification went with it.
+///
+/// An associated type says the intended thing in the type system. The
+/// `Into<CliError>` bound is the one requirement: whatever an adapter fails
+/// with has to be reportable at the CLI boundary with a code.
 pub trait SimilarityReportSourcePort: Sync {
+    /// What this adapter's own failures look like.
+    type Error: Into<paredit_core_cli::CliError>;
+
     fn discover(
         &mut self,
         request: &SimilarityReportRequest,
-    ) -> anyhow::Result<SimilarityInventory>;
+    ) -> Result<SimilarityInventory, Self::Error>;
 
     fn load(&self, file: &DiscoveredSimilarityFile) -> Result<Vec<u8>, String>;
 
@@ -273,12 +286,11 @@ fn evaluate_gate(
 pub enum SimilarityReportWorkflowError {
     /// Whatever the source port's adapter failed with.
     ///
-    /// Stays `anyhow::Error` deliberately: the port exists so this use case
-    /// does *not* know what the outside world can fail with, and enumerating
-    /// an adapter's failures here would defeat the abstraction. Section 9.2
-    /// removes type erasure from the domain; a port's error is the one place
-    /// the erasure is the point.
-    Source(anyhow::Error),
+    /// The port still does not enumerate its adapters' failures — see
+    /// [`SimilarityReportSourcePort::Error`] — but what arrives here is a
+    /// `CliError` rather than an `anyhow::Error`, so it still carries a
+    /// classification. Boxed only to keep this enum small.
+    Source(Box<paredit_core_cli::CliError>),
     Processing(SimilarityFileError),
     WorkerPanicked,
     /// The analysis itself gave up — a resource budget, or an inconsistent
@@ -327,9 +339,11 @@ mod workflow_error_tests {
 
     #[test]
     fn source_display_adds_boundary_context_without_repeating_cause() {
-        let error = SimilarityReportWorkflowError::Source(
-            anyhow::anyhow!("filesystem unavailable").context("could not discover inputs"),
-        );
+        let error =
+            SimilarityReportWorkflowError::Source(Box::new(paredit_core_cli::CliError::Io {
+                context: "could not discover inputs".to_owned(),
+                source: std::io::Error::other("filesystem unavailable"),
+            }));
 
         assert_eq!(error.to_string(), "similarity report source failed");
         let source = error.source().expect("source error must be retained");

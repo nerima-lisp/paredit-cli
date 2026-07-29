@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::append_nil::cli::args::AppendNilReportArgs;
 use crate::append_nil::cli::render::print_append_nil_report;
@@ -7,7 +7,7 @@ use crate::append_nil::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn append_nil_report(args: AppendNilReportArgs) -> Result<()> {
+pub fn append_nil_report(args: AppendNilReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut append_form_count = 0;

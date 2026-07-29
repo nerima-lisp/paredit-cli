@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +10,6 @@ pub fn print_hotspot_report(
     reports: &[FileFindings<Hotspot>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     print_report("inspect hotspots", reports, policy, output)
 }

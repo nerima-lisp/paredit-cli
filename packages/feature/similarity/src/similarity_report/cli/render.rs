@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -13,7 +13,7 @@ use paredit_core_cli::args::OutputFormat;
 pub fn print_similarity_report(
     plan: &SimilarityReportPlan,
     args: &SimilarityReportArgs,
-) -> Result<()> {
+) -> CliResult<()> {
     match args.output {
         OutputFormat::Text => print_text(plan, args),
         OutputFormat::Json => println!(

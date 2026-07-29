@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::eql_search_literal::cli::args::EqlSearchLiteralReportArgs;
 use crate::eql_search_literal::cli::render::print_eql_search_literal_report;
@@ -8,7 +8,7 @@ use crate::eql_search_literal::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn eql_search_literal_report(args: EqlSearchLiteralReportArgs) -> Result<()> {
+pub fn eql_search_literal_report(args: EqlSearchLiteralReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut search_call_count = 0;

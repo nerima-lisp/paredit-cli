@@ -1,11 +1,11 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
 use crate::workspace_report::usecase::types::{WorkspaceFileStatus, WorkspaceReportPlan};
 use paredit_core_cli::args::OutputFormat;
 
-pub fn print_workspace_report(plan: &WorkspaceReportPlan, output: OutputFormat) -> Result<()> {
+pub fn print_workspace_report(plan: &WorkspaceReportPlan, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => print_text_workspace_report(plan),
         OutputFormat::Json => print_json_workspace_report(plan)?,
@@ -58,7 +58,7 @@ fn print_text_workspace_report(plan: &WorkspaceReportPlan) {
     }
 }
 
-fn print_json_workspace_report(plan: &WorkspaceReportPlan) -> Result<()> {
+fn print_json_workspace_report(plan: &WorkspaceReportPlan) -> CliResult<()> {
     let summary = &plan.summary;
     println!(
         "{}",

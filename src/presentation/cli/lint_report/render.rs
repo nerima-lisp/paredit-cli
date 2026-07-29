@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::color::Painter;
 use serde_json::json;
 
@@ -38,7 +38,7 @@ pub(super) fn print_lint_report(
     failures: &[FileFailure],
     meta: &RuleMetaResolver<'_>,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let severity_of = |rule: &str| meta.severity(rule).as_str();
     match output {
         OutputFormat::Text => {
@@ -138,7 +138,7 @@ pub(super) fn print_lint_report(
 /// still worth explaining — the dialect list alone answers the most common
 /// "why did this find nothing?" — so the command never refuses for want of
 /// prose.
-pub(super) fn print_lint_explanation(rule: &str, output: OutputFormat) -> Result<()> {
+pub(super) fn print_lint_explanation(rule: &str, output: OutputFormat) -> CliResult<()> {
     let explanation = rule_explanation(rule);
     let tags = rule_tags(rule).names();
     let dialects = rule_dialects(rule);
@@ -213,7 +213,7 @@ pub(super) fn print_lint_explanation(rule: &str, output: OutputFormat) -> Result
 pub(super) fn print_lint_presets(
     counts: &[(RulePreset, usize)],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             for (preset, count) in counts {
@@ -247,7 +247,7 @@ pub(super) fn print_lint_presets(
 }
 
 /// Prints the `--tag` values with the rules carrying each.
-pub(super) fn print_lint_tags(output: OutputFormat) -> Result<()> {
+pub(super) fn print_lint_tags(output: OutputFormat) -> CliResult<()> {
     let tagged: Vec<(RuleTag, Vec<&'static str>)> = RuleTag::ALL
         .into_iter()
         .map(|tag| {
@@ -299,7 +299,7 @@ pub(super) fn print_lint_tags(output: OutputFormat) -> Result<()> {
 /// documentation contradicts: everything below is read from the same `RULE_DOCS`
 /// the report and `--list-rules` read. The output is the document, so it ignores
 /// `--output` and goes to stdout for redirection.
-pub(super) fn print_lint_docs(active: &[&str]) -> Result<()> {
+pub(super) fn print_lint_docs(active: &[&str]) -> CliResult<()> {
     println!("# Lint rules");
     println!();
     println!(
@@ -392,7 +392,7 @@ pub(super) fn print_lint_timings(
     total_micros: u128,
     files_scanned: usize,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("total_micros\t{total_micros}");
@@ -445,7 +445,7 @@ pub(super) fn print_lint_suppression_removal(
     files: &[LintSuppressionRemoval],
     removed: usize,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("suppressions_removed\t{removed}");
@@ -506,7 +506,7 @@ pub(super) fn print_lint_rule_catalog(
     custom: &CustomRules,
     fixable_only: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let listed: Vec<&(&str, &str, &str)> = RULE_DOCS
         .iter()
         .filter(|(rule, _, _)| active.contains(rule))
@@ -600,7 +600,7 @@ pub(super) struct LintStats {
 
 /// Prints the `--stats` rollup: totals plus per-severity, per-category, and
 /// per-rule counts, so lint debt can be gauged and prioritized at a glance.
-pub(super) fn print_lint_stats(stats: &LintStats, output: OutputFormat) -> Result<()> {
+pub(super) fn print_lint_stats(stats: &LintStats, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("finding_count\t{}", stats.finding_count);
@@ -653,7 +653,7 @@ pub(super) fn print_lint_unused_suppressions(
         crate::application::usecase::lint_report::UnusedSuppression,
     )],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("unused_suppression_count\t{}", entries.len());
@@ -710,7 +710,7 @@ pub(super) fn print_lint_expired_suppressions(
         crate::application::usecase::lint_report::UnusedSuppression,
     )],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("expired_suppression_count\t{}", entries.len());
@@ -763,7 +763,7 @@ pub(super) fn print_lint_suppression_inventory(
         crate::application::usecase::lint_report::SuppressionInventoryEntry,
     )],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let unused_count = entries.iter().filter(|(_, entry)| !entry.used).count();
     match output {
         OutputFormat::Text => {
@@ -852,7 +852,7 @@ pub(super) fn print_lint_fix_report(
     fixes_applied: usize,
     deferred: usize,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("fixes_applied\t{fixes_applied}");
@@ -926,7 +926,7 @@ pub(super) struct LintSarifResult {
 pub(super) fn print_lint_sarif(
     results: &[LintSarifResult],
     meta: &RuleMetaResolver<'_>,
-) -> Result<()> {
+) -> CliResult<()> {
     let rules = RULE_DOCS
         .iter()
         .map(|(rule, category, description)| {
@@ -1040,7 +1040,7 @@ pub(super) struct LintFixPlanEntry {
 pub(super) fn print_lint_fix_plan(
     entries: &[LintFixPlanEntry],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("fix_count\t{}", entries.len());

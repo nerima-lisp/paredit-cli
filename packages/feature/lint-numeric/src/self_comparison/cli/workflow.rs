@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::self_comparison::cli::args::SelfComparisonReportArgs;
 use crate::self_comparison::cli::render::print_self_comparison_report;
@@ -8,7 +8,7 @@ use crate::self_comparison::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn self_comparison_report(args: SelfComparisonReportArgs) -> Result<()> {
+pub fn self_comparison_report(args: SelfComparisonReportArgs) -> CommandResult {
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
 

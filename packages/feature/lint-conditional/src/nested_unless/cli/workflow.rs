@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nested_unless::cli::args::NestedUnlessReportArgs;
 use crate::nested_unless::cli::render::print_nested_unless_report;
@@ -8,7 +8,7 @@ use crate::nested_unless::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nested_unless_report(args: NestedUnlessReportArgs) -> Result<()> {
+pub fn nested_unless_report(args: NestedUnlessReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut unless_form_count = 0;

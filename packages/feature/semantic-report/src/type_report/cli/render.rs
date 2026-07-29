@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -12,7 +12,7 @@ pub fn print_type_report(
     policy: &TypeReportPolicy,
     contradictions_only: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => print_text(reports, policy, contradictions_only),
         OutputFormat::Json => print_json(reports, policy, contradictions_only)?,
@@ -79,7 +79,7 @@ fn print_json(
     reports: &[TypeReportFile],
     policy: &TypeReportPolicy,
     contradictions_only: bool,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

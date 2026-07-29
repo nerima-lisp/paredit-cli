@@ -14,7 +14,9 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
+
+use crate::error::MigrateError;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::selector::{
     Pattern, RewriteAllowances, SkipReason, Template, apply_plan, plan_rewrite,
@@ -78,7 +80,7 @@ pub fn run_migration(
     source: &str,
     migration: &Migration,
     allow: RewriteAllowances,
-) -> Result<FileOutcome> {
+) -> CliResult<FileOutcome> {
     if !migration.covers(dialect) {
         return Ok(FileOutcome {
             path: path.to_path_buf(),
@@ -93,20 +95,29 @@ pub fn run_migration(
     let mut steps = Vec::with_capacity(migration.steps.len());
 
     for (index, step) in migration.steps.iter().enumerate() {
-        let pattern = Pattern::parse(&step.query, dialect)
-            .with_context(|| format!("migration {} step {index}: :query", migration.name))?;
-        let template = Template::parse(&step.rewrite, dialect)
-            .with_context(|| format!("migration {} step {index}: :rewrite", migration.name))?;
+        let pattern = Pattern::parse(&step.query, dialect).map_err(MigrateError::step(
+            &migration.name,
+            index,
+            ":query",
+        ))?;
+        let template = Template::parse(&step.rewrite, dialect).map_err(MigrateError::step(
+            &migration.name,
+            index,
+            ":rewrite",
+        ))?;
         template
             .check_against(&pattern)
-            .with_context(|| format!("migration {} step {index}", migration.name))?;
+            .map_err(MigrateError::step(&migration.name, index, ""))?;
 
-        let tree = SyntaxTree::parse_with_dialect(&current, dialect).with_context(|| {
-            format!(
-                "migration {} step {index} left {} unparseable",
-                migration.name,
-                path.display()
-            )
+        // The write guard, per step: a migration that leaves a file it
+        // cannot read back has broken it, and the next step would compound it.
+        let tree = SyntaxTree::parse_with_dialect(&current, dialect).map_err(|source| {
+            MigrateError::StepLeftFileUnparseable {
+                migration: migration.name.clone(),
+                index,
+                path: path.display().to_string(),
+                source,
+            }
         })?;
         let plan = plan_rewrite(&tree, &pattern, &template, dialect, allow);
         steps.push(StepOutcome {

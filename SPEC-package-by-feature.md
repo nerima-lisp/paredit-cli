@@ -1683,6 +1683,97 @@ pub fn chain(&self) -> String {
 どちらも `main` が `anyhow::Result` を返すことに由来する**境界のヘルパ**であり、
 §9.2 が追放しようとしている「domain / application の型消去」ではない。
 
+### 9.2.4 【完了時の追記】`anyhow` はワークスペースから消えた
+
+`feature/*` 全 29 パッケージと root crate、`xtask` を変換し、
+**`Cargo.lock` から `anyhow` が消えた。** §9.2.3 が「落とせない、
+そして落とすべきでない」と書いた `core/cli` の 2 箇所も無くなっている。
+
+#### §9.2.3 の「落とせない 2 箇所」は落とせた
+
+| 箇所 | §9.2.3 の判断 | 実際 |
+| --- | --- | --- |
+| `gate_failure` | 型消去マーカーは境界のヘルパだから残す | `CommandFailure::Gate` バリアントにした |
+| `terminal_safe_error_chain` | anyhow のチェーンを描画するから残す | `&dyn Error` を取り `source()` を自力で辿る |
+
+判断の誤りは「`main` が `anyhow::Result` を返す」を**前提**として扱った点にある。
+それは選択であって制約ではなかった。
+
+#### 実測: `downcast` の連鎖が 107 の拒否を「ツールの不具合」にしていた
+
+§9.2 は「exit code の分岐が文字列から再導出されている」ことを問題にしたが、
+`core` 変換後に残っていたのは**文字列ではなく型消去された値からの再導出**、
+すなわち `diagnosis::classify` の `downcast_ref` 連鎖である。
+そして末尾は `.map_or(ErrorCode::Internal, ...)` だった。
+
+`main` のバイナリで実測した結果:
+
+| 実行 | 変換前の code | 変換後 |
+| --- | --- | --- |
+| `refactor add-export --package nope` | `internal.unclassified` | `selection.no-match` |
+| `refactor merge-nested-let`（Scheme） | `internal.unclassified` | `input.dialect-unsupported` |
+| `refactor rename-binding --write`（`--file` 無し） | `internal.unclassified` | `argument.write-requires-file` |
+
+`category_description` は "unclassified; a defect in this tool"。
+**ごく普通の利用者側の誤りを、エージェントに「このツールが壊れている」と
+報告していた。** 原因は `CliError` に `EditRefusal` のバリアントが無く、
+`?` が `anyhow` に吸収し、probe が 1 つも一致しなかったこと。
+`core/edit` の 107 の拒否**全部**がこの経路だった。
+
+3 番目の行は別種の証拠になる。`--write requires --file` は
+`ArgumentError::WriteRequiresFile` として**既に存在していた**のに、
+`bail!("--write requires --file")` が 36 箇所で同じ文字列を書き直しており、
+同一の利用者エラーが経路によって 2 つの code を持っていた。
+
+#### 型消去は「ポート」の名の下でも起きていた
+
+4 つの hexagonal port が `anyhow::Result` を返しており、いずれも
+「ユースケースはアダプタの失敗を知るべきでない」と正しく説明されていた。
+**説明は正しく、道具が誤っていた。** `anyhow::Error` は
+「名前を知らない何らかのエラー」ではなく「エラー型が無い」を意味し、
+分類まで一緒に捨てる。関連型がこれを型で言う:
+
+```rust
+pub trait DefinitionSourcePort {
+    type Error: Into<CliError>;
+    fn load(&mut self, file: &FsPath) -> Result<LoadedDefinitionSource, Self::Error>;
+}
+```
+
+境界が閉じている（code カタログは文書化された契約）一方で
+アダプタ集合は開いている、という非対称性がこの形の理由である。
+
+#### 閉じた分類 × 開いたペイロード
+
+`CliError` が 29 個の feature のエラーを列挙することは依存方向の反転になる。
+そこで `FeatureRefusal { code, message }` を置き、**code を必須の
+コンストラクタ引数**にした。ペイロード（`source()` の連鎖）は
+その場で文字列に潰れるが、**決定（どの code か）は型のまま残る**。
+`anyhow` はペイロードと決定の両方を捨てていた。ここが違いである。
+
+#### 追加した code は 2 つ
+
+| code | 理由 |
+| --- | --- |
+| `input.dialect-unsupported` | `input.shape-refused` と**取るべき行動が逆**。前者は「このファイル内で別の form を選べ」、後者は「このファイルは言語が違う、ここで再試行するな」 |
+| `argument.flag-combination` | 16 箇所の `bail!` が「このフラグ同士は併用できない」を各々別の文で書いていた |
+
+#### DDD: root crate の 7 モジュールのうち 5 は composition root ではない
+
+`architecture_contract.rs` の許可リストは「複数の feature を集約するもの」を
+composition root と定義している。実測すると、`AWAITING_EXTRACTION` の
+7 個は**どれもこの条件を満たさない** — import は `crate::domain` の
+re-export façade を経由して `packages/core/*` にのみ解決する
+（`duplicate_export_report` だけが feature を 1 つ参照するが、
+feature → feature は既に許された形である）。
+
+つまり「まだ動かしていない」だけであり、`COMPOSITION_ROOT` と同じリストに
+混ぜていたことが「一時的」を恒久化させる仕組みだった。2 つのリストに分け、
+**backlog が増えないことをテストで固定**した（コメントは fail しない）。
+実際の抽出はパッケージ 1 個ごとの独立した作業なので、本変換には含めない。
+
+---
+
 ### 9.5 順序が結果を決める
 
 **機械的な修正を分割の前にやるか後にやるかで、総コストが大きく変わる。**

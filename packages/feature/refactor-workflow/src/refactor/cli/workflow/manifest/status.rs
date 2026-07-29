@@ -3,9 +3,9 @@ use super::super::super::manifest::check::build_refactor_check_result;
 use super::super::super::manifest::status::refactor_status_decision;
 use super::super::super::render::print_refactor_status_result;
 use super::super::super::types::status::{RefactorStatusResult, RefactorStatusWriteTarget};
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
-pub fn refactor_status(args: RefactorStatusArgs) -> Result<()> {
+pub fn refactor_status(args: RefactorStatusArgs) -> CliResult<()> {
     let check = build_refactor_check_result(
         &args.manifest,
         args.root.as_deref(),

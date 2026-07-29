@@ -1,6 +1,6 @@
 //! Application facade for converting a selected `if` form into `cond`.
 
-use anyhow::Result;
+use crate::error::ConditionalConversionResult;
 
 use paredit_core_edit::convert_control as domain;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -8,7 +8,9 @@ use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConvertIfToCondPlan, ConvertIfToCondRequest};
 
-pub fn plan_convert_if_to_cond(request: ConvertIfToCondRequest<'_>) -> Result<ConvertIfToCondPlan> {
+pub fn plan_convert_if_to_cond(
+    request: ConvertIfToCondRequest<'_>,
+) -> ConditionalConversionResult<ConvertIfToCondPlan> {
     domain::require_supported_dialect(request.dialect, "convert-if-to-cond")?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;

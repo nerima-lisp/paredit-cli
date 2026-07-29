@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::explicit_nil_return::cli::args::ExplicitNilReturnReportArgs;
 use crate::explicit_nil_return::cli::render::print_explicit_nil_return_report;
@@ -8,7 +8,7 @@ use crate::explicit_nil_return::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn explicit_nil_return_report(args: ExplicitNilReturnReportArgs) -> Result<()> {
+pub fn explicit_nil_return_report(args: ExplicitNilReturnReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut return_form_count = 0;

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::unreachable_case_clause::cli::args::UnreachableCaseClauseReportArgs;
 use crate::unreachable_case_clause::cli::render::print_unreachable_case_clause_report;
@@ -8,7 +8,7 @@ use crate::unreachable_case_clause::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn unreachable_case_clause_report(args: UnreachableCaseClauseReportArgs) -> Result<()> {
+pub fn unreachable_case_clause_report(args: UnreachableCaseClauseReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut case_form_count = 0;

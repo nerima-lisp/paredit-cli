@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nthcdr_small_index::cli::args::NthcdrSmallIndexReportArgs;
 use crate::nthcdr_small_index::cli::render::print_nthcdr_small_index_report;
@@ -8,7 +8,7 @@ use crate::nthcdr_small_index::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nthcdr_small_index_report(args: NthcdrSmallIndexReportArgs) -> Result<()> {
+pub fn nthcdr_small_index_report(args: NthcdrSmallIndexReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut nthcdr_form_count = 0;

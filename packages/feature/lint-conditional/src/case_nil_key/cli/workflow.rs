@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::case_nil_key::cli::args::CaseNilKeyReportArgs;
 use crate::case_nil_key::cli::render::print_case_nil_key_report;
@@ -8,7 +8,7 @@ use crate::case_nil_key::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn case_nil_key_report(args: CaseNilKeyReportArgs) -> Result<()> {
+pub fn case_nil_key_report(args: CaseNilKeyReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut case_form_count = 0;

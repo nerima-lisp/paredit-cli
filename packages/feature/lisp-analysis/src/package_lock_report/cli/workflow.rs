@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::package_lock_report::usecase::{
     build_package_lock_report, evaluate_fail_on_undefined_behavior_policy,
 };
 
-pub fn package_lock_report(args: PackageLockReportArgs) -> Result<()> {
+pub fn package_lock_report(args: PackageLockReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

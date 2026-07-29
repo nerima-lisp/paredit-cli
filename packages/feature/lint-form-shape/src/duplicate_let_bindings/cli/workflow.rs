@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::duplicate_let_bindings::cli::args::DuplicateLetBindingReportArgs;
 use crate::duplicate_let_bindings::cli::render::print_duplicate_let_binding_report;
@@ -8,7 +8,7 @@ use crate::duplicate_let_bindings::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn duplicate_let_binding_report(args: DuplicateLetBindingReportArgs) -> Result<()> {
+pub fn duplicate_let_binding_report(args: DuplicateLetBindingReportArgs) -> CommandResult {
     let mut let_form_count = 0;
     let mut duplicates = Vec::new();
 

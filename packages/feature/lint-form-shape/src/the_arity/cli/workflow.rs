@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::the_arity::cli::args::TheArityReportArgs;
 use crate::the_arity::cli::render::print_the_arity_report;
@@ -8,7 +8,7 @@ use crate::the_arity::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn the_arity_report(args: TheArityReportArgs) -> Result<()> {
+pub fn the_arity_report(args: TheArityReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut the_form_count = 0;

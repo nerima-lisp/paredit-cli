@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_eql_test::cli::args::RedundantEqlTestReportArgs;
 use crate::redundant_eql_test::cli::render::print_redundant_eql_test_report;
@@ -8,7 +8,7 @@ use crate::redundant_eql_test::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_eql_test_report(args: RedundantEqlTestReportArgs) -> Result<()> {
+pub fn redundant_eql_test_report(args: RedundantEqlTestReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::api_surface_report::usecase::{
     build_api_surface_report, evaluate_fail_on_undefined_export_policy,
 };
 
-pub fn api_surface_report(args: ApiSurfaceReportArgs) -> Result<()> {
+pub fn api_surface_report(args: ApiSurfaceReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

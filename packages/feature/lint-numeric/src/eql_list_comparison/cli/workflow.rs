@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::eql_list_comparison::cli::args::EqlListComparisonReportArgs;
 use crate::eql_list_comparison::cli::render::print_eql_list_comparison_report;
@@ -8,7 +8,7 @@ use crate::eql_list_comparison::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn eql_list_comparison_report(args: EqlListComparisonReportArgs) -> Result<()> {
+pub fn eql_list_comparison_report(args: EqlListComparisonReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut comparison_form_count = 0;

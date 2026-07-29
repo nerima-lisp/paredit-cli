@@ -16,6 +16,12 @@ model, a binding table, nine lint rules, and a per-file report.
 
 ### Added
 
+- Two error codes. `input.dialect-unsupported` separates "this file is the
+  wrong language for this command" from `input.shape-refused`, because the two
+  call for opposite actions — stop retrying here, versus select a different
+  form in this file. `argument.flag-combination` covers the sixteen places that
+  each spelled "these flags do not combine" in their own words.
+
 - **Three new namespaces — `query`, `fix`, `migrate`.** The existing three
   split by what a change costs to undo (`inspect` reads, `edit` transforms one
   form, `refactor` plans and applies). These split by what the caller is
@@ -302,6 +308,23 @@ model, a binding table, nine lint rules, and a per-file report.
 
 ### Fixed
 
+- Ordinary refusals were reported to callers as `internal.unclassified` —
+  documented as "a defect in this tool" — with no repair suggestions. Every one
+  of the 107 structural-edit refusals in `paredit-core-edit` took this path, as
+  did every `defpackage` refusal and 36 spellings of `--write requires --file`.
+  The cause was the exit-code classifier probing a type-erased `anyhow::Error`
+  with `downcast_ref` and falling through to `Internal` when no probe matched.
+  Classification is now a total `match` over a closed `CommandFailure`, so a
+  failure that nothing classifies is a compile error. Messages are unchanged;
+  only the `code`, `category`, and `repairs` fields differ.
+  - `refactor add-export --package <absent>` → `selection.no-match`
+  - `refactor merge-nested-let` on a Scheme file → `input.dialect-unsupported`
+  - `refactor rename-binding --write` without `--file` →
+    `argument.write-requires-file`
+- `inspect resolve --fail-on-empty` exited 1 with `internal.unclassified`
+  rather than the exit code 3 that `--fail-on-*` gates are documented to use.
+  It is now a gate, like every other `--fail-on-*` flag.
+
 - LFE's clause-style `(defun f ((x) body) ((x y) body))` was read as a single
   parameter list, so the first clause's body was treated as a parameter and
   renaming reported an ambiguity that did not exist. Each clause now scopes
@@ -346,6 +369,15 @@ verifies itself. The whole verification gate went from 27 minutes to 8, by
 removing work it was doing twice rather than by checking less.
 
 ### Changed
+
+- `anyhow` is gone from the workspace, including `Cargo.lock`. Every fallible
+  entry point returns a typed error: a command returns `CommandResult`, whose
+  failure is either `CliError` or a tripped gate. Feature packages own their
+  own error enums and state which documented error code each refusal earns;
+  the code catalogue stays closed, and a new refusal cannot skip the question.
+  Source ports name their adapter's error as an associated type instead of
+  returning `anyhow::Result`, which is what the port abstraction meant to say
+  in the first place.
 
 - The Rust flake checks are [crane](https://github.com/ipetkov/crane)
   derivations sharing pre-built dependency artifacts, instead of four

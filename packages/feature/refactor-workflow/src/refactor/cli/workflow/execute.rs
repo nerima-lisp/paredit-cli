@@ -15,9 +15,9 @@ use crate::refactor::usecase::execute::{
     build_refactor_execute_preflight_decision,
 };
 use crate::refactor::usecase::preview::RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions;
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
-pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> Result<()> {
+pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> CommandResult {
     let resolved = args.input.resolve(&args.roots)?;
     let workspace = discover_workspace_refactor_scope(&args.input, args.roots.clone(), &resolved)?;
     let paths = workspace.paths;
@@ -38,7 +38,7 @@ pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> Result<
             args.require_definitions,
             args.require_edits,
         )
-        .map_err(anyhow::Error::msg)?,
+        .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message })?,
         workspace: Some(workspace.workspace),
     })?;
 
@@ -124,7 +124,9 @@ pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> Result<
             }
         }),
     )
-    .map_err(anyhow::Error::msg)?;
+    .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination {
+        message: message.to_owned(),
+    })?;
     let execution = WorkspaceRefactorExecute {
         preview,
         preflight_decision,
@@ -143,11 +145,19 @@ pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> Result<
     )?;
 
     if !pre_passed {
-        anyhow::bail!("refactor workspace-execute preflight failed");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::GateFailed,
+            "refactor workspace-execute preflight failed",
+        )
+        .into());
     }
 
     if !post_passed {
-        anyhow::bail!("refactor workspace-execute post verification failed");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::GateFailed,
+            "refactor workspace-execute post verification failed",
+        )
+        .into());
     }
 
     Ok(())

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::str::FromStr;
 
 use crate::similarity_report::usecase::SimilarityErrorPolicy;

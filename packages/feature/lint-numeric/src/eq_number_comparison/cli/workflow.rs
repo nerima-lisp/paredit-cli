@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::eq_number_comparison::cli::args::EqNumberComparisonReportArgs;
 use crate::eq_number_comparison::cli::render::print_eq_number_comparison_report;
@@ -8,7 +8,7 @@ use crate::eq_number_comparison::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn eq_number_comparison_report(args: EqNumberComparisonReportArgs) -> Result<()> {
+pub fn eq_number_comparison_report(args: EqNumberComparisonReportArgs) -> CommandResult {
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
 

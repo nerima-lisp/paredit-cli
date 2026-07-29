@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::multiple_value_list_of_values::cli::args::MultipleValueListOfValuesReportArgs;
 use crate::multiple_value_list_of_values::cli::render::print_multiple_value_list_of_values_report;
@@ -10,7 +10,7 @@ use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 pub fn multiple_value_list_of_values_report(
     args: MultipleValueListOfValuesReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut mvl_form_count = 0;

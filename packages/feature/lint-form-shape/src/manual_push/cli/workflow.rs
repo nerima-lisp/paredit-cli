@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::manual_push::cli::args::ManualPushReportArgs;
 use crate::manual_push::cli::render::print_manual_push_report;
@@ -8,7 +8,7 @@ use crate::manual_push::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn manual_push_report(args: ManualPushReportArgs) -> Result<()> {
+pub fn manual_push_report(args: ManualPushReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut assignment_form_count = 0;

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::sign_comparison::cli::args::SignComparisonReportArgs;
 use crate::sign_comparison::cli::render::print_sign_comparison_report;
@@ -8,7 +8,7 @@ use crate::sign_comparison::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn sign_comparison_report(args: SignComparisonReportArgs) -> Result<()> {
+pub fn sign_comparison_report(args: SignComparisonReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut comparison_form_count = 0;

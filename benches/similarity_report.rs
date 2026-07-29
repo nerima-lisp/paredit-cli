@@ -24,10 +24,13 @@ struct FixtureSource {
 }
 
 impl SimilarityReportSourcePort for FixtureSource {
+    // A fixture cannot fail to discover; the port still asks for a type.
+    type Error = paredit_core_cli::CliError;
+
     fn discover(
         &mut self,
         _request: &SimilarityReportRequest,
-    ) -> anyhow::Result<SimilarityInventory> {
+    ) -> Result<SimilarityInventory, Self::Error> {
         Ok(self.inventory.clone())
     }
 

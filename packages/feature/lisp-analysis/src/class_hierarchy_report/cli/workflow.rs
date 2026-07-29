@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -11,7 +11,7 @@ use crate::class_hierarchy_report::usecase::{
 };
 use paredit_core_cli::report::graph::print_graph;
 
-pub fn class_hierarchy_report(args: ClassHierarchyReportArgs) -> Result<()> {
+pub fn class_hierarchy_report(args: ClassHierarchyReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

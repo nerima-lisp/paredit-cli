@@ -1,8 +1,8 @@
 use crate::convert_labels_to_flet::usecase::{
     ConvertLabelsToFletPlan, ConvertLabelsToFletRequest, plan_convert_labels_to_flet,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -27,9 +27,9 @@ pub struct ConvertLabelsToFletArgs {
     output: OutputFormat,
 }
 
-pub fn convert_labels_to_flet(args: ConvertLabelsToFletArgs) -> Result<()> {
+pub fn convert_labels_to_flet(args: ConvertLabelsToFletArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = plan_convert_labels_to_flet(ConvertLabelsToFletRequest {
@@ -45,7 +45,11 @@ pub fn convert_labels_to_flet(args: ConvertLabelsToFletArgs) -> Result<()> {
     print_plan(&plan, written, args.output)
 }
 
-fn print_plan(plan: &ConvertLabelsToFletPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(
+    plan: &ConvertLabelsToFletPlan,
+    written: bool,
+    output: OutputFormat,
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

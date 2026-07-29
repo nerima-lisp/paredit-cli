@@ -17,7 +17,6 @@ paredit-core-workspace = { path = "../../core/workspace" }
 paredit-core-cli = { path = "../../core/cli" }
 # One feature edge: the lambda-list parameter reader.
 paredit-feature-function-parameter = { path = "../function-parameter" }
-anyhow.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

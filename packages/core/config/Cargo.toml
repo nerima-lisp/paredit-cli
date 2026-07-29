@@ -15,8 +15,6 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-# The test harness still returns anyhow::Result; production code does not.
-anyhow.workspace = true
 
 # Mandatory: without it this package silently opts out of the workspace lint
 # table, including `unsafe_code = "deny"`, with no error at all.

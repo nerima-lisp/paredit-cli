@@ -1,8 +1,8 @@
 //! The one printer every report in this package goes through.
 
 use crate::args::ReportFormat;
+use crate::error::{CliError, CliResult};
 use crate::shared::terminal_safe;
-use anyhow::Result;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::IsTerminal;
@@ -27,7 +27,7 @@ pub fn print_report<F: Finding>(
     reports: &[FileFindings<F>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         ReportFormat::Text => print_text(reports, policy),
         ReportFormat::Json => print_json(command, reports, policy)?,
@@ -35,13 +35,10 @@ pub fn print_report<F: Finding>(
             let flat = Flattened::new(command, reports, policy);
             match other {
                 ReportFormat::Sarif => {
-                    println!("{}", serde_json::to_string_pretty(&interop::sarif(&flat))?);
+                    println!("{}", render_json(command, &interop::sarif(&flat))?);
                 }
                 ReportFormat::CodeClimate => {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&interop::code_climate(&flat))?
-                    );
+                    println!("{}", render_json(command, &interop::code_climate(&flat))?);
                 }
                 ReportFormat::Junit => print!("{}", interop::junit(&flat)),
                 ReportFormat::Csv => print!("{}", interop::delimited(&flat, true)),
@@ -172,7 +169,7 @@ fn print_json<F: Finding>(
     command: &'static str,
     reports: &[FileFindings<F>],
     policy: &ReportPolicy,
-) -> Result<()> {
+) -> CliResult<()> {
     let mut report = json!({
         "schema_version": 1,
         "report": command,
@@ -188,8 +185,23 @@ fn print_json<F: Finding>(
     for (name, value) in aggregate(reports) {
         report[name] = value;
     }
-    println!("{}", serde_json::to_string_pretty(&report)?);
+    println!("{}", render_json(command, &report)?);
     Ok(())
+}
+
+/// Serializes a document this module just built.
+///
+/// Every caller passes a [`Value`] assembled here from `json!`, so the only
+/// documented failure of `to_string_pretty` — a map with non-string keys —
+/// cannot arise. It stays a typed error rather than an `unwrap()` because
+/// [`CliError::Json`] already means "a JSON artifact this tool owns did not
+/// render", and an impossible case is a bad reason to introduce a panic into
+/// the one function every report in the workspace prints through.
+fn render_json(command: &'static str, document: &Value) -> CliResult<String> {
+    serde_json::to_string_pretty(document).map_err(|source| CliError::Json {
+        context: format!("failed to render the {command} report"),
+        source,
+    })
 }
 
 fn file_json<F: Finding>(report: &FileFindings<F>) -> Value {

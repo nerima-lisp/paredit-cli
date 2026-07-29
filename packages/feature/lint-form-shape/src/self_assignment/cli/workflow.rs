@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::self_assignment::cli::args::SelfAssignmentReportArgs;
 use crate::self_assignment::cli::render::print_self_assignment_report;
@@ -8,7 +8,7 @@ use crate::self_assignment::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn self_assignment_report(args: SelfAssignmentReportArgs) -> Result<()> {
+pub fn self_assignment_report(args: SelfAssignmentReportArgs) -> CommandResult {
     let mut assignment_form_count = 0;
     let mut self_assignments = Vec::new();
 

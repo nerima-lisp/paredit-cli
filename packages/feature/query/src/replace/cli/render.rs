@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -25,7 +25,7 @@ pub fn print_replace_report(
     totals: &RewriteTotals,
     args: &QueryReplaceArgs,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let touched: Vec<&FileRewrite> = files
         .iter()
         .filter(|file| file.is_touched() || !file.skipped.is_empty())

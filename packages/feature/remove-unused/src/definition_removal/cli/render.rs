@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -9,7 +9,7 @@ use crate::remove_unused_definition::usecase::RemoveUnusedDefinitionsPlan;
 pub fn print_remove_definition_plan(
     plan: &RemoveDefinitionPlan,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("file\t{}", safe_text!(plan.file.display()));
@@ -66,7 +66,7 @@ pub fn print_remove_unused_definitions_plan(
     plan: &RemoveUnusedDefinitionsPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("files\t{}", plan.files.len());

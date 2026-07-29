@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::list_star_nil::cli::args::ListStarNilReportArgs;
 use crate::list_star_nil::cli::render::print_list_star_nil_report;
@@ -8,7 +8,7 @@ use crate::list_star_nil::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn list_star_nil_report(args: ListStarNilReportArgs) -> Result<()> {
+pub fn list_star_nil_report(args: ListStarNilReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

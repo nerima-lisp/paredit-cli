@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::{Value, json};
 
 use paredit_core_cli::args::OutputFormat;
@@ -63,7 +63,7 @@ pub fn print_source_report(
     scan: &SourceScan,
     cache_outcome: Option<CacheOutcome>,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let view = scan.view();
     match output {
         OutputFormat::Text => print_text(args, resolved, &view, cache_outcome),
@@ -120,7 +120,7 @@ fn print_json(
     resolved: &ResolvedWorkspaceInput,
     view: &ScanView<'_>,
     cache_outcome: Option<CacheOutcome>,
-) -> Result<()> {
+) -> CliResult<()> {
     let mut skipped = serde_json::Map::new();
     for (name, count) in skip_counter_names().into_iter().zip(view.skipped) {
         skipped.insert(name.to_owned(), json!(count));

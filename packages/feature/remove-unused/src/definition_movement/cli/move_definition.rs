@@ -1,6 +1,6 @@
 use std::fs;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 
 use crate::definition_report::usecase::DefinitionReportItem;
 use paredit_core_syntax::definition::definition_shape;
@@ -17,7 +17,7 @@ use paredit_core_cli::shared::{
     read_input_dialect_and_tree, write_files_with_rollback,
 };
 
-pub fn move_definition(args: MoveDefinitionArgs) -> Result<()> {
+pub fn move_definition(args: MoveDefinitionArgs) -> CliResult<()> {
     let same_file = match (
         fs::canonicalize(&args.from_file),
         fs::canonicalize(&args.to_file),
@@ -26,39 +26,58 @@ pub fn move_definition(args: MoveDefinitionArgs) -> Result<()> {
         _ => args.from_file == args.to_file,
     };
     if same_file {
-        anyhow::bail!("--from-file and --to-file must refer to different files");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--from-file and --to-file must refer to different files",
+        )
+        .into());
     }
 
     let (from_input, from_dialect, from_tree) =
         read_input_dialect_and_tree(Some(args.from_file.clone()), args.dialect)?;
     let (to_input, to_file_existed) = read_file_or_empty(&args.to_file)?;
     let to_dialect = detect_dialect(&to_input, args.dialect);
-    let to_tree =
-        SyntaxTree::parse_with_dialect(&to_input.text, to_dialect).with_context(|| {
-            format!(
-                "destination file is not a valid S-expression document: {}",
-                args.to_file.display()
-            )
-        })?;
+    let to_tree = SyntaxTree::parse_with_dialect(&to_input.text, to_dialect).map_err(|source| {
+        crate::error::DefinitionMovementError::DestinationNotAnSexprDocument {
+            path: args.to_file.display().to_string(),
+            source,
+        }
+    })?;
 
     let target_index = match args.path.indexes() {
         [index] => index.get(),
-        _ => anyhow::bail!(
-            "move-definition requires a top-level definition path, for example --path 2"
-        ),
+        _ => {
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentTargetRequired,
+                "move-definition requires a top-level definition path, for example --path 2",
+            )
+            .into());
+        }
     };
     if target_index >= from_tree.root_children().len() {
-        anyhow::bail!("top-level path {} is out of range", args.path);
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::SelectionPathNotReachable,
+            format!("top-level path {} is out of range", args.path),
+        )
+        .into());
     }
 
     let selection = from_tree.select_path(&args.path)?;
     let view = selection.view();
     let span = selection.span();
     let Some(head) = list_head(&view) else {
-        anyhow::bail!("selected top-level form is not a list definition");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            "selected top-level form is not a list definition",
+        )
+        .into());
     };
     let Some(shape) = definition_shape(from_dialect, &view, head) else {
-        anyhow::bail!("selected top-level form is not recognized as a definition: {head}");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            format!("selected top-level form is not recognized as a definition: {head}"),
+        )
+        .into());
     };
 
     // A leading own-line comment (or blank run) describing this definition
@@ -117,17 +136,23 @@ pub fn move_definition(args: MoveDefinitionArgs) -> Result<()> {
     };
     let to_rewritten = append_top_level_form(&to_input.text, &appended);
 
-    SyntaxTree::parse_with_dialect(&from_rewritten, from_dialect).with_context(|| {
-        format!(
-            "source file would become invalid after moving definition: {}",
-            args.from_file.display()
-        )
+    SyntaxTree::parse_with_dialect(&from_rewritten, from_dialect).map_err(|source| {
+        crate::error::DefinitionMovementError::WouldBecomeInvalid {
+            side: "source",
+            action: "moving",
+            what: "definition",
+            path: args.from_file.display().to_string(),
+            source,
+        }
     })?;
-    SyntaxTree::parse_with_dialect(&to_rewritten, to_dialect).with_context(|| {
-        format!(
-            "destination file would become invalid after receiving definition: {}",
-            args.to_file.display()
-        )
+    SyntaxTree::parse_with_dialect(&to_rewritten, to_dialect).map_err(|source| {
+        crate::error::DefinitionMovementError::WouldBecomeInvalid {
+            side: "destination",
+            action: "receiving",
+            what: "definition",
+            path: args.to_file.display().to_string(),
+            source,
+        }
     })?;
 
     let changed = from_rewritten != from_input.text || to_rewritten != to_input.text;

@@ -7,12 +7,12 @@ use super::super::render::{print_refactor_preview, refactor_preview_manifest_jso
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::workspace::discover_workspace_refactor_scope;
 use crate::refactor::usecase::preview::RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions;
-use anyhow::{Context, Result};
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::stable_text_hash;
 use paredit_core_cli::shared::write_artifact_with_rollback;
+use paredit_core_cli::{CliResult, CommandResult};
 use paredit_core_syntax::sexpr::SymbolName;
 use serde_json::json;
 use std::path::Path as FsPath;
@@ -22,7 +22,7 @@ pub use build::{BuildRefactorPreviewRequest, build_refactor_preview};
 pub use failure::finish_refactor_preview_failure;
 pub use write::write_refactor_preview;
 
-pub fn refactor_preview(args: RefactorPreviewArgs) -> Result<()> {
+pub fn refactor_preview(args: RefactorPreviewArgs) -> CommandResult {
     emit_refactor_preview(RefactorPreviewEmission {
         paths: &args.files,
         dialect: args.dialect,
@@ -46,7 +46,7 @@ pub fn refactor_preview(args: RefactorPreviewArgs) -> Result<()> {
     })
 }
 
-pub fn workspace_refactor_preview(args: WorkspaceRefactorPreviewArgs) -> Result<()> {
+pub fn workspace_refactor_preview(args: WorkspaceRefactorPreviewArgs) -> CommandResult {
     let resolved = args.input.resolve(&args.roots)?;
     let workspace = discover_workspace_refactor_scope(&args.input, args.roots.clone(), &resolved)?;
 
@@ -80,7 +80,7 @@ fn preview_policy_options(
     require_changed_files: Option<usize>,
     require_definitions: Option<usize>,
     require_edits: Option<usize>,
-) -> Result<DomainRefactorPreviewPolicyOptions> {
+) -> CliResult<DomainRefactorPreviewPolicyOptions> {
     DomainRefactorPreviewPolicyOptions::new(
         fail_on_no_change,
         fail_on_parse_error,
@@ -89,7 +89,7 @@ fn preview_policy_options(
         require_definitions,
         require_edits,
     )
-    .map_err(anyhow::Error::msg)
+    .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message }.into())
 }
 
 struct RefactorPreviewEmission<'a> {
@@ -107,7 +107,7 @@ struct RefactorPreviewEmission<'a> {
     failure_label: &'static str,
 }
 
-fn emit_refactor_preview(request: RefactorPreviewEmission<'_>) -> Result<()> {
+fn emit_refactor_preview(request: RefactorPreviewEmission<'_>) -> CommandResult {
     let RefactorPreviewEmission {
         paths,
         dialect,
@@ -157,14 +157,18 @@ fn write_manifest_and_print_summary(
     preview: &crate::refactor::cli::types::preview::RefactorPreview,
     manifest_path: &FsPath,
     output: OutputFormat,
-) -> Result<()> {
+) -> CommandResult {
     let manifest_text = format!(
         "{}\n",
         serde_json::to_string_pretty(&refactor_preview_manifest_json(preview))?
     );
     let manifest_hash = stable_text_hash(&manifest_text);
-    write_artifact_with_rollback(manifest_path.to_path_buf(), manifest_text)
-        .with_context(|| format!("failed to write manifest {}", manifest_path.display()))?;
+    write_artifact_with_rollback(manifest_path.to_path_buf(), manifest_text).map_err(
+        crate::error::RefactorContext::new(format!(
+            "failed to write manifest {}",
+            manifest_path.display()
+        )),
+    )?;
 
     match output {
         OutputFormat::Text => {

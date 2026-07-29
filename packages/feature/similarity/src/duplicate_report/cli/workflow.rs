@@ -5,10 +5,10 @@ use crate::duplicate_report::usecase::{
     DuplicateCandidateAccumulator, DuplicateCandidateGroups, build_duplicate_shape_reports,
     collect_replacement_plan_batches,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {
+pub fn duplicate_report(args: DuplicateReportArgs) -> CliResult<()> {
     ensure_thresholds(args.min_group_size, args.min_node_count)?;
     let grouped = collect_duplicate_candidate_groups(
         &args.files,
@@ -21,7 +21,7 @@ pub fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {
     print_duplicate_report(&reports, args.output)
 }
 
-pub fn replacement_plan(args: ReplacementPlanArgs) -> Result<()> {
+pub fn replacement_plan(args: ReplacementPlanArgs) -> CliResult<()> {
     ensure_thresholds(args.min_group_size, args.min_node_count)?;
     let grouped = collect_duplicate_candidate_groups(
         &args.files,
@@ -52,7 +52,7 @@ fn collect_duplicate_candidate_groups(
     dialect: Option<paredit_core_cli::args::DialectArg>,
     min_node_count: usize,
     min_group_size: usize,
-) -> Result<DuplicateCandidateGroups> {
+) -> CliResult<DuplicateCandidateGroups> {
     let mut candidates = DuplicateCandidateAccumulator::new(min_node_count);
 
     for file in discover_duplicate_report_files(roots)? {
@@ -63,8 +63,18 @@ fn collect_duplicate_candidate_groups(
     Ok(candidates.finish(min_group_size)?)
 }
 
-fn ensure_thresholds(min_group_size: usize, min_node_count: usize) -> Result<()> {
-    anyhow::ensure!(min_group_size >= 2, "--min-group-size must be at least 2");
-    anyhow::ensure!(min_node_count >= 2, "--min-node-count must be at least 2");
+fn ensure_thresholds(min_group_size: usize, min_node_count: usize) -> CliResult<()> {
+    if min_group_size < 2 {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--min-group-size must be at least 2".to_owned(),
+        }
+        .into());
+    }
+    if min_node_count < 2 {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--min-node-count must be at least 2".to_owned(),
+        }
+        .into());
+    }
     Ok(())
 }

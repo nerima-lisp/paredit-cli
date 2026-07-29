@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nested_boolean::cli::args::NestedBooleanReportArgs;
 use crate::nested_boolean::cli::render::print_nested_boolean_report;
@@ -8,7 +8,7 @@ use crate::nested_boolean::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nested_boolean_report(args: NestedBooleanReportArgs) -> Result<()> {
+pub fn nested_boolean_report(args: NestedBooleanReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut boolean_form_count = 0;

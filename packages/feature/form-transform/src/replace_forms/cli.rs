@@ -1,5 +1,5 @@
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -38,7 +38,7 @@ pub struct ReplaceFormsArgs {
     output: OutputFormat,
 }
 
-pub fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
+pub fn replace_forms(args: ReplaceFormsArgs) -> CliResult<()> {
     let ReplaceFormsArgs {
         file,
         dialect,
@@ -50,7 +50,11 @@ pub fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
     } = args;
 
     if write && file.is_none() {
-        anyhow::bail!("replace-forms --write requires --file");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentWriteRequiresFile,
+            "replace-forms --write requires --file",
+        )
+        .into());
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(file.clone(), dialect)?;
@@ -65,7 +69,11 @@ pub fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
     let written = write && plan.changed;
     if written {
         let Some(path) = file.as_ref() else {
-            anyhow::bail!("replace-forms --write requires --file");
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentWriteRequiresFile,
+                "replace-forms --write requires --file",
+            )
+            .into());
         };
         write_file_with_rollback(path.clone(), plan.rewritten.clone())?;
     }
@@ -79,7 +87,7 @@ fn print_replace_forms_plan(
     dialect: Dialect,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!(

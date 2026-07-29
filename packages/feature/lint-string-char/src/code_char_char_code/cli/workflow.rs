@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::code_char_char_code::cli::args::CodeCharCharCodeReportArgs;
 use crate::code_char_char_code::cli::render::print_code_char_char_code_report;
@@ -8,7 +8,7 @@ use crate::code_char_char_code::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn code_char_char_code_report(args: CodeCharCharCodeReportArgs) -> Result<()> {
+pub fn code_char_char_code_report(args: CodeCharCharCodeReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut code_char_form_count = 0;

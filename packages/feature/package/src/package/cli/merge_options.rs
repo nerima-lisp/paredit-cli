@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
+
+use crate::error::PackageCommandError;
 
 use crate::package::usecase as package_usecase;
 
@@ -8,7 +10,7 @@ use super::{
 };
 use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub fn merge_package_options(args: MergePackageOptionsArgs) -> Result<()> {
+pub fn merge_package_options(args: MergePackageOptionsArgs) -> CliResult<()> {
     let (input, dialect) = read_input_and_dialect(Some(args.file.clone()), args.dialect)?;
     let usecase_plan =
         package_usecase::plan_merge_package_options(package_usecase::MergePackageOptionsRequest {
@@ -16,11 +18,10 @@ pub fn merge_package_options(args: MergePackageOptionsArgs) -> Result<()> {
             dialect,
             package: args.package.as_ref(),
         })
-        .with_context(|| {
-            format!(
-                "failed to plan merge-package-options for {}",
-                args.file.display()
-            )
+        .map_err(|source| PackageCommandError::Plan {
+            operation: "merge-package-options",
+            path: args.file.display().to_string(),
+            source,
         })?;
     let changed = usecase_plan.changed;
     let written = args.write && changed;

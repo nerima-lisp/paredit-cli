@@ -1,6 +1,6 @@
 use std::io::BufRead;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::{CliResult, CommandResult};
 
 use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::shared::{
@@ -18,7 +18,7 @@ use crate::refactor_step::domain::{Selection, Step, parse_selector, selection_is
 /// The same ceiling `refactor apply` reads a source under.
 const MAX_SOURCE_BYTES: u64 = 16 * 1024 * 1024;
 
-pub fn refactor_step(args: RefactorStepArgs) -> Result<()> {
+pub fn refactor_step(args: RefactorStepArgs) -> CommandResult {
     let loaded = read_refactor_manifest_file(&args.manifest, args.expect_manifest_hash.as_deref())?;
     let manifest = parse_refactor_apply_manifest(&loaded.value)?;
 
@@ -33,21 +33,26 @@ pub fn refactor_step(args: RefactorStepArgs) -> Result<()> {
 
     let mut sources = Vec::with_capacity(changed.len());
     for file in &changed {
-        let text = read_text_file_with_limit(&file.path, MAX_SOURCE_BYTES)
-            .with_context(|| format!("failed to read {}", file.path.display()))?;
+        let text = read_text_file_with_limit(&file.path, MAX_SOURCE_BYTES).map_err(
+            crate::error::RefactorContext::new(format!("failed to read {}", file.path.display())),
+        )?;
         // The guard `refactor apply` applies, applied before anything is even
         // listed: a manifest describes edits at byte offsets into the file as
         // it was, and against a file that has moved on those offsets name
         // different text.
         let hash = stable_text_hash(&text);
         if hash != file.input_hash {
-            anyhow::bail!(
-                "{} has changed since the manifest was written (expected {}, found {}); \
-                 re-run `refactor preview` before stepping",
-                file.path.display(),
-                file.input_hash,
-                hash,
-            );
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
+                format!(
+                    "{} has changed since the manifest was written (expected {}, found {}); \
+                     re-run `refactor preview` before stepping",
+                    file.path.display(),
+                    file.input_hash,
+                    hash,
+                ),
+            )
+            .into());
         }
         sources.push(text);
     }
@@ -96,10 +101,16 @@ pub fn refactor_step(args: RefactorStepArgs) -> Result<()> {
             // A subset of a rewrite is not guaranteed to be balanced source —
             // that is precisely what taking part of a change risks — so the
             // result is parsed before it is written, not after.
-            SyntaxTree::parse_with_dialect(&rewritten, file.dialect).with_context(|| {
-                format!(
-                    "refusing to write {}: the selected steps do not leave a parseable document",
-                    file.path.display(),
+            // The write guard: this tool does not leave behind a file it
+            // cannot read back, and that is the same refusal the CLI's own
+            // write path makes.
+            SyntaxTree::parse_with_dialect(&rewritten, file.dialect).map_err(|_| {
+                paredit_core_cli::error::FeatureRefusal::message(
+                    paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+                    format!(
+                        "refusing to write {}: the selected steps do not leave a parseable document",
+                        file.path.display(),
+                    ),
                 )
             })?;
             write_file_with_rollback(file.path.clone(), rewritten)?;
@@ -117,23 +128,24 @@ fn rewrite(
     steps: &[Step],
     selection: &Selection,
     file_index: usize,
-) -> Result<String> {
+) -> CliResult<String> {
     let edits = steps
         .iter()
         .filter(|step| step.file_index == file_index && selection.contains(step.number))
         .map(|step| (step.span, step.after.clone()))
         .collect::<Vec<_>>();
-    Ok(apply_byte_span_edits(source, edits)?)
+    apply_byte_span_edits(source, edits)
 }
 
-fn select(args: &RefactorStepArgs, steps: &[Step]) -> Result<Selection> {
+fn select(args: &RefactorStepArgs, steps: &[Step]) -> CliResult<Selection> {
     if args.interactive {
         return interactive(steps);
     }
 
     let mut selection = match &args.accept {
         Some(spec) => {
-            let accepted = parse_selector(spec, steps.len()).map_err(anyhow::Error::msg)?;
+            let accepted = parse_selector(spec, steps.len())
+                .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message })?;
             let mut selection = Selection::none();
             for number in accepted {
                 selection.accept(number);
@@ -149,7 +161,9 @@ fn select(args: &RefactorStepArgs, steps: &[Step]) -> Result<Selection> {
     };
 
     if let Some(spec) = &args.skip {
-        for number in parse_selector(spec, steps.len()).map_err(anyhow::Error::msg)? {
+        for number in parse_selector(spec, steps.len())
+            .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message })?
+        {
             selection.skip(number);
         }
     }
@@ -161,7 +175,7 @@ fn select(args: &RefactorStepArgs, steps: &[Step]) -> Result<Selection> {
 /// The `git add -p` vocabulary, because a reviewer stepping a refactor already
 /// knows it. Prompts go to stderr so a caller can pipe the JSON result
 /// somewhere while still driving the prompts.
-fn interactive(steps: &[Step]) -> Result<Selection> {
+fn interactive(steps: &[Step]) -> CliResult<Selection> {
     let stdin = std::io::stdin();
     let mut lines = stdin.lock().lines();
     let mut selection = Selection::none();
@@ -200,7 +214,7 @@ fn interactive(steps: &[Step]) -> Result<Selection> {
     Ok(selection)
 }
 
-fn gate(args: &RefactorStepArgs, coherent: bool, accepted: usize, total: usize) -> Result<()> {
+fn gate(args: &RefactorStepArgs, coherent: bool, accepted: usize, total: usize) -> CommandResult {
     if !args.fail_on_partial || coherent {
         return Ok(());
     }

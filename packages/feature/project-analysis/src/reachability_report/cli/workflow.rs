@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::call_graph_report::usecase::{CallGraphReportSource, build_call_graph_report};
 use crate::reachability_report::cli::args::ReachabilityReportArgs;
@@ -8,7 +8,7 @@ use crate::reachability_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn reachability_report(args: ReachabilityReportArgs) -> Result<()> {
+pub fn reachability_report(args: ReachabilityReportArgs) -> CommandResult {
     let mut sources = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

@@ -15,7 +15,7 @@ use crate::presentation::cli::shared::{
 /// it meant hand-editing every definition it listed.
 pub(in crate::presentation::cli) fn add_ignore_declaration(
     args: AddIgnoreDeclarationArgs,
-) -> Result<()> {
+) -> CliResult<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
     let mut plans = Vec::with_capacity(files.len());
 
@@ -51,7 +51,7 @@ pub(in crate::presentation::cli) fn add_ignore_declaration(
     Ok(())
 }
 
-fn print_plans(plans: &[(String, IgnoreDeclarationPlan)], output: OutputFormat) -> Result<()> {
+fn print_plans(plans: &[(String, IgnoreDeclarationPlan)], output: OutputFormat) -> CliResult<()> {
     let declaration_count: usize = plans.iter().map(|(_, plan)| plan.items.len()).sum();
     let parameter_count: usize = plans
         .iter()

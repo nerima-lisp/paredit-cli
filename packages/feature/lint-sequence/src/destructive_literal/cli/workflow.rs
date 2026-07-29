@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::destructive_literal::cli::args::DestructiveLiteralReportArgs;
 use crate::destructive_literal::cli::render::print_destructive_literal_report;
@@ -8,7 +8,7 @@ use crate::destructive_literal::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn destructive_literal_report(args: DestructiveLiteralReportArgs) -> Result<()> {
+pub fn destructive_literal_report(args: DestructiveLiteralReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut destructive_call_count = 0;

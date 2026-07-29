@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::unused_package_report::cli::args::UnusedPackageReportArgs;
 use crate::unused_package_report::cli::render::print_unused_package_report;
@@ -8,7 +8,7 @@ use crate::unused_package_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn unused_package_report(args: UnusedPackageReportArgs) -> Result<()> {
+pub fn unused_package_report(args: UnusedPackageReportArgs) -> CommandResult {
     let mut declared = Vec::new();
     let mut referenced = Vec::new();
 

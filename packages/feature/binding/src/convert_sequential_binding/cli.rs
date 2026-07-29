@@ -2,8 +2,8 @@ use crate::convert_sequential_binding::usecase::{
     ConvertSequentialBindingPlan, ConvertSequentialBindingRequest, plan_convert_do_star_to_do,
     plan_convert_prog_star_to_prog,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -36,7 +36,7 @@ macro_rules! conversion_args {
 conversion_args!(ConvertDoStarToDoArgs);
 conversion_args!(ConvertProgStarToProgArgs);
 
-pub fn convert_do_star_to_do(args: ConvertDoStarToDoArgs) -> Result<()> {
+pub fn convert_do_star_to_do(args: ConvertDoStarToDoArgs) -> CliResult<()> {
     run_conversion(
         args.file,
         args.dialect,
@@ -47,7 +47,7 @@ pub fn convert_do_star_to_do(args: ConvertDoStarToDoArgs) -> Result<()> {
     )
 }
 
-pub fn convert_prog_star_to_prog(args: ConvertProgStarToProgArgs) -> Result<()> {
+pub fn convert_prog_star_to_prog(args: ConvertProgStarToProgArgs) -> CliResult<()> {
     run_conversion(
         args.file,
         args.dialect,
@@ -70,9 +70,9 @@ fn run_conversion(
     planner: for<'a> fn(
         ConvertSequentialBindingRequest<'a>,
     ) -> crate::error::BindingResult<ConvertSequentialBindingPlan>,
-) -> Result<()> {
+) -> CliResult<()> {
     if write && file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(file, dialect_arg)?;
     let plan = planner(ConvertSequentialBindingRequest {
@@ -92,7 +92,7 @@ fn print_plan(
     plan: &ConvertSequentialBindingPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

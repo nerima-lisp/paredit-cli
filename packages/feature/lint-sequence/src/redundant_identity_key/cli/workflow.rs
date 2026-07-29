@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_identity_key::cli::args::RedundantIdentityKeyReportArgs;
 use crate::redundant_identity_key::cli::render::print_redundant_identity_key_report;
@@ -8,7 +8,7 @@ use crate::redundant_identity_key::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_identity_key_report(args: RedundantIdentityKeyReportArgs) -> Result<()> {
+pub fn redundant_identity_key_report(args: RedundantIdentityKeyReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

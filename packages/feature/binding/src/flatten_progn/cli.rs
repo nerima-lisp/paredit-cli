@@ -1,6 +1,6 @@
 use crate::flatten_progn::usecase::{FlattenPrognPlan, FlattenPrognRequest, plan_flatten_progn};
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -25,9 +25,9 @@ pub struct FlattenPrognArgs {
     output: OutputFormat,
 }
 
-pub fn flatten_progn(args: FlattenPrognArgs) -> Result<()> {
+pub fn flatten_progn(args: FlattenPrognArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = plan_flatten_progn(FlattenPrognRequest {
@@ -43,7 +43,7 @@ pub fn flatten_progn(args: FlattenPrognArgs) -> Result<()> {
     print_plan(&plan, written, args.output)
 }
 
-fn print_plan(plan: &FlattenPrognPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(plan: &FlattenPrognPlan, written: bool, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

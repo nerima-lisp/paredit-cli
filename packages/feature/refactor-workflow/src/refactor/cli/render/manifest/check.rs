@@ -4,7 +4,7 @@ use super::{
     blocked_reason_labels, blocked_reason_text, decision_steps_json, decision_summary_json,
     print_decision_summary,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -12,7 +12,7 @@ use serde_json::json;
 pub fn print_refactor_check_result(
     result: &RefactorCheckResult,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let decision = refactor_status_decision(result);
 
     match output {

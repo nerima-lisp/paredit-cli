@@ -1,4 +1,4 @@
-use crate::error::{ArgumentError, CliResult, IoRefusal};
+use crate::error::{ArgumentError, CliError, CliResult, IoRefusal};
 use std::collections::BTreeSet;
 use std::fmt::{self, Display, Write};
 use std::path::PathBuf;
@@ -48,19 +48,42 @@ impl<T: Display> Display for TerminalSafe<T> {
     }
 }
 
+/// Renders an error's whole `source()` chain, escaped for a terminal.
+///
+/// Takes `&dyn Error` rather than a concrete type: the boundary renders a
+/// [`crate::CommandFailure`], the budget check renders an
+/// [`crate::ArgumentError`], and a feature is free to render its own. It used
+/// to take `&anyhow::Error`, which meant every caller had to reach `anyhow`
+/// just to print.
 #[must_use]
-pub const fn terminal_safe_error_chain(error: &anyhow::Error) -> TerminalSafeErrorChain<'_> {
+pub const fn terminal_safe_error_chain(
+    error: &dyn std::error::Error,
+) -> TerminalSafeErrorChain<'_> {
     TerminalSafeErrorChain(error)
 }
 
 // Public since the extraction: this was crate-internal, a visibility that
 // cannot cross a crate boundary, so the lint applies to it for the first time.
-#[derive(Debug)]
-pub struct TerminalSafeErrorChain<'a>(&'a anyhow::Error);
+pub struct TerminalSafeErrorChain<'a>(&'a dyn std::error::Error);
 
 impl Display for TerminalSafeErrorChain<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(TerminalEscapeWriter(formatter), "{:#}", self.0)
+        // `error_chain` is what `{:#}` was: `thiserror`'s own `Display` stops
+        // at the outermost message.
+        write!(
+            TerminalEscapeWriter(formatter),
+            "{}",
+            crate::error::error_chain(self.0)
+        )
+    }
+}
+
+impl fmt::Debug for TerminalSafeErrorChain<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("TerminalSafeErrorChain")
+            .field(&self.0)
+            .finish()
     }
 }
 
@@ -670,20 +693,24 @@ impl<T> FileAnalysis<T> {
 /// `std::thread::scope` rather than a work-stealing pool: the work is a flat
 /// map over a known list, and a scoped spawn needs no dependency, no runtime,
 /// and no `'static` bound on the closure.
-/// The closure returns `anyhow::Result` rather than `CliResult` because every
-/// workflow that would call this already does, and an analysis is free to fail
-/// for reasons the I/O layer has no vocabulary for.
-pub fn analyze_files<T, F>(
+/// The closure names its own error type rather than returning `CliResult`: an
+/// analysis is free to fail for reasons the I/O layer has no vocabulary for,
+/// and each feature has its own. The only thing this needs of `E` is that it
+/// can absorb the read failure this function itself produces, and that it can
+/// be rendered — the failures are turned into [`FileFailure`] messages here
+/// and never escape.
+pub fn analyze_files<T, E, F>(
     files: &[PathBuf],
     dialect: Option<DialectArg>,
     analyze: F,
 ) -> FileAnalysis<T>
 where
     T: Send,
-    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> anyhow::Result<T> + Sync,
+    E: std::error::Error + From<CliError> + Send,
+    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E> + Sync,
 {
     let workers = worker_count(files.len());
-    let results: Vec<anyhow::Result<T>> = if workers <= 1 {
+    let results: Vec<Result<T, E>> = if workers <= 1 {
         files
             .iter()
             .map(|file| analyze_one(file, dialect, &analyze))
@@ -698,7 +725,7 @@ where
         // sound without a lock.
         let mut results = files
             .iter()
-            .map(|_| None::<anyhow::Result<T>>)
+            .map(|_| None::<Result<T, E>>)
             .collect::<Vec<_>>();
         let per_worker = files.len().div_ceil(workers);
         let analyze = &analyze;
@@ -733,16 +760,17 @@ where
             Ok(value) => analysis.succeeded.push(value),
             Err(error) => analysis.failed.push(FileFailure {
                 file: file.clone(),
-                message: format!("{error:#}"),
+                message: crate::error::error_chain(&error),
             }),
         }
     }
     analysis
 }
 
-fn analyze_one<T, F>(file: &PathBuf, dialect: Option<DialectArg>, analyze: &F) -> anyhow::Result<T>
+fn analyze_one<T, E, F>(file: &PathBuf, dialect: Option<DialectArg>, analyze: &F) -> Result<T, E>
 where
-    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> anyhow::Result<T>,
+    E: From<CliError>,
+    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E>,
 {
     let (input, resolved, tree) = read_input_dialect_and_tree(Some(file.clone()), dialect)?;
     analyze(file, resolved, &tree, &input)
@@ -798,8 +826,8 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     use super::{
-        Dialect, PathBuf, analyze_files, prefers_crlf, require_output_file, restore_line_ending,
-        terminal_safe, terminal_safe_error_chain,
+        CliError, CliResult, Dialect, PathBuf, analyze_files, prefers_crlf, require_output_file,
+        restore_line_ending, terminal_safe, terminal_safe_error_chain,
     };
 
     fn restore(original: &str, rewritten: &str) -> String {
@@ -831,7 +859,7 @@ mod tests {
         ];
 
         let analysis = analyze_files(&files, None, |file, _dialect, _tree, _input| {
-            Ok(file.file_stem().unwrap().to_string_lossy().into_owned())
+            CliResult::Ok(file.file_stem().unwrap().to_string_lossy().into_owned())
         });
 
         assert!(!analysis.is_total_failure());
@@ -853,7 +881,9 @@ mod tests {
             test_file("second-broken", "(defun c (\n"),
         ];
 
-        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| Ok(()));
+        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| {
+            CliResult::Ok(())
+        });
 
         assert_eq!(analysis.succeeded, vec![()]);
         assert_eq!(analysis.failed.len(), 2);
@@ -867,15 +897,21 @@ mod tests {
             test_file("total-a", "(defun a (\n"),
             test_file("total-b", "(defun b (\n"),
         ];
-        let analysis = analyze_files(&all_broken, None, |_file, _dialect, _tree, _input| Ok(()));
+        let analysis = analyze_files(&all_broken, None, |_file, _dialect, _tree, _input| {
+            CliResult::Ok(())
+        });
         assert!(analysis.is_total_failure());
 
         let all_clean = vec![test_file("clean-only", "(defun a () 1)")];
-        let analysis = analyze_files(&all_clean, None, |_file, _dialect, _tree, _input| Ok(()));
+        let analysis = analyze_files(&all_clean, None, |_file, _dialect, _tree, _input| {
+            CliResult::Ok(())
+        });
         assert!(!analysis.is_total_failure());
 
         let empty: Vec<PathBuf> = Vec::new();
-        let analysis = analyze_files(&empty, None, |_file, _dialect, _tree, _input| Ok(()));
+        let analysis = analyze_files(&empty, None, |_file, _dialect, _tree, _input| {
+            CliResult::Ok(())
+        });
         assert!(!analysis.is_total_failure());
     }
 
@@ -894,7 +930,9 @@ mod tests {
             })
             .collect();
 
-        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| Ok(()));
+        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| {
+            CliResult::Ok(())
+        });
 
         assert_eq!(analysis.succeeded.len(), 9);
         assert_eq!(analysis.failed.len(), 1);
@@ -989,7 +1027,14 @@ mod tests {
 
     #[test]
     fn terminal_safe_error_chain_escapes_each_context_as_one_value() {
-        let error = anyhow::anyhow!("leaf\n\u{202e}").context("context\t\u{1b}");
+        // A two-level typed chain, standing in for what
+        // `anyhow!("leaf").context("context")` used to build here: the point
+        // of the test is that each link is escaped as its own value and the
+        // `": "` joiner survives, not which library produced the nesting.
+        let error = CliError::Io {
+            context: "context\t\u{1b}".to_owned(),
+            source: std::io::Error::other("leaf\n\u{202e}"),
+        };
 
         assert_eq!(
             terminal_safe_error_chain(&error).to_string(),

@@ -12,7 +12,7 @@
 
 use std::fs;
 
-use anyhow::{Context, Result};
+use crate::error::Result;
 
 use crate::repo::Repo;
 
@@ -89,10 +89,12 @@ pub fn print_command_wiring(repo: &Repo, wiring: &CommandWiring<'_>) -> Result<(
     let variant = wiring.variant;
     let workflow_fn = wiring.workflow_fn;
 
-    let contract = fs::read_to_string(repo.path("src/presentation/cli/contract.rs"))
-        .context("read src/presentation/cli/contract.rs")?;
-    let dialect_contract = fs::read_to_string(repo.path("tests/cli/dialect_contract.rs"))
-        .context("read tests/cli/dialect_contract.rs")?;
+    let contract = fs::read_to_string(repo.path("src/presentation/cli/contract.rs")).map_err(
+        crate::error::XtaskError::io("read src/presentation/cli/contract.rs"),
+    )?;
+    let dialect_contract = fs::read_to_string(repo.path("tests/cli/dialect_contract.rs")).map_err(
+        crate::error::XtaskError::io("read tests/cli/dialect_contract.rs"),
+    )?;
 
     let introspection = first_captured_number(&contract, "const INTROSPECTION_COMMANDS: [&str; ");
     let format = first_captured_number(&contract, "const FORMAT_COMMANDS: [&str; ");

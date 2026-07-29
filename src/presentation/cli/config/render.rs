@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::{Value as Json, json};
 
 use paredit_core_cli::args::OutputFormat;
@@ -14,7 +14,7 @@ use paredit_core_config::settings::Resolved;
 use crate::presentation::cli::config_bridge::Injected;
 use crate::presentation::cli::terminal_safe;
 
-pub fn print_check(loaded: &Loaded, output: OutputFormat) -> Result<()> {
+pub fn print_check(loaded: &Loaded, output: OutputFormat) -> CliResult<()> {
     let errors = count(loaded, Severity::Error);
     let warnings = count(loaded, Severity::Warning);
 
@@ -69,7 +69,7 @@ pub fn print_show(
     changed_only: bool,
     injections: Option<&[Injected]>,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let rows: Vec<(&'static KeySchema, Option<&Resolved>)> = loaded
         .settings
         .entries()
@@ -143,7 +143,7 @@ pub fn print_show(
     Ok(())
 }
 
-pub fn print_schema(output: OutputFormat) -> Result<()> {
+pub fn print_schema(output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Json => {
             let report = json!({
@@ -176,7 +176,7 @@ pub fn print_schema(output: OutputFormat) -> Result<()> {
     Ok(())
 }
 
-pub fn print_init(path: &Path, contents: &str, output: OutputFormat) -> Result<()> {
+pub fn print_init(path: &Path, contents: &str, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Json => {
             let report = json!({

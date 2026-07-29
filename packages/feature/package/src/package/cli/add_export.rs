@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
+
+use crate::error::PackageCommandError;
 
 use crate::package::usecase as package_usecase;
 
@@ -8,7 +10,7 @@ use super::{
 };
 use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub fn add_export(args: AddExportArgs) -> Result<()> {
+pub fn add_export(args: AddExportArgs) -> CliResult<()> {
     let (input, dialect) = read_input_and_dialect(Some(args.file.clone()), args.dialect)?;
     let usecase_plan = package_usecase::plan_add_export(package_usecase::AddExportRequest {
         input: &input.text,
@@ -16,7 +18,11 @@ pub fn add_export(args: AddExportArgs) -> Result<()> {
         package: args.package.as_ref(),
         symbol: &args.symbol,
     })
-    .with_context(|| format!("failed to plan add-export for {}", args.file.display()))?;
+    .map_err(|source| PackageCommandError::Plan {
+        operation: "add-export",
+        path: args.file.display().to_string(),
+        source,
+    })?;
     let changed = usecase_plan.changed;
     let written = args.write && changed;
 

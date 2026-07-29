@@ -1,8 +1,8 @@
 use crate::merge_nested_let::usecase::{
     MergeNestedLetPlan, MergeNestedLetRequest, plan_merge_nested_let,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -27,9 +27,9 @@ pub struct MergeNestedLetArgs {
     output: OutputFormat,
 }
 
-pub fn merge_nested_let(args: MergeNestedLetArgs) -> Result<()> {
+pub fn merge_nested_let(args: MergeNestedLetArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = plan_merge_nested_let(MergeNestedLetRequest {
@@ -47,7 +47,7 @@ pub fn merge_nested_let(args: MergeNestedLetArgs) -> Result<()> {
     print_plan(&plan, written, args.output)
 }
 
-fn print_plan(plan: &MergeNestedLetPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(plan: &MergeNestedLetPlan, written: bool, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

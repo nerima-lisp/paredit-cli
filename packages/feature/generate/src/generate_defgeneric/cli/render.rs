@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -10,7 +10,7 @@ pub fn print_defgeneric_plan(
     candidates: &[Candidate],
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let ready = candidates
         .iter()
         .filter(|candidate| matches!(candidate, Candidate::Ready(_)))

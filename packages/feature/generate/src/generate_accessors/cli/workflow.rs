@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::shared::{
     apply_byte_span_edits, read_input_dialect_and_tree, resolve_compact_target, unified_diff,
@@ -13,13 +13,17 @@ use crate::generate_accessors::cli::args::GenerateAccessorsArgs;
 use crate::generate_accessors::cli::render::print_accessors_plan;
 use crate::generate_accessors::usecase::{AccessorsOutcome, plan_accessors};
 
-pub fn generate_accessors(args: GenerateAccessorsArgs) -> Result<()> {
+pub fn generate_accessors(args: GenerateAccessorsArgs) -> CliResult<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     if dialect != Dialect::CommonLisp {
-        anyhow::bail!(
-            "generate accessors supports only Common Lisp, found {}",
-            dialect.label()
-        );
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputDialectUnsupported,
+            format!(
+                "generate accessors supports only Common Lisp, found {}",
+                dialect.label()
+            ),
+        )
+        .into());
     }
     let target = resolve_compact_target(&tree, dialect, &args.selector, "generate accessors")?;
     let selection = tree.select_path(&target.path)?;
@@ -33,13 +37,21 @@ pub fn generate_accessors(args: GenerateAccessorsArgs) -> Result<()> {
                 .map(|edit| (edit.span, edit.replacement.clone()))
                 .collect::<Vec<_>>();
             let rewritten = apply_byte_span_edits(&input.text, byte_edits)?;
-            SyntaxTree::parse_with_dialect(&rewritten, dialect)
-                .context("the generated accessors would leave the file unparseable")?;
+            SyntaxTree::parse_with_dialect(&rewritten, dialect).map_err(|source| {
+                crate::error::GeneratedOutputWouldNotParse {
+                    summary: "the generated accessors would leave the file unparseable",
+                    source,
+                }
+            })?;
             rewritten
         }
         AccessorsOutcome::Nothing { .. } => input.text.clone(),
         AccessorsOutcome::Unsupported { reason } => {
-            anyhow::bail!("generate accessors cannot use the selected form: {reason}");
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+                format!("generate accessors cannot use the selected form: {reason}"),
+            )
+            .into());
         }
     };
 
@@ -54,7 +66,10 @@ pub fn generate_accessors(args: GenerateAccessorsArgs) -> Result<()> {
 
     let mut written = false;
     if args.write && rewritten != input.text {
-        let file = input.file.as_ref().context("--write requires --file")?;
+        let file = input
+            .file
+            .as_ref()
+            .ok_or(paredit_core_cli::ArgumentError::WriteRequiresFile)?;
         write_file_with_rollback(file.clone(), rewritten.clone())?;
         written = true;
     }

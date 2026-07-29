@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::application::usecase::emacs_lisp_file_report::{
@@ -10,7 +10,7 @@ pub(super) fn print_emacs_lisp_file_report(
     files: &[EmacsLispFileFacts],
     policy: &EmacsLispFilePolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("file_count\t{}", files.len());

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::application::usecase::duplicate_method_report::{
     DuplicateMethodPolicyOptions, analyze_duplicate_methods, collect_declared_methods,
@@ -10,7 +10,7 @@ use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 pub(in crate::presentation::cli) fn duplicate_method_report(
     args: DuplicateMethodReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let mut declared = Vec::new();
 
     for file in &args.files {

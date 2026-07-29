@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::function_parameter::usecase::{
     MissingArgumentPolicy, RemoveFunctionParameterRequest, plan_remove_function_parameter,
@@ -10,9 +10,9 @@ use paredit_core_cli::shared::write_file_with_rollback;
 use super::args::RemoveFunctionParameterArgs;
 use super::render::remove::print_remove_function_parameter_plan;
 
-pub fn remove_function_parameter(args: RemoveFunctionParameterArgs) -> Result<()> {
+pub fn remove_function_parameter(args: RemoveFunctionParameterArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;

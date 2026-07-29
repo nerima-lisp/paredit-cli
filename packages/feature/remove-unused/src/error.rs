@@ -255,11 +255,12 @@ pub enum AnalysisWorkerError {
 pub enum RemoveUnusedError {
     /// Whatever the definition source port's adapter failed with.
     ///
-    /// Stays erased on purpose, as in `paredit_feature_similarity`: the port
-    /// exists so this use case does *not* know what the outside world can fail
-    /// with. Enumerating an adapter's failures here would defeat it.
+    /// The port still does not enumerate its adapters' failures — see
+    /// `DefinitionSourcePort::Error` — but what arrives here is a `CliError`
+    /// rather than an `anyhow::Error`, so it still carries a classification.
+    /// Boxed only to keep this enum small.
     #[error(transparent)]
-    Source(anyhow::Error),
+    Source(Box<paredit_core_cli::CliError>),
 
     /// A refusal this package shares with every other structural edit.
     #[error(transparent)]
@@ -354,3 +355,131 @@ impl From<SexprError> for RemoveUnusedError {
 
 /// The result type the remove-unused passes return.
 pub type RemoveUnusedResult<T> = std::result::Result<T, RemoveUnusedError>;
+
+/// Which documented error code a removal refusal earns.
+///
+/// Public because `paredit-feature-project-analysis` composes this package and
+/// has to answer the same question.
+#[must_use]
+pub fn code_of(error: &RemoveUnusedError) -> paredit_core_cli::diagnosis::ErrorCode {
+    match error {
+        // The adapter already classified itself; asking it again would be a
+        // second, worse answer.
+        RemoveUnusedError::Source(inner) => paredit_core_cli::diagnosis::code_for_cli_error(inner),
+
+        RemoveUnusedError::Edit(edit) => paredit_core_cli::diagnosis::code_for_edit_refusal(edit),
+
+        // "requires --name or --all-bindings" and its siblings: a command line
+        // that does not describe a runnable request.
+        RemoveUnusedError::Request(_) => {
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination
+        }
+
+        // The removal found nothing where it was pointed.
+        RemoveUnusedError::Selection(_) => paredit_core_cli::diagnosis::ErrorCode::SelectionNoMatch,
+
+        RemoveUnusedError::BindingList(_)
+        | RemoveUnusedError::Control(_)
+        | RemoveUnusedError::ReaderConditional(_) => {
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused
+        }
+
+        RemoveUnusedError::Parse(_) | RemoveUnusedError::ParseFailed { .. } => {
+            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable
+        }
+
+        RemoveUnusedError::Symbol(_) | RemoveUnusedError::InvalidSymbol { .. } => {
+            paredit_core_cli::diagnosis::ErrorCode::InputSymbolInvalid
+        }
+
+        RemoveUnusedError::UnsupportedDialect { .. } => {
+            paredit_core_cli::diagnosis::ErrorCode::InputDialectUnsupported
+        }
+
+        // The removal ran and the result would not read back. Same code as the
+        // CLI's own write guard: this tool will not leave a file it cannot parse.
+        RemoveUnusedError::WouldBecomeInvalid { .. } => {
+            paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse
+        }
+
+        // A panicked analysis worker is a defect here, not in the caller's input.
+        RemoveUnusedError::Worker(_) => paredit_core_cli::diagnosis::ErrorCode::Internal,
+    }
+}
+
+paredit_core_cli::impl_classified_refusal!(RemoveUnusedError, |error| code_of(error));
+
+/// Why a definition could not be moved between files.
+///
+/// The `definition_movement` slice guards both ends of a move: the file the
+/// definition leaves and the file it arrives in must each still parse. Written
+/// as `.context(...)` these all reached the boundary as
+/// `internal.unclassified` — the move declining rather than corrupting two
+/// files at once, reported as a defect.
+#[derive(Debug, thiserror::Error)]
+pub enum DefinitionMovementError {
+    /// The destination did not parse before anything was written to it.
+    #[error("destination file is not a valid S-expression document: {path}")]
+    DestinationNotAnSexprDocument {
+        path: String,
+        #[source]
+        source: paredit_core_syntax::sexpr::ParseError,
+    },
+
+    /// One end of the move would not read back.
+    ///
+    /// `side` and `what` carry the two axes the six messages varied on, so the
+    /// rendering is unchanged and the distinction a reader cares about — which
+    /// file broke — stays in the type.
+    #[error("{side} file would become invalid after {action} {what}: {path}")]
+    WouldBecomeInvalid {
+        side: &'static str,
+        action: &'static str,
+        what: &'static str,
+        path: String,
+        #[source]
+        source: paredit_core_syntax::sexpr::ParseError,
+    },
+
+    /// `--with` did not hold one complete top-level form.
+    #[error("{summary}")]
+    WithArgument {
+        summary: &'static str,
+        #[source]
+        source: paredit_core_syntax::sexpr::ParseError,
+    },
+
+    /// The text this insertion produced does not parse.
+    #[error("insertion produced invalid Lisp syntax")]
+    InsertionInvalid {
+        #[source]
+        source: paredit_core_syntax::sexpr::ParseError,
+    },
+
+    /// A directory on the destination path could not be created.
+    #[error("failed to create {path}")]
+    CreateDirectory {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
+paredit_core_cli::impl_classified_refusal!(DefinitionMovementError, |error| match error {
+    // The caller's own file, as it already was.
+    DefinitionMovementError::DestinationNotAnSexprDocument { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+
+    // This tool will not leave behind a file it cannot read back — the same
+    // refusal, and the same code, as the CLI's own write guard.
+    DefinitionMovementError::WouldBecomeInvalid { .. }
+    | DefinitionMovementError::InsertionInvalid { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+
+    // A flag's value, fixable only on the command line.
+    DefinitionMovementError::WithArgument { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+
+    DefinitionMovementError::CreateDirectory { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::EnvironmentIo,
+});

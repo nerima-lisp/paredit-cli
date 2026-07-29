@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_quote::cli::args::RedundantQuoteReportArgs;
 use crate::redundant_quote::cli::render::print_redundant_quote_report;
@@ -8,7 +8,7 @@ use crate::redundant_quote::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_quote_report(args: RedundantQuoteReportArgs) -> Result<()> {
+pub fn redundant_quote_report(args: RedundantQuoteReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut quoted_form_count = 0;

@@ -30,7 +30,20 @@ pub struct LoadedWorkspaceFile {
 }
 
 pub trait WorkspaceReportSourcePort {
-    fn discover(&mut self, request: &WorkspaceReportRequest) -> anyhow::Result<WorkspaceInventory>;
+    /// What this adapter's own failures look like.
+    ///
+    /// An associated type rather than `anyhow::Result`: the port exists so
+    /// this use case does not learn what an adapter can fail with, and an
+    /// associated type says that in the type system. `anyhow::Error` said
+    /// something else — "no error type at all" — and took the classification
+    /// with it. The `Into<CliError>` bound is the one requirement, because
+    /// whatever an adapter fails with has to be reportable with a code.
+    type Error: Into<paredit_core_cli::CliError>;
+
+    fn discover(
+        &mut self,
+        request: &WorkspaceReportRequest,
+    ) -> Result<WorkspaceInventory, Self::Error>;
 
     fn load(&self, path: &std::path::Path) -> LoadedWorkspaceFile;
 }

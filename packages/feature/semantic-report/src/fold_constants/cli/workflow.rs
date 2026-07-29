@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -43,7 +43,7 @@ struct FoldPlan {
 /// * Floats, refused by [`should_fold`]: the value layer keeps an `f64` and
 ///   drops the exponent marker, so no spelling this could emit preserves a
 ///   `double-float`'s type.
-pub fn fold_constants(args: FoldConstantsArgs) -> Result<()> {
+pub fn fold_constants(args: FoldConstantsArgs) -> CliResult<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
     let mut plans = Vec::with_capacity(files.len());
 
@@ -106,7 +106,7 @@ pub fn fold_constants(args: FoldConstantsArgs) -> Result<()> {
     Ok(())
 }
 
-fn print_plans(plans: &[FoldPlan], output: OutputFormat) -> Result<()> {
+fn print_plans(plans: &[FoldPlan], output: OutputFormat) -> CliResult<()> {
     let fold_count: usize = plans.iter().map(|plan| plan.folds.len()).sum();
     let saved_bytes: i64 = plans
         .iter()

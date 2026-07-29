@@ -2,8 +2,8 @@ use crate::eliminate_empty_binding_form::usecase::{
     EliminateEmptyBindingFormPlan, EliminateEmptyBindingFormRequest,
     plan_eliminate_empty_binding_form,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -28,9 +28,9 @@ pub struct EliminateEmptyBindingFormArgs {
     output: OutputFormat,
 }
 
-pub fn eliminate_empty_binding_form(args: EliminateEmptyBindingFormArgs) -> Result<()> {
+pub fn eliminate_empty_binding_form(args: EliminateEmptyBindingFormArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = plan_eliminate_empty_binding_form(EliminateEmptyBindingFormRequest {
@@ -50,7 +50,7 @@ fn print_plan(
     plan: &EliminateEmptyBindingFormPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

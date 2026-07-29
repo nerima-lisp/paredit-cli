@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::domain::dialect::Dialect;
@@ -19,7 +19,7 @@ use paredit_core_cli::error::ArgumentError;
 use paredit_core_cli::kill_ring::{KillRingEntry, read_ring, ring_path, write_ring};
 use paredit_core_syntax::selector::target_text;
 
-pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
     let check = args.check;
     let diff_stat_only = args.diff_stat;
     let max_width = args.max_width;
@@ -42,7 +42,11 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
             .file
             .as_deref()
             .map_or_else(|| "stdin".to_owned(), |path| path.display().to_string());
-        bail!("{where_} is not formatted; drop --check to see the diff or write it");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            format!("{where_} is not formatted; drop --check to see the diff or write it"),
+        )
+        .into());
     }
 
     if diff_stat_only {
@@ -65,21 +69,25 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
         return Ok(());
     }
 
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rendered,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rendered)
 }
 
-pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> CliResult<()> {
     let (input, dialect) = read_input_and_dialect(args.file, args.dialect)?;
-    let repaired = SyntaxTree::repair_unclosed_lists(&input.text)
-        .context("repair-unclosed-lists only repairs unclosed lists")?;
+    let repaired = SyntaxTree::repair_unclosed_lists(&input.text).map_err(|_| {
+        paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            "repair-unclosed-lists only repairs unclosed lists",
+        )
+    })?;
     if repaired == input.text {
-        bail!("input is already balanced");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            "input is already balanced",
+        )
+        .into());
     }
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, repaired,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, repaired)
 }
 
 /// Prints the selected source text.
@@ -89,7 +97,7 @@ pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> R
 /// because that is what callers pipe into other commands. Use
 /// `inspect resolve` when the matched forms may themselves span lines and the
 /// separator has to be unambiguous.
-pub(in crate::presentation::cli) fn select(args: TargetArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn select(args: TargetArgs) -> CliResult<()> {
     let (_, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let targets = resolve_targets(&tree, dialect, &args.selector)?;
     let rendered = targets
@@ -100,16 +108,18 @@ pub(in crate::presentation::cli) fn select(args: TargetArgs) -> Result<()> {
     Ok(())
 }
 
-pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> CliResult<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    SyntaxTree::parse_with_dialect(&args.with, dialect)
-        .context("replacement is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&args.with, dialect).map_err(|_| {
+        paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+            "replacement is not a valid S-expression document",
+        )
+    })?;
     let selection = resolve_one(&tree, dialect, &args.selector, "edit replace")?;
     let rewritten = Edit::replace(&input.text, selection, &args.with)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
 /// Removes the selected forms, optionally keeping what it removed.
@@ -118,7 +128,7 @@ pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> Result<()> {
 /// so `--to-ring` costs the command neither `--all` nor the range refusal. The
 /// ring is written only after every edit has succeeded: a kill that refused
 /// halfway should not leave half its forms on the clipboard.
-pub(in crate::presentation::cli) fn kill(args: KillArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn kill(args: KillArgs) -> CliResult<()> {
     let KillArgs {
         target,
         write,
@@ -157,7 +167,7 @@ pub(in crate::presentation::cli) fn kill(args: KillArgs) -> Result<()> {
     Ok(())
 }
 
-pub(in crate::presentation::cli) fn wrap(args: WrapArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn wrap(args: WrapArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit wrap")?;
@@ -169,63 +179,57 @@ pub(in crate::presentation::cli) fn wrap(args: WrapArgs) -> Result<()> {
         (None, None) => Edit::wrap_string(&input.text, &tree, selection)?,
     };
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
-pub(in crate::presentation::cli) fn unwrap_prefix(args: UnwrapPrefixArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn unwrap_prefix(args: UnwrapPrefixArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit unwrap-prefix")?;
     let rewritten = Edit::unwrap_prefix(&input.text, &tree, selection, args.all_prefixes)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
-pub(in crate::presentation::cli) fn splice(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::splice)?)
+pub(in crate::presentation::cli) fn splice(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::splice)
 }
 
-pub(in crate::presentation::cli) fn split(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::split)?)
+pub(in crate::presentation::cli) fn split(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::split)
 }
 
 /// Writes a second copy of the selected form immediately after it.
 ///
 /// `edit copy --to-ring` followed by `edit yank --placement after` reaches the
 /// same result in two calls, at the cost of whatever was on the kill ring.
-pub(in crate::presentation::cli) fn duplicate(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::duplicate)?)
+pub(in crate::presentation::cli) fn duplicate(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::duplicate)
 }
 
-pub(in crate::presentation::cli) fn join(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::join)?)
+pub(in crate::presentation::cli) fn join(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::join)
 }
 
-pub(in crate::presentation::cli) fn splice_killing_backward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::splice_killing_backward)?)
+pub(in crate::presentation::cli) fn splice_killing_backward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::splice_killing_backward)
 }
 
-pub(in crate::presentation::cli) fn splice_killing_forward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::splice_killing_forward)?)
+pub(in crate::presentation::cli) fn splice_killing_forward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::splice_killing_forward)
 }
 
-pub(in crate::presentation::cli) fn convolute(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::convolute)?)
+pub(in crate::presentation::cli) fn convolute(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::convolute)
 }
 
-pub(in crate::presentation::cli) fn raise(args: RaiseArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn raise(args: RaiseArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit raise")?;
     let rewritten = Edit::raise_levels(&input.text, &tree, selection, args.levels as usize)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
 /// Rewrites the selected quote into the requested spelling.
@@ -233,7 +237,7 @@ pub(in crate::presentation::cli) fn raise(args: RaiseArgs) -> Result<()> {
 /// Not routed through `edit_target`, which takes a bare
 /// `fn(&str, &SyntaxTree, Selection) -> _` and so has no room for the style
 /// argument. `raise --levels` is the same shape for the same reason.
-pub(in crate::presentation::cli) fn normalize_quotes(args: NormalizeQuotesArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn normalize_quotes(args: NormalizeQuotesArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(
@@ -245,33 +249,31 @@ pub(in crate::presentation::cli) fn normalize_quotes(args: NormalizeQuotesArgs) 
     let rewritten =
         Edit::normalize_quotes(&input.text, &tree, selection, args.style.into(), dialect)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
-pub(in crate::presentation::cli) fn transpose_forward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::transpose_forward)?)
+pub(in crate::presentation::cli) fn transpose_forward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::transpose_forward)
 }
 
-pub(in crate::presentation::cli) fn transpose_backward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::transpose_backward)?)
+pub(in crate::presentation::cli) fn transpose_backward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::transpose_backward)
 }
 
-pub(in crate::presentation::cli) fn slurp_forward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::slurp_forward)?)
+pub(in crate::presentation::cli) fn slurp_forward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::slurp_forward)
 }
 
-pub(in crate::presentation::cli) fn slurp_backward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::slurp_backward)?)
+pub(in crate::presentation::cli) fn slurp_backward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::slurp_backward)
 }
 
-pub(in crate::presentation::cli) fn barf_forward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::barf_forward)?)
+pub(in crate::presentation::cli) fn barf_forward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::barf_forward)
 }
 
-pub(in crate::presentation::cli) fn barf_backward(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::barf_backward)?)
+pub(in crate::presentation::cli) fn barf_backward(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::barf_backward)
 }
 
 /// Swaps two expressions that share a list, adjacent or not.
@@ -279,7 +281,7 @@ pub(in crate::presentation::cli) fn barf_backward(args: EditTargetArgs) -> Resul
 /// The adjacent pair already has `transpose-forward` and `transpose-backward`;
 /// this is the one that needs a second address, so it is the one command in the
 /// namespace that takes `--with-path` / `--with-at`.
-pub(in crate::presentation::cli) fn transpose(args: TransposeArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn transpose(args: TransposeArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let first = resolve_one(&tree, dialect, &args.target.selector, "edit transpose")?;
@@ -301,14 +303,12 @@ pub(in crate::presentation::cli) fn transpose(args: TransposeArgs) -> Result<()>
     )?;
     let rewritten = Edit::transpose_siblings(&input.text, &tree, first, second)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
 /// Reports where one structural move lands, as a `--path` the other commands
 /// accept verbatim.
-pub(in crate::presentation::cli) fn navigate(args: NavigateArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn navigate(args: NavigateArgs) -> CliResult<()> {
     let (_, dialect, tree) = read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let from = resolve_one(&tree, dialect, &args.target.selector, "edit navigate")?;
     let to = from.navigate(args.direction.into())?;
@@ -332,7 +332,7 @@ pub(in crate::presentation::cli) fn navigate(args: NavigateArgs) -> Result<()> {
 }
 
 /// Prints the selected form together with the comment block written above it.
-pub(in crate::presentation::cli) fn copy(args: CopyArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn copy(args: CopyArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit copy")?;
@@ -345,7 +345,7 @@ pub(in crate::presentation::cli) fn copy(args: CopyArgs) -> Result<()> {
 }
 
 /// Pastes a kill ring entry beside, or over, the selected form.
-pub(in crate::presentation::cli) fn yank(args: YankArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn yank(args: YankArgs) -> CliResult<()> {
     let path = ring_path(args.kill_ring.ring.clone());
     let ring = read_ring(&path)?;
     let entry = ring
@@ -358,8 +358,12 @@ pub(in crate::presentation::cli) fn yank(args: YankArgs) -> Result<()> {
 
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
-    SyntaxTree::parse_with_dialect(&entry.text, dialect)
-        .context("kill ring entry is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&entry.text, dialect).map_err(|_| {
+        paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+            "kill ring entry is not a valid S-expression document",
+        )
+    })?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit yank")?;
     // The entry carries the indentation it had where it was cut; the insertion
     // point supplies its own, and keeping both would indent it twice.
@@ -375,16 +379,14 @@ pub(in crate::presentation::cli) fn yank(args: YankArgs) -> Result<()> {
         YankPlacement::Replace => Edit::replace(&input.text, selection, text)?,
     };
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
-pub(in crate::presentation::cli) fn delete_forward(args: CursorArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn delete_forward(args: CursorArgs) -> CliResult<()> {
     cursor_edit(args, Edit::delete_forward)
 }
 
-pub(in crate::presentation::cli) fn delete_backward(args: CursorArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn delete_backward(args: CursorArgs) -> CliResult<()> {
     cursor_edit(args, Edit::delete_backward)
 }
 
@@ -393,52 +395,54 @@ pub(in crate::presentation::cli) fn delete_backward(args: CursorArgs) -> Result<
 /// The reindent runs against a *reparse* of the result: the tree the insertion
 /// was planned on describes the document before it, and every offset past the
 /// cursor has moved by one.
-pub(in crate::presentation::cli) fn newline(args: NewlineArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn newline(args: NewlineArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.cursor.file, args.cursor.dialect)?;
     let inserted = Edit::insert_newline(&input.text, &tree, args.cursor.at)?;
     let rewritten = if args.no_reindent {
         inserted
     } else {
-        let reparsed = SyntaxTree::parse_with_dialect(&inserted, dialect)
-            .context("newline insertion produced a document that does not reparse")?;
+        let reparsed = SyntaxTree::parse_with_dialect(&inserted, dialect).map_err(|_| {
+            paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+                "newline insertion produced a document that does not reparse",
+            )
+        })?;
         reparsed.reindent_form_at(args.cursor.at, args.indent)
     };
     // The break usually strands the space that used to separate two forms at
     // the end of the line it left behind.
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
     validated(&rewritten, dialect)?;
-    Ok(emit_document(
+    emit_document(
         &input,
         dialect,
         args.cursor.write,
         args.cursor.diff,
         rewritten,
-    )?)
+    )
 }
 
 /// Reindents the selected definition without rewrapping its lines.
-pub(in crate::presentation::cli) fn reindent_defun(args: ReindentArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn reindent_defun(args: ReindentArgs) -> CliResult<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit reindent-defun")?;
     let rewritten = tree.reindent(selection.span(), args.indent);
     validated(&rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
-pub(in crate::presentation::cli) fn split_string(args: CursorArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn split_string(args: CursorArgs) -> CliResult<()> {
     cursor_edit(args, Edit::split_string)
 }
 
-pub(in crate::presentation::cli) fn escape_string(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::escape_string)?)
+pub(in crate::presentation::cli) fn escape_string(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::escape_string)
 }
 
-pub(in crate::presentation::cli) fn unescape_string(args: EditTargetArgs) -> Result<()> {
-    Ok(edit_target(args, Edit::unescape_string)?)
+pub(in crate::presentation::cli) fn unescape_string(args: EditTargetArgs) -> CliResult<()> {
+    edit_target(args, Edit::unescape_string)
 }
 
 /// The shared body of the offset-addressed edits.
@@ -449,13 +453,11 @@ pub(in crate::presentation::cli) fn unescape_string(args: EditTargetArgs) -> Res
 fn cursor_edit(
     args: CursorArgs,
     edit: fn(&str, &SyntaxTree, usize) -> paredit_core_syntax::sexpr::SexprResult<String>,
-) -> Result<()> {
+) -> CliResult<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let rewritten = edit(&input.text, &tree, args.at)?;
     validated(&rewritten, dialect)?;
-    Ok(emit_document(
-        &input, dialect, args.write, args.diff, rewritten,
-    )?)
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
 /// Reparses a rewrite before it is printed, not only before it is written.
@@ -463,9 +465,13 @@ fn cursor_edit(
 /// `emit_document` already guards `--write`. These commands guard stdout too,
 /// because a caller piping the result into the next command would otherwise
 /// carry a broken document one step further before anything noticed.
-fn validated(rewritten: &str, dialect: Dialect) -> Result<()> {
-    SyntaxTree::parse_with_dialect(rewritten, dialect)
-        .context("refusing to emit: the rewritten source does not reparse")?;
+fn validated(rewritten: &str, dialect: Dialect) -> CliResult<()> {
+    SyntaxTree::parse_with_dialect(rewritten, dialect).map_err(|_| {
+        paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+            "refusing to emit: the rewritten source does not reparse",
+        )
+    })?;
     Ok(())
 }
 
@@ -473,7 +479,7 @@ fn validated(rewritten: &str, dialect: Dialect) -> Result<()> {
 ///
 /// The caller chooses what `text` is, because the two callers disagree on
 /// purpose: `kill` stores what it removed, `copy` stores what it printed.
-fn push_to_ring(args: &KillRingArgs, origin: Option<&Path>, text: &str) -> Result<()> {
+fn push_to_ring(args: &KillRingArgs, origin: Option<&Path>, text: &str) -> CliResult<()> {
     let path = ring_path(args.ring.clone());
     let mut ring = read_ring(&path)?;
     ring.push(
@@ -483,7 +489,7 @@ fn push_to_ring(args: &KillRingArgs, origin: Option<&Path>, text: &str) -> Resul
         },
         args.ring_size,
     );
-    Ok(write_ring(&path, &ring)?)
+    write_ring(&path, &ring)
 }
 
 fn selection_json(selection: Selection<'_>) -> serde_json::Value {

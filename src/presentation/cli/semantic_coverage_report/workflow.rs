@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::application::usecase::semantic_coverage::{
     DiscoveredSemanticCoverageFile, SemanticCoverageInventory, SemanticCoveragePolicy,
@@ -17,10 +17,12 @@ use crate::presentation::cli::shared::expand_input_files;
 struct CliSemanticCoverageSource;
 
 impl SemanticCoverageSourcePort for CliSemanticCoverageSource {
+    type Error = paredit_core_cli::CliError;
+
     fn discover(
         &mut self,
         request: &SemanticCoverageRequest,
-    ) -> anyhow::Result<SemanticCoverageInventory> {
+    ) -> Result<SemanticCoverageInventory, Self::Error> {
         Ok(SemanticCoverageInventory {
             files: request
                 .paths
@@ -38,7 +40,7 @@ impl SemanticCoverageSourcePort for CliSemanticCoverageSource {
 
 pub(in crate::presentation::cli) fn semantic_coverage_report(
     args: SemanticCoverageReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let paths = expand_input_files(&args.files, args.dialect)?;
     let mut source = CliSemanticCoverageSource;
     let report = build_semantic_coverage_report(
@@ -48,13 +50,12 @@ pub(in crate::presentation::cli) fn semantic_coverage_report(
             dialect: args.dialect.map(Into::into),
         },
     )
-    // `map_err(|e| anyhow!("{e}"))` would format through `Display` — which
-    // for `Source` is the fixed string "semantic coverage source failed" —
-    // into a brand-new error with no `source()` chain, discarding the real
-    // cause. `.context` on the wrapped error keeps both.
-    .map_err(|SemanticCoverageWorkflowError::Source(source)| {
-        source.context("semantic coverage source failed")
-    })?;
+    // The wrapper this used to add existed to work around `anyhow`: `Display`
+    // for `Source` was the fixed string "semantic coverage source failed", so
+    // `.context` was needed to keep the real cause reachable. The variant now
+    // carries a `CliError`, which already renders its own chain and carries a
+    // classification, so unwrapping it is strictly more informative.
+    .map_err(|SemanticCoverageWorkflowError::Source(source)| *source)?;
 
     let policy = SemanticCoveragePolicy::evaluate(args.fail_under, &report);
     let policy_passed = policy.passed;

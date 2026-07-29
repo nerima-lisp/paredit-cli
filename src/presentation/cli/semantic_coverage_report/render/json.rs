@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::application::usecase::semantic_coverage::{
@@ -11,7 +11,7 @@ pub(super) fn print_semantic_coverage_report(
     report: &SemanticCoverageReport,
     policy: &SemanticCoveragePolicy,
     top: usize,
-) -> Result<()> {
+) -> CliResult<()> {
     let variable_bindings = report.total_variable_bindings();
     let resolved_bindings = report.total_resolved_bindings();
     let list_expressions = report.total_list_expressions();

@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
+
+use crate::error::PackageCommandError;
 
 use crate::package::usecase as package_usecase;
 
@@ -8,7 +10,7 @@ use super::{
 };
 use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub fn rename_package(args: RenamePackageArgs) -> Result<()> {
+pub fn rename_package(args: RenamePackageArgs) -> CliResult<()> {
     let mut plans = Vec::with_capacity(args.files.len());
 
     for file in &args.files {
@@ -20,7 +22,11 @@ pub fn rename_package(args: RenamePackageArgs) -> Result<()> {
                 from: &args.from,
                 to: &args.to,
             })
-            .with_context(|| format!("failed to plan rename-package for {}", file.display()))?;
+            .map_err(|source| PackageCommandError::Plan {
+                operation: "rename-package",
+                path: file.display().to_string(),
+                source,
+            })?;
         let changed = usecase_plan.changed;
         let written = args.write && changed;
 

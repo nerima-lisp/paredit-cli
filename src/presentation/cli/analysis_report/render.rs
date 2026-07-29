@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::report::budget::Budget;
@@ -12,7 +12,7 @@ use paredit_core_cli::shared::stable_text_hash;
 
 use crate::presentation::cli::args::OutputFormat;
 
-pub(super) fn print_dialect(dialect: Dialect, output: OutputFormat) -> Result<()> {
+pub(super) fn print_dialect(dialect: Dialect, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => println!("{dialect}"),
         OutputFormat::Json => println!(
@@ -27,7 +27,11 @@ pub(super) fn print_dialect(dialect: Dialect, output: OutputFormat) -> Result<()
     Ok(())
 }
 
-pub(super) fn print_stats(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
+pub(super) fn print_stats(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    output: OutputFormat,
+) -> CliResult<()> {
     let atoms = tree.atom_occurrences();
     let outline = tree.outline(|head| dialect.is_definition_head(head));
     match output {
@@ -67,7 +71,7 @@ pub(super) fn print_agent_report(
     dialect: Dialect,
     output: OutputFormat,
     options: &AgentReportOptions<'_>,
-) -> Result<()> {
+) -> CliResult<()> {
     let atoms = tree.atom_occurrences();
     let outline = tree.outline(|head| dialect.is_definition_head(head));
     let definition_count = outline.iter().filter(|entry| entry.definition_like).count();
@@ -323,7 +327,7 @@ pub(super) fn print_outline(
     tree: &SyntaxTree,
     dialect: Dialect,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let entries = tree.outline(|head| dialect.is_definition_head(head));
     match output {
         OutputFormat::Text => {

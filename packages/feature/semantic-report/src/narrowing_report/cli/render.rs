@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -11,7 +11,7 @@ pub fn print_narrowing_report(
     policy: &NarrowingPolicy,
     binding: Option<&str>,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => print_text(reports, policy, binding),
         OutputFormat::Json => print_json(reports, policy, binding)?,
@@ -64,7 +64,7 @@ fn print_json(
     reports: &[NarrowingReportFile],
     policy: &NarrowingPolicy,
     binding: Option<&str>,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

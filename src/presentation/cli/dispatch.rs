@@ -1,6 +1,13 @@
 use super::*;
 
-pub(super) fn dispatch(command: Command) -> Result<()> {
+/// Runs the command the argument layer produced.
+///
+/// [`CommandResult`] rather than `anyhow::Result<()>`: a command entry point
+/// either did its work, could not, or tripped a gate the caller asked for, and
+/// those are three different things the exit code has to tell apart. They used
+/// to travel as one type-erased `anyhow::Error` that `diagnosis` reflected on
+/// with `downcast`.
+pub(super) fn dispatch(command: Command) -> CommandResult {
     match command {
         Command::Inspect { command } => match command {
             command::InspectCommand::Check(args) => analysis_report::workflow::check(args)?,

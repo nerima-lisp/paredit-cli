@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -6,7 +6,7 @@ use crate::loop_report::cli::args::LoopReportArgs;
 use crate::loop_report::cli::render::print_unterminated_report;
 use crate::loop_report::usecase::{build_loop_report, evaluate_fail_on_unterminated_policy};
 
-pub fn loop_report(args: LoopReportArgs) -> Result<()> {
+pub fn loop_report(args: LoopReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

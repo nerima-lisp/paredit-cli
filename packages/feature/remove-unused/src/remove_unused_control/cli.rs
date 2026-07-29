@@ -2,8 +2,8 @@ use crate::remove_unused_control::usecase::{
     RemoveUnusedControlPlan, RemoveUnusedControlRequest, plan_remove_unused_block,
     plan_remove_unused_tag,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -39,10 +39,10 @@ struct RemoveUnusedControlArgs {
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     output: OutputFormat,
 }
-pub fn remove_unused_block(args: RemoveUnusedBlockArgs) -> Result<()> {
+pub fn remove_unused_block(args: RemoveUnusedBlockArgs) -> CliResult<()> {
     run(args.common, plan_remove_unused_block)
 }
-pub fn remove_unused_tag(args: RemoveUnusedTagArgs) -> Result<()> {
+pub fn remove_unused_tag(args: RemoveUnusedTagArgs) -> CliResult<()> {
     run(args.common, plan_remove_unused_tag)
 }
 fn run(
@@ -53,9 +53,9 @@ fn run(
     planner: fn(
         RemoveUnusedControlRequest<'_>,
     ) -> crate::error::RemoveUnusedResult<RemoveUnusedControlPlan>,
-) -> Result<()> {
+) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = planner(RemoveUnusedControlRequest {

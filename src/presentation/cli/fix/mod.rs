@@ -22,7 +22,7 @@
 
 pub(super) mod args;
 
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::presentation::cli::lint_report::args::{FixMode, LintReportArgs};
 use crate::presentation::cli::lint_report::workflow::lint_report;
@@ -30,7 +30,7 @@ use crate::presentation::cli::lint_report::workflow::lint_report;
 pub(super) use args::FixCommand;
 
 /// Dispatches the namespace's four leaves onto the one lint workflow.
-pub(super) fn fix(command: FixCommand) -> Result<()> {
+pub(super) fn fix(command: FixCommand) -> CommandResult {
     let (selection, mode) = match command {
         FixCommand::Apply(selection) => (selection, FixMode::Apply),
         FixCommand::Check(selection) => (selection, FixMode::Check),
@@ -44,10 +44,12 @@ pub(super) fn fix(command: FixCommand) -> Result<()> {
     // apply` with no arguments scans nothing, reports zero fixes, and exits
     // zero — which reads exactly like a clean codebase.
     if mode != FixMode::List && selection.files.is_empty() {
-        anyhow::bail!(
-            "no files to fix: pass one or more files or directories \
-             (`paredit fix list` is the leaf that takes none)"
-        );
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "no files to fix: pass one or more files or directories \
+                      (`paredit fix list` is the leaf that takes none)"
+                .to_owned(),
+        }
+        .into());
     }
 
     lint_report(LintReportArgs::for_fix(selection, mode))

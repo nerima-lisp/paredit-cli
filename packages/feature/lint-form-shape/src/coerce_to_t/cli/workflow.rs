@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::coerce_to_t::cli::args::CoerceToTReportArgs;
 use crate::coerce_to_t::cli::render::print_coerce_to_t_report;
@@ -8,7 +8,7 @@ use crate::coerce_to_t::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn coerce_to_t_report(args: CoerceToTReportArgs) -> Result<()> {
+pub fn coerce_to_t_report(args: CoerceToTReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut coerce_form_count = 0;

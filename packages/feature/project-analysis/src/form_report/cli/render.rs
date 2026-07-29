@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -6,7 +6,7 @@ use crate::form_report::usecase::types::FormReport;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_syntax::sexpr::Delimiter;
 
-pub fn print_form_report(report: &FormReport, output: OutputFormat) -> Result<()> {
+pub fn print_form_report(report: &FormReport, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", report.dialect.label());

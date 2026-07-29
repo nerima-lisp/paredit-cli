@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::unwind_protect_no_cleanup::cli::args::UnwindProtectNoCleanupReportArgs;
 use crate::unwind_protect_no_cleanup::cli::render::print_unwind_protect_no_cleanup_report;
@@ -8,7 +8,7 @@ use crate::unwind_protect_no_cleanup::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn unwind_protect_no_cleanup_report(args: UnwindProtectNoCleanupReportArgs) -> Result<()> {
+pub fn unwind_protect_no_cleanup_report(args: UnwindProtectNoCleanupReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut unwind_protect_form_count = 0;

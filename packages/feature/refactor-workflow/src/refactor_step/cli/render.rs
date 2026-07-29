@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -12,7 +12,7 @@ pub fn print_steps(
     written: &[String],
     wrote: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let skipped = steps.len() - selection.count();
     match output {
         OutputFormat::Text => {

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::binds_constant::cli::args::BindsConstantReportArgs;
 use crate::binds_constant::cli::render::print_binds_constant_report;
@@ -8,7 +8,7 @@ use crate::binds_constant::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn binds_constant_report(args: BindsConstantReportArgs) -> Result<()> {
+pub fn binds_constant_report(args: BindsConstantReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut binding_form_count = 0;

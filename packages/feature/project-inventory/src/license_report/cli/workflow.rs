@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -6,7 +6,7 @@ use crate::license_report::cli::args::LicenseReportArgs;
 use crate::license_report::cli::render::print_review_report;
 use crate::license_report::usecase::{build_license_report, evaluate_fail_on_review_policy};
 
-pub fn license_report(args: LicenseReportArgs) -> Result<()> {
+pub fn license_report(args: LicenseReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

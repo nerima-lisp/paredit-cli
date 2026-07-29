@@ -2,13 +2,12 @@ use crate::let_report::usecase::{
     LetFormReport, LetReportPolicy, LetReportPolicyOptions, build_let_report,
     evaluate_let_report_policy,
 };
-use anyhow::Result;
-use anyhow::anyhow;
 use clap::Args;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::{CliError, CliResult, CommandResult};
 use paredit_core_syntax::dialect::Dialect;
 use serde_json::Value;
 use serde_json::json;
@@ -37,7 +36,7 @@ pub struct LetReportArgs {
     output: OutputFormat,
 }
 
-pub fn let_report(args: LetReportArgs) -> Result<()> {
+pub fn let_report(args: LetReportArgs) -> CommandResult {
     let options = LetReportPolicyOptions::new(
         args.fail_on_duplicate_evaluation,
         args.fail_on_unused_binding,
@@ -54,9 +53,9 @@ pub fn let_report(args: LetReportArgs) -> Result<()> {
             .map(|parallelism| parallelism.get())
             .unwrap_or(1)
             .clamp(1, args.files.len());
-        let mut ordered: Vec<Option<Result<FileLetReport>>> =
+        let mut ordered: Vec<Option<CliResult<FileLetReport>>> =
             (0..args.files.len()).map(|_| None).collect();
-        std::thread::scope(|scope| -> Result<()> {
+        std::thread::scope(|scope| -> CommandResult {
             let files = &args.files;
             let explicit = args.dialect;
             let handles: Vec<_> = (0..worker_count)
@@ -68,13 +67,13 @@ pub fn let_report(args: LetReportArgs) -> Result<()> {
                             .skip(worker)
                             .step_by(worker_count)
                             .map(|(index, file)| {
-                                // read_input_dialect_and_tree now returns
-                                // CliError while build_let_report returns
-                                // anyhow; anyhow::Error is the union until
-                                // this package's own section 9.2 pass.
-                                let report =
+                                // `CliError` is the union now that this
+                                // package's `BindingError` converts into it:
+                                // `read_input_dialect_and_tree` already
+                                // returned one, and `build_let_report`'s
+                                // error reaches it through `?`.
+                                let report: CliResult<_> =
                                     read_input_dialect_and_tree(Some(file.clone()), explicit)
-                                        .map_err(anyhow::Error::from)
                                         .and_then(|(input, dialect, tree)| {
                                             Ok((
                                                 file.clone(),
@@ -91,7 +90,15 @@ pub fn let_report(args: LetReportArgs) -> Result<()> {
             for handle in handles {
                 for (index, report) in handle
                     .join()
-                    .map_err(|_| anyhow!("let-report worker thread panicked"))?
+                    // A panic in a worker is a defect in this tool, not
+                    // something the caller's input or command line can fix,
+                    // and `internal.unclassified` is the code that says so.
+                    .map_err(|_| {
+                        CliError::Feature(paredit_core_cli::error::FeatureRefusal::message(
+                            paredit_core_cli::diagnosis::ErrorCode::Internal,
+                            "let-report worker thread panicked",
+                        ))
+                    })?
                 {
                     ordered[index] = Some(report);
                 }
@@ -135,7 +142,7 @@ fn print_let_report(
     reports: &[LetFormReport],
     policy: &LetReportPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", dialect.label());
@@ -162,7 +169,7 @@ fn print_multi_file_let_report(
     per_file: &[(PathBuf, Dialect, Vec<LetFormReport>)],
     policy: &LetReportPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("file_count\t{}", per_file.len());

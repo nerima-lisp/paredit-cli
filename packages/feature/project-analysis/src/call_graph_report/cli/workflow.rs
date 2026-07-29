@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::call_graph_report::cli::args::CallGraphArgs;
 use crate::call_graph_report::cli::render::{call_graph_drawing, print_call_graph_report};
@@ -9,7 +9,7 @@ use crate::call_graph_report::usecase::{
 use paredit_core_cli::report::graph::print_graph;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn call_graph(args: CallGraphArgs) -> Result<()> {
+pub fn call_graph(args: CallGraphArgs) -> CommandResult {
     let symbol = args.symbol.as_ref();
     let mut sources = Vec::with_capacity(args.files.len());
 
@@ -32,7 +32,7 @@ pub fn call_graph(args: CallGraphArgs) -> Result<()> {
             args.require_edges,
             args.require_internal_edges,
         )
-        .map_err(anyhow::Error::msg)?,
+        .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message })?,
     );
     match args.graph {
         Some(format) => print_graph(&call_graph_drawing(&report.files, symbol), format),

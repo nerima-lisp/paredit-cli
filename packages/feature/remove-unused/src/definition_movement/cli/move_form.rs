@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::MoveInsert;
 
 use paredit_core_syntax::sexpr::{Edit, SyntaxTree};
@@ -12,33 +12,48 @@ use paredit_core_cli::shared::{
     write_files_with_rollback,
 };
 
-pub fn move_form(args: MoveFormArgs) -> Result<()> {
+pub fn move_form(args: MoveFormArgs) -> CliResult<()> {
     let same_file = same_file_path(&args.from_file, &args.to_file);
     if same_file {
-        anyhow::bail!("--from-file and --to-file must refer to different files");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--from-file and --to-file must refer to different files",
+        )
+        .into());
     }
     if args.insert == MoveInsert::Append && args.anchor_path.is_some() {
-        anyhow::bail!("--anchor-path is only valid with --insert before or --insert after");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--anchor-path is only valid with --insert before or --insert after",
+        )
+        .into());
     }
     if matches!(args.insert, MoveInsert::Before | MoveInsert::After) && args.anchor_path.is_none() {
-        anyhow::bail!("--insert before/after requires --anchor-path");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--insert before/after requires --anchor-path",
+        )
+        .into());
     }
 
     let (from_input, from_dialect, from_tree) =
         read_input_dialect_and_tree(Some(args.from_file.clone()), args.dialect)?;
     let (to_input, to_file_existed) = read_file_or_empty(&args.to_file)?;
     let to_dialect = detect_dialect(&to_input, args.dialect);
-    let to_tree =
-        SyntaxTree::parse_with_dialect(&to_input.text, to_dialect).with_context(|| {
-            format!(
-                "destination file is not a valid S-expression document: {}",
-                args.to_file.display()
-            )
-        })?;
+    let to_tree = SyntaxTree::parse_with_dialect(&to_input.text, to_dialect).map_err(|source| {
+        crate::error::DefinitionMovementError::DestinationNotAnSexprDocument {
+            path: args.to_file.display().to_string(),
+            source,
+        }
+    })?;
 
     let target_index = top_level_path_index(&args.path, "move-form")?;
     if target_index >= from_tree.root_children().len() {
-        anyhow::bail!("top-level path {} is out of range", args.path);
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::SelectionPathNotReachable,
+            format!("top-level path {} is out of range", args.path),
+        )
+        .into());
     }
 
     let selection = from_tree.select_path(&args.path)?;
@@ -57,17 +72,23 @@ pub fn move_form(args: MoveFormArgs) -> Result<()> {
         "move-form",
     )?;
 
-    SyntaxTree::parse_with_dialect(&from_rewritten, from_dialect).with_context(|| {
-        format!(
-            "source file would become invalid after moving form: {}",
-            args.from_file.display()
-        )
+    SyntaxTree::parse_with_dialect(&from_rewritten, from_dialect).map_err(|source| {
+        crate::error::DefinitionMovementError::WouldBecomeInvalid {
+            side: "source",
+            action: "moving",
+            what: "form",
+            path: args.from_file.display().to_string(),
+            source,
+        }
     })?;
-    SyntaxTree::parse_with_dialect(&to_rewritten, to_dialect).with_context(|| {
-        format!(
-            "destination file would become invalid after receiving form: {}",
-            args.to_file.display()
-        )
+    SyntaxTree::parse_with_dialect(&to_rewritten, to_dialect).map_err(|source| {
+        crate::error::DefinitionMovementError::WouldBecomeInvalid {
+            side: "destination",
+            action: "receiving",
+            what: "form",
+            path: args.to_file.display().to_string(),
+            source,
+        }
     })?;
 
     let changed = from_rewritten != from_input.text || to_rewritten != to_input.text;

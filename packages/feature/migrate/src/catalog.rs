@@ -8,7 +8,9 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
+
+use crate::error::MigrateError;
 use paredit_core_cli::error::{ArgumentError, CliError};
 use paredit_core_cli::shared::{MAX_SOURCE_INPUT_BYTES, read_text_file_with_limit};
 
@@ -43,11 +45,14 @@ pub struct CatalogEntry {
 /// Panics only if a shipped recipe stops parsing, which
 /// `every_built_in_recipe_parses` below turns into a test failure rather than
 /// a runtime one.
-pub fn built_in() -> Result<Vec<CatalogEntry>> {
+pub fn built_in() -> CliResult<Vec<CatalogEntry>> {
     let mut entries = Vec::new();
     for (name, source) in BUILT_IN {
-        for migration in parse_recipes(source, name)
-            .with_context(|| format!("built-in recipe {name} is malformed"))?
+        for migration in
+            parse_recipes(source, name).map_err(|source| MigrateError::BuiltInMalformed {
+                name: name.to_string(),
+                source,
+            })?
         {
             entries.push(CatalogEntry {
                 migration,
@@ -64,7 +69,7 @@ pub fn built_in() -> Result<Vec<CatalogEntry>> {
 /// a convention, and most projects have no recipes of their own. A directory
 /// that exists and holds a file that will not parse *is* an error — a project
 /// that wrote a recipe and saw a green run has been told the recipe applied.
-pub fn from_directory(directory: &Path) -> Result<Vec<CatalogEntry>> {
+pub fn from_directory(directory: &Path) -> CliResult<Vec<CatalogEntry>> {
     let Ok(read) = std::fs::read_dir(directory) else {
         return Ok(Vec::new());
     };
@@ -88,9 +93,18 @@ pub fn from_directory(directory: &Path) -> Result<Vec<CatalogEntry>> {
         // it allocates until the process dies. A FIFO blocks forever the same
         // way. `migrate list`, `explain` and `run` all resolve the catalogue,
         // so all three were reachable.
-        let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES)
-            .with_context(|| format!("reading migration recipe {origin}"))?;
-        for migration in parse_recipes(&text, &origin)? {
+        let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES).map_err(|source| {
+            MigrateError::RecipeUnreadable {
+                origin: origin.clone(),
+                source,
+            }
+        })?;
+        for migration in
+            parse_recipes(&text, &origin).map_err(|source| MigrateError::RecipeMalformed {
+                origin: origin.clone(),
+                source,
+            })?
+        {
             entries.push(CatalogEntry {
                 migration,
                 origin: origin.clone(),
@@ -106,7 +120,7 @@ pub fn from_directory(directory: &Path) -> Result<Vec<CatalogEntry>> {
 /// Shadowing rather than refusing: a project that wants `nil-conditionals` to
 /// mean something slightly different for its codebase should be able to say
 /// so, and the origin column in `migrate list` makes the override visible.
-pub fn resolve(directory: &Path) -> Result<Vec<CatalogEntry>> {
+pub fn resolve(directory: &Path) -> CliResult<Vec<CatalogEntry>> {
     let project = from_directory(directory)?;
     let mut entries: Vec<CatalogEntry> = built_in()?
         .into_iter()
@@ -122,7 +136,7 @@ pub fn resolve(directory: &Path) -> Result<Vec<CatalogEntry>> {
 }
 
 /// The one recipe named `name`, or a failure listing what is available.
-pub fn find(entries: &[CatalogEntry], name: &str) -> Result<CatalogEntry> {
+pub fn find(entries: &[CatalogEntry], name: &str) -> CliResult<CatalogEntry> {
     if let Some(entry) = entries
         .iter()
         .find(|entry| entry.migration.name == name)
@@ -147,8 +161,7 @@ pub fn find(entries: &[CatalogEntry], name: &str) -> Result<CatalogEntry> {
         } else {
             available
         },
-    })
-    .into())
+    }))
 }
 
 #[cfg(test)]

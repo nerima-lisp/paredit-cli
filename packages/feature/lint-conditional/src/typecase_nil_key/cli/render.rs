@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_typecase_nil_key_report(
     summary: &TypecaseNilKeySummary,
     policy: &TypecaseNilKeyPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("typecase_form_count\t{}", summary.typecase_form_count);

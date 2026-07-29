@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::modify_macro_arity::cli::args::ModifyMacroArityReportArgs;
 use crate::modify_macro_arity::cli::render::print_modify_macro_arity_report;
@@ -8,7 +8,7 @@ use crate::modify_macro_arity::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn modify_macro_arity_report(args: ModifyMacroArityReportArgs) -> Result<()> {
+pub fn modify_macro_arity_report(args: ModifyMacroArityReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_count = 0;

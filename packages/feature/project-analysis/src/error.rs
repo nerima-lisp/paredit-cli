@@ -62,3 +62,23 @@ pub enum ProjectAnalysisError {
 
 /// The result type the project-analysis passes return.
 pub type ProjectAnalysisResult<T> = std::result::Result<T, ProjectAnalysisError>;
+
+// States which documented error code each project-analysis refusal earns.
+//
+// Three of the four arms delegate: this package composes `package`,
+// `remove-unused` and the workspace layer rather than refusing on its own, so
+// re-deciding here would be a second answer to a question already answered.
+paredit_core_cli::impl_classified_refusal!(ProjectAnalysisError, |error| match error {
+    ProjectAnalysisError::Selection(sexpr) =>
+        paredit_core_cli::diagnosis::code_for_sexpr_error(sexpr),
+    ProjectAnalysisError::Package(package) => paredit_feature_package::error::code_of(package),
+    ProjectAnalysisError::Definitions(definitions) =>
+        paredit_feature_remove_unused::error::code_of(definitions),
+    ProjectAnalysisError::Workspace(_) => paredit_core_cli::diagnosis::ErrorCode::RefusalWorkspace,
+});
+
+// A workspace analysis failure names the file it stopped on; the failure
+// itself is the file not parsing.
+paredit_core_cli::impl_classified_refusal!(WorkspaceAnalysisError, |_error| {
+    paredit_core_cli::diagnosis::ErrorCode::InputUnparsable
+});

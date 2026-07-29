@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::duplicate_boolean_operands::cli::args::DuplicateBooleanOperandReportArgs;
 use crate::duplicate_boolean_operands::cli::render::print_duplicate_boolean_operand_report;
@@ -8,7 +8,7 @@ use crate::duplicate_boolean_operands::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn duplicate_boolean_operand_report(args: DuplicateBooleanOperandReportArgs) -> Result<()> {
+pub fn duplicate_boolean_operand_report(args: DuplicateBooleanOperandReportArgs) -> CommandResult {
     let mut boolean_form_count = 0;
     let mut duplicates = Vec::new();
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::sharp_quoted_lambda::cli::args::SharpQuotedLambdaReportArgs;
 use crate::sharp_quoted_lambda::cli::render::print_sharp_quoted_lambda_report;
@@ -8,7 +8,7 @@ use crate::sharp_quoted_lambda::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn sharp_quoted_lambda_report(args: SharpQuotedLambdaReportArgs) -> Result<()> {
+pub fn sharp_quoted_lambda_report(args: SharpQuotedLambdaReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut lambda_form_count = 0;

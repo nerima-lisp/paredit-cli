@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::domain::dialect::Dialect;
 use crate::domain::lint::engine::PassOptions;
@@ -57,7 +57,7 @@ pub fn collect_lint_findings(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<LintFinding>> {
+) -> CliResult<Vec<LintFinding>> {
     Ok(crate::domain::lint::collect_lint_outcomes(
         path,
         dialect,
@@ -83,7 +83,7 @@ pub fn collect_lint_fixes(
     tree: &SyntaxTree,
     source: &str,
     active: &[&str],
-) -> Result<Vec<RuleFixFor>> {
+) -> CliResult<Vec<RuleFixFor>> {
     Ok(crate::domain::lint::collect_lint_outcomes(
         path,
         dialect,
@@ -121,7 +121,7 @@ pub fn collect_lint_findings_and_fixes(
     tree: &SyntaxTree,
     source: &str,
     active: &[&str],
-) -> Result<(Vec<LintFinding>, Vec<RuleFixFor>)> {
+) -> CliResult<(Vec<LintFinding>, Vec<RuleFixFor>)> {
     let outcomes = crate::domain::lint::collect_lint_outcomes(
         path,
         dialect,
@@ -177,7 +177,7 @@ pub fn run_lint_pass(
     tree: &SyntaxTree,
     source: &str,
     request: LintPassRequest<'_>,
-) -> Result<LintPassResult> {
+) -> CliResult<LintPassResult> {
     let outcome = crate::domain::lint::collect_lint_pass(
         path,
         dialect,

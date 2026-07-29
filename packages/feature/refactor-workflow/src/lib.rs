@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod error;
 pub mod refactor;
 pub mod refactor_step;
 

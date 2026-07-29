@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -10,7 +10,7 @@ use crate::value_propagation_report::usecase::{
     evaluate_value_propagation_policy,
 };
 
-pub fn value_propagation_report(args: ValuePropagationReportArgs) -> Result<()> {
+pub fn value_propagation_report(args: ValuePropagationReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

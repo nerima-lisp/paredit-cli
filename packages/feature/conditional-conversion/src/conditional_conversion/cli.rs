@@ -1,7 +1,7 @@
 use crate::conditional_sugar::usecase::{ConditionalConversionPlan, ConditionalConversionRequest};
 use crate::error::ConditionalConversionResult;
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -34,9 +34,9 @@ pub fn run(
     planner: fn(
         ConditionalConversionRequest<'_>,
     ) -> ConditionalConversionResult<ConditionalConversionPlan>,
-) -> Result<()> {
+) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = planner(ConditionalConversionRequest {

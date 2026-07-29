@@ -1,6 +1,6 @@
 use crate::introduce_let::usecase::{IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let};
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
@@ -31,9 +31,9 @@ pub struct IntroduceLetArgs {
     output: OutputFormat,
 }
 
-pub fn introduce_let(args: IntroduceLetArgs) -> Result<()> {
+pub fn introduce_let(args: IntroduceLetArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
@@ -63,7 +63,7 @@ fn print_introduce_let_plan(
     plan: &IntroduceLetPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

@@ -1,5 +1,12 @@
 use super::*;
-use anyhow::Result;
+/// The test harness's result type.
+///
+/// `Box<dyn Error>` rather than `anyhow::Result`: a test body unions
+/// `io::Error` from its fixture setup with `WorkspaceError` from the code
+/// under test, and the standard library already has a type for "either of
+/// these, and I only need to print it". Nothing here matches on the error —
+/// the assertions do that against `WorkspaceError` directly.
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 use std::fs;
 use std::io::{self, Cursor, Read};
 use std::path::PathBuf;

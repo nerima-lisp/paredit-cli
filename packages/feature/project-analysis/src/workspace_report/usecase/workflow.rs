@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::error::WorkspaceAnalysisError;
 
@@ -16,8 +16,8 @@ use super::types::{
 pub fn build_workspace_report(
     source: &mut impl WorkspaceReportSourcePort,
     request: WorkspaceReportRequest,
-) -> Result<WorkspaceReportPlan> {
-    let inventory = source.discover(&request)?;
+) -> CliResult<WorkspaceReportPlan> {
+    let inventory = source.discover(&request).map_err(Into::into)?;
     let mut reports = Vec::with_capacity(inventory.files.len());
 
     for file in inventory.files {

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_explicit_step_delta_report(
     summary: &ExplicitStepDeltaSummary,
     policy: &ExplicitStepDeltaPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("step_form_count\t{}", summary.step_form_count);

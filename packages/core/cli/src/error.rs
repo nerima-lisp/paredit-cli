@@ -21,14 +21,21 @@
 //!   its own documentation.
 //!
 //! Messages are reproduced exactly.
+//!
+//! [`CommandFailure`], at the bottom of this file, is the later addition: the
+//! sum of "the command failed" and "a requested gate tripped", which is what a
+//! command entry point actually returns and what decides the exit code.
 
 use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
+use paredit_core_edit::EditRefusal;
 use paredit_core_syntax::selector::SelectorError;
 use paredit_core_syntax::sexpr::{ParseError, SexprError};
 use paredit_core_workspace::workspace::WorkspaceError;
+
+use crate::gate::GateFailure;
 
 /// The CLI declined to read or write something, as policy rather than because
 /// the filesystem objected.
@@ -169,6 +176,19 @@ pub enum ArgumentError {
     )]
     ConflictingInputSelectors,
 
+    /// Two flags that do not combine, or one that needs another.
+    ///
+    /// Carries the message for the same reason [`CliError::Io`] carries its
+    /// context: there are sixteen of these across the feature packages, each
+    /// naming a different pair of flags on a different command, and a variant
+    /// per site would name the site rather than the failure. What the type is
+    /// for is the *classification* — every one of them is a usage problem
+    /// fixable only by changing the command line, and every one of them was
+    /// reaching the user as `internal.unclassified` because `bail!` erased
+    /// even that much.
+    #[error("{message}")]
+    FlagCombination { message: String },
+
     #[error("invalid {flag} pattern {pattern}: {reason}")]
     InvalidGlob {
         flag: &'static str,
@@ -302,6 +322,18 @@ pub enum CliError {
     #[error(transparent)]
     Selector(#[from] SelectorError),
 
+    /// A `--query` pattern does not parse.
+    #[error(transparent)]
+    Pattern(#[from] paredit_core_syntax::selector::error::PatternError),
+
+    /// A `--rewrite` template did not read as one replacement form.
+    ///
+    /// Kept apart from [`Self::Selector`]: a selector says *which* forms to
+    /// act on and a rewrite template says *what to put there*, and a caller
+    /// fixing one is editing a different flag from a caller fixing the other.
+    #[error(transparent)]
+    Rewrite(#[from] paredit_core_syntax::selector::error::RewriteError),
+
     #[error("{description} is not valid UTF-8")]
     NotUtf8 {
         description: String,
@@ -346,12 +378,67 @@ pub enum CliError {
         source: serde_json::Error,
     },
 
+    /// A structural edit declined to run.
+    ///
+    /// Added when the `anyhow` removal exposed that these were reaching the
+    /// user as `internal.unclassified` — "a defect in this tool" — for every
+    /// one of the 107 refusals in `paredit-core-edit`. They had no variant
+    /// here, so `?` absorbed them into `anyhow::Error` and the `downcast`
+    /// chain in `diagnosis` fell through to its fallback. `refactor
+    /// merge-nested-let` on a Scheme file reported the tool as broken rather
+    /// than the command as inapplicable.
+    ///
+    /// Kept whole rather than flattened: `EditRefusal`'s families already
+    /// separate "wrong dialect" from "wrong shape" from "output did not
+    /// reparse", which is exactly the distinction the error code needs.
+    #[error(transparent)]
+    Edit(#[from] EditRefusal),
+
+    /// A refusal raised inside a feature package.
+    ///
+    /// The escape hatch, and the reason it is safe: the set of error codes is
+    /// closed and documented, while the set of feature errors is open — 30
+    /// packages, each with its own vocabulary — so `CliError` cannot enumerate
+    /// them without inverting the dependency direction the workspace is built
+    /// on. What it *can* do is refuse to accept one that has not been
+    /// classified. See [`FeatureRefusal`].
+    #[error(transparent)]
+    Feature(#[from] FeatureRefusal),
+
+    /// A JSON document reaching a caller with no context attached.
+    ///
+    /// The counterpart to [`Self::Bare`], and for the same reason: the ~130
+    /// `cli/render.rs` files that serialize their own `json!` document were
+    /// already reaching `anyhow` through a bare `?`, and the rendered message
+    /// was `serde_json`'s own. `transparent` keeps that exactly.
+    ///
+    /// Distinct from [`Self::Json`], which names a *file* the tool owns and
+    /// therefore has a path worth reporting. Here there is no path: the
+    /// document was built in memory a line earlier, and the failure is a bug
+    /// rather than something the caller can fix.
+    #[error(transparent)]
+    JsonBare(#[from] serde_json::Error),
+
     /// The writes landed; only tidying up after them did not.
     ///
     /// Its own variant because it is the one failure here that a caller must
     /// *not* treat as "the operation did not happen". The files are written.
     #[error("writes committed successfully, but backup cleanup failed: {details}")]
     BackupCleanupAfterCommit { details: String },
+
+    /// The undo journal could not be written, read, or replayed.
+    ///
+    /// Carried whole rather than flattened into [`Self::Io`]: a journal that
+    /// cannot be written before a write is a different situation from one that
+    /// cannot be replayed after it, and `JournalError` already separates them.
+    #[error(transparent)]
+    Journal(#[from] paredit_core_safety::journal::JournalError),
+
+    /// A `--verify-command` could not be run at all.
+    ///
+    /// Distinct from the command running and failing, which is a gate.
+    #[error(transparent)]
+    External(#[from] paredit_core_safety::external::ExternalError),
 
     /// The wall-clock budget ran out before the work did.
     ///
@@ -361,6 +448,153 @@ pub enum CliError {
     /// wrong conclusion, so the type says which it is.
     #[error(transparent)]
     TimedOut(#[from] paredit_core_safety::deadline::TimeoutError),
+}
+
+/// A feature's own refusal, carrying the documented code it earns.
+///
+/// A feature keeps its rich error type internally — `PackageRefactorError`,
+/// `SimilarityCandidateCollectionError`, and so on — and converts to this at
+/// the point where it hands control back to the CLI. Two things happen there,
+/// and the split is the whole design:
+///
+/// - the **decision** is preserved as a type: [`Self::code`] is one of the
+///   documented codes, and `diagnosis` reads it directly rather than guessing;
+/// - the **presentation** is flattened to the rendered `source()` chain, which
+///   is exactly what the boundary was going to print anyway.
+///
+/// Flattening the payload is a real loss and worth being explicit about: a
+/// caller can no longer match on a feature's internal variants once the error
+/// is here. Nothing does — `report_failure` prints it and picks an exit code —
+/// and the alternative was `CliError` naming all 30 feature packages.
+///
+/// What this is *not* is the `anyhow` situation it replaces. `anyhow` erased
+/// the payload **and** the decision, which is how 107 edit refusals reached
+/// users as `internal.unclassified`. Here the code is a required constructor
+/// argument: there is no way to build one without answering the question.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("{message}")]
+pub struct FeatureRefusal {
+    code: crate::diagnosis::ErrorCode,
+    message: String,
+}
+
+impl FeatureRefusal {
+    /// Classifies a feature's error on its way to the CLI boundary.
+    ///
+    /// Answer `code` from the caller's point of view: what would they *do*
+    /// about it? `input.shape-refused` says "select a different form",
+    /// `selection.no-match` says "widen the search". `internal.unclassified`
+    /// says "this tool is broken", which is almost never the honest answer for
+    /// something a feature deliberately declined.
+    #[must_use]
+    pub fn new(code: crate::diagnosis::ErrorCode, error: &dyn std::error::Error) -> Self {
+        Self {
+            code,
+            // The whole chain, not just the outermost message: this is the
+            // last point at which the causes are still reachable.
+            message: error_chain(error),
+        }
+    }
+
+    /// Classifies a refusal a feature states directly, with no inner error.
+    ///
+    /// The typed replacement for `bail!`, and the reason it is worth having
+    /// rather than insisting on an enum variant per message: 68 of these are
+    /// one-off sentences on one command each — "`--insert before/after`
+    /// requires `--anchor-path`", "`move-definition` requires a top-level
+    /// definition path". Nothing matches on them; they are read once, by a
+    /// person or an agent, and acted on.
+    ///
+    /// So the message stays a string, exactly as `bail!` had it, and the thing
+    /// that was actually missing becomes mandatory: `code` has no default and
+    /// no inference. Where a feature's refusals *do* form a set worth matching
+    /// on — `PackageRefactorError`, `ExternalCheckError` — they get a real
+    /// enum and reach [`Self::new`] instead.
+    #[must_use]
+    pub fn message(code: crate::diagnosis::ErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+
+    /// Which documented code this refusal earns.
+    #[must_use]
+    pub const fn code(&self) -> crate::diagnosis::ErrorCode {
+        self.code
+    }
+}
+
+impl From<FeatureRefusal> for CommandFailure {
+    fn from(refusal: FeatureRefusal) -> Self {
+        Self::Error(CliError::Feature(refusal))
+    }
+}
+
+/// Wires a feature's error type into the CLI boundary, with its classification.
+///
+/// Every feature that reaches a command entry point needs the same two `From`
+/// impls, and the second exists only because `From` does not chain: `?` at an
+/// entry point needs `TheirError -> CommandFailure` in one step. Written by
+/// hand nine times, the pair was nine chances to reach for a plausible-looking
+/// code without thinking; written here, the *only* thing a feature supplies is
+/// the `match` that answers the question.
+///
+/// ```ignore
+/// paredit_core_cli::impl_classified_refusal!(BindingError, |error| match error {
+///     BindingError::Edit(edit) => code_for_edit_refusal(edit),
+///     BindingError::Shape(_) => ErrorCode::InputShapeRefused,
+/// });
+/// ```
+#[macro_export]
+macro_rules! impl_classified_refusal {
+    ($error:ty, |$binding:ident| $code:expr) => {
+        impl From<$error> for $crate::CliError {
+            fn from(error: $error) -> Self {
+                let code = {
+                    let $binding = &error;
+                    $code
+                };
+                Self::Feature($crate::error::FeatureRefusal::new(code, &error))
+            }
+        }
+
+        impl From<$error> for $crate::CommandFailure {
+            fn from(error: $error) -> Self {
+                Self::Error($crate::CliError::from(error))
+            }
+        }
+    };
+}
+
+/// Flattens a lint failure into the variant that already covers it.
+///
+/// Deliberately not a `CliError::Lint(LintError)` variant. `LintError`'s two
+/// cases are a path that did not resolve and an expired deadline, and this
+/// enum already carries both — a wrapping variant would create a second route
+/// to `SelectionPathNotReachable` and `EnvironmentTimeout` that
+/// `diagnosis::classify_cli` would have to keep in step with the first.
+impl From<paredit_core_lint_engine::error::LintError> for CliError {
+    fn from(error: paredit_core_lint_engine::error::LintError) -> Self {
+        use paredit_core_lint_engine::error::LintError;
+        match error {
+            LintError::Selection(sexpr) => Self::Sexpr(sexpr),
+            LintError::TimedOut(timeout) => Self::TimedOut(timeout),
+        }
+    }
+}
+
+/// Naming a rule that is not registered is a command-line problem.
+///
+/// Raised while *choosing* rules, before any tree exists — `RuleSelectionError`
+/// documents itself that way — so it belongs with the other argument errors
+/// rather than with what a lint pass can fail with.
+impl From<paredit_core_lint_engine::error::RuleSelectionError> for CliError {
+    fn from(error: paredit_core_lint_engine::error::RuleSelectionError) -> Self {
+        Self::Argument(ArgumentError::FlagCombination {
+            message: error.to_string(),
+        })
+    }
 }
 
 impl CliError {
@@ -384,35 +618,169 @@ impl CliError {
     /// The message chain, joined the way `anyhow`'s `{:#}` joins it.
     ///
     /// `thiserror` renders only the outermost message; `anyhow` walks
-    /// `source()` and joins with `": "`. The CLI still sees the `anyhow`
-    /// rendering, because `main` converts at the boundary — this exists so a
-    /// caller inside the workspace can assert on the whole chain without
-    /// going through that conversion.
+    /// `source()` and joins with `": "`. This is what the CLI prints, and what
+    /// a caller inside the workspace asserts on.
     #[must_use]
     pub fn chain(&self) -> String {
-        let mut rendered = self.to_string();
-        let mut source = std::error::Error::source(self);
-        while let Some(error) = source {
-            rendered.push_str(": ");
-            rendered.push_str(&error.to_string());
-            source = error.source();
-        }
-        rendered
+        error_chain(self)
     }
 
     /// The deepest error in the chain, as `anyhow::Error::root_cause` returned.
     #[must_use]
     pub fn root_cause(&self) -> &(dyn std::error::Error + 'static) {
-        let mut cause: &(dyn std::error::Error + 'static) = self;
-        while let Some(source) = std::error::Error::source(cause) {
-            cause = source;
-        }
-        cause
+        root_cause(self)
     }
+}
+
+/// Joins an error and its `source()` chain with `": "`.
+///
+/// The replacement for `anyhow`'s `{:#}`, which is the one thing a typed error
+/// does not inherit: `thiserror`'s `Display` renders only the outermost
+/// message. Free and `dyn`-taking rather than a method, because three
+/// different types need it — [`CliError`], [`CommandFailure`], and whatever
+/// error a caller's `analyze_files` closure returns.
+#[must_use]
+pub fn error_chain(error: &dyn std::error::Error) -> String {
+    let mut rendered = error.to_string();
+    let mut source = error.source();
+    while let Some(next) = source {
+        rendered.push_str(": ");
+        rendered.push_str(&next.to_string());
+        source = next.source();
+    }
+    rendered
+}
+
+/// The deepest error in a `source()` chain.
+#[must_use]
+pub fn root_cause<'a>(
+    error: &'a (dyn std::error::Error + 'static),
+) -> &'a (dyn std::error::Error + 'static) {
+    let mut cause = error;
+    while let Some(source) = std::error::Error::source(cause) {
+        cause = source;
+    }
+    cause
 }
 
 /// The result type the CLI's I/O entry points return.
 pub type CliResult<T> = std::result::Result<T, CliError>;
+
+/// Why a command did not finish with a clean exit.
+///
+/// Two different things share the `Err` channel, and until this type existed
+/// they shared it *type-erased*: a command that could not do its work, and a
+/// command that did its work, printed its report, and then tripped a
+/// `--fail-on-*` gate the caller explicitly asked for. The second is not a
+/// malfunction — it is the answer — but `main` still has to exit non-zero for
+/// it, so both travel as `Err`.
+///
+/// `diagnosis::classify` used to recover the difference by probing an
+/// `anyhow::Error` with a chain of `downcast_ref`, ending in
+/// `.map_or(ErrorCode::Internal, ...)`. That fallback is why this type exists:
+/// a typed failure nobody had written a probe for was reported to the user as
+/// an internal malfunction. It is the defect §9.2 set out to remove — a
+/// decision re-derived from a value whose type had been thrown away — one
+/// level up from the string matching that was removed first.
+///
+/// As a two-variant enum the classification becomes a total `match`, so a new
+/// [`CliError`] variant cannot silently become `Internal`; the compiler asks.
+/// The second effect is larger: `gate_failure` returning `anyhow::Error` was
+/// the *only* reason ~400 `cli/workflow.rs` and `cli/render.rs` files in
+/// `feature/*` still imported `anyhow`. Every other helper they call had
+/// already been typed.
+#[derive(Debug, Error)]
+pub enum CommandFailure {
+    /// The command could not do its work.
+    #[error(transparent)]
+    Error(#[from] CliError),
+
+    /// The command did its work and a requested policy gate tripped.
+    ///
+    /// Kept separate from [`Self::Error`] rather than folded into `CliError`
+    /// because the two answer different questions. A caller reading a gate
+    /// failure as a malfunction would retry; a caller reading a malfunction as
+    /// a gate would report violations that were never measured.
+    #[error(transparent)]
+    Gate(#[from] GateFailure),
+}
+
+impl CommandFailure {
+    /// The message chain, joined the way `anyhow`'s `{:#}` joins it.
+    ///
+    /// See [`CliError::chain`] — same reason, at the outer type.
+    #[must_use]
+    pub fn chain(&self) -> String {
+        error_chain(self)
+    }
+
+    /// The deepest error in the chain, as `anyhow::Error::root_cause` returned.
+    #[must_use]
+    pub fn root_cause(&self) -> &(dyn std::error::Error + 'static) {
+        root_cause(self)
+    }
+}
+
+/// Routes the error types [`CliError`] already absorbs on to [`CommandFailure`],
+/// so a command body keeps using `?` on them unchanged.
+///
+/// Written out rather than as `impl<E: Into<CliError>> From<E>`: the blanket
+/// form overlaps its own `From<CliError>` and would leave `?` inferring
+/// nothing. Each line here is one type that used to reach `anyhow` implicitly.
+macro_rules! command_failure_from {
+    ($($source:ty),+ $(,)?) => {
+        $(impl From<$source> for CommandFailure {
+            fn from(source: $source) -> Self {
+                Self::Error(CliError::from(source))
+            }
+        })+
+    };
+}
+
+/// The syntax layer's sub-errors, each of which `SexprError` already wraps.
+///
+/// `From` does not chain, so `?` on a bare `PathError` needs the middle step
+/// spelled out or every call site would write `SexprError::from(x).into()`.
+macro_rules! cli_error_from_sexpr {
+    ($($source:ty),+ $(,)?) => {
+        $(impl From<$source> for CliError {
+            fn from(source: $source) -> Self {
+                Self::Sexpr(SexprError::from(source))
+            }
+        })+
+    };
+}
+
+cli_error_from_sexpr!(
+    paredit_core_syntax::sexpr::PathError,
+    paredit_core_syntax::sexpr::SymbolError,
+    paredit_core_syntax::sexpr::StructureError,
+    paredit_core_syntax::sexpr::SelectionError,
+);
+
+command_failure_from!(
+    std::io::Error,
+    serde_json::Error,
+    IoRefusal,
+    SexprError,
+    WorkspaceError,
+    ArgumentError,
+    SelectorError,
+    paredit_core_syntax::selector::error::PatternError,
+    paredit_core_syntax::selector::error::RewriteError,
+    CleanupFailure,
+    WriteTargetError,
+    paredit_core_lint_engine::error::LintError,
+    paredit_core_lint_engine::error::RuleSelectionError,
+    paredit_core_safety::deadline::TimeoutError,
+);
+
+/// The result type a command's `workflow` entry point returns.
+///
+/// `()` rather than a report value: the command has already written its output
+/// by the time it returns, and what the caller needs back is only whether to
+/// exit zero, and if not, which non-zero.
+pub type CommandResult = std::result::Result<(), CommandFailure>;
 
 #[cfg(test)]
 mod tests {

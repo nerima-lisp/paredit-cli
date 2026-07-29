@@ -1,12 +1,12 @@
 use super::super::types::preview::{RefactorPreview, RefactorPreviewDecision};
 use super::write_plan::{print_refactor_write_plan, refactor_write_plan_json};
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::Value;
 use serde_json::json;
 
-pub fn print_refactor_preview(preview: &RefactorPreview, output: OutputFormat) -> Result<()> {
+pub fn print_refactor_preview(preview: &RefactorPreview, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             let write_plan = preview.write_plan();

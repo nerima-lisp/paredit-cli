@@ -41,6 +41,10 @@ pub enum ConditionalConversionError {
 
     #[error(transparent)]
     Shape(#[from] ConditionalShapeError),
+
+    /// A reader conditional made the rewrite unsafe.
+    #[error(transparent)]
+    ReaderConditional(#[from] paredit_core_edit::mutation_safety::ReaderConditionalSafetyError),
 }
 
 // `From` does not chain: `DialectRefusal -> EditRefusal -> ConditionalConversionError`
@@ -67,6 +71,44 @@ from_edit_refusal!(
 impl From<paredit_core_syntax::sexpr::SexprError> for ConditionalConversionError {
     fn from(error: paredit_core_syntax::sexpr::SexprError) -> Self {
         Self::Edit(error.into())
+    }
+}
+
+impl From<paredit_core_syntax::sexpr::ParseError> for ConditionalConversionError {
+    fn from(error: paredit_core_syntax::sexpr::ParseError) -> Self {
+        Self::Edit(paredit_core_edit::DocumentRefusal::InputParseFailed { source: error }.into())
+    }
+}
+
+/// States which documented error code this package's refusals earn.
+///
+/// Every arm is `EditRefusal`-shaped or a shape refusal, so there is exactly
+/// one decision to make here and core makes the rest.
+const fn code_of(error: &ConditionalConversionError) -> paredit_core_cli::diagnosis::ErrorCode {
+    match error {
+        ConditionalConversionError::Edit(edit) => {
+            paredit_core_cli::diagnosis::code_for_edit_refusal(edit)
+        }
+        // "convert-if-to-cond requires (if test then else)" and friends: the
+        // selected form is not the shape this conversion rewrites.
+        ConditionalConversionError::Shape(_) | ConditionalConversionError::ReaderConditional(_) => {
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused
+        }
+    }
+}
+
+impl From<ConditionalConversionError> for paredit_core_cli::CliError {
+    fn from(error: ConditionalConversionError) -> Self {
+        Self::Feature(paredit_core_cli::error::FeatureRefusal::new(
+            code_of(&error),
+            &error,
+        ))
+    }
+}
+
+impl From<ConditionalConversionError> for paredit_core_cli::CommandFailure {
+    fn from(error: ConditionalConversionError) -> Self {
+        Self::Error(error.into())
     }
 }
 

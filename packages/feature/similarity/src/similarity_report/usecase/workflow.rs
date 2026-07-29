@@ -22,7 +22,7 @@ pub fn build_similarity_report(
 ) -> Result<SimilarityReportPlan, SimilarityReportWorkflowError> {
     let inventory = source
         .discover(&request)
-        .map_err(SimilarityReportWorkflowError::Source)?;
+        .map_err(|error| SimilarityReportWorkflowError::Source(Box::new(error.into())))?;
     let results = process_files(source, &inventory, &request)?;
     let mut candidates = Vec::new();
     let mut errors = Vec::new();

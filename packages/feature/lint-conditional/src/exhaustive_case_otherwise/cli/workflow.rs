@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::exhaustive_case_otherwise::cli::args::ExhaustiveCaseOtherwiseReportArgs;
 use crate::exhaustive_case_otherwise::cli::render::print_exhaustive_case_otherwise_report;
@@ -8,7 +8,7 @@ use crate::exhaustive_case_otherwise::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn exhaustive_case_otherwise_report(args: ExhaustiveCaseOtherwiseReportArgs) -> Result<()> {
+pub fn exhaustive_case_otherwise_report(args: ExhaustiveCaseOtherwiseReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut case_form_count = 0;

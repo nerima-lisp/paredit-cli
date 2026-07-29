@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -11,7 +11,7 @@ pub fn print_eql_string_comparison_report(
     summary: &EqlStringComparisonSummary,
     policy: &EqlStringComparisonPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("comparison_form_count\t{}", summary.comparison_form_count);

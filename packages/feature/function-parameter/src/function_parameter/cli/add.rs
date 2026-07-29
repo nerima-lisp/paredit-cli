@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::function_parameter::usecase::{
     AddFunctionParameterRequest, FunctionParameterInsert, plan_add_function_parameter,
@@ -11,9 +11,9 @@ use super::args::AddFunctionParameterArgs;
 use super::render::add::print_add_function_parameter_plan;
 use paredit_core_cli::args::ParameterInsert;
 
-pub fn add_function_parameter(args: AddFunctionParameterArgs) -> Result<()> {
+pub fn add_function_parameter(args: AddFunctionParameterArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;

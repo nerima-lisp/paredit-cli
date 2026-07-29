@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_divisor::cli::args::RedundantDivisorReportArgs;
 use crate::redundant_divisor::cli::render::print_redundant_divisor_report;
@@ -8,7 +8,7 @@ use crate::redundant_divisor::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_divisor_report(args: RedundantDivisorReportArgs) -> Result<()> {
+pub fn redundant_divisor_report(args: RedundantDivisorReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut quotient_form_count = 0;

@@ -13,7 +13,7 @@ use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_works
 
 pub(in crate::presentation::cli) fn unused_parameter_report(
     args: UnusedParameterReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let files = expand_unused_parameter_report_inputs(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -48,7 +48,7 @@ pub(in crate::presentation::cli) fn unused_parameter_report(
 fn expand_unused_parameter_report_inputs(
     files: &[PathBuf],
     dialect: Option<super::super::DialectArg>,
-) -> Result<Vec<PathBuf>> {
+) -> CliResult<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
 

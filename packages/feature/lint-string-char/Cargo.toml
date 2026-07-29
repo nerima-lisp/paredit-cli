@@ -15,7 +15,6 @@ paredit-core-semantics = { path = "../../core/semantics" }
 paredit-core-lint-engine = { path = "../../core/lint-engine" }
 paredit-core-workspace = { path = "../../core/workspace" }
 paredit-core-cli = { path = "../../core/cli" }
-anyhow.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

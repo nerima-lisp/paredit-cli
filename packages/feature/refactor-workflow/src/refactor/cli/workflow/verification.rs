@@ -9,7 +9,7 @@ use crate::refactor::usecase::plan::{
     refactor_plan_gates as application_refactor_plan_gates,
     refactor_verification_checks as application_refactor_verification_checks,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_edit::refactor_plan::{RefactorRiskLevel, RefactorVerificationCheck};
@@ -21,7 +21,7 @@ use paredit_feature_project_analysis::impact_report::usecase::{
 use paredit_feature_rename::macro_construction::find_macro_construction_sites;
 use std::path::PathBuf;
 
-pub fn verify_refactor(args: VerifyRefactorArgs) -> Result<()> {
+pub fn verify_refactor(args: VerifyRefactorArgs) -> CliResult<()> {
     let verification = build_refactor_verification(
         &args.files,
         args.dialect,
@@ -43,7 +43,7 @@ pub fn build_refactor_verification(
     operation: RefactorOperation,
     phase: VerificationPhase,
     target_kind_hint: Option<RefactorPlanTargetKind>,
-) -> Result<RefactorVerification> {
+) -> CliResult<RefactorVerification> {
     let application_operation = ApplicationRefactorOperation::from(operation);
     let application_phase = ApplicationVerificationPhase::from(phase);
     let before_files = impact_report::workflow::collect_impact_reports(paths, dialect, symbol)?;
@@ -130,7 +130,7 @@ fn macro_construction_check(
     paths: &[PathBuf],
     dialect: Option<DialectArg>,
     symbol: &SymbolName,
-) -> Result<RefactorVerificationCheck> {
+) -> CliResult<RefactorVerificationCheck> {
     let mut sites = Vec::new();
     for path in paths {
         let (input, _, tree) = read_input_dialect_and_tree(Some(path.clone()), dialect)?;

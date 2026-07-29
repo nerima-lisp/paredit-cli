@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::setf_arity::cli::args::SetfArityReportArgs;
 use crate::setf_arity::cli::render::print_setf_arity_report;
@@ -8,7 +8,7 @@ use crate::setf_arity::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn setf_arity_report(args: SetfArityReportArgs) -> Result<()> {
+pub fn setf_arity_report(args: SetfArityReportArgs) -> CommandResult {
     let mut assignment_form_count = 0;
     let mut violations = Vec::new();
 

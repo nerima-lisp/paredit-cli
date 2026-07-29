@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_let_star::cli::args::RedundantLetStarReportArgs;
 use crate::redundant_let_star::cli::render::print_redundant_let_star_report;
@@ -8,7 +8,7 @@ use crate::redundant_let_star::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_let_star_report(args: RedundantLetStarReportArgs) -> Result<()> {
+pub fn redundant_let_star_report(args: RedundantLetStarReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut let_star_form_count = 0;

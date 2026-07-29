@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::lambda_list_keyword_order::cli::args::LambdaListKeywordOrderReportArgs;
 use crate::lambda_list_keyword_order::cli::render::print_lambda_list_keyword_order_report;
@@ -8,7 +8,7 @@ use crate::lambda_list_keyword_order::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn lambda_list_keyword_order_report(args: LambdaListKeywordOrderReportArgs) -> Result<()> {
+pub fn lambda_list_keyword_order_report(args: LambdaListKeywordOrderReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut definition_count = 0;

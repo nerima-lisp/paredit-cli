@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::undefined_package_report::cli::args::UndefinedPackageReportArgs;
 use crate::undefined_package_report::cli::render::print_undefined_package_report;
@@ -8,7 +8,7 @@ use crate::undefined_package_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn undefined_package_report(args: UndefinedPackageReportArgs) -> Result<()> {
+pub fn undefined_package_report(args: UndefinedPackageReportArgs) -> CommandResult {
     let mut declared = Vec::new();
     let mut referenced = Vec::new();
 

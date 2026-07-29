@@ -3,7 +3,7 @@ use crate::impact_report::usecase::ImpactRiskLevel as ApplicationImpactRiskLevel
 use crate::impact_report::usecase::{
     ImpactReportFile, ImpactReportPolicy, impact_risks, impact_status_counts,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_syntax::sexpr::SymbolName;
@@ -14,7 +14,7 @@ pub fn print_impact_report(
     symbol: &SymbolName,
     policy: &ImpactReportPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let by_status = impact_status_counts(reports);
     let risks = impact_risks(
         policy.definition_count,

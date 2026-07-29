@@ -244,6 +244,24 @@ example `SimilarityReportSourcePort` resolves each file's dialect during
 alongside a failed read. Adapter state or ordering failures return through
 `Result`; they never panic.
 
+**A port names its adapter's error as an associated type.**
+
+```rust
+pub trait DefinitionSourcePort {
+    type Error: Into<CliError>;
+    fn load(&mut self, file: &Path) -> Result<LoadedDefinitionSource, Self::Error>;
+}
+```
+
+These methods returned `anyhow::Result` until the typed-error pass, justified
+by the port's whole purpose: the use case must not know what an adapter can
+fail with. That reasoning is right and `anyhow::Error` was the wrong way to say
+it — it does not express "some error I do not name", it expresses "no error
+type at all", and the failure's classification went with it. An associated type
+says the intended thing in the type system. The `Into<CliError>` bound is the
+one requirement, because whatever an adapter fails with has to be reportable at
+the CLI boundary with an error code.
+
 The `Plan` an application use case returns is the contract with presentation:
 it holds the domain report, a discovery inventory, per-file typed errors, and a
 single computed gate decision. Presentation reads the plan; it never
@@ -274,6 +292,32 @@ everything else in the application and domain layers — is what lets the same
 report logic serve both a human `--output text` reader and a machine
 `--output json` consumer without duplication.
 
+### The failure a command returns
+
+A command entry point returns `CommandResult` — `Result<(), CommandFailure>`
+— and `CommandFailure` has exactly two variants:
+
+| Variant | Means |
+| --- | --- |
+| `Error(CliError)` | the command could not do its work |
+| `Gate(GateFailure)` | it *did* its work, printed its report, and a requested `--fail-on-*` gate tripped |
+
+Those are different answers and they earn different exit codes (1 and 3), so
+`diagnosis::classify` is a total `match` over the pair. It used to be a chain
+of `downcast_ref` probes against an `anyhow::Error` ending in
+`.map_or(ErrorCode::Internal, ...)`, which meant a failure nobody had written a
+probe for was reported to the caller as `internal.unclassified` — "a defect in
+this tool" — for perfectly ordinary refusals. A closed sum makes that a compile
+error instead.
+
+The set of error codes is closed and documented; the set of *feature* errors is
+open, because `CliError` naming all 29 feature packages would invert the
+dependency direction. `FeatureRefusal` bridges the two: a feature converts its
+own rich error at its `cli/` boundary and **must** supply the code it earns.
+The `source()` chain flattens into the message there — the last point at which
+anything reads it — while the classification stays a type.
+
+## How the layers map to the three namespaces
 ## How the layers map to the namespaces
 
 The [command model](commands.md) — `inspect`, `edit`, `refactor`, `query`,

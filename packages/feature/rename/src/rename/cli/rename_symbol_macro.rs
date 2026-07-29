@@ -1,4 +1,5 @@
-use anyhow::{Context, Result};
+use crate::error::RenamePlanError;
+use paredit_core_cli::CommandResult;
 
 use super::args::RenameSymbolMacroArgs;
 use super::render::symbol_macro::print_rename_symbol_macro_report;
@@ -6,7 +7,7 @@ use super::types::{PendingRenameSymbolMacroFile, RenameSymbolMacroFileReport};
 use crate::rename::usecase as rename_usecase;
 use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub fn rename_symbol_macro(args: RenameSymbolMacroArgs) -> Result<()> {
+pub fn rename_symbol_macro(args: RenameSymbolMacroArgs) -> CommandResult {
     let mut pending = Vec::with_capacity(args.files.len());
     let mut definition_count = 0usize;
 
@@ -19,8 +20,10 @@ pub fn rename_symbol_macro(args: RenameSymbolMacroArgs) -> Result<()> {
                 from: args.from.clone(),
                 to: args.to.clone(),
             })
-            .with_context(|| {
-                format!("failed to plan rename-symbol-macro for {}", file.display())
+            .map_err(|source| RenamePlanError {
+                operation: "rename-symbol-macro".to_owned(),
+                path: file.display().to_string(),
+                source,
             })?;
         let definitions = plan.definitions;
         let references = plan.references;
@@ -36,9 +39,11 @@ pub fn rename_symbol_macro(args: RenameSymbolMacroArgs) -> Result<()> {
     }
 
     if definition_count == 0 {
-        anyhow::bail!(
-            "rename-symbol-macro requires at least one matching define-symbol-macro definition"
-        );
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::SelectionNoMatch,
+            "rename-symbol-macro requires at least one matching define-symbol-macro definition",
+        )
+        .into());
     }
 
     let written_files = pending

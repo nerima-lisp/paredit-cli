@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nested_cxr::cli::args::NestedCxrReportArgs;
 use crate::nested_cxr::cli::render::print_nested_cxr_report;
@@ -7,7 +7,7 @@ use crate::nested_cxr::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nested_cxr_report(args: NestedCxrReportArgs) -> Result<()> {
+pub fn nested_cxr_report(args: NestedCxrReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut accessor_form_count = 0;

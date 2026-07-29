@@ -1,5 +1,5 @@
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -44,10 +44,10 @@ struct RenameControlArgs {
     output: OutputFormat,
 }
 
-pub fn rename_block(args: RenameBlockArgs) -> Result<()> {
+pub fn rename_block(args: RenameBlockArgs) -> CliResult<()> {
     run(args.common, plan_rename_block)
 }
-pub fn rename_tag(args: RenameTagArgs) -> Result<()> {
+pub fn rename_tag(args: RenameTagArgs) -> CliResult<()> {
     run(args.common, plan_rename_tag)
 }
 
@@ -57,9 +57,9 @@ fn run(
     // the anyhow result this presentation layer shares with the CLI's own
     // I/O failures.
     planner: fn(RenameControlRequest<'_>) -> crate::error::RenameResult<RenameControlPlan>,
-) -> Result<()> {
+) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = planner(RenameControlRequest {
@@ -77,7 +77,7 @@ fn run(
     print_plan(&plan, written, args.output)
 }
 
-fn print_plan(plan: &RenameControlPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(plan: &RenameControlPlan, written: bool, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

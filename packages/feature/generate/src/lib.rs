@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod error;
 pub mod generate_accessors;
 pub mod generate_defgeneric;
 pub mod generate_defpackage;

@@ -1,11 +1,11 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::form_report::cli::{args::FormReportArgs, render::print_form_report};
 use crate::form_report::usecase::types::FormReportRequest;
 use crate::form_report::usecase::workflow::build_form_report;
 use paredit_core_cli::shared::{read_input_dialect_and_tree, resolve_one_target};
 
-pub fn form_report(args: FormReportArgs) -> Result<()> {
+pub fn form_report(args: FormReportArgs) -> CliResult<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let target = resolve_one_target(&tree, dialect, &args.selector, "inspect form")?;
     let selection = tree.select_path(&target.path)?;

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CommandResult;
 
 use super::args::RenameInFormArgs;
 use super::render::scoped_form::print_rename_in_form_plan;
@@ -6,9 +6,9 @@ use super::shared::{ensure_rename_changed, rename_target};
 use crate::rename::usecase as rename_usecase;
 use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub fn rename_in_form(args: RenameInFormArgs) -> Result<()> {
+pub fn rename_in_form(args: RenameInFormArgs) -> CommandResult {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;
@@ -21,7 +21,10 @@ pub fn rename_in_form(args: RenameInFormArgs) -> Result<()> {
     })?;
     let written = args.write && plan.changed;
     if written {
-        let file = args.file.as_ref().context("--write requires --file")?;
+        let file = args
+            .file
+            .as_ref()
+            .ok_or(paredit_core_cli::ArgumentError::WriteRequiresFile)?;
         write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
     }
 

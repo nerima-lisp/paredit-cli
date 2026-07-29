@@ -1,6 +1,6 @@
 use crate::split_let_star::usecase::{SplitLetStarPlan, SplitLetStarRequest, plan_split_let_star};
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -27,9 +27,9 @@ pub struct SplitLetStarArgs {
     output: OutputFormat,
 }
 
-pub fn split_let_star(args: SplitLetStarArgs) -> Result<()> {
+pub fn split_let_star(args: SplitLetStarArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = plan_split_let_star(SplitLetStarRequest {
@@ -46,7 +46,7 @@ pub fn split_let_star(args: SplitLetStarArgs) -> Result<()> {
     print_plan(&plan, written, args.output)
 }
 
-fn print_plan(plan: &SplitLetStarPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(plan: &SplitLetStarPlan, written: bool, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

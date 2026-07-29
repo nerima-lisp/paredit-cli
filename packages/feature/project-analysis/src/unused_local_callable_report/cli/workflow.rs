@@ -1,5 +1,5 @@
-use anyhow::Result;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::{CliResult, CommandResult};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ use crate::unused_local_callable_report::usecase::{
 };
 use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-pub fn unused_local_callable_report(args: UnusedLocalCallableReportArgs) -> Result<()> {
+pub fn unused_local_callable_report(args: UnusedLocalCallableReportArgs) -> CommandResult {
     let files = expand_unused_local_callable_report_inputs(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -47,7 +47,7 @@ pub fn unused_local_callable_report(args: UnusedLocalCallableReportArgs) -> Resu
 fn expand_unused_local_callable_report_inputs(
     files: &[PathBuf],
     dialect: Option<paredit_core_cli::args::DialectArg>,
-) -> Result<Vec<PathBuf>> {
+) -> CliResult<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
 

@@ -5,13 +5,13 @@ use crate::impact_report::usecase::{
     ImpactReportFile, ImpactReportPolicyOptions, ImpactReportSource, build_impact_reports,
     evaluate_impact_report_policy, impact_risks, impact_status_counts, summarize_impact_reports,
 };
-use anyhow::Result;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::{CliResult, CommandResult};
 use paredit_core_syntax::sexpr::SymbolName;
 use std::path::PathBuf;
 
-pub fn impact_report(args: ImpactReportArgs) -> Result<()> {
+pub fn impact_report(args: ImpactReportArgs) -> CommandResult {
     let reports = collect_impact_reports(&args.files, args.dialect, &args.symbol)?;
     let summary = summarize_impact_reports(&reports);
     let by_status = impact_status_counts(&reports);
@@ -33,7 +33,7 @@ pub fn impact_report(args: ImpactReportArgs) -> Result<()> {
             args.require_references,
             args.require_calls,
         )
-        .map_err(anyhow::Error::msg)?,
+        .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message })?,
         &summary,
         risk_level,
     );
@@ -52,7 +52,7 @@ pub fn collect_impact_reports(
     files: &[PathBuf],
     dialect_override: Option<DialectArg>,
     symbol: &SymbolName,
-) -> Result<Vec<ImpactReportFile>> {
+) -> CliResult<Vec<ImpactReportFile>> {
     let mut sources = Vec::with_capacity(files.len());
 
     for file in files {

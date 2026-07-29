@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -7,7 +7,7 @@ use paredit_core_cli::safe_text;
 use crate::catalog::CatalogEntry;
 use crate::run::usecase::{FileOutcome, MigrationTotals};
 
-pub fn print_list(entries: &[CatalogEntry], output: OutputFormat) -> Result<()> {
+pub fn print_list(entries: &[CatalogEntry], output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("recipes\t{}", entries.len());
@@ -34,7 +34,7 @@ pub fn print_list(entries: &[CatalogEntry], output: OutputFormat) -> Result<()> 
     Ok(())
 }
 
-pub fn print_explain(entry: &CatalogEntry, output: OutputFormat) -> Result<()> {
+pub fn print_explain(entry: &CatalogEntry, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!(
@@ -84,7 +84,7 @@ pub fn print_run_report(
     totals: &MigrationTotals,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let touched: Vec<&FileOutcome> = files.iter().filter(|file| file.is_touched()).collect();
 
     match output {

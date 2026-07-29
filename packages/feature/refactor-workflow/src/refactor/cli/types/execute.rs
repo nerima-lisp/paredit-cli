@@ -4,7 +4,6 @@ use crate::refactor::usecase::execute::{
     RefactorExecuteDecision, RefactorExecuteOutcome, RefactorExecutePostVerificationResult,
     RefactorExecuteStep, RefactorExecuteStepStatus,
 };
-use anyhow::Result;
 
 #[derive(Debug)]
 pub struct WorkspaceRefactorExecute {

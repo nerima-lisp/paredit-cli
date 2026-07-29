@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::unused_nickname_report::cli::args::UnusedNicknameReportArgs;
 use crate::unused_nickname_report::cli::render::print_unused_nickname_report;
@@ -8,7 +8,7 @@ use crate::unused_nickname_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn unused_nickname_report(args: UnusedNicknameReportArgs) -> Result<()> {
+pub fn unused_nickname_report(args: UnusedNicknameReportArgs) -> CommandResult {
     let mut declared = Vec::new();
     let mut referenced = Vec::new();
 

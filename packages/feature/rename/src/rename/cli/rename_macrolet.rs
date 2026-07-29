@@ -1,10 +1,10 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use super::args::RenameMacroletArgs;
 use super::shared::{CallableRenameCommand, CallableRenamePlanData, run_callable_rename};
 use crate::rename::usecase as rename_usecase;
 
-pub fn rename_macrolet(args: RenameMacroletArgs) -> Result<()> {
+pub fn rename_macrolet(args: RenameMacroletArgs) -> CommandResult {
     run_callable_rename(
         CallableRenameCommand {
             files: &args.files,

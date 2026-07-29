@@ -1,6 +1,6 @@
 use super::super::types::verification::RefactorVerification;
 use crate::refactor::usecase::plan::RefactorPlanSummary;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -8,7 +8,7 @@ use serde_json::json;
 pub fn print_refactor_verification(
     verification: &RefactorVerification,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("operation\t{}", verification.operation.label());

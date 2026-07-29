@@ -3,7 +3,7 @@ use super::*;
 pub(super) fn print_unused_parameter_report(
     reports: &[UnusedParameterReportFile],
     policy: &UnusedParameterReportPolicy,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

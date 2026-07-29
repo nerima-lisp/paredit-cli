@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::symbol_index_report::usecase::{
     build_symbol_index_report, evaluate_fail_on_external_policy,
 };
 
-pub fn symbol_index_report(args: SymbolIndexReportArgs) -> Result<()> {
+pub fn symbol_index_report(args: SymbolIndexReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

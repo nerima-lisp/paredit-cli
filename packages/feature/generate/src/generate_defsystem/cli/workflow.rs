@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::shared::{
     expand_input_files, read_input_dialect_and_tree, write_file_with_rollback,
@@ -10,7 +10,7 @@ use crate::generate_defsystem::cli::args::GenerateDefsystemArgs;
 use crate::generate_defsystem::cli::render::print_defsystem_plan;
 use crate::generate_defsystem::usecase::plan_defsystem;
 
-pub fn generate_defsystem(args: GenerateDefsystemArgs) -> Result<()> {
+pub fn generate_defsystem(args: GenerateDefsystemArgs) -> CliResult<()> {
     let system_name = args
         .name
         .clone()
@@ -29,13 +29,22 @@ pub fn generate_defsystem(args: GenerateDefsystemArgs) -> Result<()> {
     }
 
     let plan = plan_defsystem(&system_name, &parsed);
-    SyntaxTree::parse(&plan.generated).context("the generated defsystem would not be parseable")?;
+    SyntaxTree::parse(&plan.generated).map_err(|source| {
+        crate::error::GeneratedOutputWouldNotParse {
+            summary: "the generated defsystem would not be parseable",
+            source,
+        }
+    })?;
 
     let mut written = false;
     if args.write {
         let target = args.directory.join(format!("{system_name}.asd"));
         if target.exists() && !args.force {
-            anyhow::bail!("refusing to overwrite {} without --force", target.display());
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+                format!("refusing to overwrite {} without --force", target.display()),
+            )
+            .into());
         }
         write_file_with_rollback(target, plan.generated.clone())?;
         written = true;

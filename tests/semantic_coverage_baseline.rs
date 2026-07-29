@@ -38,10 +38,13 @@ fn is_lisp_source(path: &Path) -> bool {
 struct FilesystemSource;
 
 impl SemanticCoverageSourcePort for FilesystemSource {
+    // A directory walk that skips what it cannot read; nothing here fails.
+    type Error = paredit_core_cli::CliError;
+
     fn discover(
         &mut self,
         request: &SemanticCoverageRequest,
-    ) -> anyhow::Result<SemanticCoverageInventory> {
+    ) -> Result<SemanticCoverageInventory, Self::Error> {
         let mut files = Vec::new();
         for root in &request.paths {
             collect(root, &mut files);

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -11,7 +11,7 @@ pub fn print_constant_report(
     policy: &ConstantReportPolicy,
     min_saved_bytes: i64,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => print_text(reports, policy, min_saved_bytes),
         OutputFormat::Json => print_json(reports, policy, min_saved_bytes)?,
@@ -68,7 +68,7 @@ fn print_json(
     reports: &[ConstantReportFile],
     policy: &ConstantReportPolicy,
     min: i64,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

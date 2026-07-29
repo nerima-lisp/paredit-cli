@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::dead_boolean_operand::cli::args::DeadBooleanOperandReportArgs;
 use crate::dead_boolean_operand::cli::render::print_dead_boolean_operand_report;
@@ -8,7 +8,7 @@ use crate::dead_boolean_operand::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn dead_boolean_operand_report(args: DeadBooleanOperandReportArgs) -> Result<()> {
+pub fn dead_boolean_operand_report(args: DeadBooleanOperandReportArgs) -> CommandResult {
     let mut boolean_form_count = 0;
     let mut violations = Vec::new();
 

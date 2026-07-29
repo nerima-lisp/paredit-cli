@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nth_constant_index::cli::args::NthConstantIndexReportArgs;
 use crate::nth_constant_index::cli::render::print_nth_constant_index_report;
@@ -8,7 +8,7 @@ use crate::nth_constant_index::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nth_constant_index_report(args: NthConstantIndexReportArgs) -> Result<()> {
+pub fn nth_constant_index_report(args: NthConstantIndexReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut nth_form_count = 0;

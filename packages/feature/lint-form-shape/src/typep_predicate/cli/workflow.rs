@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::typep_predicate::cli::args::TypepPredicateReportArgs;
 use crate::typep_predicate::cli::render::print_typep_predicate_report;
@@ -8,7 +8,7 @@ use crate::typep_predicate::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn typep_predicate_report(args: TypepPredicateReportArgs) -> Result<()> {
+pub fn typep_predicate_report(args: TypepPredicateReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut typep_form_count = 0;

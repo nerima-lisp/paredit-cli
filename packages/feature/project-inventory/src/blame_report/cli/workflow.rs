@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -6,7 +6,7 @@ use crate::blame_report::cli::args::BlameReportArgs;
 use crate::blame_report::cli::render::print_blame_report;
 use crate::blame_report::usecase::{build_blame_report, evaluate_blame_policy, measure_blame};
 
-pub fn blame_report(args: BlameReportArgs) -> Result<()> {
+pub fn blame_report(args: BlameReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

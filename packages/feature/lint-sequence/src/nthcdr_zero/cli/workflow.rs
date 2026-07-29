@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nthcdr_zero::cli::args::NthcdrZeroReportArgs;
 use crate::nthcdr_zero::cli::render::print_nthcdr_zero_report;
@@ -8,7 +8,7 @@ use crate::nthcdr_zero::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nthcdr_zero_report(args: NthcdrZeroReportArgs) -> Result<()> {
+pub fn nthcdr_zero_report(args: NthcdrZeroReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut nthcdr_form_count = 0;

@@ -1,11 +1,11 @@
 use super::*;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 pub fn print_definition_report(
     reports: &[DefinitionReportFile],
     summary: &DefinitionReportSummary,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
@@ -55,7 +55,7 @@ pub fn print_definition_report(
 pub fn print_unused_definition_report(
     reports: &[UnusedDefinitionFile],
     policy: &UnusedDefinitionPolicy,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

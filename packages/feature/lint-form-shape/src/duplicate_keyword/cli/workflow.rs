@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::duplicate_keyword::cli::args::DuplicateKeywordReportArgs;
 use crate::duplicate_keyword::cli::render::print_duplicate_keyword_report;
@@ -8,7 +8,7 @@ use crate::duplicate_keyword::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn duplicate_keyword_report(args: DuplicateKeywordReportArgs) -> Result<()> {
+pub fn duplicate_keyword_report(args: DuplicateKeywordReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

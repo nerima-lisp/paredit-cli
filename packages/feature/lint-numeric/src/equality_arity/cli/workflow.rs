@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::equality_arity::cli::args::EqualityArityReportArgs;
 use crate::equality_arity::cli::render::print_equality_arity_report;
@@ -8,7 +8,7 @@ use crate::equality_arity::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn equality_arity_report(args: EqualityArityReportArgs) -> Result<()> {
+pub fn equality_arity_report(args: EqualityArityReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_count = 0;

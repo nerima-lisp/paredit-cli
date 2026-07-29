@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::application::usecase::semantic_coverage::{
     SemanticCoveragePolicy, SemanticCoverageReport,
@@ -13,7 +13,7 @@ pub(in crate::presentation::cli) fn print_semantic_coverage_report(
     policy: &SemanticCoveragePolicy,
     top: usize,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => text::print_semantic_coverage_report(report, policy, top),
         OutputFormat::Json => json::print_semantic_coverage_report(report, policy, top)?,

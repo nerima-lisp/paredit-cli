@@ -1,17 +1,19 @@
 use super::super::types::manifest::{
     RefactorApplyManifest, RefactorApplyManifestEdit, RefactorApplyManifestFile,
 };
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::ByteOffset;
 use paredit_core_syntax::sexpr::ByteSpan;
 use serde_json::Value;
 use std::path::PathBuf;
 
-pub fn parse_refactor_apply_manifest(value: &Value) -> Result<RefactorApplyManifest> {
-    let object = value
-        .as_object()
-        .context("refactor manifest must be a JSON object")?;
+pub fn parse_refactor_apply_manifest(value: &Value) -> CliResult<RefactorApplyManifest> {
+    let object = value.as_object().ok_or_else(|| {
+        crate::error::ManifestError::Malformed(String::from(
+            "refactor manifest must be a JSON object",
+        ))
+    })?;
     let policy = required_object(object.get("policy"), "policy")?;
     let summary = required_object(object.get("summary"), "summary")?;
     let files = required_array(object.get("files"), "files")?;
@@ -29,22 +31,25 @@ pub fn parse_refactor_apply_manifest(value: &Value) -> Result<RefactorApplyManif
             .iter()
             .enumerate()
             .map(|(index, file)| parse_refactor_apply_manifest_file(index, file))
-            .collect::<Result<Vec<_>>>()?,
+            .collect::<CliResult<Vec<_>>>()?,
     })
 }
 
 fn parse_refactor_apply_manifest_file(
     index: usize,
     value: &Value,
-) -> Result<RefactorApplyManifestFile> {
-    let object = value
-        .as_object()
-        .with_context(|| format!("files[{index}] must be a JSON object"))?;
+) -> CliResult<RefactorApplyManifestFile> {
+    let object = value.as_object().ok_or_else(|| {
+        crate::error::ManifestError::Malformed(format!("files[{index}] must be a JSON object"))
+    })?;
     let edits = required_array(object.get("edits"), &format!("files[{index}].edits"))?;
     let dialect_field = format!("files[{index}].dialect");
     let dialect_label = required_string(object.get("dialect"), &dialect_field)?;
-    let dialect = dialect_label.parse::<Dialect>().with_context(|| {
-        format!("manifest field {dialect_field} has invalid dialect {dialect_label:?}")
+    let dialect = dialect_label.parse::<Dialect>().map_err(|_| {
+        crate::error::ManifestError::UnsupportedDialect {
+            field: dialect_field.clone(),
+            dialect: dialect_label.to_string(),
+        }
     })?;
 
     Ok(RefactorApplyManifestFile {
@@ -70,7 +75,7 @@ fn parse_refactor_apply_manifest_file(
             .iter()
             .enumerate()
             .map(|(edit_index, edit)| parse_refactor_apply_manifest_edit(index, edit_index, edit))
-            .collect::<Result<Vec<_>>>()?,
+            .collect::<CliResult<Vec<_>>>()?,
     })
 }
 
@@ -78,9 +83,11 @@ fn parse_refactor_apply_manifest_edit(
     file_index: usize,
     edit_index: usize,
     value: &Value,
-) -> Result<RefactorApplyManifestEdit> {
-    let object = value.as_object().with_context(|| {
-        format!("files[{file_index}].edits[{edit_index}] must be a JSON object")
+) -> CliResult<RefactorApplyManifestEdit> {
+    let object = value.as_object().ok_or_else(|| {
+        crate::error::ManifestError::Malformed(format!(
+            "files[{file_index}].edits[{edit_index}] must be a JSON object"
+        ))
     })?;
     let start = required_usize(
         object.get("start"),
@@ -96,8 +103,10 @@ fn parse_refactor_apply_manifest_edit(
     )?;
 
     let span =
-        ByteSpan::try_new(ByteOffset::new(start), ByteOffset::new(end)).with_context(|| {
-            format!("files[{file_index}].edits[{edit_index}] start must not exceed end")
+        ByteSpan::try_new(ByteOffset::new(start), ByteOffset::new(end)).ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "files[{file_index}].edits[{edit_index}] start must not exceed end"
+            ))
         })?;
 
     Ok(RefactorApplyManifestEdit { span, replacement })
@@ -106,39 +115,90 @@ fn parse_refactor_apply_manifest_edit(
 fn required_object<'a>(
     value: Option<&'a Value>,
     field: &str,
-) -> Result<&'a serde_json::Map<String, Value>> {
+) -> Result<&'a serde_json::Map<String, Value>, crate::error::ManifestError> {
     value
-        .with_context(|| format!("missing required manifest field {field}"))?
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "missing required manifest field {field}"
+            ))
+        })?
         .as_object()
-        .with_context(|| format!("manifest field {field} must be an object"))
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "manifest field {field} must be an object"
+            ))
+        })
 }
 
-fn required_array<'a>(value: Option<&'a Value>, field: &str) -> Result<&'a Vec<Value>> {
+fn required_array<'a>(
+    value: Option<&'a Value>,
+    field: &str,
+) -> Result<&'a Vec<Value>, crate::error::ManifestError> {
     value
-        .with_context(|| format!("missing required manifest field {field}"))?
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "missing required manifest field {field}"
+            ))
+        })?
         .as_array()
-        .with_context(|| format!("manifest field {field} must be an array"))
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "manifest field {field} must be an array"
+            ))
+        })
 }
 
-fn required_string(value: Option<&Value>, field: &str) -> Result<String> {
+fn required_string(
+    value: Option<&Value>,
+    field: &str,
+) -> Result<String, crate::error::ManifestError> {
     value
-        .with_context(|| format!("missing required manifest field {field}"))?
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "missing required manifest field {field}"
+            ))
+        })?
         .as_str()
         .map(str::to_owned)
-        .with_context(|| format!("manifest field {field} must be a string"))
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "manifest field {field} must be a string"
+            ))
+        })
 }
 
-fn required_bool(value: Option<&Value>, field: &str) -> Result<bool> {
+fn required_bool(value: Option<&Value>, field: &str) -> Result<bool, crate::error::ManifestError> {
     value
-        .with_context(|| format!("missing required manifest field {field}"))?
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "missing required manifest field {field}"
+            ))
+        })?
         .as_bool()
-        .with_context(|| format!("manifest field {field} must be a boolean"))
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "manifest field {field} must be a boolean"
+            ))
+        })
 }
 
-fn required_usize(value: Option<&Value>, field: &str) -> Result<usize> {
+fn required_usize(
+    value: Option<&Value>,
+    field: &str,
+) -> Result<usize, crate::error::ManifestError> {
     let raw = value
-        .with_context(|| format!("missing required manifest field {field}"))?
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "missing required manifest field {field}"
+            ))
+        })?
         .as_u64()
-        .with_context(|| format!("manifest field {field} must be an unsigned integer"))?;
-    usize::try_from(raw).with_context(|| format!("manifest field {field} is too large"))
+        .ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "manifest field {field} must be an unsigned integer"
+            ))
+        })?;
+    usize::try_from(raw).map_err(|_| {
+        crate::error::ManifestError::Malformed(format!("manifest field {field} is too large"))
+    })
 }

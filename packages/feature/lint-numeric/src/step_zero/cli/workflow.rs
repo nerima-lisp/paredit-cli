@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::step_zero::cli::args::StepZeroReportArgs;
 use crate::step_zero::cli::render::print_step_zero_report;
@@ -7,7 +7,7 @@ use crate::step_zero::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn step_zero_report(args: StepZeroReportArgs) -> Result<()> {
+pub fn step_zero_report(args: StepZeroReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut step_form_count = 0;

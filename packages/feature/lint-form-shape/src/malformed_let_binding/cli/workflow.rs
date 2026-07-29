@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::malformed_let_binding::cli::args::MalformedLetBindingReportArgs;
 use crate::malformed_let_binding::cli::render::print_malformed_let_binding_report;
@@ -8,7 +8,7 @@ use crate::malformed_let_binding::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn malformed_let_binding_report(args: MalformedLetBindingReportArgs) -> Result<()> {
+pub fn malformed_let_binding_report(args: MalformedLetBindingReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut let_form_count = 0;
