@@ -7,7 +7,7 @@ use paredit_core_syntax::selector::{
     LinePosition, Pattern, RelativeStep, SelectorError, SelectorRequest, SelectorTerm,
     StableSelectorId,
 };
-use paredit_core_syntax::sexpr::{Delimiter, Direction, Path, ReaderPrefix};
+use paredit_core_syntax::sexpr::{Delimiter, Direction, Path, QuoteStyle, ReaderPrefix};
 
 #[derive(Debug, Args)]
 pub struct AnalyzeArgs {
@@ -391,6 +391,42 @@ pub struct UnwrapPrefixArgs {
     /// "act on every match" rather than "peel every prefix".
     #[arg(long = "all-prefixes")]
     pub all_prefixes: bool,
+}
+
+/// A `clap` mirror of [`QuoteStyle`], keeping the argument parser out of the
+/// syntax package. The `From` below is the only place the two spellings meet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum QuoteStyleArg {
+    /// The reader prefix: `'x`, `#'f`.
+    Shorthand,
+    /// The list the reader expands it into: `(quote x)`, `(function f)`.
+    Longhand,
+}
+
+impl From<QuoteStyleArg> for QuoteStyle {
+    fn from(value: QuoteStyleArg) -> Self {
+        match value {
+            QuoteStyleArg::Shorthand => Self::Shorthand,
+            QuoteStyleArg::Longhand => Self::Longhand,
+        }
+    }
+}
+
+/// Target selection plus in-place write support and the spelling to produce.
+#[derive(Debug, Args)]
+pub struct NormalizeQuotesArgs {
+    #[command(flatten)]
+    pub target: TargetArgs,
+    /// Write the rewritten document back to --file instead of stdout.
+    #[arg(long)]
+    pub write: bool,
+    /// Print a unified diff against the input instead of the rewritten document.
+    #[arg(long)]
+    pub diff: bool,
+    /// Which spelling to produce. Defaults to the reader prefix, which is what
+    /// hand-written Lisp overwhelmingly uses.
+    #[arg(long, value_enum, default_value_t = QuoteStyleArg::Shorthand)]
+    pub style: QuoteStyleArg,
 }
 
 /// Target selection plus in-place write support and a raise depth.

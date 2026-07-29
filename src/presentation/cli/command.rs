@@ -3,8 +3,8 @@ use super::{
     append_list_to_cons_report, append_nil_report,
     args::{
         AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
-        NewlineArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs,
-        UnwrapPrefixArgs, WrapArgs, YankArgs,
+        NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs,
+        TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
     },
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
@@ -585,6 +585,8 @@ pub(super) enum EditCommand {
     Copy(CopyArgs),
     /// Write a second copy of the selected S-expression immediately after it, without using the kill ring.
     Duplicate(EditTargetArgs),
+    /// Rewrite the selected quote between its two spellings: 'x / (quote x), #'f / (function f).
+    NormalizeQuotes(NormalizeQuotesArgs),
     /// Paste a kill ring entry beside, or over, the selected S-expression.
     Yank(YankArgs),
     /// Wrap the selected S-expression in a delimiter pair, a string, or a reader prefix.

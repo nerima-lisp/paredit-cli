@@ -493,6 +493,81 @@ fn duplicate_leaves_the_kill_ring_alone() {
     );
 }
 
+// --- D39: normalize-quotes, the two spellings of one quote ---
+
+#[test]
+fn normalize_quotes_shortens_a_quote_list_to_its_prefix() {
+    assert_eq!(
+        edit(
+            &["edit", "normalize-quotes", "--path", "0.1"],
+            "(list (quote x) y)\n"
+        ),
+        "(list 'x y)\n"
+    );
+    assert_eq!(
+        edit(
+            &["edit", "normalize-quotes", "--path", "0.1"],
+            "(mapcar (function car) xs)\n"
+        ),
+        "(mapcar #'car xs)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_expands_a_prefix_into_its_list() {
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--style",
+                "longhand"
+            ],
+            "(list 'x y)\n"
+        ),
+        "(list (quote x) y)\n"
+    );
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--style",
+                "longhand"
+            ],
+            "(mapcar #'car xs)\n"
+        ),
+        "(mapcar (function car) xs)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_leaves_a_form_already_in_that_style_alone() {
+    // Running this over a whole file must not depend on knowing which forms
+    // already comply.
+    assert_eq!(
+        edit(
+            &["edit", "normalize-quotes", "--path", "0.1"],
+            "(list 'x)\n"
+        ),
+        "(list 'x)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_refuses_a_form_that_is_not_a_quote() {
+    paredit()
+        .args(["edit", "normalize-quotes", "--path", "0.1"])
+        .write_stdin("(list (f x))")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not a quote form"));
+}
+
 // --- K9: reindent ---
 
 #[test]

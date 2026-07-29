@@ -674,6 +674,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::EditCommand::Kill(args) => basic_edit::workflow::kill(args)?,
             command::EditCommand::Copy(args) => basic_edit::workflow::copy(args)?,
             command::EditCommand::Duplicate(args) => basic_edit::workflow::duplicate(args)?,
+            command::EditCommand::NormalizeQuotes(args) => {
+                basic_edit::workflow::normalize_quotes(args)?;
+            }
             command::EditCommand::Yank(args) => basic_edit::workflow::yank(args)?,
             command::EditCommand::Wrap(args) => basic_edit::workflow::wrap(args)?,
             command::EditCommand::UnwrapPrefix(args) => {

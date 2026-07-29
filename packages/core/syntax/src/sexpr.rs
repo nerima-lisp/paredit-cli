@@ -7,6 +7,7 @@ pub mod error;
 mod formatter;
 mod navigation;
 mod parser;
+mod quote_edit;
 pub mod reader;
 mod reader_policy;
 mod reader_prefix_edit;
@@ -28,6 +29,7 @@ pub use error::{
 pub use formatter::Formatter;
 pub use navigation::{ContextKind, Direction, SourceContext};
 pub use parser::ParseError;
+pub use quote_edit::QuoteStyle;
 pub use reindent::body_form_distinguished;
 pub use structural_edit::Placement;
 pub use tree::AtomOccurrenceIndex;

@@ -5,8 +5,9 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTree};
 use crate::presentation::cli::args::{
     CompactSelectorArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, KillRingArgs,
-    NavigateArgs, NewlineArgs, OutputFormat, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs,
-    TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs, YankPlacement,
+    NavigateArgs, NewlineArgs, NormalizeQuotesArgs, OutputFormat, RaiseArgs, ReindentArgs,
+    RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
+    YankPlacement,
 };
 use std::path::Path;
 
@@ -221,6 +222,27 @@ pub(in crate::presentation::cli) fn raise(args: RaiseArgs) -> Result<()> {
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit raise")?;
     let rewritten = Edit::raise_levels(&input.text, &tree, selection, args.levels as usize)?;
+    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
+    Ok(emit_document(
+        &input, dialect, args.write, args.diff, rewritten,
+    )?)
+}
+
+/// Rewrites the selected quote into the requested spelling.
+///
+/// Not routed through `edit_target`, which takes a bare
+/// `fn(&str, &SyntaxTree, Selection) -> _` and so has no room for the style
+/// argument. `raise --levels` is the same shape for the same reason.
+pub(in crate::presentation::cli) fn normalize_quotes(args: NormalizeQuotesArgs) -> Result<()> {
+    let (input, dialect, tree) =
+        read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
+    let selection = resolve_one(
+        &tree,
+        dialect,
+        &args.target.selector,
+        "edit normalize-quotes",
+    )?;
+    let rewritten = Edit::normalize_quotes(&input.text, &tree, selection, args.style.into())?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
     Ok(emit_document(
         &input, dialect, args.write, args.diff, rewritten,
