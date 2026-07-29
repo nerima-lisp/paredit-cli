@@ -2,9 +2,11 @@ use std::path::PathBuf;
 
 use super::super::*;
 use super::args::AddIgnoreDeclarationArgs;
-use crate::domain::unused_parameter_report::{IgnoreDeclarationPlan, plan_ignore_declarations};
 use crate::presentation::cli::shared::{
     expand_input_files, read_input_dialect_and_tree, unified_diff, write_files_with_rollback,
+};
+use paredit_feature_function_parameter::unused_parameter_report::domain::{
+    IgnoreDeclarationPlan, plan_ignore_declarations,
 };
 
 /// Inserts `(declare (ignore ...))` for every parameter `inspect

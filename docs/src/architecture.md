@@ -52,20 +52,31 @@ when that layer has more than one file, and a slice need not have all three.
 
 ## What the root crate still owns
 
-`src/{domain,application,infrastructure,presentation}` remain as the public
-API's namespace — `paredit_cli::domain::sexpr` still resolves — but they hold
-re-exports rather than code. A contract test enforces that, with a short
-allowlist for the **composition root**: modules that enumerate or aggregate
-several features and therefore belong in neither core nor a feature.
+Almost nothing, which is the point. Outside `src/presentation` the root holds
+the lint registry, the module that runs it, and the `semantic_coverage`
+harness — and a contract test keeps it that way.
 
-The lint `REGISTRY` is the canonical example. It names all 169 rules, and every
-rule depends on the engine; putting the registry in either would be a cycle. So
-the engine takes a `RuleCatalog` as an argument and never learns which rules
-exist, the rules never learn the registry does, and the registry sits in the
-root reaching six packages for their `META` and `RULE`.
+The lint `REGISTRY` is the canonical example of what *must* live here. It names
+all 169 rules, and every rule depends on the engine; putting the registry in
+either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
+never learns which rules exist, the rules never learn the registry does, and
+the registry sits in the root reaching six packages for their `META` and
+`RULE`. That is the criterion: **a module that enumerates or aggregates several
+features** belongs in neither core nor any one feature.
 
-The same test identifies anything else that aggregates features: a module
-naming three features' capabilities is composition root regardless of its size.
+`src/domain` and `src/application` used to hold 415 lines of `pub use`
+re-exporting other packages, on the reasoning that they were "the public API's
+namespace". Measured, 26 of those lines were referenced and the crate is
+`publish = false`, so the namespace had no consumer outside this repository.
+Worse, the names were an invitation: a directory called `domain` is where "just
+put it here for now" goes, which is why seven report modules had accumulated in
+one. Callers now name the package that owns the type, and `src/infrastructure`
+— five lines, all re-export, zero consumers — is gone entirely; the
+infrastructure layer is `packages/core/workspace`, and saying so twice only
+made one of them a lie.
+
+`paredit_cli::{dialect, sexpr}` still resolve, re-exported in `lib.rs` from
+`paredit-core-syntax` directly.
 
 ## Where the detail lives
 
@@ -81,7 +92,7 @@ README; when you want to know how packages fit together, read this.
 | --- | --- | --- |
 | Domain | `<slice>/domain` | Core Lisp parsing, dialect detection, and semantic refactoring rules. Independent of CLI delivery and filesystems. |
 | Application | `<slice>/usecase` | Orchestrates typed domain operations into agent-facing reports, plans, and refactor workflows. |
-| Infrastructure | `core/workspace` | Turns filesystems and workspace discovery into inputs the application layer can consume. |
+| Infrastructure | `core/workspace` | Turns filesystems and workspace discovery into inputs the application layer can consume. There is no `src/infrastructure`; this is it. |
 | Presentation | `<slice>/cli` | Maps commands, flags, and output modes onto application services; renders reports and chooses exit codes. |
 
 Within a slice the direction is unchanged — `cli` calls `usecase` calls

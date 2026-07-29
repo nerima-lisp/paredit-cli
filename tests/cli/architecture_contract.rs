@@ -185,9 +185,6 @@ const COMPOSITION_ROOT: &[&str] = &[
     "lint",
     // Runs the registry, so it cannot be core or a feature.
     "lint_report",
-    "lint_suppression",
-    // Re-exports policy types owned by three separate features.
-    "report_policy",
     // A development harness measured against the semantics layer, reached
     // by examples/semantic_coverage.rs through the public API.
     "semantic_coverage",
@@ -226,7 +223,6 @@ fn root_layer_modules_hold_only_facades_and_the_composition_root() {
     for (layer, dir) in [
         ("domain", "src/domain"),
         ("application", "src/application/usecase"),
-        ("infrastructure", "src/infrastructure"),
     ] {
         let Ok(entries) = fs::read_dir(dir) else {
             continue;

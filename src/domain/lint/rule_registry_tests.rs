@@ -7,9 +7,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint_report::collect_lint_findings;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_string_char::char_op_string::rule::META;
     use std::path::Path;
 
@@ -99,9 +99,9 @@ mod tests {
 
 #[cfg(test)]
 mod eq_char_comparison_tests {
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint_report::collect_lint_findings;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_numeric::eq_char_comparison::rule::META;
     use std::path::Path;
 
@@ -185,9 +185,9 @@ mod eq_char_comparison_tests {
 
 #[cfg(test)]
 mod parse_integer_default_radix_tests {
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint_report::collect_lint_findings;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use std::path::Path;
 
     fn hits(input: &str) -> usize {
@@ -232,9 +232,9 @@ mod parse_integer_default_radix_tests {
 
 #[cfg(test)]
 mod constant_if_test_tests {
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint_report::collect_lint_findings;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use std::path::Path;
 
     fn messages(input: &str) -> Vec<String> {
@@ -290,9 +290,9 @@ mod constant_if_test_tests {
 
 #[cfg(test)]
 mod redundant_the_tests {
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint_report::collect_lint_findings;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_form_shape::redundant_the::rule::META;
     use std::path::Path;
 
@@ -382,9 +382,9 @@ mod redundant_the_tests {
 
 #[cfg(test)]
 mod eq_number_comparison_tests {
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint_report::collect_lint_findings;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_numeric::eq_number_comparison::rule::META;
     use std::path::Path;
 
@@ -470,10 +470,10 @@ mod eq_number_comparison_tests {
 
 #[cfg(test)]
 mod zero_divisor_tests {
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint::policy::RuleSelection;
     use crate::domain::lint_report::collect_lint_findings;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_numeric::zero_divisor::rule::META;
     use std::path::Path;
 

@@ -44,7 +44,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 /// Which rules a directive silences.
 #[derive(Debug, Clone, PartialEq, Eq)]

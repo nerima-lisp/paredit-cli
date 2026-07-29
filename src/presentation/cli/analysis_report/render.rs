@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
 use paredit_core_cli::CliResult;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 use serde_json::json;
 
 use paredit_core_cli::report::budget::Budget;

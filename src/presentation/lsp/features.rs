@@ -349,7 +349,7 @@ pub(crate) fn formatting_edits(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
 
     fn document(text: &str) -> Document {
         Document::new(text.to_owned(), Dialect::CommonLisp, 1)

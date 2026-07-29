@@ -7,7 +7,6 @@ use crate::application::usecase::lint_report::{
     lint_gate_violations, resolve_active_rules, rule_setting, rule_tags, rule_timing_report,
     run_lint_pass, summarize_lint_findings,
 };
-use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 use crate::presentation::cli::lint_report::args::{EmitFormat, LintReportArgs};
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
@@ -21,6 +20,7 @@ use crate::presentation::cli::lint_report::render::{
 };
 use paredit_core_cli::report::FindingSeverity;
 use paredit_core_cli::report::interop::{self, Flattened, Row};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 
 use crate::presentation::cli::shared::{
     FileFailure, analyze_files, apply_byte_span_edits, expand_input_files,
@@ -227,8 +227,8 @@ fn retain_unbaselined(
 /// which is what a rule reporting twice on one span has always resolved to.
 fn collect_lint_fixes(
     file: &std::path::Path,
-    dialect: crate::domain::dialect::Dialect,
-    tree: &crate::domain::sexpr::SyntaxTree,
+    dialect: paredit_core_syntax::dialect::Dialect,
+    tree: &paredit_core_syntax::sexpr::SyntaxTree,
     text: &str,
     active: &[&str],
     settings: &RuleSettings,
@@ -725,7 +725,7 @@ fn lint_report_remove_unused_suppressions(
 /// Line -> the rules that reported a finding there, across every rule.
 fn findings_by_line(
     file: &std::path::Path,
-    dialect: crate::domain::dialect::Dialect,
+    dialect: paredit_core_syntax::dialect::Dialect,
     tree: &SyntaxTree,
     text: &str,
 ) -> CliResult<std::collections::HashMap<usize, std::collections::HashSet<&'static str>>> {
@@ -1635,7 +1635,7 @@ fn lint_report_test_rules(custom: &CustomRules) -> CommandResult {
 mod tests {
     use super::*;
     use crate::application::usecase::lint_report::{FIXABLE_RULES, RULES};
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
@@ -1755,7 +1755,7 @@ mod tests {
             (source, Dialect::CommonLisp, "fixture.lisp"),
             (elisp_source, Dialect::EmacsLisp, "fixture.el"),
         ] {
-            let tree = crate::domain::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
+            let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
                 .expect("parse fixture");
             let fixes = collect_lint_fixes(
                 &PathBuf::from(name),

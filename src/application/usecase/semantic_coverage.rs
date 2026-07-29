@@ -9,26 +9,26 @@
 //! asserts, what they found.
 //!
 //! Discovery is a source-port responsibility, mirroring
-//! [`crate::application::usecase::similarity_report`]: this module only knows
+//! [`paredit_feature_similarity::similarity_report::usecase`]: this module only knows
 //! how to turn bytes into a report, not how paths become files.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::domain::dialect::Dialect;
-use crate::domain::semantics::binding::{
+use paredit_core_semantics::semantics::binding::{
     Binding, BindingKind, BindingTable, OpacityCauseKind, build_binding_table,
 };
-use crate::domain::semantics::project::GlobalTable;
-use crate::domain::semantics::project::service::{
+use paredit_core_semantics::semantics::project::GlobalTable;
+use paredit_core_semantics::semantics::project::service::{
     FilePackages, ProjectFile, build_global_table, resolve_file_packages,
 };
-use crate::domain::semantics::value::{
+use paredit_core_semantics::semantics::value::{
     ProjectConstants, ValueTable, build_value_table, build_value_table_in_project,
     evaluate_constant,
 };
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, SyntaxTree};
-use crate::domain::view_query::for_each_subview;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, SyntaxTree};
+use paredit_core_syntax::view_query::for_each_subview;
 
 /// The files to measure. Discovery (walking directories, filtering
 /// extensions) happens behind [`SemanticCoverageSourcePort`]; this only names
@@ -125,7 +125,7 @@ impl std::error::Error for SemanticCoverageWorkflowError {
 /// Why a `Variable` binding's constant value was not in the value table.
 ///
 /// The variants mirror the checks
-/// [`Binding::is_propagatable`](crate::domain::semantics::binding::Binding::is_propagatable)
+/// [`Binding::is_propagatable`](paredit_core_semantics::semantics::binding::Binding::is_propagatable)
 /// makes, in the same order, so a binding falls into exactly the bucket that
 /// explains the first disqualifying fact about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

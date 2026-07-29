@@ -27,8 +27,8 @@ mod rule_registry_tests;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 use engine::{HeadIndex, PassOptions, PassOutcome};
 use model::{LintFinding, LintOutcome, LintPolicy, LintPolicyOptions, LintSummary, Severity};

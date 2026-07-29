@@ -13,13 +13,13 @@ use std::path::Path;
 
 use paredit_core_cli::CliResult;
 
-use crate::domain::dialect::Dialect;
 use crate::domain::lint::engine::PassOptions;
 pub use crate::domain::lint::engine::RuleTimings;
 pub use crate::domain::lint::model::RuleFix;
 use crate::domain::lint::policy::RuleSelection;
 use crate::domain::lint::registry::catalog;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
 pub use crate::domain::lint::model::{
     FindingId, LintFinding, LintPolicy, LintPolicyOptions, LintSummary, RuleExample,

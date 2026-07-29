@@ -10,10 +10,10 @@
 mod tests {
     use std::path::Path;
 
-    use crate::domain::dialect::Dialect;
     use crate::domain::lint::collect_lint_outcomes;
     use crate::domain::lint::policy::RuleSelection;
-    use crate::domain::sexpr::SyntaxTree;
+    use paredit_core_syntax::dialect::Dialect;
+    use paredit_core_syntax::sexpr::SyntaxTree;
 
     /// `self-assignment` (`WholeTree`) sits at registry position 0;
     /// `redundant-quote` (`AllNodes`) sits well after it. Both fire on this

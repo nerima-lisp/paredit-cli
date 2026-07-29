@@ -2,8 +2,11 @@
 
 pub mod application;
 pub mod domain;
-pub mod infrastructure;
 pub mod presentation;
 
-pub use domain::dialect;
-pub use domain::sexpr;
+// The two vocabulary modules this crate's own integration tests read the world
+// through. Sourced from `paredit-core-syntax`, which owns them, rather than
+// from a `domain` module that used to re-export 200 names it did not own —
+// see `tests/cli/public_api_docs_contract.rs` for why the `paredit_cli::`
+// spelling is kept at all.
+pub use paredit_core_syntax::{dialect, sexpr};

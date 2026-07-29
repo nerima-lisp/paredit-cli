@@ -67,7 +67,7 @@ pub struct PackageCyclePolicy {
 /// Collects `defpackage` `:use`/`:import-from` edges from one file. Only
 /// Common Lisp declares packages this way, so non-Common-Lisp files
 /// contribute no edges (a documented no-op, mirroring how
-/// `crate::domain::package_boundary_report` scopes itself to Common Lisp).
+/// `paredit_feature_package::package_boundary_report::domain` scopes itself to Common Lisp).
 pub fn collect_package_dependency_edges(
     dialect: Dialect,
     tree: &SyntaxTree,

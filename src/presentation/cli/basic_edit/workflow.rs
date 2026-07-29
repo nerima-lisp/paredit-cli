@@ -1,14 +1,14 @@
 use paredit_core_cli::CliResult;
 use serde_json::json;
 
-use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTree};
 use crate::presentation::cli::args::{
     CompactSelectorArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, KillRingArgs,
     NavigateArgs, NewlineArgs, NormalizeQuotesArgs, OutputFormat, RaiseArgs, ReindentArgs,
     RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
     YankPlacement,
 };
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTree};
 use std::path::Path;
 
 use crate::presentation::cli::shared::{

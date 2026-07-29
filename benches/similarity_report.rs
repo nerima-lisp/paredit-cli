@@ -5,13 +5,13 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use paredit_cli::application::usecase::similarity_report::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_feature_similarity::similarity_report::usecase::{
     DiscoveredSimilarityFile, SimilarityComparisonScope, SimilarityDuplicatePolicy,
     SimilarityErrorPolicy, SimilarityFormScope, SimilarityInventory, SimilarityOverlapPolicy,
     SimilarityReportOptions, SimilarityReportPlan, SimilarityReportRequest,
     SimilarityReportSourcePort, build_similarity_report,
 };
-use paredit_cli::domain::dialect::Dialect;
 
 const INPUT_SIZES: [usize; 3] = [32, 64, 128];
 const RETENTION_MODES: [(Option<usize>, &str); 2] =

@@ -95,7 +95,7 @@ impl CustomRules {
     /// fix)`, with the rule name interned so it can join a `LintFinding`.
     pub(super) fn findings(
         &self,
-        tree: &crate::domain::sexpr::SyntaxTree,
+        tree: &paredit_core_syntax::sexpr::SyntaxTree,
         source: &str,
     ) -> Vec<(&'static str, CustomFinding)> {
         run(&self.ruleset, tree, source)
@@ -323,7 +323,7 @@ mod tests {
     fn findings_carry_the_interned_name() {
         let custom = loaded(r#"(defrule no-print :pattern (print ?x) :message "m")"#);
         let source = "(print 1)";
-        let tree = crate::domain::sexpr::SyntaxTree::parse(source).expect("parse");
+        let tree = paredit_core_syntax::sexpr::SyntaxTree::parse(source).expect("parse");
         let found = custom.findings(&tree, source);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].0, "no-print");

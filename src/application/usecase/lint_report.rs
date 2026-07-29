@@ -11,4 +11,4 @@ pub use crate::domain::lint_report::{
     rule_explanation, rule_is_fixable, rule_setting, rule_settings, rule_severity, rule_tags,
     rule_timing_report, run_lint_pass, summarize_lint_findings,
 };
-pub use crate::domain::lint_suppression::{LintSuppressions, UnusedSuppression};
+pub use paredit_core_lint_engine::suppression::{LintSuppressions, UnusedSuppression};

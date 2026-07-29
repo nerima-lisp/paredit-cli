@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use paredit_core_cli::CliResult;
 use serde_json::json;
 
-use crate::application::usecase::dependency_report::DependencyKind;
 use crate::presentation::cli::OutputFormat;
 use crate::presentation::cli::dependency_report::types::DependencyReportFile;
 use paredit_core_cli::report::graph::{EdgeStyle, Graph, NodeShape};
+use paredit_feature_package::dependency_report::usecase::DependencyKind;
 
 /// Draws the dependency graph: one node per package, system, or file, one edge
 /// per declared dependency.

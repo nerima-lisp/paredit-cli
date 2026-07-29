@@ -1767,6 +1767,71 @@ feature → feature は既に許された形である）。
 
 ---
 
+### 9.2.5 【完了時の追記】DDD 再検討: root crate は composition root だけになった
+
+§9.2.4 が「root の 7 モジュールのうち 5 は composition root ではない」と
+書いた件を実施し、さらに facade 自体を見直した。
+
+#### 移送先は「好み」ではなく既存の結合が決めていた
+
+7 個すべてについて、**移送先パッケージを既に import していた**。
+
+| モジュール | 移送先 | 既に依存していたもの |
+| --- | --- | --- |
+| `duplicate_export_report` | `feature/package` | 隣が `unused_export_report`、同じ `defpackage :export` |
+| `duplicate_method_report` | `feature/lisp-analysis` | 隣が `method_combination_report` |
+| `duplicate_slot_report` | `feature/lisp-analysis` | 隣が `class_hierarchy_report` |
+| `shadowed_binding_report` | `feature/binding` | その `let_report` を import |
+| `unused_parameter_report` | `feature/function-parameter` | その lambda-list パーサを import |
+| `symbol_report` | `feature/project-inventory` | 隣が `symbol_index_report` |
+| `mutation_safety` | 削除 | ファイルが空だった |
+
+**新規パッケージは 1 つも必要なかった。** backlog が難しく見えていたのは、
+誰も import を読まなかったからである。移送先に迷ったらまず import を読む。
+
+#### facade は 415 行で、参照されていたのは 26 行
+
+`src/domain` / `src/application` の `pub use` を実測:
+
+| | 行数 | 参照されている |
+| --- | ---: | ---: |
+| `src/domain/mod.rs` | 201 | 14 |
+| `src/application/usecase/mod.rs` | 213 | 12 |
+| `src/infrastructure/mod.rs` | 1 | **0** |
+
+根拠は「public API の名前空間として残す」だったが、この crate は
+`publish = false` であり、rustdoc も公開していない。**消費者はこのリポジトリ
+自身の 6 パスだけ**だった。しかも内部コードは 755 対 129 で既に直接 import を
+選んでいた。
+
+害は行数ではない。**`domain` という名前のディレクトリは「とりあえずここ」の
+行き先になる。** 7 個のレポートが溜まったのも、それを見張る contract test が
+必要だったのも、この命名が原因である。
+
+`src/infrastructure` は全体が re-export 1 行・消費者 0 で削除した。
+infrastructure 層は `packages/core/workspace` であり、2 箇所で名乗れば
+片方は嘘になる。
+
+#### contract の根拠が事実と違っていた 2 件
+
+- `report_policy` — doc コメント自身が "Compatibility exports. New code should
+  import from the report's domain module" と書いており、**参照 0**。削除。
+- `lint_suppression`（870 行）— contract は「registry の上に建っている」と
+  説明していたが、import は `paredit_core_syntax::sexpr::SyntaxTree` と std
+  **のみ**。registry に一切触れていない。lint の *機構* なので
+  `core/lint-engine::suppression` へ移した。
+
+**教訓は §9.2.4 と同じ**: 配置の根拠は散文ではなく import に書いてある。
+
+#### 綴りを固定していた contract が変更を止めた
+
+`crate_metadata_contract` は `pub use domain::dialect;` という**文字列**を
+pin していた。facade を消して同じ名前を実際の定義元から re-export した際、
+`paredit_cli::dialect` は変わらず解決するのに失敗した。
+性質（名前が re-export されている）を検査する形に直した。
+
+---
+
 ### 9.5 順序が結果を決める
 
 **機械的な修正を分割の前にやるか後にやるかで、総コストが大きく変わる。**

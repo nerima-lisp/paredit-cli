@@ -18,10 +18,6 @@ fn top_level_public_modules_keep_docs_rs_responsibility_docs() {
             "//! Core Lisp parsing, dialect, and semantic refactoring rules that stay",
         ),
         (
-            "src/infrastructure/mod.rs",
-            "//! Infrastructure adapters that turn filesystems and workspace discovery into",
-        ),
-        (
             "src/presentation/mod.rs",
             "//! Presentation adapters that map delivery mechanisms — the command line, and",
         ),

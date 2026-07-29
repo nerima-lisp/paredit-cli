@@ -196,6 +196,7 @@ pub fn rule_description(name: &str) -> Option<&'static str> {
 }
 
 /// The category for a rule name, or `None` if the name is unknown.
+#[must_use]
 pub fn rule_category(name: &str) -> Option<RuleCategory> {
     meta_of(name).map(|meta| meta.category())
 }
@@ -248,7 +249,7 @@ pub fn rule_setting(rule: &str, key: &str) -> Option<RuleSetting> {
 /// dialect, not by the rule's logic.
 #[must_use]
 pub fn rule_dialects(name: &str) -> Vec<&'static str> {
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
     REGISTRY
         .iter()
         .find(|entry| entry.meta().name().as_str() == name)
