@@ -114,6 +114,10 @@ struct Cli {
     /// operations long enough that silence looks like a hang.
     #[arg(long, global = true)]
     progress: bool,
+    /// Whether text output may use ANSI color. `auto` follows the
+    /// destination terminal and `NO_COLOR`/`CLICOLOR_FORCE`.
+    #[arg(long, global = true, value_enum)]
+    color: Option<paredit_core_cli::color::ColorMode>,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -263,9 +267,10 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
             serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
         );
     } else {
+        let painter = paredit_core_cli::color::Painter::stderr();
         eprintln!(
             "{} [{}]: {}",
-            messages::say(messages::Message::ErrorPrefix),
+            painter.red(messages::say(messages::Message::ErrorPrefix)),
             diagnosis.code,
             terminal_safe_error_chain(error)
         );
@@ -280,14 +285,14 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
                 Some(command) => {
                     eprintln!(
                         "  {}: {} — {}",
-                        messages::say(messages::Message::RepairPrefix),
+                        painter.cyan(messages::say(messages::Message::RepairPrefix)),
                         repair.detail(),
                         terminal_safe(command)
                     );
                 }
                 None => eprintln!(
                     "  {}: {}",
-                    messages::say(messages::Message::RepairPrefix),
+                    painter.cyan(messages::say(messages::Message::RepairPrefix)),
                     repair.detail()
                 ),
             }
@@ -372,6 +377,12 @@ fn bootstrap() -> Cli {
     let raw: Vec<String> = std::env::args().collect();
     runtime.dry_run = is_dry_run(&raw);
     runtime.progress = raw.iter().any(|token| token == "--progress");
+    if let Some(mode) = argv::long_flag_value(&raw, "color")
+        .as_deref()
+        .and_then(paredit_core_cli::color::ColorMode::from_label)
+    {
+        runtime.color = mode;
+    }
     paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file

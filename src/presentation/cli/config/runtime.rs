@@ -6,6 +6,7 @@
 
 use std::path::PathBuf;
 
+use paredit_core_cli::color::ColorMode;
 use paredit_core_cli::runtime::{Language, RuntimeSettings, Verbosity};
 use paredit_core_config::Settings;
 use paredit_core_syntax::dialect::Dialect;
@@ -49,6 +50,10 @@ pub fn resolve(settings: &Settings) -> RuntimeSettings {
         language: settings
             .text("output.language")
             .and_then(Language::from_label)
+            .unwrap_or_default(),
+        color: settings
+            .text("output.color")
+            .and_then(ColorMode::from_label)
             .unwrap_or_default(),
         // Neither is a configuration key. A `paredit.toml` that quietly made
         // every write a no-op would be a trap, and progress on stderr is a
@@ -139,9 +144,16 @@ mod tests {
             ("output.verbosity", Value::String("detailed".to_owned())),
             ("output.max-tokens", Value::Integer(4096)),
             ("output.language", Value::String("ja".to_owned())),
+            ("output.color", Value::String("never".to_owned())),
         ]));
         assert_eq!(runtime.verbosity, Verbosity::Detailed);
         assert_eq!(runtime.max_tokens, 4096);
         assert_eq!(runtime.language, Language::Japanese);
+        assert_eq!(runtime.color, ColorMode::Never);
+    }
+
+    #[test]
+    fn an_empty_configuration_defaults_color_to_auto() {
+        assert_eq!(resolve(&Settings::with_defaults()).color, ColorMode::Auto);
     }
 }

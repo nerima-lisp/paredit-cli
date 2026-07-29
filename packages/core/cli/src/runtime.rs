@@ -21,6 +21,8 @@ use std::sync::OnceLock;
 
 use paredit_core_syntax::dialect::Dialect;
 
+use crate::color::ColorMode;
+
 /// How much detail a report includes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Verbosity {
@@ -109,6 +111,8 @@ pub struct RuntimeSettings {
     /// Approximate token budget for a report. Zero means no budget.
     pub max_tokens: usize,
     pub language: Language,
+    /// Whether a text renderer may paint ANSI color.
+    pub color: ColorMode,
     /// Emit JSON Lines progress on stderr.
     pub progress: bool,
     /// Nothing may be written to disk.
@@ -181,6 +185,7 @@ mod tests {
         let settings = RuntimeSettings::default();
         assert_eq!(settings.verbosity, Verbosity::Normal);
         assert_eq!(settings.language, Language::English);
+        assert_eq!(settings.color, ColorMode::Auto);
         assert_eq!(settings.max_tokens, 0);
         assert!(settings.dialect_default.is_none());
     }

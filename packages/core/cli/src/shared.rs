@@ -384,14 +384,26 @@ pub fn emit_document(
         SyntaxTree::parse_with_dialect(&rewritten, dialect)
             .map_err(|_| IoRefusal::RewriteDoesNotReparse)?;
         if diff {
-            print!("{}", unified_diff(&path, &input.text, &rewritten));
+            print!(
+                "{}",
+                crate::color::colorize_diff(
+                    crate::color::Painter::stdout(),
+                    &unified_diff(&path, &input.text, &rewritten)
+                )
+            );
         }
         return write_file_with_rollback(path, rewritten);
     }
 
     if diff {
         let path = input.file.clone().unwrap_or_else(|| PathBuf::from("stdin"));
-        print!("{}", unified_diff(&path, &input.text, &rewritten));
+        print!(
+            "{}",
+            crate::color::colorize_diff(
+                crate::color::Painter::stdout(),
+                &unified_diff(&path, &input.text, &rewritten)
+            )
+        );
         return Ok(());
     }
 
