@@ -17,69 +17,97 @@
 //! `unused-parameters`' scope).
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::list_head;
 use paredit_feature_function_parameter::function_parameter::domain::list_lambda_list_parameter_names;
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateParameterItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The 1-based line the definition starts on.
+    pub line: usize,
     pub definition: String,
     pub parameter: String,
     pub occurrence_count: usize,
 }
 
-#[derive(Debug)]
-pub struct DuplicateParameterSummary {
-    pub definition_count: usize,
-    pub duplicates: Vec<DuplicateParameterItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateParameterPolicyOptions {
-    fail_on_duplicate: bool,
-}
-
-impl DuplicateParameterPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_duplicate: bool) -> Self {
-        Self { fail_on_duplicate }
+impl Finding for DuplicateParameterItem {
+    /// The rule's own name, not the parameter.
+    ///
+    /// The parameter is read from the source and so is an open set, while
+    /// `kind` is `&'static str`. It stays a text column and a JSON field
+    /// instead.
+    fn kind(&self) -> &'static str {
+        "duplicate-parameters"
     }
 
-    #[must_use]
-    pub const fn fail_on_duplicate(self) -> bool {
-        self.fail_on_duplicate
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DuplicateParameterPolicy {
-    pub fail_on_duplicate: bool,
-    pub definition_count: usize,
-    pub duplicate_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("definition={}", self.definition),
+            format!("parameter={}", self.parameter),
+            format!("count={}", self.occurrence_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("definition", json!(self.definition)),
+            ("parameter", json!(self.parameter)),
+            ("occurrence_count", json!(self.occurrence_count)),
+        ]
+    }
+
+    /// The same sentence the `duplicate-parameters` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one defect described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} names parameter {} more than once ({}×)",
+            self.definition, self.parameter, self.occurrence_count
+        )
+    }
 }
 
 /// Collects every duplicated lambda-list parameter from every callable
-/// definition in one file, along with the number of definitions scanned.
-pub fn collect_duplicate_parameters(
+/// definition in one file, with the number of definitions scanned as the
+/// denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated parameter here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_duplicate_parameter_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateParameterItem>)> {
+) -> LintResult<FileFindings<DuplicateParameterItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("definition_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut definition_count = 0;
     let mut duplicates = Vec::new();
 
@@ -124,8 +152,8 @@ pub fn collect_duplicate_parameters(
                 continue;
             }
             duplicates.push(DuplicateParameterItem {
-                path: path.to_path_buf(),
                 span: view.span,
+                line: line_of(source, view.span.start().get()),
                 definition: definition.clone(),
                 parameter: parameter.clone(),
                 occurrence_count: *occurrence_count,
@@ -133,48 +161,44 @@ pub fn collect_duplicate_parameters(
         }
     }
 
-    Ok((definition_count, duplicates))
-}
-
-#[must_use]
-pub const fn summarize_duplicate_parameters(
-    definition_count: usize,
-    duplicates: Vec<DuplicateParameterItem>,
-) -> DuplicateParameterSummary {
-    DuplicateParameterSummary {
-        definition_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
         duplicates,
-    }
+        vec![("definition_count", json!(definition_count))],
+    ))
 }
 
-#[must_use]
-pub fn evaluate_duplicate_parameter_policy(
-    options: DuplicateParameterPolicyOptions,
-    summary: &DuplicateParameterSummary,
-) -> DuplicateParameterPolicy {
-    let duplicate_count = summary.duplicates.len();
-    let mut violations = Vec::new();
-    if options.fail_on_duplicate() && duplicate_count > 0 {
-        violations.push(format!("duplicate_count {duplicate_count} exceeds 0"));
-    }
-
-    DuplicateParameterPolicy {
-        fail_on_duplicate: options.fail_on_duplicate(),
-        definition_count: summary.definition_count,
-        duplicate_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn duplicates(input: &str) -> (usize, Vec<DuplicateParameterItem>) {
+    fn report(input: &str) -> FileFindings<DuplicateParameterItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_duplicate_parameters(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect duplicate parameters")
+        build_duplicate_parameter_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build duplicate parameter report")
+    }
+
+    /// The `(definition_count, duplicates)` pair the report is built from.
+    fn duplicates(input: &str) -> (u64, Vec<DuplicateParameterItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "definition_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("definition_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -213,32 +237,52 @@ mod tests {
         assert!(duplicates.is_empty());
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(defun f (x x) x)").expect("parse input");
-        let (definition_count, duplicates) =
-            collect_duplicate_parameters(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect duplicate parameters");
-        assert_eq!(definition_count, 0);
-        assert!(duplicates.is_empty());
+        let report =
+            build_duplicate_parameter_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build duplicate parameter report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("definition_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (definition_count, items) = duplicates("(defun f (x x) x)");
-        let summary = summarize_duplicate_parameters(definition_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(defun f (x) x)").dialect_modelled);
+    }
 
-        let quiet = evaluate_duplicate_parameter_policy(
-            DuplicateParameterPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_columns() {
+        let report = report("(defun g (a) a)\n(defun f (x y x) x)\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "duplicate-parameters");
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "definition=f".to_owned(),
+                "parameter=x".to_owned(),
+                "count=2".to_owned(),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.duplicate_count, 1);
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("definition", json!("f")),
+                ("parameter", json!("x")),
+                ("occurrence_count", json!(2)),
+            ]
+        );
+    }
 
-        let strict = evaluate_duplicate_parameter_policy(
-            DuplicateParameterPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_definition_scanned_not_only_the_flagged_ones() {
+        let report = report("(defun f (x x) x)\n(defun g (y) y)\n");
+        assert_eq!(report.summary, vec![("definition_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
