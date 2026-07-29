@@ -81,6 +81,75 @@ accepts `--fail-on-no-change`, which turns a zero-match rename from a silent
 no-op into an exit-1 failure — pass it whenever you expect the rename to do
 something.
 
+## Error identity and repairs
+
+An exit code says *that* a command failed. Every failure also carries a stable
+code saying *what kind*, and whatever steps would plausibly get past it.
+
+The rendering follows the format the command's own report would have used, so a
+command that answers in JSON also fails in JSON — on stderr:
+
+```json
+{
+  "schema_version": 1,
+  "status": "error",
+  "command": "inspect form",
+  "error": {
+    "code": "selection.path-not-reachable",
+    "category": "selection",
+    "retryable": false,
+    "exit_code": 1,
+    "message": "path segment 9 is out of range: the form at path 0 has 4 child expressions (valid indexes 0..=3)",
+    "repairs": [
+      {
+        "action": "inspect-first",
+        "detail": "list the paths this document actually has, then select one of them",
+        "command": "paredit inspect outline --output json --file src/a.lisp"
+      },
+      {
+        "action": "change-selection",
+        "detail": "select by byte offset instead of by path, with --at <offset>",
+        "command": null
+      }
+    ]
+  }
+}
+```
+
+For a command whose report is text, the same failure reads:
+
+```
+Error [selection.path-not-reachable]: path segment 9 is out of range: ...
+  try: list the paths this document actually has, then select one of them — paredit inspect outline --output json --file src/a.lisp
+  try: select by byte offset instead of by path, with --at <offset>
+```
+
+**Branch on `category`, not on the message.** There are seven, and they answer
+different questions:
+
+| Category | Meaning | Retryable |
+| --- | --- | --- |
+| `argument` | The command line does not describe a runnable request | no |
+| `selection` | `--path` or `--at` did not resolve; a different one might | no |
+| `input` | The source is not what the operation needs | no |
+| `refusal` | Declined for safety; the state has to change first | no |
+| `environment` | The filesystem or environment failed | **yes** |
+| `gate` | A requested gate tripped. The report was printed first | no |
+| `internal` | Unclassified — a defect in this tool, not in your call | no |
+
+`retryable` is stated outright so an agent does not have to infer it. Only
+`environment` is: re-running an identical command after a selection failure
+will fail identically.
+
+A `repairs[].command` is a command line that runs exactly as written; it is
+`null` when the failure did not carry enough context to build one, and the
+`detail` is then the whole answer. `action` is the machine-readable kind:
+`inspect-first`, `change-selection`, `pass-flag`, `re-read`, `fix-source`,
+`check-configuration`.
+
+Codes are namespaced `<category>.<name>`. Adding one is a compatible change;
+renaming one is not.
+
 ## Output contract
 
 - `--output json` is the stable, parseable contract; prefer it everywhere it

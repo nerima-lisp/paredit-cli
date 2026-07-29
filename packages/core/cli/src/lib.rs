@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod args;
+pub mod diagnosis;
 pub mod error;
 pub mod gate;
 pub mod runtime;

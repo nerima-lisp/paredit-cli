@@ -25,6 +25,8 @@
 
 use clap::builder::Command as ClapCommand;
 
+use super::argv::{declares_flag, long_flags_present, resolve_leaf};
+
 use paredit_core_config::Settings;
 use paredit_core_config::toml::Value;
 
@@ -357,57 +359,6 @@ impl Binding {
             _ => None,
         }
     }
-}
-
-/// Walks the subcommand tree with `argv` to find the command being run.
-///
-/// Returns the leaf and its space-separated path. Stops at the first token
-/// that is not a known subcommand name, which is exactly where the flags and
-/// positionals start.
-fn resolve_leaf<'a>(argv: &[String], root: &'a ClapCommand) -> Option<(&'a ClapCommand, String)> {
-    let mut current = root;
-    let mut path = Vec::new();
-
-    for token in argv.iter().skip(1) {
-        if token == "--" || token.starts_with('-') {
-            break;
-        }
-        let Some(next) = current
-            .get_subcommands()
-            .find(|candidate| candidate.get_name() == token)
-        else {
-            break;
-        };
-        current = next;
-        path.push(token.clone());
-    }
-
-    (!path.is_empty()).then(|| (current, path.join(" ")))
-}
-
-/// The long flags already on the command line, `--flag` and `--flag=value`
-/// alike. Anything after `--` is a positional and does not count.
-fn long_flags_present(argv: &[String]) -> Vec<String> {
-    let mut present = Vec::new();
-    for token in argv {
-        if token == "--" {
-            break;
-        }
-        let Some(rest) = token.strip_prefix("--") else {
-            continue;
-        };
-        let name = rest.split('=').next().unwrap_or(rest);
-        if !name.is_empty() {
-            present.push(name.to_owned());
-        }
-    }
-    present
-}
-
-fn declares_flag(command: &ClapCommand, flag: &str) -> bool {
-    command
-        .get_arguments()
-        .any(|argument| argument.get_long() == Some(flag))
 }
 
 #[cfg(test)]

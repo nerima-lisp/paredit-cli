@@ -151,6 +151,8 @@ mod eql_search_literal_report;
 mod eql_string_comparison_report;
 #[path = "cli/equality_arity_report.rs"]
 mod equality_arity_report;
+#[path = "cli/error_diagnosis.rs"]
+mod error_diagnosis;
 #[path = "cli/eval_when_situation_report.rs"]
 mod eval_when_situation_report;
 #[path = "cli/exhaustive_case_otherwise_report.rs"]

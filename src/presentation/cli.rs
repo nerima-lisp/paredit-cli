@@ -5,6 +5,7 @@ macro_rules! safe_text {
 }
 
 mod analysis_report;
+mod argv;
 mod basic_edit;
 mod capabilities;
 mod command;
@@ -17,7 +18,7 @@ mod dependency_report;
 // macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
 // it enumerates three features' capabilities, which makes it composition root
 // (section 11.5.1).
-use paredit_core_cli::{args, gate, shared};
+use paredit_core_cli::{args, diagnosis, gate, shared};
 // Phase 3 facade: the composition root sees each slice's Args type and run fn.
 use paredit_feature_code_metrics::cohesion_report::cli as cohesion_report;
 use paredit_feature_code_metrics::debt_score_report::cli as debt_score_report;
@@ -105,18 +106,64 @@ struct Cli {
 
 #[must_use]
 pub fn run() -> ExitCode {
+    let invocation: Vec<String> = std::env::args().collect();
     let cli = bootstrap();
     match dispatch::dispatch(cli.command) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("Error: {}", terminal_safe_error_chain(&error));
-            if error.downcast_ref::<gate::GateFailure>().is_some() {
-                ExitCode::from(gate::GATE_FAILURE_EXIT_CODE as u8)
-            } else {
-                ExitCode::FAILURE
+        Err(error) => report_failure(&error, &invocation),
+    }
+}
+
+/// Prints a failure with its stable code and whatever would get past it, in
+/// the format this invocation was already going to be read in.
+fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
+    use clap::CommandFactory;
+
+    let root = Cli::command();
+    let context = diagnosis::Context {
+        file: argv::long_flag_value(invocation, "file"),
+        command_path: argv::resolve_leaf(invocation, &root).map(|(_, path)| path),
+    };
+    let diagnosis = diagnosis::diagnose(error, &context);
+
+    // JSON on stderr when the report itself would have been JSON. An agent
+    // that asked for a machine-readable answer should not have to parse
+    // English to find out why it did not get one.
+    if argv::effective_output_format(invocation, &root).as_deref() == Some("json") {
+        let envelope = json!({
+            "schema_version": 1,
+            "status": "error",
+            "command": context.command_path.as_deref(),
+            "error": diagnosis.to_json(),
+        });
+        // Not wrapped in `terminal_safe`: the values inside were escaped when
+        // the envelope was built, and escaping the serialized document would
+        // turn its own newlines into `\u{a}` and stop it being JSON.
+        eprintln!(
+            "{}",
+            serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
+        );
+    } else {
+        eprintln!(
+            "Error [{}]: {}",
+            diagnosis.code,
+            terminal_safe_error_chain(error)
+        );
+        for repair in &diagnosis.repairs {
+            match &repair.command {
+                Some(command) => {
+                    eprintln!(
+                        "  try: {} — {}",
+                        terminal_safe(&repair.detail),
+                        terminal_safe(command)
+                    );
+                }
+                None => eprintln!("  try: {}", terminal_safe(&repair.detail)),
             }
         }
     }
+
+    ExitCode::from(diagnosis.code.exit_code())
 }
 
 /// Reads the configuration, installs what acts below the argument layer, and
