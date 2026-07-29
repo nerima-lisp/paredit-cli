@@ -11,6 +11,7 @@ use paredit_core_config::load::{Loaded, Source};
 use paredit_core_config::schema::{self, KeySchema, ValueKind};
 use paredit_core_config::settings::Resolved;
 
+use crate::presentation::cli::config_bridge::Injected;
 use crate::presentation::cli::terminal_safe;
 
 pub fn print_check(loaded: &Loaded, output: OutputFormat) -> Result<()> {
@@ -66,6 +67,7 @@ pub fn print_show(
     loaded: &Loaded,
     key: Option<&str>,
     changed_only: bool,
+    injections: Option<&[Injected]>,
     output: OutputFormat,
 ) -> Result<()> {
     let rows: Vec<(&'static KeySchema, Option<&Resolved>)> = loaded
@@ -93,6 +95,9 @@ pub fn print_show(
                     .iter()
                     .map(|(entry, resolved)| setting_json(entry, *resolved))
                     .collect::<Vec<_>>(),
+                "injections": injections.map(|injections| {
+                    injections.iter().map(injection_json).collect::<Vec<_>>()
+                }),
             });
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
@@ -118,6 +123,18 @@ pub fn print_show(
                     None => println!("{}\t<unset>\t-\t-", entry.key),
                 }
             }
+            for injection in injections.unwrap_or_default() {
+                println!(
+                    "injects\t{}\t--{}\t{}",
+                    injection.key,
+                    injection.flag,
+                    if injection.values.is_empty() {
+                        "(no value)".to_owned()
+                    } else {
+                        injection.values.join(" ")
+                    }
+                );
+            }
             for diagnostic in &loaded.diagnostics {
                 println!("{}", terminal_safe(diagnostic));
             }
@@ -134,6 +151,10 @@ pub fn print_schema(output: OutputFormat) -> Result<()> {
                 "report": "config schema",
                 "key_count": schema::KEY_COUNT,
                 "file_names": paredit_core_config::load::CONFIG_FILE_NAMES,
+                "loader_variables": paredit_core_config::load::LOADER_VARS
+                    .iter()
+                    .map(|(name, summary)| json!({ "name": name, "summary": summary }))
+                    .collect::<Vec<_>>(),
                 "layers": ["default", "user", "repository", "directory", "explicit", "environment", "flag"],
                 "keys": schema::SCHEMA.iter().map(key_json).collect::<Vec<_>>(),
             });
@@ -223,6 +244,14 @@ fn setting_json(entry: &KeySchema, resolved: Option<&Resolved>) -> Json {
         "value": resolved.map(|resolved| resolved.value.to_json()),
         "value_display": resolved.map(|resolved| resolved.value.to_string()),
         "origin": resolved.map(|resolved| resolved.origin.to_json()),
+    })
+}
+
+fn injection_json(injection: &Injected) -> Json {
+    json!({
+        "key": injection.key,
+        "flag": format!("--{}", injection.flag),
+        "values": injection.values,
     })
 }
 

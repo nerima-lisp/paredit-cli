@@ -9,6 +9,7 @@ mod basic_edit;
 mod capabilities;
 mod command;
 mod config;
+mod config_bridge;
 mod contract;
 mod dependency_report;
 
@@ -104,7 +105,7 @@ struct Cli {
 
 #[must_use]
 pub fn run() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = bootstrap();
     match dispatch::dispatch(cli.command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -115,6 +116,70 @@ pub fn run() -> ExitCode {
                 ExitCode::FAILURE
             }
         }
+    }
+}
+
+/// Reads the configuration, installs what acts below the argument layer, and
+/// parses the command line the configuration has contributed to.
+///
+/// Ordered so that failure is always survivable. A configuration that cannot
+/// be read leaves the command running unconfigured with a warning, rather than
+/// refusing to run at all: `paredit config check` is where a broken file
+/// should be diagnosed, and a tool that will not start is a bad place to learn
+/// that a file two directories up has a typo.
+fn bootstrap() -> Cli {
+    use clap::CommandFactory;
+
+    let argv: Vec<String> = std::env::args().collect();
+    let loaded = match config::workflow::load(&config::args::ConfigLocationArgs::default()) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            eprintln!(
+                "Warning: ignoring the configuration: {}",
+                terminal_safe_error_chain(&error)
+            );
+            return Cli::parse_from(argv);
+        }
+    };
+
+    paredit_core_cli::runtime::install(config::runtime::resolve(&loaded.settings));
+
+    // A configuration with errors contributes nothing. Injecting from a file
+    // that `config check` would reject turns a fixable diagnostic into a
+    // baffling error about flags the caller never typed.
+    if loaded.has_errors() {
+        eprintln!(
+            "Warning: the configuration has errors and was not applied; \
+             run `paredit config check` for the details"
+        );
+        return Cli::parse_from(argv);
+    }
+
+    let augmented = config_bridge::augment(&argv, &loaded.settings, &Cli::command());
+    if augmented.argv == argv {
+        return Cli::parse_from(argv);
+    }
+
+    match Cli::try_parse_from(&augmented.argv) {
+        Ok(cli) => cli,
+        // The rewrite must never be the reason a command fails. Re-parsing the
+        // original both drops the injection and reports against what the
+        // caller actually typed. Naming the dropped keys matters: the command
+        // is about to run with settings the caller believes are in force.
+        Err(error) if error.use_stderr() => {
+            let dropped = augmented
+                .injected
+                .iter()
+                .map(|injection| injection.key)
+                .collect::<Vec<_>>()
+                .join(", ");
+            eprintln!(
+                "Warning: these configured keys do not combine with the given flags \
+                 and were not applied: {dropped}"
+            );
+            Cli::parse_from(argv)
+        }
+        Err(error) => error.exit(),
     }
 }
 

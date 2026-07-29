@@ -41,10 +41,16 @@ pub fn load(location: &ConfigLocationArgs) -> Result<Loaded> {
         None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
     };
 
+    // `from_process` has already read the loader variables. A flag adds to
+    // what they said rather than replacing it: assigning here would let an
+    // unset flag switch `PAREDIT_NO_CONFIG` back off, which is the opposite of
+    // what a flag defaulting to false should do.
     let mut options = LoadOptions::from_process(start);
-    options.explicit.clone_from(&location.config);
-    options.skip_files = location.no_config;
-    options.skip_environment = location.no_config_env;
+    if location.config.is_some() {
+        options.explicit.clone_from(&location.config);
+    }
+    options.skip_files |= location.no_config;
+    options.skip_environment |= location.no_config_env;
 
     Ok(paredit_core_config::load::load(
         &options,
@@ -84,7 +90,30 @@ pub fn show(args: ConfigShowArgs) -> Result<()> {
         }
     }
 
-    render::print_show(&loaded, args.key.as_deref(), args.changed_only, args.output)
+    let injections = match &args.for_command {
+        None => None,
+        Some(command_path) => Some(
+            crate::presentation::cli::config_bridge::plan_for(
+                command_path,
+                &loaded.settings,
+                &<crate::presentation::cli::Cli as clap::CommandFactory>::command(),
+            )
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "`{command_path}` is not a command. Pass a full path such as \
+                     \"inspect lint\"; `paredit inspect capabilities` lists them all."
+                )
+            })?,
+        ),
+    };
+
+    render::print_show(
+        &loaded,
+        args.key.as_deref(),
+        args.changed_only,
+        injections.as_deref(),
+        args.output,
+    )
 }
 
 pub fn schema_report(args: ConfigSchemaArgs) -> Result<()> {

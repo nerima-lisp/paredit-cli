@@ -47,6 +47,10 @@ pub struct ConfigShowArgs {
     /// Show only the keys some layer actually set, hiding the defaults.
     #[arg(long)]
     pub changed_only: bool,
+    /// Also report the flags this configuration would add to one command, as
+    /// a quoted path: --for "inspect lint".
+    #[arg(long = "for", value_name = "COMMAND")]
+    pub for_command: Option<String>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,

@@ -26,6 +26,31 @@ pub const CONFIG_FILE_NAMES: [&str; 2] = ["paredit.toml", ".paredit.toml"];
 /// The environment variable that relocates the user layer wholesale.
 pub const CONFIG_HOME_VAR: &str = "PAREDIT_CONFIG_HOME";
 
+/// The variables that control *loading* rather than settings.
+///
+/// Separate from [`schema::SCHEMA`] because they are not configuration: they
+/// decide which configuration is read. They exist as variables rather than
+/// flags so that every command honours them without 275 argument structs
+/// growing three flags each.
+pub const LOADER_VARS: [(&str, &str); 4] = [
+    (
+        CONFIG_HOME_VAR,
+        "Directory holding the user layer's paredit.toml.",
+    ),
+    (
+        "PAREDIT_CONFIG",
+        "Read this file and skip discovery, as --config does.",
+    ),
+    (
+        "PAREDIT_NO_CONFIG",
+        "Read no configuration files at all, as --no-config does.",
+    ),
+    (
+        "PAREDIT_NO_CONFIG_ENV",
+        "Ignore the PAREDIT_* setting overrides, as --no-config-env does.",
+    ),
+];
+
 /// A configuration file this big is a mistake, not a configuration.
 pub const MAX_CONFIG_BYTES: u64 = 1 << 20;
 
@@ -70,11 +95,22 @@ impl LoadOptions {
             .or_else(|| lookup("XDG_CONFIG_HOME").map(|dir| dir.join("paredit")))
             .or_else(|| lookup("HOME").map(|home| home.join(".config").join("paredit")));
 
+        let flag = |name: &str| {
+            environment
+                .iter()
+                .find(|(key, _)| key == name)
+                .is_some_and(|(_, value)| is_truthy(value))
+        };
+        let explicit = environment
+            .iter()
+            .find(|(key, _)| key == "PAREDIT_CONFIG")
+            .map(|(_, value)| PathBuf::from(value));
+
         Self {
             start: start.into(),
-            explicit: None,
-            skip_files: false,
-            skip_environment: false,
+            explicit,
+            skip_files: flag("PAREDIT_NO_CONFIG"),
+            skip_environment: flag("PAREDIT_NO_CONFIG_ENV"),
             environment,
             user_config_dir,
         }
@@ -86,6 +122,19 @@ impl LoadOptions {
             .find(|(key, _)| key == name)
             .map(|(_, value)| value.as_str())
     }
+}
+
+/// Whether a `PAREDIT_NO_*` style loader switch is on.
+///
+/// The same vocabulary the boolean *settings* accept, so the two kinds of
+/// variable do not disagree about how "on" is spelled. An unrecognised value
+/// is off: a loader switch cannot raise a diagnostic, because it is what
+/// decides whether there is anything to raise a diagnostic about.
+fn is_truthy(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
 }
 
 /// One file that contributed to the merge.

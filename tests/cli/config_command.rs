@@ -454,3 +454,264 @@ fn diagnostic<'a>(report: &'a serde_json::Value, code: &str) -> &'a serde_json::
         .find(|entry| entry["code"] == code)
         .unwrap_or_else(|| panic!("no {code} diagnostic in {report}"))
 }
+
+// --- The configuration taking effect, rather than merely being reported. ---
+//
+// `config show` proving a key was read is not the same claim as a command
+// behaving differently because of it. These run real commands.
+
+/// Written to `paredit()` rather than `config()`: these invoke ordinary
+/// commands, which have no `--from`, so the working directory does the
+/// discovery.
+fn in_repo(root: &Path, args: &[&str]) -> Command {
+    let mut command = paredit();
+    command
+        .current_dir(root)
+        .args(args)
+        .env_remove("PAREDIT_CONFIG_HOME")
+        .env_remove("XDG_CONFIG_HOME")
+        .env("HOME", root.display().to_string());
+    command
+}
+
+#[test]
+fn a_disabled_rule_stops_being_reported_by_lint() {
+    let root = repo("config-effect-lint");
+    write(&root, "a.lisp", "(defun f (x) (if (eq x nil) 1 2))\n");
+
+    let before = in_repo(&root, &["inspect", "lint", "a.lisp"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let before: serde_json::Value = serde_json::from_slice(&before).expect("valid JSON");
+    assert_eq!(before["finding_count"], 1);
+
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ndisable = [\"nil-comparison\"]\n",
+    );
+
+    let after = in_repo(&root, &["inspect", "lint", "a.lisp"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let after: serde_json::Value = serde_json::from_slice(&after).expect("valid JSON");
+    assert_eq!(after["finding_count"], 0);
+}
+
+/// The rule the whole bridge is built around.
+#[test]
+fn a_flag_still_beats_the_configuration() {
+    let root = repo("config-flag-wins");
+    write(&root, "a.lisp", "(defun f (x)\n(list x))\n");
+    write(&root, "paredit.toml", "[format]\nindent = 8\n");
+
+    let configured = in_repo(&root, &["edit", "format", "--file", "a.lisp"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert!(
+        String::from_utf8_lossy(&configured).contains("\n        "),
+        "the configured indent of 8 was not applied"
+    );
+
+    let flagged = in_repo(
+        &root,
+        &["edit", "format", "--file", "a.lisp", "--indent", "1"],
+    )
+    .assert()
+    .success()
+    .get_output()
+    .stdout
+    .clone();
+    let flagged = String::from_utf8_lossy(&flagged);
+    assert!(flagged.contains("\n "), "{flagged:?}");
+    assert!(!flagged.contains("\n        "), "{flagged:?}");
+}
+
+/// `[dialect]` acts below the argument layer, so it is checked through a
+/// command's own answer rather than through an injected flag.
+#[test]
+fn a_forced_dialect_overrides_extension_detection() {
+    let root = repo("config-dialect-force");
+    write(&root, "a.el", "(defun f () nil)\n");
+
+    let detected = in_repo(
+        &root,
+        &["inspect", "dialect", "--file", "a.el", "--output", "json"],
+    )
+    .assert()
+    .success()
+    .get_output()
+    .stdout
+    .clone();
+    let detected: serde_json::Value = serde_json::from_slice(&detected).expect("valid JSON");
+    assert_eq!(detected["dialect"], "emacs-lisp");
+
+    write(
+        &root,
+        "paredit.toml",
+        "[dialect]\ndefault = \"common-lisp\"\nforce = true\n",
+    );
+
+    let forced = in_repo(
+        &root,
+        &["inspect", "dialect", "--file", "a.el", "--output", "json"],
+    )
+    .assert()
+    .success()
+    .get_output()
+    .stdout
+    .clone();
+    let forced: serde_json::Value = serde_json::from_slice(&forced).expect("valid JSON");
+    assert_eq!(forced["dialect"], "common-lisp");
+}
+
+/// Without `force`, a configured dialect is a fallback: a recognised
+/// extension still wins, and only a file detection could not place picks it up.
+#[test]
+fn an_unforced_dialect_only_fills_in_for_an_undetected_file() {
+    let root = repo("config-dialect-default");
+    write(&root, "a.el", "(defun f () nil)\n");
+    write(&root, "script", "(defun f () nil)\n");
+    write(
+        &root,
+        "paredit.toml",
+        "[dialect]\ndefault = \"common-lisp\"\n",
+    );
+
+    for (file, expected) in [("a.el", "emacs-lisp"), ("script", "common-lisp")] {
+        let report = in_repo(
+            &root,
+            &["inspect", "dialect", "--file", file, "--output", "json"],
+        )
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+        let report: serde_json::Value = serde_json::from_slice(&report).expect("valid JSON");
+        assert_eq!(report["dialect"], expected, "for {file}");
+    }
+}
+
+/// An explicit `--dialect` outranks even a forced configuration: it is the
+/// most specific thing anyone said.
+#[test]
+fn an_explicit_dialect_flag_outranks_a_forced_configuration() {
+    let root = repo("config-dialect-flag");
+    write(&root, "a.el", "(defun f () nil)\n");
+    write(
+        &root,
+        "paredit.toml",
+        "[dialect]\ndefault = \"common-lisp\"\nforce = true\n",
+    );
+
+    let report = in_repo(
+        &root,
+        &[
+            "inspect",
+            "dialect",
+            "--file",
+            "a.el",
+            "--dialect",
+            "racket",
+            "--output",
+            "json",
+        ],
+    )
+    .assert()
+    .success()
+    .get_output()
+    .stdout
+    .clone();
+    let report: serde_json::Value = serde_json::from_slice(&report).expect("valid JSON");
+    assert_eq!(report["dialect"], "racket");
+}
+
+/// A broken file must not become a broken tool. The command still runs; the
+/// warning points at where the problem is diagnosed properly.
+#[test]
+fn a_configuration_with_errors_is_skipped_rather_than_fatal() {
+    let root = repo("config-broken-skipped");
+    write(&root, "a.lisp", "(defun f (x) x)\n");
+    write(&root, "paredit.toml", "[lint]\npreset = \"everything\"\n");
+
+    in_repo(&root, &["inspect", "lint", "a.lisp"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("paredit config check"));
+}
+
+#[test]
+fn a_configuration_that_cannot_be_parsed_is_skipped_rather_than_fatal() {
+    let root = repo("config-unparsable-skipped");
+    write(&root, "a.lisp", "(defun f (x) x)\n");
+    write(&root, "paredit.toml", "this is not toml\n");
+
+    in_repo(&root, &["inspect", "lint", "a.lisp"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("ignoring the configuration"));
+}
+
+#[test]
+fn the_no_config_variable_turns_the_whole_thing_off() {
+    let root = repo("config-env-off");
+    write(&root, "a.lisp", "(defun f (x) (if (eq x nil) 1 2))\n");
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ndisable = [\"nil-comparison\"]\n",
+    );
+
+    let output = in_repo(&root, &["inspect", "lint", "a.lisp"])
+        .env("PAREDIT_NO_CONFIG", "1")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(report["finding_count"], 1);
+}
+
+#[test]
+fn show_for_reports_the_flags_a_configuration_would_add_to_one_command() {
+    let root = repo("config-show-for");
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ndisable = [\"nil-comparison\"]\n",
+    );
+
+    let report = json_of(config(&root, &["show", "--for", "inspect lint"]));
+    let injections = report["injections"].as_array().expect("injections");
+    assert_eq!(injections.len(), 1);
+    assert_eq!(injections[0]["key"], "lint.disable");
+    assert_eq!(injections[0]["flag"], "--exclude");
+    assert_eq!(injections[0]["values"][0], "nil-comparison");
+}
+
+#[test]
+fn show_for_rejects_something_that_is_not_a_command() {
+    let root = repo("config-show-for-bad");
+    config(&root, &["show", "--for", "inspect nonsense"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is not a command"));
+}
+
+#[test]
+fn show_without_for_reports_no_injections_at_all() {
+    let root = repo("config-show-no-for");
+    let report = json_of(config(&root, &["show"]));
+    assert!(report["injections"].is_null());
+}

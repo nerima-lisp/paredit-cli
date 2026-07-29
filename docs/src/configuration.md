@@ -140,17 +140,51 @@ The `code` in brackets is stable and machine-readable — `unknown-key`,
 `unknown-category`, `conflict`, `empty-value` — so an agent can act on the
 class of problem without matching English prose.
 
+## How a setting reaches a command
+
+Most keys arrive as the flag the command already documents. Before `clap` sees
+the command line, `paredit` appends the configured value for any flag the
+command declares and the caller did not pass. So `lint.disable` becomes
+`--exclude`, and `format.indent` becomes `--indent`.
+
+That is why "a flag always wins" needs no policy: a flag already on the command
+line is never injected over. It is also why `--help` stays honest — the flag a
+command documents is the only way that setting reaches it.
+
+To see exactly what your configuration will do to a command:
+
+```sh
+$ paredit config show --for "inspect lint" --output text --changed-only
+source	repository	/repo/paredit.toml
+lint.disable	["nil-comparison"]	repository	/repo/paredit.toml:2
+injects	lint.disable	--exclude	nil-comparison
+```
+
+`[dialect]` and the discovery half of `[paths]` are the exception: they act
+below the argument layer, inside dialect detection and the directory walk,
+because most commands have no flag for them.
+
+Two rules keep the rewrite from ever being the reason a command fails. A
+configuration with errors contributes nothing at all — you get a warning
+pointing at `paredit config check` and the command runs unconfigured. And if
+the rewritten command line does not parse for any reason, the original is used
+and the dropped keys are named.
+
 ## Turning it off
 
-| Flag | Effect |
-| --- | --- |
-| `--config <FILE>` | Read exactly this file; skip the user, repository, and directory layers |
-| `--no-config` | Read no files at all |
-| `--no-config-env` | Ignore `PAREDIT_*` |
-| `--from <DIR>` | Resolve discovery from this directory instead of the working one |
+| Flag | Variable | Effect |
+| --- | --- | --- |
+| `--config <FILE>` | `PAREDIT_CONFIG` | Read exactly this file; skip the user, repository, and directory layers |
+| `--no-config` | `PAREDIT_NO_CONFIG` | Read no files at all |
+| `--no-config-env` | `PAREDIT_NO_CONFIG_ENV` | Ignore the `PAREDIT_*` setting overrides |
+| `--from <DIR>` | — | Resolve discovery from this directory instead of the working one |
 
-`--no-config --no-config-env` is the reproducible-CI combination: it pins the
-run to the built-in defaults plus whatever the command line says.
+The flags exist on the `config` namespace; the variables work everywhere,
+which is why they exist — 275 commands do not each need three more flags.
+
+`PAREDIT_NO_CONFIG=1 PAREDIT_NO_CONFIG_ENV=1` is the reproducible-CI
+combination: it pins the run to the built-in defaults plus whatever the command
+line says.
 
 ## What the file may contain
 
