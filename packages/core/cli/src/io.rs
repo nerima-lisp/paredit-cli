@@ -2563,7 +2563,10 @@ fn open_exclusive_file_at(
         use cap_std::fs::OpenOptionsExt;
 
         let mut options = cap_std::fs::OpenOptions::new();
-        options.write(true).create_new(true).mode(0o600);
+        options
+            .write(true)
+            .create_new(true)
+            .mode(crate::runtime::current().new_file_mode.unwrap_or(0o600));
         parent
             .handle
             .open_with(name, &options)

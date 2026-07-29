@@ -117,6 +117,14 @@ pub struct RuntimeSettings {
     /// value is "no command in this process writes" — a property of the run,
     /// not of one invocation's arguments.
     pub dry_run: bool,
+    /// Permission bits (e.g. `0o600`) a brand-new file is created with.
+    ///
+    /// `None` keeps the built-in `0o600`. Global rather than per-command for
+    /// the same reason as `dry_run`: every one of the ~90 writing commands
+    /// creates a new file through the same staging function in `io.rs`, and a
+    /// caller who wants group-readable output (a shared checkout, a CI
+    /// artifact directory) wants it for all of them, not one at a time.
+    pub new_file_mode: Option<u32>,
 }
 
 static RUNTIME: OnceLock<RuntimeSettings> = OnceLock::new();

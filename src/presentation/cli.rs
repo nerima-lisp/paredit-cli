@@ -114,6 +114,10 @@ struct Cli {
     /// operations long enough that silence looks like a hang.
     #[arg(long, global = true)]
     progress: bool,
+    /// Permission bits a brand-new file is created with, octal without a
+    /// leading 0 (for example 644). Unix only; the built-in default is 600.
+    #[arg(long, global = true, value_name = "MODE")]
+    new_file_mode: Option<String>,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -179,6 +183,19 @@ pub fn run() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_failure(&error, &invocation),
     }
+}
+
+/// Parses `--new-file-mode`'s value: octal permission bits, `chmod`-style
+/// (no `0o` prefix required, though it is accepted), bounded to the
+/// `rwxrwxrwx` range so the flag cannot hand out setuid/setgid/sticky bits on
+/// a plain file by typing one digit too many.
+fn parse_new_file_mode(value: &str) -> Result<u32, &'static str> {
+    let digits = value.strip_prefix("0o").unwrap_or(value);
+    let mode = u32::from_str_radix(digits, 8).map_err(|_| "not an octal number")?;
+    if mode > 0o777 {
+        return Err("must be within 000-777");
+    }
+    Ok(mode)
 }
 
 /// Whether this run may not write.
@@ -319,6 +336,16 @@ fn bootstrap() -> Cli {
     let raw: Vec<String> = std::env::args().collect();
     runtime.dry_run = is_dry_run(&raw);
     runtime.progress = raw.iter().any(|token| token == "--progress");
+    runtime.new_file_mode = match argv::long_flag_value(&raw, "new-file-mode") {
+        Some(value) => match parse_new_file_mode(&value) {
+            Ok(mode) => Some(mode),
+            Err(reason) => {
+                eprintln!("Error: --new-file-mode {value}: {reason}");
+                std::process::exit(2);
+            }
+        },
+        None => None,
+    };
     paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file
@@ -586,7 +613,7 @@ use paredit_feature_rename::rename_control::cli as rename_control;
 
 #[cfg(test)]
 mod tests {
-    use super::terminal_safe_error_chain;
+    use super::{parse_new_file_mode, terminal_safe_error_chain};
 
     #[test]
     fn cli_error_diagnostic_escapes_untrusted_controls() {
@@ -596,5 +623,21 @@ mod tests {
             format!("Error: {}", terminal_safe_error_chain(&error)),
             "Error: open failed: bad\\u{a}path\\u{9}\\u{1b}[31m\\u{202e}"
         );
+    }
+
+    #[test]
+    fn new_file_mode_accepts_chmod_style_octal() {
+        assert_eq!(parse_new_file_mode("600"), Ok(0o600));
+        assert_eq!(parse_new_file_mode("644"), Ok(0o644));
+        assert_eq!(parse_new_file_mode("0o640"), Ok(0o640));
+        assert_eq!(parse_new_file_mode("000"), Ok(0));
+    }
+
+    #[test]
+    fn new_file_mode_rejects_non_octal_and_out_of_range_values() {
+        assert!(parse_new_file_mode("999").is_err());
+        assert!(parse_new_file_mode("not-a-number").is_err());
+        // 1000 (octal) sets a bit above rwxrwxrwx (the sticky bit).
+        assert!(parse_new_file_mode("1000").is_err());
     }
 }
