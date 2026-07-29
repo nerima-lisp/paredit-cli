@@ -21,4 +21,6 @@ macro_rules! safe_text {
     };
 }
 
+pub mod report;
+
 pub use error::{ArgumentError, CleanupFailure, CliError, CliResult, IoRefusal, WriteTargetError};

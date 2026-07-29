@@ -1,0 +1,7 @@
+pub mod args;
+mod render;
+pub mod workflow;
+
+// Hoisted for the composition root (section 4.2).
+pub use args::TestMapReportArgs;
+pub use workflow::test_map_report;

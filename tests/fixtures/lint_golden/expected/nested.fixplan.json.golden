@@ -3,6 +3,7 @@
   "fixes": [
     {
       "description": "Remove the redundant quote",
+      "id": "redundant-quote/07bb8307b4864109/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -19,6 +20,7 @@
     },
     {
       "description": "Unwrap the redundant progn",
+      "id": "redundant-progn/9715182cb9f63314/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -35,6 +37,7 @@
     },
     {
       "description": "Unwrap the redundant progn",
+      "id": "redundant-progn/8d949e5fcf0552a8/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -51,6 +54,7 @@
     },
     {
       "description": "Unwrap the redundant progn",
+      "id": "redundant-progn/d76c6d3cd567aa37/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -67,6 +71,7 @@
     },
     {
       "description": "Splice the nested progn into the enclosing progn",
+      "id": "nested-progn/32d9beb078a330f2/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -83,6 +88,7 @@
     },
     {
       "description": "Splice the nested progn into the enclosing progn",
+      "id": "nested-progn/92784ad7b319e3e5/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -99,6 +105,7 @@
     },
     {
       "description": "Merge the nested when tests with and",
+      "id": "nested-when/01c713b3cc5714bd/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -115,6 +122,7 @@
     },
     {
       "description": "Merge the nested when tests with and",
+      "id": "nested-when/47f3cc8d19ddaaf5/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -131,6 +139,7 @@
     },
     {
       "description": "Merge the nested unless tests with or",
+      "id": "nested-unless/835cbf88e8f4a683/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -147,6 +156,7 @@
     },
     {
       "description": "Merge the nested unless tests with or",
+      "id": "nested-unless/4f88eac26094a26d/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -163,6 +173,7 @@
     },
     {
       "description": "Flatten the nested same-operator and/or",
+      "id": "nested-boolean/f45659592901beaf/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -179,6 +190,7 @@
     },
     {
       "description": "Flatten the nested same-operator and/or",
+      "id": "nested-boolean/d0023e693387d698/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -195,6 +207,7 @@
     },
     {
       "description": "Combine the nested accessors into cadr",
+      "id": "nested-cxr/711a5272cecca21e/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -211,6 +224,7 @@
     },
     {
       "description": "Combine the nested accessors into cddr",
+      "id": "nested-cxr/3c85de2e7690aceb/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -227,6 +241,7 @@
     },
     {
       "description": "Splice the progn into the enclosing defun",
+      "id": "redundant-body-progn/cf5441812f2f8395/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -243,6 +258,7 @@
     },
     {
       "description": "Splice the progn into the enclosing when",
+      "id": "redundant-body-progn/656d6b2196b97388/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -259,6 +275,7 @@
     },
     {
       "description": "Rewrite the empty let as progn",
+      "id": "empty-let/dc954b1687c1363e/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -275,6 +292,7 @@
     },
     {
       "description": "Rewrite the redundant let* as let",
+      "id": "redundant-let-star/0f0bdbf55650550e/0",
       "path": "nested.lisp",
       "replacements": [
         {
@@ -291,6 +309,7 @@
     },
     {
       "description": "Unwrap the single-operand or",
+      "id": "single-operand-boolean/242e39c274656eed/0",
       "path": "nested.lisp",
       "replacements": [
         {

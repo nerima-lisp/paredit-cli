@@ -74,6 +74,42 @@ discovery, impact analysis, and preflight checks.
 | `package-conflicts` | Report distinct defpackage forms that claim the same package name or nickname. |
 | `redefinitions` | Report top-level definitions of the same category and name declared more than once. |
 | `undefined-packages` | Report in-package forms naming a package no analyzed defpackage declares. |
+| `api-surface` | Report every exported symbol with the signature its export commits to — the defining category, the required and maximum arity, and the lambda list as written. `defpackage`'s `:export` is a list of names; what a caller relies on is those names *plus their shapes*, and that pairing exists nowhere in the source. An export nothing defines is reported rather than dropped: that is usually a rename that missed one side. |
+| `api-diff` | Compare the current API against a `--baseline` `api-surface` snapshot and answer the SemVer question mechanically. Breaking: an export removed, a minimum arity raised, a maximum lowered, or a defining category changed. Compatible: an export added or a range widened. `--intended-bump` fails the run when the diff requires a larger bump than the release claims. |
+| `test-map` | Pair definitions with the tests that name them, by the `test-x` / `x-test` / `x-tests` conventions, and report both sides that have no counterpart — untested definitions and tests nobody can tell what they cover. A list of tests and a list of definitions are each easy to get; neither answers the question. |
+| `symbol-index` | Index every symbol to its definition site, its category, and the byte offset of every occurrence. Built for a consumer that will ask thousands of "where is this defined" questions and should not re-parse for each one. Symbols nothing analyzed defines are reported as external, which makes the index also an answer to "what does this file depend on". |
+| `keyword-arity` | Check call sites against `&optional`, `&rest`, and `&key` lambda lists. `signature` compares positional counts, which cannot express "accepts one, three, or five arguments and rejects two" — and cannot see that a call passing `:widht` to a function taking `:width` is wrong, because the argument *count* is right. |
+| `unreachable-expressions` | Report forms that cannot run because a `return-from`, `go`, `throw`, or `error` precedes them in the same implicit progn. `reachability` answers this between definitions; this answers it inside one, which is where it hides. An exit inside an `if` branch is correctly *not* treated as killing the following form. |
+| `external-systems` | Report which ASDF systems this project depends on but does not define — an SBOM, in effect. Reads both `:depends-on` spellings, including the `(:version …)` and `(:feature …)` forms whose system name is not in first position. Internal dependencies are reported too, so the output is a complete account of the graph. |
+| `licenses` | Report each `defsystem`'s declared licence and its copyleft strength (permissive, weak, strong, unknown, undeclared), and flag systems whose licence is superseded by a stronger one in the same file — an MIT system beside a GPL one ships as GPL. An unrecognised licence is reported as unknown, never assumed permissive. Not legal advice. |
+| `serial-consistency` | Report components whose `:depends-on` contradicts their system's `:serial t` — a dependency on a *later* sibling, which the serial order cannot satisfy — or merely duplicates it. Also flags a non-serial system whose components declare no dependencies at all, where the file order everyone assumes is not a guarantee. |
+| `blame` | Report the last author, date, and commit for each definition, so any other report's finding can be routed to someone. Attribution is per definition rather than per line, taking the most recent line in the span. Degrades like `hotspots`: when git cannot answer it says so rather than emitting an empty author. |
+| `duplication-ratio` | Report what fraction of a file is structurally repeated, as an integer per mille, plus each repeated shape with its occurrence count and redundant bytes. `duplicates` says *which* forms repeat; this says whether the tree is 3% repeated or 30%, which is the number a decision gets made on. Matching is exact structural equality with identifiers erased, so the ratio does not move when a similarity threshold does. |
+| `cohesion` | Report per-definition coupling — calls to definitions in the same file versus calls out of it — and the file's internal/external ratio. A file whose definitions call each other is a module; one whose definitions each call outward and never to each other is a namespace, and can be split anywhere. Definitions nothing links to are flagged as isolated. |
+| `hotspots` | Rank definitions by git change frequency (`--since`) multiplied by complexity. Complexity alone ranks code that is hard; churn alone ranks code that moves; the product ranks code where a refactor pays. The only report that reads outside its input files — when `git log` cannot answer it says so and falls back to complexity, rather than reporting a zero that reads like "never changed". |
+| `debt-score` | Report one score per file with the weighted contribution of every input shown, so the number can be argued with. Weighted by how expensive a problem is to live with: deep nesting highest (it makes every other problem harder to fix), then oversized definitions, then missing documentation and parked work. Uncapped, because a cap compresses exactly the files that most need distinguishing. |
+| `indentation` | Report body forms indented against the Emacs/SLIME convention. Not `format` under another name: `format` states what *this tool* would print, and this states what an Emacs user's editor would produce on `C-M-q`. Most Lisp is written in Emacs, so a file `format` considers correct can still churn every line the moment someone opens it. |
+| `docstrings` | Report definitions with no docstring, and — the useful half — docstrings that name a parameter the lambda list does not have. A stale docstring survives every rename this tool performs, since renaming deliberately does not touch string contents, so nothing else will ever notice it. Parameters the docstring never mentions are reported separately, as the weaker signal. |
+| `todo` | Report `TODO`/`FIXME`/`XXX`/`HACK`/`BUG` markers with the top-level definition each one sits inside and any `TODO(name):` attribution. Comments are kept as trivia beside the tree rather than as nodes in it, so this is the only report that can see one. |
+| `line-metrics` | Report line length, file length, and lines per definition against thresholds the caller sets (`--max-line-length`, `--max-file-lines`, `--max-definition-lines`). Distinct from `complexity`, which measures how hard a definition is to reason about; this measures how hard a file is to navigate. Width is counted in characters, not bytes. |
+| `macro-expansion` | Report what each same-file `defmacro` expands its own call sites into. Template substitution only — it does not evaluate, does not expand nested macros, and reports every call it declined with the reason (a computed expansion, an `&key`/destructuring lambda list, or an argument-count mismatch). |
+| `macro-hygiene` | Report the two ways a macro template betrays its caller: binding a literal name inside a quasiquoted template (variable capture, since Common Lisp macros are unhygienic), and unquoting one parameter more than once (multiple evaluation of the caller's argument form). A name bound to `(gensym)` outside the template is recognised and not reported. |
+| `loop` | Report each `loop`'s clause structure: the variables `for`/`as`/`with` bind, what it accumulates and into what, which clauses can end it, and whether anything can. `loop` has a grammar rather than an S-expression shape, so nothing else in this tool can see inside one. |
+| `format-directives` | Report `format`-family calls with a literal control string, counting the arguments the directives consume against the arguments the call supplies. Iteration (`~{…~}`), conditionals (`~[…~]`), and `~?` make the count indeterminate rather than wrong, and an indeterminate call never counts as a mismatch. |
+| `read-conditionals` | Report every `#+`/`#-`, the feature expression it tests, the individual features that expression names, and the code it guards. Also counts features named exactly once in a file, which is usually a misspelling of one named everywhere else. |
+| `read-time-eval` | Report every `#.`, separating an inert dispatch (a quoted datum, a literal) from a live one (a call). Read-time evaluation runs while the file is being *read*, which is a build-reproducibility and trust question as much as a correctness one. |
+| `circular-literals` | Report `#n=` and `#n#` reader labels, pairing each definition against its references. A `#n#` with no `#n=` is a read error; a `#n=` nothing refers to is usually the residue of a deleted reference. |
+| `readtable-case` | Report symbols whose identity changes with `readtable-case` — mixed-case symbols, which read as different symbols under `:upcase` and `:preserve` — and the `|…|` escapes that pin a spelling against every readtable case. |
+| `package-locks` | Report definitions and bindings that collide with a `COMMON-LISP` symbol. CLHS leaves the consequences undefined and locked implementations refuse to load, so this is a portability failure a test suite on one implementation cannot find. An explicit `(:shadow …)` is reported but not counted as undefined behaviour. |
+| `method-combination` | Report `defmethod` qualifiers (`:before`/`:after`/`:around`/primary) and the auxiliary methods with no primary on the same specializers to run around — a generic function that signals `no-applicable-method` because a form nobody wrote is missing. |
+| `class-hierarchy` | Report the CLOS inheritance tree: each class's direct superclasses, depth, own slots, the slots it inherits and from which class, and the slots it *shadows*. Covers `defclass`, `define-condition`, and `defstruct` `:include`. The non-cyclic counterpart of `class-cycles`. |
+| `generic-dispatch` | Report `defgeneric` declarations against the `defmethod` forms that implement them: methods with no `defgeneric`, a `defgeneric` with no method, a method whose required arity is not congruent with the declaration, and two methods sharing a name, qualifier, and specializers. |
+| `restarts` | Report established restarts against invoked ones, and each side with no counterpart: an `invoke-restart` naming a restart nothing establishes signals `control-error`, and a `restart-case` clause nobody invokes is dead recovery code. `handler-bind`/`handler-case` clauses are listed beside them. |
+| `types` | Report what the type layer proved: each binding's declared type (`declare`/`declaim`/`proclaim`/`check-type`) beside the constant the value layer proved it holds, plus every typed expression. A pair whose types share no member is flagged as a contradiction — a declaration no object can satisfy. Common Lisp only; other dialects report `dialect_modelled: false` rather than an empty list. |
+| `narrowing` | Report where a branch proves something about a binding that is not true outside it: a type predicate in an `if`/`when`/`unless`/`cond` test, or a `typecase` clause's type specifier. Each site names the binding, the type the branch proves, which branch it holds in, and the span the narrowing is scoped to. |
+| `constants` | Report expressions that provably evaluate to a literal, with the value, its kind, and the bytes folding would remove; plus the file's `defconstant` values as the value layer resolved them. A fold is reported once at its outermost form, so nested arithmetic is one opportunity rather than several. |
+| `value-propagation` | Report which bindings carry a provable constant and, for those that do not, the first of the four propagation conditions they failed — reassigned, special, opaque scope, no initial form, or a non-constant initial form. The reason is the actionable half: "not constant" and "constant but reassigned" call for different work. |
+| `effects` | Classify each definition as `pure`, `effectful`, or `unknown`, propagating effects along the file's own call graph to a fixpoint. `unknown` is a real verdict, not a failure: a body reaching an unregistered head may be reaching a macro, and a macro can expand into anything. Many refactor-safety questions (may this be hoisted? folded? inlined?) reduce to this one. |
 | `class-cycles` | Report CLOS defclass/define-condition superclass inheritance cycles across two or more classes. |
 | `struct-cycles` | Report defstruct :include cycles across two or more structs. |
 | `system-conflicts` | Report distinct asdf:defsystem forms that claim the same system name. |
@@ -214,9 +250,109 @@ discovery, impact analysis, and preflight checks.
 | `eql-list-comparison` | Report eq/eql calls that compare against a quoted list literal (never reliably eql). |
 | `eql-search-literal` | Report `member`/`assoc`/`find`/`position`/`count`/`remove`/`delete`/`adjoin`/`pushnew` (item first) and `substitute`/`nsubstitute`/`subst`/`nsubst` (item second) searching for a string or quoted-list literal with no `:test`; the default `eql` never matches a string/list literal — add `:test #'equal`. |
 | `setf-arity` | Report setq/setf/psetq/psetf forms with an odd argument count (a place missing its value). |
-| `lint` | Run every within-file logic-bug lint at once and report all findings, tagged by rule and category. Each finding is self-describing — it carries its `severity`, `category`, and a `fixable` flag inline (so an agent can triage and decide whether to run `--fix` without cross-referencing `--list-rules`). `--list-rules` prints the rule catalog with categories, descriptions, a `severity` (`error` for likely/certain bugs, `warning` for redundant/non-idiomatic style), and a `fixable` flag marking the rules `--fix` can repair — and it honors the same `--rule`/`--exclude`/`--category` selectors, so `--list-rules --category dead-code` lists just that group; `--rule`/`--exclude` select rules; `--category` selects a whole group (arity, dead-code, duplicate, malformed, suspicious); `--sarif` emits a SARIF 2.1.0 log for CI code scanning (with stable fingerprints and one-click `fixes` for every rule `--list-rules` marks fixable); `--github` emits GitHub Actions `::error::` annotations for inline PR review; `--fix` applies those auto-fixes in place, iterating to a fixpoint (so nested redundancies collapse fully) and reporting the per-file/per-rule counts; add `--diff` to preview the changes as a unified diff without writing, or `--check` to write nothing and exit 3 when any auto-fix is still pending (a CI gate that stays green only when fixable lint has been cleaned up — distinct from `--fail-on-finding`, which also gates on report-only findings). `--check` and `--diff` combine (show the diff and fail). `--fix-plan` instead emits the machine-readable fix plan — each fixable finding's exact byte-region replacements as JSON (or tab-separated text) — without writing, so an editor or agent can preview or apply fixes one at a time (honoring the same suppressions and `--baseline` as `--fix`). Findings can be silenced in source with an inline `; paredit:ignore [rule…]` comment: on its own line it suppresses the next line, trailing after code it suppresses that line, and with no rule names it suppresses every rule — honored uniformly across the report, SARIF, GitHub, and `--fix` outputs. `--fail-on <error\|warning>` gates only on findings at or above a severity (so CI can block on bugs while still reporting style warnings), and SARIF `level` reflects each finding's severity. `--stats` prints a lint-debt rollup instead of individual findings — finding counts by severity, by category, and by rule, plus files-scanned/files-with-findings — honoring the same `--rule`/`--category`/`--baseline` filters. `--report-unused-suppressions` instead reports any `; paredit:ignore` that silences no finding (a stale ignore or a typo'd rule name) and exits 3 if any are found, keeping the ignore list honest in CI. For adopting the linter on an existing codebase, `--write-baseline <file>` snapshots today's findings and `--baseline <file>` then suppresses those known findings (matched by rule and trimmed-line content, so they survive line shifts) — reporting and gating only on new findings, across the default, `--sarif`, and `--github` outputs. |
+| `lint` | Run every within-file logic-bug lint at once and report all findings, tagged by rule and category. Each finding is self-describing — it carries its `severity`, `category`, and a `fixable` flag inline (so an agent can triage and decide whether to run `--fix` without cross-referencing `--list-rules`). `--list-rules` prints the rule catalog with categories, descriptions, a `severity` (`error` for likely/certain bugs, `warning` for redundant/non-idiomatic style), and a `fixable` flag marking the rules `--fix` can repair — and it honors the same `--rule`/`--exclude`/`--category` selectors, so `--list-rules --category dead-code` lists just that group; `--rule`/`--exclude` select rules; `--category` selects a whole group (see `--list-rules` for the current set); `--sarif` emits a SARIF 2.1.0 log for CI code scanning (with stable fingerprints and one-click `fixes` for every rule `--list-rules` marks fixable); `--github` emits GitHub Actions `::error::` annotations for inline PR review; `--fix` applies those auto-fixes in place, iterating to a fixpoint (so nested redundancies collapse fully) and reporting the per-file/per-rule counts; add `--diff` to preview the changes as a unified diff without writing, or `--check` to write nothing and exit 3 when any auto-fix is still pending (a CI gate that stays green only when fixable lint has been cleaned up — distinct from `--fail-on-finding`, which also gates on report-only findings). `--check` and `--diff` combine (show the diff and fail). `--fix-plan` instead emits the machine-readable fix plan — each fixable finding's exact byte-region replacements as JSON (or tab-separated text) — without writing, so an editor or agent can preview or apply fixes one at a time (honoring the same suppressions and `--baseline` as `--fix`). Findings can be silenced in source with an inline `; paredit:ignore [rule…]` comment: on its own line it suppresses the next line, trailing after code it suppresses that line, and with no rule names it suppresses every rule — honored uniformly across the report, SARIF, GitHub, and `--fix` outputs. `--fail-on <error\|warning>` gates only on findings at or above a severity (so CI can block on bugs while still reporting style warnings), and SARIF `level` reflects each finding's severity. `--stats` prints a lint-debt rollup instead of individual findings — finding counts by severity, by category, and by rule, plus files-scanned/files-with-findings — honoring the same `--rule`/`--category`/`--baseline` filters. `--report-unused-suppressions` instead reports any `; paredit:ignore` that silences no finding (a stale ignore or a typo'd rule name) and exits 3 if any are found, keeping the ignore list honest in CI. For adopting the linter on an existing codebase, `--write-baseline <file>` snapshots today's findings and `--baseline <file>` then suppresses those known findings (matched by rule and trimmed-line content, so they survive line shifts) — reporting and gating only on new findings, across the default, `--sarif`, and `--github` outputs. |
 
 Most reports accept `--output json` for machine-readable results.
+
+### Choosing and tuning lint rules
+
+With 169 rules, `inspect lint` needs more than an on/off switch per rule. The
+flags below are about the rule *set* rather than about any one rule, and all of
+them work with `--list-rules` as well as with a scan — so a run can be
+inspected before it is made.
+
+| Flag | What it does |
+| --- | --- |
+| `--preset <minimal\|recommended\|pedantic\|all>` | How wide a net to cast. `minimal` is error-severity rules only; `recommended` (the default) is every stable, non-opinionated rule; `pedantic` adds the naming and documentation conventions; `all` adds the experimental ones. `--list-presets` prints the ladder with the size of each rung. |
+| `--experimental` | Adds the experimental rules to whichever preset is in force, rather than jumping to `all`. |
+| `--tag <TAG>` | Runs only rules carrying *every* named tag. Tags are orthogonal to categories: `experimental`, `pedantic`, `destructive`, `semantic`, `style`, `cross-file`. `--list-tags` prints each with the rules that carry it. |
+| `--deny <RULE\|CATEGORY>` / `--warn <RULE\|CATEGORY>` | Reports the named rules (or every rule in the named categories) at error or warning severity, whatever they ship as. This changes the `--fail-on` gate, the SARIF `level`, and whether `--github` emits `::error` or `::warning` — not only the printed word. Use `--exclude` to silence a rule entirely. |
+| `--rule-arg <RULE.KEY=VALUE>` | Retunes one rule's threshold. The rule must declare the key, so a typo fails the run before any file is read; `--explain <rule>` lists the knobs a rule has. |
+| `--explain <RULE>` | Prints everything known about one rule: its category, severity, tags, dialects, why it fires, a before/after example, what it deliberately leaves alone, and its tunable settings. |
+| `--docs` | Emits the whole rule reference as Markdown, one section per rule grouped by category, generated from the same metadata the report reads. |
+| `--timings` | Reports what each rule cost and how often it ran, slowest first, instead of the findings. Measurement is not free, so it is opt-in. |
+| `--no-destructive-fixes` | With `--fix`, holds back the fixes tagged `destructive` — the few whose rewrite can change runtime behaviour rather than only spelling. |
+
+Every finding also carries a content-derived `id` (in the JSON report, the fix
+plan, and as a SARIF `pareditFindingId` fingerprint). It is derived from the
+rule and a whitespace-normalized prefix of the reported form, so it survives
+reformatting and unrelated edits above it — which is what makes it usable as a
+key for baselines and suppression tooling.
+
+### Rules a project writes for itself
+
+The 169 shipped rules are the ones everybody gets. A rule like "in *this*
+codebase, `defentity` must always be given a `:table`" is the majority of what
+a mature project wants and none of what a linter can ship, so a project writes
+those itself, in Lisp, in `.paredit/rules/*.lisp`:
+
+```lisp
+(defrule entity-needs-table
+  :category malformed          ; optional; defaults to suspicious
+  :severity error              ; optional; defaults to warning
+  :description "a defentity with no :table option"
+  :pattern (defentity ?name ...)
+  :message "defentity needs a :table"
+  :fix (defentity ?name :table "TODO"))   ; optional
+
+(deftest entity-needs-table
+  (:matches  "(defentity user)")
+  (:no-match "(defentity user :table \"users\")")
+  (:fix "(defentity user)" "(defentity user :table \"TODO\")"))
+
+(deprecate legacy-connect :use connect :reason "removed in 3.0")
+```
+
+The directory is read automatically when it exists; `--custom-rules <DIR>`
+points elsewhere. A rule file that does not load fails the run — a project that
+has written a rule and sees a green build has been told the rule passed.
+
+Three spellings are special in a `:pattern`:
+
+| Spelling | Matches |
+| --- | --- |
+| `?name` | one form, and binds it; a repeated `?name` must match the *same* form, which is how `(setf ?p ?p)` says "self-assignment" |
+| `?_` | one form, binding nothing, so two `?_` need not agree |
+| `...` | the rest of the enclosing list, however many forms |
+
+Everything else matches itself: a symbol case- and package-insensitively (so
+`(cl:print x)` matches `(print ?x)`), a string or number exactly.
+
+A `:fix` is a template in the same language; each `?name` is replaced by the
+source it bound, verbatim, so the parts the fix does not change keep their
+formatting. A template naming a variable the pattern does not bind is rejected
+when the file loads.
+
+`--test-rules` runs every `deftest` and exits 3 on a failure. `:no-match` is
+the clause that earns its keep: it is what catches a pattern that grew broader
+than its author meant.
+
+Custom findings are then indistinguishable from shipped ones — same suppression
+comments, same baseline, same stable ids, same `--fail-on` gate, same SARIF and
+GitHub output, same `--fix`. `--list-rules` lists them in a separate
+`custom_rules` block so the two are still tellable apart.
+
+### Suppressing findings in source
+
+Three scopes, each spelled as a comment:
+
+| Directive | Scope |
+| --- | --- |
+| `; paredit:ignore [rule…]` | One line: its own if code precedes the comment, otherwise the next. |
+| `;; paredit:ignore-next-form [rule…]` | Every line of the next top-level form, however many it spans. |
+| `;; paredit:ignore-file [rule…]` | Every line of the file. |
+
+With no rule names a directive silences every rule in its scope. Anything after
+`--` is a free-text reason; `--require-suppression-reason` turns a missing one
+into a reported problem, so a project can insist that every silenced finding
+says why.
+
+`--report-unused-suppressions` reports the directives that silence nothing (a
+stale ignore or a typo'd rule name) and exits 3 if any are found.
+`--remove-unused-suppressions` is its write side: it deletes those directives
+in place and *narrows* the partly stale ones, keeping the rule names that are
+still doing work — so cleaning up a typo cannot silently un-suppress a finding
+somebody meant to ignore.
 
 ## Edit
 

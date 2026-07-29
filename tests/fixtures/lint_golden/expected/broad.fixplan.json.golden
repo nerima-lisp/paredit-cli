@@ -3,6 +3,7 @@
   "fixes": [
     {
       "description": "Rewrite the setf as incf",
+      "id": "manual-incf/e9cc51bb9767dcb7/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -19,6 +20,7 @@
     },
     {
       "description": "Rewrite the setf as push",
+      "id": "manual-push/4847791ff6aa61f5/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -35,6 +37,7 @@
     },
     {
       "description": "Rewrite the setf as pushnew",
+      "id": "manual-pushnew/1e8f91739c283b2f/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -51,6 +54,7 @@
     },
     {
       "description": "Drop the explicit default delta of 1",
+      "id": "explicit-step-delta/00a1f8d32f2b1a3f/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -67,6 +71,7 @@
     },
     {
       "description": "Use decf with a positive delta",
+      "id": "negated-step-delta/c72d843010c3cb77/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -83,6 +88,7 @@
     },
     {
       "description": "Drop the explicit nil result",
+      "id": "explicit-nil-return/83c6c0866319952f/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -99,6 +105,7 @@
     },
     {
       "description": "Rewrite the cons as a list",
+      "id": "cons-to-list/30734641edf18c29/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -115,6 +122,7 @@
     },
     {
       "description": "Rewrite (reverse (reverse x)) as (copy-seq x)",
+      "id": "double-reverse/64abc2d4def62155/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -131,6 +139,7 @@
     },
     {
       "description": "Remove the redundant quote",
+      "id": "redundant-quote/07bb8307b4864109/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -147,6 +156,7 @@
     },
     {
       "description": "Unwrap the redundant progn",
+      "id": "redundant-progn/a2fdba9820c97822/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -163,6 +173,7 @@
     },
     {
       "description": "Splice the nested progn into the enclosing progn",
+      "id": "nested-progn/5cd55ce143529b1f/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -179,6 +190,7 @@
     },
     {
       "description": "Merge the nested when tests with and",
+      "id": "nested-when/3709b9f1558a096d/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -195,6 +207,7 @@
     },
     {
       "description": "Merge the nested unless tests with or",
+      "id": "nested-unless/374f1c05f4fd74ef/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -211,6 +224,7 @@
     },
     {
       "description": "Flatten the nested same-operator and/or",
+      "id": "nested-boolean/62bd4b586d0045bf/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -227,6 +241,7 @@
     },
     {
       "description": "Combine the nested accessors into cadr",
+      "id": "nested-cxr/109a80ae72e5eb4e/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -243,6 +258,7 @@
     },
     {
       "description": "Use (first …) instead of nth with a constant index",
+      "id": "nth-constant-index/9c4d78c87d9ad119/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -259,6 +275,7 @@
     },
     {
       "description": "Drop the no-op (nthcdr 0 …)",
+      "id": "nthcdr-zero/bfda713e07890a09/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -275,6 +292,7 @@
     },
     {
       "description": "Rewrite (nthcdr n …) as (cddr …)",
+      "id": "nthcdr-small-index/f273b4ffe8359de6/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -291,6 +309,7 @@
     },
     {
       "description": "Splice the progn into the enclosing when",
+      "id": "redundant-body-progn/bd91eb5e515cc145/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -307,6 +326,7 @@
     },
     {
       "description": "Rewrite the empty let as progn",
+      "id": "empty-let/6f975d0b4722f4eb/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -323,6 +343,7 @@
     },
     {
       "description": "Drop the redundant nil else branch",
+      "id": "redundant-if-nil/e883c2a7438b14d9/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -339,6 +360,7 @@
     },
     {
       "description": "Rewrite the redundant let* as let",
+      "id": "redundant-let-star/a18f256659e1ba9a/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -355,6 +377,7 @@
     },
     {
       "description": "Rewrite (funcall #'g …) as a direct call",
+      "id": "redundant-funcall/80c1c3159cdf3d87/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -371,6 +394,7 @@
     },
     {
       "description": "Drop the vacuous (the t …) declaration",
+      "id": "redundant-the/2bac242fe26b506b/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -387,6 +411,7 @@
     },
     {
       "description": "Apply the lambda directly, dropping funcall",
+      "id": "funcall-lambda/673d7cfe29eecb61/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -403,6 +428,7 @@
     },
     {
       "description": "Drop the redundant #' before lambda",
+      "id": "sharp-quoted-lambda/8265b306d04d5a6a/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -419,6 +445,7 @@
     },
     {
       "description": "Drop the redundant identity call",
+      "id": "redundant-identity/05affcb5b7734a90/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -435,6 +462,7 @@
     },
     {
       "description": "Rewrite (apply #'g (list …)) as a direct call",
+      "id": "redundant-apply/f5c33aecf2ade963/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -451,6 +479,7 @@
     },
     {
       "description": "Drop the redundant :test #'eql",
+      "id": "redundant-eql-test/08921075042be6dd/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -467,6 +496,7 @@
     },
     {
       "description": "Drop the redundant :key #'identity",
+      "id": "redundant-identity-key/0d6a3e2540c960d7/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -483,6 +513,7 @@
     },
     {
       "description": "Rewrite when (not …) as unless",
+      "id": "negated-when-unless/8cea77f08ec45975/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -504,6 +535,7 @@
     },
     {
       "description": "Use the complement >= instead of negating",
+      "id": "negated-comparison/63ee3702a87c2d97/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -520,6 +552,7 @@
     },
     {
       "description": "Drop the negated test and swap the if branches",
+      "id": "negated-if/33df133ba8537bf9/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -536,6 +569,7 @@
     },
     {
       "description": "Rewrite (if x x y) as (or x y)",
+      "id": "if-to-or/ab61c84ad573df95/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -552,6 +586,7 @@
     },
     {
       "description": "Rewrite (if test nil t) as (not test)",
+      "id": "if-not/62237ccefbf0b61e/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -568,6 +603,7 @@
     },
     {
       "description": "Use the 1+ shorthand",
+      "id": "one-step-arithmetic/044bc8cb6d37fb31/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -584,6 +620,7 @@
     },
     {
       "description": "Rewrite the else-less if as when",
+      "id": "one-armed-if/efd043892749780a/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -600,6 +637,7 @@
     },
     {
       "description": "Rewrite (equal X nil) as (null X)",
+      "id": "nil-comparison/826bacda3f3e61e2/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -616,6 +654,7 @@
     },
     {
       "description": "Drop the dead branch of the constant t test",
+      "id": "constant-if-test/026b11490469946b/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -632,6 +671,7 @@
     },
     {
       "description": "Rewrite the always-true (when t …) as progn",
+      "id": "constant-when-test/9b0a7978fb01361b/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -648,6 +688,7 @@
     },
     {
       "description": "Rewrite (append (list x) rest) as (cons x rest)",
+      "id": "append-list-to-cons/88d7b250cdb0e3fd/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -664,6 +705,7 @@
     },
     {
       "description": "Rewrite (format nil … x) as (princ-to-string x)",
+      "id": "format-to-string/39b50b82e8ac11f4/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -680,6 +722,7 @@
     },
     {
       "description": "Rewrite (format t \"~%\") as (terpri)",
+      "id": "format-newline/b36342f1429c38ae/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -696,6 +739,7 @@
     },
     {
       "description": "Drop the redundant 1 divisor from floor",
+      "id": "redundant-divisor/ec0523314eb5cfd2/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -712,6 +756,7 @@
     },
     {
       "description": "Drop the redundant t operand from and",
+      "id": "redundant-boolean-identity/6099f3c432a128b2/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -728,6 +773,7 @@
     },
     {
       "description": "Collapse the and of negations via De Morgan",
+      "id": "de-morgan/59f199d4d6ca0ffc/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -744,6 +790,7 @@
     },
     {
       "description": "Unwrap the single-operand and",
+      "id": "single-operand-boolean/7e86df9999f069f3/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -760,6 +807,7 @@
     },
     {
       "description": "Drop the no-op single-argument append",
+      "id": "single-operand-list-op/6e6fdee3fc4c76f1/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -776,6 +824,7 @@
     },
     {
       "description": "Unwrap the single-operand *",
+      "id": "single-operand-arithmetic/5d68a41993e476ea/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -792,6 +841,7 @@
     },
     {
       "description": "Compare with eql (eq is unreliable on numbers)",
+      "id": "eq-number-comparison/23196700b33d9c59/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -808,6 +858,7 @@
     },
     {
       "description": "Compare with eql (eq is unreliable on characters)",
+      "id": "eq-char-comparison/0372a7cb6b4144bd/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -824,6 +875,7 @@
     },
     {
       "description": "Use (zerop X) instead of comparing against 0",
+      "id": "sign-comparison/93d63434e0602a33/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -840,6 +892,7 @@
     },
     {
       "description": "Rewrite the single-clause cond as when",
+      "id": "single-clause-cond/370e08e4584356c3/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -856,6 +909,7 @@
     },
     {
       "description": "Rewrite the single t-clause cond as progn",
+      "id": "cond-t-clause/8c478783d564aef8/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -872,6 +926,7 @@
     },
     {
       "description": "Rewrite single-value multiple-value-bind as let",
+      "id": "single-value-bind/aabdcc153cb0635a/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -888,6 +943,7 @@
     },
     {
       "description": "Use unary (- x) for negation",
+      "id": "verbose-negation/db07057c02c96d6b/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -904,6 +960,7 @@
     },
     {
       "description": "Rewrite (list* a b) as (cons a b)",
+      "id": "list-star-to-cons/8dfbceb8e6484013/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -920,6 +977,7 @@
     },
     {
       "description": "Rewrite (values-list (list …)) as (values …)",
+      "id": "values-list-of-list/a01fe3b901d6d599/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -936,6 +994,7 @@
     },
     {
       "description": "Drop the single-form prog1",
+      "id": "redundant-prog1/d11c68d1c2a8c075/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -952,6 +1011,7 @@
     },
     {
       "description": "Rewrite (subseq seq 0) as (copy-seq seq)",
+      "id": "subseq-zero/86623ddc853cc31a/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -968,6 +1028,7 @@
     },
     {
       "description": "Rewrite (car (nthcdr n x)) as (nth n x)",
+      "id": "car-nthcdr/fa5f8068ce51888c/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -984,6 +1045,7 @@
     },
     {
       "description": "Rewrite (car (reverse x)) as (car (last x))",
+      "id": "car-reverse/358664c82b8eb6c2/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1000,6 +1062,7 @@
     },
     {
       "description": "Rewrite (append x nil) as (copy-list x)",
+      "id": "append-nil/9dcde276136a9a2c/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1016,6 +1079,7 @@
     },
     {
       "description": "Rewrite (multiple-value-list (values …)) as (list …)",
+      "id": "multiple-value-list-of-values/1b4099bfb77b9dcf/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1032,6 +1096,7 @@
     },
     {
       "description": "Rewrite typep as (stringp x)",
+      "id": "typep-predicate/c4524e22023511e4/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1048,6 +1113,7 @@
     },
     {
       "description": "Drop the no-op (coerce x t)",
+      "id": "coerce-to-t/5287c8c7f1849642/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1064,6 +1130,7 @@
     },
     {
       "description": "Drop the redundant nil default",
+      "id": "gethash-default/f31c83fc13478b4e/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1080,6 +1147,7 @@
     },
     {
       "description": "Drop the redundant :test 'eql",
+      "id": "make-hash-table-test/35479fa9b5b47097/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1096,6 +1164,7 @@
     },
     {
       "description": "Rewrite (if c nil e) as (unless c e)",
+      "id": "if-to-unless/54bbf94ef24fbf44/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1112,6 +1181,7 @@
     },
     {
       "description": "Rewrite prog2 as progn",
+      "id": "prog2-to-progn/cfc0af416a06509b/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1128,6 +1198,7 @@
     },
     {
       "description": "Drop the clauseless handler-case",
+      "id": "handler-case-no-clauses/e6eca94ec47a803d/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1144,6 +1215,7 @@
     },
     {
       "description": "Drop the cleanupless unwind-protect",
+      "id": "unwind-protect-no-cleanup/0517ee52f6bcfa89/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1160,6 +1232,7 @@
     },
     {
       "description": "Drop the redundant :start 0",
+      "id": "redundant-start-zero/204c4a0fd8b6054d/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1176,6 +1249,7 @@
     },
     {
       "description": "Drop the redundant :end nil",
+      "id": "redundant-end-nil/95fb7a788caa4221/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1192,6 +1266,7 @@
     },
     {
       "description": "Drop the redundant :from-end nil",
+      "id": "redundant-from-end-nil/74a10cdf08c695fc/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1208,6 +1283,7 @@
     },
     {
       "description": "Drop the redundant :count nil",
+      "id": "redundant-count-nil/b4e4e8611abe92d2/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1224,6 +1300,7 @@
     },
     {
       "description": "Rewrite as (string-equal a b)",
+      "id": "string-case-fold/35ed4435ec80226f/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1240,6 +1317,7 @@
     },
     {
       "description": "Rewrite as (char-equal a b)",
+      "id": "char-case-fold/1151e7de6ce93524/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1256,6 +1334,7 @@
     },
     {
       "description": "Collapse the nested string case op",
+      "id": "nested-string-case/e1b50d70e857d80e/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1272,6 +1351,7 @@
     },
     {
       "description": "Drop the code-char/char-code round-trip",
+      "id": "code-char-char-code/d64bd87a6ec1dd94/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1288,6 +1368,7 @@
     },
     {
       "description": "Drop the redundant last count of 1",
+      "id": "last-default-count/ee8e9f6b4ebb33ac/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1304,6 +1385,7 @@
     },
     {
       "description": "Drop the redundant butlast count of 1",
+      "id": "butlast-default-count/6841ef3bad2f901d/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1320,6 +1402,7 @@
     },
     {
       "description": "Drop the redundant :initial-element nil",
+      "id": "make-list-default-element/091b9e3ccae97a5b/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1336,6 +1419,7 @@
     },
     {
       "description": "Drop the redundant :radix 10",
+      "id": "parse-integer-default-radix/6689082ca07df47e/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1352,6 +1436,7 @@
     },
     {
       "description": "Drop the redundant nil default",
+      "id": "getf-default-nil/ccab3d746985ff27/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1368,6 +1453,7 @@
     },
     {
       "description": "Drop the redundant :adjustable nil",
+      "id": "make-array-default-keyword/5378b26260ebe135/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1384,6 +1470,7 @@
     },
     {
       "description": "Collapse the nested char case op",
+      "id": "nested-char-case/e5d63774dec3163c/0",
       "path": "broad.lisp",
       "replacements": [
         {
@@ -1400,6 +1487,7 @@
     },
     {
       "description": "Rewrite list* with a nil tail as list",
+      "id": "list-star-nil/3d15900073a4c4e4/0",
       "path": "broad.lisp",
       "replacements": [
         {

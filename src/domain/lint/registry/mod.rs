@@ -13,7 +13,7 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-pub const RULE_COUNT: usize = 143;
+pub const RULE_COUNT: usize = 169;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -553,6 +553,117 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_sequence::list_star_nil::rule::META,
         &paredit_feature_lint_sequence::list_star_nil::rule::RULE,
+    ),
+    // Cost, not correctness: every rule below flags code that works and works
+    // more slowly than the alternative its message names.
+    RuleEntry::new(
+        &paredit_feature_lint_performance::length_emptiness_test::META,
+        &paredit_feature_lint_performance::length_emptiness_test::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::quadratic_accumulation::META,
+        &paredit_feature_lint_performance::quadratic_accumulation::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::linear_search_in_loop::META,
+        &paredit_feature_lint_performance::linear_search_in_loop::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::unnecessary_copy::META,
+        &paredit_feature_lint_performance::unnecessary_copy::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::copy_before_destructive::META,
+        &paredit_feature_lint_performance::copy_before_destructive::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_performance::loop_invariant_allocation::META,
+        &paredit_feature_lint_performance::loop_invariant_allocation::RULE,
+    ),
+    // What the code assumes about where it runs.
+    RuleEntry::new(
+        &paredit_feature_lint_portability::implementation_package_symbol::META,
+        &paredit_feature_lint_portability::implementation_package_symbol::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_portability::unportable_pathname::META,
+        &paredit_feature_lint_portability::unportable_pathname::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_portability::ascii_code_char::META,
+        &paredit_feature_lint_portability::ascii_code_char::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_portability::float_equality::META,
+        &paredit_feature_lint_portability::float_equality::RULE,
+    ),
+    // Shared state, untrusted input, leaked resources, swallowed errors: every
+    // rule below reports a form whose defect is only visible one level out.
+    RuleEntry::new(
+        &paredit_feature_lint_safety::global_mutation_in_function::META,
+        &paredit_feature_lint_safety::global_mutation_in_function::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::check_then_act::META,
+        &paredit_feature_lint_safety::check_then_act::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::eval_of_non_constant::META,
+        &paredit_feature_lint_safety::eval_of_non_constant::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::read_without_read_eval_guard::META,
+        &paredit_feature_lint_safety::read_without_read_eval_guard::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::subprocess_string_building::META,
+        &paredit_feature_lint_safety::subprocess_string_building::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::unclosed_stream::META,
+        &paredit_feature_lint_safety::unclosed_stream::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::stream_escapes_with_open_file::META,
+        &paredit_feature_lint_safety::stream_escapes_with_open_file::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::handler_case_swallows_error::META,
+        &paredit_feature_lint_safety::handler_case_swallows_error::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::unreachable_handler_clause::META,
+        &paredit_feature_lint_safety::unreachable_handler_clause::RULE,
+    ),
+    // What a definition says about itself: its name, its docstring, its
+    // declarations, and its CLOS options.
+    RuleEntry::new(
+        &paredit_feature_lint_convention::definition_naming::META,
+        &paredit_feature_lint_convention::definition_naming::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::destructive_function_naming::META,
+        &paredit_feature_lint_convention::destructive_function_naming::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::missing_docstring::META,
+        &paredit_feature_lint_convention::missing_docstring::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::ignore_declaration_conflict::META,
+        &paredit_feature_lint_convention::ignore_declaration_conflict::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::contradictory_optimize::META,
+        &paredit_feature_lint_convention::contradictory_optimize::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::defclass_slot_option::META,
+        &paredit_feature_lint_convention::defclass_slot_option::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::method_lambda_list_mismatch::META,
+        &paredit_feature_lint_convention::method_lambda_list_mismatch::RULE,
     ),
     // Emacs Lisp. Every rule below declares `Dialect::EmacsLisp` only, so a
     // Common Lisp run skips them before walking anything.

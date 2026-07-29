@@ -49,6 +49,10 @@ paredit-feature-package = { path = "packages/feature/package" }
 paredit-feature-remove-unused = { path = "packages/feature/remove-unused" }
 paredit-feature-rename = { path = "packages/feature/rename" }
 paredit-feature-project-analysis = { path = "packages/feature/project-analysis" }
+paredit-feature-code-metrics = { path = "packages/feature/code-metrics" }
+paredit-feature-lisp-analysis = { path = "packages/feature/lisp-analysis" }
+paredit-feature-project-inventory = { path = "packages/feature/project-inventory" }
+paredit-feature-semantic-report = { path = "packages/feature/semantic-report" }
 paredit-feature-refactor-workflow = { path = "packages/feature/refactor-workflow" }
 paredit-feature-lint-string-char = { path = "packages/feature/lint-string-char" }
 paredit-feature-lint-control-flow = { path = "packages/feature/lint-control-flow" }
@@ -56,6 +60,11 @@ paredit-feature-lint-numeric = { path = "packages/feature/lint-numeric" }
 paredit-feature-lint-sequence = { path = "packages/feature/lint-sequence" }
 paredit-feature-lint-conditional = { path = "packages/feature/lint-conditional" }
 paredit-feature-lint-form-shape = { path = "packages/feature/lint-form-shape" }
+paredit-feature-lint-performance = { path = "packages/feature/lint-performance" }
+paredit-feature-lint-portability = { path = "packages/feature/lint-portability" }
+paredit-feature-lint-safety = { path = "packages/feature/lint-safety" }
+paredit-feature-lint-convention = { path = "packages/feature/lint-convention" }
+paredit-feature-lint-custom = { path = "packages/feature/lint-custom" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 anyhow = "1.0"

@@ -133,6 +133,28 @@ rule	getf-default-nil	0
 rule	make-array-default-keyword	0
 rule	nested-char-case	0
 rule	list-star-nil	0
+rule	length-emptiness-test	0
+rule	quadratic-accumulation	0
+rule	linear-search-in-loop	0
+rule	unnecessary-copy	0
+rule	copy-before-destructive	0
+rule	implementation-package-symbol	0
+rule	unportable-pathname	0
+rule	ascii-code-char	0
+rule	float-equality	0
+rule	global-mutation-in-function	0
+rule	check-then-act	0
+rule	eval-of-non-constant	0
+rule	read-without-read-eval-guard	0
+rule	subprocess-string-building	0
+rule	unclosed-stream	0
+rule	stream-escapes-with-open-file	0
+rule	handler-case-swallows-error	0
+rule	unreachable-handler-clause	0
+rule	ignore-declaration-conflict	0
+rule	contradictory-optimize	0
+rule	defclass-slot-option	0
+rule	method-lambda-list-mismatch	0
 rule	elisp-missing-lexical-binding	1
 rule	elisp-unreachable-lexical-binding	1
 rule	elisp-autoload-cookie-without-form	2
@@ -142,13 +164,13 @@ rule	elisp-obsolete-cl-alias	1
 rule	elisp-quoted-lambda	1
 rule	elisp-interactive-in-macro	1
 rule	elisp-condition-case-without-handler	1
-finding	elisp-missing-lexical-binding	warning	suspicious	fixable=false	emacs-lisp.el	0	no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`
-finding	elisp-unreachable-lexical-binding	error	suspicious	fixable=false	emacs-lisp.el	911	`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding
-finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	748	this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload
-finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	970	this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it
-finding	elisp-defcustom-missing-type	warning	malformed	fixable=false	emacs-lisp.el	265	defcustom fixture-option has no :type, so Customize cannot offer a widget for it
-finding	elisp-defcustom-missing-group	warning	malformed	fixable=false	emacs-lisp.el	265	defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order
-finding	elisp-obsolete-cl-alias	error	suspicious	fixable=false	emacs-lisp.el	505	`loop` was removed in Emacs 27.1; use `cl-loop`
-finding	elisp-quoted-lambda	error	suspicious	fixable=false	emacs-lisp.el	621	a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope
-finding	elisp-interactive-in-macro	error	suspicious	fixable=false	emacs-lisp.el	418	macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant
-finding	elisp-condition-case-without-handler	error	suspicious	fixable=false	emacs-lisp.el	700	this condition-case has no handler clauses, so it evaluates its body form and catches nothing
+finding	elisp-missing-lexical-binding	warning	suspicious	fixable=false	emacs-lisp.el	0	no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`	elisp-missing-lexical-binding/48686428ba8a57d0/0
+finding	elisp-unreachable-lexical-binding	error	suspicious	fixable=false	emacs-lisp.el	911	`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding	elisp-unreachable-lexical-binding/7bec796cbb2809fb/0
+finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	748	this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload	elisp-autoload-cookie-without-form/1d02fc8f50fffe50/0
+finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	970	this autoload cookie is followed by no top-level form, so `loaddefs` generation silently produces no autoload for it	elisp-autoload-cookie-without-form/1d02fc8f50fffe50/1
+finding	elisp-defcustom-missing-type	warning	malformed	fixable=false	emacs-lisp.el	265	defcustom fixture-option has no :type, so Customize cannot offer a widget for it	elisp-defcustom-missing-type/9fccc736d0e46b79/0
+finding	elisp-defcustom-missing-group	warning	malformed	fixable=false	emacs-lisp.el	265	defcustom fixture-option has no :group, so its placement in the Customize tree depends on file order	elisp-defcustom-missing-group/9fccc736d0e46b79/0
+finding	elisp-obsolete-cl-alias	error	suspicious	fixable=false	emacs-lisp.el	505	`loop` was removed in Emacs 27.1; use `cl-loop`	elisp-obsolete-cl-alias/cdece4ad70d57deb/0
+finding	elisp-quoted-lambda	error	suspicious	fixable=true	emacs-lisp.el	621	a quoted lambda evaluates to a list, not a closure; drop the quote or write `#'` so the body captures its enclosing scope	elisp-quoted-lambda/d01b8b8f281f7655/0
+finding	elisp-interactive-in-macro	error	suspicious	fixable=false	emacs-lisp.el	418	macro fixture-macro declares itself interactive, but a macro is expanded rather than called and cannot be a command; `defun` was probably meant	elisp-interactive-in-macro/b042d29eb1a42a48/0
+finding	elisp-condition-case-without-handler	error	suspicious	fixable=false	emacs-lisp.el	700	this condition-case has no handler clauses, so it evaluates its body form and catches nothing	elisp-condition-case-without-handler/e02bbaeea25cf9c0/0

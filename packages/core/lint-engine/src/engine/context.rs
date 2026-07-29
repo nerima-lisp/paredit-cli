@@ -10,6 +10,8 @@ use paredit_core_semantics::semantics::value::{ValueTable, build_value_table};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
+use crate::model::{RuleSetting, RuleSettings};
+
 /// The read-only surroundings of a check: which file, which dialect, the whole
 /// tree, and the exact source bytes.
 ///
@@ -32,10 +34,16 @@ pub struct RuleContext<'a> {
     dialect: Dialect,
     tree: &'a SyntaxTree,
     source: &'a str,
+    settings: &'a RuleSettings,
     bindings: OnceCell<BindingTable>,
     values: OnceCell<ValueTable>,
     types: OnceCell<TypeTable>,
 }
+
+/// The settings a context carries when the caller supplied none, which is every
+/// run without a `--rule-arg`. A `static` so [`RuleContext::new`] stays `const`
+/// and allocates nothing for the common case.
+static NO_SETTINGS: RuleSettings = RuleSettings::empty();
 
 impl<'a> RuleContext<'a> {
     #[must_use]
@@ -50,10 +58,28 @@ impl<'a> RuleContext<'a> {
             dialect,
             tree,
             source,
+            settings: &NO_SETTINGS,
             bindings: OnceCell::new(),
             values: OnceCell::new(),
             types: OnceCell::new(),
         }
+    }
+
+    /// Supplies the caller's `--rule-arg` overrides.
+    #[must_use]
+    pub const fn with_settings(mut self, settings: &'a RuleSettings) -> Self {
+        self.settings = settings;
+        self
+    }
+
+    /// The value `rule` should use for the knob it declared as `setting`.
+    ///
+    /// A rule passes its own name and its own `RuleSetting` constant, so a
+    /// misspelled key cannot compile and a rule cannot read another rule's
+    /// threshold.
+    #[must_use]
+    pub fn setting(&self, rule: &str, setting: RuleSetting) -> i64 {
+        self.settings.get(rule, setting)
     }
 
     /// Every binding in this file, and what each reference resolves to.
@@ -130,6 +156,28 @@ mod tests {
         let context = RuleContext::new(Path::new("test.lisp"), Dialect::CommonLisp, &tree, input);
         let span = ByteSpan::new(ByteOffset::new(7), ByteOffset::new(13));
         assert_eq!(context.slice(span), "(or x)");
+    }
+
+    #[test]
+    fn a_context_with_no_overrides_reads_the_declared_default() {
+        const MAX: RuleSetting = RuleSetting::new("max", 5, "the deepest acceptable nesting");
+        let input = "(a)";
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
+        let context = RuleContext::new(Path::new("test.lisp"), Dialect::CommonLisp, &tree, input);
+        assert_eq!(context.setting("nesting-depth", MAX), 5);
+    }
+
+    #[test]
+    fn a_supplied_override_reaches_the_rule_that_declared_it() {
+        const MAX: RuleSetting = RuleSetting::new("max", 5, "the deepest acceptable nesting");
+        let input = "(a)";
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
+        let mut settings = RuleSettings::new();
+        settings.set("nesting-depth", "max", 12);
+        let context = RuleContext::new(Path::new("test.lisp"), Dialect::CommonLisp, &tree, input)
+            .with_settings(&settings);
+        assert_eq!(context.setting("nesting-depth", MAX), 12);
+        assert_eq!(context.setting("function-length", MAX), 5);
     }
 
     #[test]

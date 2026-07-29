@@ -1,5 +1,23 @@
 {
-  "fix_count": 0,
-  "fixes": [],
+  "fix_count": 1,
+  "fixes": [
+    {
+      "description": "Drop the quote so the lambda is a closure",
+      "id": "elisp-quoted-lambda/d01b8b8f281f7655/0",
+      "path": "emacs-lisp.el",
+      "replacements": [
+        {
+          "byte_length": 15,
+          "byte_offset": 621,
+          "text": "(lambda (n) n)"
+        }
+      ],
+      "rule": "elisp-quoted-lambda",
+      "span": {
+        "end": 636,
+        "start": 621
+      }
+    }
+  ],
   "schema_version": 1
 }

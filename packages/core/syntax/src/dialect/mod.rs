@@ -65,6 +65,25 @@ pub enum Dialect {
 }
 
 impl Dialect {
+    /// Every dialect, in declaration order.
+    ///
+    /// [`Dialect::Unknown`] is included: it is the dialect of an
+    /// extensionless file, and a caller enumerating "which dialects does this
+    /// apply to?" needs to be able to say so.
+    pub const ALL: [Self; 11] = [
+        Self::CommonLisp,
+        Self::EmacsLisp,
+        Self::Lfe,
+        Self::Scheme,
+        Self::Racket,
+        Self::Clojure,
+        Self::Hy,
+        Self::Carp,
+        Self::Janet,
+        Self::Fennel,
+        Self::Unknown,
+    ];
+
     /// Resolves the effective dialect from an explicit override or file extension.
     pub fn detect(path: Option<&Path>, explicit: Option<Self>) -> Self {
         if let Some(dialect) = explicit {

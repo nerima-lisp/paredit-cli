@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::model::{LintFinding, LintPolicy, LintPolicyOptions, LintSummary};
+use crate::policy::SeverityOverrides;
 use crate::rule::RuleCatalog;
 
 /// Summarizes findings, keeping only those from `active` rules; `per_rule`
@@ -43,9 +44,15 @@ pub fn summarize_lint_findings(
 /// findings out as they are produced and never build one. Both readings go
 /// through this function so the gate has a single implementation — two would
 /// drift the moment a third condition is added.
+///
+/// `overrides` is what makes `--deny`/`--warn` mean anything: a run that
+/// re-ranks a rule and then gates on the shipped ranking would have changed
+/// only the colour of the output, which is the opposite of what the flags are
+/// for.
 #[must_use]
 pub fn lint_gate_violations(
     catalog: RuleCatalog,
+    overrides: &SeverityOverrides,
     options: LintPolicyOptions,
     finding_rules: &[&str],
 ) -> Vec<String> {
@@ -56,7 +63,7 @@ pub fn lint_gate_violations(
     if let Some(threshold) = options.fail_on_severity() {
         let count = finding_rules
             .iter()
-            .filter(|rule| catalog.severity_of(rule).at_least(threshold))
+            .filter(|rule| overrides.severity_of(catalog, rule).at_least(threshold))
             .count();
         if count > 0 {
             violations.push(format!(
@@ -73,6 +80,7 @@ pub fn lint_gate_violations(
 #[must_use]
 pub fn evaluate_lint_policy(
     catalog: RuleCatalog,
+    overrides: &SeverityOverrides,
     options: LintPolicyOptions,
     summary: &LintSummary,
 ) -> LintPolicy {
@@ -81,7 +89,7 @@ pub fn evaluate_lint_policy(
         .iter()
         .map(|finding| finding.rule)
         .collect();
-    let violations = lint_gate_violations(catalog, options, &finding_rules);
+    let violations = lint_gate_violations(catalog, overrides, options, &finding_rules);
 
     LintPolicy {
         fail_on_finding: options.fail_on_finding(),

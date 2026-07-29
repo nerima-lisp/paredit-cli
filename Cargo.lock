@@ -657,6 +657,7 @@ dependencies = [
  "paredit-core-syntax",
  "paredit-core-workspace",
  "paredit-feature-binding",
+ "paredit-feature-code-metrics",
  "paredit-feature-conditional-conversion",
  "paredit-feature-emacs-lisp",
  "paredit-feature-extract",
@@ -665,15 +666,23 @@ dependencies = [
  "paredit-feature-inline",
  "paredit-feature-lint-conditional",
  "paredit-feature-lint-control-flow",
+ "paredit-feature-lint-convention",
+ "paredit-feature-lint-custom",
  "paredit-feature-lint-form-shape",
  "paredit-feature-lint-numeric",
+ "paredit-feature-lint-performance",
+ "paredit-feature-lint-portability",
+ "paredit-feature-lint-safety",
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
+ "paredit-feature-lisp-analysis",
  "paredit-feature-package",
  "paredit-feature-project-analysis",
+ "paredit-feature-project-inventory",
  "paredit-feature-refactor-workflow",
  "paredit-feature-remove-unused",
  "paredit-feature-rename",
+ "paredit-feature-semantic-report",
  "paredit-feature-similarity",
  "predicates",
  "proptest",
@@ -766,6 +775,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-code-metrics"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]
@@ -886,6 +906,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-convention"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-custom"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "thiserror",
+]
+
+[[package]]
 name = "paredit-feature-lint-form-shape"
 version = "1.2.1"
 dependencies = [
@@ -916,6 +953,30 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-performance"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-portability"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-safety"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
 ]
 
 [[package]]
@@ -951,6 +1012,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lisp-analysis"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
 name = "paredit-feature-package"
 version = "1.2.1"
 dependencies = [
@@ -982,6 +1054,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-project-inventory"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]
@@ -1037,6 +1120,18 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-semantic-report"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

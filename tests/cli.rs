@@ -47,6 +47,8 @@ mod char_op_string_report;
 mod class_cycle_report;
 #[path = "cli/code_char_char_code_report.rs"]
 mod code_char_char_code_report;
+#[path = "cli/code_metrics_report.rs"]
+mod code_metrics_report;
 #[path = "cli/coerce_to_t_report.rs"]
 mod coerce_to_t_report;
 #[path = "cli/compatibility_contract.rs"]
@@ -219,6 +221,8 @@ mod let_refactor;
 mod lint_report;
 #[path = "cli/lint_report_golden.rs"]
 mod lint_report_golden;
+#[path = "cli/lisp_analysis_report.rs"]
+mod lisp_analysis_report;
 #[path = "cli/list_star_nil_report.rs"]
 mod list_star_nil_report;
 #[path = "cli/list_star_to_cons_report.rs"]
@@ -305,6 +309,8 @@ mod parse_integer_default_radix_report;
 mod plan_steps_contract;
 #[path = "cli/prog2_to_progn_report.rs"]
 mod prog2_to_progn_report;
+#[path = "cli/project_inventory_report.rs"]
+mod project_inventory_report;
 #[path = "cli/public_api_docs_contract.rs"]
 mod public_api_docs_contract;
 #[path = "cli/public_module_docs_contract.rs"]
@@ -391,6 +397,8 @@ mod replace_forms;
 mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]
 mod self_comparison_report;
+#[path = "cli/semantic_report.rs"]
+mod semantic_report;
 #[path = "cli/setf_arity_report.rs"]
 mod setf_arity_report;
 #[path = "cli/setq_non_variable_report.rs"]

@@ -3,6 +3,7 @@
   "fixes": [
     {
       "description": "Remove the redundant quote",
+      "id": "redundant-quote/07bb8007b4863bf0/0",
       "path": "suppressed.lisp",
       "replacements": [
         {
