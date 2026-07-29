@@ -4,6 +4,7 @@ macro_rules! safe_text {
     };
 }
 
+mod add_ignore_declaration;
 mod analysis_report;
 mod argv;
 mod basic_edit;

@@ -412,7 +412,7 @@ const STRUCTURAL_COMMANDS: [&str; 31] = [
     "edit unescape-string",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 81] = [
+const SEMANTIC_COMMANDS: [&str; 82] = [
     "refactor step",
     "refactor patch",
     "refactor plan",
@@ -428,6 +428,7 @@ const SEMANTIC_COMMANDS: [&str; 81] = [
     "refactor workspace-execute",
     "refactor remove-definition",
     "refactor remove-unused-definitions",
+    "refactor add-ignore-declaration",
     "refactor move-definition",
     "refactor split-file",
     "refactor sort-definitions",

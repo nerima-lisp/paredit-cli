@@ -479,6 +479,7 @@ plan/preview/verify/apply lifecycle.
 | --- | --- |
 | `remove-definition` | Plan or remove a top-level definition from one file. |
 | `remove-unused-definitions` | Plan or remove unused top-level definitions across files. |
+| `add-ignore-declaration` | Insert `(declare (ignore …))` for every parameter `inspect unused-parameters` reports as unused. The write side that report never had: it could name the problem and nothing in the tool could fix it, so acting on it meant hand-editing every definition it listed. The declaration goes after the lambda list, past a docstring and past any declarations already there — several `declare` forms may head one body, so an existing one is followed rather than merged into. One declaration per definition names every unused parameter of it. A parameter already declared ignored never reaches this, because the report counts its appearance in the declaration as a reference. Common Lisp and Emacs Lisp only; other dialects plan nothing rather than refusing. |
 | `move-definition` | Plan or move a top-level definition between files. |
 | `split-file` | Plan or split multiple top-level definitions into another file. |
 | `sort-definitions` | Plan or sort contiguous top-level definition blocks in one file. |

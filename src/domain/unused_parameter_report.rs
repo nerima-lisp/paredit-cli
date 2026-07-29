@@ -286,3 +286,256 @@ mod tests {
         assert!(!strict.passed);
     }
 }
+
+// --- the edit side: turning the report above into `(declare (ignore ...))` ---
+
+/// One definition's planned `(declare (ignore ...))` insertion.
+#[derive(Debug, Clone)]
+pub struct IgnoreDeclarationItem {
+    pub definition_path: String,
+    pub definition_name: Option<String>,
+    /// The parameters this declaration will name, in lambda-list order.
+    pub parameter_names: Vec<String>,
+    /// Where the new form is spliced in: a zero-width point, not a
+    /// replacement.
+    pub insert_at: usize,
+}
+
+#[derive(Debug)]
+pub struct IgnoreDeclarationPlan {
+    pub path: PathBuf,
+    pub dialect: Dialect,
+    pub items: Vec<IgnoreDeclarationItem>,
+    pub rewritten: String,
+}
+
+/// Plans a `(declare (ignore ...))` for every definition the unused-parameter
+/// report flags.
+///
+/// The names come from [`build_unused_parameter_report`] rather than a second
+/// scan, so this can never disagree with the report about which parameters
+/// are unused — the gap this closes is that the report had no write side at
+/// all, not that its answer needed refining.
+///
+/// Scoped to the Common Lisp family, which is the only place `declare` means
+/// this. Other dialects get an empty plan rather than a refusal: a workspace
+/// sweep should skip a `.clj` file, not stop at it.
+pub fn plan_ignore_declarations(
+    path: PathBuf,
+    dialect: Dialect,
+    tree: &SyntaxTree,
+    input: &str,
+) -> Result<IgnoreDeclarationPlan> {
+    let report = build_unused_parameter_report(path.clone(), dialect, tree, input)?;
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
+        return Ok(IgnoreDeclarationPlan {
+            path,
+            dialect,
+            items: Vec::new(),
+            rewritten: input.to_owned(),
+        });
+    }
+
+    // One item per definition, not per parameter: `(declare (ignore x y))` is
+    // one form naming both, and two separate declarations of the same body
+    // would be a rewrite nobody writes by hand.
+    let mut items: Vec<IgnoreDeclarationItem> = Vec::new();
+    for unused in &report.unused_parameters {
+        if let Some(existing) = items
+            .iter_mut()
+            .find(|item| item.definition_path == unused.definition_path)
+        {
+            existing.parameter_names.push(unused.parameter_name.clone());
+            continue;
+        }
+        let form_path: Path = unused.definition_path.parse()?;
+        let view = tree.select_path(&form_path)?.view();
+        let Some(head) = list_head(&view) else {
+            continue;
+        };
+        let Some(shape) = definition_shape(dialect, &view, head) else {
+            continue;
+        };
+        let Some(insert_at) = declaration_insertion_offset(&view, shape.body_forms(&view)) else {
+            continue;
+        };
+        items.push(IgnoreDeclarationItem {
+            definition_path: unused.definition_path.clone(),
+            definition_name: unused.definition_name.clone(),
+            parameter_names: vec![unused.parameter_name.clone()],
+            insert_at,
+        });
+    }
+
+    // Applied last-first so an earlier insertion never shifts a later offset.
+    let mut ordered = items.clone();
+    ordered.sort_by_key(|item| std::cmp::Reverse(item.insert_at));
+    let mut rewritten = input.to_owned();
+    for item in &ordered {
+        let names = item.parameter_names.join(" ");
+        let indent = line_indent_at(&rewritten, item.insert_at);
+        rewritten.insert_str(
+            item.insert_at,
+            &format!("(declare (ignore {names}))\n{}", " ".repeat(indent)),
+        );
+    }
+
+    Ok(IgnoreDeclarationPlan {
+        path,
+        dialect,
+        items,
+        rewritten,
+    })
+}
+
+/// Where a new declaration goes: after the lambda list, past a docstring and
+/// past any declarations already there.
+///
+/// Returns `None` for a definition with no body at all, which has no position
+/// that is inside it and after its lambda list.
+fn declaration_insertion_offset(view: &ExpressionView, body: &[ExpressionView]) -> Option<usize> {
+    let mut index = 0usize;
+    // A leading string is a docstring only when something follows it. As the
+    // sole body form it is the definition's return value, and a declaration
+    // inserted after it would be dead code below the return.
+    if body.len() > 1 && body[0].kind == ExpressionKind::Atom {
+        let is_string = body[0]
+            .text
+            .as_deref()
+            .is_some_and(|text| text.starts_with('"'));
+        if is_string {
+            index = 1;
+        }
+    }
+    // Several `declare` forms may sit at a body's head, so an existing one is
+    // something to insert *after* rather than to merge into.
+    while body
+        .get(index)
+        .and_then(list_head)
+        .is_some_and(|head| head.eq_ignore_ascii_case("declare"))
+    {
+        index += 1;
+    }
+    body.get(index).map_or_else(
+        || view.span.end().get().checked_sub(1),
+        |form| Some(form.span.start().get()),
+    )
+}
+
+/// The indentation of the line `offset` sits on, for keeping an inserted form
+/// aligned with the one it was placed above.
+fn line_indent_at(input: &str, offset: usize) -> usize {
+    let line_start = input[..offset].rfind('\n').map_or(0, |index| index + 1);
+    input[line_start..offset]
+        .chars()
+        .take_while(|character| *character == ' ')
+        .count()
+}
+
+#[cfg(test)]
+mod ignore_declaration_tests {
+    use super::*;
+
+    fn plan(source: &str) -> IgnoreDeclarationPlan {
+        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)
+            .expect("fixture parses as Common Lisp");
+        plan_ignore_declarations(
+            PathBuf::from("fixture.lisp"),
+            Dialect::CommonLisp,
+            &tree,
+            source,
+        )
+        .expect("planning succeeds")
+    }
+
+    #[test]
+    fn declares_an_unused_parameter_after_the_lambda_list() {
+        let planned = plan("(defun f (x y)\n  x)\n");
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y)\n  (declare (ignore y))\n  x)\n"
+        );
+        assert_eq!(planned.items.len(), 1);
+        assert_eq!(planned.items[0].parameter_names, vec!["y".to_owned()]);
+    }
+
+    #[test]
+    fn a_docstring_keeps_its_place_above_the_declaration() {
+        let planned = plan("(defun f (x y)\n  \"Doc.\"\n  x)\n");
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y)\n  \"Doc.\"\n  (declare (ignore y))\n  x)\n"
+        );
+    }
+
+    #[test]
+    fn an_existing_declaration_is_followed_rather_than_merged_into() {
+        // Several `declare` forms may head one body, so appending is valid and
+        // leaves the existing declaration's own specs untouched.
+        let planned = plan("(defun f (x y)\n  (declare (type fixnum x))\n  x)\n");
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y)\n  (declare (type fixnum x))\n  (declare (ignore y))\n  x)\n"
+        );
+    }
+
+    #[test]
+    fn a_parameter_already_declared_ignored_is_not_declared_twice() {
+        // The report counts the name's appearance inside `(declare (ignore y))`
+        // as a reference, so it never reaches the edit side. Declaring it a
+        // second time would be a duplicate declaration, which is an error.
+        let source = "(defun f (x y)\n  (declare (ignore y))\n  x)\n";
+        let planned = plan(source);
+        assert!(planned.items.is_empty());
+        assert_eq!(planned.rewritten, source);
+    }
+
+    #[test]
+    fn several_unused_parameters_share_one_declaration() {
+        let planned = plan("(defun f (x y z)\n  x)\n");
+        assert_eq!(planned.items.len(), 1);
+        assert_eq!(
+            planned.items[0].parameter_names,
+            vec!["y".to_owned(), "z".to_owned()]
+        );
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y z)\n  (declare (ignore y z))\n  x)\n"
+        );
+    }
+
+    #[test]
+    fn two_definitions_are_both_rewritten_without_shifting_each_other() {
+        let planned = plan("(defun f (x y)\n  x)\n\n(defun g (a b)\n  a)\n");
+        assert_eq!(planned.items.len(), 2);
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y)\n  (declare (ignore y))\n  x)\n\n(defun g (a b)\n  (declare (ignore b))\n  a)\n"
+        );
+    }
+
+    #[test]
+    fn a_lone_string_body_is_a_return_value_not_a_docstring() {
+        // `(defun f (x y) "text")` returns the string; a declaration inserted
+        // after it would sit below the definition's only form. Both parameters
+        // are unused here precisely because the body references neither.
+        let planned = plan("(defun f (x y)\n  \"text\")\n");
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y)\n  (declare (ignore x y))\n  \"text\")\n"
+        );
+    }
+
+    #[test]
+    fn the_rewrite_still_parses() {
+        for source in [
+            "(defun f (x y)\n  x)\n",
+            "(defun f (x y)\n  \"Doc.\"\n  x)\n",
+            "(defun f (x y z)\n  x)\n",
+        ] {
+            let planned = plan(source);
+            SyntaxTree::parse_with_dialect(&planned.rewritten, Dialect::CommonLisp)
+                .expect("a planned rewrite must reparse");
+        }
+    }
+}

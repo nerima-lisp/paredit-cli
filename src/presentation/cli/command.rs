@@ -1,6 +1,6 @@
 use super::{
-    accessor_arity_report, analysis_report, api_diff_report, api_surface_report,
-    append_list_to_cons_report, append_nil_report,
+    accessor_arity_report, add_ignore_declaration, analysis_report, api_diff_report,
+    api_surface_report, append_list_to_cons_report, append_nil_report,
     args::{
         AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
         NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs,
@@ -676,6 +676,8 @@ pub(super) enum RefactorCommand {
     RemoveDefinition(definition_removal::args::RemoveDefinitionArgs),
     /// Plan or remove unused top-level definitions across explicit files.
     RemoveUnusedDefinitions(definition_removal::args::RemoveUnusedDefinitionsArgs),
+    /// Insert (declare (ignore ...)) for every parameter `inspect unused-parameters` reports as unused.
+    AddIgnoreDeclaration(add_ignore_declaration::args::AddIgnoreDeclarationArgs),
     /// Plan or move a top-level definition between files.
     MoveDefinition(definition_movement::args::MoveDefinitionArgs),
     /// Plan or split multiple top-level definitions into another file.
