@@ -65,6 +65,8 @@ pub enum Message {
     RepairReadTheReport,
     RepairConvertEncoding,
     RepairSpanBoundaries,
+    RepairDropDryRun,
+    RepairUsePreviewFlag,
 }
 
 impl Message {
@@ -163,6 +165,12 @@ impl Message {
             Self::RepairSpanBoundaries => {
                 "the span does not lie on character boundaries of the current source"
             }
+            Self::RepairDropDryRun => {
+                "drop --dry-run (or unset PAREDIT_DRY_RUN) to let the write happen"
+            }
+            Self::RepairUsePreviewFlag => {
+                "or use this command's own preview: --diff on an edit, --fix --diff on lint"
+            }
         }
     }
 
@@ -254,11 +262,17 @@ impl Message {
                 "本ツールは UTF-8 のみを読みます。先にファイルの文字コードを変換してください"
             }
             Self::RepairSpanBoundaries => "範囲が現在のソースの文字境界に一致していません",
+            Self::RepairDropDryRun => {
+                "書き込みを行うには --dry-run を外してください（PAREDIT_DRY_RUN も解除）"
+            }
+            Self::RepairUsePreviewFlag => {
+                "あるいは各コマンドのプレビューを使ってください（編集系は --diff、lint は --fix --diff）"
+            }
         }
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 42] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -299,6 +313,8 @@ impl Message {
         Self::RepairReadTheReport,
         Self::RepairConvertEncoding,
         Self::RepairSpanBoundaries,
+        Self::RepairDropDryRun,
+        Self::RepairUsePreviewFlag,
     ];
 }
 

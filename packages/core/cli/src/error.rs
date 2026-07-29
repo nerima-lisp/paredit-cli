@@ -82,6 +82,15 @@ pub enum IoRefusal {
 
     #[error("refusing writable parent directory {path}")]
     WritableParentDirectory { path: String },
+
+    /// `--dry-run` reached a write the argument layer could not turn into a
+    /// preview, because the command does not spell writing as `--write`.
+    #[error(
+        "refusing to write: --dry-run is in force. \
+         Drop it, or use the command's own preview flag (--diff on an edit, \
+         --fix --diff on lint)"
+    )]
+    DryRun,
 }
 
 /// The path a write was aimed at cannot serve as a target.

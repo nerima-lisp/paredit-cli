@@ -86,11 +86,28 @@ something.
 Three flags apply to every command, so a harness can append them to a command
 line it did not construct.
 
-**`--dry-run`** (or `PAREDIT_DRY_RUN=1`) writes nothing. It removes `--write`
-before the command sees it — `--write` is the one flag every mutating command
-in this tool spells the same way, which is what makes one uniform meaning
-possible — and says on stderr that it did. The result still goes to stdout, so
-it is a preview rather than a refusal.
+**`--dry-run`** (or `PAREDIT_DRY_RUN=1`) writes nothing, and that is enforced
+in two places.
+
+At the argument layer it removes `--write` before the command sees it, and says
+on stderr that it did. `--write` is how ~80 mutating commands spell writing, so
+those turn into a preview: the result still goes to stdout.
+
+At the write layer, every write in this tool funnels through one function, and
+that function refuses outright while `--dry-run` is in force. That covers the
+commands that spell writing some other way — `inspect lint --fix` is the live
+example — and it covers commands added later without anyone remembering to. You
+get `refusal.dry-run` and a pointer to that command's own preview flag, rather
+than a silent write:
+
+```
+$ paredit inspect lint --fix --dry-run src/
+Error [refusal.dry-run]: refusing to write: --dry-run is in force. ...
+  try: or use this command's own preview: --diff on an edit, --fix --diff on lint
+```
+
+Refusing rather than skipping is deliberate: a command reporting success
+without doing what it said is worse than an error naming the flag.
 
 **`--progress`** emits JSON Lines on stderr, one object per line:
 

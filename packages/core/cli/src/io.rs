@@ -617,6 +617,20 @@ fn stage_and_apply<T>(
     files: Vec<T>,
     mut stage: impl FnMut(T) -> CliResult<StagedWriteTarget>,
 ) -> CliResult<()> {
+    // The backstop for `--dry-run`. The argument layer already removes
+    // `--write`, which covers the ~80 commands that spell writing that way and
+    // leaves them printing a preview. It does *not* cover the ones that spell
+    // it differently — `inspect lint --fix` and `--write-baseline` are the
+    // live examples — and "nothing is written" has to be true for all of them
+    // or it is not a guarantee anyone can rely on.
+    //
+    // Refusing here rather than silently skipping: a command that reports
+    // success without doing what it said would be a worse failure than an
+    // error naming the flag responsible.
+    if crate::runtime::current().dry_run {
+        return Err(IoRefusal::DryRun.into());
+    }
+
     let mut staged = Vec::with_capacity(files.len());
     for file in files {
         match stage(file) {

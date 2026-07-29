@@ -181,6 +181,61 @@ fn dry_run_and_progress_are_documented_on_every_command() {
     }
 }
 
+/// The guarantee has to hold for commands that do not spell writing as
+/// `--write`. `inspect lint --fix` is the live example, and no flag table can
+/// safely claim to know them all — so the write path itself refuses.
+#[test]
+fn dry_run_stops_a_write_that_does_not_go_through_the_write_flag() {
+    let dir = fresh_temp_dir("dry-run-lint-fix");
+    let file = dir.join("a.lisp");
+    let source = "(defun f (x) (if (eq x nil) 1 2))\n";
+    fs::write(&file, source).expect("write fixture");
+
+    let stderr = paredit()
+        .args(["inspect", "lint", "--fix", "--dry-run"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&stderr).expect("stderr is JSON");
+
+    assert_eq!(report["error"]["code"], "refusal.dry-run");
+    assert_eq!(report["error"]["category"], "refusal");
+    assert_eq!(contents(&file), source, "the file was written anyway");
+
+    // And it refuses rather than reporting a success it did not perform.
+    let details: Vec<&str> = report["error"]["repairs"]
+        .as_array()
+        .expect("repairs")
+        .iter()
+        .map(|repair| repair["detail"].as_str().expect("detail"))
+        .collect();
+    assert!(
+        details.iter().any(|detail| detail.contains("--fix --diff")),
+        "{details:?}"
+    );
+}
+
+/// Without `--dry-run` the same command does write, so the test above is
+/// checking the guard rather than a command that never wrote.
+#[test]
+fn the_same_fix_does_write_without_dry_run() {
+    let dir = fresh_temp_dir("dry-run-lint-fix-control");
+    let file = dir.join("a.lisp");
+    let source = "(defun f (x) (if (eq x nil) 1 2))\n";
+    fs::write(&file, source).expect("write fixture");
+
+    paredit()
+        .args(["inspect", "lint", "--fix", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    assert_ne!(contents(&file), source);
+}
+
 // --- H15: JSON Lines progress ---
 
 #[test]

@@ -127,6 +127,7 @@ pub enum ErrorCode {
     RefusalOverlappingSpans,
     RefusalSpanOutOfBounds,
     RefusalWorkspace,
+    RefusalDryRun,
 
     EnvironmentIo,
     EnvironmentWorkspaceLimit,
@@ -166,6 +167,7 @@ impl ErrorCode {
             Self::RefusalOverlappingSpans => "refusal.overlapping-spans",
             Self::RefusalSpanOutOfBounds => "refusal.span-out-of-bounds",
             Self::RefusalWorkspace => "refusal.workspace",
+            Self::RefusalDryRun => "refusal.dry-run",
 
             Self::EnvironmentIo => "environment.io",
             Self::EnvironmentWorkspaceLimit => "environment.workspace-limit",
@@ -203,7 +205,8 @@ impl ErrorCode {
             | Self::RefusalRewriteDoesNotReparse
             | Self::RefusalOverlappingSpans
             | Self::RefusalSpanOutOfBounds
-            | Self::RefusalWorkspace => Category::Refusal,
+            | Self::RefusalWorkspace
+            | Self::RefusalDryRun => Category::Refusal,
 
             Self::EnvironmentIo
             | Self::EnvironmentWorkspaceLimit
@@ -231,7 +234,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 28] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -252,6 +255,7 @@ impl ErrorCode {
         Self::RefusalOverlappingSpans,
         Self::RefusalSpanOutOfBounds,
         Self::RefusalWorkspace,
+        Self::RefusalDryRun,
         Self::EnvironmentIo,
         Self::EnvironmentWorkspaceLimit,
         Self::EnvironmentUnavailable,
@@ -440,6 +444,7 @@ const fn classify_refusal(error: &IoRefusal) -> ErrorCode {
         | IoRefusal::DuplicateWriteTarget { .. }
         | IoRefusal::WriteTargetHasNoFileName { .. }
         | IoRefusal::WritableParentDirectory { .. } => ErrorCode::RefusalWriteTarget,
+        IoRefusal::DryRun => ErrorCode::RefusalDryRun,
         IoRefusal::OverlappingRewriteSpans => ErrorCode::RefusalOverlappingSpans,
         IoRefusal::RewriteSpanOutOfBounds => ErrorCode::RefusalSpanOutOfBounds,
         IoRefusal::RewriteDoesNotReparse | IoRefusal::NamedRewriteDoesNotReparse { .. } => {
@@ -590,6 +595,11 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
         ErrorCode::SelectionSpanInvalid => {
             vec![Repair::new("re-read", Message::RepairSpanBoundaries)]
         }
+
+        ErrorCode::RefusalDryRun => vec![
+            Repair::new("pass-flag", Message::RepairDropDryRun),
+            Repair::new("pass-flag", Message::RepairUsePreviewFlag),
+        ],
     }
 }
 
