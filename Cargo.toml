@@ -83,6 +83,7 @@ paredit-feature-lint-custom = { path = "packages/feature/lint-custom" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }
+paredit-feature-generate = { path = "packages/feature/generate" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"
@@ -134,7 +135,11 @@ members = ["packages/*/*"]
 # build. It declares its own `[workspace]` as well, so this line is belt and
 # braces — but the failure without it is "package is not included in the
 # workspace", which stops every build rather than only the fuzz one.
-exclude = ["fuzz"]
+#
+# `xtask/` is dev-only tooling (see xtask/Cargo.toml): it is not part of the
+# shipped binary or the analysis engine, so it should not have to satisfy the
+# architecture contracts written for `packages/*/*`.
+exclude = ["fuzz", "xtask"]
 
 # Required, not cosmetic. This workspace has a root package, so a bare
 # `cargo test` / `cargo nextest run` would otherwise build only the root and
@@ -158,6 +163,7 @@ blake3 = "1.8"
 cap-std = "4.0"
 clap = { version = "4.6", features = ["derive"] }
 clap_complete = "4.5"
+encoding_rs = "0.8"
 libc = "0.2"
 serde_json = "1.0"
 thiserror = "2.0"

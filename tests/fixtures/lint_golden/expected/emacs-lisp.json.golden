@@ -132,6 +132,7 @@
       }
     }
   ],
+  "partial_failures": [],
   "per_rule": [
     {
       "category": "suspicious",

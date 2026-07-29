@@ -21,6 +21,8 @@ use std::sync::OnceLock;
 
 use paredit_core_syntax::dialect::Dialect;
 
+use crate::color::ColorMode;
+
 /// How much detail a report includes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Verbosity {
@@ -109,14 +111,71 @@ pub struct RuntimeSettings {
     /// Approximate token budget for a report. Zero means no budget.
     pub max_tokens: usize,
     pub language: Language,
+    /// Whether a text renderer may paint ANSI color.
+    pub color: ColorMode,
     /// Emit JSON Lines progress on stderr.
     pub progress: bool,
+    /// Delegate stdout to `$PAGER` when it is a terminal.
+    pub paginate: bool,
     /// Nothing may be written to disk.
     ///
     /// Resolved before argument parsing rather than per command, because its
     /// value is "no command in this process writes" — a property of the run,
     /// not of one invocation's arguments.
     pub dry_run: bool,
+    /// Permission bits (e.g. `0o600`) a brand-new file is created with.
+    ///
+    /// `None` keeps the built-in `0o600`. Global rather than per-command for
+    /// the same reason as `dry_run`: every one of the ~90 writing commands
+    /// creates a new file through the same staging function in `io.rs`, and a
+    /// caller who wants group-readable output (a shared checkout, a CI
+    /// artifact directory) wants it for all of them, not one at a time.
+    pub new_file_mode: Option<u32>,
+    /// Refuse a write whose target's parent path climbs through a symlinked
+    /// directory above the immediate parent (which is refused unconditionally
+    /// already, `O_NOFOLLOW` catching only the last path component).
+    ///
+    /// Default off: `/tmp` is a symlink to `/private/tmp` on macOS, and
+    /// similar stable, root-owned redirections are common enough elsewhere
+    /// that refusing them unconditionally would break routine use. This is
+    /// for a caller who wants the stricter policy — CI writing into a
+    /// less-trusted checkout, for instance — not a universal default.
+    pub refuse_symlinked_ancestors: bool,
+    /// The declared encoding of source files this run reads, when it is not
+    /// UTF-8.
+    ///
+    /// `None` keeps the existing strict-UTF-8 read path. Read-only commands
+    /// work normally against a legacy (Shift_JIS, EUC-JP, ISO-8859-1, ...)
+    /// source file once this is set; a write is refused instead of silently
+    /// re-encoding the file to UTF-8 — see [`writes_are_supported`].
+    pub source_encoding: Option<&'static encoding_rs::Encoding>,
+}
+
+impl RuntimeSettings {
+    /// Whether this run's declared encoding still allows a write.
+    ///
+    /// Only UTF-8 (the built-in default) round-trips today: decoding a
+    /// legacy encoding to the UTF-8 this tool works in internally, then
+    /// writing that UTF-8 back out, would silently change the file's
+    /// encoding. Refusing is safer than guessing which of "keep re-encoding
+    /// it back" or "this file's encoding never actually mattered to you" the
+    /// caller meant.
+    #[must_use]
+    pub fn writes_are_supported(&self) -> bool {
+        self.source_encoding
+            .is_none_or(|encoding| std::ptr::eq(encoding, encoding_rs::UTF_8))
+    }
+}
+
+/// Parses `--encoding`'s value: a WHATWG encoding label (`shift_jis`,
+/// `euc-jp`, `iso-8859-1`, `windows-1252`, `utf-8`, ...), case-insensitive,
+/// including the common aliases browsers accept.
+///
+/// # Errors
+///
+/// Returns the label back, unrecognized, if it names no known encoding.
+pub fn parse_source_encoding(label: &str) -> Result<&'static encoding_rs::Encoding, &str> {
+    encoding_rs::Encoding::for_label(label.as_bytes()).ok_or(label)
 }
 
 static RUNTIME: OnceLock<RuntimeSettings> = OnceLock::new();
@@ -181,6 +240,7 @@ mod tests {
         let settings = RuntimeSettings::default();
         assert_eq!(settings.verbosity, Verbosity::Normal);
         assert_eq!(settings.language, Language::English);
+        assert_eq!(settings.color, ColorMode::Auto);
         assert_eq!(settings.max_tokens, 0);
         assert!(settings.dialect_default.is_none());
     }

@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 226] = [
+const INTROSPECTION_COMMANDS: [&str; 227] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -374,15 +374,18 @@ const INTROSPECTION_COMMANDS: [&str; 226] = [
     "inspect identity-arithmetic",
     "inspect redundant-divisor",
     "inspect context-at",
+    "inspect writability",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
 
-const STRUCTURAL_COMMANDS: [&str; 29] = [
+const STRUCTURAL_COMMANDS: [&str; 31] = [
     "edit select",
     "edit replace",
     "edit kill",
     "edit copy",
+    "edit duplicate",
+    "edit normalize-quotes",
     "edit yank",
     "edit wrap",
     "edit unwrap-prefix",
@@ -410,7 +413,7 @@ const STRUCTURAL_COMMANDS: [&str; 29] = [
     "edit unescape-string",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 81] = [
+const SEMANTIC_COMMANDS: [&str; 83] = [
     "refactor step",
     "refactor patch",
     "refactor plan",
@@ -426,6 +429,8 @@ const SEMANTIC_COMMANDS: [&str; 81] = [
     "refactor workspace-execute",
     "refactor remove-definition",
     "refactor remove-unused-definitions",
+    "refactor add-ignore-declaration",
+    "refactor fold-constants",
     "refactor move-definition",
     "refactor split-file",
     "refactor sort-definitions",
@@ -502,7 +507,7 @@ const SEMANTIC_COMMANDS: [&str; 81] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 13] = [
+const SYNTAX_TIER_REPORTS: [&str; 14] = [
     "inspect context-at",
     "inspect diff",
     "inspect elisp-file",
@@ -516,6 +521,7 @@ const SYNTAX_TIER_REPORTS: [&str; 13] = [
     "inspect find-symbol",
     "inspect workspace",
     "inspect sources",
+    "inspect writability",
 ];
 
 /// Reports built on the dialect-neutral definition and scope shapes, which

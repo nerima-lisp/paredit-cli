@@ -11,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod accessor_arity_report;
 #[path = "cli/action_contract.rs"]
 mod action_contract;
+#[path = "cli/add_ignore_declaration.rs"]
+mod add_ignore_declaration;
 #[path = "cli/agent_report_budget.rs"]
 mod agent_report_budget;
 #[path = "cli/analysis_report.rs"]
@@ -59,6 +61,8 @@ mod code_char_char_code_report;
 mod code_metrics_report;
 #[path = "cli/coerce_to_t_report.rs"]
 mod coerce_to_t_report;
+#[path = "cli/commands_doc_sync_contract.rs"]
+mod commands_doc_sync_contract;
 #[path = "cli/compatibility_contract.rs"]
 mod compatibility_contract;
 #[path = "cli/completions_contract.rs"]
@@ -149,6 +153,8 @@ mod emacs_lisp_file_report;
 mod empty_body_report;
 #[path = "cli/empty_let_report.rs"]
 mod empty_let_report;
+#[path = "cli/encoding_write.rs"]
+mod encoding_write;
 #[path = "cli/eq_char_comparison_report.rs"]
 mod eq_char_comparison_report;
 #[path = "cli/eq_number_comparison_report.rs"]
@@ -179,8 +185,12 @@ mod extract_constant;
 mod extract_function;
 #[path = "cli/extract_local_function/mod.rs"]
 mod extract_local_function;
+#[path = "cli/feature_dependency_contract.rs"]
+mod feature_dependency_contract;
 #[path = "cli/flatten_progn.rs"]
 mod flatten_progn;
+#[path = "cli/fold_constants.rs"]
+mod fold_constants;
 #[path = "cli/form_report.rs"]
 mod form_report;
 #[path = "cli/format/mod.rs"]
@@ -195,6 +205,8 @@ mod format_to_string_report;
 mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
+#[path = "cli/generate.rs"]
+mod generate;
 #[path = "cli/getf_default_nil_report.rs"]
 mod getf_default_nil_report;
 #[path = "cli/gethash_default_report.rs"]
@@ -537,6 +549,8 @@ mod verbose_negation_report;
 mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]
 mod workspace_report;
+#[path = "cli/writability_report.rs"]
+mod writability_report;
 #[path = "cli/write_scope.rs"]
 mod write_scope;
 #[path = "cli/zero_divisor_report.rs"]

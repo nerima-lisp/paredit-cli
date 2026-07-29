@@ -1,10 +1,10 @@
 use super::{
-    accessor_arity_report, analysis_report, api_diff_report, api_surface_report,
-    append_list_to_cons_report, append_nil_report,
+    accessor_arity_report, add_ignore_declaration, analysis_report, api_diff_report,
+    api_surface_report, append_list_to_cons_report, append_nil_report,
     args::{
         AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
-        NewlineArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs,
-        UnwrapPrefixArgs, WrapArgs, YankArgs,
+        NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs,
+        TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
     },
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
@@ -28,21 +28,23 @@ use super::{
     eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
     exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
     external_diagnostics_report, external_system_report, extract_constant, extract_function,
-    extract_local_function, flatten_progn, form_report, format_directive_report,
+    extract_local_function, flatten_progn, fold_constants, form_report, format_directive_report,
     format_missing_destination_report, format_newline_report, format_to_string_report,
-    funcall_lambda_report, function_parameter, generic_dispatch_report, getf_default_nil_report,
-    gethash_default_report, handler_case_no_clauses_report, hotspot_report,
-    identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_not_report,
-    if_to_or_report, if_to_unless_report, impact_report, indentation_report, inline_function,
-    inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
-    introduce_let, keyword_arity_report, lambda_list_keyword_order_report,
-    last_default_count_report, let_report, license_report, line_metrics_report, lint_report,
-    list_star_nil_report, list_star_to_cons_report, literal_place_report, loop_report,
-    macro_expansion_report, macro_hygiene_report, make_array_default_keyword_report,
-    make_hash_table_test_report, make_list_default_element_report, malformed_case_clause_report,
-    malformed_cond_clause_report, malformed_iteration_spec_report, malformed_let_binding_report,
-    manual_incf_report, manual_push_report, manual_pushnew_report, merge_nested_flet,
-    merge_nested_let, merge_nested_let_star, method_combination_report, modify_macro_arity_report,
+    funcall_lambda_report, function_parameter, generate_accessors, generate_defgeneric,
+    generate_defpackage, generate_defsystem, generate_docstring, generate_tests,
+    generic_dispatch_report, getf_default_nil_report, gethash_default_report,
+    handler_case_no_clauses_report, hotspot_report, identical_if_branch_report,
+    identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report,
+    if_to_unless_report, impact_report, indentation_report, inline_function, inline_lambda,
+    inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let,
+    keyword_arity_report, lambda_list_keyword_order_report, last_default_count_report, let_report,
+    license_report, line_metrics_report, lint_report, list_star_nil_report,
+    list_star_to_cons_report, literal_place_report, loop_report, macro_expansion_report,
+    macro_hygiene_report, make_array_default_keyword_report, make_hash_table_test_report,
+    make_list_default_element_report, malformed_case_clause_report, malformed_cond_clause_report,
+    malformed_iteration_spec_report, malformed_let_binding_report, manual_incf_report,
+    manual_push_report, manual_pushnew_report, merge_nested_flet, merge_nested_let,
+    merge_nested_let_star, method_combination_report, modify_macro_arity_report,
     multiple_value_list_of_values_report, naming_report, narrowing_report,
     negated_comparison_report, negated_if_report, negated_step_delta_report,
     negated_when_unless_report, nested_boolean_report, nested_char_case_report, nested_cxr_report,
@@ -74,7 +76,7 @@ use super::{
     unused_local_callable_report, unused_nickname_report, unused_package_report,
     unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
     value_propagation_report, values_list_of_list_report, verbose_negation_report,
-    workspace_report, zero_divisor_report,
+    workspace_report, writability_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -561,6 +563,8 @@ pub(super) enum InspectCommand {
     UndefinedPackages(undefined_package_report::args::UndefinedPackageReportArgs),
     /// Report whether a byte offset is code, a string, a comment, a delimiter, or reader sugar.
     ContextAt(context_report::args::ContextAtArgs),
+    /// Report whether a write to --file would succeed, without writing anything.
+    Writability(writability_report::args::WritabilityReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source
@@ -583,6 +587,10 @@ pub(super) enum EditCommand {
     Kill(KillArgs),
     /// Print the selected S-expression with the comment block written above it.
     Copy(CopyArgs),
+    /// Write a second copy of the selected S-expression immediately after it, without using the kill ring.
+    Duplicate(EditTargetArgs),
+    /// Rewrite the selected quote between its two spellings: 'x / (quote x), #'f / (function f).
+    NormalizeQuotes(NormalizeQuotesArgs),
     /// Paste a kill ring entry beside, or over, the selected S-expression.
     Yank(YankArgs),
     /// Wrap the selected S-expression in a delimiter pair, a string, or a reader prefix.
@@ -672,6 +680,10 @@ pub(super) enum RefactorCommand {
     RemoveDefinition(definition_removal::args::RemoveDefinitionArgs),
     /// Plan or remove unused top-level definitions across explicit files.
     RemoveUnusedDefinitions(definition_removal::args::RemoveUnusedDefinitionsArgs),
+    /// Replace every expression `inspect constants` proves constant with the literal it evaluates to.
+    FoldConstants(fold_constants::args::FoldConstantsArgs),
+    /// Insert (declare (ignore ...)) for every parameter `inspect unused-parameters` reports as unused.
+    AddIgnoreDeclaration(add_ignore_declaration::args::AddIgnoreDeclarationArgs),
     /// Plan or move a top-level definition between files.
     MoveDefinition(definition_movement::args::MoveDefinitionArgs),
     /// Plan or split multiple top-level definitions into another file.
@@ -807,6 +819,33 @@ pub(super) enum RefactorCommand {
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }
 
+/// Generators that produce new Common Lisp source: a `defpackage` from a
+/// file's definitions, an ASDF `defsystem` from a directory, test skeletons
+/// for untested definitions, CLOS accessors for bare slots, a `defgeneric`
+/// for an undeclared method group, and a docstring template for a
+/// definition. Common Lisp only.
+#[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit generate defpackage --file src/app.lisp\n  paredit generate defsystem . --write\n  paredit generate tests src/app.lisp --into tests/app-tests.lisp --write\n  paredit generate accessors --file src/point.lisp --name point --write\n  paredit generate defgeneric --file src/app.lisp --write\n  paredit generate docstring --file src/app.lisp --name render --write"
+)]
+pub(super) enum GenerateCommand {
+    /// Generate a `defpackage` form from a file's own definitions and
+    /// qualified symbol references.
+    Defpackage(generate_defpackage::GenerateDefpackageArgs),
+    /// Generate an ASDF `defsystem` form from a directory of Lisp sources.
+    Defsystem(generate_defsystem::GenerateDefsystemArgs),
+    /// Generate a `deftest` skeleton for every definition with no test.
+    Tests(generate_tests::GenerateTestsArgs),
+    /// Add `:accessor` to every `defclass` slot that has neither `:accessor`,
+    /// `:reader`, nor `:writer`.
+    Accessors(generate_accessors::GenerateAccessorsArgs),
+    /// Generate a `defgeneric` for a name whose `defmethod` forms have no
+    /// declaration.
+    Defgeneric(generate_defgeneric::GenerateDefgenericArgs),
+    /// Insert a docstring template at the position Common Lisp expects it.
+    Docstring(generate_docstring::GenerateDocstringArgs),
+}
+
 /// Configuration introspection. Reads `paredit.toml`; never reads source.
 #[derive(Debug, Subcommand)]
 #[command(
@@ -845,6 +884,12 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
+    /// Generators that produce new Common Lisp source from what this tool
+    /// already knows how to analyze.
+    Generate {
+        #[command(subcommand)]
+        command: GenerateCommand,
+    },
     /// Run a Language Server Protocol server over stdio.
     Lsp(crate::presentation::lsp::LspArgs),
     /// Run a Model Context Protocol server over stdio, for AI coding agents.
@@ -852,6 +897,8 @@ pub(super) enum Command {
     /// Run a resident analysis server over HTTP and JSON-RPC, sharing one
     /// parse and lint cache across calls.
     Serve(crate::presentation::serve::ServeArgs),
+    /// Interactively browse one file's tree; prints the last selected --path on exit.
+    Tui(crate::presentation::tui::TuiArgs),
     /// Print a shell completion script to stdout.
     Completions {
         /// Shell to generate a completion script for.

@@ -21,9 +21,11 @@ paredit inspect <report> [args]    # read-only inventory, validation, analysis
 paredit edit <transform> [args]    # one structural edit (stdout, --diff, or --write)
 paredit refactor <workflow> [args] # plan, preview, verify, and apply changes
 paredit config <command>           # inspect and validate the layered paredit.toml
+paredit generate <generator> [args] # generate new source: defpackage, defsystem, tests, ...
 paredit lsp                        # Language Server Protocol server over stdio
 paredit mcp                        # Model Context Protocol server over stdio (agents)
 paredit serve                      # resident analysis server over HTTP/JSON-RPC
+paredit tui <file>                 # interactively browse a file's tree; prints --path on exit
 paredit completions <shell>        # shell completion scripts (bash/zsh/fish/...)
 ```
 

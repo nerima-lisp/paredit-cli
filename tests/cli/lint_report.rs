@@ -19,6 +19,119 @@ fn cli_aggregates_findings_from_multiple_rules() {
         .stdout(predicate::str::contains("\"eql-string-comparison\""));
 }
 
+/// One unparsable file among several no longer takes the whole run down with
+/// it (Q10): the other files' findings are still reported, and the broken
+/// file is named — not silently dropped — as a `partial_failures` entry.
+#[test]
+fn cli_lint_reports_findings_from_the_files_that_parsed_despite_one_that_did_not() {
+    let dir = fresh_temp_dir("lint-report-partial-failure");
+    let good = dir.join("good.lisp");
+    fs::write(&good, "(setq x x)\n").expect("write good.lisp");
+    let broken = dir.join("broken.lisp");
+    fs::write(&broken, "(defun f (x)\n").expect("write broken.lisp");
+
+    let mut cmd = paredit();
+    let stdout = cmd
+        .arg("inspect")
+        .arg("lint")
+        .arg("--output")
+        .arg("json")
+        .arg(&good)
+        .arg(&broken)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+
+    // The finding from the file that parsed is still there.
+    assert_eq!(report["finding_count"], 1, "{report}");
+    assert!(
+        report["findings"][0]["path"]
+            .as_str()
+            .expect("path")
+            .ends_with("good.lisp"),
+        "{report}"
+    );
+
+    // The file that did not parse is named, not silently absent.
+    let failures = report["partial_failures"].as_array().expect("failures");
+    assert_eq!(failures.len(), 1, "{report}");
+    assert!(
+        failures[0]["file"]
+            .as_str()
+            .expect("file")
+            .ends_with("broken.lisp"),
+        "{report}"
+    );
+    assert!(
+        failures[0]["error"]
+            .as_str()
+            .expect("error")
+            .contains("unclosed list"),
+        "{report}"
+    );
+}
+
+/// The stderr note is unconditional: a caller reading only stdout for the
+/// report body would otherwise never learn a file was skipped.
+#[test]
+fn cli_lint_notes_a_partial_failure_on_stderr() {
+    let dir = fresh_temp_dir("lint-report-partial-failure-stderr");
+    fs::write(dir.join("good.lisp"), "(setq x x)\n").expect("write good.lisp");
+    fs::write(dir.join("broken.lisp"), "(defun f (x)\n").expect("write broken.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "1 of the requested files could not be analyzed",
+        ))
+        .stderr(predicate::str::contains("broken.lisp"));
+}
+
+/// When every file fails, there is nothing to report and the run fails
+/// outright rather than printing a report that looks clean.
+#[test]
+fn cli_lint_fails_outright_when_every_file_is_unparsable() {
+    let dir = fresh_temp_dir("lint-report-total-failure");
+    fs::write(dir.join("a.lisp"), "(defun f (x)\n").expect("write a.lisp");
+    fs::write(dir.join("b.lisp"), "(defun g (y)\n").expect("write b.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg(&dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("failed to analyze"));
+}
+
+/// Text mode reports the same partial failure as its own tab-separated line,
+/// consistent with how a `finding` line is spelled.
+#[test]
+fn cli_lint_text_reports_partial_failures_as_their_own_line() {
+    let dir = fresh_temp_dir("lint-report-partial-failure-text");
+    fs::write(dir.join("good.lisp"), "(setq x x)\n").expect("write good.lisp");
+    fs::write(dir.join("broken.lisp"), "(defun f (x)\n").expect("write broken.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg("--output")
+        .arg("text")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("failed\t"))
+        .stdout(predicate::str::contains("broken.lisp"))
+        .stdout(predicate::str::contains("unclosed list"));
+}
+
 #[test]
 fn cli_lint_expands_a_directory_argument_recursively() {
     let dir = fresh_temp_dir("lint-report-dir");
@@ -357,6 +470,28 @@ fn cli_lint_sarif_emits_a_valid_report() {
         .stdout(predicate::str::contains("\"level\": \"error\""));
 }
 
+/// SARIF mode tolerates a partial failure the same way the standard report
+/// does: the file that parsed is still reported, rather than the whole run
+/// aborting over the one that did not.
+#[test]
+fn cli_lint_sarif_reports_the_file_that_parsed_despite_one_that_did_not() {
+    let dir = fresh_temp_dir("lint-report-sarif-partial-failure");
+    fs::write(dir.join("good.lisp"), "(setq x x)\n").expect("write good.lisp");
+    fs::write(dir.join("broken.lisp"), "(defun f (x)\n").expect("write broken.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg("--sarif")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"ruleId\": \"self-assignment\""))
+        .stderr(predicate::str::contains(
+            "1 of the requested files could not be analyzed",
+        ));
+}
+
 #[test]
 fn cli_lint_sarif_respects_category_and_gate() {
     let dir = fresh_temp_dir("lint-report-sarif-gate");
@@ -428,6 +563,27 @@ fn cli_lint_github_emits_annotations() {
         .stdout(predicate::str::contains("::error file="))
         .stdout(predicate::str::contains("line=2"))
         .stdout(predicate::str::contains("self-assignment:"));
+}
+
+/// GitHub-annotation mode tolerates a partial failure too: the annotation
+/// stream still emits for the file that parsed.
+#[test]
+fn cli_lint_github_reports_the_file_that_parsed_despite_one_that_did_not() {
+    let dir = fresh_temp_dir("lint-report-github-partial-failure");
+    fs::write(dir.join("good.lisp"), "(setq x x)\n").expect("write good.lisp");
+    fs::write(dir.join("broken.lisp"), "(defun f (x)\n").expect("write broken.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("lint")
+        .arg("--github")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("self-assignment:"))
+        .stderr(predicate::str::contains(
+            "1 of the requested files could not be analyzed",
+        ));
 }
 
 #[test]

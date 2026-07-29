@@ -4,6 +4,7 @@
 #   ./scripts/bench-compare.sh                    # against origin/main
 #   ./scripts/bench-compare.sh v1.2.0             # against a tag
 #   THRESHOLD=15 ./scripts/bench-compare.sh       # allow 15% instead of 10%
+#   REPORT=bench-report.md ./scripts/bench-compare.sh   # also write a Markdown table
 #
 # ## Why back to back
 #
@@ -25,13 +26,45 @@
 # statistics; this reads the `change/estimates.json` it writes and fails when a
 # benchmark's mean regressed by more than THRESHOLD percent. An improvement is
 # reported and never fails.
+#
+# ## Why the confidence interval and not just the point estimate
+#
+# Criterion reports a mean change *and* a confidence interval for it. The point
+# estimate alone does not say whether the number means anything: +10.3% with an
+# interval spanning -5%..+25% is a measurement that could not tell the two
+# revisions apart, and failing on it reports a regression that was never
+# observed. On a shared CI runner that is the common case, not the rare one.
+#
+# So the gate fails only when the interval's *lower* bound clears the
+# threshold — when the measurement is confident the regression is at least that
+# large. A point estimate over the threshold whose interval is not is still
+# printed, marked `noisy`, because it is worth a reviewer's glance; it just is
+# not evidence.
+#
+# ## The Markdown report
+#
+# `REPORT=<path>` additionally writes every benchmark's change as a Markdown
+# table — not just the ones over THRESHOLD, so a reviewer sees the whole
+# picture rather than only what failed. It is written whether the comparison
+# passes, fails, or (see below) cannot be made at all, so CI can attach it to
+# a job summary unconditionally.
 
 set -euo pipefail
 
 baseline_ref="${1:-origin/main}"
 threshold="${THRESHOLD:-10}"
+report_path="${REPORT:-}"
 repository_root="$(git rev-parse --show-toplevel)"
 cd "$repository_root"
+
+write_missing_report() {
+  [ -n "$report_path" ] || return 0
+  {
+    printf '## Benchmark comparison: %s vs working tree\n\n' "$baseline_ref"
+    printf 'The baseline could not be benchmarked, so nothing was compared. This is not a\n'
+    printf 'verdict on the working tree — see the job log for why.\n'
+  } >"$report_path"
+}
 
 if ! git rev-parse --verify --quiet "$baseline_ref" >/dev/null; then
   printf 'bench-compare: %s is not a revision in this repository\n' "$baseline_ref" >&2
@@ -98,6 +131,7 @@ This is not a verdict on the working tree. It usually means the branch adds or
 repairs a benchmark that the baseline does not have or cannot run. Nothing was
 compared.
 MESSAGE
+  write_missing_report
   exit 0
 fi
 
@@ -105,37 +139,81 @@ printf 'bench-compare: measuring working tree\n'
 cargo bench --quiet --package paredit-cli "${bench_targets[@]}" -- --baseline bench-compare-base "${bench_args[@]}" >/dev/null
 
 printf 'bench-compare: comparing (threshold %s%%)\n' "$threshold"
-python3 - "$repository_root/target/criterion" "$threshold" <<'PYTHON'
+python3 - "$repository_root/target/criterion" "$threshold" "$baseline_ref" "$report_path" <<'PYTHON'
 import json
 import os
 import sys
 
-criterion_root, threshold = sys.argv[1], float(sys.argv[2])
-regressions, improvements, compared = [], [], 0
+criterion_root, threshold, baseline_ref, report_path = (
+    sys.argv[1],
+    float(sys.argv[2]),
+    sys.argv[3],
+    sys.argv[4],
+)
+changes = []  # (name, change_percent)
 
 for directory, _, files in os.walk(criterion_root):
     if os.path.basename(directory) != "change" or "estimates.json" not in files:
         continue
     with open(os.path.join(directory, "estimates.json")) as handle:
         estimates = json.load(handle)
+    mean = estimates["mean"]
     # Criterion reports the change as a fraction of the baseline mean.
-    change = estimates["mean"]["point_estimate"] * 100.0
+    change = mean["point_estimate"] * 100.0
+    # The interval is what makes the point estimate evidence. Fall back to the
+    # point estimate itself if a Criterion version ever stops writing one, so
+    # the gate degrades to its old behaviour rather than silently passing
+    # everything.
+    interval = mean.get("confidence_interval") or {}
+    lower = interval.get("lower_bound", mean["point_estimate"]) * 100.0
     name = os.path.relpath(os.path.dirname(directory), criterion_root)
-    compared += 1
-    if change > threshold:
-        regressions.append((name, change))
-    elif change < -threshold:
-        improvements.append((name, change))
+    changes.append((name, change, lower))
+
+compared = len(changes)
+# Over the threshold *and* measured confidently enough to say so.
+regressions = [entry for entry in changes if entry[1] > threshold and entry[2] > threshold]
+noisy = [entry for entry in changes if entry[1] > threshold and entry[2] <= threshold]
+improvements = [entry for entry in changes if entry[1] < -threshold]
+
+if report_path:
+    with open(report_path, "w") as handle:
+        handle.write(f"## Benchmark comparison: {baseline_ref} vs working tree\n\n")
+        if compared == 0:
+            handle.write("No comparable benchmarks were found.\n")
+        else:
+            handle.write("| Benchmark | Change | At least | |\n| --- | ---: | ---: | --- |\n")
+            for name, change, lower in sorted(changes, key=lambda entry: -entry[1]):
+                if change > threshold:
+                    flag = "SLOWER" if lower > threshold else "noisy"
+                elif change < -threshold:
+                    flag = "faster"
+                else:
+                    flag = ""
+                handle.write(f"| `{name}` | {change:+.1f}% | {lower:+.1f}% | {flag} |\n")
+            handle.write(
+                f"\n{compared} benchmark(s) compared, {len(regressions)} over the "
+                f"{threshold:g}% threshold, {len(noisy)} over it but within the "
+                "measurement's own noise.\n\n"
+                "\"At least\" is the lower bound of Criterion's confidence interval for "
+                "the change. A benchmark is only counted as a regression when that bound "
+                "clears the threshold too — a point estimate whose interval reaches back "
+                "below it is a measurement that could not tell the two revisions apart.\n"
+            )
 
 if compared == 0:
     print("bench-compare: no comparisons found; did both runs execute?", file=sys.stderr)
     sys.exit(2)
 
-for name, change in sorted(improvements, key=lambda entry: entry[1]):
+for name, change, _ in sorted(improvements, key=lambda entry: entry[1]):
     print(f"  faster  {change:+7.1f}%  {name}")
-for name, change in sorted(regressions, key=lambda entry: -entry[1]):
-    print(f"  SLOWER  {change:+7.1f}%  {name}")
+for name, change, lower in sorted(noisy, key=lambda entry: -entry[1]):
+    print(f"  noisy   {change:+7.1f}%  {name}  (interval reaches {lower:+.1f}%)")
+for name, change, lower in sorted(regressions, key=lambda entry: -entry[1]):
+    print(f"  SLOWER  {change:+7.1f}%  {name}  (at least {lower:+.1f}%)")
 
-print(f"bench-compare: {compared} benchmark(s) compared, {len(regressions)} over threshold")
+print(
+    f"bench-compare: {compared} benchmark(s) compared, {len(regressions)} over threshold, "
+    f"{len(noisy)} over threshold but within noise"
+)
 sys.exit(1 if regressions else 0)
 PYTHON

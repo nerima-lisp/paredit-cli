@@ -133,6 +133,7 @@ nav:
       - Agent Interface: agents.md
   - Reference:
       - Architecture: architecture.md
+      - Error Codes: errors.md
       - Integrations: integrations.md
       - Releases and Compatibility: releases.md
       - Release Checklist: releasing.md

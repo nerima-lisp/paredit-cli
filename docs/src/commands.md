@@ -87,6 +87,7 @@ discovery, impact analysis, and preflight checks.
 | `redefinitions` | Report top-level definitions of the same category and name declared more than once. |
 | `undefined-packages` | Report in-package forms naming a package no analyzed defpackage declares. |
 | `context-at` | Report what kind of text sits at a byte offset — code, a string, a comment, a list delimiter, reader sugar, or the whitespace between forms — together with the enclosing list, the nesting depth, and the stack of open delimiters. The question to ask *before* a character edit rather than after a refused one: `edit delete-forward` and `edit newline` decline every offset this reports as carrying structure, and `--fail-on-structural` turns that into an exit code. |
+| `writability` | Report whether a write to `--file` would succeed — right now, without writing anything — by staging a same-size placeholder exactly as a real write would (so a full disk fails this the same way it would fail the real write) and discarding it instead of publishing it. `--file` need not exist yet. The answer `--dry-run` cannot give: `--dry-run` refuses every write unconditionally and says nothing about whether it would have worked. |
 | `api-surface` | Report every exported symbol with the signature its export commits to — the defining category, the required and maximum arity, and the lambda list as written. `defpackage`'s `:export` is a list of names; what a caller relies on is those names *plus their shapes*, and that pairing exists nowhere in the source. An export nothing defines is reported rather than dropped: that is usually a rename that missed one side. |
 | `api-diff` | Compare the current API against a `--baseline` `api-surface` snapshot and answer the SemVer question mechanically. Breaking: an export removed, a minimum arity raised, a maximum lowered, or a defining category changed. Compatible: an export added or a range widened. `--intended-bump` fails the run when the diff requires a larger bump than the release claims. |
 | `test-map` | Pair definitions with the tests that name them, by the `test-x` / `x-test` / `x-tests` conventions, and report both sides that have no counterpart — untested definitions and tests nobody can tell what they cover. A list of tests and a list of definitions are each easy to get; neither answers the question. |
@@ -415,6 +416,8 @@ Mutating commands also accept:
 | `replace` | Replace the selected S-expression with replacement text. |
 | `kill` | Remove the selected S-expression. `--to-ring` pushes it onto the kill ring first. |
 | `copy` | Print the selected S-expression together with the own-line comment block written above it. `--to-ring` pushes it onto the kill ring. |
+| `duplicate` | Write a second copy of the selected S-expression immediately after it, carrying its own-line comment block along and following the same layout rule `yank` does — a form on its own line gets one, a form sharing a line stays inline. `copy --to-ring` then `yank --placement after` reaches the same result in two calls, at the cost of whatever was on the kill ring; this touches neither. |
+| `normalize-quotes` | Rewrite the selected quote between its two spellings — `'x` / `(quote x)` and `#'f` / `(function f)` — with `--style shorthand` (the default) or `--style longhand`. The reader expands one into the other before anything else sees it, so which a file uses is a style choice that tends to drift: a macro emitting `(quote ...)` sits beside hand-written `'...` and neither `format` nor any lint rule reconciles them, because both are correct. A form already in the requested spelling is left alone rather than refused, so this is safe to run over a whole file; a form that is not a quote at all *is* refused, because that is a selector that missed. Quasiquote and unquote are deliberately absent — `` ` ``, `,` and `,@` have no portable list spelling to normalize to. |
 | `yank` | Paste a kill ring entry `--placement before\|after\|replace` the selection. `--index` picks the entry, newest first. |
 | `wrap` | Wrap the selected S-expression. `--delimiter paren\|bracket\|brace\|doublequote` chooses the delimiter; `doublequote` produces a string literal and escapes the selection's own quotes and backslashes. `--prefix quote\|quasiquote\|unquote\|unquote-splicing\|sharp-quote` attaches reader sugar instead. |
 | `unwrap-prefix` | Remove the selected expression's outermost reader prefix, or every one of them with `--all-prefixes`. |
@@ -500,6 +503,8 @@ plan/preview/verify/apply lifecycle.
 | --- | --- |
 | `remove-definition` | Plan or remove a top-level definition from one file. |
 | `remove-unused-definitions` | Plan or remove unused top-level definitions across files. |
+| `add-ignore-declaration` | Insert `(declare (ignore …))` for every parameter `inspect unused-parameters` reports as unused. The write side that report never had: it could name the problem and nothing in the tool could fix it, so acting on it meant hand-editing every definition it listed. The declaration goes after the lambda list, past a docstring and past any declarations already there — several `declare` forms may head one body, so an existing one is followed rather than merged into. One declaration per definition names every unused parameter of it. A parameter already declared ignored never reaches this, because the report counts its appearance in the declaration as a reference. Common Lisp and Emacs Lisp only; other dialects plan nothing rather than refusing. |
+| `fold-constants` | Replace every expression `inspect constants` proves constant with the literal it evaluates to — `(+ 1 2)` becomes `3`. The write side of that report, which its own documentation already described as "the input a `fold-constants` edit would take". It takes that report's spans and reader spellings rather than folding anything itself, so the two cannot disagree. Quoted forms are safe by construction rather than by a guard: the value layer refuses to evaluate through `'` and `` ` ``, so `'(+ 1 2)` is never reported foldable and never reaches the edit. `--min-saved-bytes` folds only the profitable ones, since folding a short form to a longer string literal is a loss. |
 | `move-definition` | Plan or move a top-level definition between files. |
 | `split-file` | Plan or split multiple top-level definitions into another file. |
 | `sort-definitions` | Plan or sort contiguous top-level definition blocks in one file. |
@@ -609,4 +614,35 @@ paredit config check
 paredit config show --changed-only --output text
 paredit config show --key lint.preset
 paredit config init --dry-run
+```
+
+## Generate
+
+`paredit generate` produces new Common Lisp source from analysis this tool
+already does elsewhere, rather than transforming a form that already exists —
+the direction `edit` and `refactor` do not cover. Common Lisp only: every
+generator refuses a non-Common-Lisp dialect.
+
+| Command | Purpose |
+| --- | --- |
+| `defpackage` | Generate a `defpackage` form from a file's own definitions (export) and qualified symbol references (`:use`). |
+| `defsystem` | Generate an ASDF `defsystem` form from a directory of Lisp sources: one `(:file ...)` per source, `:depends-on` inferred from packages used but not defined in the directory. |
+| `tests` | Generate a `deftest` skeleton for every definition `inspect test-map` reports as untested. |
+| `accessors` | Add `:accessor` to every `defclass` slot that has neither `:accessor`, `:reader`, nor `:writer`. |
+| `defgeneric` | Generate a `defgeneric` for a name whose `defmethod` forms have no declaration, from the methods' congruent required arity. |
+| `docstring` | Insert a docstring template at the position Common Lisp expects it: after the lambda list, at the fixed value slot, before a `defstruct`'s slots, or as a `(:documentation ...)` option. |
+
+`defpackage`, `defgeneric`, `accessors`, and `docstring` print a plan by
+default; `--write` applies it to `--file` and `--diff` previews it as a
+unified diff. `defsystem` and `tests` operate on a directory or a list of
+files and write with `--write` to `<directory>/<name>.asd` or `--into <FILE>`
+respectively.
+
+```sh
+paredit generate defpackage --file src/app.lisp --write
+paredit generate defsystem . --write
+paredit generate tests src/app.lisp --into tests/app-tests.lisp --write
+paredit generate accessors --file src/point.lisp --select name:point --write
+paredit generate defgeneric --file src/app.lisp --write
+paredit generate docstring --file src/app.lisp --select name:render --write
 ```

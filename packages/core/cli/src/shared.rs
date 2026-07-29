@@ -23,13 +23,14 @@ mod io;
 #[path = "macos_acl.rs"]
 mod macos_acl;
 
-pub use diff::unified_diff;
+pub use diff::{DiffStat, diff_stat, unified_diff};
 pub use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored};
 pub use io::{
-    ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, parse_document, read_file_or_empty,
-    read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_expected_target,
-    read_text_file_with_limit, read_text_with_limit, write_artifact_with_rollback,
-    write_file_with_rollback, write_files_with_rollback, write_files_with_rollback_expected,
+    ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, WritabilityCheck, check_deadline_for_read,
+    check_writable, parse_document, read_file_or_empty, read_input_and_dialect,
+    read_input_dialect_and_tree, read_text_file_with_expected_target, read_text_file_with_limit,
+    read_text_with_limit, write_artifact_with_rollback, write_file_with_rollback,
+    write_files_with_rollback, write_files_with_rollback_expected,
 };
 
 pub const fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {
@@ -372,6 +373,12 @@ pub fn edit_target_with(
 /// Print the rewritten document to stdout, or with `write` persist it back to
 /// the source file after confirming the result reparses with the input dialect.
 /// With `diff`, stdout carries a unified diff instead of the whole document.
+///
+/// The rewrite always arrives with bare `\n` line endings — a whole-document
+/// reformat has no other line ending to work from — so a CRLF-authored input
+/// is restored to CRLF here, once, rather than in every command that produces
+/// one. Without this, `format --diff` on a CRLF file would show every line as
+/// changed, and `--write` would silently convert the file's line endings.
 pub fn emit_document(
     input: &SourceInput,
     dialect: Dialect,
@@ -379,24 +386,137 @@ pub fn emit_document(
     diff: bool,
     rewritten: String,
 ) -> CliResult<()> {
+    let rewritten = restore_line_ending(&input.text, rewritten, dialect);
     if write {
         let path = require_output_file(input.file.as_ref())?.clone();
         SyntaxTree::parse_with_dialect(&rewritten, dialect)
             .map_err(|_| IoRefusal::RewriteDoesNotReparse)?;
         if diff {
-            print!("{}", unified_diff(&path, &input.text, &rewritten));
+            print!(
+                "{}",
+                crate::color::colorize_diff(
+                    crate::color::Painter::stdout(),
+                    &unified_diff(&path, &input.text, &rewritten)
+                )
+            );
         }
         return write_file_with_rollback(path, rewritten);
     }
 
     if diff {
         let path = input.file.clone().unwrap_or_else(|| PathBuf::from("stdin"));
-        print!("{}", unified_diff(&path, &input.text, &rewritten));
+        print!(
+            "{}",
+            crate::color::colorize_diff(
+                crate::color::Painter::stdout(),
+                &unified_diff(&path, &input.text, &rewritten)
+            )
+        );
         return Ok(());
     }
 
     print!("{rewritten}");
     Ok(())
+}
+
+/// Re-applies `original`'s line ending to `rewritten` when `original` is
+/// CRLF-dominant.
+///
+/// Normalizes any `\r\n` already in `rewritten` back to a bare `\n` first, so
+/// this is safe to call on a rewrite that already preserved CRLF in an
+/// untouched region (a targeted edit's output) as well as one that has none
+/// at all (a whole-document reformat) — either way the result ends up with
+/// exactly one line ending throughout, matching `original`.
+///
+/// Only newlines *outside* every atom are touched. A newline inside an atom is
+/// not a line ending at all, it is program data — the `\n` in a multi-line
+/// string literal, or the newline that *is* the character in Common Lisp's
+/// `#\<newline>` — and a whole-document substitution turns it into `\r\n`,
+/// silently changing what the program means. Atom text is copied verbatim from
+/// the source by every rewrite, so a CRLF file's multi-line atoms already carry
+/// `\r\n` and need nothing done to them; leaving them alone is both the safe
+/// choice and the correct one.
+///
+/// A rewrite that no longer parses is returned untouched: the write path
+/// refuses it a few lines below anyway, and guessing at line endings in text
+/// whose structure is unknown is exactly how the data above gets corrupted.
+fn restore_line_ending(original: &str, rewritten: String, dialect: Dialect) -> String {
+    if !rewritten.contains('\n') || !prefers_crlf(original) {
+        return rewritten;
+    }
+    let Ok(tree) = SyntaxTree::parse_with_dialect(&rewritten, dialect) else {
+        return rewritten;
+    };
+    let mut atoms = Vec::new();
+    collect_atom_spans(&tree.root_view(), &mut atoms);
+    atoms.sort_by_key(ByteSpan::start);
+
+    let mut restored = String::with_capacity(rewritten.len());
+    let mut cursor = 0usize;
+    for atom in atoms {
+        let (start, end) = (atom.start().get(), atom.end().get());
+        if start < cursor {
+            continue;
+        }
+        push_crlf_line_endings(&mut restored, &rewritten[cursor..start]);
+        restored.push_str(&rewritten[start..end]);
+        cursor = end;
+    }
+    push_crlf_line_endings(&mut restored, &rewritten[cursor..]);
+    restored
+}
+
+/// Collects every atom's content span (its text past any reader prefix), in
+/// document order for a well-formed tree.
+fn collect_atom_spans(view: &ExpressionView, spans: &mut Vec<ByteSpan>) {
+    if view.kind == ExpressionKind::Atom {
+        spans.push(view.content_span);
+    }
+    for child in &view.children {
+        collect_atom_spans(child, spans);
+    }
+}
+
+/// Appends `segment` with every line ending rewritten to `\r\n`, whichever of
+/// the two it arrived as.
+fn push_crlf_line_endings(out: &mut String, segment: &str) {
+    let bytes = segment.as_bytes();
+    let mut start = 0usize;
+    for (index, &byte) in bytes.iter().enumerate() {
+        if byte != b'\n' {
+            continue;
+        }
+        let end = if index > 0 && bytes[index - 1] == b'\r' {
+            index - 1
+        } else {
+            index
+        };
+        out.push_str(&segment[start..end]);
+        out.push_str("\r\n");
+        start = index + 1;
+    }
+    out.push_str(&segment[start..]);
+}
+
+/// Whether `text` uses `\r\n` line endings more often than a bare `\n`.
+///
+/// Strictly more, not merely as often: a file with no clear majority is left
+/// exactly as the rewrite produced it rather than guessed at.
+fn prefers_crlf(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut crlf = 0usize;
+    let mut lone_lf = 0usize;
+    for (index, &byte) in bytes.iter().enumerate() {
+        if byte != b'\n' {
+            continue;
+        }
+        if index > 0 && bytes[index - 1] == b'\r' {
+            crlf += 1;
+        } else {
+            lone_lf += 1;
+        }
+    }
+    crlf > lone_lf
 }
 
 pub fn resolve_target<'a>(
@@ -490,6 +610,41 @@ pub fn expand_input_files(
     Ok(expanded)
 }
 
+/// One file `analyze_files` could not produce a result for, and why.
+#[derive(Debug, Clone)]
+pub struct FileFailure {
+    pub file: PathBuf,
+    /// The failure's message chain, flattened the way `anyhow`'s `{:#}`
+    /// flattens it — the same rendering a top-level command failure gets.
+    pub message: String,
+}
+
+/// The result of analyzing a list of files: what succeeded, and what did not.
+///
+/// Never itself an error. A file that fails to read or parse is data a
+/// report can act on — "N of M files analyzed cleanly" — not a reason to
+/// discard every other file's result, which is what returning
+/// `anyhow::Result<Vec<T>>` used to do: one bad file among a thousand good
+/// ones threw the whole run away and told the caller nothing about the other
+/// 999. Both fields preserve the input order of the files they came from.
+#[derive(Debug)]
+pub struct FileAnalysis<T> {
+    pub succeeded: Vec<T>,
+    pub failed: Vec<FileFailure>,
+}
+
+impl<T> FileAnalysis<T> {
+    /// Whether nothing could be analyzed at all.
+    ///
+    /// The one case a caller cannot report around: if every file failed,
+    /// there is no partial result to show, and the run should fail loudly
+    /// rather than print an empty report that looks like a clean one.
+    #[must_use]
+    pub fn is_total_failure(&self) -> bool {
+        self.succeeded.is_empty() && !self.failed.is_empty()
+    }
+}
+
 /// Reads, parses, and analyzes a list of files, using every available core.
 ///
 /// The shape every multi-file report in this tool has is
@@ -503,10 +658,11 @@ pub fn expand_input_files(
 ///   which thread finished first, so the report's bytes do not depend on
 ///   scheduling. That is the same-input-same-output contract, and it is the
 ///   reason the results are collected into pre-indexed slots rather than
-///   pushed as they arrive.
-/// - **The first failure by input order wins.** A run over ten files where
-///   files 2 and 7 both fail must report file 2, every time — not whichever
-///   thread lost the race.
+///   pushed as they arrive. [`FileAnalysis::succeeded`] and
+///   [`FileAnalysis::failed`] each keep that ordering independently.
+/// - **Every failure is kept, not only the first.** A run over ten files
+///   where files 2 and 7 both fail reports both, every time — not whichever
+///   thread lost the race, and not only the earliest by input order.
 /// - **One worker is the serial path.** With `--jobs 1`, or a list short
 ///   enough not to be worth a thread, no thread is spawned at all. A caller
 ///   debugging a panic gets the original stack.
@@ -521,54 +677,67 @@ pub fn analyze_files<T, F>(
     files: &[PathBuf],
     dialect: Option<DialectArg>,
     analyze: F,
-) -> anyhow::Result<Vec<T>>
+) -> FileAnalysis<T>
 where
     T: Send,
     F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> anyhow::Result<T> + Sync,
 {
     let workers = worker_count(files.len());
-    if workers <= 1 {
-        return files
+    let results: Vec<anyhow::Result<T>> = if workers <= 1 {
+        files
             .iter()
             .map(|file| analyze_one(file, dialect, &analyze))
-            .collect();
-    }
+            .collect()
+    } else {
+        // Static partition into contiguous chunks. A work-stealing queue would
+        // balance an uneven file-size distribution better; it would also need a
+        // dependency, a mutex on the hot path, and a reason to believe the
+        // imbalance costs more than the contention. Contiguous chunks of a
+        // sorted file list are close to even in practice, and each worker
+        // writes only its own slice — which is what makes the whole thing
+        // sound without a lock.
+        let mut results = files
+            .iter()
+            .map(|_| None::<anyhow::Result<T>>)
+            .collect::<Vec<_>>();
+        let per_worker = files.len().div_ceil(workers);
+        let analyze = &analyze;
 
-    // Static partition into contiguous chunks. A work-stealing queue would
-    // balance an uneven file-size distribution better; it would also need a
-    // dependency, a mutex on the hot path, and a reason to believe the
-    // imbalance costs more than the contention. Contiguous chunks of a sorted
-    // file list are close to even in practice, and each worker writes only its
-    // own slice — which is what makes the whole thing sound without a lock.
-    let mut results = files
-        .iter()
-        .map(|_| None::<anyhow::Result<T>>)
-        .collect::<Vec<_>>();
-    let per_worker = files.len().div_ceil(workers);
-    let analyze = &analyze;
-
-    std::thread::scope(|scope| {
-        for (chunk_index, slots) in results.chunks_mut(per_worker).enumerate() {
-            let start = chunk_index * per_worker;
-            scope.spawn(move || {
-                for (offset, slot) in slots.iter_mut().enumerate() {
-                    // `files` is borrowed immutably by every worker; the
-                    // mutable half is the disjoint slice each one owns.
-                    if let Some(file) = files.get(start + offset) {
-                        *slot = Some(analyze_one(file, dialect, analyze));
+        std::thread::scope(|scope| {
+            for (chunk_index, slots) in results.chunks_mut(per_worker).enumerate() {
+                let start = chunk_index * per_worker;
+                scope.spawn(move || {
+                    for (offset, slot) in slots.iter_mut().enumerate() {
+                        // `files` is borrowed immutably by every worker; the
+                        // mutable half is the disjoint slice each one owns.
+                        if let Some(file) = files.get(start + offset) {
+                            *slot = Some(analyze_one(file, dialect, analyze));
+                        }
                     }
-                }
-            });
-        }
-    });
+                });
+            }
+        });
 
-    // Collected in input order, so the report's bytes do not depend on which
-    // worker finished first, and the first failure by input order is the one
-    // reported.
-    results
-        .into_iter()
-        .map(|slot| slot.expect("every slot is filled before the scope ends"))
-        .collect()
+        results
+            .into_iter()
+            .map(|slot| slot.expect("every slot is filled before the scope ends"))
+            .collect()
+    };
+
+    let mut analysis = FileAnalysis {
+        succeeded: Vec::with_capacity(results.len()),
+        failed: Vec::new(),
+    };
+    for (file, result) in files.iter().zip(results) {
+        match result {
+            Ok(value) => analysis.succeeded.push(value),
+            Err(error) => analysis.failed.push(FileFailure {
+                file: file.clone(),
+                message: format!("{error:#}"),
+            }),
+        }
+    }
+    analysis
 }
 
 fn analyze_one<T, F>(file: &PathBuf, dialect: Option<DialectArg>, analyze: &F) -> anyhow::Result<T>
@@ -626,12 +795,186 @@ fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, p
 
 #[cfg(test)]
 mod tests {
-    use super::{require_output_file, terminal_safe, terminal_safe_error_chain};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::{
+        Dialect, PathBuf, analyze_files, prefers_crlf, require_output_file, restore_line_ending,
+        terminal_safe, terminal_safe_error_chain,
+    };
+
+    fn restore(original: &str, rewritten: &str) -> String {
+        restore_line_ending(original, rewritten.to_owned(), Dialect::CommonLisp)
+    }
+
+    static TEST_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// A file under a fresh temp directory, so parallel test binaries never
+    /// collide.
+    fn test_file(name: &str, content: &str) -> PathBuf {
+        let directory = std::env::temp_dir().join(format!(
+            "paredit-cli-shared-{name}-{}-{}",
+            std::process::id(),
+            TEST_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&directory).expect("create test directory");
+        let path = directory.join(format!("{name}.lisp"));
+        std::fs::write(&path, content).expect("write test file");
+        path
+    }
+
+    #[test]
+    fn analyze_files_partitions_successes_and_failures_by_input_order() {
+        let files = vec![
+            test_file("a", "(defun a () 1)"),
+            test_file("b", "(defun b (\n"), // unclosed: fails
+            test_file("c", "(defun c () 3)"),
+        ];
+
+        let analysis = analyze_files(&files, None, |file, _dialect, _tree, _input| {
+            Ok(file.file_stem().unwrap().to_string_lossy().into_owned())
+        });
+
+        assert!(!analysis.is_total_failure());
+        assert_eq!(analysis.succeeded, vec!["a".to_owned(), "c".to_owned()]);
+        assert_eq!(analysis.failed.len(), 1);
+        assert_eq!(analysis.failed[0].file, files[1]);
+        assert!(
+            analysis.failed[0].message.contains("unclosed list"),
+            "{}",
+            analysis.failed[0].message
+        );
+    }
+
+    #[test]
+    fn analyze_files_reports_every_failure_not_only_the_first() {
+        let files = vec![
+            test_file("first-broken", "(defun a (\n"),
+            test_file("clean", "(defun b () 2)"),
+            test_file("second-broken", "(defun c (\n"),
+        ];
+
+        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| Ok(()));
+
+        assert_eq!(analysis.succeeded, vec![()]);
+        assert_eq!(analysis.failed.len(), 2);
+        assert_eq!(analysis.failed[0].file, files[0]);
+        assert_eq!(analysis.failed[1].file, files[2]);
+    }
+
+    #[test]
+    fn analyze_files_is_a_total_failure_only_when_nothing_succeeded() {
+        let all_broken = vec![
+            test_file("total-a", "(defun a (\n"),
+            test_file("total-b", "(defun b (\n"),
+        ];
+        let analysis = analyze_files(&all_broken, None, |_file, _dialect, _tree, _input| Ok(()));
+        assert!(analysis.is_total_failure());
+
+        let all_clean = vec![test_file("clean-only", "(defun a () 1)")];
+        let analysis = analyze_files(&all_clean, None, |_file, _dialect, _tree, _input| Ok(()));
+        assert!(!analysis.is_total_failure());
+
+        let empty: Vec<PathBuf> = Vec::new();
+        let analysis = analyze_files(&empty, None, |_file, _dialect, _tree, _input| Ok(()));
+        assert!(!analysis.is_total_failure());
+    }
+
+    /// The same partitioning holds on the parallel path — the worker
+    /// threshold is small enough to exercise from a unit test without a
+    /// slow fixture.
+    #[test]
+    fn analyze_files_partitions_correctly_on_the_parallel_path() {
+        let files: Vec<PathBuf> = (0..10)
+            .map(|index| {
+                if index == 4 {
+                    test_file(&format!("parallel-broken-{index}"), "(defun f (\n")
+                } else {
+                    test_file(&format!("parallel-ok-{index}"), "(defun f () 1)")
+                }
+            })
+            .collect();
+
+        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| Ok(()));
+
+        assert_eq!(analysis.succeeded.len(), 9);
+        assert_eq!(analysis.failed.len(), 1);
+        assert_eq!(analysis.failed[0].file, files[4]);
+    }
 
     #[test]
     fn require_output_file_rejects_missing_file() {
         let error = require_output_file(None).unwrap_err();
         assert_eq!(error.to_string(), "--write requires --file");
+    }
+
+    #[test]
+    fn a_crlf_majority_is_detected_even_with_one_stray_lf() {
+        assert!(prefers_crlf("(a)\r\n(b)\r\n(c)\n"));
+    }
+
+    #[test]
+    fn a_pure_lf_document_does_not_prefer_crlf() {
+        assert!(!prefers_crlf("(a)\n(b)\n"));
+    }
+
+    #[test]
+    fn a_tie_does_not_prefer_crlf() {
+        assert!(!prefers_crlf("(a)\r\n(b)\n"));
+    }
+
+    #[test]
+    fn a_single_line_document_has_no_preference() {
+        assert!(!prefers_crlf("(a)"));
+    }
+
+    #[test]
+    fn restore_line_ending_converts_a_bare_lf_rewrite_back_to_crlf() {
+        assert_eq!(restore("(a)\r\n(b)\r\n", "(a)\n(b)\n"), "(a)\r\n(b)\r\n");
+    }
+
+    #[test]
+    fn restore_line_ending_does_not_double_convert_an_already_crlf_rewrite() {
+        // A targeted edit's rewrite can already carry CRLF in an untouched
+        // region; restore_line_ending must not turn that into `\r\r\n`.
+        assert_eq!(
+            restore("(a)\r\n(b)\r\n", "(a)\r\n(new)\n"),
+            "(a)\r\n(new)\r\n"
+        );
+    }
+
+    #[test]
+    fn restore_line_ending_leaves_an_lf_document_untouched() {
+        let rewritten = "(a)\n(c)\n";
+        assert_eq!(restore("(a)\n(b)\n", rewritten), rewritten);
+    }
+
+    #[test]
+    fn restore_line_ending_leaves_a_newline_inside_a_string_literal_alone() {
+        // The `\n` between `one` and `two` is the string's own content, not a
+        // line ending: turning it into `\r\n` changes the value the program
+        // computes. Only the two real line endings may be converted.
+        let original = "(defun f ()\r\n  \"line one\nline two\")\r\n";
+        assert_eq!(
+            restore(original, "(defun f ()\n  \"line one\nline two\")\n"),
+            "(defun f ()\r\n  \"line one\nline two\")\r\n"
+        );
+    }
+
+    #[test]
+    fn restore_line_ending_leaves_a_newline_character_literal_alone() {
+        // `#\` followed by a newline byte *is* the newline character in Common
+        // Lisp; rewriting it to `\r\n` makes it the return character instead.
+        let original = "(list #\\\n 1)\r\n(b)\r\n";
+        assert_eq!(
+            restore(original, "(list #\\\n 1)\n(b)\n"),
+            "(list #\\\n 1)\r\n(b)\r\n"
+        );
+    }
+
+    #[test]
+    fn restore_line_ending_returns_an_unparseable_rewrite_untouched() {
+        let rewritten = "(a\n";
+        assert_eq!(restore("(a)\r\n(b)\r\n", rewritten), rewritten);
     }
 
     #[test]

@@ -77,31 +77,48 @@ fn a_short_file_list_is_analysed_below_the_parallel_threshold() {
     );
 }
 
-/// A failure must be reported by *input order*, not by whichever worker lost
-/// the race — otherwise the same tree produces different errors on different
-/// runs, and a caller cannot act on either.
+/// Every failing file is reported, not only whichever worker lost the race
+/// to finish first — otherwise the same tree produces a different set of
+/// reported failures on different runs, and a caller cannot act on either.
+/// (Section Q10: a broken file among many no longer takes the whole run
+/// down with it, so both broken files are named on stderr and the 38 good
+/// files' findings are still in the JSON report — at every worker count.)
 #[test]
-fn the_first_failing_file_by_input_order_is_the_one_reported() {
+fn every_failing_file_is_reported_regardless_of_worker_count() {
     let dir = workspace("parallel-error-order", 40);
-    // Two unparseable files. The earlier one must always be named.
+    // Two unparseable files among 40. Both must always be named.
     fs::write(dir.join("file005.lisp"), "(defun broken (x)\n").expect("write source");
     fs::write(dir.join("file030.lisp"), "(defun also-broken (x)\n").expect("write source");
 
     for jobs in ["1", "2", "8", "0"] {
-        let output = paredit()
+        let mut command = paredit();
+        let assertion = command
             .args(["inspect", "lint"])
             .arg(&dir)
             .args(["--jobs", jobs, "--output", "json"])
             .assert()
-            .failure()
-            .get_output()
-            .stderr
-            .clone();
-        let stderr = String::from_utf8_lossy(&output);
+            .success();
+        let stderr = String::from_utf8_lossy(&assertion.get_output().stderr).into_owned();
+        let report: serde_json::Value =
+            serde_json::from_slice(&assertion.get_output().stdout).expect("report is JSON");
 
         assert!(
-            stderr.contains("file005.lisp"),
-            "--jobs {jobs} reported {stderr} rather than the first failing file"
+            stderr.contains("file005.lisp") && stderr.contains("file030.lisp"),
+            "--jobs {jobs} reported {stderr} rather than both failing files"
+        );
+        let failed_paths: Vec<&str> = report["partial_failures"]
+            .as_array()
+            .expect("partial_failures")
+            .iter()
+            .map(|failure| failure["file"].as_str().expect("file"))
+            .collect();
+        assert_eq!(failed_paths.len(), 2, "--jobs {jobs}: {failed_paths:?}");
+        // The 38 other files still parsed, and each still trips both
+        // redundant-progn and one-armed-if.
+        assert_eq!(
+            report["finding_count"].as_u64(),
+            Some(76),
+            "--jobs {jobs}: {report}"
         );
     }
 }

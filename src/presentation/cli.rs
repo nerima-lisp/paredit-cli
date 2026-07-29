@@ -4,6 +4,7 @@ macro_rules! safe_text {
     };
 }
 
+mod add_ignore_declaration;
 mod analysis_report;
 mod argv;
 mod basic_edit;
@@ -37,6 +38,12 @@ use paredit_feature_form_transform::replace_forms::cli as replace_forms;
 use paredit_feature_form_transform::thread_expression::cli as thread_expression;
 use paredit_feature_form_transform::unthread_expression::cli as unthread_expression;
 use paredit_feature_form_transform::unwrap_call::cli as unwrap_call;
+use paredit_feature_generate::generate_accessors::cli as generate_accessors;
+use paredit_feature_generate::generate_defgeneric::cli as generate_defgeneric;
+use paredit_feature_generate::generate_defpackage::cli as generate_defpackage;
+use paredit_feature_generate::generate_defsystem::cli as generate_defsystem;
+use paredit_feature_generate::generate_docstring::cli as generate_docstring;
+use paredit_feature_generate::generate_tests::cli as generate_tests;
 use paredit_feature_inline::inline_function::cli as inline_function;
 use paredit_feature_inline::inline_lambda::cli as inline_lambda;
 use paredit_feature_inline::inline_let::cli as inline_let;
@@ -68,6 +75,7 @@ use paredit_feature_project_inventory::unreachable_expression_report::cli as unr
 use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
+use paredit_feature_semantic_report::fold_constants::cli as fold_constants;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
 use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;
@@ -85,6 +93,7 @@ mod lint_report;
 mod shadowed_binding_report;
 mod symbol_report;
 mod unused_parameter_report;
+mod writability_report;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -114,6 +123,32 @@ struct Cli {
     /// operations long enough that silence looks like a hang.
     #[arg(long, global = true)]
     progress: bool,
+    /// Whether text output may use ANSI color. `auto` follows the
+    /// destination terminal and `NO_COLOR`/`CLICOLOR_FORCE`.
+    #[arg(long, global = true, value_enum)]
+    color: Option<paredit_core_cli::color::ColorMode>,
+    /// Delegate stdout to `$PAGER` (falling back to `less`) when it is a
+    /// terminal. Never on by default: unlike `--color`, this changes the
+    /// interaction itself.
+    #[arg(long, global = true)]
+    paginate: bool,
+    /// Permission bits a brand-new file is created with, octal without a
+    /// leading 0 (for example 644). Unix only; the built-in default is 600.
+    #[arg(long, global = true, value_name = "MODE")]
+    new_file_mode: Option<String>,
+    /// Refuse a write whose parent directory climbs through a symlink above
+    /// its immediate parent (which is refused unconditionally already). Off
+    /// by default: `/tmp` is a symlink to `/private/tmp` on macOS, and this
+    /// would refuse writes there along with any similar stable redirection.
+    #[arg(long, global = true)]
+    refuse_symlinked_ancestors: bool,
+    /// Declared encoding of source files this run reads (shift_jis, euc-jp,
+    /// iso-8859-1, windows-1252, utf-8, ...); a WHATWG label, case
+    /// insensitive. Only utf-8 (the default) supports --write: a write under
+    /// any other declared encoding is refused rather than silently
+    /// re-encoded.
+    #[arg(long, global = true, value_name = "LABEL")]
+    encoding: Option<String>,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -173,12 +208,34 @@ pub fn run() -> ExitCode {
         Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
         Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
         Command::Serve(args) => return crate::presentation::serve::serve(args),
+        Command::Tui(args) => return crate::presentation::tui::tui(args),
         command => command,
     };
-    match dispatch::dispatch(command) {
+
+    #[cfg(unix)]
+    let pager = paredit_core_cli::pager::maybe_start();
+    let exit_code = match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_failure(&error, &invocation),
+    };
+    #[cfg(unix)]
+    if let Some(pager) = pager {
+        pager.finish();
     }
+    exit_code
+}
+
+/// Parses `--new-file-mode`'s value: octal permission bits, `chmod`-style
+/// (no `0o` prefix required, though it is accepted), bounded to the
+/// `rwxrwxrwx` range so the flag cannot hand out setuid/setgid/sticky bits on
+/// a plain file by typing one digit too many.
+fn parse_new_file_mode(value: &str) -> Result<u32, &'static str> {
+    let digits = value.strip_prefix("0o").unwrap_or(value);
+    let mode = u32::from_str_radix(digits, 8).map_err(|_| "not an octal number")?;
+    if mode > 0o777 {
+        return Err("must be within 000-777");
+    }
+    Ok(mode)
 }
 
 /// Whether this run may not write.
@@ -263,25 +320,32 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
             serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
         );
     } else {
+        let painter = paredit_core_cli::color::Painter::stderr();
         eprintln!(
             "{} [{}]: {}",
-            messages::say(messages::Message::ErrorPrefix),
+            painter.red(messages::say(messages::Message::ErrorPrefix)),
             diagnosis.code,
             terminal_safe_error_chain(error)
         );
+        // Best-effort: the file may have moved or changed since the failure,
+        // in which case there is nothing to point a caret at and this simply
+        // prints no excerpt rather than a wrong one.
+        if let Some(caret) = caret_for_failure(&diagnosis, context.file.as_deref()) {
+            eprintln!("{caret}");
+        }
         for repair in &diagnosis.repairs {
             match &repair.command {
                 Some(command) => {
                     eprintln!(
                         "  {}: {} — {}",
-                        messages::say(messages::Message::RepairPrefix),
+                        painter.cyan(messages::say(messages::Message::RepairPrefix)),
                         repair.detail(),
                         terminal_safe(command)
                     );
                 }
                 None => eprintln!(
                     "  {}: {}",
-                    messages::say(messages::Message::RepairPrefix),
+                    painter.cyan(messages::say(messages::Message::RepairPrefix)),
                     repair.detail()
                 ),
             }
@@ -289,6 +353,50 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
     }
 
     ExitCode::from(diagnosis.code.exit_code())
+}
+
+/// The caret excerpt for a failure, when it named a byte position and a file
+/// to read it from.
+///
+/// Re-reads the file rather than reusing whatever the command already had in
+/// memory: by the time a failure is reported, that buffer is gone, and a
+/// second read is the same trade the rest of the repair suggestions already
+/// make (`RepairRereadFile` and friends). A read that fails - the file moved,
+/// permissions changed - is silently swallowed: the error already printed is
+/// the operative one, and a second, unrelated I/O failure here would only
+/// obscure it.
+fn caret_for_failure(diagnosis: &diagnosis::Diagnosis, file: Option<&str>) -> Option<String> {
+    let offset = diagnosis.offset?;
+    let source = std::fs::read_to_string(file?).ok()?;
+    diagnosis::render_caret(&source, offset)
+}
+
+/// Prints a warning — the run continues, but not quite as asked — in the
+/// format this invocation was already going to be read in.
+///
+/// Mirrors [`report_failure`]'s JSON/text split for the same reason: a
+/// caller that asked for `--output json` should not have to fall back to
+/// parsing English stderr to learn a configuration file was ignored. Text
+/// mode is unchanged from before this existed - `"Warning: {message}"` on
+/// stderr - so this only adds a reading, never removes one.
+fn report_warning(message: &str, argv: &[String]) {
+    use clap::CommandFactory;
+
+    let root = Cli::command();
+    if argv::effective_output_format(argv, &root).as_deref() == Some("json") {
+        let envelope = json!({
+            "schema_version": 1,
+            "status": "warning",
+            "command": argv::resolve_leaf(argv, &root).map(|(_, path)| path),
+            "warning": { "message": terminal_safe(message).to_string() },
+        });
+        eprintln!(
+            "{}",
+            serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
+        );
+    } else {
+        eprintln!("Warning: {}", terminal_safe(message));
+    }
 }
 
 /// Reads the configuration, installs what acts below the argument layer, and
@@ -306,10 +414,13 @@ fn bootstrap() -> Cli {
     let loaded = match config::workflow::load(&config::args::ConfigLocationArgs::default()) {
         Ok(loaded) => loaded,
         Err(error) => {
-            eprintln!(
-                "Warning: {}: {}",
-                messages::say(messages::Message::ConfigIgnored),
-                terminal_safe_error_chain(&error)
+            report_warning(
+                &format!(
+                    "{}: {:#}",
+                    messages::say(messages::Message::ConfigIgnored),
+                    error
+                ),
+                &argv,
             );
             return Cli::parse_from(argv);
         }
@@ -319,16 +430,43 @@ fn bootstrap() -> Cli {
     let raw: Vec<String> = std::env::args().collect();
     runtime.dry_run = is_dry_run(&raw);
     runtime.progress = raw.iter().any(|token| token == "--progress");
+    runtime.paginate = raw.iter().any(|token| token == "--paginate");
+    if let Some(mode) = argv::long_flag_value(&raw, "color")
+        .as_deref()
+        .and_then(paredit_core_cli::color::ColorMode::from_label)
+    {
+        runtime.color = mode;
+    }
+    runtime.new_file_mode = match argv::long_flag_value(&raw, "new-file-mode") {
+        Some(value) => match parse_new_file_mode(&value) {
+            Ok(mode) => Some(mode),
+            Err(reason) => {
+                eprintln!("Error: --new-file-mode {value}: {reason}");
+                std::process::exit(2);
+            }
+        },
+        None => None,
+    };
+    runtime.refuse_symlinked_ancestors = raw
+        .iter()
+        .any(|token| token == "--refuse-symlinked-ancestors");
+    runtime.source_encoding = match argv::long_flag_value(&raw, "encoding") {
+        Some(value) => match paredit_core_cli::runtime::parse_source_encoding(&value) {
+            Ok(encoding) => Some(encoding),
+            Err(label) => {
+                eprintln!("Error: --encoding {label}: unrecognized encoding label");
+                std::process::exit(2);
+            }
+        },
+        None => None,
+    };
     paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file
     // that `config check` would reject turns a fixable diagnostic into a
     // baffling error about flags the caller never typed.
     if loaded.has_errors() {
-        eprintln!(
-            "Warning: {}",
-            messages::say(messages::Message::ConfigHasErrors)
-        );
+        report_warning(messages::say(messages::Message::ConfigHasErrors), &argv);
         return Cli::parse_from(argv);
     }
 
@@ -350,9 +488,12 @@ fn bootstrap() -> Cli {
                 .map(|injection| injection.key)
                 .collect::<Vec<_>>()
                 .join(", ");
-            eprintln!(
-                "Warning: {}: {dropped}",
-                messages::say(messages::Message::ConfigKeysNotApplied)
+            report_warning(
+                &format!(
+                    "{}: {dropped}",
+                    messages::say(messages::Message::ConfigKeysNotApplied)
+                ),
+                &argv,
             );
             Cli::parse_from(argv)
         }
@@ -586,7 +727,7 @@ use paredit_feature_rename::rename_control::cli as rename_control;
 
 #[cfg(test)]
 mod tests {
-    use super::terminal_safe_error_chain;
+    use super::{parse_new_file_mode, terminal_safe_error_chain};
 
     #[test]
     fn cli_error_diagnostic_escapes_untrusted_controls() {
@@ -596,5 +737,21 @@ mod tests {
             format!("Error: {}", terminal_safe_error_chain(&error)),
             "Error: open failed: bad\\u{a}path\\u{9}\\u{1b}[31m\\u{202e}"
         );
+    }
+
+    #[test]
+    fn new_file_mode_accepts_chmod_style_octal() {
+        assert_eq!(parse_new_file_mode("600"), Ok(0o600));
+        assert_eq!(parse_new_file_mode("644"), Ok(0o644));
+        assert_eq!(parse_new_file_mode("0o640"), Ok(0o640));
+        assert_eq!(parse_new_file_mode("000"), Ok(0));
+    }
+
+    #[test]
+    fn new_file_mode_rejects_non_octal_and_out_of_range_values() {
+        assert!(parse_new_file_mode("999").is_err());
+        assert!(parse_new_file_mode("not-a-number").is_err());
+        // 1000 (octal) sets a bit above rwxrwxrwx (the sticky bit).
+        assert!(parse_new_file_mode("1000").is_err());
     }
 }

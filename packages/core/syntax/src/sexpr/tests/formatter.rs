@@ -854,3 +854,78 @@ fn clojure_layouts_do_not_leak_into_other_dialects() {
         )
     );
 }
+
+#[test]
+fn with_max_width_narrows_the_inline_fit_threshold() {
+    // A plain call (`ListStyle::General`) is the one shape `compact_node`
+    // will inline at all — binding/definition-style heads like `defun`/`let`
+    // always break onto multiple lines regardless of width.
+    let input = "(foo (bar 1 2) (baz 3 4))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let default = Formatter::new(2).format(&tree);
+    assert_eq!(
+        default, "(foo (bar 1 2) (baz 3 4))\n",
+        "fits inline by default"
+    );
+
+    let narrowed = Formatter::new(2).with_max_width(10).format(&tree);
+    assert_ne!(
+        narrowed, default,
+        "a budget narrower than the form itself must stop it fitting inline"
+    );
+    assert!(narrowed.contains('\n'));
+}
+
+#[test]
+fn with_max_width_widens_the_inline_fit_threshold() {
+    // 89 columns: past the compiled-in 80-column default, so this wraps
+    // there, but comfortably inside a widened budget.
+    let input =
+        "(some-function-name argument-one argument-two argument-three argument-four argument-five)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let default = Formatter::new(2).format(&tree);
+    assert!(
+        default.contains('\n'),
+        "89 columns must not fit inline at the compiled-in default"
+    );
+
+    let widened = Formatter::new(2).with_max_width(200).format(&tree);
+    assert_eq!(
+        widened,
+        format!("{input}\n"),
+        "fits on one line once widened"
+    );
+}
+
+#[test]
+fn with_max_width_moves_the_definition_header_threshold_in_both_directions() {
+    // `compact_form` — the whole-form fit test behind a `defsystem` header —
+    // was the last width decision still reading the compiled-in constant, so
+    // this 74-column form stayed inline however narrow the budget got, and a
+    // 96-column one broke however wide it got.
+    let short = "(defsystem \"foo\" :description \"short\" :version \"0.1.0\" :depends-on (:asdf))";
+    let tree = SyntaxTree::parse(short).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        format!("{short}\n"),
+        "74 columns fits inline at the compiled-in default"
+    );
+    assert_eq!(
+        Formatter::new(2).with_max_width(40).format(&tree),
+        "(defsystem \"foo\"\n  :description \"short\"\n  :version \"0.1.0\"\n  :depends-on (:asdf))\n",
+        "a 40-column budget must break a 74-column header"
+    );
+
+    let long = "(defsystem \"foo\" :description \"a description that pushes this past eighty columns\" :version \"0.1.0\")";
+    let tree = SyntaxTree::parse(long).expect("valid");
+    assert_ne!(
+        Formatter::new(2).format(&tree),
+        format!("{long}\n"),
+        "100 columns must not fit inline at the compiled-in default"
+    );
+    assert_eq!(
+        Formatter::new(2).with_max_width(120).format(&tree),
+        format!("{long}\n"),
+        "fits on one line once widened"
+    );
+}

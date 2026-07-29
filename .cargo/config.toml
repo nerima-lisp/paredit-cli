@@ -1,0 +1,5 @@
+# `xtask/` is deliberately its own workspace root (see xtask/Cargo.toml), so
+# it needs an explicit --manifest-path rather than `-p xtask`. Run from the
+# repository root, same as scripts/*.sh already assume.
+[alias]
+xtask = "run --manifest-path xtask/Cargo.toml --quiet --"
