@@ -18,67 +18,96 @@
 //! Scope: Common Lisp only.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, list_head};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateLambdaListKeywordItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The 1-based line the definition starts on.
+    pub line: usize,
     pub definition: String,
     pub keyword: String,
     pub occurrence_count: usize,
 }
 
-#[derive(Debug)]
-pub struct DuplicateLambdaListKeywordSummary {
-    pub definition_count: usize,
-    pub duplicates: Vec<DuplicateLambdaListKeywordItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateLambdaListKeywordPolicyOptions {
-    fail_on_duplicate: bool,
-}
-
-impl DuplicateLambdaListKeywordPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_duplicate: bool) -> Self {
-        Self { fail_on_duplicate }
+impl Finding for DuplicateLambdaListKeywordItem {
+    /// The rule's own name, not the keyword.
+    ///
+    /// The keyword is the source's own spelling of an `&`-token, so it is
+    /// neither `&'static str` nor identifier-like; it stays a text column and a
+    /// JSON field instead.
+    fn kind(&self) -> &'static str {
+        "duplicate-lambda-list-keyword"
     }
 
-    #[must_use]
-    pub const fn fail_on_duplicate(self) -> bool {
-        self.fail_on_duplicate
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("definition={}", self.definition),
+            format!("keyword={}", self.keyword),
+            format!("occurrences={}", self.occurrence_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("definition", json!(self.definition)),
+            ("keyword", json!(self.keyword)),
+            ("occurrence_count", json!(self.occurrence_count)),
+        ]
+    }
+
+    /// The same sentence the `duplicate-lambda-list-keyword` lint rule writes,
+    /// so a SARIF or JUnit consumer reading both sees one defect described one
+    /// way.
+    fn message(&self) -> String {
+        format!(
+            "{} repeats lambda-list keyword {} ({}×)",
+            self.definition, self.keyword, self.occurrence_count
+        )
     }
 }
 
-#[derive(Debug)]
-pub struct DuplicateLambdaListKeywordPolicy {
-    pub fail_on_duplicate: bool,
-    pub definition_count: usize,
-    pub duplicate_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
-}
-
-/// Collects every callable definition whose lambda list repeats a lambda-list
-/// keyword, along with the total number of callable definitions scanned.
-pub fn collect_duplicate_lambda_list_keywords(
+/// Collects every callable definition in one file whose lambda list repeats a
+/// lambda-list keyword, with the number of callable definitions scanned as the
+/// denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated keyword here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_duplicate_lambda_list_keyword_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateLambdaListKeywordItem>)> {
+) -> LintResult<FileFindings<DuplicateLambdaListKeywordItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("definition_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut definition_count = 0;
     let mut duplicates = Vec::new();
 
@@ -126,8 +155,8 @@ pub fn collect_duplicate_lambda_list_keywords(
                 continue;
             }
             duplicates.push(DuplicateLambdaListKeywordItem {
-                path: path.to_path_buf(),
                 span: view.span,
+                line: line_of(source, view.span.start().get()),
                 definition: definition.clone(),
                 keyword: keyword.clone(),
                 occurrence_count: *occurrence_count,
@@ -135,52 +164,48 @@ pub fn collect_duplicate_lambda_list_keywords(
         }
     }
 
-    Ok((definition_count, duplicates))
-}
-
-#[must_use]
-pub const fn summarize_duplicate_lambda_list_keywords(
-    definition_count: usize,
-    duplicates: Vec<DuplicateLambdaListKeywordItem>,
-) -> DuplicateLambdaListKeywordSummary {
-    DuplicateLambdaListKeywordSummary {
-        definition_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
         duplicates,
-    }
+        vec![("definition_count", json!(definition_count))],
+    ))
 }
 
-#[must_use]
-pub fn evaluate_duplicate_lambda_list_keyword_policy(
-    options: DuplicateLambdaListKeywordPolicyOptions,
-    summary: &DuplicateLambdaListKeywordSummary,
-) -> DuplicateLambdaListKeywordPolicy {
-    let duplicate_count = summary.duplicates.len();
-    let mut violations = Vec::new();
-    if options.fail_on_duplicate() && duplicate_count > 0 {
-        violations.push(format!("duplicate_count {duplicate_count} exceeds 0"));
-    }
-
-    DuplicateLambdaListKeywordPolicy {
-        fail_on_duplicate: options.fail_on_duplicate(),
-        definition_count: summary.definition_count,
-        duplicate_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn duplicates(input: &str) -> (usize, Vec<DuplicateLambdaListKeywordItem>) {
+    fn report(input: &str) -> FileFindings<DuplicateLambdaListKeywordItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_duplicate_lambda_list_keywords(
-            &PathBuf::from("test.lisp"),
+        build_duplicate_lambda_list_keyword_report(
+            Path::new("test.lisp"),
             Dialect::CommonLisp,
             &tree,
         )
-        .expect("collect duplicate lambda list keywords")
+        .expect("build duplicate lambda list keyword report")
+    }
+
+    /// The `(definition_count, duplicates)` pair the report is built from.
+    fn duplicates(input: &str) -> (u64, Vec<DuplicateLambdaListKeywordItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "definition_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("definition_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -228,39 +253,59 @@ mod tests {
         assert!(duplicates.is_empty());
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect(
             "(defun f (&optional x &optional y) x)",
             Dialect::Clojure,
         )
         .expect("parse input");
-        let (definition_count, duplicates) = collect_duplicate_lambda_list_keywords(
-            &PathBuf::from("app.clj"),
+        let report = build_duplicate_lambda_list_keyword_report(
+            Path::new("app.clj"),
             Dialect::Clojure,
             &tree,
         )
-        .expect("collect duplicate lambda list keywords");
-        assert_eq!(definition_count, 0);
-        assert!(duplicates.is_empty());
+        .expect("build duplicate lambda list keyword report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("definition_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (definition_count, items) = duplicates("(defun f (&optional x &optional y) x)");
-        let summary = summarize_duplicate_lambda_list_keywords(definition_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(defun f (a b) a)").dialect_modelled);
+    }
 
-        let quiet = evaluate_duplicate_lambda_list_keyword_policy(
-            DuplicateLambdaListKeywordPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_columns() {
+        let report = report("(defun g (a) a)\n(defun f (&key b &key c) b)\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "duplicate-lambda-list-keyword");
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "definition=f".to_owned(),
+                "keyword=&key".to_owned(),
+                "occurrences=2".to_owned(),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.duplicate_count, 1);
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("definition", json!("f")),
+                ("keyword", json!("&key")),
+                ("occurrence_count", json!(2)),
+            ]
+        );
+    }
 
-        let strict = evaluate_duplicate_lambda_list_keyword_policy(
-            DuplicateLambdaListKeywordPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_definition_scanned_not_only_the_flagged_ones() {
+        let report = report("(defun f (&key a &key b) a)\n(defun g (c) c)\n");
+        assert_eq!(report.summary, vec![("definition_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
