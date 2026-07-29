@@ -40,6 +40,21 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?;
             }
+            command::InspectCommand::CloneClasses(args) => {
+                clone_report::workflow::clone_classes(args)?;
+            }
+            command::InspectCommand::CloneSequences(args) => {
+                clone_report::workflow::clone_sequences(args)?;
+            }
+            command::InspectCommand::CloneExternal(args) => {
+                clone_report::workflow::clone_external(args)?;
+            }
+            command::InspectCommand::CloneThreshold(args) => {
+                clone_report::workflow::clone_threshold(args)?;
+            }
+            command::InspectCommand::CloneGenealogy(args) => {
+                clone_report::workflow::clone_genealogy(args)?;
+            }
             command::InspectCommand::DuplicateSetfPlaces(args) => {
                 duplicate_setf_place_report::workflow::duplicate_setf_place_report(args)?;
             }

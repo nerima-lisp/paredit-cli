@@ -7,11 +7,11 @@ use super::{
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
     case_nil_key_report, char_case_fold_report, char_op_string_report, circular_literal_report,
-    class_cycle_report, class_hierarchy_report, code_char_char_code_report, coerce_to_t_report,
-    cohesion_report, complexity_report, cond_t_clause_report, cons_to_list_report,
-    constant_if_test_report, constant_report, constant_when_test_report, convert_cond_to_if,
-    convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless, convert_if_to_when,
-    convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    class_cycle_report, class_hierarchy_report, clone_report, code_char_char_code_report,
+    coerce_to_t_report, cohesion_report, complexity_report, cond_t_clause_report,
+    cons_to_list_report, constant_if_test_report, constant_report, constant_when_test_report,
+    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
+    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
     convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
     dead_boolean_operand_report, debt_score_report, definition_movement, definition_removal,
     definition_report, defpackage_quoted_report, dependency_report, destructive_literal_report,
@@ -118,6 +118,16 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Group near-duplicate forms into clone classes, label each Type-1/2/3, and rank them by the lines extracting one would save.
+    CloneClasses(clone_report::args::CloneClassReportArgs),
+    /// Report duplicated runs of adjacent sibling forms, the sub-form clones no whole-form report can see.
+    CloneSequences(clone_report::args::CloneSequenceReportArgs),
+    /// Report project forms that duplicate a reference corpus, to find code a dependency already provides.
+    CloneExternal(clone_report::args::CloneExternalReportArgs),
+    /// Recommend a --threshold from the project's own similarity distribution instead of the built-in default.
+    CloneThreshold(clone_report::args::CloneThresholdReportArgs),
+    /// Order each clone class by the commit that introduced it, separating the original from the copies.
+    CloneGenealogy(clone_report::args::CloneGenealogyReportArgs),
     /// Report a setf/setq/psetf/psetq that assigns the same variable more than once.
     DuplicateSetfPlaces(duplicate_setf_place_report::args::DuplicateSetfPlaceReportArgs),
     /// Report defclass/define-condition/defstruct forms declaring the same slot name more than once.

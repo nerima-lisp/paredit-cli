@@ -16,6 +16,25 @@ model, a binding table, nine lint rules, and a per-file report.
 
 ### Added
 
+- Five clone-detection commands built on the existing tree-edit-distance
+  scorer, which `similarity` and `duplicates` had been under-using.
+  `inspect clone-classes` groups near-duplicate forms into classes, labels each
+  on the standard Type-1/2/3 taxonomy, and ranks them by the lines extracting
+  one would save — five copies of a helper are one class to act on rather than
+  ten pairs to read. `inspect clone-sequences` finds duplicated runs of adjacent
+  sibling forms, the sub-form clones that no whole-form report can see because
+  the duplication does not line up with a form boundary. `inspect clone-external`
+  compares the project against a reference corpus across head symbols, so a
+  local `join-strings` matches a library `str:join`. `inspect clone-threshold`
+  recommends a `--threshold` from the project's own similarity distribution,
+  reporting the histogram, an Otsu split, the widest distribution gap and
+  percentiles so the recommendation can be judged rather than taken.
+  `inspect clone-genealogy` orders each class by the commit that introduced its
+  members, separating the original from the copies.
+- `inspect similarity` labels every reported pair with its clone type, the
+  number of atoms renamed, and whether that renaming is a bijection. An
+  inconsistent Type-2 renaming is the shape a copy-paste bug takes when one
+  occurrence of a variable was missed.
 - `inspect capabilities --schema-version 3` reports a `dialect_contract` in
   which every one of the 2760 command/dialect cells is answered. Previously
   2720 of them said `unknown`. Cells gain a fourth status, `silent`: the

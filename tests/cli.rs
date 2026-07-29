@@ -45,6 +45,8 @@ mod char_case_fold_report;
 mod char_op_string_report;
 #[path = "cli/class_cycle_report.rs"]
 mod class_cycle_report;
+#[path = "cli/clone_report.rs"]
+mod clone_report;
 #[path = "cli/code_char_char_code_report.rs"]
 mod code_char_char_code_report;
 #[path = "cli/code_metrics_report.rs"]

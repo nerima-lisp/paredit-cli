@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod clone_report;
 pub mod duplicate_report;
 pub mod error;
 pub mod form_similarity;

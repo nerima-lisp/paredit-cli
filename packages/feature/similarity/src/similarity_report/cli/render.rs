@@ -3,7 +3,7 @@ use paredit_core_cli::safe_text;
 use serde_json::json;
 
 use crate::similarity_report::usecase::{
-    SimilarityFormReport, SimilarityProcessingStage, SimilarityReportPlan,
+    SimilarityFormReport, SimilarityProcessingStage, SimilarityReportPlan, classify_form_pair,
 };
 use paredit_core_syntax::dialect::Dialect;
 
@@ -84,10 +84,13 @@ fn print_text(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) {
     }
 
     for pair in &report.pairs {
+        let classification = classify_form_pair(pair.left(), pair.right());
         println!(
-            "pair\tsimilarity={:.6}\tscore={:.6}",
+            "pair\tsimilarity={:.6}\tscore={:.6}\tclone_type={}\tconsistent_renaming={}",
             pair.similarity().as_f64(),
-            pair.score().as_f64()
+            pair.score().as_f64(),
+            classification.map_or("-", |classification| classification.clone_type.label()),
+            classification.is_some_and(|classification| classification.consistent_renaming),
         );
         print_text_form("left", pair.left());
         print_text_form("right", pair.right());
@@ -148,12 +151,22 @@ fn json_report(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) -> serd
             "stage": cli_stage_label(error.stage),
             "message": error.message,
         })).collect::<Vec<_>>(),
-        "pairs": report.pairs.iter().map(|pair| json!({
-            "similarity": pair.similarity().as_f64(),
-            "score": pair.score().as_f64(),
-            "left": form_json(pair.left()),
-            "right": form_json(pair.right()),
-        })).collect::<Vec<_>>(),
+        "pairs": report.pairs.iter().map(|pair| {
+            let classification = classify_form_pair(pair.left(), pair.right());
+            json!({
+                "similarity": pair.similarity().as_f64(),
+                "score": pair.score().as_f64(),
+                // Which of the three standard clone types this pair is. Null
+                // only if a reported form somehow failed to reparse, which the
+                // report says rather than guessing at a label.
+                "clone_type": classification.map(|classification| classification.clone_type.label()),
+                "renamed_atoms": classification.map(|classification| classification.renamed_atoms),
+                "consistent_renaming": classification
+                    .map(|classification| classification.consistent_renaming),
+                "left": form_json(pair.left()),
+                "right": form_json(pair.right()),
+            })
+        }).collect::<Vec<_>>(),
     })
 }
 

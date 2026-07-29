@@ -48,6 +48,11 @@ discovery, impact analysis, and preflight checks.
 | `unused-definitions` | Report definitions with no external exact atom references. |
 | `duplicates` | Report repeated structural S-expression shapes across explicit files. |
 | `similarity` | Report structurally similar S-expression forms across explicit files. |
+| `clone-classes` | Group near-duplicate forms into clone classes, label each on the Type-1/2/3 taxonomy, and rank them by the lines extracting one would save. Where `similarity` reports pairs, this reports the thing there is to extract: five copies of one helper are one class, not ten pairs. |
+| `clone-sequences` | Report duplicated runs of adjacent sibling forms — the sub-form clones that no whole-form report can see, because the duplication does not line up with a form boundary. Runs whose enclosing forms are themselves clones are left to `clone-classes`. |
+| `clone-external` | Report project forms that duplicate a reference corpus, to find code a dependency already provides. Unlike `similarity` it compares across head symbols, since a local `join-strings` and a library `str:join` disagree on the head and are the point. The reference corpus is scanned *including* generated directories, because that is where dependencies live. |
+| `clone-threshold` | Recommend a `--threshold` from the project's own similarity distribution instead of the built-in 0.87. Reports the histogram, an Otsu split, the widest distribution gap, and percentiles, so the recommendation can be judged rather than taken. |
+| `clone-genealogy` | Order each clone class by the commit that introduced each member, separating the original from the copies and reporting how long the copying went on. Degrades like `blame`: no repository, no `git`, or an untracked file yields `unknown`, never a fabricated date. |
 | `lets` | Report local let bindings and inline safety for refactor planning. |
 | `complexity` | Report per-definition nesting depth and size metrics for refactor prioritization. |
 | `naming` | Report definition names that deviate from idiomatic kebab-case Lisp naming. |
