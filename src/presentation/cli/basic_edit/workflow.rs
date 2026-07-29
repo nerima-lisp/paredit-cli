@@ -242,7 +242,8 @@ pub(in crate::presentation::cli) fn normalize_quotes(args: NormalizeQuotesArgs) 
         &args.target.selector,
         "edit normalize-quotes",
     )?;
-    let rewritten = Edit::normalize_quotes(&input.text, &tree, selection, args.style.into())?;
+    let rewritten =
+        Edit::normalize_quotes(&input.text, &tree, selection, args.style.into(), dialect)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
     Ok(emit_document(
         &input, dialect, args.write, args.diff, rewritten,

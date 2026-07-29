@@ -504,9 +504,19 @@ fn normalize_quotes_shortens_a_quote_list_to_its_prefix() {
         ),
         "(list 'x y)\n"
     );
+    // `--dialect` is required for the `function` half: stdin with no file name
+    // resolves to `Dialect::Unknown`, and `(function f)` is a form only the
+    // Common Lisp family has.
     assert_eq!(
         edit(
-            &["edit", "normalize-quotes", "--path", "0.1"],
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--dialect",
+                "common-lisp"
+            ],
             "(mapcar (function car) xs)\n"
         ),
         "(mapcar #'car xs)\n"
@@ -537,11 +547,82 @@ fn normalize_quotes_expands_a_prefix_into_its_list() {
                 "--path",
                 "0.1",
                 "--style",
-                "longhand"
+                "longhand",
+                "--dialect",
+                "common-lisp"
             ],
             "(mapcar #'car xs)\n"
         ),
         "(mapcar (function car) xs)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_keeps_a_non_quote_reader_prefix() {
+    // The selection's span covers its reader prefix, so shortening the list
+    // inside `,(quote x)` used to take the unquote with it and print
+    // `(list 'x y)` — an inversion of when the form is evaluated, in output
+    // that still reparses and so never tripped the `--write` reparse guard.
+    for input in [
+        "(list `(quote x) y)",
+        "(list ,(quote x) y)",
+        "(list ,@(quote x) y)",
+        "(list #(quote x) y)",
+    ] {
+        paredit()
+            .args([
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--dialect",
+                "common-lisp",
+            ])
+            .write_stdin(input.to_owned())
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("not a quote form"));
+    }
+}
+
+#[test]
+fn normalize_quotes_does_not_write_a_function_form_into_a_clojure_file() {
+    // `#'inc` in Clojure is a var quote, and `@x` is a deref; the parser files
+    // both under the same catch-all reader-prefix slot as Common Lisp's `#'`.
+    // Expanding either into `(function ...)` writes a form Clojure does not
+    // have.
+    for input in ["(map #'inc xs)", "(map @xs ys)"] {
+        paredit()
+            .args([
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--style",
+                "longhand",
+                "--dialect",
+                "clojure",
+            ])
+            .write_stdin(input.to_owned())
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("not a quote form"));
+    }
+
+    // The universal half still works there.
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--dialect",
+                "clojure"
+            ],
+            "(map (quote x) xs)\n"
+        ),
+        "(map 'x xs)\n"
     );
 }
 
