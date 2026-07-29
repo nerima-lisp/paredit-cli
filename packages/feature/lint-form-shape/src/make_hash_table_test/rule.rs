@@ -44,7 +44,7 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine(
             view,
-            context.path(),
+            context.source(),
             &mut make_hash_table_form_count,
             &mut items,
         );

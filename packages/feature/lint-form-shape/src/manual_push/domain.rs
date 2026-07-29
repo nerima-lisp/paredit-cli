@@ -26,13 +26,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) reads together with the
 /// form that follows it, so it does not count as one settled operand.
@@ -64,52 +66,58 @@ fn cons_push_element(value: &ExpressionView, place_text: &str) -> Option<ByteSpa
 
 #[derive(Debug, Clone)]
 pub struct ManualPushItem {
-    pub path: PathBuf,
     /// The span of the whole `(setf P (cons E P))` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the assigned variable `P` (for reconstructing the fix).
+    ///
+    /// The rewrite's input, not the report's: the lint rule slices it to build
+    /// `(push E P)`, and the command never printed it.
     pub place_span: ByteSpan,
     /// The span of the pushed element `E`.
+    ///
+    /// The rewrite's input, not the report's, for the same reason as
+    /// `place_span`.
     pub element_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct ManualPushSummary {
-    pub assignment_form_count: usize,
-    pub violations: Vec<ManualPushItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ManualPushPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ManualPushPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ManualPushItem {
+    /// The rule's own name. Every finding here is the same rewrite — a
+    /// hand-written `cons` onto its own place — with nothing to sub-divide it
+    /// by.
+    fn kind(&self) -> &'static str {
+        "manual-push"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ManualPushPolicy {
-    pub fail_on_violation: bool,
-    pub assignment_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `manual-push` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "setf conses onto a variable; use push".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     assignment_form_count: &mut usize,
     violations: &mut Vec<ManualPushItem>,
 ) {
@@ -139,74 +147,83 @@ pub fn examine_assignment(
     };
 
     violations.push(ManualPushItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         place_span: place.span,
         element_span,
     });
 }
 
-/// Collects every manual push across a whole file, along with the total number
-/// of setf/setq forms scanned.
-pub fn collect_manual_pushes(
+/// Collects every manual push in one file, with the number of `setf`/`setq`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no hand-written push" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_manual_push_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ManualPushItem>)> {
+) -> LintResult<FileFindings<ManualPushItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("assignment_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut assignment_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_assignment(subview, path, &mut assignment_form_count, &mut violations);
+            examine_assignment(subview, source, &mut assignment_form_count, &mut violations);
         });
     }
-    Ok((assignment_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("assignment_form_count", json!(assignment_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_manual_pushes(
-    assignment_form_count: usize,
-    violations: Vec<ManualPushItem>,
-) -> ManualPushSummary {
-    ManualPushSummary {
-        assignment_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_manual_push_policy(
-    options: ManualPushPolicyOptions,
-    summary: &ManualPushSummary,
-) -> ManualPushPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ManualPushPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        assignment_form_count: summary.assignment_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn pushes(input: &str) -> (usize, Vec<ManualPushItem>) {
+    fn report(input: &str) -> FileFindings<ManualPushItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_manual_pushes(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect manual pushes")
+        build_manual_push_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build manual push report")
+    }
+
+    /// The `(assignment_form_count, violations)` pair the report is built from.
+    fn pushes(input: &str) -> (u64, Vec<ManualPushItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "assignment_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("assignment_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -279,27 +296,39 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(setf xs (cons item xs))", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_manual_pushes(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect manual pushes");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_manual_push_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build manual push report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("assignment_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = pushes("(setf xs (cons item xs))");
-        let summary = summarize_manual_pushes(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(setf xs (reverse xs))").dialect_modelled);
+    }
 
-        let quiet = evaluate_manual_push_policy(ManualPushPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_leaves_the_description_to_its_message() {
+        let report = report("(defun record (item)\n  (setf log (cons item log)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "manual-push");
+        assert!(finding.json_fields().is_empty());
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(finding.message(), "setf conses onto a variable; use push");
+    }
 
-        let strict = evaluate_manual_push_policy(ManualPushPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_assignment_scanned_not_only_the_flagged_ones() {
+        let report = report("(setf xs (cons a xs))\n(setf ys (reverse ys))\n");
+        assert_eq!(report.summary, vec![("assignment_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
