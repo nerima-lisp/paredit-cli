@@ -26,6 +26,7 @@ use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
+use paredit_core_syntax::selector::SelectorError;
 use paredit_core_syntax::sexpr::{ParseError, SexprError};
 use paredit_core_workspace::workspace::WorkspaceError;
 
@@ -112,6 +113,9 @@ pub enum ArgumentError {
     )]
     NoInput,
 
+    /// Raised by the commands that still take only `--path`/`--at`. Commands
+    /// carrying the full [`SelectorArgs`](crate::args::SelectorArgs) surface
+    /// report `SelectorError::Missing`, which names every selector instead.
     #[error("target required: pass --path or --at")]
     TargetRequired,
 
@@ -120,6 +124,18 @@ pub enum ArgumentError {
 
     #[error("--write requires --file")]
     WriteRequiresFile,
+
+    /// One `--all` match was disturbed by an edit applied to a later one.
+    ///
+    /// Reachable only for edits that reach outside their own form — slurp and
+    /// barf move a sibling across the boundary — and only when two matches are
+    /// close enough to collide. Refusing keeps the file consistent with what
+    /// the selector described when it was resolved.
+    #[error(
+        "--all: the form at byte {start} was changed by an edit to a later match; \
+         re-run without --all, or narrow the selector"
+    )]
+    AllMatchShifted { start: usize },
 }
 
 /// A write failed, and then undoing it failed too.
@@ -184,6 +200,14 @@ pub enum CliError {
 
     #[error(transparent)]
     Argument(#[from] ArgumentError),
+
+    /// A selector named no form, named too many, or does not parse.
+    ///
+    /// Kept whole rather than folded into [`Self::Argument`]: a selector
+    /// failure carries what it looked for and how many it found, which is
+    /// what an agent needs in order to widen or narrow and try again.
+    #[error(transparent)]
+    Selector(#[from] SelectorError),
 
     #[error("{description} is not valid UTF-8")]
     NotUtf8 {
