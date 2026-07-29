@@ -70,6 +70,7 @@ use paredit_feature_semantic_report::effect_report::cli as effect_report;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
 use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;
+use paredit_feature_similarity::clone_report::cli as clone_report;
 use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
 use paredit_feature_similarity::similarity_report::cli as similarity_report;
 use paredit_feature_structural_diff::structural_diff::cli as structural_diff;

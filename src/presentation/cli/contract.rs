@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 220] = [
+const INTROSPECTION_COMMANDS: [&str; 225] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -172,6 +172,11 @@ const INTROSPECTION_COMMANDS: [&str; 220] = [
     "inspect unused-definitions",
     "inspect duplicates",
     "inspect similarity",
+    "inspect clone-classes",
+    "inspect clone-sequences",
+    "inspect clone-external",
+    "inspect clone-threshold",
+    "inspect clone-genealogy",
     "inspect lets",
     "inspect complexity",
     "inspect naming",
@@ -513,7 +518,7 @@ const SYNTAX_TIER_REPORTS: [&str; 13] = [
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 28] = [
+const SCOPE_TIER_REPORTS: [&str; 33] = [
     "inspect resolve",
     "inspect test-map",
     "inspect symbol-index",
@@ -541,6 +546,11 @@ const SCOPE_TIER_REPORTS: [&str; 28] = [
     "inspect lets",
     "inspect duplicates",
     "inspect similarity",
+    "inspect clone-classes",
+    "inspect clone-sequences",
+    "inspect clone-external",
+    "inspect clone-threshold",
+    "inspect clone-genealogy",
     "inspect call-cycles",
 ];
 

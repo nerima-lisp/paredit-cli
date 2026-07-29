@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering};
@@ -381,6 +382,166 @@ impl StructuralTree {
         }
         Some(distance)
     }
+
+    /// Order-sensitive digest of the whole tree, atom text included.
+    ///
+    /// Two trees with the same fingerprint are Type-1 clones up to a hash
+    /// collision; two with different fingerprints are certainly not.
+    #[must_use]
+    pub const fn exact_fingerprint(&self) -> u64 {
+        self.tree_hash
+    }
+
+    /// Order-sensitive digest of the tree with every atom's text erased.
+    ///
+    /// This is the Type-2 key: it survives renaming identifiers and literals
+    /// but not reshaping the tree, changing a delimiter, or changing a reader
+    /// prefix. Computed on demand rather than cached, because only the
+    /// sequence-clone detector asks for it and it asks once per candidate.
+    #[must_use]
+    pub fn generic_fingerprint(&self) -> u64 {
+        self.labels
+            .iter()
+            .map(erased_label_hash)
+            .fold(FNV_OFFSET, fnv_u64)
+    }
+}
+
+/// Where a pair of forms sits on the standard clone taxonomy.
+///
+/// The names are Roy and Cordy's, and so are the boundaries: Type-1 is a copy,
+/// Type-2 is a copy with the names changed, Type-3 is a copy someone then
+/// edited. Layout and comments never enter into it here because the structural
+/// tree has already dropped both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CloneType {
+    /// Identical structure and identical atom text.
+    Type1,
+    /// Identical structure; every difference is one atom's text.
+    Type2,
+    /// The structures themselves differ.
+    Type3,
+}
+
+impl CloneType {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Type1 => "type-1",
+            Self::Type2 => "type-2",
+            Self::Type3 => "type-3",
+        }
+    }
+
+    #[must_use]
+    pub const fn number(self) -> u8 {
+        match self {
+            Self::Type1 => 1,
+            Self::Type2 => 2,
+            Self::Type3 => 3,
+        }
+    }
+}
+
+impl fmt::Display for CloneType {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.label())
+    }
+}
+
+/// A clone type plus the evidence that produced it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CloneClassification {
+    pub clone_type: CloneType,
+    /// Atoms whose text differs between the two trees. Zero for Type-1, and
+    /// meaningless for Type-3, where the trees do not correspond node for node.
+    pub renamed_atoms: usize,
+    /// Whether the Type-2 substitution is a bijection — every `x` became the
+    /// same `y` and nothing else became that `y`.
+    ///
+    /// An inconsistent renaming is the interesting case: it is the shape a
+    /// copy-paste bug takes when one occurrence of a variable was missed. True
+    /// for Type-1 (the empty substitution is a bijection) and false for Type-3,
+    /// where there is no substitution to be consistent about.
+    pub consistent_renaming: bool,
+}
+
+/// Classifies a pair of structural trees on the clone taxonomy.
+///
+/// Cheap by construction: Type-1 is one integer comparison via the derived
+/// `PartialEq`, Type-3 is one `Vec` comparison of the postorder leftmost
+/// encodings, and only a same-topology pair pays a walk over the labels. No
+/// tree edit distance is computed, so a caller that has already decided a pair
+/// is similar can label it for free.
+///
+/// The head of a form is an atom like any other, so `(alpha x)` and `(beta x)`
+/// are Type-2. That follows the taxonomy — a function name is an identifier —
+/// but it does mean a Type-2 label is not on its own a claim that the two forms
+/// compute the same thing.
+#[must_use]
+pub fn classify_clone(left: &StructuralTree, right: &StructuralTree) -> CloneClassification {
+    if left == right {
+        return CloneClassification {
+            clone_type: CloneType::Type1,
+            renamed_atoms: 0,
+            consistent_renaming: true,
+        };
+    }
+
+    // Equal leftmost encodings uniquely determine the ordered topology, so an
+    // inequality here is conclusive: no node-for-node correspondence exists.
+    if left.leftmost != right.leftmost {
+        return CloneClassification {
+            clone_type: CloneType::Type3,
+            renamed_atoms: 0,
+            consistent_renaming: false,
+        };
+    }
+
+    let mut renamed_atoms = 0;
+    let mut forward = HashMap::<&str, &str>::new();
+    let mut backward = HashMap::<&str, &str>::new();
+    let mut consistent_renaming = true;
+    let type_3 = CloneClassification {
+        clone_type: CloneType::Type3,
+        renamed_atoms: 0,
+        consistent_renaming: false,
+    };
+    for (left_label, right_label) in left.labels.iter().zip(&right.labels) {
+        match (left_label, right_label) {
+            (
+                NodeLabel::Atom(left_text, left_prefixes),
+                NodeLabel::Atom(right_text, right_prefixes),
+            ) => {
+                // A differing reader prefix is not a rename: `'x` and `x` read
+                // differently however the symbol is spelled.
+                if left_prefixes != right_prefixes {
+                    return type_3;
+                }
+                if left_text != right_text {
+                    renamed_atoms += 1;
+                }
+                // Every atom pair enters the substitution, including the ones
+                // that did not change. An atom left alone is the identity
+                // mapping `x -> x`, and it is precisely the conflict between
+                // that and a `x -> y` elsewhere that exposes a missed rename.
+                consistent_renaming &= forward
+                    .insert(left_text, right_text)
+                    .is_none_or(|previous| previous == right_text);
+                consistent_renaming &= backward
+                    .insert(right_text, left_text)
+                    .is_none_or(|previous| previous == left_text);
+            }
+            _ if left_label == right_label => {}
+            _ => return type_3,
+        }
+    }
+
+    CloneClassification {
+        clone_type: CloneType::Type2,
+        renamed_atoms,
+        consistent_renaming,
+    }
 }
 
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
@@ -427,6 +588,24 @@ fn hash_label(label: &NodeLabel) -> u64 {
             // field boundaries from colliding.
             hash_prefixes(fnv_byte(hash, 0xff), prefixes)
         }
+    }
+}
+
+/// Hashes a label the way `hash_label` does, minus an atom's text.
+///
+/// Keeping the reader prefixes and the delimiter means the digest still
+/// separates `'x` from `x` and `[a]` from `(a)`; only the identifier itself is
+/// erased, which is exactly the Type-2 equivalence.
+fn erased_label_hash(label: &NodeLabel) -> u64 {
+    match label {
+        NodeLabel::Atom(_, prefixes) => {
+            let mut hash = fnv_byte(FNV_OFFSET, 2);
+            for prefix in prefixes {
+                hash = fnv_byte(hash, *prefix as u8 + 1);
+            }
+            hash
+        }
+        other => hash_label(other),
     }
 }
 
@@ -1412,6 +1591,135 @@ mod tests {
         assert!(workspace.try_reset(usize::MAX, usize::MAX).is_err());
         assert_eq!(workspace.tree_distances.capacity(), tree_capacity);
         assert_eq!(workspace.forest_distances.capacity(), forest_capacity);
+    }
+
+    #[test]
+    fn identical_forms_classify_as_type_1() {
+        let classification = classify_clone(&form("(+ a b)"), &form("(+ a b)"));
+
+        assert_eq!(classification.clone_type, CloneType::Type1);
+        assert_eq!(classification.renamed_atoms, 0);
+        assert!(classification.consistent_renaming);
+    }
+
+    #[test]
+    fn renamed_identifiers_classify_as_type_2() {
+        let classification = classify_clone(
+            &form("(let ((x 1)) (+ x 2))"),
+            &form("(let ((y 1)) (+ y 2))"),
+        );
+
+        assert_eq!(classification.clone_type, CloneType::Type2);
+        assert_eq!(classification.renamed_atoms, 2);
+        assert!(classification.consistent_renaming);
+    }
+
+    #[test]
+    fn a_missed_occurrence_makes_the_type_2_renaming_inconsistent() {
+        // The copy-paste bug: `x` became `y` in one place and stayed `x` in the
+        // other. Same shape, same atom count, and the substitution is not a
+        // function.
+        let classification = classify_clone(&form("(+ x x)"), &form("(+ y x)"));
+
+        assert_eq!(classification.clone_type, CloneType::Type2);
+        assert_eq!(classification.renamed_atoms, 1);
+        assert!(!classification.consistent_renaming);
+
+        // Collapsing two distinct names onto one is equally inconsistent, and
+        // only the backward map catches it.
+        let collapsed = classify_clone(&form("(+ x y)"), &form("(+ z z)"));
+        assert_eq!(collapsed.clone_type, CloneType::Type2);
+        assert!(!collapsed.consistent_renaming);
+    }
+
+    #[test]
+    fn structural_edits_classify_as_type_3() {
+        for (left, right) in [
+            ("(+ a b)", "(+ a b c)"),
+            ("(+ a b)", "(+ (f a) b)"),
+            // Same node count, regrouped: a rename cannot move a node.
+            ("((a) b)", "(a (b))"),
+        ] {
+            assert_eq!(
+                classify_clone(&form(left), &form(right)).clone_type,
+                CloneType::Type3,
+                "{left} vs {right}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_rename_that_changes_delimiter_or_prefix_is_not_type_2() {
+        // Same topology, but the differing labels are not both atoms.
+        assert_eq!(
+            classify_clone(&form("(f (a))"), &form("(f [a])")).clone_type,
+            CloneType::Type3
+        );
+        // Same topology and both labels are atoms, but one is quoted.
+        assert_eq!(
+            classify_clone(&form("(f a)"), &form("(f 'b)")).clone_type,
+            CloneType::Type3
+        );
+    }
+
+    #[test]
+    fn classification_is_symmetric() {
+        let inputs = [
+            "(+ a b)",
+            "(+ x y)",
+            "(+ a b c)",
+            "(let ((x 1)) x)",
+            "[a b]",
+            "'(a b)",
+        ]
+        .map(form);
+
+        for left in &inputs {
+            for right in &inputs {
+                let forward = classify_clone(left, right);
+                let backward = classify_clone(right, left);
+                assert_eq!(forward.clone_type, backward.clone_type);
+                assert_eq!(forward.renamed_atoms, backward.renamed_atoms);
+                assert_eq!(forward.consistent_renaming, backward.consistent_renaming);
+            }
+        }
+    }
+
+    #[test]
+    fn type_1_implies_equal_exact_fingerprints_and_type_2_implies_equal_generic_ones() {
+        let base = form("(defun alpha (x) (+ x 1))");
+        let copy = form("(defun alpha (x) (+ x 1))");
+        let renamed = form("(defun beta (y) (+ y 2))");
+        let reshaped = form("(defun alpha (x) (+ x 1 2))");
+
+        assert_eq!(base.exact_fingerprint(), copy.exact_fingerprint());
+        assert_ne!(base.exact_fingerprint(), renamed.exact_fingerprint());
+
+        assert_eq!(base.generic_fingerprint(), renamed.generic_fingerprint());
+        assert_ne!(base.generic_fingerprint(), reshaped.generic_fingerprint());
+
+        // The generic digest keeps everything a rename cannot touch.
+        assert_ne!(
+            form("(f a)").generic_fingerprint(),
+            form("(f 'a)").generic_fingerprint()
+        );
+        assert_ne!(
+            form("(f (a))").generic_fingerprint(),
+            form("(f [a])").generic_fingerprint()
+        );
+    }
+
+    #[test]
+    fn clone_type_labels_and_numbers_agree() {
+        for (clone_type, label, number) in [
+            (CloneType::Type1, "type-1", 1),
+            (CloneType::Type2, "type-2", 2),
+            (CloneType::Type3, "type-3", 3),
+        ] {
+            assert_eq!(clone_type.label(), label);
+            assert_eq!(clone_type.number(), number);
+            assert_eq!(clone_type.to_string(), label);
+        }
     }
 
     #[test]
