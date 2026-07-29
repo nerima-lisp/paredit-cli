@@ -1,13 +1,13 @@
 use crate::unwrap_call::usecase::{UnwrapCallPlan, UnwrapCallRequest, plan_unwrap_call};
 use anyhow::{Context, Result};
 use clap::Args;
+use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
-use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::resolve_compact_target;
 use paredit_core_cli::shared::write_file_with_rollback;
-use paredit_core_syntax::sexpr::Path;
 use paredit_core_syntax::sexpr::SymbolName;
 use serde_json::json;
 use std::path::PathBuf;
@@ -20,12 +20,8 @@ pub struct UnwrapCallArgs {
     /// Override extension-based dialect detection.
     #[arg(long)]
     dialect: Option<DialectArg>,
-    /// Select by child index path, for example 0.2.1.
-    #[arg(long, conflicts_with = "at")]
-    path: Option<Path>,
-    /// Select the smallest expression containing byte offset.
-    #[arg(long, conflicts_with = "path")]
-    at: Option<usize>,
+    #[command(flatten)]
+    selector: CompactSelectorArgs,
     /// Optional guard: fail unless the selected call has this function head.
     #[arg(long)]
     function: Option<SymbolName>,
@@ -42,12 +38,13 @@ pub struct UnwrapCallArgs {
 
 pub fn unwrap_call(args: UnwrapCallArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let target = resolve_compact_target(&tree, dialect, &args.selector, "refactor unwrap-call")?;
+    let selection = tree.select_path(&target.path)?;
     let selected = selection.view();
     let plan = plan_unwrap_call(UnwrapCallRequest {
         input: &input.text,
         dialect,
-        path: args.path,
+        path: Some(target.path),
         target: selected,
         expected_function: args.function,
         argument_index: args.argument_index,

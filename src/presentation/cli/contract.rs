@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 220] = [
+const INTROSPECTION_COMMANDS: [&str; 221] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -155,6 +155,7 @@ const INTROSPECTION_COMMANDS: [&str; 220] = [
     "inspect capabilities",
     "inspect outline",
     "inspect form",
+    "inspect resolve",
     "inspect find-symbol",
     "inspect symbols",
     "inspect calls",
@@ -495,7 +496,8 @@ const SYNTAX_TIER_REPORTS: [&str; 9] = [
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 32] = [
+const SCOPE_TIER_REPORTS: [&str; 33] = [
+    "inspect resolve",
     "inspect test-map",
     "inspect symbol-index",
     "inspect unreachable-expressions",

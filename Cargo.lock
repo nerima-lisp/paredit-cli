@@ -682,6 +682,7 @@ dependencies = [
  "paredit-feature-refactor-workflow",
  "paredit-feature-remove-unused",
  "paredit-feature-rename",
+ "paredit-feature-selector",
  "paredit-feature-semantic-report",
  "paredit-feature-similarity",
  "predicates",
@@ -1119,6 +1120,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-selector"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

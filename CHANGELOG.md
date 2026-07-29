@@ -35,6 +35,47 @@ model, a binding table, nine lint rules, and a per-file report.
   number of atoms renamed, and whether that renaming is a bijection. An
   inconsistent Type-2 renaming is the shape a copy-paste bug takes when one
   occurrence of a variable was missed.
+- **Six new ways to select a form.** `--path` and `--at` were the only two,
+  and both cost a round trip to build: an agent had to run `inspect outline`,
+  read a path out of it, and hope nothing moved in between. Every command that
+  takes a target now also accepts:
+  - `--query '(defun ?name ...)'` — an S-expression pattern, written in the
+    file's own dialect and read with its own reader. `_` matches one form,
+    `?name` binds one, `...` matches a run, `?body...` binds a run. Captures
+    may be constrained (`?x:list`, `?x:number`, …), a repeated name is a
+    back-reference (`(eq ?x ?x)` finds self-comparisons), and `--capture name`
+    selects the bound sub-form rather than the whole match.
+  - `--name <symbol>` — the definition of that name, at any nesting depth.
+  - `--line-column LINE[:COLUMN]` — a 1-based editor coordinate, columns
+    counted in characters. The column defaults to 1.
+  - `--id <id>` — a content-addressed id that keeps naming the same form after
+    edits elsewhere in the file, where a `--path` would not.
+  - `--from` / `--to` — a contiguous range of siblings, each end given as a
+    compact selector (`0.2`, `at:120`, `name:foo`, `query:(defun ?n ...)`).
+  - `--parent` / `--child N` / `--sibling ±N` — relative moves over any of the
+    above, applied up-across-down.
+  - `--select <selector>` — any of the above in one flag, using the compact
+    grammar. This is how the richer selectors reach the eight commands whose
+    own flags already claim these names (`refactor introduce-let --name` is
+    the new binding's name, `rename-binding --from`/`--to` are symbols):
+    `introduce-let`, `inline-let`, `remove-unused-binding`,
+    `thread-expression`, `unthread-expression`, `unwrap-call`,
+    `extract-function`, `extract-constant` now take `--path`, `--at`, and
+    `--select`. They also report the *resolved* path in their JSON plan where
+    they previously reported `null` for `--at`.
+- **`--all`.** A selector naming more than one form is now refused by default
+  rather than resolving to the first match; `--all` turns the refusal into a
+  fan-out. Edits apply right to left with a re-parse between them, and stop
+  with a refusal if one edit disturbs a match still to come.
+- **`paredit inspect resolve`.** Reports what a selector names — path, byte
+  span, start and end line/column, kind, head, stable id, preview, and every
+  pattern capture — without acting on it. Never refuses an ambiguous selector,
+  since seeing all the matches is how you decide whether to narrow.
+  `--fail-on-empty` makes "no match" an exit code for scripts.
+- `inspect form` accepts the whole selector surface, so
+  `inspect form --name parse-header` turns a name into a path in one call. Its
+  JSON now reports the *resolved* path for `--at` and the other coordinate
+  selectors, where it previously reported `null`.
 - `inspect capabilities --schema-version 3` reports a `dialect_contract` in
   which every one of the 2760 command/dialect cells is answered. Previously
   2720 of them said `unknown`. Cells gain a fourth status, `silent`: the

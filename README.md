@@ -33,6 +33,11 @@ command list. For machine-readable discovery, run
 paredit inspect check --file src/example.lisp
 paredit edit wrap --file src/example.lisp --path 0.2 --diff
 paredit refactor plan --symbol old-name src/example.lisp
+
+# Name a form without counting parentheses: by definition name, by editor
+# coordinate, or by shape. `inspect resolve` shows what a selector matches.
+paredit inspect resolve --file src/example.lisp --query '(defun ?name ...)'
+paredit edit wrap --file src/example.lisp --name parse-header --diff
 ```
 
 ## Install

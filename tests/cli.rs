@@ -395,6 +395,8 @@ mod rename_control;
 mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
+#[path = "cli/selector.rs"]
+mod selector;
 #[path = "cli/self_assignment_report.rs"]
 mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]
