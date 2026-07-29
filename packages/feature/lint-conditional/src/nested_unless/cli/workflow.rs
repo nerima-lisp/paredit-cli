@@ -3,37 +3,28 @@ use paredit_core_cli::CommandResult;
 use crate::nested_unless::cli::args::NestedUnlessReportArgs;
 use crate::nested_unless::cli::render::print_nested_unless_report;
 use crate::nested_unless::usecase::{
-    NestedUnlessPolicyOptions, collect_nested_unlesses, evaluate_nested_unless_policy,
-    summarize_nested_unlesses,
+    build_nested_unless_report, evaluate_fail_on_violation_policy,
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 pub fn nested_unless_report(args: NestedUnlessReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let mut unless_form_count = 0;
-    let mut violations = Vec::new();
-
+    let mut reports = Vec::with_capacity(files.len());
     for file in &files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_form_count, file_violations) = collect_nested_unlesses(file, dialect, &tree)?;
-        unless_form_count += file_form_count;
-        violations.extend(file_violations);
+        reports.push(build_nested_unless_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_nested_unlesses(unless_form_count, violations);
-    let policy = evaluate_nested_unless_policy(
-        NestedUnlessPolicyOptions::new(args.fail_on_violation),
-        &summary,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_nested_unless_report(&summary, &policy, args.output)?;
+    print_nested_unless_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "nested-unless-report policy failed: {policy_message}"
+            "nested-unless-report policy failed: {message}"
         )));
     }
 
