@@ -284,7 +284,14 @@ fn rule_id(command: &str, kind: &str) -> String {
 pub fn junit(flat: &Flattened) -> String {
     let grouped = flat.by_path();
     let failures = flat.rows.len();
-    let clean_files = flat.file_count - grouped.len() - flat.skipped.len();
+    // Saturating: the same path can be reported twice in one run (a caller may
+    // list it twice, or a directory scan may reach it by two routes), which
+    // collapses in `grouped` and would otherwise underflow this subtraction
+    // into a panic on a debug build.
+    let clean_files = flat
+        .file_count
+        .saturating_sub(grouped.len())
+        .saturating_sub(flat.skipped.len());
     let tests = failures + clean_files + flat.skipped.len();
 
     let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
