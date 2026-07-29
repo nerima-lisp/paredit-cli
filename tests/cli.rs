@@ -103,6 +103,8 @@ mod defpackage_quoted_report;
 mod dependency_report;
 #[path = "cli/destructive_literal_report.rs"]
 mod destructive_literal_report;
+#[path = "cli/determinism_contract.rs"]
+mod determinism_contract;
 #[path = "cli/dialect_contract.rs"]
 mod dialect_contract;
 #[path = "cli/double_reverse_report.rs"]
@@ -399,6 +401,8 @@ mod rename_control;
 mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
+#[path = "cli/run_controls.rs"]
+mod run_controls;
 #[path = "cli/self_assignment_report.rs"]
 mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]

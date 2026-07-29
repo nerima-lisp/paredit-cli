@@ -81,6 +81,71 @@ accepts `--fail-on-no-change`, which turns a zero-match rename from a silent
 no-op into an exit-1 failure — pass it whenever you expect the rename to do
 something.
 
+## Run-wide controls
+
+Three flags apply to every command, so a harness can append them to a command
+line it did not construct.
+
+**`--dry-run`** (or `PAREDIT_DRY_RUN=1`) writes nothing. It removes `--write`
+before the command sees it — `--write` is the one flag every mutating command
+in this tool spells the same way, which is what makes one uniform meaning
+possible — and says on stderr that it did. The result still goes to stdout, so
+it is a preview rather than a refusal.
+
+**`--progress`** emits JSON Lines on stderr, one object per line:
+
+```
+{"event":"discovered","files":214,"root":"src"}
+{"event":"file","sequence":1,"path":"src/core.lisp"}
+{"event":"file","sequence":2,"path":"src/reader.lisp"}
+```
+
+stderr because stdout is the report contract; JSON Lines because a line is
+complete the moment it is written, so a reader can act on it before the run
+ends. `sequence` counts up, so a consumer can tell it missed a line. Progress
+never changes stdout.
+
+**`--no-config` / `--config` / `--no-config-env`** are the configuration
+controls — see [Configuration](configuration.md).
+
+## Discovering the gates
+
+Every command that can fail on a policy publishes its gates in
+`inspect capabilities`:
+
+```json
+{
+  "name": "lint",
+  "gates": [
+    { "flag": "--fail-on", "kind": "severity", "exit_code": 3, "help": "..." },
+    { "flag": "--fail-on-finding", "kind": "presence", "exit_code": 3, "help": "..." }
+  ]
+}
+```
+
+There are three kinds, and the spelling tells you which:
+
+| Spelling | `kind` | Fails when |
+| --- | --- | --- |
+| `--fail-on <severity>` | `severity` | a finding at or above the level |
+| `--fail-on-<thing>` | `presence` | any `<thing>` was found |
+| `--require-<thing> <N>` | `minimum` | fewer than `N` were found |
+
+The field is **absent**, not empty, on a command with no gate, so "cannot fail
+on a policy" and "we did not look" stay distinguishable. A contract test
+enforces the convention, so a gate that does not follow it cannot ship.
+
+## Determinism
+
+Same input, same bytes. Identical invocations over identical sources produce
+byte-identical stdout, across processes and across runs — which is what makes
+it safe to cache a report, diff two of them, or hash one into a manifest.
+
+This is checked rather than intended: a contract test runs a sample of reports
+and edits twice in separate processes and compares bytes. Rust randomises its
+hash seed per process, so a finding rendered in `HashMap` iteration order fails
+that test immediately rather than intermittently in your pipeline.
+
 ## Fitting a report in a context window
 
 `inspect agent-report` takes three flags that matter when the report has to

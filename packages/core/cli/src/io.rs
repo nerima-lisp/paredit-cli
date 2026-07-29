@@ -368,6 +368,10 @@ fn describe_refused_input_link(path: &FsPath, error: io::Error) -> io::Error {
 pub fn read_input(file: Option<PathBuf>) -> CliResult<SourceInput> {
     match file {
         Some(path) => {
+            // Every multi-file command reaches its files through here, so one
+            // event at this point gives per-file progress across the tool
+            // without any command's loop knowing progress exists.
+            crate::progress::file_read(&path);
             let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES)?;
             Ok(SourceInput {
                 text,

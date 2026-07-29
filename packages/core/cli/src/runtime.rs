@@ -100,6 +100,14 @@ pub struct RuntimeSettings {
     /// Approximate token budget for a report. Zero means no budget.
     pub max_tokens: usize,
     pub language: Language,
+    /// Emit JSON Lines progress on stderr.
+    pub progress: bool,
+    /// Nothing may be written to disk.
+    ///
+    /// Resolved before argument parsing rather than per command, because its
+    /// value is "no command in this process writes" — a property of the run,
+    /// not of one invocation's arguments.
+    pub dry_run: bool,
 }
 
 static RUNTIME: OnceLock<RuntimeSettings> = OnceLock::new();

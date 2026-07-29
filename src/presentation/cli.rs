@@ -100,9 +100,20 @@ pub(crate) use shared::{read_input_dialect_and_tree, terminal_safe, terminal_saf
     after_help = "Canonical namespaces:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form; stdout by default, --write to update the file.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAll source-facing commands live in these three namespaces.\n`paredit completions <shell>` prints a shell completion script.\nRun `paredit inspect capabilities --output json` for a machine-readable catalog of every command and flag."
 )]
 struct Cli {
+    /// Write nothing to disk. Suppresses --write on every command, whatever
+    /// else the command line says, so a wrapper can append it unconditionally.
+    #[arg(long, global = true)]
+    dry_run: bool,
+    /// Emit JSON Lines progress on stderr, one object per line, for
+    /// operations long enough that silence looks like a hang.
+    #[arg(long, global = true)]
+    progress: bool,
     #[command(subcommand)]
     command: Command,
 }
+
+/// The environment spelling of `--dry-run`, for wrapping a whole session.
+const DRY_RUN_VAR: &str = "PAREDIT_DRY_RUN";
 
 #[must_use]
 pub fn run() -> ExitCode {
@@ -112,6 +123,55 @@ pub fn run() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_failure(&error, &invocation),
     }
+}
+
+/// Whether this run may not write.
+fn is_dry_run(argv: &[String]) -> bool {
+    argv.iter().any(|token| token == "--dry-run")
+        || std::env::var(DRY_RUN_VAR).is_ok_and(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+}
+
+/// Removes `--write` when the run is a dry run.
+///
+/// `--write` is the one flag every mutating command in this tool spells the
+/// same way, which is what makes a single uniform `--dry-run` possible at all:
+/// removing it is exactly "write nothing", on all ~80 mutating commands, with
+/// no argument struct having to know the flag exists.
+///
+/// Done here rather than inside each command so a harness can append
+/// `--dry-run` to a command line it did not construct and be certain. A
+/// per-command opt-in would be a guarantee with 80 places to have missed.
+fn suppress_writes_when_dry(argv: Vec<String>) -> Vec<String> {
+    if !is_dry_run(&argv) {
+        return argv;
+    }
+
+    let mut suppressed = false;
+    let mut kept = Vec::with_capacity(argv.len());
+    let mut past_separator = false;
+    for token in argv {
+        // After `--` everything is a file name, and one that happens to be
+        // called `--write` is still a file name.
+        if token == "--" {
+            past_separator = true;
+        }
+        if !past_separator && token == "--write" {
+            suppressed = true;
+            continue;
+        }
+        kept.push(token);
+    }
+
+    // Never silent: the caller asked for a write and is not getting one.
+    if suppressed {
+        eprintln!("Note: --dry-run suppressed --write; nothing will be written.");
+    }
+    kept
 }
 
 /// Prints a failure with its stable code and whatever would get past it, in
@@ -177,7 +237,7 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
 fn bootstrap() -> Cli {
     use clap::CommandFactory;
 
-    let argv: Vec<String> = std::env::args().collect();
+    let argv = suppress_writes_when_dry(std::env::args().collect());
     let loaded = match config::workflow::load(&config::args::ConfigLocationArgs::default()) {
         Ok(loaded) => loaded,
         Err(error) => {
@@ -189,7 +249,11 @@ fn bootstrap() -> Cli {
         }
     };
 
-    paredit_core_cli::runtime::install(config::runtime::resolve(&loaded.settings));
+    let mut runtime = config::runtime::resolve(&loaded.settings);
+    let raw: Vec<String> = std::env::args().collect();
+    runtime.dry_run = is_dry_run(&raw);
+    runtime.progress = raw.iter().any(|token| token == "--progress");
+    paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file
     // that `config check` would reject turns a fixable diagnostic into a

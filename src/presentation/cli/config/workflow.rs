@@ -123,7 +123,7 @@ pub fn schema_report(args: ConfigSchemaArgs) -> Result<()> {
 pub fn init(args: ConfigInitArgs) -> Result<()> {
     let contents = template(args.all_keys);
 
-    if args.dry_run {
+    if paredit_core_cli::runtime::current().dry_run {
         print!("{contents}");
         return Ok(());
     }

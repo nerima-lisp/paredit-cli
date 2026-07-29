@@ -307,7 +307,9 @@ pub fn expand_input_files(
                 max_depth: runtime.max_depth,
                 exclude: runtime.exclude_paths.clone(),
             })?;
-            for discovered in discovery.into_files() {
+            let files = discovery.into_files();
+            crate::progress::discovered(files.len(), input);
+            for discovered in files {
                 push_unique_path(&mut expanded, &mut seen, discovered);
             }
         } else {

@@ -75,11 +75,8 @@ pub struct ConfigInitArgs {
     /// Write every key, including the ones already at their default.
     #[arg(long)]
     pub all_keys: bool,
-    /// Print the file to stdout instead of writing it.
-    #[arg(long)]
-    pub dry_run: bool,
-    /// Output format for agent consumption. Ignored with --dry-run, whose
-    /// payload is the file itself.
+    /// Output format for agent consumption. Ignored with the global
+    /// --dry-run, whose payload is the file itself.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,
 }
