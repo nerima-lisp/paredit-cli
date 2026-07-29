@@ -27,13 +27,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal `t` (no reader prefixes).
 fn is_literal_t(view: &ExpressionView) -> bool {
@@ -49,51 +51,60 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct CondTClauseItem {
-    pub path: PathBuf,
     /// The span of the whole `(cond (t body…))` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the clause body (`body…`, test and parens excluded), spliced
     /// into `(progn …)`.
+    ///
+    /// Both the rewrite's input and part of the report: the old renderer
+    /// published it, and a consumer building its own rewrite needs the same
+    /// extent the lint rule splices.
     pub body_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct CondTClauseSummary {
-    pub cond_form_count: usize,
-    pub violations: Vec<CondTClauseItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CondTClausePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl CondTClausePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for CondTClauseItem {
+    /// The rule's own name. A single-`t`-clause `cond` has exactly one shape and
+    /// one rewrite, so there is no variant to split on.
+    fn kind(&self) -> &'static str {
+        "cond-t-clause"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct CondTClausePolicy {
-    pub fail_on_violation: bool,
-    pub cond_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "body_span",
+            json!({
+                "start": self.body_span.start().get(),
+                "end": self.body_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `cond-t-clause` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "single t-clause cond is just progn; (cond (t a b)) is (progn a b)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cond(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     cond_form_count: &mut usize,
     violations: &mut Vec<CondTClauseItem>,
 ) {
@@ -130,73 +141,82 @@ pub fn examine_cond(
     let body_end = clause.children[clause.children.len() - 1].span.end();
 
     violations.push(CondTClauseItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         body_span: ByteSpan::new(body_start, body_end),
     });
 }
 
-/// Collects every single-`t`-clause `cond` across a whole file, along with the
-/// total number of `cond` forms scanned.
-pub fn collect_cond_t_clauses(
+/// Collects every single-`t`-clause `cond` in one file, with the number of
+/// `cond` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no unconditional cond here" for Common
+/// Lisp and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_cond_t_clause_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<CondTClauseItem>)> {
+) -> LintResult<FileFindings<CondTClauseItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("cond_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut cond_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_cond(subview, path, &mut cond_form_count, &mut violations);
+            examine_cond(subview, source, &mut cond_form_count, &mut violations);
         });
     }
-    Ok((cond_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("cond_form_count", json!(cond_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_cond_t_clauses(
-    cond_form_count: usize,
-    violations: Vec<CondTClauseItem>,
-) -> CondTClauseSummary {
-    CondTClauseSummary {
-        cond_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_cond_t_clause_policy(
-    options: CondTClausePolicyOptions,
-    summary: &CondTClauseSummary,
-) -> CondTClausePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    CondTClausePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        cond_form_count: summary.cond_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn conds(input: &str) -> (usize, Vec<CondTClauseItem>) {
+    fn report(input: &str) -> FileFindings<CondTClauseItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_cond_t_clauses(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect cond-t-clause")
+        build_cond_t_clause_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build cond-t-clause report")
+    }
+
+    /// The `(cond_form_count, violations)` pair the report is built from.
+    fn conds(input: &str) -> (u64, Vec<CondTClauseItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "cond_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("cond_form_count in the summary");
+        (count, report.findings)
     }
 
     fn body<'a>(source: &'a str, item: &CondTClauseItem) -> &'a str {
@@ -252,26 +272,47 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(cond (t a))", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_cond_t_clauses(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect cond-t-clause");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_cond_t_clause_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build cond-t-clause report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("cond_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = conds("(cond (t a))");
-        let summary = summarize_cond_t_clauses(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(cond (p a))").dialect_modelled);
+    }
 
-        let quiet = evaluate_cond_t_clause_policy(CondTClausePolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_body_span() {
+        let source = "(defun f ()\n  (cond (t a b)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "cond-t-clause");
+        assert_eq!(body(source, finding), "a b");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "body_span",
+                json!({
+                    "start": finding.body_span.start().get(),
+                    "end": finding.body_span.end().get(),
+                })
+            )]
+        );
+    }
 
-        let strict = evaluate_cond_t_clause_policy(CondTClausePolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_cond_scanned_not_only_the_flagged_ones() {
+        let report = report("(cond (t a))\n(cond (p a) (q b))\n");
+        assert_eq!(report.summary, vec![("cond_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

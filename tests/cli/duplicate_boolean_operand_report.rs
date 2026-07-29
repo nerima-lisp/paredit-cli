@@ -14,8 +14,12 @@ fn cli_reports_a_repeated_operand_in_an_or() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 1"))
-        .stdout(predicate::str::contains("\"operand\": \"x\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"boolean_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"head\": \"or\""))
+        .stdout(predicate::str::contains("\"operand\": \"x\""))
+        .stdout(predicate::str::contains("\"occurrence_count\": 2"));
 }
 
 #[test]
@@ -32,7 +36,7 @@ fn cli_finds_a_boolean_nested_in_a_function_body() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
 
 #[test]
@@ -49,7 +53,48 @@ fn cli_does_not_flag_distinct_operands() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no repeat in one `and` form" from
+        // "no boolean form at all".
+        .stdout(predicate::str::contains("\"boolean_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_duplicate_boolean_operands_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("duplicate-boolean-operand-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn check [x] (or x x))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "duplicate-boolean-operands", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_duplicate_boolean_operands_emits_sarif() {
+    let dir = fresh_temp_dir("duplicate-boolean-operand-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(or x y x)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "duplicate-boolean-operands", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/duplicate-boolean-operands/duplicate-boolean-operands\"",
+        ))
+        .stdout(predicate::str::contains("or repeats operand x (2×)"));
 }
 
 #[test]
@@ -85,5 +130,5 @@ fn cli_duplicate_boolean_operands_passes_gate_when_all_operands_are_distinct() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
 }

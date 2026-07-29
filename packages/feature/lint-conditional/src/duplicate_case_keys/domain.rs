@@ -19,13 +19,15 @@
 //! string), matching `eql`.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const CASE_HEADS: [&str; 3] = ["case", "ecase", "ccase"];
 
@@ -62,50 +64,66 @@ fn clause_keys(clause: &ExpressionView) -> Vec<&str> {
 
 #[derive(Debug, Clone)]
 pub struct DuplicateCaseKeyItem {
-    pub path: PathBuf,
+    /// The span of the whole `case`/`ecase`/`ccase` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
+    /// The case operator as it is spelled in source.
     pub head: String,
+    /// The repeated key, in its first-seen spelling.
     pub key: String,
+    /// How many clauses match it.
     pub occurrence_count: usize,
 }
 
-#[derive(Debug)]
-pub struct DuplicateCaseKeySummary {
-    pub case_form_count: usize,
-    pub duplicates: Vec<DuplicateCaseKeyItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateCaseKeyPolicyOptions {
-    fail_on_duplicate: bool,
-}
-
-impl DuplicateCaseKeyPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_duplicate: bool) -> Self {
-        Self { fail_on_duplicate }
+impl Finding for DuplicateCaseKeyItem {
+    /// The rule's own name. The three `eql`-comparing operators dispatch
+    /// identically, so a repeated key is the same dead clause in each; the
+    /// operator that carried it stays in the JSON rather than splitting the
+    /// kind.
+    fn kind(&self) -> &'static str {
+        "duplicate-case-keys"
     }
 
-    #[must_use]
-    pub const fn fail_on_duplicate(self) -> bool {
-        self.fail_on_duplicate
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DuplicateCaseKeyPolicy {
-    pub fail_on_duplicate: bool,
-    pub case_form_count: usize,
-    pub duplicate_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("head={}", self.head),
+            format!("key={}", self.key),
+            format!("count={}", self.occurrence_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("key", json!(self.key)),
+            ("occurrence_count", json!(self.occurrence_count)),
+        ]
+    }
+
+    /// The same sentence the `duplicate-case-keys` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} repeats key {} ({}×)",
+            self.head, self.key, self.occurrence_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     case_form_count: &mut usize,
     duplicates: &mut Vec<DuplicateCaseKeyItem>,
 ) {
@@ -140,8 +158,8 @@ pub fn examine_case(
             continue;
         }
         duplicates.push(DuplicateCaseKeyItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             head: head.to_owned(),
             key: key.clone(),
             occurrence_count: *occurrence_count,
@@ -149,67 +167,76 @@ pub fn examine_case(
     }
 }
 
-/// Collects every duplicated `case`/`ecase`/`ccase` key across a whole file,
-/// along with the total number of such forms scanned.
-pub fn collect_duplicate_case_keys(
+/// Collects every duplicated `case`/`ecase`/`ccase` key in one file, with the
+/// number of such forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated key here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_duplicate_case_key_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateCaseKeyItem>)> {
+) -> LintResult<FileFindings<DuplicateCaseKeyItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("case_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut case_form_count = 0;
     let mut duplicates = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, path, &mut case_form_count, &mut duplicates);
+            examine_case(subview, source, &mut case_form_count, &mut duplicates);
         });
     }
-    Ok((case_form_count, duplicates))
-}
 
-#[must_use]
-pub const fn summarize_duplicate_case_keys(
-    case_form_count: usize,
-    duplicates: Vec<DuplicateCaseKeyItem>,
-) -> DuplicateCaseKeySummary {
-    DuplicateCaseKeySummary {
-        case_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
         duplicates,
-    }
+        vec![("case_form_count", json!(case_form_count))],
+    ))
 }
 
-#[must_use]
-pub fn evaluate_duplicate_case_key_policy(
-    options: DuplicateCaseKeyPolicyOptions,
-    summary: &DuplicateCaseKeySummary,
-) -> DuplicateCaseKeyPolicy {
-    let duplicate_count = summary.duplicates.len();
-    let mut violations = Vec::new();
-    if options.fail_on_duplicate() && duplicate_count > 0 {
-        violations.push(format!("duplicate_count {duplicate_count} exceeds 0"));
-    }
-
-    DuplicateCaseKeyPolicy {
-        fail_on_duplicate: options.fail_on_duplicate(),
-        case_form_count: summary.case_form_count,
-        duplicate_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn duplicates(input: &str) -> (usize, Vec<DuplicateCaseKeyItem>) {
-        let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_duplicate_case_keys(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect duplicate case keys")
+    fn report(input: &str) -> FileFindings<DuplicateCaseKeyItem> {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
+        build_duplicate_case_key_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build duplicate case key report")
+    }
+
+    /// The `(case_form_count, duplicates)` pair the report is built from.
+    fn duplicates(input: &str) -> (u64, Vec<DuplicateCaseKeyItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "case_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("case_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -262,28 +289,52 @@ mod tests {
         assert!(duplicates.is_empty());
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
-        let tree = SyntaxTree::parse("(case x (:a 1) (:a 2))").expect("parse input");
-        let (case_form_count, duplicates) =
-            collect_duplicate_case_keys(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect duplicate case keys");
-        assert_eq!(case_form_count, 0);
-        assert!(duplicates.is_empty());
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
+        let tree = SyntaxTree::parse_with_dialect("(case x (:a 1) (:a 2))", Dialect::Clojure)
+            .expect("parse input");
+        let report = build_duplicate_case_key_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build duplicate case key report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("case_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (case_form_count, dups) = duplicates("(case x (:a 1) (:a 2))");
-        let summary = summarize_duplicate_case_keys(case_form_count, dups);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(case x (:a 1))").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_duplicate_case_key_policy(DuplicateCaseKeyPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.duplicate_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_key_and_its_count() {
+        let report = report("(defun f (x)\n  (case x (:a 1) (:b 2) (:a 3)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "duplicate-case-keys");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("head", json!("case")),
+                ("key", json!(":a")),
+                ("occurrence_count", json!(2)),
+            ]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "head=case".to_owned(),
+                "key=:a".to_owned(),
+                "count=2".to_owned()
+            ]
+        );
+    }
 
-        let strict =
-            evaluate_duplicate_case_key_policy(DuplicateCaseKeyPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_case_scanned_not_only_the_flagged_ones() {
+        let report = report("(case x (:a 1) (:a 2))\n(case y (:b 1))\n");
+        assert_eq!(report.summary, vec![("case_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

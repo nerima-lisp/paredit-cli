@@ -3,36 +3,26 @@ use paredit_core_cli::CommandResult;
 use crate::dead_boolean_operand::cli::args::DeadBooleanOperandReportArgs;
 use crate::dead_boolean_operand::cli::render::print_dead_boolean_operand_report;
 use crate::dead_boolean_operand::usecase::{
-    DeadBooleanOperandPolicyOptions, collect_dead_boolean_operands,
-    evaluate_dead_boolean_operand_policy, summarize_dead_boolean_operands,
+    build_dead_boolean_operand_report, evaluate_fail_on_violation_policy,
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn dead_boolean_operand_report(args: DeadBooleanOperandReportArgs) -> CommandResult {
-    let mut boolean_form_count = 0;
-    let mut violations = Vec::new();
-
+    let mut reports = Vec::with_capacity(args.files.len());
     for file in &args.files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_boolean_form_count, file_violations) =
-            collect_dead_boolean_operands(file, dialect, &tree)?;
-        boolean_form_count += file_boolean_form_count;
-        violations.extend(file_violations);
+        reports.push(build_dead_boolean_operand_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_dead_boolean_operands(boolean_form_count, violations);
-    let policy = evaluate_dead_boolean_operand_policy(
-        DeadBooleanOperandPolicyOptions::new(args.fail_on_violation),
-        &summary,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_dead_boolean_operand_report(&summary, &policy, args.output)?;
+    print_dead_boolean_operand_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "dead-boolean-operand-report policy failed: {policy_message}"
+            "dead-boolean-operand-report policy failed: {message}"
         )));
     }
 

@@ -14,8 +14,12 @@ fn cli_flags_when_t() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"when_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"progn\""))
         .stdout(predicate::str::contains("\"head\": \"when\""))
+        .stdout(predicate::str::contains("\"test\": \"t\""))
         .stdout(predicate::str::contains("\"always_runs\": true"));
 }
 
@@ -33,7 +37,8 @@ fn cli_flags_unless_t_as_dead() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"dead\""))
         .stdout(predicate::str::contains("\"always_runs\": false"));
 }
 
@@ -51,7 +56,50 @@ fn cli_does_not_flag_a_variable_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no constant test in two `when`
+        // forms" from "no `when` form at all".
+        .stdout(predicate::str::contains("\"when_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_constant_when_test_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("constant-when-test-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn go [] (when true 1))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "constant-when-test", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_constant_when_test_emits_sarif() {
+    let dir = fresh_temp_dir("constant-when-test-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(when nil (dead))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "constant-when-test", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/constant-when-test/dead\"",
+        ))
+        .stdout(predicate::str::contains(
+            "when test is the constant nil; the body never runs, so this is nil",
+        ));
 }
 
 #[test]
