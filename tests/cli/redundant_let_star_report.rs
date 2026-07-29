@@ -14,8 +14,10 @@ fn cli_flags_single_binding_let_star() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"binding_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"binding_count\": 1"))
+        .stdout(predicate::str::contains("\"let_star_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"));
 }
 
 #[test]
@@ -55,7 +57,56 @@ fn cli_does_not_flag_multi_binding_or_plain_let() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "two let* forms, neither
+        // redundant" from "no let* at all"; the plain let is not one.
+        .stdout(predicate::str::contains("\"let_star_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_redundant_let_star_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("redundant-let-star-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(let* ((x 1)) x)\n").expect("write a.clj");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-let-star")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_redundant_let_star_emits_sarif() {
+    let dir = fresh_temp_dir("redundant-let-star-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(let* ((x 1)) x)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-let-star")
+        .arg("--output")
+        .arg("sarif")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/redundant-let-star/redundant-let-star\"",
+        ))
+        .stdout(predicate::str::contains(
+            "let* with 1 binding is just let; sequential scope is unused",
+        ));
 }
 
 #[test]

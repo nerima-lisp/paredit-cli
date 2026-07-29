@@ -17,60 +17,68 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone)]
 pub struct RedundantIdentityItem {
-    pub path: PathBuf,
     /// The span of the whole `(identity X)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the argument `X` (lets a fix substitute its source).
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to splice
+    /// the argument in, and the command never printed it.
     pub inner_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct RedundantIdentitySummary {
-    pub identity_form_count: usize,
-    pub violations: Vec<RedundantIdentityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantIdentityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantIdentityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantIdentityItem {
+    /// The rule's own name. Every finding is the same unwrapping; there is
+    /// nothing to discriminate on.
+    fn kind(&self) -> &'static str {
+        "redundant-identity"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantIdentityPolicy {
-    pub fail_on_violation: bool,
-    pub identity_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// None. The old text row carried the path and offset the envelope now
+    /// prints itself, and nothing else.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// None. The old JSON carried only the path and span, both of which the
+    /// envelope now emits itself.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `redundant-identity` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "identity returns its argument unchanged; (identity x) is x".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_identity(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     identity_form_count: &mut usize,
     violations: &mut Vec<RedundantIdentityItem>,
 ) {
@@ -88,73 +96,82 @@ pub fn examine_identity(
     }
 
     violations.push(RedundantIdentityItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         inner_span: view.children[1].span,
     });
 }
 
-/// Collects every redundant `(identity X)` call across a whole file, along with
-/// the total number of `identity` forms scanned.
-pub fn collect_redundant_identities(
+/// Collects every redundant `(identity X)` call in one file, with the number of
+/// `identity` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no identity call here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_identity_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantIdentityItem>)> {
+) -> LintResult<FileFindings<RedundantIdentityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("identity_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut identity_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_identity(subview, path, &mut identity_form_count, &mut violations);
+            examine_identity(subview, source, &mut identity_form_count, &mut violations);
         });
     }
-    Ok((identity_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("identity_form_count", json!(identity_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_redundant_identities(
-    identity_form_count: usize,
-    violations: Vec<RedundantIdentityItem>,
-) -> RedundantIdentitySummary {
-    RedundantIdentitySummary {
-        identity_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_identity_policy(
-    options: RedundantIdentityPolicyOptions,
-    summary: &RedundantIdentitySummary,
-) -> RedundantIdentityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantIdentityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        identity_form_count: summary.identity_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn identities(input: &str) -> (usize, Vec<RedundantIdentityItem>) {
+    fn report(input: &str) -> FileFindings<RedundantIdentityItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_identities(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant identities")
+        build_redundant_identity_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant identity report")
+    }
+
+    /// The `(identity_form_count, violations)` pair the report is built from.
+    fn identities(input: &str) -> (u64, Vec<RedundantIdentityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "identity_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("identity_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -204,30 +221,37 @@ mod tests {
         assert_eq!(slice("(list (identity y))", violations[0].inner_span), "y");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(identity x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_redundant_identities(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant identities");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_redundant_identity_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build redundant identity report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("identity_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = identities("(identity x)");
-        let summary = summarize_redundant_identities(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(identity)").dialect_modelled);
+    }
 
-        let quiet = evaluate_redundant_identity_policy(
-            RedundantIdentityPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_no_extra_fields() {
+        let report = report("(defun echo (x)\n  (identity x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "redundant-identity");
+        assert!(finding.text_columns().is_empty());
+        assert!(finding.json_fields().is_empty());
+    }
 
-        let strict =
-            evaluate_redundant_identity_policy(RedundantIdentityPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_identity_scanned_not_only_the_flagged_ones() {
+        let report = report("(identity x)\n(identity a b)\n");
+        assert_eq!(report.summary, vec![("identity_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

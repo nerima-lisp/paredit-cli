@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// binding list containing one has no settled binding count.
@@ -37,52 +39,58 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct RedundantLetStarItem {
-    pub path: PathBuf,
     /// The span of the whole `(let* … …)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the `let*` head symbol (for the head-only rewrite to `let`).
+    ///
+    /// The rewrite's input, not the report's: the lint rule replaces exactly
+    /// these bytes with `let`, and the command never printed it.
     pub head_span: ByteSpan,
     /// The number of bindings (0 or 1) that made the `let*` redundant.
     pub binding_count: usize,
 }
 
-#[derive(Debug)]
-pub struct RedundantLetStarSummary {
-    pub let_star_form_count: usize,
-    pub violations: Vec<RedundantLetStarItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantLetStarPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantLetStarPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantLetStarItem {
+    /// The rule's own name. The binding count is a number, not a tag, so it
+    /// stays a JSON field.
+    fn kind(&self) -> &'static str {
+        "redundant-let-star"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantLetStarPolicy {
-    pub fail_on_violation: bool,
-    pub let_star_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("bindings={}", self.binding_count)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("binding_count", json!(self.binding_count))]
+    }
+
+    /// The same sentence the `redundant-let-star` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "let* with {} binding{} is just let; sequential scope is unused",
+            self.binding_count,
+            if self.binding_count == 1 { "" } else { "s" }
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let_star(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     let_star_form_count: &mut usize,
     violations: &mut Vec<RedundantLetStarItem>,
 ) {
@@ -114,74 +122,83 @@ pub fn examine_let_star(
     }
 
     violations.push(RedundantLetStarItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         head_span: view.children[0].span,
         binding_count,
     });
 }
 
-/// Collects every redundant `let*` (≤ 1 binding) across a whole file, along
-/// with the total number of `let*` forms scanned.
-pub fn collect_redundant_let_stars(
+/// Collects every redundant `let*` (≤ 1 binding) in one file, with the number
+/// of `let*` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant let* here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_let_star_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantLetStarItem>)> {
+) -> LintResult<FileFindings<RedundantLetStarItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("let_star_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut let_star_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let_star(subview, path, &mut let_star_form_count, &mut violations);
+            examine_let_star(subview, source, &mut let_star_form_count, &mut violations);
         });
     }
-    Ok((let_star_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("let_star_form_count", json!(let_star_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_redundant_let_stars(
-    let_star_form_count: usize,
-    violations: Vec<RedundantLetStarItem>,
-) -> RedundantLetStarSummary {
-    RedundantLetStarSummary {
-        let_star_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_let_star_policy(
-    options: RedundantLetStarPolicyOptions,
-    summary: &RedundantLetStarSummary,
-) -> RedundantLetStarPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantLetStarPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        let_star_form_count: summary.let_star_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn let_stars(input: &str) -> (usize, Vec<RedundantLetStarItem>) {
+    fn report(input: &str) -> FileFindings<RedundantLetStarItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_let_stars(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant let*")
+        build_redundant_let_star_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant let* report")
+    }
+
+    /// The `(let_star_form_count, violations)` pair the report is built from.
+    fn let_stars(input: &str) -> (u64, Vec<RedundantLetStarItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "let_star_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("let_star_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -252,29 +269,38 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(let* ((x 1)) x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_redundant_let_stars(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant let*");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_redundant_let_star_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build redundant let* report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("let_star_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = let_stars("(let* ((x 1)) x)");
-        let summary = summarize_redundant_let_stars(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(let ((x 1)) x)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_redundant_let_star_policy(RedundantLetStarPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_binding_count() {
+        let report = report("(defun f ()\n  (let* ((x 1)) x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "redundant-let-star");
+        assert_eq!(finding.json_fields(), vec![("binding_count", json!(1))]);
+        assert_eq!(finding.text_columns(), vec!["bindings=1".to_owned()]);
+    }
 
-        let strict =
-            evaluate_redundant_let_star_policy(RedundantLetStarPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_let_star_scanned_not_only_the_flagged_ones() {
+        let report = report("(let* ((x 1)) x)\n(let* ((a 1) (b a)) b)\n");
+        assert_eq!(report.summary, vec![("let_star_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
