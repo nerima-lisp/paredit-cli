@@ -144,13 +144,14 @@ pub const DIALECT_CHOICES: [&str; Dialect::ALL.len()] = {
 const OUTPUT_FORMATS: &[&str] = &["text", "json"];
 const VERBOSITIES: &[&str] = &["quiet", "normal", "detailed"];
 const LANGUAGES: &[&str] = &["en", "ja"];
+const COLOR_MODES: &[&str] = &["auto", "always", "never"];
 const LINT_PRESETS: &[&str] = &["minimal", "recommended", "pedantic", "all"];
 const FAIL_SEVERITIES: &[&str] = &["never", "warning", "error"];
 
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 27;
+pub const KEY_COUNT: usize = 28;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -325,6 +326,12 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         kind: ValueKind::Choice(LANGUAGES),
         default: DefaultValue::Text("en"),
         summary: "Language for diagnostics and gate messages. Report payloads stay in English.",
+    },
+    KeySchema {
+        key: "output.color",
+        kind: ValueKind::Choice(COLOR_MODES),
+        default: DefaultValue::Text("auto"),
+        summary: "Whether text output may use ANSI color: follow the terminal, force on, or force off.",
     },
 ];
 

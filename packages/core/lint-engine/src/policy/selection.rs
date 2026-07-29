@@ -1,6 +1,6 @@
 //! Choosing which rules a run applies.
 
-use crate::error::RuleSelectionError;
+use crate::error::{RuleSelectionError, did_you_mean};
 use crate::model::{RuleCategory, RuleName, RuleTag};
 use crate::rule::RuleCatalog;
 
@@ -101,6 +101,7 @@ pub fn resolve_active_rules(
     for name in filter.only.iter().chain(filter.exclude) {
         if !rules.contains(&name.as_str()) {
             return Err(RuleSelectionError::UnknownRule {
+                suggestion: did_you_mean(rules.iter().copied(), name),
                 name: name.clone(),
                 valid: rules.join(", "),
             });
@@ -109,6 +110,7 @@ pub fn resolve_active_rules(
     for name in filter.categories {
         if !category_names.contains(&name.as_str()) {
             return Err(RuleSelectionError::UnknownCategory {
+                suggestion: did_you_mean(category_names.iter().copied(), name),
                 name: name.clone(),
                 valid: category_names.join(", "),
             });
@@ -116,13 +118,11 @@ pub fn resolve_active_rules(
     }
     let mut wanted_tags = Vec::with_capacity(filter.tags.len());
     for name in filter.tags {
+        let tag_names: Vec<&str> = RuleTag::ALL.iter().map(|tag| tag.as_str()).collect();
         let tag = RuleTag::parse(name).ok_or_else(|| RuleSelectionError::UnknownTag {
+            suggestion: did_you_mean(tag_names.iter().copied(), name),
             name: name.clone(),
-            valid: RuleTag::ALL
-                .iter()
-                .map(|tag| tag.as_str())
-                .collect::<Vec<_>>()
-                .join(", "),
+            valid: tag_names.join(", "),
         })?;
         wanted_tags.push(tag);
     }
@@ -327,11 +327,17 @@ mod tests {
             ..RuleFilter::default()
         };
         let error = resolve_active_rules(catalog(), &filter).expect_err("typo must not pass");
-        let RuleSelectionError::UnknownTag { name, valid } = error else {
+        let RuleSelectionError::UnknownTag {
+            name,
+            valid,
+            suggestion,
+        } = error
+        else {
             panic!("expected an unknown-tag error");
         };
         assert_eq!(name, "experimentl");
         assert!(valid.contains("experimental"));
+        assert_eq!(suggestion, r#"; did you mean "experimental"?"#);
     }
 
     #[test]

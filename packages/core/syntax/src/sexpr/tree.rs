@@ -382,6 +382,40 @@ pub struct Selection<'a> {
     pub(in crate::sexpr) node_id: NodeId,
 }
 
+/// The most [`SyntaxTree::find_parse_errors`] reports for one document,
+/// however many syntax problems it actually has.
+const MAX_RECOVERED_ERRORS: usize = 50;
+
+/// The byte offset of the next line in `remaining` that starts, at column
+/// zero, with an opening parenthesis — after byte `after`, which is where
+/// the previous attempt failed.
+///
+/// Deliberately column-zero only, not "next non-whitespace after a
+/// newline": a `(` indented under the form that just failed to parse is
+/// still inside the broken structure, and resuming there would re-parse a
+/// fragment of the same problem as if it were a fresh one. Requiring column
+/// zero trades recall - a heavily-indented or non-conventional layout may
+/// hide a real form boundary from this heuristic - for precision: it only
+/// ever resyncs on what is unambiguously a new top-level form in
+/// conventionally formatted Lisp source, which is what this tool's own
+/// `edit format` produces and what virtually all Lisp source in the wild
+/// looks like.
+fn next_top_level_form_start(remaining: &str, after: usize) -> Option<usize> {
+    let bytes = remaining.as_bytes();
+    let mut search_from = after;
+    loop {
+        let newline_offset = remaining[search_from..].find('\n')?;
+        let line_start = search_from + newline_offset + 1;
+        if line_start >= bytes.len() {
+            return None;
+        }
+        if bytes[line_start] == b'(' {
+            return Some(line_start);
+        }
+        search_from = line_start;
+    }
+}
+
 impl SyntaxTree {
     /// Append only the closing delimiters needed to balance unclosed lists.
     /// Refuses every other parser error so callers never guess at malformed input.
@@ -405,6 +439,51 @@ impl SyntaxTree {
     ) -> std::result::Result<Self, ParseError> {
         let mut parser = Parser::with_dialect(input, dialect);
         parser.parse()
+    }
+
+    /// Every parse failure in `input`, instead of only the first.
+    ///
+    /// [`Self::parse_with_dialect`] stops at the first malformed form, so a
+    /// document with three unrelated syntax problems costs three round
+    /// trips to see: fix one, re-run, hit the next. This recovers by
+    /// looking, after each failure, for the next line that starts at column
+    /// zero with `(` — the shape essentially every top-level form in
+    /// formatted Lisp source has — and re-parsing from there, so every
+    /// problem in the document is visible in one pass. Bounded at
+    /// [`MAX_RECOVERED_ERRORS`] so a pathological input (a syntax error on
+    /// every line) does a bounded amount of work and produces a bounded
+    /// report rather than one entry per line of a huge file.
+    ///
+    /// Returns no tree, on purpose. Recovery works by re-lexing independent
+    /// suffixes of the document; splicing their partial trees into one
+    /// coherent tree is not attempted, because the byte spans and node
+    /// identities a caller would then act on could not be trusted the way
+    /// [`Self::parse_with_dialect`]'s can. What can be trusted is "these are
+    /// the places parsing broke" — which is what a caller fixing syntax
+    /// errors before ever building a tree actually needs. A clean parse
+    /// returns an empty vector, with the same result [`Self::parse_with_dialect`]
+    /// would have returned `Ok` for.
+    ///
+    /// The column-zero heuristic means single-line or minified source, where
+    /// no such line exists, falls back to exactly [`Self::parse_with_dialect`]'s
+    /// behaviour: one error, the first one.
+    #[must_use]
+    pub fn find_parse_errors(input: &str, dialect: Dialect) -> Vec<ParseError> {
+        let mut errors = Vec::new();
+        let mut offset = 0usize;
+        while offset < input.len() && errors.len() < MAX_RECOVERED_ERRORS {
+            let remaining = &input[offset..];
+            let Err(error) = Self::parse_with_dialect(remaining, dialect) else {
+                break;
+            };
+            let resync = next_top_level_form_start(remaining, error.position());
+            errors.push(error.shifted(offset));
+            let Some(resync) = resync else {
+                break;
+            };
+            offset += resync;
+        }
+        errors
     }
 
     /// Returns the exact source text this tree was parsed from.
