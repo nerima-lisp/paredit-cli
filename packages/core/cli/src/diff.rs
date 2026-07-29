@@ -55,13 +55,25 @@ pub struct DiffStat {
 /// disagreeing about what a "hunk" or a "changed line" is.
 #[must_use]
 pub fn diff_stat(diff: &str) -> DiffStat {
+    // The `--- path` / `+++ path` file headers are written exactly once each,
+    // as the first two lines, so they are skipped by position. Skipping them
+    // by prefix instead dropped real content: a removed source line whose own
+    // text begins with `--` renders as `---...`, and Lisp sources do contain
+    // such lines (`--x` is a symbol; a `#'-`-heavy line can start with `-`).
+    let mut lines = diff.lines().peekable();
+    for header in ["--- ", "+++ "] {
+        if lines.peek().is_some_and(|line| line.starts_with(header)) {
+            lines.next();
+        }
+    }
+
     let mut stat = DiffStat::default();
-    for line in diff.lines() {
+    for line in lines {
         if line.starts_with("@@ ") {
             stat.hunks += 1;
-        } else if line.starts_with('+') && !line.starts_with("+++") {
+        } else if line.starts_with('+') {
             stat.added_lines += 1;
-        } else if line.starts_with('-') && !line.starts_with("---") {
+        } else if line.starts_with('-') {
             stat.removed_lines += 1;
         }
     }
@@ -623,6 +635,33 @@ mod tests {
         let diff = unified_diff(Path::new("x.lisp"), before, after);
         let stat = diff_stat(&diff);
         assert_eq!(stat.hunks, 1);
+        assert_eq!(stat.added_lines, 1);
+        assert_eq!(stat.removed_lines, 1);
+    }
+
+    #[test]
+    fn diff_stat_counts_content_lines_that_open_with_dashes_or_pluses() {
+        // `--old` renders as `---old` and `++old` as `+++old`, which the
+        // header guard used to swallow along with the two real file headers.
+        let before = "keep\n--old\n++old\n";
+        let after = "keep\n--new\n++new\n";
+        let diff = unified_diff(Path::new("x.lisp"), before, after);
+
+        assert!(diff.contains("\n---old\n"), "{diff}");
+        assert!(diff.contains("\n+++new\n"), "{diff}");
+
+        let stat = diff_stat(&diff);
+        assert_eq!(stat.hunks, 1);
+        assert_eq!(stat.added_lines, 2);
+        assert_eq!(stat.removed_lines, 2);
+    }
+
+    #[test]
+    fn diff_stat_still_skips_the_two_file_headers() {
+        let diff = unified_diff(Path::new("x.lisp"), "a\n", "b\n");
+        assert!(diff.starts_with("--- x.lisp\n+++ x.lisp\n"));
+
+        let stat = diff_stat(&diff);
         assert_eq!(stat.added_lines, 1);
         assert_eq!(stat.removed_lines, 1);
     }
