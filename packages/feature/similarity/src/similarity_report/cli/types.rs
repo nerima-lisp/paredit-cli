@@ -10,6 +10,9 @@ pub enum ErrorPolicy {
 }
 
 impl ErrorPolicy {
+    // `pub` reaches outside the crate now that the clone reports share this
+    // policy, so the lint applies for the first time.
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Fail => "fail",

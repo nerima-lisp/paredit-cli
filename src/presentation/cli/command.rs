@@ -7,7 +7,7 @@ use super::{
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
     case_nil_key_report, change_summary, char_case_fold_report, char_op_string_report,
-    circular_literal_report, class_cycle_report, class_hierarchy_report,
+    circular_literal_report, class_cycle_report, class_hierarchy_report, clone_report,
     code_char_char_code_report, coerce_to_t_report, cohesion_report, complexity_report,
     cond_t_clause_report, config, cons_to_list_report, constant_if_test_report, constant_report,
     constant_when_test_report, convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond,
@@ -125,6 +125,16 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Group near-duplicate forms into clone classes, label each Type-1/2/3, and rank them by the lines extracting one would save.
+    CloneClasses(clone_report::args::CloneClassReportArgs),
+    /// Report duplicated runs of adjacent sibling forms, the sub-form clones no whole-form report can see.
+    CloneSequences(clone_report::args::CloneSequenceReportArgs),
+    /// Report project forms that duplicate a reference corpus, to find code a dependency already provides.
+    CloneExternal(clone_report::args::CloneExternalReportArgs),
+    /// Recommend a --threshold from the project's own similarity distribution instead of the built-in default.
+    CloneThreshold(clone_report::args::CloneThresholdReportArgs),
+    /// Order each clone class by the commit that introduced it, separating the original from the copies.
+    CloneGenealogy(clone_report::args::CloneGenealogyReportArgs),
     /// Compare two documents by their parse: which forms were inserted,
     /// deleted, or replaced, ignoring whitespace and comments.
     Diff(structural_diff::args::StructuralDiffArgs),

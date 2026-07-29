@@ -4,15 +4,23 @@ Similarity and duplicate reporting over workspace forms.
 
 ## Responsibilities
 
-Two commands that answer "is this code written twice?", and the scoring they
+The commands that answer "is this code written twice?", and the scoring they
 share:
 
 - **`inspect similarity`** — ranks near-duplicate forms across a workspace by a
   similarity ratio, with thresholds, scope and overlap policies, and a CI gate.
+  Each reported pair carries its clone type.
 - **`inspect duplicates`** — reports forms that are structurally identical.
-- **`form_similarity`** — the scoring primitive both are built on. It lives
-  here rather than in core because nothing else uses it; if a third feature
-  ever needs it, that is the moment to reconsider, not before.
+- **`inspect clone-classes` / `clone-sequences` / `clone-external` /
+  `clone-threshold` / `clone-genealogy`** — the `clone_report` slice, which
+  turns the pair list into something to act on: classes ranked by what
+  extraction would save, sub-form runs no whole-form report can see, matches
+  against a reference corpus, a threshold calibrated from the project, and the
+  commit order that separates an original from its copies.
+- **`form_similarity`** — the scoring primitive they are all built on,
+  including the clone taxonomy (`classify_clone`). It lives here rather than in
+  core because nothing else uses it; if another feature ever needs it, that is
+  the moment to reconsider, not before.
 
 ### What this package does not own
 
@@ -45,9 +53,14 @@ type and the function that runs it (§4.2). Everything else is internal:
 ```rust,ignore
 pub use similarity_report::cli::{SimilarityReportArgs, similarity_report};
 pub use duplicate_report::cli::{DuplicateReportArgs, duplicate_report};
+pub use clone_report::cli::{
+    CloneClassReportArgs, CloneExternalReportArgs, CloneGenealogyReportArgs,
+    CloneSequenceReportArgs, CloneThresholdReportArgs, clone_classes, clone_external,
+    clone_genealogy, clone_sequences, clone_threshold,
+};
 ```
 
-`command.rs` and `dispatch.rs` in the root reference those four names and
+`command.rs` and `dispatch.rs` in the root reference those names and
 nothing more. Keeping that surface at two names per slice is what makes the
 root's command tree mechanical rather than a second place where a feature's
 internals leak.
@@ -65,16 +78,23 @@ Slice-first, per §3.1 — the layers are names, not directories:
 
 ```text
 src/
-├── form_similarity.rs          shared scoring primitive
+├── form_similarity.rs          shared scoring primitive and clone taxonomy
 ├── similarity_report/
-│   ├── domain/                 scoring, report model, options
+│   ├── domain/                 scoring, report model, options, classification
 │   ├── usecase/                orchestration behind a source port
 │   └── cli/                    args, workflow, render, types
+├── clone_report/
+│   ├── domain/                 classes, sequences, external, calibration, genealogy
+│   └── cli/                    args, collection, git port, workflow, render
 └── duplicate_report/
     ├── domain.rs
     ├── usecase.rs
     └── cli/
 ```
+
+`clone_report` depends on `similarity_report`, never the reverse. Pair
+classification therefore lives in `similarity_report::domain::classify`, beside
+the form model that both need, rather than in the slice built on top of it.
 
 **Do not add `domain/`, `application/` or `presentation/` directories at the
 top level of this package.** That would reproduce inside the package the exact
@@ -87,6 +107,8 @@ than one file, as `similarity_report` does and `duplicate_report` does not.
 | You are… | and it belongs here because… |
 | --- | --- |
 | changing how similarity is scored, or what counts as a duplicate | `form_similarity` is the one scorer |
+| changing what makes a pair Type-1, Type-2 or Type-3 | `form_similarity::classify_clone` is the one classifier, and five reports read it |
+| changing how clone classes are grouped or ranked | `clone_report/domain/class.rs` |
 | adding a threshold, scope or overlap policy | options live in the slice's `domain` |
 | changing the report's JSON or text rendering | the slice's `cli/render.rs` |
 | adding a flag to either command | the slice's `cli/args.rs` |
