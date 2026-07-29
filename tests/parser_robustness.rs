@@ -49,12 +49,16 @@ fn check_invariants(source: &str, dialect: Dialect) -> Result<(), String> {
         // 1a. A document that does not parse must still survive the repair
         // path without panicking, and whatever repair produces must parse —
         // that is the entire claim `repair-unclosed-lists` makes.
-        if let Ok(repaired) = SyntaxTree::repair_unclosed_lists(source)
-            && SyntaxTree::parse(&repaired).is_err()
-        {
-            return Err(format!(
-                "repair-unclosed-lists produced output that does not reparse for {source:?}"
-            ));
+        //
+        // Written as a nested `if` rather than a let chain: edition 2024 makes
+        // `let ... && ...` look available and this workspace's 1.85 MSRV does
+        // not have it, so only the `msrv` check would have caught it.
+        if let Ok(repaired) = SyntaxTree::repair_unclosed_lists(source) {
+            if SyntaxTree::parse(&repaired).is_err() {
+                return Err(format!(
+                    "repair-unclosed-lists produced output that does not reparse for {source:?}"
+                ));
+            }
         }
         return Ok(());
     };
