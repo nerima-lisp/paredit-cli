@@ -37,7 +37,9 @@ paredit-core-semantics = { path = "packages/core/semantics" }
 paredit-core-edit = { path = "packages/core/edit" }
 paredit-core-lint-engine = { path = "packages/core/lint-engine" }
 paredit-core-cli = { path = "packages/core/cli" }
+paredit-core-jsonrpc = { path = "packages/core/jsonrpc" }
 paredit-feature-similarity = { path = "packages/feature/similarity" }
+paredit-feature-structural-diff = { path = "packages/feature/structural-diff" }
 paredit-feature-extract = { path = "packages/feature/extract" }
 paredit-feature-inline = { path = "packages/feature/inline" }
 paredit-feature-form-transform = { path = "packages/feature/form-transform" }

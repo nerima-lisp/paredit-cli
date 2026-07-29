@@ -1,12 +1,13 @@
 //! The one printer every report in this package goes through.
 
-use crate::args::OutputFormat;
+use crate::args::ReportFormat;
 use crate::shared::terminal_safe;
 use anyhow::Result;
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
+use super::interop::{self, Flattened};
 use super::{FileFindings, Finding, ReportPolicy};
 
 /// Prints a report in the requested format.
@@ -14,15 +15,43 @@ use super::{FileFindings, Finding, ReportPolicy};
 /// `command` names the report in its own gate message and JSON, so a consumer
 /// aggregating several of these can tell which produced a finding without
 /// tracking which process wrote it.
+///
+/// The two native formats read the `FileFindings` tree directly, since both
+/// print per-file structure the interop formats have no place for (the summary
+/// aggregation, the per-file dialect notice). Everything else goes through
+/// [`Flattened`], which is the same findings with the file grouping dissolved.
 pub fn print_report<F: Finding>(
     command: &'static str,
     reports: &[FileFindings<F>],
     policy: &ReportPolicy,
-    output: OutputFormat,
+    output: ReportFormat,
 ) -> Result<()> {
     match output {
-        OutputFormat::Text => print_text(reports, policy),
-        OutputFormat::Json => print_json(command, reports, policy)?,
+        ReportFormat::Text => print_text(reports, policy),
+        ReportFormat::Json => print_json(command, reports, policy)?,
+        other => {
+            let flat = Flattened::new(command, reports, policy);
+            match other {
+                ReportFormat::Sarif => {
+                    println!("{}", serde_json::to_string_pretty(&interop::sarif(&flat))?);
+                }
+                ReportFormat::CodeClimate => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&interop::code_climate(&flat))?
+                    );
+                }
+                ReportFormat::Junit => print!("{}", interop::junit(&flat)),
+                ReportFormat::Csv => print!("{}", interop::delimited(&flat, true)),
+                ReportFormat::Tsv => print!("{}", interop::delimited(&flat, false)),
+                ReportFormat::Html => print!("{}", interop::html(&flat)),
+                ReportFormat::Markdown => print!("{}", interop::markdown(&flat)),
+                ReportFormat::Github => print!("{}", interop::github(&flat)),
+                // Handled above; repeating them here rather than using a
+                // wildcard keeps a format added later a compile error.
+                ReportFormat::Text | ReportFormat::Json => unreachable!(),
+            }
+        }
     }
     Ok(())
 }
