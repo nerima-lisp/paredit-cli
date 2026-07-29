@@ -200,6 +200,15 @@ model, a binding table, nine lint rules, and a per-file report.
   `elisp-quoted-lambda`, `elisp-interactive-in-macro`, and
   `elisp-condition-case-without-handler`. Each declares `Dialect::EmacsLisp`
   only, so a Common Lisp run skips them before walking anything.
+- `inspect semantic-coverage`, promoted from a development-only example into
+  a real command. It measures how much of `types`/`narrowing`/`constants`/
+  `value-propagation` actually resolves on real source — variable-binding and
+  constant-folding rates, broken down per dialect — and ranks unresolved
+  bindings by cause, so the highest-count unknown head is the next operator
+  worth registering in the transparency table. `--fail-under` gates CI on a
+  resolution-rate floor; a new bundled corpus and baseline test
+  (`tests/semantic_coverage_baseline.rs`) pin today's rate so a future change
+  cannot quietly narrow it.
 - Every reported failure names the byte position it is about, when it has
   one: `--output json`'s error envelope carries an `offset` field, and the
   text rendering shows a `rustc`-style caret under the source line. A parse
