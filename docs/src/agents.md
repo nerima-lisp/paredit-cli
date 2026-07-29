@@ -20,6 +20,26 @@ each with nested `commands` and an `args` array. Every arg entry carries
 `long`, `short`, `kind` (`option`, `flag`, or `positional`), `help`,
 `required`, `repeatable`, `default_values`, and `possible_values`.
 
+## Type the catalog
+
+The catalog conforms to a published JSON Schema (draft 2020-12), which the same
+command emits:
+
+```sh
+paredit inspect capabilities --emit schema                     # for the v1 catalog
+paredit inspect capabilities --emit schema --schema-version 3  # for the v3 catalog
+```
+
+Generate types from it, or validate a response against it before parsing. The
+schema is versioned with the catalog and is *strict* — `additionalProperties`
+is `false` throughout — so a version 1 schema rejects a version 3 document
+rather than quietly accepting a field it does not know. Ask for the schema whose
+version matches the `schema_version` in the document you hold, not the newest
+one.
+
+A test in this repository runs the live catalog through the emitted schema at
+every version, so the two cannot drift.
+
 ## Discover how deep a dialect goes
 
 `--schema-version 3` adds a `dialect_contract`: every command crossed with

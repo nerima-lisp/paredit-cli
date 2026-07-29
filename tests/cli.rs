@@ -33,6 +33,8 @@ mod call_graph_report;
 mod call_report;
 #[path = "cli/capabilities_contract.rs"]
 mod capabilities_contract;
+#[path = "cli/capabilities_schema.rs"]
+mod capabilities_schema;
 #[path = "cli/car_nthcdr_report.rs"]
 mod car_nthcdr_report;
 #[path = "cli/car_reverse_report.rs"]
