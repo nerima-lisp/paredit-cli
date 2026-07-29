@@ -773,6 +773,8 @@ pub(super) enum Command {
     },
     /// Run a Language Server Protocol server over stdio.
     Lsp(crate::presentation::lsp::LspArgs),
+    /// Run a Model Context Protocol server over stdio, for AI coding agents.
+    Mcp(crate::presentation::mcp::McpArgs),
     /// Print a shell completion script to stdout.
     Completions {
         /// Shell to generate a completion script for.

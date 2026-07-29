@@ -106,13 +106,16 @@ struct Cli {
 #[must_use]
 pub fn run() -> ExitCode {
     let cli = Cli::parse();
-    // The protocol servers own their own exit status. A language server session
-    // normally ends with the editor closing the pipe, and routing that through
-    // the `Result` path below would report every clean shutdown as an error.
-    if let Command::Lsp(args) = cli.command {
-        return crate::presentation::lsp::lsp(args);
-    }
-    match dispatch::dispatch(cli.command) {
+    // The protocol servers own their own exit status, and are therefore taken
+    // before dispatch. A session normally ends with the client closing the
+    // pipe, and routing that through the `Result` path below would report every
+    // clean shutdown as an error.
+    let command = match cli.command {
+        Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
+        Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
+        command => command,
+    };
+    match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("Error: {}", terminal_safe_error_chain(&error));

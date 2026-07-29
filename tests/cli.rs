@@ -255,6 +255,8 @@ mod manual_incf_report;
 mod manual_push_report;
 #[path = "cli/manual_pushnew_report.rs"]
 mod manual_pushnew_report;
+#[path = "cli/mcp_server.rs"]
+mod mcp_server;
 #[path = "cli/merge_nested_flet.rs"]
 mod merge_nested_flet;
 #[path = "cli/merge_nested_let_star.rs"]
