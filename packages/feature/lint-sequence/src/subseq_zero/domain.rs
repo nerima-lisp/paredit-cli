@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -53,7 +53,7 @@ impl Finding for SubseqZeroItem {
     /// One tag for every finding: this report has a single shape to describe, a
     /// whole-sequence copy written as a slice from index 0.
     fn kind(&self) -> &'static str {
-        "whole-sequence-copy"
+        "subseq-zero"
     }
 
     fn span(&self) -> ByteSpan {
@@ -167,15 +167,6 @@ pub fn build_subseq_zero_report(
     ))
 }
 
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,7 +267,7 @@ mod tests {
         let report = report("(defun f (x)\n  (subseq x 0))\n");
         let finding = &report.findings[0];
         assert_eq!(finding.line, 2);
-        assert_eq!(finding.kind(), "whole-sequence-copy");
+        assert_eq!(finding.kind(), "subseq-zero");
         assert_eq!(
             finding.json_fields(),
             vec![(

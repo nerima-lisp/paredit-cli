@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -49,7 +49,7 @@ impl Finding for ValuesListOfListItem {
     /// One tag for every finding: this report has a single shape to describe,
     /// a list built only to be spread by the `values-list` around it.
     fn kind(&self) -> &'static str {
-        "throwaway-list"
+        "values-list-of-list"
     }
 
     fn span(&self) -> ByteSpan {
@@ -186,15 +186,6 @@ pub fn build_values_list_of_list_report(
     ))
 }
 
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,7 +290,7 @@ mod tests {
         let report = report("(defun f (a b)\n  (values-list (list a b)))\n");
         let finding = &report.findings[0];
         assert_eq!(finding.line, 2);
-        assert_eq!(finding.kind(), "throwaway-list");
+        assert_eq!(finding.kind(), "values-list-of-list");
         let span = finding.elements_span.expect("two elements");
         assert_eq!(
             finding.json_fields(),

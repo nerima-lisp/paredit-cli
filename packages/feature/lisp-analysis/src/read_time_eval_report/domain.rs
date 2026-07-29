@@ -25,7 +25,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::for_each_subview;
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 
 /// How much of the evaluated form the finding quotes.
 const FORM_LIMIT: usize = 64;
@@ -185,15 +185,6 @@ fn elide(form: &str) -> String {
         .take(FORM_LIMIT.saturating_sub(1))
         .collect::<String>();
     format!("{head}…")
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

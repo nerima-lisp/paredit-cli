@@ -20,7 +20,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -62,7 +62,7 @@ impl Finding for TheArityItem {
     /// and a count is a quantity rather than a class of defect. It stays in the
     /// columns and the JSON, where a consumer can compare it numerically.
     fn kind(&self) -> &'static str {
-        "wrong-arity"
+        "the-arity"
     }
 
     fn span(&self) -> ByteSpan {
@@ -163,15 +163,6 @@ pub fn build_the_arity_report(
     ))
 }
 
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,7 +251,7 @@ mod tests {
         let report = report("(defun f (x)\n  (the fixnum x x))\n");
         let finding = &report.findings[0];
         assert_eq!(finding.line, 2);
-        assert_eq!(finding.kind(), "wrong-arity");
+        assert_eq!(finding.kind(), "the-arity");
         assert_eq!(
             finding.json_fields(),
             vec![("argument_count", json!(3_usize))]

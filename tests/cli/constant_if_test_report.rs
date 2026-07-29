@@ -41,6 +41,27 @@ fn cli_does_not_flag_variable_or_truthy_literal_test() {
         .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
+/// The test literal leads the text row as the finding's `kind`, so it must not
+/// also appear as a `test=` column — that printed `t` twice on one line. The
+/// JSON keeps the field, having no leading-kind column for it to duplicate.
+#[test]
+fn cli_text_rows_do_not_repeat_the_leading_kind() {
+    let dir = fresh_temp_dir("constant-if-test-report-text");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun pick () (if t 1 2))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("constant-if-test")
+        .arg("--output")
+        .arg("text")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("test=").not())
+        .stdout(predicate::str::contains("finding_count\t1"));
+}
+
 /// An empty finding list is ambiguous, so a dialect this rule does not model
 /// must be labelled rather than silently reported as clean.
 #[test]

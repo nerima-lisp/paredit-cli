@@ -29,7 +29,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Synta
 use paredit_core_syntax::view_query::for_each_subview;
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 
 /// Why a symbol's spelling is load-bearing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -181,15 +181,6 @@ fn case_sensitive(view: &ExpressionView, source: &str) -> Option<CaseSensitiveSy
 /// identity that depends on which case is in effect.
 fn is_mixed_case(text: &str) -> bool {
     text.chars().any(char::is_uppercase) && text.chars().any(char::is_lowercase)
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

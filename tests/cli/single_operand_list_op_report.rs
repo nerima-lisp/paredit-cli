@@ -74,7 +74,7 @@ fn cli_single_operand_list_op_emits_sarif() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "\"ruleId\": \"inspect/single-operand-list-op/single-operand\"",
+            "\"ruleId\": \"inspect/single-operand-list-op/single-operand-list-op\"",
         ))
         .stdout(predicate::str::contains(
             "nconc of one argument returns it unchanged; (nconc x) is x",

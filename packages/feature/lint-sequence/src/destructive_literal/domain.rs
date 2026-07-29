@@ -28,7 +28,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
@@ -226,15 +226,6 @@ pub fn collect_destructive_literals(
         violations,
         vec![("destructive_call_count", json!(destructive_call_count))],
     ))
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

@@ -27,7 +27,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -64,7 +64,7 @@ impl Finding for SingleOperandListOpItem {
     /// `(APPEND xs)` reports `APPEND` — which makes it data to print rather
     /// than a class to filter on.
     fn kind(&self) -> &'static str {
-        "single-operand"
+        "single-operand-list-op"
     }
 
     fn span(&self) -> ByteSpan {
@@ -166,15 +166,6 @@ pub fn build_single_operand_list_op_report(
         violations,
         vec![("list_op_form_count", json!(list_op_form_count))],
     ))
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]
@@ -291,7 +282,7 @@ mod tests {
         let report = report("(defun f (xs)\n  (nconc xs))\n");
         let finding = &report.findings[0];
         assert_eq!(finding.line, 2);
-        assert_eq!(finding.kind(), "single-operand");
+        assert_eq!(finding.kind(), "single-operand-list-op");
         assert_eq!(finding.json_fields(), vec![("head", json!("nconc"))]);
         assert_eq!(finding.text_columns(), vec!["nconc".to_owned()]);
     }

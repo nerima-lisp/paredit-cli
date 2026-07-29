@@ -75,7 +75,7 @@ fn cli_subseq_zero_emits_sarif() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "\"ruleId\": \"inspect/subseq-zero/whole-sequence-copy\"",
+            "\"ruleId\": \"inspect/subseq-zero/subseq-zero\"",
         ))
         .stdout(predicate::str::contains(
             "a subseq from index 0 copies the whole sequence",

@@ -27,7 +27,7 @@
 
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionView, SyntaxTree, body_form_distinguished,
@@ -161,15 +161,6 @@ fn column_of(source: &str, offset: usize) -> usize {
         .rsplit_once('\n')
         .map_or(before, |(_, line)| line)
         .chars()
-        .count()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
         .count()
 }
 

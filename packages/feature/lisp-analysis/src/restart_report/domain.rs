@@ -28,7 +28,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Synta
 use paredit_core_syntax::view_query::list_head;
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 
 /// What one finding is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -283,15 +283,6 @@ fn shorthand_invocation(head: &str) -> Option<String> {
 
 fn fold(name: &str) -> String {
     name.to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

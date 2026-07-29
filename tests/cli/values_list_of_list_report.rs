@@ -90,7 +90,7 @@ fn cli_values_list_of_list_emits_sarif() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "\"ruleId\": \"inspect/values-list-of-list/throwaway-list\"",
+            "\"ruleId\": \"inspect/values-list-of-list/values-list-of-list\"",
         ))
         .stdout(predicate::str::contains(
             "values-list of a fresh list is just values",

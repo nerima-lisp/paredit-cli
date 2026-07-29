@@ -84,7 +84,7 @@ fn cli_string_case_fold_emits_sarif() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "\"ruleId\": \"inspect/string-case-fold/folded-comparison\"",
+            "\"ruleId\": \"inspect/string-case-fold/string-case-fold\"",
         ))
         .stdout(predicate::str::contains(
             "case-folding both sides of string= is case-insensitive; use string-equal",

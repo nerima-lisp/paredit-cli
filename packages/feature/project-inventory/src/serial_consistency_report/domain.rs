@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
@@ -278,15 +278,6 @@ fn designator(name: &str) -> String {
         .trim_start_matches(':')
         .trim_matches(['|', '"'])
         .to_ascii_lowercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

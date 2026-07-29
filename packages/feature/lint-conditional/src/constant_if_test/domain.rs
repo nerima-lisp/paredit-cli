@@ -20,7 +20,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -82,10 +82,15 @@ impl Finding for ConstantIfTestItem {
         self.line
     }
 
+    /// None: the test already leads the row as the `kind`, and a column
+    /// repeating it would print `t` twice on the same line.
     fn text_columns(&self) -> Vec<String> {
-        vec![format!("test={}", self.test)]
+        Vec::new()
     }
 
+    /// The JSON keeps `test` even though the text row drops it: the old JSON
+    /// published the field, and a JSON object has no leading `kind` column for
+    /// it to duplicate.
     fn json_fields(&self) -> Vec<(&'static str, Value)> {
         vec![("test", json!(self.test))]
     }
@@ -201,15 +206,6 @@ pub fn build_constant_if_test_report(
         violations,
         vec![("if_form_count", json!(if_form_count))],
     ))
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]
@@ -331,7 +327,9 @@ mod tests {
         assert_eq!(finding.line, 2);
         assert_eq!(finding.kind(), "t");
         assert_eq!(finding.json_fields(), vec![("test", json!("t"))]);
-        assert_eq!(finding.text_columns(), vec!["test=t".to_owned()]);
+        // The test leads the row as the `kind`; a column repeating it would
+        // print `t` twice on one line.
+        assert!(finding.text_columns().is_empty());
     }
 
     #[test]

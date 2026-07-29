@@ -63,6 +63,34 @@ pub trait Finding {
     }
 }
 
+/// The 1-based line a byte offset falls on.
+///
+/// Reports print spans, which an agent can slice with, and lines, which a
+/// human can navigate with. Counting here rather than per report keeps the
+/// two definitions of "line 1" from drifting — every report on this envelope
+/// had written the same six lines, and six lines repeated is six places for
+/// the off-by-one to appear in only one of them.
+///
+/// Counting newlines from the start of the file makes this O(offset), so a
+/// caller that asked for every node's line would be quadratic in the file.
+/// That is acceptable here because the callers ask once per *finding*, and
+/// findings are rare: a file with more than a handful is already a file
+/// someone is about to edit. A report that needs a line for every node wants
+/// a prebuilt line index instead, not this.
+///
+/// An offset past the end of `source` answers for the end of `source` rather
+/// than panicking, so a stale span degrades to a wrong line rather than a
+/// crash.
+#[must_use]
+pub fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
+}
+
 /// The level an interop consumer files a finding under.
 ///
 /// Three rungs because that is the intersection of what the target formats can
@@ -211,6 +239,21 @@ mod tests {
             starts.iter().copied().map(Probe).collect(),
             Vec::new(),
         )
+    }
+
+    #[test]
+    fn the_first_byte_is_on_line_one() {
+        assert_eq!(line_of("(a)\n(b)\n", 0), 1);
+    }
+
+    #[test]
+    fn a_byte_after_one_newline_is_on_line_two() {
+        assert_eq!(line_of("(a)\n(b)\n", 4), 2);
+    }
+
+    #[test]
+    fn an_offset_past_the_end_still_answers() {
+        assert_eq!(line_of("(a)\n", 999), 2);
     }
 
     #[test]

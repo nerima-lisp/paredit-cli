@@ -108,7 +108,7 @@ fn cli_the_arity_emits_sarif() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "\"ruleId\": \"inspect/the-arity/wrong-arity\"",
+            "\"ruleId\": \"inspect/the-arity/the-arity\"",
         ))
         .stdout(predicate::str::contains(
             "the takes exactly 2 arguments (a type and a form) but has 1",

@@ -34,7 +34,7 @@ use serde_json::{Value, json};
 
 mod standard_symbols;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 pub use standard_symbols::is_standard_symbol;
 
 /// How a name collides with the `COMMON-LISP` package.
@@ -251,15 +251,6 @@ fn normalize(name: &str) -> String {
         .trim_start_matches(':')
         .trim_matches('|')
         .to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

@@ -27,7 +27,7 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 
 const DATUM_LIMIT: usize = 48;
 
@@ -211,15 +211,6 @@ fn datum_text(source: &str, dispatch: ByteSpan, whole: ByteSpan) -> String {
         .take(DATUM_LIMIT.saturating_sub(1))
         .collect::<String>();
     format!("{head}…")
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]
