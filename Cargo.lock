@@ -651,6 +651,7 @@ dependencies = [
  "criterion",
  "libc",
  "paredit-core-cli",
+ "paredit-core-config",
  "paredit-core-edit",
  "paredit-core-jsonrpc",
  "paredit-core-lint-engine",
@@ -658,6 +659,7 @@ dependencies = [
  "paredit-core-syntax",
  "paredit-core-workspace",
  "paredit-feature-binding",
+ "paredit-feature-change-summary",
  "paredit-feature-code-metrics",
  "paredit-feature-conditional-conversion",
  "paredit-feature-emacs-lisp",
@@ -712,6 +714,16 @@ dependencies = [
  "serde_json",
  "thiserror",
  "xattr",
+]
+
+[[package]]
+name = "paredit-core-config"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "paredit-core-syntax",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -786,6 +798,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-change-summary"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

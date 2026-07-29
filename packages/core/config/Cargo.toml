@@ -1,0 +1,24 @@
+[package]
+name = "paredit-core-config"
+description = "Layered paredit.toml configuration with per-key file and line provenance"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../syntax" }
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# The test harness still returns anyhow::Result; production code does not.
+anyhow.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true
