@@ -6,8 +6,10 @@ use crate::error::Result;
 
 pub fn write_new_file(path: &Path, contents: &str) -> Result<()> {
     if path.exists() {
-        return Err(crate::error::XtaskError::refused(format!("{} already exists — refusing to overwrite; remove it first if regenerating",
-            path.display())));
+        return Err(crate::error::XtaskError::refused(format!(
+            "{} already exists — refusing to overwrite; remove it first if regenerating",
+            path.display()
+        )));
     }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(crate::error::XtaskError::io(format!("create {}", parent.display())))?;
@@ -24,7 +26,9 @@ pub fn insert_sorted_mod_line(lib_rs: &Path, module_line: &str) -> Result<()> {
     let text =
         std::fs::read_to_string(lib_rs).map_err(crate::error::XtaskError::io(format!("read {}", lib_rs.display())))?;
     if text.contains(module_line) {
-        return Err(crate::error::XtaskError::refused(format!("{} already contains `{module_line}`", lib_rs.display())));
+        return Err(crate::error::XtaskError::refused(format!(
+            "{} already contains `{module_line}`", lib_rs.display()
+        )));
     }
 
     let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();

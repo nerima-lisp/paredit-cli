@@ -33,13 +33,13 @@ pub fn clone_classes(args: CloneClassReportArgs) -> CommandResult {
         clone_type: args.clone_type.map(clone_type_from_number),
         helper_overhead_lines: args.extraction.helper_overhead_lines,
     };
-    if !(args.min_members >= 2) {
+    if args.min_members < 2 {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--min-members must be at least 2".to_owned(),
         }
         .into());
     }
-    if !(args.max_classes != Some(0)) {
+    if args.max_classes == Some(0) {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--max-classes must be at least 1".to_owned(),
         }
@@ -148,13 +148,13 @@ pub fn clone_external(args: CloneExternalReportArgs) -> CommandResult {
 }
 
 pub fn clone_threshold(args: CloneThresholdReportArgs) -> CliResult<()> {
-    if !((0.0..=1.0).contains(&args.floor)) {
+    if !(0.0..=1.0).contains(&args.floor) {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--floor must be between 0.0 and 1.0".to_owned(),
         }
         .into());
     }
-    if !(args.bucket_width > 0.0 && args.bucket_width <= 1.0) {
+    if args.bucket_width <= 0.0 || args.bucket_width > 1.0 {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--bucket-width must be greater than 0.0 and at most 1.0".to_owned(),
         }
@@ -181,13 +181,13 @@ pub fn clone_threshold(args: CloneThresholdReportArgs) -> CliResult<()> {
 }
 
 pub fn clone_genealogy(args: CloneGenealogyReportArgs) -> CommandResult {
-    if !(args.min_members >= 2) {
+    if args.min_members < 2 {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--min-members must be at least 2".to_owned(),
         }
         .into());
     }
-    if !(args.max_classes != Some(0)) {
+    if args.max_classes == Some(0) {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--max-classes must be at least 1".to_owned(),
         }

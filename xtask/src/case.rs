@@ -20,8 +20,10 @@ impl Name {
             && !raw.ends_with('-')
             && !raw.contains("--");
         if !is_valid {
-            return Err(crate::error::XtaskError::refused(format!("`{raw}` must be lowercase kebab-case (letters, digits, single hyphens), \
-                 e.g. `char-case-fold`")));
+            return Err(crate::error::XtaskError::refused(format!(
+                "`{raw}` must be lowercase kebab-case (letters, digits, single hyphens), \
+                e.g. `char-case-fold`"
+            )));
         }
         Ok(Self {
             kebab: raw.to_owned(),

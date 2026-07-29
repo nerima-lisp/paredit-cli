@@ -24,9 +24,11 @@ impl Repo {
                 .unwrap_or(false)
             && cwd.join("packages").is_dir();
         if !looks_right {
-            return Err(crate::error::XtaskError::refused(format!("run `cargo xtask` from the repository root (packages/ and the \
-                 paredit-cli Cargo.toml were not found in {})",
-                cwd.display())));
+            return Err(crate::error::XtaskError::refused(format!(
+                "run `cargo xtask` from the repository root (packages/ and the \
+                paredit-cli Cargo.toml were not found in {})",
+                cwd.display()
+            )));
         }
         Ok(Self { root: cwd })
     }
@@ -40,9 +42,11 @@ impl Repo {
     pub fn feature_package(&self, name: &str) -> Result<PathBuf> {
         let path = self.path(&format!("packages/feature/{name}"));
         if !path.join("Cargo.toml").is_file() {
-            return Err(crate::error::XtaskError::refused(format!("no feature package at {} — pick an existing one under packages/feature/, \
-                 or scaffold it first with scripts/scaffold-feature-package.py",
-                path.display())));
+            return Err(crate::error::XtaskError::refused(format!(
+                "no feature package at {} — pick an existing one under packages/feature/, \
+                or scaffold it first with scripts/scaffold-feature-package.py",
+                path.display()
+            )));
         }
         Ok(path)
     }
