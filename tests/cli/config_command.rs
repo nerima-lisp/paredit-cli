@@ -662,6 +662,37 @@ fn a_configuration_that_cannot_be_parsed_is_skipped_rather_than_fatal() {
         .stderr(predicate::str::contains("ignoring the configuration"));
 }
 
+/// `inspect lint` defaults to `--output json` with no flag typed, so a
+/// caller reading only structured stderr should not have to fall back to
+/// scraping English out of a `Warning: ` line to learn the configuration
+/// was ignored — the same contract `report_failure` already keeps for
+/// errors extends to this warning.
+#[test]
+fn a_skipped_configuration_is_a_json_warning_when_the_command_defaults_to_json() {
+    let root = repo("config-unparsable-json-warning");
+    write(&root, "a.lisp", "(defun f (x) x)\n");
+    write(&root, "paredit.toml", "this is not toml\n");
+
+    let stderr = in_repo(&root, &["inspect", "lint", "a.lisp"])
+        .assert()
+        .success()
+        .get_output()
+        .stderr
+        .clone();
+    let text = String::from_utf8(stderr).expect("UTF-8");
+    let warning: serde_json::Value =
+        serde_json::from_str(&text).unwrap_or_else(|error| panic!("{error}: {text:?}"));
+    assert_eq!(warning["status"], "warning");
+    assert_eq!(warning["command"], "inspect lint");
+    assert!(
+        warning["warning"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("ignoring the configuration"),
+        "{warning}"
+    );
+}
+
 #[test]
 fn the_no_config_variable_turns_the_whole_thing_off() {
     let root = repo("config-env-off");

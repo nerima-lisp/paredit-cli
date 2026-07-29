@@ -271,15 +271,19 @@ fn resolve_rule_settings(args: &LintReportArgs) -> Result<RuleSettings> {
             anyhow::anyhow!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")
         })?;
         if !RULES.contains(&rule) {
-            anyhow::bail!("unknown lint rule {rule:?} in --rule-arg {argument:?}");
+            let suggestion =
+                paredit_core_lint_engine::error::did_you_mean(RULES.iter().copied(), rule);
+            anyhow::bail!("unknown lint rule {rule:?} in --rule-arg {argument:?}{suggestion}");
         }
         let Some(declared) = rule_setting(rule, key) else {
             let valid: Vec<&str> = crate::application::usecase::lint_report::rule_settings(rule)
                 .iter()
                 .map(|setting| setting.key())
                 .collect();
+            let suggestion =
+                paredit_core_lint_engine::error::did_you_mean(valid.iter().copied(), key);
             anyhow::bail!(
-                "lint rule {rule:?} has no setting {key:?}; valid settings: {}",
+                "lint rule {rule:?} has no setting {key:?}; valid settings: {}{suggestion}",
                 if valid.is_empty() {
                     "(none)".to_owned()
                 } else {
@@ -324,8 +328,10 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
 
     if let Some(rule) = &args.explain {
         if !RULES.contains(&rule.as_str()) {
+            let suggestion =
+                paredit_core_lint_engine::error::did_you_mean(RULES.iter().copied(), rule);
             anyhow::bail!(
-                "unknown lint rule {rule:?}; run `inspect lint --list-rules` for the catalogue"
+                "unknown lint rule {rule:?}; run `inspect lint --list-rules` for the catalogue{suggestion}"
             );
         }
         return print_lint_explanation(rule, args.output);
