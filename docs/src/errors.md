@@ -235,6 +235,14 @@ for.
 already moved — slurp and barf can move a sibling across a form boundary.
 Re-run without `--all`, or narrow the selector so the matches do not collide.
 
+### `refusal.encoding-write` { #refusal.encoding-write }
+
+`--encoding` declared a source encoding other than UTF-8, and the command
+asked to write. Reading works: the file is decoded to the UTF-8 this tool
+works in internally. Writing that back out would silently re-encode the file,
+so it is refused rather than guessed at. Read the report, or convert the file
+to UTF-8 first.
+
 ## Environment
 
 The filesystem or the environment failed. This is the one category worth
