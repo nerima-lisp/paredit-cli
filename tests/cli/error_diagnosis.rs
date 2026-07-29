@@ -242,3 +242,70 @@ fn reported_codes_are_dotted_identifiers() {
         );
     }
 }
+
+// --- selectors, which are the other way of naming a form ---
+
+/// A selector that matches nothing is a *selection* failure, not an internal
+/// one. Falling through to `internal.unclassified` would tell an agent the
+/// tool is broken for the most common recoverable failure it will hit.
+#[test]
+fn a_selector_that_matches_nothing_is_a_selection_failure() {
+    let file = lisp("diagnosis-selector-none");
+    let mut command = paredit();
+    command
+        .args(["inspect", "form", "--name", "no-such-name", "--file"])
+        .arg(&file);
+
+    let report = error_json(command);
+    assert_eq!(code_of(&report), "selection.no-match");
+    assert_eq!(report["error"]["category"], "selection");
+
+    let commands: Vec<&str> = report["error"]["repairs"]
+        .as_array()
+        .expect("repairs")
+        .iter()
+        .filter_map(|repair| repair["command"].as_str())
+        .collect();
+    assert!(
+        commands.iter().any(|c| c.contains("inspect resolve")),
+        "{commands:?}"
+    );
+}
+
+/// Ambiguity is its own code: the answer is "narrow it or pass --all", which
+/// is a different action from "widen it".
+#[test]
+fn a_selector_that_matches_too_much_has_its_own_code() {
+    let dir = fresh_temp_dir("diagnosis-selector-many");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun alpha (x) x)\n(defun beta (y) y)\n").expect("write");
+
+    let mut command = paredit();
+    command
+        .args(["inspect", "form", "--query", "(defun ?n ...)", "--file"])
+        .arg(&file);
+
+    let report = error_json(command);
+    assert_eq!(code_of(&report), "selection.ambiguous");
+
+    let details: Vec<&str> = report["error"]["repairs"]
+        .as_array()
+        .expect("repairs")
+        .iter()
+        .map(|repair| repair["detail"].as_str().expect("detail"))
+        .collect();
+    assert!(details.iter().any(|d| d.contains("--all")), "{details:?}");
+}
+
+/// No selector at all is the problem `--path`/`--at` already had, so it gets
+/// the code that already means it rather than a second spelling of the same
+/// thing.
+#[test]
+fn no_selector_reuses_the_target_required_code() {
+    let file = lisp("diagnosis-selector-missing");
+    let mut command = paredit();
+    command.args(["inspect", "form", "--file"]).arg(&file);
+
+    let report = error_json(command);
+    assert_eq!(code_of(&report), "argument.target-required");
+}

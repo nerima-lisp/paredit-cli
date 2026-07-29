@@ -1,14 +1,14 @@
 use crate::introduce_let::usecase::{IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let};
 use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 use paredit_core_cli::shared::require_output_file;
-use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::resolve_compact_target;
 use paredit_core_cli::shared::write_file_with_rollback;
-use paredit_core_syntax::sexpr::Path;
 use paredit_core_syntax::sexpr::SymbolName;
 use serde_json::json;
 use std::path::PathBuf;
@@ -19,10 +19,8 @@ pub struct IntroduceLetArgs {
     file: Option<PathBuf>,
     #[arg(long)]
     dialect: Option<DialectArg>,
-    #[arg(long)]
-    path: Option<Path>,
-    #[arg(long)]
-    at: Option<usize>,
+    #[command(flatten)]
+    selector: CompactSelectorArgs,
     #[arg(long)]
     name: SymbolName,
     #[arg(long)]
@@ -39,12 +37,13 @@ pub fn introduce_let(args: IntroduceLetArgs) -> Result<()> {
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let target = resolve_compact_target(&tree, dialect, &args.selector, "refactor introduce-let")?;
+    let selection = tree.select_path(&target.path)?;
     let enclosing_span = selection.enclosing_list_span()?;
     let plan = plan_introduce_let(IntroduceLetRequest {
         input: &input.text,
         dialect,
-        path: args.path,
+        path: Some(target.path),
         target: selection.view(),
         enclosing_span,
         name: args.name,

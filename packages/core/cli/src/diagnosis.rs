@@ -20,6 +20,7 @@
 
 use std::fmt;
 
+use paredit_core_syntax::selector::error::SelectorError;
 use paredit_core_syntax::sexpr::{
     ParseError, PathError, SelectionError, SexprError, StructureError, SymbolError,
 };
@@ -114,6 +115,10 @@ pub enum ErrorCode {
     SelectionOffsetNotFound,
     SelectionStale,
     SelectionSpanInvalid,
+    SelectionNoMatch,
+    SelectionAmbiguous,
+    SelectionPatternInvalid,
+    SelectionMalformed,
 
     InputUnparsable,
     InputNotUtf8,
@@ -128,6 +133,7 @@ pub enum ErrorCode {
     RefusalSpanOutOfBounds,
     RefusalWorkspace,
     RefusalDryRun,
+    RefusalMatchShifted,
 
     EnvironmentIo,
     EnvironmentWorkspaceLimit,
@@ -154,6 +160,10 @@ impl ErrorCode {
             Self::SelectionOffsetNotFound => "selection.offset-not-found",
             Self::SelectionStale => "selection.stale",
             Self::SelectionSpanInvalid => "selection.span-invalid",
+            Self::SelectionNoMatch => "selection.no-match",
+            Self::SelectionAmbiguous => "selection.ambiguous",
+            Self::SelectionPatternInvalid => "selection.pattern-invalid",
+            Self::SelectionMalformed => "selection.malformed",
 
             Self::InputUnparsable => "input.unparsable",
             Self::InputNotUtf8 => "input.not-utf8",
@@ -168,6 +178,7 @@ impl ErrorCode {
             Self::RefusalSpanOutOfBounds => "refusal.span-out-of-bounds",
             Self::RefusalWorkspace => "refusal.workspace",
             Self::RefusalDryRun => "refusal.dry-run",
+            Self::RefusalMatchShifted => "refusal.match-shifted",
 
             Self::EnvironmentIo => "environment.io",
             Self::EnvironmentWorkspaceLimit => "environment.workspace-limit",
@@ -192,7 +203,11 @@ impl ErrorCode {
             | Self::SelectionPathInvalid
             | Self::SelectionOffsetNotFound
             | Self::SelectionStale
-            | Self::SelectionSpanInvalid => Category::Selection,
+            | Self::SelectionSpanInvalid
+            | Self::SelectionNoMatch
+            | Self::SelectionAmbiguous
+            | Self::SelectionPatternInvalid
+            | Self::SelectionMalformed => Category::Selection,
 
             Self::InputUnparsable
             | Self::InputNotUtf8
@@ -206,7 +221,8 @@ impl ErrorCode {
             | Self::RefusalOverlappingSpans
             | Self::RefusalSpanOutOfBounds
             | Self::RefusalWorkspace
-            | Self::RefusalDryRun => Category::Refusal,
+            | Self::RefusalDryRun
+            | Self::RefusalMatchShifted => Category::Refusal,
 
             Self::EnvironmentIo
             | Self::EnvironmentWorkspaceLimit
@@ -234,7 +250,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 33] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -244,6 +260,10 @@ impl ErrorCode {
         Self::SelectionOffsetNotFound,
         Self::SelectionStale,
         Self::SelectionSpanInvalid,
+        Self::SelectionNoMatch,
+        Self::SelectionAmbiguous,
+        Self::SelectionPatternInvalid,
+        Self::SelectionMalformed,
         Self::InputUnparsable,
         Self::InputNotUtf8,
         Self::InputShapeRefused,
@@ -256,6 +276,7 @@ impl ErrorCode {
         Self::RefusalSpanOutOfBounds,
         Self::RefusalWorkspace,
         Self::RefusalDryRun,
+        Self::RefusalMatchShifted,
         Self::EnvironmentIo,
         Self::EnvironmentWorkspaceLimit,
         Self::EnvironmentUnavailable,
@@ -397,6 +418,9 @@ fn classify(error: &anyhow::Error) -> ErrorCode {
     if let Some(sexpr) = error.downcast_ref::<SexprError>() {
         return classify_sexpr(sexpr);
     }
+    if let Some(selector) = error.downcast_ref::<SelectorError>() {
+        return classify_selector(selector);
+    }
     if let Some(workspace) = error.downcast_ref::<WorkspaceError>() {
         return classify_workspace(workspace);
     }
@@ -416,6 +440,7 @@ const fn classify_cli(error: &CliError) -> ErrorCode {
         CliError::Sexpr(sexpr) => classify_sexpr(sexpr),
         CliError::Workspace(workspace) => classify_workspace(workspace),
         CliError::Argument(argument) => classify_argument(argument),
+        CliError::Selector(selector) => classify_selector(selector),
         CliError::NotUtf8 { .. } => ErrorCode::InputNotUtf8,
         CliError::Parse { .. } => ErrorCode::InputUnparsable,
         CliError::CleanupAlsoFailed(CleanupFailure { .. }) => ErrorCode::EnvironmentRollbackFailed,
@@ -433,6 +458,10 @@ const fn classify_argument(error: &ArgumentError) -> ErrorCode {
         ArgumentError::TargetRequired => ErrorCode::ArgumentTargetRequired,
         ArgumentError::TargetAmbiguous => ErrorCode::ArgumentTargetAmbiguous,
         ArgumentError::WriteRequiresFile => ErrorCode::ArgumentWriteRequiresFile,
+        // Lives in `ArgumentError` but is a safety refusal, not a usage
+        // problem: the command line was fine and an earlier edit moved the
+        // form this one was going to touch.
+        ArgumentError::AllMatchShifted { .. } => ErrorCode::RefusalMatchShifted,
     }
 }
 
@@ -457,6 +486,56 @@ const fn classify_refusal(error: &IoRefusal) -> ErrorCode {
         | IoRefusal::TargetReplacedSinceParsing { .. }
         | IoRefusal::TargetChangedSinceParsing { .. }
         | IoRefusal::TargetRemovedSinceParsing { .. } => ErrorCode::RefusalTargetChanged,
+    }
+}
+
+/// A selector is the other way of naming a form, so its failures are
+/// selection failures. `Missing` and `Conflict` are the exceptions: those are
+/// "you named nothing" and "you named two things", which is the same problem
+/// `--path`/`--at` already has and deserves the same code.
+const fn classify_selector(error: &SelectorError) -> ErrorCode {
+    match error {
+        // "You named nothing" and "you named two things" are the problems
+        // `--path`/`--at` already has, and deserve the same codes.
+        SelectorError::Missing { .. } => ErrorCode::ArgumentTargetRequired,
+        SelectorError::Conflict { .. } => ErrorCode::ArgumentTargetAmbiguous,
+
+        // The pattern language itself is wrong.
+        SelectorError::Pattern(_) | SelectorError::UnknownCapture { .. } => {
+            ErrorCode::SelectionPatternInvalid
+        }
+
+        // The selector is well-formed and names nothing, or names too much.
+        SelectorError::NoMatch { .. } | SelectorError::UnknownStableId { .. } => {
+            ErrorCode::SelectionNoMatch
+        }
+        SelectorError::Ambiguous { .. } => ErrorCode::SelectionAmbiguous,
+
+        // A coordinate past the end names nothing, exactly as a byte offset
+        // past the end does.
+        SelectorError::LineOutOfRange { .. } | SelectorError::ColumnOutOfRange { .. } => {
+            ErrorCode::SelectionOffsetNotFound
+        }
+
+        // Navigating off the tree: the same answer as an unreachable path.
+        SelectorError::ParentAboveRoot { .. }
+        | SelectorError::ChildOutOfRange { .. }
+        | SelectorError::SiblingOutOfRange { .. }
+        | SelectorError::SiblingWithoutParent => ErrorCode::SelectionPathNotReachable,
+
+        // The selector's own text does not parse.
+        SelectorError::ZeroLineOrColumn { .. }
+        | SelectorError::MalformedPosition { .. }
+        | SelectorError::UnknownSelectorPrefix { .. }
+        | SelectorError::MalformedSelector { .. }
+        | SelectorError::MalformedStableId { .. }
+        | SelectorError::RangeParentMismatch
+        | SelectorError::RangeReversed => ErrorCode::SelectionMalformed,
+
+        // The selection resolved; this command cannot act on that shape.
+        SelectorError::RangeUnsupported { .. } => ErrorCode::InputShapeRefused,
+
+        SelectorError::Sexpr(sexpr) => classify_sexpr(sexpr),
     }
 }
 
@@ -595,6 +674,35 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
         ErrorCode::SelectionSpanInvalid => {
             vec![Repair::new("re-read", Message::RepairSpanBoundaries)]
         }
+
+        ErrorCode::SelectionMalformed => vec![
+            Repair::new("change-selection", Message::RepairSelectorSyntax),
+            Repair::new("inspect-first", Message::RepairShowMatches)
+                .with_command(context.command("inspect resolve --output json")),
+        ],
+
+        ErrorCode::SelectionNoMatch => vec![
+            Repair::new("change-selection", Message::RepairWidenSelector),
+            Repair::new("inspect-first", Message::RepairShowMatches)
+                .with_command(context.command("inspect resolve --output json")),
+        ],
+
+        ErrorCode::SelectionAmbiguous => vec![
+            Repair::new("change-selection", Message::RepairNarrowSelector),
+            Repair::new("inspect-first", Message::RepairShowMatches)
+                .with_command(context.command("inspect resolve --output json")),
+        ],
+
+        ErrorCode::SelectionPatternInvalid => vec![
+            Repair::new("change-selection", Message::RepairPatternSyntax),
+            Repair::new("inspect-first", Message::RepairShowMatches)
+                .with_command(context.command("inspect resolve --output json")),
+        ],
+
+        ErrorCode::RefusalMatchShifted => vec![
+            Repair::new("change-selection", Message::RepairRerunWithoutAll),
+            Repair::new("change-selection", Message::RepairNarrowSelector),
+        ],
 
         ErrorCode::RefusalDryRun => vec![
             Repair::new("pass-flag", Message::RepairDropDryRun),

@@ -13,6 +13,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Change(args) => change_summary::change_summary(args)?,
             command::InspectCommand::Outline(args) => analysis_report::workflow::outline(args)?,
             command::InspectCommand::Form(args) => form_report::workflow::form_report(args)?,
+            command::InspectCommand::Resolve(args) => {
+                resolve_report::workflow::resolve_report(args)?;
+            }
             command::InspectCommand::FindSymbol(args) => {
                 symbol_report::workflow::find_symbol(args)?;
             }

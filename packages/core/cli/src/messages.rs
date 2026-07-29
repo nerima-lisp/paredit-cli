@@ -67,6 +67,12 @@ pub enum Message {
     RepairSpanBoundaries,
     RepairDropDryRun,
     RepairUsePreviewFlag,
+    RepairNarrowSelector,
+    RepairWidenSelector,
+    RepairShowMatches,
+    RepairPatternSyntax,
+    RepairRerunWithoutAll,
+    RepairSelectorSyntax,
 }
 
 impl Message {
@@ -171,6 +177,20 @@ impl Message {
             Self::RepairUsePreviewFlag => {
                 "or use this command's own preview: --diff on an edit, --fix --diff on lint"
             }
+            Self::RepairNarrowSelector => {
+                "narrow the selector, or pass --all to act on every match"
+            }
+            Self::RepairWidenSelector => {
+                "nothing matched; widen the selector or check the spelling of the name"
+            }
+            Self::RepairShowMatches => "see what the selector matches before acting on it",
+            Self::RepairPatternSyntax => {
+                "a pattern is an s-expression with ?name holes and ... for the remaining forms"
+            }
+            Self::RepairRerunWithoutAll => "re-run without --all and act on one match at a time",
+            Self::RepairSelectorSyntax => {
+                "the selector is not well formed; `paredit inspect capabilities` lists each selector's spelling"
+            }
         }
     }
 
@@ -268,11 +288,25 @@ impl Message {
             Self::RepairUsePreviewFlag => {
                 "あるいは各コマンドのプレビューを使ってください（編集系は --diff、lint は --fix --diff）"
             }
+            Self::RepairNarrowSelector => {
+                "セレクタを絞り込むか、全一致に対して実行するなら --all を指定してください"
+            }
+            Self::RepairWidenSelector => {
+                "何も一致しませんでした。セレクタを広げるか、名前の綴りを確認してください"
+            }
+            Self::RepairShowMatches => "実行前に、そのセレクタが何に一致するかを確認してください",
+            Self::RepairPatternSyntax => {
+                "パターンは S 式で、穴は ?name、残りのフォームは ... で書きます"
+            }
+            Self::RepairRerunWithoutAll => "--all を外し、一致を 1 つずつ処理してください",
+            Self::RepairSelectorSyntax => {
+                "セレクタの書式が正しくありません。各セレクタの綴りは `paredit inspect capabilities` で確認できます"
+            }
         }
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 42] = [
+    pub const ALL: [Self; 48] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -315,6 +349,12 @@ impl Message {
         Self::RepairSpanBoundaries,
         Self::RepairDropDryRun,
         Self::RepairUsePreviewFlag,
+        Self::RepairNarrowSelector,
+        Self::RepairWidenSelector,
+        Self::RepairShowMatches,
+        Self::RepairPatternSyntax,
+        Self::RepairRerunWithoutAll,
+        Self::RepairSelectorSyntax,
     ];
 }
 

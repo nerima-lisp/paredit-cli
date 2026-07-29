@@ -5,8 +5,10 @@ use crate::presentation::cli::args::{
     EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
 };
 use crate::presentation::cli::shared::{
-    edit_target, emit_document, read_input_and_dialect, read_input_dialect_and_tree, resolve_target,
+    edit_target, emit_document, read_input_and_dialect, read_input_dialect_and_tree, resolve_one,
+    resolve_targets,
 };
+use paredit_core_syntax::selector::target_text;
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
@@ -28,10 +30,21 @@ pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> R
     )?)
 }
 
+/// Prints the selected source text.
+///
+/// With `--all` the matches are separated by a newline rather than run
+/// together. A single match is still printed bare, with no trailing newline,
+/// because that is what callers pipe into other commands. Use
+/// `inspect resolve` when the matched forms may themselves span lines and the
+/// separator has to be unambiguous.
 pub(in crate::presentation::cli) fn select(args: TargetArgs) -> Result<()> {
-    let (_, _, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-    print!("{}", selection.text());
+    let (_, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
+    let targets = resolve_targets(&tree, dialect, &args.selector)?;
+    let rendered = targets
+        .iter()
+        .map(|target| target_text(&tree, target))
+        .collect::<Vec<_>>();
+    print!("{}", rendered.join("\n"));
     Ok(())
 }
 
@@ -39,7 +52,7 @@ pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     SyntaxTree::parse_with_dialect(&args.with, dialect)
         .context("replacement is not a valid S-expression document")?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let selection = resolve_one(&tree, dialect, &args.selector, "edit replace")?;
     let rewritten = Edit::replace(&input.text, selection, &args.with)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
     Ok(emit_document(
@@ -54,7 +67,7 @@ pub(in crate::presentation::cli) fn kill(args: EditTargetArgs) -> Result<()> {
 pub(in crate::presentation::cli) fn wrap(args: WrapArgs) -> Result<()> {
     let (input, dialect, tree) =
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
-    let selection = resolve_target(&tree, args.target.path.as_ref(), args.target.at)?;
+    let selection = resolve_one(&tree, dialect, &args.target.selector, "edit wrap")?;
     let rewritten = Edit::wrap(&input.text, &tree, selection, args.delimiter.into())?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
     Ok(emit_document(

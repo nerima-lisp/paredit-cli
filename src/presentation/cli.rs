@@ -64,6 +64,7 @@ use paredit_feature_project_inventory::serial_consistency_report::cli as serial_
 use paredit_feature_project_inventory::symbol_index_report::cli as symbol_index_report;
 use paredit_feature_project_inventory::test_map_report::cli as test_map_report;
 use paredit_feature_project_inventory::unreachable_expression_report::cli as unreachable_expression_report;
+use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
