@@ -70,7 +70,7 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_call(
             view,
-            context.path(),
+            context.source(),
             &mut destructive_call_count,
             &mut items,
         );

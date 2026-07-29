@@ -18,13 +18,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled operand list.
@@ -34,52 +36,62 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct CarNthcdrItem {
-    pub path: PathBuf,
     /// The span of the whole `(car (nthcdr n x))` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the count operand `n`.
     pub count_span: ByteSpan,
     /// The span of the list operand `x`.
     pub list_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct CarNthcdrSummary {
-    pub car_form_count: usize,
-    pub violations: Vec<CarNthcdrItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CarNthcdrPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl CarNthcdrPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for CarNthcdrItem {
+    fn kind(&self) -> &'static str {
+        "car-nthcdr"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing: the old text row carried only the path and the offset, both of
+    /// which the envelope prints itself. The `message` override is what a
+    /// reader of a text row has to go on.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The two operand spans, which this report published before it moved onto
+    /// the envelope. They are also the rewrite's inputs, but a consumer that
+    /// highlights the count and the list separately already reads them.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("count_span", span_json(self.count_span)),
+            ("list_span", span_json(self.list_span)),
+        ]
+    }
+
+    /// The same sentence the `car-nthcdr` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "car of an nthcdr is nth; (car (nthcdr n x)) is (nth n x)".to_owned()
     }
 }
 
-#[derive(Debug)]
-pub struct CarNthcdrPolicy {
-    pub fail_on_violation: bool,
-    pub car_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+fn span_json(span: ByteSpan) -> Value {
+    json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     car_form_count: &mut usize,
     violations: &mut Vec<CarNthcdrItem>,
 ) {
@@ -116,74 +128,83 @@ pub fn examine(
     }
 
     violations.push(CarNthcdrItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         count_span: count.span,
         list_span: list.span,
     });
 }
 
-/// Collects every `(car (nthcdr n x))` across a whole file, along with the total
-/// number of `car` forms scanned.
+/// Collects every `(car (nthcdr n x))` in one file, with the number of `car`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no car of an nthcdr here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
 pub fn collect_car_nthcdrs(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<CarNthcdrItem>)> {
+) -> LintResult<FileFindings<CarNthcdrItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("car_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut car_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut car_form_count, &mut violations);
+            examine(subview, source, &mut car_form_count, &mut violations);
         });
     }
-    Ok((car_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("car_form_count", json!(car_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_car_nthcdrs(
-    car_form_count: usize,
-    violations: Vec<CarNthcdrItem>,
-) -> CarNthcdrSummary {
-    CarNthcdrSummary {
-        car_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_car_nthcdr_policy(
-    options: CarNthcdrPolicyOptions,
-    summary: &CarNthcdrSummary,
-) -> CarNthcdrPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    CarNthcdrPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        car_form_count: summary.car_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn cars(input: &str) -> (usize, Vec<CarNthcdrItem>) {
+    fn report(input: &str) -> FileFindings<CarNthcdrItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_car_nthcdrs(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
+        collect_car_nthcdrs(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
             .expect("collect car nthcdrs")
+    }
+
+    /// The `(car_form_count, violations)` pair the report is built from.
+    fn cars(input: &str) -> (u64, Vec<CarNthcdrItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "car_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("car_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -238,27 +259,44 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(car (nthcdr n x))", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_car_nthcdrs(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect car nthcdrs");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = collect_car_nthcdrs(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("collect car nthcdrs");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("car_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = cars("(car (nthcdr n x))");
-        let summary = summarize_car_nthcdrs(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(car xs)").dialect_modelled);
+    }
 
-        let quiet = evaluate_car_nthcdr_policy(CarNthcdrPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_both_operand_spans() {
+        let report = report("(defun f (n x)\n  (car (nthcdr n x)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "car-nthcdr");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("count_span", span_json(finding.count_span)),
+                ("list_span", span_json(finding.list_span)),
+            ]
+        );
+    }
 
-        let strict = evaluate_car_nthcdr_policy(CarNthcdrPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_car_scanned_not_only_the_flagged_ones() {
+        let report = report("(car (nthcdr n x))\n(car xs)\n");
+        assert_eq!(report.summary, vec![("car_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

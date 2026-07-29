@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal `nil` (no reader prefixes).
 fn is_nil_literal(view: &ExpressionView) -> bool {
@@ -43,50 +45,57 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct AppendNilItem {
-    pub path: PathBuf,
     /// The span of the whole `(append x nil)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the list operand `x`.
     pub list_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct AppendNilSummary {
-    pub append_form_count: usize,
-    pub violations: Vec<AppendNilItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct AppendNilPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl AppendNilPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for AppendNilItem {
+    fn kind(&self) -> &'static str {
+        "append-nil"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing: the old text row carried only the path and the offset, both of
+    /// which the envelope prints itself. The `message` override is what a
+    /// reader of a text row has to go on.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The list operand's span, which this report published before it moved
+    /// onto the envelope. It is also the rewrite's input, but a consumer that
+    /// highlights the copied list rather than the whole call already reads it.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("list_span", span_json(self.list_span))]
+    }
+
+    /// The same sentence the `append-nil` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "append with a nil tail is a fresh copy; (append x nil) is (copy-list x)".to_owned()
     }
 }
 
-#[derive(Debug)]
-pub struct AppendNilPolicy {
-    pub fail_on_violation: bool,
-    pub append_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+fn span_json(span: ByteSpan) -> Value {
+    json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     append_form_count: &mut usize,
     violations: &mut Vec<AppendNilItem>,
 ) {
@@ -112,73 +121,82 @@ pub fn examine(
     }
 
     violations.push(AppendNilItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         list_span: list.span,
     });
 }
 
-/// Collects every `(append x nil)` across a whole file, along with the total
-/// number of `append` forms scanned.
+/// Collects every `(append x nil)` in one file, with the number of `append`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no nil-tailed append here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
 pub fn collect_append_nils(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<AppendNilItem>)> {
+) -> LintResult<FileFindings<AppendNilItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("append_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut append_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut append_form_count, &mut violations);
+            examine(subview, source, &mut append_form_count, &mut violations);
         });
     }
-    Ok((append_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("append_form_count", json!(append_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_append_nils(
-    append_form_count: usize,
-    violations: Vec<AppendNilItem>,
-) -> AppendNilSummary {
-    AppendNilSummary {
-        append_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_append_nil_policy(
-    options: AppendNilPolicyOptions,
-    summary: &AppendNilSummary,
-) -> AppendNilPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    AppendNilPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        append_form_count: summary.append_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn appends(input: &str) -> (usize, Vec<AppendNilItem>) {
+    fn report(input: &str) -> FileFindings<AppendNilItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_append_nils(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
+        collect_append_nils(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
             .expect("collect append nils")
+    }
+
+    /// The `(append_form_count, violations)` pair the report is built from.
+    fn appends(input: &str) -> (u64, Vec<AppendNilItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "append_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("append_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -231,27 +249,41 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(append xs nil)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_append_nils(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect append nils");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = collect_append_nils(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("collect append nils");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("append_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = appends("(append xs nil)");
-        let summary = summarize_append_nils(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(append xs ys)").dialect_modelled);
+    }
 
-        let quiet = evaluate_append_nil_policy(AppendNilPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_list_span() {
+        let report = report("(defun f (xs)\n  (append xs nil))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "append-nil");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.json_fields(),
+            vec![("list_span", span_json(finding.list_span))]
+        );
+    }
 
-        let strict = evaluate_append_nil_policy(AppendNilPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_append_scanned_not_only_the_flagged_ones() {
+        let report = report("(append xs nil)\n(append xs ys)\n");
+        assert_eq!(report.summary, vec![("append_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
