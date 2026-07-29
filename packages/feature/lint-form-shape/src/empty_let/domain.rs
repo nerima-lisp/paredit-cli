@@ -22,13 +22,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is an empty binding list: `()` (a paren list with no
 /// children) or the bare atom `nil`.
@@ -48,51 +50,56 @@ fn is_declare_form(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct EmptyLetItem {
-    pub path: PathBuf,
     /// The span of the whole `(let () body…)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the `(let ()` prefix (form start through the binding list),
     /// which the fix replaces with `(progn`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to splice
+    /// `(progn` in, and neither the old report nor this one printed it.
     pub prefix_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct EmptyLetSummary {
-    pub let_form_count: usize,
-    pub violations: Vec<EmptyLetItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EmptyLetPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EmptyLetPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EmptyLetItem {
+    /// The rule's name. Every finding here is the one shape — a `let` with no
+    /// bindings — so there is no closed set to discriminate on.
+    fn kind(&self) -> &'static str {
+        "empty-let"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EmptyLetPolicy {
-    pub fail_on_violation: bool,
-    pub let_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the path and location: the old text row carried only
+    /// those, and the finding has no field the report published. `message` is
+    /// what a reader gets here.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `empty-let` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "let with no bindings is just progn; (let () body) is (progn body)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     let_form_count: &mut usize,
     violations: &mut Vec<EmptyLetItem>,
 ) {
@@ -119,73 +126,82 @@ pub fn examine_let(
 
     let prefix_span = ByteSpan::new(view.span.start(), binding.span.end());
     violations.push(EmptyLetItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         prefix_span,
     });
 }
 
-/// Collects every empty-binding `let` across a whole file, along with the total
-/// number of `let` forms scanned.
-pub fn collect_empty_lets(
+/// Collects every empty-binding `let` in one file, with the number of `let`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no empty `let` here" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_empty_let_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EmptyLetItem>)> {
+) -> LintResult<FileFindings<EmptyLetItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("let_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut let_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let(subview, path, &mut let_form_count, &mut violations);
+            examine_let(subview, source, &mut let_form_count, &mut violations);
         });
     }
-    Ok((let_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("let_form_count", json!(let_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_empty_lets(
-    let_form_count: usize,
-    violations: Vec<EmptyLetItem>,
-) -> EmptyLetSummary {
-    EmptyLetSummary {
-        let_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_empty_let_policy(
-    options: EmptyLetPolicyOptions,
-    summary: &EmptyLetSummary,
-) -> EmptyLetPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EmptyLetPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        let_form_count: summary.let_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn lets(input: &str) -> (usize, Vec<EmptyLetItem>) {
+    fn report(input: &str) -> FileFindings<EmptyLetItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_empty_lets(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect empty lets")
+        build_empty_let_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build empty let report")
+    }
+
+    /// The `(let_form_count, violations)` pair the report is built from.
+    fn lets(input: &str) -> (u64, Vec<EmptyLetItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "let_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("let_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -250,27 +266,42 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(let () (foo))", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_empty_lets(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect empty lets");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_empty_let_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build empty let report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("let_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = lets("(let () (foo))");
-        let summary = summarize_empty_lets(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(let ((x 1)) x)").dialect_modelled);
+    }
 
-        let quiet = evaluate_empty_let_policy(EmptyLetPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_leans_on_its_message() {
+        let report = report("(defun f ()\n  (let () (side-effect) (result)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "empty-let");
+        assert!(finding.text_columns().is_empty());
+        assert!(finding.json_fields().is_empty());
+        assert_eq!(
+            finding.message(),
+            "let with no bindings is just progn; (let () body) is (progn body)"
+        );
+    }
 
-        let strict = evaluate_empty_let_policy(EmptyLetPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_let_scanned_not_only_the_flagged_ones() {
+        let report = report("(let () (foo))\n(let ((x 1)) x)\n(let nil (bar))\n");
+        assert_eq!(report.summary, vec![("let_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

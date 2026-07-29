@@ -1,8 +1,29 @@
 //! Redundant make-array default keyword ((make-array n :adjustable nil) is (make-array n)) detection.
 
 pub use crate::make_array_default_keyword::domain::{
-    MakeArrayDefaultKeywordItem, MakeArrayDefaultKeywordPolicy,
-    MakeArrayDefaultKeywordPolicyOptions, MakeArrayDefaultKeywordSummary,
-    collect_make_array_default_keywords, evaluate_make_array_default_keyword_policy,
-    summarize_make_array_default_keywords,
+    MakeArrayDefaultKeywordItem, build_make_array_default_keyword_report,
 };
+
+use paredit_core_cli::report::{FileFindings, ReportPolicy};
+
+/// Evaluates this report's gate.
+///
+/// Armed by a flag rather than always on. A restated default is noise, but it
+/// is a build-breaking one only in a project that has decided it is.
+#[must_use]
+pub fn evaluate_fail_on_violation_policy(
+    fail_on_violation: bool,
+    reports: &[FileFindings<MakeArrayDefaultKeywordItem>],
+) -> ReportPolicy {
+    ReportPolicy::fail_on_any(
+        fail_on_violation.then_some("--fail-on-violation"),
+        reports,
+        |report| {
+            format!(
+                "{} has {} redundant make-array default keyword(s)",
+                report.path.display(),
+                report.findings.len()
+            )
+        },
+    )
+}
