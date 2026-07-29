@@ -19,7 +19,10 @@ use std::path::Path;
 #[derive(Debug)]
 pub enum XtaskError {
     /// An OS failure, with what was being done when it happened.
-    Io { context: String, source: std::io::Error },
+    Io {
+        context: String,
+        source: std::io::Error,
+    },
     /// The tooling declined: a name that is not valid, a file already present,
     /// a repository layout that is not what it expects.
     Refused(String),

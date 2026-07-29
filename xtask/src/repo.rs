@@ -16,7 +16,8 @@ pub struct Repo {
 
 impl Repo {
     pub fn discover() -> Result<Self> {
-        let cwd = std::env::current_dir().map_err(crate::error::XtaskError::io("read current directory"))?;
+        let cwd = std::env::current_dir()
+            .map_err(crate::error::XtaskError::io("read current directory"))?;
         let manifest = cwd.join("Cargo.toml");
         let looks_right = manifest.is_file()
             && std::fs::read_to_string(&manifest)
