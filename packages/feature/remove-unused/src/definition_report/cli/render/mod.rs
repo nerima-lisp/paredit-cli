@@ -1,7 +1,7 @@
 use crate::definition_report::usecase::{
     DefinitionReportFile, UnusedDefinitionFile, UnusedDefinitionPolicy,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_syntax::definition::DefinitionCategory;
 use std::collections::BTreeMap;
@@ -43,7 +43,7 @@ fn unused_candidate_count(report: &UnusedDefinitionFile) -> usize {
 pub fn print_definition_report(
     reports: &[DefinitionReportFile],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let summary = DefinitionReportSummary::from_reports(reports);
     match output {
         OutputFormat::Text => text::print_definition_report(reports, &summary),
@@ -57,7 +57,7 @@ pub fn print_unused_definition_report(
     reports: &[UnusedDefinitionFile],
     policy: &UnusedDefinitionPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => text::print_unused_definition_report(reports, policy),
         OutputFormat::Json => json::print_unused_definition_report(reports, policy)?,

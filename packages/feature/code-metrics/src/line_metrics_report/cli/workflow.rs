@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::line_metrics_report::usecase::{
     build_line_metrics_report, evaluate_line_metrics_policy,
 };
 
-pub fn line_metrics_report(args: LineMetricsReportArgs) -> Result<()> {
+pub fn line_metrics_report(args: LineMetricsReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
     let thresholds = args.thresholds();
 

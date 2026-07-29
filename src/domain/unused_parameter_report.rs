@@ -13,7 +13,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::{DefinitionCategory, definition_shape};
@@ -99,7 +99,7 @@ pub fn build_unused_parameter_report(
     dialect: Dialect,
     tree: &SyntaxTree,
     input: &str,
-) -> Result<UnusedParameterReportFile> {
+) -> CliResult<UnusedParameterReportFile> {
     let mut unused_parameters = Vec::new();
     let mut checked_definition_count = 0;
 
@@ -325,7 +325,7 @@ pub fn plan_ignore_declarations(
     dialect: Dialect,
     tree: &SyntaxTree,
     input: &str,
-) -> Result<IgnoreDeclarationPlan> {
+) -> CliResult<IgnoreDeclarationPlan> {
     let report = build_unused_parameter_report(path.clone(), dialect, tree, input)?;
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok(IgnoreDeclarationPlan {

@@ -1,4 +1,5 @@
-use anyhow::{Context, Result};
+use crate::error::RenamePlanError;
+use paredit_core_cli::CommandResult;
 
 use super::args::ReplaceFunctionCallsArgs;
 use super::render::replace_call::print_replace_function_calls_report;
@@ -7,9 +8,13 @@ use super::types::{PendingReplaceFunctionCallsFile, ReplaceFunctionCallsFileRepo
 use crate::rename::usecase::{self as rename_usecase, ReplaceFunctionCallsScope};
 use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub fn replace_function_calls(args: ReplaceFunctionCallsArgs) -> Result<()> {
+pub fn replace_function_calls(args: ReplaceFunctionCallsArgs) -> CommandResult {
     if args.all_calls != args.call_paths.is_empty() {
-        anyhow::bail!("replace-function-calls requires either --all-calls or repeated --call-path");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "replace-function-calls requires either --all-calls or repeated --call-path",
+        )
+        .into());
     }
 
     let mut pending = Vec::with_capacity(args.files.len());
@@ -29,11 +34,10 @@ pub fn replace_function_calls(args: ReplaceFunctionCallsArgs) -> Result<()> {
                 scope,
             },
         )
-        .with_context(|| {
-            format!(
-                "failed to plan replace-function-calls for {}",
-                file.display()
-            )
+        .map_err(|source| RenamePlanError {
+            operation: "replace-function-calls".to_owned(),
+            path: file.display().to_string(),
+            source,
         })?;
         pending.push(PendingReplaceFunctionCallsFile {
             path: file.clone(),
@@ -79,5 +83,10 @@ pub fn replace_function_calls(args: ReplaceFunctionCallsArgs) -> Result<()> {
         });
     }
 
-    print_replace_function_calls_report(&reports, &args, &policy, args.output)
+    Ok(print_replace_function_calls_report(
+        &reports,
+        &args,
+        &policy,
+        args.output,
+    )?)
 }

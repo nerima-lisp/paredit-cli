@@ -1,4 +1,5 @@
-use anyhow::{Context, Result};
+use crate::error::RenamePlanError;
+use paredit_core_cli::CommandResult;
 
 use super::args::WrapFunctionCallsArgs;
 use super::render::wrap::print_wrap_function_calls_report;
@@ -7,9 +8,13 @@ use super::types::{PendingWrapFunctionCallsFile, WrapFunctionCallsFileReport};
 use crate::rename::usecase::{self as rename_usecase, WrapFunctionCallsScope};
 use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub fn wrap_function_calls(args: WrapFunctionCallsArgs) -> Result<()> {
+pub fn wrap_function_calls(args: WrapFunctionCallsArgs) -> CommandResult {
     if args.all_calls != args.call_paths.is_empty() {
-        anyhow::bail!("wrap-function-calls requires either --all-calls or repeated --call-path");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "wrap-function-calls requires either --all-calls or repeated --call-path",
+        )
+        .into());
     }
 
     let mut pending = Vec::with_capacity(args.files.len());
@@ -29,8 +34,10 @@ pub fn wrap_function_calls(args: WrapFunctionCallsArgs) -> Result<()> {
                 wrapper_template: args.wrapper_template.clone(),
                 scope,
             })
-            .with_context(|| {
-                format!("failed to plan wrap-function-calls for {}", file.display())
+            .map_err(|source| RenamePlanError {
+                operation: "wrap-function-calls".to_owned(),
+                path: file.display().to_string(),
+                source,
             })?;
         pending.push(PendingWrapFunctionCallsFile {
             path: file.clone(),
@@ -80,5 +87,10 @@ pub fn wrap_function_calls(args: WrapFunctionCallsArgs) -> Result<()> {
         });
     }
 
-    print_wrap_function_calls_report(&reports, &args, &policy, args.output)
+    Ok(print_wrap_function_calls_report(
+        &reports,
+        &args,
+        &policy,
+        args.output,
+    )?)
 }

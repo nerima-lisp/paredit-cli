@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::explicit_step_delta::cli::args::ExplicitStepDeltaReportArgs;
 use crate::explicit_step_delta::cli::render::print_explicit_step_delta_report;
@@ -8,7 +8,7 @@ use crate::explicit_step_delta::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn explicit_step_delta_report(args: ExplicitStepDeltaReportArgs) -> Result<()> {
+pub fn explicit_step_delta_report(args: ExplicitStepDeltaReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut step_form_count = 0;

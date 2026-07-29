@@ -1,6 +1,6 @@
 //! Application safety facade for conditional-sugar domain plans.
 
-use anyhow::Result;
+use crate::error::ConditionalConversionResult;
 
 use crate::conditional_sugar::domain;
 use paredit_core_edit::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -8,7 +8,7 @@ use paredit_core_syntax::sexpr::SyntaxTree;
 
 pub use domain::{ConditionalConversionPlan, ConditionalConversionRequest};
 
-fn safe(request: &ConditionalConversionRequest<'_>) -> Result<()> {
+fn safe(request: &ConditionalConversionRequest<'_>) -> ConditionalConversionResult<()> {
     domain::require_supported_dialect(request.dialect)?;
     let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     Ok(reject_common_lisp_reader_conditionals(
@@ -19,27 +19,27 @@ fn safe(request: &ConditionalConversionRequest<'_>) -> Result<()> {
 
 pub fn plan_convert_when_to_if(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     safe(&request)?;
-    Ok(domain::plan_convert_when_to_if(request)?)
+    domain::plan_convert_when_to_if(request)
 }
 pub fn plan_convert_unless_to_if(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     safe(&request)?;
-    Ok(domain::plan_convert_unless_to_if(request)?)
+    domain::plan_convert_unless_to_if(request)
 }
 pub fn plan_convert_if_to_when(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     safe(&request)?;
-    Ok(domain::plan_convert_if_to_when(request)?)
+    domain::plan_convert_if_to_when(request)
 }
 pub fn plan_convert_if_to_unless(
     request: ConditionalConversionRequest<'_>,
-) -> Result<ConditionalConversionPlan> {
+) -> ConditionalConversionResult<ConditionalConversionPlan> {
     safe(&request)?;
-    Ok(domain::plan_convert_if_to_unless(request)?)
+    domain::plan_convert_if_to_unless(request)
 }
 
 #[cfg(test)]

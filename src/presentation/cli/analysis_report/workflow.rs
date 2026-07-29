@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::{CliError, CliResult};
 use serde_json::json;
 
 use paredit_core_cli::report::budget::Budget;
@@ -24,7 +24,7 @@ use super::render::{
 /// field is unchanged, still the first problem found, so an existing
 /// consumer reading only that field sees exactly what it always has; `errors`
 /// is the new, additive way to see all of them at once.
-pub(in crate::presentation::cli) fn check(args: AnalyzeArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn check(args: AnalyzeArgs) -> CliResult<()> {
     check_deadline_for_read(args.file.as_deref())?;
     let (input, dialect) = read_input_and_dialect(args.file, args.dialect)?;
     let mut errors = SyntaxTree::find_parse_errors(&input.text, dialect);
@@ -38,7 +38,11 @@ pub(in crate::presentation::cli) fn check(args: AnalyzeArgs) -> Result<()> {
             for error in &errors {
                 println!("error: {error}");
             }
-            Err(errors.remove(0)).context("input is not a balanced S-expression document")
+            Err(CliError::Parse {
+                origin: "input".to_owned(),
+                location: "input is not a balanced S-expression document".to_owned(),
+                source: errors.remove(0),
+            })
         }
         OutputFormat::Json => {
             let file = input.file.as_deref().map(|path| path.display().to_string());
@@ -63,23 +67,27 @@ pub(in crate::presentation::cli) fn check(args: AnalyzeArgs) -> Result<()> {
             if errors.is_empty() {
                 Ok(())
             } else {
-                Err(errors.remove(0)).context("input is not a balanced S-expression document")
+                Err(CliError::Parse {
+                    origin: "input".to_owned(),
+                    location: "input is not a balanced S-expression document".to_owned(),
+                    source: errors.remove(0),
+                })
             }
         }
     }
 }
 
-pub(in crate::presentation::cli) fn dialect(args: AnalyzeArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn dialect(args: AnalyzeArgs) -> CliResult<()> {
     let (_, dialect, _) = read_input_dialect_and_tree(args.file, args.dialect)?;
     print_dialect(dialect, args.output)
 }
 
-pub(in crate::presentation::cli) fn stats(args: AnalyzeArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn stats(args: AnalyzeArgs) -> CliResult<()> {
     let (_, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     print_stats(&tree, dialect, args.output)
 }
 
-pub(in crate::presentation::cli) fn agent_report(args: AgentReportArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn agent_report(args: AgentReportArgs) -> CliResult<()> {
     let runtime = paredit_core_cli::runtime::current();
     let analyze = args.analyze;
 
@@ -113,23 +121,32 @@ pub(in crate::presentation::cli) fn agent_report(args: AgentReportArgs) -> Resul
 /// Refused rather than ignored when it is not one: comparing against a file
 /// that happens to be JSON but is not this report would produce a delta that
 /// says everything changed, which is indistinguishable from a real answer.
-fn read_previous_report(path: &Path) -> Result<serde_json::Value> {
-    let text = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read --since {}", path.display()))?;
-    let report: serde_json::Value = serde_json::from_str(&text)
-        .with_context(|| format!("--since {} is not JSON", path.display()))?;
+fn read_previous_report(path: &Path) -> CliResult<serde_json::Value> {
+    let text = std::fs::read_to_string(path).map_err(CliError::io(format!(
+        "failed to read --since {}",
+        path.display()
+    )))?;
+    let report: serde_json::Value =
+        serde_json::from_str(&text).map_err(|source| CliError::Json {
+            context: format!("--since {} is not JSON", path.display()),
+            source,
+        })?;
 
     if report.get("outline").is_none() || report.get("metrics").is_none() {
-        return Err(anyhow::anyhow!(
-            "--since {} is not an `inspect agent-report --output json` report \
-             (no `outline` or `metrics`)",
-            path.display()
-        ));
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+            format!(
+                "--since {} is not an `inspect agent-report --output json` report \
+                 (no `outline` or `metrics`)",
+                path.display()
+            ),
+        )
+        .into());
     }
     Ok(report)
 }
 
-pub(in crate::presentation::cli) fn outline(args: AnalyzeArgs) -> Result<()> {
+pub(in crate::presentation::cli) fn outline(args: AnalyzeArgs) -> CliResult<()> {
     let (_, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     print_outline(&tree, dialect, args.output)
 }

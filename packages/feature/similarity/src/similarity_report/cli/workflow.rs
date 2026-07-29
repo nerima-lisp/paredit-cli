@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use paredit_core_cli::CommandResult;
 
 use crate::similarity_report::usecase::{
     DiscoveredSimilarityFile, SimilarityDuplicatePolicy, SimilarityGateDecision,
@@ -14,7 +14,7 @@ use paredit_core_workspace::workspace::{
 use super::args::SimilarityReportArgs;
 use super::render::print_similarity_report;
 
-pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
+pub fn similarity_report(args: SimilarityReportArgs) -> CommandResult {
     let options = SimilarityReportOptions::new(
         args.threshold,
         args.min_node_count,
@@ -62,19 +62,19 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         }
         SimilarityGateDecision::Indeterminate(SimilarityIndeterminateReason::ComparisonLimit {
             unprocessed_pairs,
-        }) => bail!(
+        }) => Err(paredit_core_cli::gate::gate_failure(format!(
             "similarity-report policy indeterminate: comparison limit reached with {unprocessed_pairs} pair(s) unprocessed"
-        ),
+        ))),
         SimilarityGateDecision::Indeterminate(SimilarityIndeterminateReason::CandidateLimit {
             omitted_candidates,
-        }) => bail!(
+        }) => Err(paredit_core_cli::gate::gate_failure(format!(
             "similarity-report policy indeterminate: candidate limit reached with {omitted_candidates} candidate(s) omitted"
-        ),
+        ))),
         SimilarityGateDecision::Indeterminate(
             SimilarityIndeterminateReason::ProcessingErrors { file_count },
-        ) => bail!(
+        ) => Err(paredit_core_cli::gate::gate_failure(format!(
             "similarity-report policy indeterminate: {file_count} file(s) skipped due to processing errors"
-        ),
+        ))),
     }
 }
 
@@ -89,10 +89,12 @@ struct CliSimilarityReportSource {
 }
 
 impl SimilarityReportSourcePort for CliSimilarityReportSource {
+    type Error = paredit_core_cli::CliError;
+
     fn discover(
         &mut self,
         request: &SimilarityReportRequest,
-    ) -> anyhow::Result<SimilarityInventory> {
+    ) -> Result<SimilarityInventory, Self::Error> {
         // `--dialect` forces every file to be parsed with one dialect, so an
         // unknown extension is no longer a reason to skip a file.
         let options = WorkspaceDiscoveryOptions {

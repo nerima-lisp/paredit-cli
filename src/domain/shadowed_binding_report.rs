@@ -19,7 +19,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::definition_shape;
@@ -123,7 +123,7 @@ pub fn build_shadowed_binding_report(
     dialect: Dialect,
     input: &str,
     tree: &SyntaxTree,
-) -> Result<ShadowedBindingReportFile> {
+) -> CliResult<ShadowedBindingReportFile> {
     let mut scopes = Vec::new();
 
     for index in 0..tree.root_children().len() {

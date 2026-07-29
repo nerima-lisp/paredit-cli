@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::single_clause_cond::cli::args::SingleClauseCondReportArgs;
 use crate::single_clause_cond::cli::render::print_single_clause_cond_report;
@@ -8,7 +8,7 @@ use crate::single_clause_cond::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn single_clause_cond_report(args: SingleClauseCondReportArgs) -> Result<()> {
+pub fn single_clause_cond_report(args: SingleClauseCondReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut cond_form_count = 0;

@@ -103,6 +103,15 @@ resolved to no file inside the scanned roots.
 
 `--from-archive` was given without `--extract-to <DIR>`.
 
+### `argument.flag-combination` { #argument.flag-combination }
+
+Two flags that do not combine were given together, or one that needs a
+companion was given alone — `--insert before` without `--anchor-path`,
+`--name` together with `--all-bindings`, `--from-file` equal to `--to-file`.
+
+The message names the flags involved. Nothing about the file is at fault, and
+re-running the same command line cannot help.
+
 ### `argument.kill-ring-index` { #argument.kill-ring-index }
 
 `--index` named an entry the kill ring file does not have.
@@ -181,6 +190,18 @@ answers this way: try a different selection, a parent, or a sibling.
 ### `input.symbol-invalid` { #input.symbol-invalid }
 
 A symbol argument was empty, or contained whitespace or a reader delimiter.
+
+### `input.dialect-unsupported` { #input.dialect-unsupported }
+
+The command is not defined for this file's dialect — `refactor
+merge-package-options` is Common Lisp only, several `refactor` edits are
+Common Lisp and Emacs Lisp only.
+
+Distinct from [`input.shape-refused`](#input.shape-refused) because the two
+call for opposite actions. A shape refusal means "select a different form in
+this file"; this one means the file is the wrong language for this command, so
+no selection in it will help and it should not be retried here. Nothing about
+the file needs fixing.
 
 ## Refusal
 

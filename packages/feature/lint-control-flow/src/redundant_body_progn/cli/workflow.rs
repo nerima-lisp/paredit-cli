@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_body_progn::cli::args::RedundantBodyPrognReportArgs;
 use crate::redundant_body_progn::cli::render::print_redundant_body_progn_report;
@@ -8,7 +8,7 @@ use crate::redundant_body_progn::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_body_progn_report(args: RedundantBodyPrognReportArgs) -> Result<()> {
+pub fn redundant_body_progn_report(args: RedundantBodyPrognReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut implicit_progn_form_count = 0;

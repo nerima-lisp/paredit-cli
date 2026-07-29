@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{
     apply_byte_span_edits, read_input_dialect_and_tree, unified_diff, write_file_with_rollback,
@@ -10,7 +10,7 @@ use crate::structural_patch::cli::args::StructuralPatchArgs;
 use crate::structural_patch::cli::render::{PatchSubjects, print_patch_plan};
 use crate::structural_patch::usecase::{Outcome, plan_patch};
 
-pub fn structural_patch(args: StructuralPatchArgs) -> Result<()> {
+pub fn structural_patch(args: StructuralPatchArgs) -> CommandResult {
     let (from_input, _, from_tree) =
         read_input_dialect_and_tree(Some(args.from.clone()), args.dialect)?;
     let (to_input, _, to_tree) = read_input_dialect_and_tree(Some(args.to.clone()), args.dialect)?;
@@ -32,11 +32,11 @@ pub fn structural_patch(args: StructuralPatchArgs) -> Result<()> {
     // back. Refusing here is the difference between a failed patch and a
     // corrupted file.
     if let Err(error) = SyntaxTree::parse(&patched) {
-        anyhow::bail!(
-            "refusing to patch {}: applying the change would produce source that no longer \
-             parses ({error})",
-            args.apply_to.display(),
-        );
+        return Err(crate::error::PatchWouldNotReparse {
+            path: args.apply_to.display().to_string(),
+            reason: error.to_string(),
+        }
+        .into());
     }
 
     if args.diff {
@@ -74,7 +74,7 @@ pub fn structural_patch(args: StructuralPatchArgs) -> Result<()> {
 fn gate(
     plan: &crate::structural_patch::usecase::PatchPlan,
     args: &StructuralPatchArgs,
-) -> Result<()> {
+) -> CommandResult {
     if !args.fail_on_unapplied {
         return Ok(());
     }

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -9,7 +9,7 @@ use crate::constant_report::usecase::{
 };
 use crate::shared::SemanticFile;
 
-pub fn constant_report(args: ConstantReportArgs) -> Result<()> {
+pub fn constant_report(args: ConstantReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

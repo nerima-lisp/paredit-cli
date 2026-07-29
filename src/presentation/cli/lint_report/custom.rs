@@ -25,7 +25,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 
 use crate::application::usecase::lint_report::{
     RULES, Severity, SeverityOverrides, overridden_rule_severity, rule_category, rule_is_fixable,
@@ -128,9 +128,12 @@ impl CustomRules {
 /// rule order, and therefore the same report order. Directory iteration order
 /// is not specified, and a report whose order depends on a filesystem is not
 /// reproducible.
-fn read_directory(directory: &Path) -> Result<Ruleset> {
+fn read_directory(directory: &Path) -> CliResult<Ruleset> {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(directory)
-        .with_context(|| format!("reading custom rule directory {}", directory.display()))?
+        .map_err(paredit_core_cli::CliError::io(format!(
+            "reading custom rule directory {}",
+            directory.display()
+        )))?
         .filter_map(std::result::Result::ok)
         .map(|entry| entry.path())
         .filter(|path| {
@@ -142,10 +145,15 @@ fn read_directory(directory: &Path) -> Result<Ruleset> {
 
     let mut ruleset = Ruleset::default();
     for path in paths {
-        let text = std::fs::read_to_string(&path)
-            .with_context(|| format!("reading custom rule file {}", path.display()))?;
-        let parsed = parse_ruleset(&path.display().to_string(), &text)
-            .with_context(|| format!("in custom rule file {}", path.display()))?;
+        let text = std::fs::read_to_string(&path).map_err(paredit_core_cli::CliError::io(
+            format!("reading custom rule file {}", path.display()),
+        ))?;
+        let parsed = parse_ruleset(&path.display().to_string(), &text).map_err(|error| {
+            paredit_core_cli::error::FeatureRefusal::new(
+                paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+                &error,
+            )
+        })?;
         ruleset.extend(parsed);
     }
     Ok(ruleset)
@@ -157,7 +165,7 @@ fn read_directory(directory: &Path) -> Result<Ruleset> {
 /// the run is otherwise unchanged. A rule file that fails to load fails the
 /// run: a project that has written a rule and sees a green build has been told
 /// the rule passed.
-pub(super) fn load(explicit: Option<&Path>) -> Result<CustomRules> {
+pub(super) fn load(explicit: Option<&Path>) -> CliResult<CustomRules> {
     let directory = match explicit {
         Some(path) => path.to_path_buf(),
         None => {
@@ -170,9 +178,12 @@ pub(super) fn load(explicit: Option<&Path>) -> Result<CustomRules> {
     };
 
     let ruleset = read_directory(&directory)?;
-    ruleset
-        .validate(&RULES)
-        .with_context(|| format!("in custom rules under {}", directory.display()))?;
+    ruleset.validate(&RULES).map_err(|error| {
+        paredit_core_cli::error::FeatureRefusal::new(
+            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+            &error,
+        )
+    })?;
 
     let meta = ruleset
         .rules

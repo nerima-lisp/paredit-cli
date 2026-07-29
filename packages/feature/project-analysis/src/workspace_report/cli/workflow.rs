@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::workspace_report::usecase::types::{
     LoadedWorkspaceFile, WorkspaceInventory, WorkspaceReportRequest, WorkspaceReportSourcePort,
@@ -13,7 +13,7 @@ use paredit_core_workspace::workspace::WorkspaceDiscovery;
 use super::args::WorkspaceReportArgs;
 use super::render::print_workspace_report;
 
-pub fn workspace_report(args: WorkspaceReportArgs) -> Result<()> {
+pub fn workspace_report(args: WorkspaceReportArgs) -> CliResult<()> {
     let output = args.output;
     // Resolution runs here, not in the use case: `--since` shells out to git and
     // `--paths-from -` reads stdin, and a use case that did either would stop
@@ -42,7 +42,9 @@ struct CliWorkspaceReportSource<'a> {
 }
 
 impl WorkspaceReportSourcePort for CliWorkspaceReportSource<'_> {
-    fn discover(&mut self, _request: &WorkspaceReportRequest) -> Result<WorkspaceInventory> {
+    type Error = paredit_core_cli::CliError;
+
+    fn discover(&mut self, _request: &WorkspaceReportRequest) -> CliResult<WorkspaceInventory> {
         let (discovery, _) = self.input.scan(&self.resolved)?;
         let inventory = WorkspaceInventory {
             files: discovery.files().to_vec(),

@@ -1,10 +1,10 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use super::super::super::types::PackageReportFile;
 use crate::package::cli::render::json::shared::span_json;
 use serde_json::json;
 
-pub fn print_package_report(reports: &[PackageReportFile]) -> Result<()> {
+pub fn print_package_report(reports: &[PackageReportFile]) -> CliResult<()> {
     let defpackage_count = reports
         .iter()
         .map(|report| report.report.defpackages.len())

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::call_report::cli::{
     args::CallReportArgs, render::print_call_report, types::CallReportFile,
@@ -6,7 +6,7 @@ use crate::call_report::cli::{
 use crate::call_report::usecase::build_call_report;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn call_report(args: CallReportArgs) -> Result<()> {
+pub fn call_report(args: CallReportArgs) -> CommandResult {
     let mut reports = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

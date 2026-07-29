@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::single_operand_arithmetic::cli::args::SingleOperandArithmeticReportArgs;
 use crate::single_operand_arithmetic::cli::render::print_single_operand_arithmetic_report;
@@ -8,7 +8,7 @@ use crate::single_operand_arithmetic::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn single_operand_arithmetic_report(args: SingleOperandArithmeticReportArgs) -> Result<()> {
+pub fn single_operand_arithmetic_report(args: SingleOperandArithmeticReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut arithmetic_form_count = 0;

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::application::usecase::duplicate_method_report::{
@@ -10,7 +10,7 @@ pub(super) fn print_duplicate_method_report(
     summary: &DuplicateMethodSummary,
     policy: &DuplicateMethodPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("declared_count\t{}", summary.declared_count);

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::subseq_zero::cli::args::SubseqZeroReportArgs;
 use crate::subseq_zero::cli::render::print_subseq_zero_report;
@@ -8,7 +8,7 @@ use crate::subseq_zero::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn subseq_zero_report(args: SubseqZeroReportArgs) -> Result<()> {
+pub fn subseq_zero_report(args: SubseqZeroReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut subseq_form_count = 0;

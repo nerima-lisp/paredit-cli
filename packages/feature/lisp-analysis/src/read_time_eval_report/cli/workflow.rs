@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::read_time_eval_report::usecase::{
     build_read_time_eval_report, evaluate_fail_on_read_eval_policy,
 };
 
-pub fn read_time_eval_report(args: ReadTimeEvalReportArgs) -> Result<()> {
+pub fn read_time_eval_report(args: ReadTimeEvalReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

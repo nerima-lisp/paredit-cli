@@ -1,7 +1,7 @@
 use paredit_core_cli::safe_text;
 use std::collections::BTreeMap;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::call_graph_report::usecase::{CallGraphFile, CallGraphNode, CallGraphPolicy};
@@ -71,7 +71,7 @@ pub fn print_call_graph_report(
     include_external: bool,
     policy: &CallGraphPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let definition_count = reports
         .iter()
         .map(|report| report.definitions.len())

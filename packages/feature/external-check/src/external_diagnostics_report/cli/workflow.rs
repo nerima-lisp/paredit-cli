@@ -1,7 +1,7 @@
 use std::fs;
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::{CliError, CommandResult};
 
 use paredit_core_cli::report::render::print_report;
 use paredit_core_cli::report::{FileFindings, ReportPolicy};
@@ -11,12 +11,13 @@ use paredit_core_cli::shared::{
 use paredit_core_syntax::dialect::Dialect;
 
 use super::args::ExternalDiagnosticsReportArgs;
+use crate::error::ExternalCheckError;
 use crate::external_diagnostics_report::domain::{
     Implementation, PlacedDiagnostic, locate_context,
 };
 use crate::external_diagnostics_report::usecase::{Baseline, compile_and_read, scratch_directory};
 
-pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Result<()> {
+pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
     let implementation = Implementation::from(args.implementation);
     let program = args
@@ -27,11 +28,21 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Resul
 
     let baseline = match args.baseline.as_deref() {
         Some(path) => {
-            let text = fs::read_to_string(path)
-                .with_context(|| format!("failed to read baseline {}", path.display()))?;
-            let value: serde_json::Value = serde_json::from_str(&text)
-                .with_context(|| format!("baseline {} is not JSON", path.display()))?;
-            Some(Baseline::from_json(&value).map_err(|error| anyhow::anyhow!(error))?)
+            let text = fs::read_to_string(path).map_err(CliError::io(format!(
+                "failed to read baseline {}",
+                path.display()
+            )))?;
+            let value: serde_json::Value =
+                serde_json::from_str(&text).map_err(|source| CliError::Json {
+                    context: format!("baseline {} is not JSON", path.display()),
+                    source,
+                })?;
+            Some(Baseline::from_json(&value).map_err(|reason| {
+                ExternalCheckError::BaselineUnusable {
+                    path: path.to_path_buf(),
+                    reason,
+                }
+            })?)
         }
         None => None,
     };
@@ -57,20 +68,20 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Resul
         }
 
         let scratch = scratch_directory(index);
-        fs::create_dir_all(&scratch)
-            .with_context(|| format!("failed to create scratch directory {}", scratch.display()))?;
+        fs::create_dir_all(&scratch).map_err(CliError::io(format!(
+            "failed to create scratch directory {}",
+            scratch.display()
+        )))?;
         let outcome = compile_and_read(implementation, &program, file, &scratch, budget);
         // The scratch directory is removed whether or not the compilation
         // worked: a fasl left in /tmp after a failed run is litter, and the
         // caller cannot be expected to know the name.
         let _ = fs::remove_dir_all(&scratch);
 
-        let outcome = outcome.with_context(|| {
-            format!(
-                "failed to run {} over {}",
-                implementation.label(),
-                file.display()
-            )
+        let outcome = outcome.map_err(|source| ExternalCheckError::RunFailed {
+            implementation: implementation.label(),
+            path: file.display().to_string(),
+            source,
         })?;
 
         // The implementation ran and said something this tool could not read
@@ -80,22 +91,23 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Resul
         // refactor on this command would read a failed check as a passed one —
         // so it is a hard error rather than a note.
         if let Some(transcript) = outcome.unparsed_transcript {
-            anyhow::bail!(
-                "{} produced no readable diagnostics for {} (exit {}): {transcript}",
-                implementation.label(),
-                file.display(),
-                outcome
+            return Err(ExternalCheckError::NoReadableDiagnostics {
+                implementation: implementation.label(),
+                path: file.display().to_string(),
+                exit: outcome
                     .exit_code
                     .map_or_else(|| "signal".to_owned(), |code| code.to_string()),
-            );
+                transcript,
+            }
+            .into());
         }
         if outcome.timed_out {
-            anyhow::bail!(
-                "{} exceeded the {}ms budget compiling {}",
-                implementation.label(),
-                args.compile_timeout_ms,
-                file.display(),
-            );
+            return Err(ExternalCheckError::CompileTimedOut {
+                implementation: implementation.label(),
+                budget_ms: args.compile_timeout_ms,
+                path: file.display().to_string(),
+            }
+            .into());
         }
 
         let findings = outcome
@@ -133,7 +145,10 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Resul
             path.to_path_buf(),
             format!("{}\n", serde_json::to_string_pretty(&baseline.to_json())?),
         )
-        .with_context(|| format!("failed to write baseline {}", path.display()))?;
+        .map_err(|source| ExternalCheckError::BaselineWriteFailed {
+            path: path.display().to_string(),
+            source: Box::new(source),
+        })?;
     }
 
     let policy = evaluate_policy(&args, &reports);

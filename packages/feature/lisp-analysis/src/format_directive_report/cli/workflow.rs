@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::format_directive_report::usecase::{
     build_format_directive_report, evaluate_fail_on_mismatch_policy,
 };
 
-pub fn format_directive_report(args: FormatDirectiveReportArgs) -> Result<()> {
+pub fn format_directive_report(args: FormatDirectiveReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

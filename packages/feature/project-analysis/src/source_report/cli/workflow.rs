@@ -25,7 +25,7 @@
 //!   | paredit inspect lint --paths-from - .
 //! ```
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::workspace_args::ResolvedWorkspaceInput;
 use paredit_core_workspace::workspace::{
@@ -45,7 +45,7 @@ pub enum SourceScan {
     Cached(Box<CachedDiscovery>),
 }
 
-pub fn source_report(args: SourceReportArgs) -> Result<()> {
+pub fn source_report(args: SourceReportArgs) -> CliResult<()> {
     let resolved = args.input.resolve(&args.roots)?;
     let cache = args.input.cache()?;
 
@@ -56,7 +56,7 @@ pub fn source_report(args: SourceReportArgs) -> Result<()> {
 fn scan(
     resolved: &ResolvedWorkspaceInput,
     cache: Option<&DiscoveryCache>,
-) -> Result<(SourceScan, Option<CacheOutcome>)> {
+) -> CliResult<(SourceScan, Option<CacheOutcome>)> {
     if let Some(cache) = cache {
         let (outcome, cached) = cache.lookup(&resolved.options);
         if let Some(cached) = cached {
@@ -77,7 +77,7 @@ fn scan(
 /// A `--since` over a large merge names thousands of files, and every one of
 /// them becomes a root. That is well past the bound meant for a hand-written
 /// command line, and the file limit still applies to the result.
-fn discover(resolved: &ResolvedWorkspaceInput) -> Result<WorkspaceDiscovery> {
+fn discover(resolved: &ResolvedWorkspaceInput) -> CliResult<WorkspaceDiscovery> {
     let discovery = if resolved.from_list {
         discover_workspace_files_from_list(&resolved.options)?
     } else {

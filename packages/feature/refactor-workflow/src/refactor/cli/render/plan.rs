@@ -1,11 +1,11 @@
 use super::super::types::plan::RefactorPlan;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use paredit_feature_project_analysis::impact_report::usecase::summarize_impact_reports;
 use serde_json::json;
 
-pub fn print_refactor_plan(plan: &RefactorPlan, output: OutputFormat) -> Result<()> {
+pub fn print_refactor_plan(plan: &RefactorPlan, output: OutputFormat) -> CliResult<()> {
     let mut summary = summarize_impact_reports(&plan.files);
     summary.safe_to_automate = !plan.gates.iter().any(|gate| gate.blocks_automation);
 

@@ -25,10 +25,12 @@ struct FakeSource {
 }
 
 impl SimilarityReportSourcePort for FakeSource {
+    type Error = paredit_core_cli::CliError;
+
     fn discover(
         &mut self,
         _request: &SimilarityReportRequest,
-    ) -> anyhow::Result<SimilarityInventory> {
+    ) -> Result<SimilarityInventory, Self::Error> {
         Ok(self.inventory.clone())
     }
 

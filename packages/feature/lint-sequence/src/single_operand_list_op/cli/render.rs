@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -11,7 +11,7 @@ pub fn print_single_operand_list_op_report(
     summary: &SingleOperandListOpSummary,
     policy: &SingleOperandListOpPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("list_op_form_count\t{}", summary.list_op_form_count);

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_boolean_identity::cli::args::RedundantBooleanIdentityReportArgs;
 use crate::redundant_boolean_identity::cli::render::print_redundant_boolean_identity_report;
@@ -8,7 +8,9 @@ use crate::redundant_boolean_identity::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_boolean_identity_report(args: RedundantBooleanIdentityReportArgs) -> Result<()> {
+pub fn redundant_boolean_identity_report(
+    args: RedundantBooleanIdentityReportArgs,
+) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut boolean_form_count = 0;

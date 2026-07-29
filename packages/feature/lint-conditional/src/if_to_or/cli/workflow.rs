@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::if_to_or::cli::args::IfToOrReportArgs;
 use crate::if_to_or::cli::render::print_if_to_or_report;
@@ -7,7 +7,7 @@ use crate::if_to_or::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn if_to_or_report(args: IfToOrReportArgs) -> Result<()> {
+pub fn if_to_or_report(args: IfToOrReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;

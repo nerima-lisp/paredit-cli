@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_duplicate_parameter_report(
     summary: &DuplicateParameterSummary,
     policy: &DuplicateParameterPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("definition_count\t{}", summary.definition_count);

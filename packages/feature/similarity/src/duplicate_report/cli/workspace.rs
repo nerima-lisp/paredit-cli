@@ -1,10 +1,10 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 pub fn discover_duplicate_report_files(
     roots: &[std::path::PathBuf],
-) -> Result<Vec<std::path::PathBuf>> {
+) -> CliResult<Vec<std::path::PathBuf>> {
     let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
         roots: roots.to_owned(),
         include_unknown: false,

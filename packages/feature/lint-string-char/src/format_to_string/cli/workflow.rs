@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::format_to_string::cli::args::FormatToStringReportArgs;
 use crate::format_to_string::cli::render::print_format_to_string_report;
@@ -8,7 +8,7 @@ use crate::format_to_string::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn format_to_string_report(args: FormatToStringReportArgs) -> Result<()> {
+pub fn format_to_string_report(args: FormatToStringReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut format_form_count = 0;

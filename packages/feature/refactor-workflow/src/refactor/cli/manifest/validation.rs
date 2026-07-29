@@ -1,20 +1,28 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_syntax::sexpr::ByteSpan;
 
-pub fn validate_manifest_edits(input: &str, edits: &[(ByteSpan, String)]) -> Result<()> {
+pub fn validate_manifest_edits(input: &str, edits: &[(ByteSpan, String)]) -> CliResult<()> {
     for (span, _) in edits {
         let start = span.start().get();
         let end = span.end().get();
         if start > end || end > input.len() {
-            anyhow::bail!(
-                "edit span {}..{} is outside input length {}",
-                start,
-                end,
-                input.len()
-            );
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::RefusalSpanOutOfBounds,
+                format!(
+                    "edit span {}..{} is outside input length {}",
+                    start,
+                    end,
+                    input.len()
+                ),
+            )
+            .into());
         }
         if !input.is_char_boundary(start) || !input.is_char_boundary(end) {
-            anyhow::bail!("edit span {start}..{end} is not on UTF-8 character boundaries");
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::RefusalSpanOutOfBounds,
+                format!("edit span {start}..{end} is not on UTF-8 character boundaries"),
+            )
+            .into());
         }
     }
     Ok(())

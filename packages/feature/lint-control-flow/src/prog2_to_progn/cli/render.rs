@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_prog2_to_progn_report(
     summary: &Prog2ToPrognSummary,
     policy: &Prog2ToPrognPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("prog2_form_count\t{}", summary.prog2_form_count);

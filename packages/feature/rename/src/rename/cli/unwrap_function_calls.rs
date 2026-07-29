@@ -1,4 +1,5 @@
-use anyhow::{Context, Result};
+use crate::error::RenamePlanError;
+use paredit_core_cli::CommandResult;
 
 use super::args::UnwrapFunctionCallsArgs;
 use super::render::unwrap::print_unwrap_function_calls_report;
@@ -7,9 +8,13 @@ use super::types::{PendingUnwrapFunctionCallsFile, UnwrapFunctionCallsFileReport
 use crate::rename::usecase::{self as rename_usecase, UnwrapFunctionCallsScope};
 use paredit_core_cli::shared::{read_input_and_dialect, write_files_with_rollback};
 
-pub fn unwrap_function_calls(args: UnwrapFunctionCallsArgs) -> Result<()> {
+pub fn unwrap_function_calls(args: UnwrapFunctionCallsArgs) -> CommandResult {
     if args.all_calls != args.call_paths.is_empty() {
-        anyhow::bail!("unwrap-function-calls requires either --all-calls or repeated --call-path");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "unwrap-function-calls requires either --all-calls or repeated --call-path",
+        )
+        .into());
     }
 
     let mut pending = Vec::with_capacity(args.files.len());
@@ -29,11 +34,10 @@ pub fn unwrap_function_calls(args: UnwrapFunctionCallsArgs) -> Result<()> {
                 scope,
             },
         )
-        .with_context(|| {
-            format!(
-                "failed to plan unwrap-function-calls for {}",
-                file.display()
-            )
+        .map_err(|source| RenamePlanError {
+            operation: "unwrap-function-calls".to_owned(),
+            path: file.display().to_string(),
+            source,
         })?;
         pending.push(PendingUnwrapFunctionCallsFile {
             path: file.clone(),
@@ -83,5 +87,10 @@ pub fn unwrap_function_calls(args: UnwrapFunctionCallsArgs) -> Result<()> {
         });
     }
 
-    print_unwrap_function_calls_report(&reports, &args, &policy, args.output)
+    Ok(print_unwrap_function_calls_report(
+        &reports,
+        &args,
+        &policy,
+        args.output,
+    )?)
 }

@@ -1,5 +1,5 @@
 use crate::complexity_report::usecase::{ComplexityReportFile, ComplexityReportPolicy};
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_syntax::dialect::Dialect;
 
@@ -57,7 +57,7 @@ pub fn print_complexity_report(
     policy: &ComplexityReportPolicy,
     top: Option<usize>,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let ranked = ranked_entries(reports, top);
     match output {
         OutputFormat::Text => text::print_complexity_report(reports, policy, &ranked),

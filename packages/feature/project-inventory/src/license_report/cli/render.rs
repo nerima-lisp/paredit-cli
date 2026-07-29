@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
 
@@ -10,6 +10,6 @@ pub fn print_review_report(
     reports: &[FileFindings<SystemLicense>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     print_report("inspect licenses", reports, policy, output)
 }

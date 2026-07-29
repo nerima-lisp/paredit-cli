@@ -20,15 +20,18 @@
 
 use std::fmt;
 
+use paredit_core_edit::EditRefusal;
 use paredit_core_syntax::selector::error::SelectorError;
 use paredit_core_syntax::sexpr::{
-    ParseError, PathError, SelectionError, SexprError, SpanError, StructureError, SymbolError,
+    PathError, SelectionError, SexprError, SpanError, StructureError, SymbolError,
 };
 use paredit_core_workspace::workspace::WorkspaceError;
 use serde_json::{Value as Json, json};
 
-use crate::error::{ArgumentError, CleanupFailure, CliError, IoRefusal, WriteTargetError};
-use crate::gate::{GATE_FAILURE_EXIT_CODE, GateFailure};
+use crate::error::{
+    ArgumentError, CleanupFailure, CliError, CommandFailure, IoRefusal, WriteTargetError,
+};
+use crate::gate::GATE_FAILURE_EXIT_CODE;
 use crate::messages::{Message, say};
 
 /// The class of a failure, from the caller's point of view.
@@ -115,6 +118,8 @@ pub enum ErrorCode {
     ArgumentNoInputsProduced,
     ArgumentArchiveDestination,
     ArgumentKillRingIndex,
+    /// Two flags that do not combine, or one that needs another.
+    ArgumentFlagCombination,
 
     SelectionPathNotReachable,
     SelectionPathInvalid,
@@ -130,6 +135,13 @@ pub enum ErrorCode {
     InputNotUtf8,
     InputShapeRefused,
     InputSymbolInvalid,
+    /// The command is not defined for this file's dialect.
+    ///
+    /// Its own code rather than [`Self::InputShapeRefused`] because the two
+    /// call for opposite actions: a shape refusal means "select a different
+    /// form in this file", and this one means "this file is the wrong
+    /// language for this command, stop retrying it here".
+    InputDialectUnsupported,
 
     RefusalInputTooLarge,
     RefusalWriteTarget,
@@ -170,6 +182,7 @@ impl ErrorCode {
             Self::ArgumentNoInputsProduced => "argument.no-inputs-produced",
             Self::ArgumentArchiveDestination => "argument.archive-destination",
             Self::ArgumentKillRingIndex => "argument.kill-ring-index",
+            Self::ArgumentFlagCombination => "argument.flag-combination",
 
             Self::SelectionPathNotReachable => "selection.path-not-reachable",
             Self::SelectionPathInvalid => "selection.path-invalid",
@@ -185,6 +198,7 @@ impl ErrorCode {
             Self::InputNotUtf8 => "input.not-utf8",
             Self::InputShapeRefused => "input.shape-refused",
             Self::InputSymbolInvalid => "input.symbol-invalid",
+            Self::InputDialectUnsupported => "input.dialect-unsupported",
 
             Self::RefusalInputTooLarge => "refusal.input-too-large",
             Self::RefusalWriteTarget => "refusal.write-target",
@@ -221,7 +235,8 @@ impl ErrorCode {
             | Self::ArgumentNeedsRepository
             | Self::ArgumentNoInputsProduced
             | Self::ArgumentArchiveDestination
-            | Self::ArgumentKillRingIndex => Category::Argument,
+            | Self::ArgumentKillRingIndex
+            | Self::ArgumentFlagCombination => Category::Argument,
 
             Self::SelectionPathNotReachable
             | Self::SelectionPathInvalid
@@ -236,7 +251,8 @@ impl ErrorCode {
             Self::InputUnparsable
             | Self::InputNotUtf8
             | Self::InputShapeRefused
-            | Self::InputSymbolInvalid => Category::Input,
+            | Self::InputSymbolInvalid
+            | Self::InputDialectUnsupported => Category::Input,
 
             Self::RefusalInputTooLarge
             | Self::RefusalWriteTarget
@@ -290,7 +306,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 43] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -301,6 +317,7 @@ impl ErrorCode {
         Self::ArgumentNoInputsProduced,
         Self::ArgumentArchiveDestination,
         Self::ArgumentKillRingIndex,
+        Self::ArgumentFlagCombination,
         Self::SelectionPathNotReachable,
         Self::SelectionPathInvalid,
         Self::SelectionOffsetNotFound,
@@ -314,6 +331,7 @@ impl ErrorCode {
         Self::InputNotUtf8,
         Self::InputShapeRefused,
         Self::InputSymbolInvalid,
+        Self::InputDialectUnsupported,
         Self::RefusalInputTooLarge,
         Self::RefusalWriteTarget,
         Self::RefusalTargetChanged,
@@ -459,30 +477,31 @@ impl Diagnosis {
 
 /// Classifies a failure and works out what would get past it.
 #[must_use]
-pub fn diagnose(error: &anyhow::Error, context: &Context) -> Diagnosis {
-    let message = format!("{error:#}");
-    let code = classify(error);
+pub fn diagnose(failure: &CommandFailure, context: &Context) -> Diagnosis {
+    // `chain()`, not `{failure:#}`: the alternate form was `anyhow`'s, and it
+    // is the one thing a typed error does not inherit. `chain()` reproduces it
+    // exactly — see `CliError::chain`.
+    let message = failure.chain();
+    let code = classify(failure);
     Diagnosis {
-        repairs: repairs(code, error, context),
-        offset: extract_offset(error),
+        repairs: repairs(code, context),
+        offset: extract_offset(failure),
         code,
         message,
     }
 }
 
-/// The byte position `error` names, when it names one at all.
+/// The byte position `failure` names, when it names one at all.
 ///
 /// Most failures are not about one place in the source — `RaiseTopLevel` is a
 /// shape refusal, not a location — so this returns `None` far more often than
 /// [`classify`] does.
-fn extract_offset(error: &anyhow::Error) -> Option<usize> {
-    if let Some(sexpr) = error.downcast_ref::<SexprError>() {
-        return offset_of_sexpr(sexpr);
+const fn extract_offset(failure: &CommandFailure) -> Option<usize> {
+    match failure {
+        // A gate tripped on a report, not on a position in a file.
+        CommandFailure::Gate(_) => None,
+        CommandFailure::Error(error) => offset_of_cli(error),
     }
-    if let Some(parse) = error.downcast_ref::<ParseError>() {
-        return Some(parse.position());
-    }
-    error.downcast_ref::<CliError>().and_then(offset_of_cli)
 }
 
 const fn offset_of_cli(error: &CliError) -> Option<usize> {
@@ -563,33 +582,42 @@ pub fn render_caret(source: &str, offset: usize) -> Option<String> {
     ))
 }
 
-fn classify(error: &anyhow::Error) -> ErrorCode {
-    if error.downcast_ref::<GateFailure>().is_some() {
-        return ErrorCode::GateFailed;
+/// Which exit code this failure earns.
+///
+/// This was six `downcast_ref` probes against an `anyhow::Error`, ending in
+/// `.map_or(ErrorCode::Internal, ...)`. The probes for `SexprError`,
+/// `SelectorError`, `WorkspaceError` and `ParseError` existed because those
+/// types could arrive bare, having been absorbed by `anyhow` at some `?`.
+/// They now arrive as the [`CliError`] variants that wrap them, which
+/// [`classify_cli`] was already matching on — so the probes were a second,
+/// hand-maintained copy of a table that had to agree with the first.
+///
+/// The `Internal` fallback is what made that dangerous rather than merely
+/// redundant: a failure whose type nobody had added a probe for was reported
+/// to the user as an internal malfunction, and adding a `CliError` variant
+/// could not fail to compile. Now it can.
+const fn classify(failure: &CommandFailure) -> ErrorCode {
+    match failure {
+        CommandFailure::Gate(_) => ErrorCode::GateFailed,
+        CommandFailure::Error(error) => code_for_cli_error(error),
     }
-    if let Some(sexpr) = error.downcast_ref::<SexprError>() {
-        return classify_sexpr(sexpr);
-    }
-    if let Some(selector) = error.downcast_ref::<SelectorError>() {
-        return classify_selector(selector);
-    }
-    if let Some(workspace) = error.downcast_ref::<WorkspaceError>() {
-        return classify_workspace(workspace);
-    }
-    if let Some(parse) = error.downcast_ref::<ParseError>() {
-        let _ = parse;
-        return ErrorCode::InputUnparsable;
-    }
-    error
-        .downcast_ref::<CliError>()
-        .map_or(ErrorCode::Internal, classify_cli)
 }
 
-const fn classify_cli(error: &CliError) -> ErrorCode {
+/// Which code a [`CliError`] earns.
+///
+/// Public for the same reason [`code_for_edit_refusal`] is: a feature that
+/// wraps one — `RemoveUnusedError::Source` carries whatever its port's adapter
+/// failed with — has to answer this question, and answering it twice is how
+/// the two answers drift apart.
+#[must_use]
+pub const fn code_for_cli_error(error: &CliError) -> ErrorCode {
     match error {
         CliError::Io { .. } | CliError::Bare(_) => ErrorCode::EnvironmentIo,
         CliError::Refused(refusal) => classify_refusal(refusal),
-        CliError::Sexpr(sexpr) => classify_sexpr(sexpr),
+        CliError::Sexpr(sexpr) => code_for_sexpr_error(sexpr),
+        CliError::Edit(refusal) => code_for_edit_refusal(refusal),
+        // The feature stated its own code — see `ClassifiedRefusal`.
+        CliError::Feature(refusal) => refusal.code(),
         CliError::Workspace(workspace) => classify_workspace(workspace),
         CliError::Argument(argument) => classify_argument(argument),
         CliError::Selector(selector) => classify_selector(selector),
@@ -599,12 +627,24 @@ const fn classify_cli(error: &CliError) -> ErrorCode {
         // that did not: to a caller both mean "something read is malformed",
         // and the message already names which file.
         CliError::Json { .. } => ErrorCode::InputUnparsable,
+        // Not `InputUnparsable`: nothing the caller supplied is at fault. This
+        // variant only ever carries the failure to serialize a document this
+        // tool built itself a line earlier, so it is a malfunction here — and
+        // it is what keeps `Internal` a reachable code now that classification
+        // is a total match rather than a fallback.
+        CliError::JsonBare(_) => ErrorCode::Internal,
         CliError::CleanupAlsoFailed(CleanupFailure { .. }) => ErrorCode::EnvironmentRollbackFailed,
         CliError::WriteTarget(WriteTargetError::ParentNotADirectory { .. }) => {
             ErrorCode::EnvironmentIo
         }
         CliError::WriteTarget(_) => ErrorCode::RefusalWriteTarget,
         CliError::BackupCleanupAfterCommit { .. } => ErrorCode::EnvironmentCleanupAfterCommit,
+        // The journal is this tool's own bookkeeping; failing at it is an
+        // environment problem, and a replay failure is the rollback case.
+        CliError::Journal(_) => ErrorCode::EnvironmentRollbackFailed,
+        // The verification command named on the command line is not runnable
+        // here — nothing about the source is at fault.
+        CliError::External(_) => ErrorCode::EnvironmentUnavailable,
         CliError::TimedOut(_) => ErrorCode::EnvironmentTimeout,
     }
 }
@@ -619,6 +659,7 @@ const fn classify_argument(error: &ArgumentError) -> ErrorCode {
         // problem: the command line was fine and an earlier edit moved the
         // form this one was going to touch.
         ArgumentError::ConflictingInputSelectors => ErrorCode::ArgumentConflictingInputs,
+        ArgumentError::FlagCombination { .. } => ErrorCode::ArgumentFlagCombination,
         ArgumentError::InvalidGlob { .. } => ErrorCode::ArgumentInvalidGlob,
         ArgumentError::SinceRequiresRepository => ErrorCode::ArgumentNeedsRepository,
         // All three mean the same thing to a caller: the selector ran and
@@ -710,11 +751,51 @@ const fn classify_selector(error: &SelectorError) -> ErrorCode {
         // The selection resolved; this command cannot act on that shape.
         SelectorError::RangeUnsupported { .. } => ErrorCode::InputShapeRefused,
 
-        SelectorError::Sexpr(sexpr) => classify_sexpr(sexpr),
+        SelectorError::Sexpr(sexpr) => code_for_sexpr_error(sexpr),
     }
 }
 
-const fn classify_sexpr(error: &SexprError) -> ErrorCode {
+/// Which code a structural edit's refusal earns.
+///
+/// The families of `EditRefusal` were drawn for exactly this question, so the
+/// mapping is one arm each. What matters is that the three outcomes call for
+/// three different actions: change the file's language, select a different
+/// form, or fix the source so it parses.
+///
+/// Public because a feature that wraps an `EditRefusal` in its own error has
+/// to answer the same question, and answering it twice is how the two answers
+/// drift apart. `feature/package` calls this for the `Edit` arm of
+/// `PackageRefactorError` and only decides the arms core knows nothing about.
+#[must_use]
+pub const fn code_for_edit_refusal(refusal: &EditRefusal) -> ErrorCode {
+    match refusal {
+        // "stop retrying this command on this file"
+        EditRefusal::Dialect(_) => ErrorCode::InputDialectUnsupported,
+
+        // "the text this edit produced, or was given, is not a document"
+        EditRefusal::Document(_) => ErrorCode::InputUnparsable,
+
+        // "the form you selected is not the shape this edit rewrites" — the
+        // conservative refusals belong here too: a form with comments in it is
+        // a shape this edit declines, and the action is to select another.
+        EditRefusal::Conservative(_)
+        | EditRefusal::Shape(_)
+        | EditRefusal::Binding(_)
+        | EditRefusal::LocalFunction(_)
+        | EditRefusal::Insertion(_) => ErrorCode::InputShapeRefused,
+
+        // The tree underneath the edit declined, and it already says why.
+        EditRefusal::Selection(sexpr) => code_for_sexpr_error(sexpr),
+    }
+}
+
+/// Which code a syntax-layer refusal earns.
+///
+/// Public alongside [`code_for_edit_refusal`] and [`code_for_cli_error`], for
+/// the same reason: a feature that carries a `SexprError` in its own enum has
+/// to answer this, and a second answer is one that can drift.
+#[must_use]
+pub const fn code_for_sexpr_error(error: &SexprError) -> ErrorCode {
     match error {
         SexprError::Structure(structure) => classify_structure(structure),
         SexprError::Selection(selection) | SexprError::EditSelection { source: selection } => {
@@ -754,7 +835,13 @@ const fn classify_workspace(error: &WorkspaceError) -> ErrorCode {
     }
 }
 
-fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Repair> {
+/// What to suggest trying next, given the code.
+///
+/// Took the failure itself until the `anyhow` removal made it visible that
+/// every arm ignored it (`let _ = error;`): the repair table is a function of
+/// the classification alone. Keeping the parameter suggested the suggestions
+/// were tailored to the specific failure, and they are not.
+fn repairs(code: ErrorCode, context: &Context) -> Vec<Repair> {
     match code {
         ErrorCode::ArgumentNoInput => vec![Repair::new("pass-flag", Message::RepairNameTheSource)],
 
@@ -803,6 +890,19 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
 
         ErrorCode::InputSymbolInvalid => vec![Repair::new("pass-flag", Message::RepairSymbolShape)],
 
+        // The message names the flags; the only useful addition is the help
+        // text that lists what they combine with.
+        ErrorCode::ArgumentFlagCombination => {
+            vec![Repair::new("pass-flag", Message::RepairFlagCombination)]
+        }
+
+        // No `change-selection` repair: no selection in this file would help,
+        // which is the whole reason this is not `InputShapeRefused`.
+        ErrorCode::InputDialectUnsupported => vec![
+            Repair::new("inspect-first", Message::RepairOtherDialect)
+                .with_command(context.command("inspect dialect --output json")),
+        ],
+
         ErrorCode::RefusalInputTooLarge => {
             vec![Repair::new("change-selection", Message::RepairSmallerInput)]
         }
@@ -846,7 +946,6 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
             // Nothing specific to say, and inventing something would cost a
             // round trip to discover it did not help. The message stands
             // alone; `Internal` additionally means the table missed a case.
-            let _ = error;
             Vec::new()
         }
 
@@ -924,6 +1023,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
+    use paredit_core_syntax::sexpr::ParseError;
 
     fn context() -> Context {
         Context {
@@ -932,7 +1032,7 @@ mod tests {
         }
     }
 
-    fn diagnose_of(error: impl Into<anyhow::Error>) -> Diagnosis {
+    fn diagnose_of(error: impl Into<CommandFailure>) -> Diagnosis {
         diagnose(&error.into(), &context())
     }
 
@@ -1100,18 +1200,50 @@ mod tests {
         );
     }
 
+    /// There is no longer such a thing as an unclassified failure.
+    ///
+    /// This test used to build `anyhow!("something else entirely")` and assert
+    /// it came back as [`ErrorCode::Internal`] — the fallback arm of a
+    /// `downcast` chain. Since [`CommandFailure`] is a closed sum, a failure
+    /// that classifies to nothing cannot be constructed to test with: the
+    /// nearest thing is to check that every variant of the sum classifies to
+    /// something other than the "the table missed a case" code.
     #[test]
-    fn an_unclassified_failure_says_so_rather_than_guessing() {
-        let diagnosis = diagnose(&anyhow::anyhow!("something else entirely"), &context());
-        assert_eq!(diagnosis.code, ErrorCode::Internal);
-        assert!(diagnosis.repairs.is_empty());
-        assert_eq!(diagnosis.message, "something else entirely");
+    fn every_failure_classifies_to_something_other_than_internal() {
+        let failures = [
+            CommandFailure::from(gate_failure_of("policy failed")),
+            CommandFailure::from(CliError::from(ArgumentError::NoInput)),
+            CommandFailure::from(CliError::from(SexprError::from(
+                StructureError::RaiseTopLevel,
+            ))),
+            CommandFailure::from(CliError::Bare(std::io::Error::other("disk"))),
+        ];
+
+        for failure in &failures {
+            assert_ne!(
+                diagnose(failure, &context()).code,
+                ErrorCode::Internal,
+                "{failure}"
+            );
+        }
     }
 
+    fn gate_failure_of(message: &str) -> crate::gate::GateFailure {
+        crate::gate::GateFailure(message.to_owned())
+    }
+
+    /// The rendered message is the whole `source()` chain, joined with `": "`.
+    ///
+    /// This is what `anyhow`'s `{:#}` did and what `thiserror`'s `Display`
+    /// does not: without `error_chain` the message here would be only
+    /// `"outer"`, and the reason would be lost.
     #[test]
     fn the_message_is_the_flattened_chain() {
-        let error = anyhow::anyhow!("leaf").context("outer");
-        assert_eq!(diagnose(&error, &context()).message, "outer: leaf");
+        let failure = CommandFailure::from(CliError::Io {
+            context: "outer".to_owned(),
+            source: std::io::Error::other("leaf"),
+        });
+        assert_eq!(diagnose(&failure, &context()).message, "outer: leaf");
     }
 
     #[test]

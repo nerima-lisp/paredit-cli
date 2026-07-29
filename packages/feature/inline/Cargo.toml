@@ -16,7 +16,6 @@ paredit-core-edit = { path = "../../core/edit" }
 paredit-core-cli = { path = "../../core/cli" }
 # inline_literal_constant renames symbol-macro references.
 paredit-feature-rename = { path = "../rename" }
-anyhow.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

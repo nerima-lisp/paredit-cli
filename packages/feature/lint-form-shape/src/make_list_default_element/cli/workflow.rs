@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::make_list_default_element::cli::args::MakeListDefaultElementReportArgs;
 use crate::make_list_default_element::cli::render::print_make_list_default_element_report;
@@ -8,7 +8,7 @@ use crate::make_list_default_element::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn make_list_default_element_report(args: MakeListDefaultElementReportArgs) -> Result<()> {
+pub fn make_list_default_element_report(args: MakeListDefaultElementReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

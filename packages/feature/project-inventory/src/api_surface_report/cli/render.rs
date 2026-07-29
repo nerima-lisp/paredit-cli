@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
 
@@ -10,6 +10,6 @@ pub fn print_undefined_export_report(
     reports: &[FileFindings<ApiEntry>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     print_report("inspect api-surface", reports, policy, output)
 }

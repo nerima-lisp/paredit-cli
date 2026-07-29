@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::typecase_nil_key::cli::args::TypecaseNilKeyReportArgs;
 use crate::typecase_nil_key::cli::render::print_typecase_nil_key_report;
@@ -8,7 +8,7 @@ use crate::typecase_nil_key::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn typecase_nil_key_report(args: TypecaseNilKeyReportArgs) -> Result<()> {
+pub fn typecase_nil_key_report(args: TypecaseNilKeyReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut typecase_form_count = 0;

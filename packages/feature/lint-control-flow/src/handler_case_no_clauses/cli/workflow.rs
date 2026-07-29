@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::handler_case_no_clauses::cli::args::HandlerCaseNoClausesReportArgs;
 use crate::handler_case_no_clauses::cli::render::print_handler_case_no_clauses_report;
@@ -8,7 +8,7 @@ use crate::handler_case_no_clauses::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn handler_case_no_clauses_report(args: HandlerCaseNoClausesReportArgs) -> Result<()> {
+pub fn handler_case_no_clauses_report(args: HandlerCaseNoClausesReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut handler_case_form_count = 0;

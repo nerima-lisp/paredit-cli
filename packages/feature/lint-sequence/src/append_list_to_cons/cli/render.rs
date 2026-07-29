@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_append_list_to_cons_report(
     summary: &AppendListToConsSummary,
     policy: &AppendListToConsPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("append_form_count\t{}", summary.append_form_count);

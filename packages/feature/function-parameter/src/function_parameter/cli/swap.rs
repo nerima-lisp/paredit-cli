@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::function_parameter::usecase::{
     SwapFunctionParametersRequest, plan_swap_function_parameters,
@@ -10,9 +10,9 @@ use paredit_core_cli::shared::write_file_with_rollback;
 use super::args::SwapFunctionParametersArgs;
 use super::render::swap::print_swap_function_parameters_plan;
 
-pub fn swap_function_parameters(args: SwapFunctionParametersArgs) -> Result<()> {
+pub fn swap_function_parameters(args: SwapFunctionParametersArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;

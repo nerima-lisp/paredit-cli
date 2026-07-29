@@ -181,3 +181,32 @@ impl From<SexprError> for BindingError {
 
 /// The result type the binding refactors and reports return.
 pub type BindingResult<T> = std::result::Result<T, BindingError>;
+
+// States which documented error code each binding refusal earns.
+//
+// The families were drawn for the reader; they turn out to answer the
+// caller's question too, which is why this is one arm each and not a
+// per-variant table.
+paredit_core_cli::impl_classified_refusal!(BindingError, |error| match error {
+    BindingError::Edit(edit) => paredit_core_cli::diagnosis::code_for_edit_refusal(edit),
+
+    // "requires a plain binding list", "rejects destructuring", "refuses to
+    // rewrite a top-level progn", "references earlier binding" — every one is
+    // the tool being conservative about a form that is itself valid. The
+    // action is to select a different form, or to rewrite by hand.
+    BindingError::Shape(_)
+    | BindingError::Context(_)
+    | BindingError::Capture(_)
+    | BindingError::ReaderConditional(_) =>
+        paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+
+    BindingError::Parse(_) => paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+
+    // `--binding-index` is one-based and zero was passed: a command-line
+    // problem, fixable only by changing the command line.
+    BindingError::BindingIndex(_) =>
+        paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+
+    BindingError::DialectDoesNotSupport { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::InputDialectUnsupported,
+});

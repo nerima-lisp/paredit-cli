@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_nested_string_case_report(
     summary: &NestedStringCaseSummary,
     policy: &NestedStringCasePolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("string_case_form_count\t{}", summary.string_case_form_count);

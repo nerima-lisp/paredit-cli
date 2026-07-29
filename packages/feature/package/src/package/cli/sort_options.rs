@@ -1,4 +1,6 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
+
+use crate::error::PackageCommandError;
 
 use crate::package::usecase as package_usecase;
 
@@ -8,7 +10,7 @@ use super::{
 };
 use paredit_core_cli::shared::{read_input_and_dialect, write_file_with_rollback};
 
-pub fn sort_package_options(args: SortPackageOptionsArgs) -> Result<()> {
+pub fn sort_package_options(args: SortPackageOptionsArgs) -> CliResult<()> {
     let (input, dialect) = read_input_and_dialect(Some(args.file.clone()), args.dialect)?;
     let usecase_plan =
         package_usecase::plan_sort_package_options(package_usecase::SortPackageOptionsRequest {
@@ -17,11 +19,10 @@ pub fn sort_package_options(args: SortPackageOptionsArgs) -> Result<()> {
             package: args.package.as_ref(),
             order: args.order.into(),
         })
-        .with_context(|| {
-            format!(
-                "failed to plan sort-package-options for {}",
-                args.file.display()
-            )
+        .map_err(|source| PackageCommandError::Plan {
+            operation: "sort-package-options",
+            path: args.file.display().to_string(),
+            source,
         })?;
     let changed = usecase_plan.changed;
     let written = args.write && changed;

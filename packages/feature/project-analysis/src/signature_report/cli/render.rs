@@ -1,7 +1,7 @@
 use paredit_core_cli::safe_text;
 use std::collections::BTreeMap;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::signature_report::usecase::{
@@ -23,7 +23,7 @@ pub fn print_signature_report(
     symbol: Option<&SymbolName>,
     policy: &SignatureReportPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let mut by_status = BTreeMap::<SignatureCallStatus, usize>::new();
     for item in reports.iter().flat_map(|report| &report.calls) {
         *by_status.entry(item.status).or_default() += 1;
@@ -109,7 +109,7 @@ fn print_json_report(
     symbol: Option<&SymbolName>,
     policy: &SignatureReportPolicy,
     by_status: &BTreeMap<SignatureCallStatus, usize>,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

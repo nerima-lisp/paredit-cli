@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -12,7 +12,7 @@ pub fn print_effect_report(
     policy: &EffectPolicy,
     filter: Option<PurityFilter>,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => print_text(reports, policy, filter),
         OutputFormat::Json => print_json(reports, policy, filter)?,
@@ -71,7 +71,7 @@ fn print_json(
     reports: &[EffectReportFile],
     policy: &EffectPolicy,
     filter: Option<PurityFilter>,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::literal_place::cli::args::LiteralPlaceReportArgs;
 use crate::literal_place::cli::render::print_literal_place_report;
@@ -8,7 +8,7 @@ use crate::literal_place::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn literal_place_report(args: LiteralPlaceReportArgs) -> Result<()> {
+pub fn literal_place_report(args: LiteralPlaceReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut modify_form_count = 0;

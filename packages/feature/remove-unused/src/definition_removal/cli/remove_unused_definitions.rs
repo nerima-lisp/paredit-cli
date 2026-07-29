@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
@@ -10,15 +10,19 @@ use crate::remove_unused_definition::usecase::{
 use paredit_core_cli::shared::{read_input_dialect_and_tree, write_files_with_rollback};
 use paredit_feature_package::package_report::usecase::build_package_report;
 
-pub fn remove_unused_definitions(args: RemoveUnusedDefinitionsArgs) -> Result<()> {
+pub fn remove_unused_definitions(args: RemoveUnusedDefinitionsArgs) -> CliResult<()> {
     let mut input_files = Vec::with_capacity(args.files.len());
     let mut package_definitions = Vec::new();
 
     for file in &args.files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         let (package, definitions) = collect_definition_forms(&tree, dialect)?;
-        let package_report = build_package_report(&tree, dialect)
-            .with_context(|| format!("failed to inspect packages in {}", file.display()))?;
+        let package_report = build_package_report(&tree, dialect).map_err(|source| {
+            paredit_feature_package::error::PackageCommandError::Inspect {
+                path: file.display().to_string(),
+                source,
+            }
+        })?;
         package_definitions.extend(package_report.defpackages);
 
         input_files.push(RemoveUnusedDefinitionInputFile {

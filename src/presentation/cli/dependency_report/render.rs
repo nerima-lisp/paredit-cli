@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::application::usecase::dependency_report::DependencyKind;
@@ -60,7 +60,7 @@ pub fn dependency_drawing(reports: &[DependencyReportFile]) -> Graph {
 pub fn print_dependency_report(
     reports: &[DependencyReportFile],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let dependency_count = reports
         .iter()
         .map(|report| report.dependencies.len())

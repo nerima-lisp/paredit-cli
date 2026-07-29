@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -12,7 +12,7 @@ pub fn print_call_report(
     symbol: Option<&SymbolName>,
     include_definitions: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let total_count = reports
         .iter()
         .map(|report| report.calls.len())

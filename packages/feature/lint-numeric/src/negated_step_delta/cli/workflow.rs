@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::negated_step_delta::cli::args::NegatedStepDeltaReportArgs;
 use crate::negated_step_delta::cli::render::print_negated_step_delta_report;
@@ -8,7 +8,7 @@ use crate::negated_step_delta::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn negated_step_delta_report(args: NegatedStepDeltaReportArgs) -> Result<()> {
+pub fn negated_step_delta_report(args: NegatedStepDeltaReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut step_form_count = 0;

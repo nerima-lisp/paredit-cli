@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::butlast_default_count::cli::args::ButlastDefaultCountReportArgs;
 use crate::butlast_default_count::cli::render::print_butlast_default_count_report;
@@ -8,7 +8,7 @@ use crate::butlast_default_count::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn butlast_default_count_report(args: ButlastDefaultCountReportArgs) -> Result<()> {
+pub fn butlast_default_count_report(args: ButlastDefaultCountReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

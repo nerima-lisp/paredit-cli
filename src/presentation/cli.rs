@@ -19,7 +19,9 @@ mod dependency_report;
 // macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
 // it enumerates three features' capabilities, which makes it composition root
 // (section 11.5.1).
-use paredit_core_cli::{args, diagnosis, gate, messages, shared};
+use paredit_core_cli::{
+    CliResult, CommandFailure, CommandResult, args, diagnosis, gate, messages, shared,
+};
 // Phase 3 facade: the composition root sees each slice's Args type and run fn.
 use paredit_feature_change_summary::change_summary::cli as change_summary;
 use paredit_feature_code_metrics::cohesion_report::cli as cohesion_report;
@@ -98,7 +100,6 @@ mod writability_report;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use anyhow::Result;
 use clap::{Args, Parser};
 use serde_json::json;
 
@@ -292,7 +293,7 @@ fn suppress_writes_when_dry(argv: Vec<String>) -> Vec<String> {
 
 /// Prints a failure with its stable code and whatever would get past it, in
 /// the format this invocation was already going to be read in.
-fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
+fn report_failure(failure: &CommandFailure, invocation: &[String]) -> ExitCode {
     use clap::CommandFactory;
 
     let root = Cli::command();
@@ -300,7 +301,7 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
         file: argv::long_flag_value(invocation, "file"),
         command_path: argv::resolve_leaf(invocation, &root).map(|(_, path)| path),
     };
-    let diagnosis = diagnosis::diagnose(error, &context);
+    let diagnosis = diagnosis::diagnose(failure, &context);
 
     // JSON on stderr when the report itself would have been JSON. An agent
     // that asked for a machine-readable answer should not have to parse
@@ -325,7 +326,7 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
             "{} [{}]: {}",
             painter.red(messages::say(messages::Message::ErrorPrefix)),
             diagnosis.code,
-            terminal_safe_error_chain(error)
+            terminal_safe_error_chain(failure)
         );
         // Best-effort: the file may have moved or changed since the failure,
         // in which case there is nothing to point a caret at and this simply
@@ -506,7 +507,7 @@ fn bootstrap() -> Cli {
 /// Flags win over the environment, and the environment exists because a CI
 /// container's budget is not something the person typing the command controls.
 /// Both are ratchets: either may lower a ceiling, neither may raise one.
-fn install_budget(args: &BudgetArgs) -> Result<()> {
+fn install_budget(args: &BudgetArgs) -> Result<(), paredit_core_safety::limits::LimitError> {
     use paredit_core_safety::deadline::{self, Deadline};
     use paredit_core_safety::limits::{self, ResourceLimitOverrides, ResourceLimits};
 
@@ -731,7 +732,13 @@ mod tests {
 
     #[test]
     fn cli_error_diagnostic_escapes_untrusted_controls() {
-        let error = anyhow::anyhow!("bad\npath\t\u{1b}[31m\u{202e}").context("open failed");
+        // A two-level typed chain standing in for what
+        // `anyhow!(..).context(..)` used to build: the point is that each link
+        // is escaped as its own value, not which library nested them.
+        let error = paredit_core_cli::CliError::Io {
+            context: "open failed".to_owned(),
+            source: std::io::Error::other("bad\npath\t\u{1b}[31m\u{202e}"),
+        };
 
         assert_eq!(
             format!("Error: {}", terminal_safe_error_chain(&error)),

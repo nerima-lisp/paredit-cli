@@ -55,10 +55,18 @@ pub struct SemanticCoverageInventory {
 /// `build_value_table` return an empty table for every other dialect, so a
 /// source that discovered other dialects would only measure zeroes.
 pub trait SemanticCoverageSourcePort {
+    /// What this adapter's own failures look like.
+    ///
+    /// An associated type rather than `anyhow::Result`, for the reason given
+    /// on every other port in this workspace: the use case must not know what
+    /// an adapter can fail with, and `anyhow::Error` does not say that — it
+    /// says "no error type at all", and takes the classification with it.
+    type Error: Into<paredit_core_cli::CliError>;
+
     fn discover(
         &mut self,
         request: &SemanticCoverageRequest,
-    ) -> anyhow::Result<SemanticCoverageInventory>;
+    ) -> Result<SemanticCoverageInventory, Self::Error>;
 
     fn load(&self, file: &DiscoveredSemanticCoverageFile) -> Result<Vec<u8>, String>;
 }
@@ -90,7 +98,12 @@ pub struct SemanticCoverageFileError {
 
 #[derive(Debug)]
 pub enum SemanticCoverageWorkflowError {
-    Source(anyhow::Error),
+    /// Whatever the source port's adapter failed with.
+    ///
+    /// The port still does not enumerate its adapters' failures — see
+    /// [`SemanticCoverageSourcePort::Error`] — but a `CliError` still carries
+    /// a classification, which an `anyhow::Error` did not.
+    Source(Box<paredit_core_cli::CliError>),
 }
 
 impl std::fmt::Display for SemanticCoverageWorkflowError {
@@ -426,7 +439,7 @@ pub fn build_semantic_coverage_report(
 ) -> Result<SemanticCoverageReport, SemanticCoverageWorkflowError> {
     let inventory = source
         .discover(&request)
-        .map_err(SemanticCoverageWorkflowError::Source)?;
+        .map_err(|error| SemanticCoverageWorkflowError::Source(Box::new(error.into())))?;
 
     let mut loaded = Vec::with_capacity(inventory.files.len());
     let mut errors = Vec::new();
@@ -687,10 +700,12 @@ mod tests {
     }
 
     impl SemanticCoverageSourcePort for FakeSource {
+        type Error = paredit_core_cli::CliError;
+
         fn discover(
             &mut self,
             _request: &SemanticCoverageRequest,
-        ) -> anyhow::Result<SemanticCoverageInventory> {
+        ) -> Result<SemanticCoverageInventory, Self::Error> {
             Ok(SemanticCoverageInventory {
                 files: self
                     .files

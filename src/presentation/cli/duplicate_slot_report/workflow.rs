@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::application::usecase::duplicate_slot_report::{
     DuplicateSlotPolicyOptions, collect_duplicate_slots, evaluate_duplicate_slot_policy,
@@ -10,7 +10,7 @@ use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 pub(in crate::presentation::cli) fn duplicate_slot_report(
     args: DuplicateSlotReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let mut definition_count = 0;
     let mut duplicates = Vec::new();
 

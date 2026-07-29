@@ -14,13 +14,14 @@
 //! exercised only a few times a year and already works.
 
 mod case;
+mod error;
 mod checklist;
 mod fs_util;
 mod new_command;
 mod new_lint_rule;
 mod repo;
 
-use anyhow::Result;
+use crate::error::Result;
 use clap::{Parser, Subcommand};
 
 use case::Name;

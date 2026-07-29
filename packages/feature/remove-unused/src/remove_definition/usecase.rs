@@ -1,3 +1,4 @@
+use paredit_core_cli::CliError;
 use std::path::{Path as FsPath, PathBuf};
 
 use crate::error::{RemoveRequestError, RemoveUnusedError, RemoveUnusedResult};
@@ -17,14 +18,23 @@ pub struct LoadedDefinitionSource {
 
 /// The outside world, as this use case needs it.
 ///
-/// Its methods keep `anyhow::Result` after §9.2: the port exists so the use
-/// case does not know what an adapter can fail with, and the CLI adapter here
-/// unions a `CliError` with its own. `RemoveUnusedError::Source` carries the
-/// result through.
+/// The methods used to return `anyhow::Result`, justified by the port's whole
+/// purpose: the use case must not know what an adapter can fail with. That
+/// reasoning is right and `anyhow::Error` was the wrong way to say it — it
+/// does not express "some error I do not name", it expresses "no error type at
+/// all", and it took the classification down with it.
+///
+/// An associated type says the intended thing in the type system: each adapter
+/// names its own error, and the use case never learns which. The `Into<CliError>`
+/// bound is the one thing it does require, because whatever an adapter fails
+/// with has to be reportable at the CLI boundary with a code.
 pub trait DefinitionSourcePort {
-    fn load(&mut self, file: &FsPath) -> anyhow::Result<LoadedDefinitionSource>;
+    /// What this adapter's own failures look like.
+    type Error: Into<CliError>;
 
-    fn write(&mut self, file: &FsPath, content: &str) -> anyhow::Result<()>;
+    fn load(&mut self, file: &FsPath) -> Result<LoadedDefinitionSource, Self::Error>;
+
+    fn write(&mut self, file: &FsPath, content: &str) -> Result<(), Self::Error>;
 }
 
 #[derive(Debug)]
@@ -53,7 +63,7 @@ pub fn remove_definition(
 ) -> RemoveUnusedResult<RemoveDefinitionPlan> {
     let loaded = source
         .load(&request.file)
-        .map_err(RemoveUnusedError::Source)?;
+        .map_err(|error| RemoveUnusedError::Source(Box::new(error.into())))?;
     let tree = SyntaxTree::parse_with_dialect(&loaded.text, loaded.dialect)?;
 
     let target_index = match request.path.indexes() {
@@ -102,7 +112,7 @@ pub fn remove_definition(
     if written {
         source
             .write(&request.file, &rewritten)
-            .map_err(RemoveUnusedError::Source)?;
+            .map_err(|error| RemoveUnusedError::Source(Box::new(error.into())))?;
     }
 
     Ok(RemoveDefinitionPlan {
@@ -137,6 +147,7 @@ mod tests {
     use super::{
         DefinitionSourcePort, LoadedDefinitionSource, RemoveDefinitionRequest, remove_definition,
     };
+    use paredit_core_cli::CliError;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::Path as ExpressionPath;
 
@@ -146,14 +157,16 @@ mod tests {
     }
 
     impl DefinitionSourcePort for MemorySource {
-        fn load(&mut self, _file: &Path) -> anyhow::Result<LoadedDefinitionSource> {
+        type Error = CliError;
+
+        fn load(&mut self, _file: &Path) -> Result<LoadedDefinitionSource, CliError> {
             Ok(LoadedDefinitionSource {
                 text: self.text.clone(),
                 dialect: Dialect::CommonLisp,
             })
         }
 
-        fn write(&mut self, _file: &Path, content: &str) -> anyhow::Result<()> {
+        fn write(&mut self, _file: &Path, content: &str) -> Result<(), CliError> {
             self.writes.push(content.to_owned());
             Ok(())
         }

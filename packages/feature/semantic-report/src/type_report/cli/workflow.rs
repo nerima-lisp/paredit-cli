@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -9,7 +9,7 @@ use crate::type_report::usecase::{
     TypeReportPolicyOptions, build_type_report, evaluate_type_report_policy,
 };
 
-pub fn type_report(args: TypeReportArgs) -> Result<()> {
+pub fn type_report(args: TypeReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

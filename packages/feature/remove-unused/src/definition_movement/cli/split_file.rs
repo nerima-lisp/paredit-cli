@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path as FsPath;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 
 use paredit_feature_form_transform::split_file::usecase::{
     SplitFileDestination, SplitFileRequest, plan_split_file,
@@ -14,9 +14,13 @@ use paredit_core_cli::shared::{
     detect_dialect, read_file_or_empty, read_input_and_dialect, write_files_with_rollback,
 };
 
-pub fn split_file(args: SplitFileArgs) -> Result<()> {
+pub fn split_file(args: SplitFileArgs) -> CliResult<()> {
     if same_file_path(&args.from_file, &args.to_file) {
-        anyhow::bail!("--from-file and --to-file must refer to different files");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--from-file and --to-file must refer to different files",
+        )
+        .into());
     }
 
     let (from_input, from_dialect) =
@@ -50,8 +54,12 @@ pub fn split_file(args: SplitFileArgs) -> Result<()> {
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
         {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create {}", parent.display()))?;
+            fs::create_dir_all(parent).map_err(|source| {
+                crate::error::DefinitionMovementError::CreateDirectory {
+                    path: parent.display().to_string(),
+                    source,
+                }
+            })?;
         }
         write_files_with_rollback([
             (args.from_file.clone(), plan.from_rewritten.clone()),

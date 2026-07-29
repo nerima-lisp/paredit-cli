@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::circular_literal_report::usecase::{
     build_circular_literal_report, evaluate_fail_on_label_policy,
 };
 
-pub fn circular_literal_report(args: CircularLiteralReportArgs) -> Result<()> {
+pub fn circular_literal_report(args: CircularLiteralReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

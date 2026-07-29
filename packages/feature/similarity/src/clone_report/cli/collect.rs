@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -77,7 +77,7 @@ pub fn collect_candidates(
     roots: &[PathBuf],
     args: &CloneDiscoveryArgs,
     options: &SimilarityReportOptions,
-) -> Result<CandidateCorpus> {
+) -> CliResult<CandidateCorpus> {
     collect_candidates_with_generated(roots, args, options, args.input.include_generated)
 }
 
@@ -86,7 +86,7 @@ pub fn collect_candidates_with_generated(
     args: &CloneDiscoveryArgs,
     options: &SimilarityReportOptions,
     include_generated: bool,
-) -> Result<CandidateCorpus> {
+) -> CliResult<CandidateCorpus> {
     let scan = Scan {
         roots,
         args,
@@ -135,7 +135,7 @@ pub fn collect_candidates_with_generated(
     })
 }
 
-pub fn collect_sources(roots: &[PathBuf], args: &CloneDiscoveryArgs) -> Result<SourceCorpus> {
+pub fn collect_sources(roots: &[PathBuf], args: &CloneDiscoveryArgs) -> CliResult<SourceCorpus> {
     let scan = Scan {
         roots,
         args,
@@ -160,7 +160,7 @@ pub fn collect_sources(roots: &[PathBuf], args: &CloneDiscoveryArgs) -> Result<S
     })
 }
 
-fn discover(scan: &Scan<'_>) -> Result<(Vec<PathBuf>, DiscoverySummary, WorkspaceDiscovery)> {
+fn discover(scan: &Scan<'_>) -> CliResult<(Vec<PathBuf>, DiscoverySummary, WorkspaceDiscovery)> {
     // Every input selector and filter comes from the shared flag block, so
     // `--since`, `--paths-from`, `--include` and the cache work here exactly as
     // they do for `inspect similarity`. Only the two overrides this slice
@@ -222,14 +222,18 @@ fn push_error(
     errors: &mut Vec<CorpusFileError>,
     error: CorpusFileError,
     policy: ErrorPolicy,
-) -> Result<()> {
+) -> CliResult<()> {
     if policy == ErrorPolicy::Fail {
-        anyhow::bail!(
-            "failed to {} {}: {}",
-            error.stage,
-            error.path.display(),
-            error.message
-        );
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::EnvironmentIo,
+            format!(
+                "failed to {} {}: {}",
+                error.stage,
+                error.path.display(),
+                error.message
+            ),
+        )
+        .into());
     }
     errors.push(error);
     Ok(())

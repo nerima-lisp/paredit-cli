@@ -265,3 +265,31 @@ impl From<SexprError> for FormTransformError {
 
 /// The result type the form transformations return.
 pub type FormTransformResult<T> = std::result::Result<T, FormTransformError>;
+
+// States which documented error code each transform refusal earns.
+paredit_core_cli::impl_classified_refusal!(FormTransformError, |error| match error {
+    FormTransformError::Edit(edit) => paredit_core_cli::diagnosis::code_for_edit_refusal(edit),
+
+    FormTransformError::Dialect(_) =>
+        paredit_core_cli::diagnosis::ErrorCode::InputDialectUnsupported,
+
+    FormTransformError::Selector(_) => paredit_core_cli::diagnosis::ErrorCode::SelectionNoMatch,
+
+    FormTransformError::Target(_)
+    | FormTransformError::CommentWouldBeDiscarded(_)
+    | FormTransformError::ReaderConditional(_) =>
+        paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+
+    FormTransformError::Parse(_)
+    | FormTransformError::ParseFailed { .. }
+    | FormTransformError::DestinationNotAnSexprDocument { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+
+    // The transform ran and the result would not parse. Same code as the
+    // CLI's own write guard, because it is the same refusal: this tool will
+    // not leave a file it cannot read back.
+    FormTransformError::WouldBecomeInvalid { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+
+    FormTransformError::Symbol(_) => paredit_core_cli::diagnosis::ErrorCode::InputSymbolInvalid,
+});

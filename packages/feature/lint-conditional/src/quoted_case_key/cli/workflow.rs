@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::quoted_case_key::cli::args::QuotedCaseKeyReportArgs;
 use crate::quoted_case_key::cli::render::print_quoted_case_key_report;
@@ -8,7 +8,7 @@ use crate::quoted_case_key::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn quoted_case_key_report(args: QuotedCaseKeyReportArgs) -> Result<()> {
+pub fn quoted_case_key_report(args: QuotedCaseKeyReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut case_form_count = 0;

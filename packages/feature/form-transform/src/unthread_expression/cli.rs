@@ -2,8 +2,8 @@ use crate::unthread_expression::usecase::{
     UnthreadExpressionPlan, UnthreadExpressionRequest, UnthreadStyle as ApplicationUnthreadStyle,
     plan_unthread_expression,
 };
-use anyhow::{Context, Result};
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
@@ -52,7 +52,7 @@ const fn application_unthread_style(style: ThreadStyleArg) -> ApplicationUnthrea
     }
 }
 
-pub fn unthread_expression(args: UnthreadExpressionArgs) -> Result<()> {
+pub fn unthread_expression(args: UnthreadExpressionArgs) -> CliResult<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let target = resolve_compact_target(
         &tree,
@@ -76,7 +76,10 @@ pub fn unthread_expression(args: UnthreadExpressionArgs) -> Result<()> {
     let mut written = false;
 
     if args.write {
-        let file = input.file.as_ref().context("--write requires --file")?;
+        let file = input
+            .file
+            .as_ref()
+            .ok_or(paredit_core_cli::ArgumentError::WriteRequiresFile)?;
         if plan.changed {
             write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
         }
@@ -90,7 +93,7 @@ fn print_unthread_expression_plan(
     plan: &UnthreadExpressionPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

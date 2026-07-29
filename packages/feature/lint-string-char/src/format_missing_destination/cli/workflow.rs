@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::format_missing_destination::cli::args::FormatMissingDestinationReportArgs;
 use crate::format_missing_destination::cli::render::print_format_missing_destination_report;
@@ -8,7 +8,9 @@ use crate::format_missing_destination::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn format_missing_destination_report(args: FormatMissingDestinationReportArgs) -> Result<()> {
+pub fn format_missing_destination_report(
+    args: FormatMissingDestinationReportArgs,
+) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut format_call_count = 0;

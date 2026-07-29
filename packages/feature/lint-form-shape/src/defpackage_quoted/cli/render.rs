@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ pub fn print_defpackage_quoted_report(
     summary: &DefpackageQuotedSummary,
     policy: &DefpackageQuotedPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("defpackage_form_count\t{}", summary.defpackage_form_count);

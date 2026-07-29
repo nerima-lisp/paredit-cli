@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::values_list_of_list::cli::args::ValuesListOfListReportArgs;
 use crate::values_list_of_list::cli::render::print_values_list_of_list_report;
@@ -8,7 +8,7 @@ use crate::values_list_of_list::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn values_list_of_list_report(args: ValuesListOfListReportArgs) -> Result<()> {
+pub fn values_list_of_list_report(args: ValuesListOfListReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut values_list_form_count = 0;

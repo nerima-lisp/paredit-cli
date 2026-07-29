@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
 
@@ -10,6 +10,6 @@ pub fn print_external_report(
     reports: &[FileFindings<SystemDependency>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     print_report("inspect external-systems", reports, policy, output)
 }

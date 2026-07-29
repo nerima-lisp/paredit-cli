@@ -27,7 +27,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 use crate::domain::dialect::Dialect;
@@ -139,7 +139,7 @@ pub fn collect_declared_methods(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<Vec<DeclaredMethod>> {
+) -> CliResult<Vec<DeclaredMethod>> {
     if dialect != Dialect::CommonLisp {
         return Ok(Vec::new());
     }

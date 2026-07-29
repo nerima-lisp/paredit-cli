@@ -1,10 +1,10 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use super::args::RenameLocalFunctionArgs;
 use super::shared::{CallableRenameCommand, CallableRenamePlanData, run_callable_rename};
 use crate::rename::usecase as rename_usecase;
 
-pub fn rename_local_function(args: RenameLocalFunctionArgs) -> Result<()> {
+pub fn rename_local_function(args: RenameLocalFunctionArgs) -> CommandResult {
     run_callable_rename(
         CallableRenameCommand {
             files: &args.files,

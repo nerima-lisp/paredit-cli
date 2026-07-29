@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::domain::dialect::Dialect;
@@ -13,7 +13,7 @@ pub(super) fn print_symbol_occurrences(
     dialect: Dialect,
     symbol: &SymbolName,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let occurrences = matching_symbol_occurrences(tree, symbol);
     match output {
         OutputFormat::Text => {
@@ -55,7 +55,7 @@ pub(super) fn print_symbol_report(
     reports: &[SymbolReportFile],
     symbol: &SymbolName,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let total_count = reports
         .iter()
         .map(|report| report.occurrences.len())

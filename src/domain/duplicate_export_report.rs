@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::domain::common_lisp::{
     common_lisp_symbol_reference_needle, normalize_common_lisp_package_designator,
@@ -71,7 +71,7 @@ pub fn collect_duplicate_exports(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<DuplicateExportItem>)> {
+) -> CliResult<(usize, Vec<DuplicateExportItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

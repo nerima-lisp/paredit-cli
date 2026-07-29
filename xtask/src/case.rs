@@ -1,7 +1,7 @@
 //! kebab-case in, snake_case and PascalCase derived — the three spellings
 //! every generated file needs to agree on.
 
-use anyhow::{Result, bail};
+use crate::error::Result;
 
 /// A name given as `--rule-name`/`--command-name`, validated once so every
 /// generator can trust its three derived spellings.
@@ -20,10 +20,8 @@ impl Name {
             && !raw.ends_with('-')
             && !raw.contains("--");
         if !is_valid {
-            bail!(
-                "`{raw}` must be lowercase kebab-case (letters, digits, single hyphens), \
-                 e.g. `char-case-fold`"
-            );
+            return Err(crate::error::XtaskError::refused(format!("`{raw}` must be lowercase kebab-case (letters, digits, single hyphens), \
+                 e.g. `char-case-fold`")));
         }
         Ok(Self {
             kebab: raw.to_owned(),

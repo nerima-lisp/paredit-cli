@@ -74,3 +74,57 @@ impl From<TreeSimilarityError> for SimilarityAnalysisError {
 
 /// The result type the similarity analysis passes return.
 pub type SimilarityAnalysisResult<T> = std::result::Result<T, SimilarityAnalysisError>;
+
+// States which documented error code each similarity refusal earns.
+paredit_core_cli::impl_classified_refusal!(SimilarityAnalysisError, |error| code_of_analysis(
+    error
+));
+
+// Both options types are entirely `--flag must be ...` refusals, checked
+// before any work starts.
+paredit_core_cli::impl_classified_refusal!(
+    crate::similarity_report::domain::SimilarityReportOptionsError,
+    |_error| paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination
+);
+
+paredit_core_cli::impl_classified_refusal!(
+    crate::clone_report::domain::CloneSequenceOptionsError,
+    |_error| paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination
+);
+
+// The workflow error is one layer out: the analysis, plus what the source port
+// and the per-file processing can add.
+paredit_core_cli::impl_classified_refusal!(
+    crate::similarity_report::usecase::SimilarityReportWorkflowError,
+    |error| {
+        use crate::similarity_report::usecase::SimilarityReportWorkflowError as Workflow;
+        match error {
+            // The adapter already classified itself.
+            Workflow::Source(inner) => paredit_core_cli::diagnosis::code_for_cli_error(inner),
+            Workflow::Analysis(analysis) => code_of_analysis(analysis),
+            // One file could not be read or parsed on the way in.
+            Workflow::Processing(_) => paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+            // Both are defects here rather than in the caller's input.
+            Workflow::WorkerPanicked | Workflow::InvalidPlan(_) => {
+                paredit_core_cli::diagnosis::ErrorCode::Internal
+            }
+        }
+    }
+);
+
+/// Shared by [`SimilarityAnalysisError`]'s own impl and the workflow's.
+const fn code_of_analysis(
+    error: &SimilarityAnalysisError,
+) -> paredit_core_cli::diagnosis::ErrorCode {
+    match error {
+        SimilarityAnalysisError::Budget(_) => {
+            paredit_core_cli::diagnosis::ErrorCode::RefusalInputTooLarge
+        }
+        SimilarityAnalysisError::Worker(_) | SimilarityAnalysisError::InvalidReport(_) => {
+            paredit_core_cli::diagnosis::ErrorCode::Internal
+        }
+        SimilarityAnalysisError::InvalidOptions(_) => {
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination
+        }
+    }
+}

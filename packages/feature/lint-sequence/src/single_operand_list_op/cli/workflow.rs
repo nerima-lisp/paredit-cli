@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::single_operand_list_op::cli::args::SingleOperandListOpReportArgs;
 use crate::single_operand_list_op::cli::render::print_single_operand_list_op_report;
@@ -8,7 +8,7 @@ use crate::single_operand_list_op::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn single_operand_list_op_report(args: SingleOperandListOpReportArgs) -> Result<()> {
+pub fn single_operand_list_op_report(args: SingleOperandListOpReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut list_op_form_count = 0;

@@ -1,6 +1,6 @@
 //! Use-case helpers for extracting one expression into a top-level constant.
 
-use anyhow::Result;
+use crate::error::ExtractionResult;
 
 use paredit_core_edit::extract_shared::TopLevelInsert;
 use paredit_core_edit::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
@@ -37,13 +37,13 @@ pub struct ExtractConstantPlan {
     pub changed: bool,
 }
 
-pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
-    Ok(crate::extract_constant::domain::path_for_selection(
-        tree, selection,
-    )?)
+pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> ExtractionResult<Path> {
+    crate::extract_constant::domain::path_for_selection(tree, selection)
 }
 
-pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<ExtractConstantPlan> {
+pub fn plan_extract_constant(
+    request: ExtractConstantRequest<'_>,
+) -> ExtractionResult<ExtractConstantPlan> {
     request
         .selection
         .validate_context(request.input, request.tree)?;
@@ -85,7 +85,7 @@ mod tests {
     use super::*;
     use std::str::FromStr;
 
-    fn plan(input: &str, path: &str, dialect: Dialect) -> Result<ExtractConstantPlan> {
+    fn plan(input: &str, path: &str, dialect: Dialect) -> ExtractionResult<ExtractConstantPlan> {
         let tree = SyntaxTree::parse(input)?;
         let path = Path::from_str(path)?;
         let selection = tree.select_path(&path)?;

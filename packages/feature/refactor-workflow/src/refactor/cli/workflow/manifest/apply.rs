@@ -12,7 +12,7 @@ use super::super::super::types::apply::{
 use super::super::super::types::manifest::RefactorApplyManifestHeader;
 use super::super::super::types::root::{RefactorRootGuard, RefactorRootReport};
 use super::undo::{resolve_journal_path, restore_from_journal};
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::apply_byte_span_edits;
 use paredit_core_cli::shared::stable_text_hash;
@@ -48,7 +48,7 @@ fn run_before_manifest_write_hook() {
     }
 }
 
-pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
+pub fn refactor_apply(args: RefactorApplyArgs) -> CliResult<()> {
     let loaded_manifest =
         read_refactor_manifest_file(&args.manifest, args.expect_manifest_hash.as_deref())?;
     let manifest = parse_refactor_apply_manifest(&loaded_manifest.value)?;
@@ -67,7 +67,9 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             })
         })
         .transpose()
-        .context("--verify-command is not runnable")?;
+        .map_err(|_| paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--verify-command is not runnable".to_owned(),
+        })?;
 
     let mut files = Vec::with_capacity(manifest.files.len());
     let mut rewritten_outputs = Vec::with_capacity(manifest.files.len());
@@ -83,9 +85,11 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             read_refactor_manifest_source(&file.path, root_guard.as_ref())?;
         source_bytes = source_bytes.saturating_add(input.len() as u64);
         if source_bytes > MAX_MANIFEST_SOURCE_TOTAL_BYTES {
-            anyhow::bail!(
-                "refusing manifest sources: cumulative input exceeds {MAX_MANIFEST_SOURCE_TOTAL_BYTES} bytes"
-            );
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::RefusalInputTooLarge,
+    format!("refusing manifest sources: cumulative input exceeds {MAX_MANIFEST_SOURCE_TOTAL_BYTES} bytes"),
+)
+.into());
         }
         let input_hash = stable_text_hash(&input);
         let edits = file
@@ -93,12 +97,16 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             .iter()
             .map(|edit| (edit.span, edit.replacement.clone()))
             .collect::<Vec<_>>();
-        validate_manifest_edits(&input, &edits)
-            .with_context(|| format!("manifest edits are invalid for {}", file.path.display()))?;
+        validate_manifest_edits(&input, &edits).map_err(crate::error::RefactorContext::new(
+            format!("manifest edits are invalid for {}", file.path.display()),
+        ))?;
         journal_entries.push(
-            UndoJournalFile::record(resolved_path.clone(), &input, &edits).with_context(|| {
-                format!("cannot record an undo journal for {}", file.path.display())
-            })?,
+            UndoJournalFile::record(resolved_path.clone(), &input, &edits).map_err(
+                crate::error::RefactorContext::new(format!(
+                    "cannot record an undo journal for {}",
+                    file.path.display()
+                )),
+            )?,
         );
         let rewritten = apply_byte_span_edits(&input, edits)?;
         let output_hash = stable_text_hash(&rewritten);
@@ -167,7 +175,7 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
                     .map(|(path, content, expected)| {
                         root_guard.anchored_manifest_write(path, content, expected)
                     })
-                    .collect::<Result<Vec<_>>>()?;
+                    .collect::<CliResult<Vec<_>>>()?;
                 write_files_with_rollback_expected_anchored(anchored_outputs)?;
             }
             None => write_files_with_rollback_expected(written_outputs)?,
@@ -201,7 +209,10 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
                 path.clone(),
                 format!("{}\n", serde_json::to_string_pretty(&journal.to_json())?),
             )
-            .with_context(|| format!("failed to write undo journal {}", path.display()))?;
+            .map_err(crate::error::RefactorContext::new(format!(
+                "failed to write undo journal {}",
+                path.display()
+            )))?;
         }
 
         if let Some(verification) = &verification {
@@ -270,15 +281,17 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
     print_refactor_apply_result(&result, args.output)?;
 
     if !can_apply {
-        anyhow::bail!(
-            "refactor apply validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::GateFailed,
+    format!("refactor apply validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
             result.manifest_policy_passed,
             result.manifest_outputs_parse,
             result.summary.stale_file_count,
             result.summary.output_hash_mismatch_count,
             result.summary.parse_error_count,
-            result.summary.manifest_flag_mismatch_count
-        );
+            result.summary.manifest_flag_mismatch_count),
+)
+.into());
     }
 
     Ok(())
@@ -300,10 +313,12 @@ fn run_verification_or_restore(
     verification: &VerificationCommand,
     journal: &UndoJournal,
     root_guard: Option<&RefactorRootGuard>,
-) -> Result<()> {
+) -> CliResult<()> {
     let outcome = verification
         .run()
-        .context("failed to run --verify-command after writing")?;
+        .map_err(crate::error::RefactorContext::new(
+            "failed to run --verify-command after writing",
+        ))?;
     if outcome.passed() {
         return Ok(());
     }
@@ -311,15 +326,28 @@ fn run_verification_or_restore(
     report_verification_transcript(&outcome);
 
     match restore_from_journal(journal, root_guard) {
-        Ok(restored) => anyhow::bail!(
-            "{}; restored {restored} file(s) to their pre-refactor content",
-            outcome.failure_reason(),
-        ),
-        Err(error) => anyhow::bail!(
-            "{}; restoring the written files ALSO failed, so the working tree is \
-             partially refactored: {error:#}",
-            outcome.failure_reason(),
-        ),
+        Ok(restored) => Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::GateFailed,
+            format!(
+                "{}; restored {restored} file(s) to their pre-refactor content",
+                outcome.failure_reason()
+            ),
+        )
+        .into()),
+        // Not a gate: the writes landed and undoing them did not, so the
+        // working tree is in a state the caller has to look at. That is
+        // `environment.rollback-failed`, and reporting it as a tripped gate
+        // would tell an agent the operation simply did not happen.
+        Err(error) => Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::EnvironmentRollbackFailed,
+            format!(
+                "{}; restoring the written files ALSO failed, so the working tree is \
+                 partially refactored: {}",
+                outcome.failure_reason(),
+                paredit_core_cli::error::error_chain(&error),
+            ),
+        )
+        .into()),
     }
 }
 
@@ -436,9 +464,14 @@ mod tests {
         })
         .expect_err("root replacement must be rejected");
 
+        // `chain()`, not `{error:#}`: the alternate form was `anyhow`'s, and
+        // a typed error's `Display` stops at the outermost message — here
+        // "retained parent no longer matches", with the refusal underneath it.
+        // The two sibling assertions on this refusal already read the chain.
         assert!(
-            format!("{error:#}").contains("refusing replaced parent directory"),
-            "unexpected error: {error:#}"
+            error.chain().contains("refusing replaced parent directory"),
+            "unexpected error: {}",
+            error.chain()
         );
         assert_eq!(
             fs::read_to_string(&source).expect("read replacement-root source"),

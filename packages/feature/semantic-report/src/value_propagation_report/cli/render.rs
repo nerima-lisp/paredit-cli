@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -13,7 +13,7 @@ pub fn print_value_propagation_report(
     policy: &ValuePropagationPolicy,
     blocked_only: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => print_text(reports, policy, blocked_only),
         OutputFormat::Json => print_json(reports, policy, blocked_only)?,
@@ -75,7 +75,7 @@ fn print_json(
     reports: &[ValuePropagationReportFile],
     policy: &ValuePropagationPolicy,
     blocked_only: bool,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

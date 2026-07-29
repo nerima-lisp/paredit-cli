@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::signature_report::cli::args::SignatureReportArgs;
 use crate::signature_report::cli::render::print_signature_report;
@@ -7,7 +7,7 @@ use crate::signature_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn signature_report(args: SignatureReportArgs) -> Result<()> {
+pub fn signature_report(args: SignatureReportArgs) -> CommandResult {
     let symbol = args.symbol.as_ref();
     let mut sources = Vec::with_capacity(args.files.len());
 

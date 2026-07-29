@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::unused_export_report::cli::args::UnusedExportReportArgs;
 use crate::unused_export_report::cli::render::print_unused_export_report;
@@ -8,7 +8,7 @@ use crate::unused_export_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn unused_export_report(args: UnusedExportReportArgs) -> Result<()> {
+pub fn unused_export_report(args: UnusedExportReportArgs) -> CommandResult {
     let mut declared = Vec::new();
     let mut referenced = Vec::new();
 

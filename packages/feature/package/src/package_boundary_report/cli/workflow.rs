@@ -3,11 +3,11 @@ use super::render::print_package_boundary_report;
 use crate::package_boundary_report::usecase::{
     PackageBoundaryPolicyOptions, build_package_boundary_report, evaluate_package_boundary_policy,
 };
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 use paredit_core_cli::shared::expand_input_files;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn package_boundary_report(args: PackageBoundaryReportArgs) -> Result<()> {
+pub fn package_boundary_report(args: PackageBoundaryReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 

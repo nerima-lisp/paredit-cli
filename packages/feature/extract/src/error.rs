@@ -136,3 +136,18 @@ impl From<paredit_core_syntax::sexpr::SexprError> for ExtractionError {
 
 /// The result type the extraction planners return.
 pub type ExtractionResult<T> = std::result::Result<T, ExtractionError>;
+
+// States which documented error code each extraction refusal earns.
+paredit_core_cli::impl_classified_refusal!(ExtractionError, |error| match error {
+    ExtractionError::Edit(edit) => paredit_core_cli::diagnosis::code_for_edit_refusal(edit),
+
+    // "cannot select inside quote", "cannot select a definition head": the
+    // selection landed somewhere this extraction will not work from.
+    ExtractionError::Scope(_) | ExtractionError::ReaderConditional(_) =>
+        paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+
+    // The path itself does not name a form in this tree.
+    ExtractionError::Target(_) => paredit_core_cli::diagnosis::ErrorCode::SelectionPathNotReachable,
+
+    ExtractionError::Parse(_) => paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+});

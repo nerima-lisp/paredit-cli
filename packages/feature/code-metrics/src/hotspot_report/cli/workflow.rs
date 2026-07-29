@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::hotspot_report::usecase::{
     build_hotspot_report, churn_target, evaluate_hotspot_policy, measure_churn,
 };
 
-pub fn hotspot_report(args: HotspotReportArgs) -> Result<()> {
+pub fn hotspot_report(args: HotspotReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

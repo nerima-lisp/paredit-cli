@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::negated_when_unless::cli::args::NegatedWhenUnlessReportArgs;
 use crate::negated_when_unless::cli::render::print_negated_when_unless_report;
@@ -8,7 +8,7 @@ use crate::negated_when_unless::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn negated_when_unless_report(args: NegatedWhenUnlessReportArgs) -> Result<()> {
+pub fn negated_when_unless_report(args: NegatedWhenUnlessReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut conditional_form_count = 0;

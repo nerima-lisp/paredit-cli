@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::single_operand_boolean::cli::args::SingleOperandBooleanReportArgs;
 use crate::single_operand_boolean::cli::render::print_single_operand_boolean_report;
@@ -8,7 +8,7 @@ use crate::single_operand_boolean::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn single_operand_boolean_report(args: SingleOperandBooleanReportArgs) -> Result<()> {
+pub fn single_operand_boolean_report(args: SingleOperandBooleanReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut boolean_form_count = 0;

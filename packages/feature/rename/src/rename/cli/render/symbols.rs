@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -12,7 +12,7 @@ pub fn print_rename_symbols_report(
     to: &SymbolName,
     write: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("from\t{}", safe_text!(from));

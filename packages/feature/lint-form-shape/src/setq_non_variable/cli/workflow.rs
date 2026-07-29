@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::setq_non_variable::cli::args::SetqNonVariableReportArgs;
 use crate::setq_non_variable::cli::render::print_setq_non_variable_report;
@@ -8,7 +8,7 @@ use crate::setq_non_variable::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn setq_non_variable_report(args: SetqNonVariableReportArgs) -> Result<()> {
+pub fn setq_non_variable_report(args: SetqNonVariableReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut assignment_form_count = 0;

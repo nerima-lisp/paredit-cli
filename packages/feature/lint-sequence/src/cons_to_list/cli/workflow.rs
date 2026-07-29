@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::cons_to_list::cli::args::ConsToListReportArgs;
 use crate::cons_to_list::cli::render::print_cons_to_list_report;
@@ -8,7 +8,7 @@ use crate::cons_to_list::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn cons_to_list_report(args: ConsToListReportArgs) -> Result<()> {
+pub fn cons_to_list_report(args: ConsToListReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut cons_form_count = 0;

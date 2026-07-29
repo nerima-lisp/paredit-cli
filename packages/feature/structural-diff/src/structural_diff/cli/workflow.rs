@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
@@ -6,7 +6,7 @@ use crate::structural_diff::cli::args::StructuralDiffArgs;
 use crate::structural_diff::cli::render::print_structural_diff;
 use crate::structural_diff::usecase::{DiffPolicy, diff_documents};
 
-pub fn structural_diff(args: StructuralDiffArgs) -> Result<()> {
+pub fn structural_diff(args: StructuralDiffArgs) -> CommandResult {
     let (old_input, _, old_tree) =
         read_input_dialect_and_tree(Some(args.old.clone()), args.dialect)?;
     let (new_input, _, new_tree) =

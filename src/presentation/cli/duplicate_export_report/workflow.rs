@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::application::usecase::duplicate_export_report::{
     DuplicateExportPolicyOptions, collect_duplicate_exports, evaluate_duplicate_export_policy,
@@ -10,7 +10,7 @@ use crate::presentation::cli::shared::{expand_input_files, read_input_dialect_an
 
 pub(in crate::presentation::cli) fn duplicate_export_report(
     args: DuplicateExportReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut defpackage_count = 0;

@@ -1,8 +1,8 @@
 use crate::extract_local_function::usecase::{
     ExtractLocalFunctionPlan, ExtractLocalFunctionRequest, plan_extract_local_function,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -48,9 +48,9 @@ pub struct ExtractLocalFunctionArgs {
     output: OutputFormat,
 }
 
-pub fn extract_local_function(args: ExtractLocalFunctionArgs) -> Result<()> {
+pub fn extract_local_function(args: ExtractLocalFunctionArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
@@ -87,7 +87,7 @@ fn print_extract_local_function_plan(
     plan: &ExtractLocalFunctionPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let binding = if plan.recursive { "labels" } else { "flet" };
     match output {
         OutputFormat::Text => {

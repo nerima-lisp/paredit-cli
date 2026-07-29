@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::one_step_arithmetic::cli::args::OneStepArithmeticReportArgs;
 use crate::one_step_arithmetic::cli::render::print_one_step_arithmetic_report;
@@ -8,7 +8,7 @@ use crate::one_step_arithmetic::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn one_step_arithmetic_report(args: OneStepArithmeticReportArgs) -> Result<()> {
+pub fn one_step_arithmetic_report(args: OneStepArithmeticReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut arithmetic_form_count = 0;

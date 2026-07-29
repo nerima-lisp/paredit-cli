@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::eq_char_comparison::cli::args::EqCharComparisonReportArgs;
 use crate::eq_char_comparison::cli::render::print_eq_char_comparison_report;
@@ -8,7 +8,7 @@ use crate::eq_char_comparison::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn eq_char_comparison_report(args: EqCharComparisonReportArgs) -> Result<()> {
+pub fn eq_char_comparison_report(args: EqCharComparisonReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut comparison_form_count = 0;

@@ -7,13 +7,16 @@ use super::{
 use crate::refactor::cli::manifest::status::{
     ManifestOutputs, ManifestPolicy, RefactorManifestChecks, RefactorManifestMismatchCounts,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
-pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFormat) -> Result<()> {
+pub fn print_refactor_diff_result(
+    result: &RefactorDiffResult,
+    output: OutputFormat,
+) -> CliResult<()> {
     let decision = refactor_manifest_decision(RefactorManifestChecks {
         policy: ManifestPolicy::from_passed(result.manifest_policy_passed),
         outputs: ManifestOutputs::from_parse(result.manifest_outputs_parse),

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use paredit_core_cli::gate::gate_failure;
 use paredit_core_cli::shared::write_artifact_with_rollback;
@@ -35,7 +35,7 @@ pub const fn vocabulary() -> Vocabulary<'static> {
 /// One function so that `config check` cannot validate a different set of
 /// files from the one the next command actually applies — a check that looks
 /// somewhere else is worse than no check.
-pub fn load(location: &ConfigLocationArgs) -> Result<Loaded> {
+pub fn load(location: &ConfigLocationArgs) -> CliResult<Loaded> {
     let start = match &location.from {
         Some(directory) => directory.clone(),
         None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
@@ -52,13 +52,20 @@ pub fn load(location: &ConfigLocationArgs) -> Result<Loaded> {
     options.skip_files |= location.no_config;
     options.skip_environment |= location.no_config_env;
 
-    Ok(paredit_core_config::load::load(
-        &options,
-        Some(vocabulary()),
-    )?)
+    // `core/cli` does not depend on `core/config`, so neither can define the
+    // conversion between their error types — the orphan rule, and the right
+    // answer anyway: choosing which documented code a configuration failure
+    // earns is a composition-root decision, and this is the composition root.
+    paredit_core_config::load::load(&options, Some(vocabulary())).map_err(|error| {
+        paredit_core_cli::error::FeatureRefusal::new(
+            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+            &error,
+        )
+        .into()
+    })
 }
 
-pub fn check(args: ConfigCheckArgs) -> Result<()> {
+pub fn check(args: ConfigCheckArgs) -> CommandResult {
     let loaded = load(&args.location)?;
     render::print_check(&loaded, args.output)?;
 
@@ -76,17 +83,21 @@ pub fn check(args: ConfigCheckArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn show(args: ConfigShowArgs) -> Result<()> {
+pub fn show(args: ConfigShowArgs) -> CliResult<()> {
     let loaded = load(&args.location)?;
 
     if let Some(key) = &args.key {
         if schema::lookup(key).is_none() {
             let hint = schema::nearest_key(key)
                 .map_or_else(String::new, |near| format!(" (did you mean `{near}`?)"));
-            return Err(anyhow::anyhow!(
-                "`{key}` is not a configuration key{hint}. \
-                 Run `paredit config schema` for the full list."
-            ));
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+                paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+                format!(
+                    "`{key}` is not a configuration key{hint}. \
+                     Run `paredit config schema` for the full list."
+                ),
+            )
+            .into());
         }
     }
 
@@ -99,9 +110,12 @@ pub fn show(args: ConfigShowArgs) -> Result<()> {
                 &<crate::presentation::cli::Cli as clap::CommandFactory>::command(),
             )
             .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "`{command_path}` is not a command. Pass a full path such as \
-                     \"inspect lint\"; `paredit inspect capabilities` lists them all."
+                paredit_core_cli::error::FeatureRefusal::message(
+                    paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+                    format!(
+                        "`{command_path}` is not a command. Pass a full path such as \
+                         \"inspect lint\"; `paredit inspect capabilities` lists them all."
+                    ),
                 )
             })?,
         ),
@@ -116,11 +130,11 @@ pub fn show(args: ConfigShowArgs) -> Result<()> {
     )
 }
 
-pub fn schema_report(args: ConfigSchemaArgs) -> Result<()> {
+pub fn schema_report(args: ConfigSchemaArgs) -> CliResult<()> {
     render::print_schema(args.output)
 }
 
-pub fn init(args: ConfigInitArgs) -> Result<()> {
+pub fn init(args: ConfigInitArgs) -> CliResult<()> {
     let contents = template(args.all_keys);
 
     if paredit_core_cli::runtime::current().dry_run {
@@ -130,16 +144,20 @@ pub fn init(args: ConfigInitArgs) -> Result<()> {
 
     let path = init_path(&args)?;
     if path.exists() {
-        return Err(anyhow::anyhow!(
-            "refusing to overwrite {}: delete it first, or use --dry-run to print the template",
-            path.display()
-        ));
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            format!(
+                "refusing to overwrite {}: delete it first, or use --dry-run to print the template",
+                path.display()
+            ),
+        )
+        .into());
     }
     write_artifact_with_rollback(path.clone(), contents.clone())?;
     render::print_init(&path, &contents, args.output)
 }
 
-fn init_path(args: &ConfigInitArgs) -> Result<PathBuf> {
+fn init_path(args: &ConfigInitArgs) -> CliResult<PathBuf> {
     if let Some(path) = &args.path {
         return Ok(path.clone());
     }
@@ -155,9 +173,11 @@ fn init_path(args: &ConfigInitArgs) -> Result<PathBuf> {
         }
         current = directory.parent();
     }
-    Err(anyhow::anyhow!(
-        "--repository-root found no ancestor holding a .git; pass --path instead"
-    ))
+    Err(paredit_core_cli::error::FeatureRefusal::message(
+        paredit_core_cli::diagnosis::ErrorCode::ArgumentNeedsRepository,
+        "--repository-root found no ancestor holding a .git; pass --path instead",
+    )
+    .into())
 }
 
 /// A starting `paredit.toml`, generated from the schema.

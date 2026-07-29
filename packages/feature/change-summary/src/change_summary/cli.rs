@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CommandResult;
 use serde_json::{Value, json};
 
 use paredit_core_cli::args::{DialectArg, OutputFormat};
@@ -34,19 +34,17 @@ pub struct ChangeSummaryArgs {
     pub output: OutputFormat,
 }
 
-pub fn change_summary(args: ChangeSummaryArgs) -> Result<()> {
+pub fn change_summary(args: ChangeSummaryArgs) -> CommandResult {
     let after_path = args.after.clone().unwrap_or_else(|| args.before.clone());
 
     let (before_input, dialect) = read_input_and_dialect(Some(args.before.clone()), args.dialect)?;
     let (after_input, _) = read_input_and_dialect(Some(after_path.clone()), args.dialect)?;
 
     let summary = summarise(&before_input.text, &after_input.text, dialect).ok_or_else(|| {
-        anyhow::anyhow!(
-            "cannot compare {} with {}: one of them is not a balanced S-expression document. \
-             Run `paredit inspect check` on each to find out which.",
-            args.before.display(),
-            after_path.display()
-        )
+        crate::error::DocumentsNotComparable {
+            before: args.before.display().to_string(),
+            after: after_path.display().to_string(),
+        }
     })?;
 
     match args.output {

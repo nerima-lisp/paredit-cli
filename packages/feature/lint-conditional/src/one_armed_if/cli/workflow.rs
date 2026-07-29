@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::one_armed_if::cli::args::OneArmedIfReportArgs;
 use crate::one_armed_if::cli::render::print_one_armed_if_report;
@@ -8,7 +8,7 @@ use crate::one_armed_if::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn one_armed_if_report(args: OneArmedIfReportArgs) -> Result<()> {
+pub fn one_armed_if_report(args: OneArmedIfReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;

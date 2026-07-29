@@ -16,7 +16,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 use crate::domain::dialect::Dialect;
@@ -99,7 +99,7 @@ pub fn collect_duplicate_slots(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> Result<(usize, Vec<DuplicateSlotItem>)> {
+) -> CliResult<(usize, Vec<DuplicateSlotItem>)> {
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }

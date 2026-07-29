@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -21,7 +21,7 @@ pub fn print_structural_diff(
     changes: &[Change],
     policy: &DiffPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("old\t{}", safe_text!(old));

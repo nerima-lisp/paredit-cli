@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::redundant_count_nil::cli::args::RedundantCountNilReportArgs;
 use crate::redundant_count_nil::cli::render::print_redundant_count_nil_report;
@@ -8,7 +8,7 @@ use crate::redundant_count_nil::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn redundant_count_nil_report(args: RedundantCountNilReportArgs) -> Result<()> {
+pub fn redundant_count_nil_report(args: RedundantCountNilReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

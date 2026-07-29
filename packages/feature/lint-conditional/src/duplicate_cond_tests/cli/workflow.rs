@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::duplicate_cond_tests::cli::args::DuplicateCondTestReportArgs;
 use crate::duplicate_cond_tests::cli::render::print_duplicate_cond_test_report;
@@ -8,7 +8,7 @@ use crate::duplicate_cond_tests::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn duplicate_cond_test_report(args: DuplicateCondTestReportArgs) -> Result<()> {
+pub fn duplicate_cond_test_report(args: DuplicateCondTestReportArgs) -> CommandResult {
     let mut cond_form_count = 0;
     let mut duplicates = Vec::new();
 

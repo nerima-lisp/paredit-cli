@@ -43,10 +43,12 @@ fn top_causes() -> usize {
 struct FilesystemSource;
 
 impl SemanticCoverageSourcePort for FilesystemSource {
+    type Error = paredit_core_cli::CliError;
+
     fn discover(
         &mut self,
         request: &SemanticCoverageRequest,
-    ) -> anyhow::Result<SemanticCoverageInventory> {
+    ) -> Result<SemanticCoverageInventory, Self::Error> {
         let mut files = Vec::new();
         for root in &request.paths {
             collect(root, &mut files)?;
@@ -66,12 +68,12 @@ impl SemanticCoverageSourcePort for FilesystemSource {
     }
 }
 
-fn collect(root: &Path, files: &mut Vec<PathBuf>) -> anyhow::Result<()> {
+fn collect(root: &Path, files: &mut Vec<PathBuf>) -> paredit_core_cli::CliResult<()> {
     let metadata = fs::symlink_metadata(root)
-        .map_err(|error| anyhow::anyhow!("{}: {error}", root.display()))?;
+        .map_err(paredit_core_cli::CliError::io(root.display().to_string()))?;
     if metadata.is_dir() {
         let mut entries: Vec<PathBuf> = fs::read_dir(root)
-            .map_err(|error| anyhow::anyhow!("{}: {error}", root.display()))?
+            .map_err(paredit_core_cli::CliError::io(root.display().to_string()))?
             .filter_map(Result::ok)
             .map(|entry| entry.path())
             .collect();

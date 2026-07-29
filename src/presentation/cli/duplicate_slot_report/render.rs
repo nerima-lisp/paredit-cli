@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::application::usecase::duplicate_slot_report::{
@@ -10,7 +10,7 @@ pub(super) fn print_duplicate_slot_report(
     summary: &DuplicateSlotSummary,
     policy: &DuplicateSlotPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("definition_count\t{}", summary.definition_count);

@@ -7,7 +7,7 @@
 //! `tests/cli/dialect_contract.rs`, `docs/src/commands.md`) — see
 //! `crate::checklist` for why those are printed instead of edited.
 
-use anyhow::Result;
+use crate::error::Result;
 
 use crate::case::Name;
 use crate::checklist::{self, Namespace};
@@ -31,7 +31,7 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
     let module_dir = package_dir.join("src").join(&snake);
 
     if module_dir.exists() {
-        anyhow::bail!("{} already exists", module_dir.display());
+        return Err(crate::error::XtaskError::refused(format!("{} already exists", module_dir.display())));
     }
 
     write_new_file(
@@ -52,7 +52,7 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
         &format!(
             "//! `{kebab}` analysis: TODO — {description}.\n\n\
              use std::path::{{Path, PathBuf}};\n\n\
-             use anyhow::Result;\n\
+             use paredit_core_cli::CliResult;\n\
              use paredit_core_syntax::dialect::Dialect;\n\
              use paredit_core_syntax::sexpr::SyntaxTree;\n\n\
              #[derive(Debug, Clone)]\n\
@@ -64,7 +64,7 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
              \x20   pub items: Vec<{pascal}Item>,\n\
              }}\n\n\
              /// TODO: replace with the real analysis for {description}.\n\
-             pub fn analyze(path: &Path, _dialect: Dialect, _tree: &SyntaxTree) -> Result<Vec<{pascal}Item>> {{\n\
+             pub fn analyze(path: &Path, _dialect: Dialect, _tree: &SyntaxTree) -> CliResult<Vec<{pascal}Item>> {{\n\
              \x20   let _ = path;\n\
              \x20   Ok(Vec::new())\n\
              }}\n\n\
@@ -123,11 +123,11 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
     write_new_file(
         &module_dir.join("cli").join("render.rs"),
         &format!(
-            "use anyhow::Result;\n\
+            "use paredit_core_cli::CliResult;\n\
              use serde_json::json;\n\n\
              use crate::{snake}::usecase::{pascal}Summary;\n\
              use paredit_core_cli::args::OutputFormat;\n\n\
-             pub fn print_{snake}_report(summary: &{pascal}Summary, output: OutputFormat) -> Result<()> {{\n\
+             pub fn print_{snake}_report(summary: &{pascal}Summary, output: OutputFormat) -> CliResult<()> {{\n\
              \x20   match output {{\n\
              \x20       OutputFormat::Text => {{\n\
              \x20           println!(\"item_count\\t{{}}\", summary.items.len());\n\
@@ -150,12 +150,12 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
     write_new_file(
         &module_dir.join("cli").join("workflow.rs"),
         &format!(
-            "use anyhow::Result;\n\n\
+            "use paredit_core_cli::CliResult;\n\n\
              use crate::{snake}::cli::args::{pascal}Args;\n\
              use crate::{snake}::cli::render::print_{snake}_report;\n\
              use crate::{snake}::usecase::{{analyze, summarize}};\n\
              use paredit_core_cli::shared::{{expand_input_files, read_input_dialect_and_tree}};\n\n\
-             pub fn {snake}_report(args: {pascal}Args) -> Result<()> {{\n\
+             pub fn {snake}_report(args: {pascal}Args) -> CommandResult {{\n\
              \x20   let files = expand_input_files(&args.files, args.dialect)?;\n\n\
              \x20   let mut items = Vec::new();\n\
              \x20   for file in &files {{\n\

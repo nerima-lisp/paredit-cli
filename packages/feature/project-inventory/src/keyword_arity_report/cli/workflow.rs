@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::keyword_arity_report::usecase::{
     build_keyword_arity_report, evaluate_fail_on_fault_policy,
 };
 
-pub fn keyword_arity_report(args: KeywordArityReportArgs) -> Result<()> {
+pub fn keyword_arity_report(args: KeywordArityReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

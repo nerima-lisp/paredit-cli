@@ -16,10 +16,12 @@ struct FakeSource {
 }
 
 impl WorkspaceReportSourcePort for FakeSource {
+    type Error = paredit_core_cli::CliError;
+
     fn discover(
         &mut self,
         _request: &WorkspaceReportRequest,
-    ) -> anyhow::Result<WorkspaceInventory> {
+    ) -> Result<WorkspaceInventory, Self::Error> {
         Ok(self.inventory.take().expect("discovery called once"))
     }
 

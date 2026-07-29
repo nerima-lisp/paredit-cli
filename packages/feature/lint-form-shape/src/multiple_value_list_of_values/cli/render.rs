@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -11,7 +11,7 @@ pub fn print_multiple_value_list_of_values_report(
     summary: &MultipleValueListOfValuesSummary,
     policy: &MultipleValueListOfValuesPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("mvl_form_count\t{}", summary.mvl_form_count);

@@ -2,7 +2,7 @@ use paredit_core_cli::args::MoveInsert;
 use std::fs;
 use std::path::Path as FsPath;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_syntax::sexpr::{ByteSpan, Path, SyntaxTree};
 
@@ -23,10 +23,14 @@ pub fn same_file_path(left: &FsPath, right: &FsPath) -> bool {
     }
 }
 
-pub fn top_level_path_index(path: &Path, command: &str) -> Result<usize> {
+pub fn top_level_path_index(path: &Path, command: &str) -> CliResult<usize> {
     match path.indexes() {
         [index] => Ok(index.get()),
-        _ => anyhow::bail!("{command} requires a top-level path, for example --path 2"),
+        _ => Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::SelectionPathNotReachable,
+            format!("{command} requires a top-level path, for example --path 2"),
+        )
+        .into()),
     }
 }
 
@@ -37,16 +41,22 @@ pub fn insert_top_level_form(
     insert: MoveInsert,
     anchor_path: Option<&Path>,
     command: &str,
-) -> Result<(String, Option<ByteSpan>)> {
+) -> CliResult<(String, Option<ByteSpan>)> {
     match insert {
         MoveInsert::Append => Ok((append_top_level_form(input, form), None)),
         MoveInsert::Before | MoveInsert::After => {
-            let anchor_path = anchor_path
-                .ok_or_else(|| anyhow::anyhow!("--insert before/after requires --anchor-path"))?;
+            let anchor_path =
+                anchor_path.ok_or_else(|| paredit_core_cli::ArgumentError::FlagCombination {
+                    message: "--insert before/after requires --anchor-path".to_owned(),
+                })?;
             let anchor_flag = format!("{command} --anchor-path");
             let anchor_index = top_level_path_index(anchor_path, &anchor_flag)?;
             if anchor_index >= tree.root_children().len() {
-                anyhow::bail!("anchor top-level path {anchor_path} is out of range");
+                return Err(paredit_core_cli::error::FeatureRefusal::message(
+                    paredit_core_cli::diagnosis::ErrorCode::SelectionPathNotReachable,
+                    format!("anchor top-level path {anchor_path} is out of range"),
+                )
+                .into());
             }
             let anchor = tree.select_path(anchor_path)?;
             let anchor_span = anchor.span();

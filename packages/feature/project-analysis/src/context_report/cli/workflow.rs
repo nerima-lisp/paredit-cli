@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::context_report::cli::{args::ContextAtArgs, render::print_context_report};
 use paredit_core_cli::gate::gate_failure;
@@ -10,7 +10,7 @@ use paredit_core_cli::shared::read_input_dialect_and_tree;
 /// failed one: `edit delete-forward` and `edit newline` refuse an offset that
 /// carries structure, and this says which offsets those are without attempting
 /// the edit.
-pub fn context_at_report(args: ContextAtArgs) -> Result<()> {
+pub fn context_at_report(args: ContextAtArgs) -> CommandResult {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let context = tree.context_at(args.at)?;
     print_context_report(&input.text, dialect, &context, args.output)?;

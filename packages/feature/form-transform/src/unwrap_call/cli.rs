@@ -1,6 +1,6 @@
 use crate::unwrap_call::usecase::{UnwrapCallPlan, UnwrapCallRequest, plan_unwrap_call};
-use anyhow::{Context, Result};
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
@@ -36,7 +36,7 @@ pub struct UnwrapCallArgs {
     output: OutputFormat,
 }
 
-pub fn unwrap_call(args: UnwrapCallArgs) -> Result<()> {
+pub fn unwrap_call(args: UnwrapCallArgs) -> CliResult<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let target = resolve_compact_target(&tree, dialect, &args.selector, "refactor unwrap-call")?;
     let selection = tree.select_path(&target.path)?;
@@ -52,7 +52,10 @@ pub fn unwrap_call(args: UnwrapCallArgs) -> Result<()> {
     let mut written = false;
 
     if args.write {
-        let file = input.file.as_ref().context("--write requires --file")?;
+        let file = input
+            .file
+            .as_ref()
+            .ok_or(paredit_core_cli::ArgumentError::WriteRequiresFile)?;
         if plan.changed {
             write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
         }
@@ -66,7 +69,7 @@ fn print_unwrap_call_plan(
     plan: &UnwrapCallPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

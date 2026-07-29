@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::car_reverse::cli::args::CarReverseReportArgs;
 use crate::car_reverse::cli::render::print_car_reverse_report;
@@ -8,7 +8,7 @@ use crate::car_reverse::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn car_reverse_report(args: CarReverseReportArgs) -> Result<()> {
+pub fn car_reverse_report(args: CarReverseReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut accessor_form_count = 0;

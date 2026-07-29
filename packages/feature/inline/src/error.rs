@@ -407,3 +407,31 @@ impl From<SexprError> for InlineError {
 
 /// The result type the inline planners return.
 pub type InlineResult<T> = std::result::Result<T, InlineError>;
+
+// States which documented error code each inline refusal earns.
+paredit_core_cli::impl_classified_refusal!(InlineError, |error| match error {
+    InlineError::Edit(edit) => paredit_core_cli::diagnosis::code_for_edit_refusal(edit),
+
+    // The rename this inline delegates to already answered the question.
+    InlineError::Rename(rename) => paredit_feature_rename::error::code_of(rename),
+
+    InlineError::LambdaList(_)
+    | InlineError::Safety(_)
+    | InlineError::CallBinding(_)
+    | InlineError::ReaderConditional(_) =>
+        paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+
+    InlineError::Selection(_) => paredit_core_cli::diagnosis::ErrorCode::SelectionNoMatch,
+    InlineError::Path(_) => paredit_core_cli::diagnosis::ErrorCode::SelectionPathInvalid,
+    InlineError::Parse(_) => paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+    InlineError::Symbol(_) => paredit_core_cli::diagnosis::ErrorCode::InputSymbolInvalid,
+
+    // Named `Internal` by this package for the same reason the code is: a
+    // defect here, not something the caller can fix.
+    InlineError::Internal(_) => paredit_core_cli::diagnosis::ErrorCode::Internal,
+});
+
+// `CallBindingError` also reaches the boundary on its own.
+paredit_core_cli::impl_classified_refusal!(CallBindingError, |_error| {
+    paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused
+});

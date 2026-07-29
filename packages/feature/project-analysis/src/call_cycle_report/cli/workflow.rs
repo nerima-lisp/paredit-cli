@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::call_cycle_report::cli::args::CallCycleReportArgs;
 use crate::call_cycle_report::cli::render::print_call_cycle_report;
@@ -8,7 +8,7 @@ use crate::call_cycle_report::usecase::{
 use crate::call_graph_report::usecase::{CallGraphReportSource, build_call_graph_report};
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn call_cycle_report(args: CallCycleReportArgs) -> Result<()> {
+pub fn call_cycle_report(args: CallCycleReportArgs) -> CommandResult {
     let mut sources = Vec::with_capacity(args.files.len());
 
     for file in &args.files {

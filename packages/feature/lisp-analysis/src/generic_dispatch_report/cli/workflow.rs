@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::generic_dispatch_report::usecase::{
     build_generic_dispatch_report, evaluate_fail_on_defect_policy,
 };
 
-pub fn generic_dispatch_report(args: GenericDispatchReportArgs) -> Result<()> {
+pub fn generic_dispatch_report(args: GenericDispatchReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

@@ -8,7 +8,7 @@ use crate::refactor::cli::manifest::status::{
     ManifestOutputs, ManifestPolicy, RefactorApplyOutcome, RefactorManifestChecks,
     RefactorManifestMismatchCounts,
 };
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -16,7 +16,7 @@ use serde_json::json;
 pub fn print_refactor_apply_result(
     result: &RefactorApplyResult,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let decision = refactor_apply_decision(
         RefactorManifestChecks {
             policy: ManifestPolicy::from_passed(result.manifest_policy_passed),

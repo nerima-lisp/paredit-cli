@@ -1,8 +1,8 @@
 use crate::convert_let_star_to_let::usecase::{
     ConvertLetStarToLetPlan, ConvertLetStarToLetRequest, plan_convert_let_star_to_let,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -28,9 +28,9 @@ pub struct ConvertLetStarToLetArgs {
     output: OutputFormat,
 }
 
-pub fn convert_let_star_to_let(args: ConvertLetStarToLetArgs) -> Result<()> {
+pub fn convert_let_star_to_let(args: ConvertLetStarToLetArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect, _) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let plan = plan_convert_let_star_to_let(ConvertLetStarToLetRequest {
@@ -46,7 +46,11 @@ pub fn convert_let_star_to_let(args: ConvertLetStarToLetArgs) -> Result<()> {
     print_plan(&plan, written, args.output)
 }
 
-fn print_plan(plan: &ConvertLetStarToLetPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(
+    plan: &ConvertLetStarToLetPlan,
+    written: bool,
+    output: OutputFormat,
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

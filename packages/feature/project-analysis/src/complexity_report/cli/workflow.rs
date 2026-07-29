@@ -1,5 +1,5 @@
-use anyhow::Result;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::{CliResult, CommandResult};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -11,7 +11,7 @@ use crate::complexity_report::usecase::{
 };
 use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-pub fn complexity_report(args: ComplexityReportArgs) -> Result<()> {
+pub fn complexity_report(args: ComplexityReportArgs) -> CommandResult {
     let files = expand_complexity_report_inputs(&args.files, args.dialect)?;
     let mut reports = Vec::with_capacity(files.len());
 
@@ -42,7 +42,7 @@ pub fn complexity_report(args: ComplexityReportArgs) -> Result<()> {
 fn expand_complexity_report_inputs(
     files: &[PathBuf],
     dialect: Option<paredit_core_cli::args::DialectArg>,
-) -> Result<Vec<PathBuf>> {
+) -> CliResult<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
 

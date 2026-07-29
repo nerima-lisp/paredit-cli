@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::format_newline::cli::args::FormatNewlineReportArgs;
 use crate::format_newline::cli::render::print_format_newline_report;
@@ -8,7 +8,7 @@ use crate::format_newline::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn format_newline_report(args: FormatNewlineReportArgs) -> Result<()> {
+pub fn format_newline_report(args: FormatNewlineReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut format_form_count = 0;

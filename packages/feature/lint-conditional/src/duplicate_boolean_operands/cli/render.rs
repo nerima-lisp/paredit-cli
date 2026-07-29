@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -11,7 +11,7 @@ pub fn print_duplicate_boolean_operand_report(
     summary: &DuplicateBooleanOperandSummary,
     policy: &DuplicateBooleanOperandPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("boolean_form_count\t{}", summary.boolean_form_count);

@@ -12,7 +12,7 @@
 
 use std::collections::BTreeSet;
 
-use anyhow::{Context, Result};
+use paredit_core_cli::{CliError, CliResult};
 use serde_json::{Value, json};
 
 /// One recorded finding identity.
@@ -38,20 +38,34 @@ impl LintBaseline {
     }
 
     /// Parses a baseline file's JSON contents.
-    pub(super) fn parse(text: &str) -> Result<Self> {
-        let value: Value = serde_json::from_str(text).context("baseline file is not valid JSON")?;
+    pub(super) fn parse(text: &str) -> CliResult<Self> {
+        let value: Value = serde_json::from_str(text).map_err(|source| CliError::Json {
+            context: "baseline file is not valid JSON".to_owned(),
+            source,
+        })?;
         let array = value
             .get("entries")
             .and_then(Value::as_array)
-            .context("baseline file has no \"entries\" array")?;
+            .ok_or_else(|| {
+                paredit_core_cli::error::FeatureRefusal::message(
+                    paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+                    "baseline file has no \"entries\" array",
+                )
+            })?;
         let mut entries = BTreeSet::new();
         for entry in array {
-            let field = |name: &str| -> Result<String> {
+            let field = |name: &str| -> CliResult<String> {
                 entry
                     .get(name)
                     .and_then(Value::as_str)
                     .map(str::to_owned)
-                    .with_context(|| format!("baseline entry is missing string field {name:?}"))
+                    .ok_or_else(|| {
+                        paredit_core_cli::error::FeatureRefusal::message(
+                            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+                            format!("baseline entry is missing string field {name:?}"),
+                        )
+                        .into()
+                    })
             };
             entries.insert(BaselineEntry {
                 path: field("path")?,
@@ -63,7 +77,7 @@ impl LintBaseline {
     }
 
     /// Serializes the baseline to pretty JSON with entries in a stable order.
-    pub(super) fn to_json(&self) -> Result<String> {
+    pub(super) fn to_json(&self) -> CliResult<String> {
         let entries = self
             .entries
             .iter()

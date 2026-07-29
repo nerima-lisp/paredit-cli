@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::duplicate_case_keys::cli::args::DuplicateCaseKeyReportArgs;
 use crate::duplicate_case_keys::cli::render::print_duplicate_case_key_report;
@@ -8,7 +8,7 @@ use crate::duplicate_case_keys::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn duplicate_case_key_report(args: DuplicateCaseKeyReportArgs) -> Result<()> {
+pub fn duplicate_case_key_report(args: DuplicateCaseKeyReportArgs) -> CommandResult {
     let mut case_form_count = 0;
     let mut duplicates = Vec::new();
 

@@ -74,12 +74,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.103"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
-
-[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -651,7 +645,6 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 name = "paredit-cli"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "assert_cmd",
  "blake3",
  "cap-std",
@@ -712,7 +705,6 @@ dependencies = [
 name = "paredit-core-cli"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "blake3",
  "cap-std",
  "clap",
@@ -734,7 +726,6 @@ dependencies = [
 name = "paredit-core-config"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "paredit-core-syntax",
  "serde_json",
  "thiserror",
@@ -801,7 +792,6 @@ dependencies = [
 name = "paredit-core-workspace"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "blake3",
  "cap-std",
  "libc",
@@ -815,7 +805,6 @@ dependencies = [
 name = "paredit-feature-binding"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -830,18 +819,17 @@ dependencies = [
 name = "paredit-feature-change-summary"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
 name = "paredit-feature-code-metrics"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
@@ -852,7 +840,6 @@ dependencies = [
 name = "paredit-feature-conditional-conversion"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -875,19 +862,18 @@ dependencies = [
 name = "paredit-feature-external-check"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-safety",
  "paredit-core-syntax",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
 name = "paredit-feature-extract"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -902,7 +888,6 @@ dependencies = [
 name = "paredit-feature-form-transform"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -918,7 +903,6 @@ dependencies = [
 name = "paredit-feature-function-parameter"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -933,19 +917,18 @@ dependencies = [
 name = "paredit-feature-generate"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
  "paredit-feature-project-inventory",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
 name = "paredit-feature-inline"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -961,7 +944,6 @@ dependencies = [
 name = "paredit-feature-lint-conditional"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -977,7 +959,6 @@ dependencies = [
 name = "paredit-feature-lint-control-flow"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1010,7 +991,6 @@ dependencies = [
 name = "paredit-feature-lint-form-shape"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1027,7 +1007,6 @@ dependencies = [
 name = "paredit-feature-lint-numeric"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1067,7 +1046,6 @@ dependencies = [
 name = "paredit-feature-lint-sequence"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1083,7 +1061,6 @@ dependencies = [
 name = "paredit-feature-lint-string-char"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-lint-engine",
@@ -1099,7 +1076,6 @@ dependencies = [
 name = "paredit-feature-lisp-analysis"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
@@ -1110,7 +1086,6 @@ dependencies = [
 name = "paredit-feature-package"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -1126,7 +1101,6 @@ dependencies = [
 name = "paredit-feature-project-analysis"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -1144,7 +1118,6 @@ dependencies = [
 name = "paredit-feature-project-inventory"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
@@ -1155,7 +1128,6 @@ dependencies = [
 name = "paredit-feature-refactor-workflow"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "blake3",
  "cap-std",
  "clap",
@@ -1177,7 +1149,6 @@ dependencies = [
 name = "paredit-feature-remove-unused"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -1195,7 +1166,6 @@ dependencies = [
 name = "paredit-feature-rename"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-edit",
@@ -1211,7 +1181,6 @@ dependencies = [
 name = "paredit-feature-selector"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
@@ -1222,7 +1191,6 @@ dependencies = [
 name = "paredit-feature-semantic-report"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-semantics",
@@ -1234,7 +1202,6 @@ dependencies = [
 name = "paredit-feature-similarity"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
@@ -1248,12 +1215,12 @@ dependencies = [
 name = "paredit-feature-structural-diff"
 version = "1.2.1"
 dependencies = [
- "anyhow",
  "blake3",
  "clap",
  "paredit-core-cli",
  "paredit-core-syntax",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

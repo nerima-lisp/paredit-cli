@@ -4,7 +4,7 @@
 //! leading key on every line so `grep`, `cut` and a human all work; the JSON
 //! form is what an agent should read, which is why it is the default.
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::{Value, json};
 
 use paredit_core_cli::args::OutputFormat;
@@ -23,7 +23,7 @@ pub fn print_clone_classes(
     summary: &DiscoverySummary,
     errors: &[CorpusFileError],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Json => println!(
             "{}",
@@ -105,7 +105,7 @@ pub fn print_clone_sequences(
     summary: &DiscoverySummary,
     errors: &[CorpusFileError],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Json => println!(
             "{}",
@@ -204,7 +204,7 @@ pub fn print_clone_external(
     reference: &DiscoverySummary,
     errors: &[CorpusFileError],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Json => println!(
             "{}",
@@ -277,7 +277,7 @@ pub fn print_clone_threshold(
     summary: &DiscoverySummary,
     errors: &[CorpusFileError],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Json => println!(
             "{}",
@@ -361,7 +361,7 @@ pub fn print_clone_genealogy(
     summary: &DiscoverySummary,
     errors: &[CorpusFileError],
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Json => println!(
             "{}",

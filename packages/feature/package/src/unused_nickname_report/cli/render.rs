@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -9,7 +9,7 @@ pub fn print_unused_nickname_report(
     summary: &UnusedNicknameSummary,
     policy: &UnusedNicknamePolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("declared_count\t{}", summary.declared_count);

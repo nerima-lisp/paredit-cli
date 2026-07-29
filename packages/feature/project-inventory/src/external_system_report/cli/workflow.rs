@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,7 +8,7 @@ use crate::external_system_report::usecase::{
     build_external_system_report, evaluate_fail_on_external_policy,
 };
 
-pub fn external_system_report(args: ExternalSystemReportArgs) -> Result<()> {
+pub fn external_system_report(args: ExternalSystemReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

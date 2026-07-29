@@ -17,7 +17,7 @@
 
 use std::fs;
 
-use anyhow::{Context, Result, bail};
+use crate::error::Result;
 
 use crate::case::Name;
 use crate::checklist::{self, Namespace};
@@ -41,7 +41,7 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     let rule_dir = package_dir.join("src").join(&snake);
 
     if rule_dir.exists() {
-        bail!("{} already exists", rule_dir.display());
+        return Err(crate::error::XtaskError::refused(format!("{} already exists", rule_dir.display())));
     }
 
     write_new_file(
@@ -265,7 +265,7 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     write_new_file(
         &rule_dir.join("cli").join("render.rs"),
         &format!(
-            "use anyhow::Result;\n\
+            "use crate::error::Result;\n\
              use paredit_core_cli::safe_text;\n\
              use serde_json::json;\n\n\
              use crate::{snake}::usecase::{{{pascal}Policy, {pascal}Summary}};\n\
@@ -324,7 +324,7 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     write_new_file(
         &rule_dir.join("cli").join("workflow.rs"),
         &format!(
-            "use anyhow::Result;\n\n\
+            "use crate::error::Result;\n\n\
              use crate::{snake}::cli::args::{pascal}ReportArgs;\n\
              use crate::{snake}::cli::render::print_{snake}_report;\n\
              use crate::{snake}::usecase::{{\n\
@@ -401,21 +401,21 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
 
 fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u32, u32)> {
     let path = repo.path("src/domain/lint/registry/mod.rs");
-    let mut text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!("read {}", path.display())))?;
 
     let marker = "pub const RULE_COUNT: usize = ";
     let start = text
         .find(marker)
-        .with_context(|| format!("`{marker}` not found in {}", path.display()))?
+        .map_err(crate::error::XtaskError::io(format!("`{marker}` not found in {}", path.display())))?
         + marker.len();
     let end = start
         + text[start..]
             .find(';')
-            .context("no `;` after RULE_COUNT value")?;
+            .map_err(crate::error::XtaskError::io("no `;` after RULE_COUNT value"))?;
     let old_count: u32 = text[start..end]
         .trim()
         .parse()
-        .context("RULE_COUNT value is not a number")?;
+        .map_err(crate::error::XtaskError::io("RULE_COUNT value is not a number"))?;
     let new_count = old_count + 1;
     text.replace_range(start..end, &new_count.to_string());
 
@@ -425,17 +425,17 @@ fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u
     );
     let closing = text
         .rfind("\n];")
-        .context("closing `];` of REGISTRY not found")?;
+        .map_err(crate::error::XtaskError::io("closing `];` of REGISTRY not found"))?;
     text.insert_str(closing + 1, &insertion);
 
-    fs::write(&path, &text).with_context(|| format!("write {}", path.display()))?;
+    fs::write(&path, &text).map_err(crate::error::XtaskError::io(format!("write {}", path.display())))?;
     println!("  updated {} (RULE_COUNT, REGISTRY entry)", path.display());
     Ok((old_count, new_count))
 }
 
 fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Result<()> {
     let path = repo.path("src/domain/lint/registry/catalog.rs");
-    let mut text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!("read {}", path.display())))?;
 
     text = bump_assert(&text, "assert!(RULE_COUNT == ")?;
     if is_fixable {
@@ -445,7 +445,7 @@ fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Resul
         text = bump_assert(&text, "assert!(warning_count() == ")?;
     }
 
-    fs::write(&path, text).with_context(|| format!("write {}", path.display()))?;
+    fs::write(&path, text).map_err(crate::error::XtaskError::io(format!("write {}", path.display())))?;
     println!("  updated {} (pinned-count assertions)", path.display());
     Ok(())
 }
@@ -453,16 +453,16 @@ fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Resul
 fn bump_assert(text: &str, marker: &str) -> Result<String> {
     let start = text
         .find(marker)
-        .with_context(|| format!("`{marker}` not found"))?
+        .map_err(crate::error::XtaskError::io(format!("`{marker}` not found")))?
         + marker.len();
     let rest = &text[start..];
     let end_offset = rest
         .find(')')
-        .context("no closing `)` after assertion value")?;
+        .map_err(crate::error::XtaskError::io("no closing `)` after assertion value"))?;
     let old: i64 = rest[..end_offset]
         .trim()
         .parse()
-        .with_context(|| format!("`{marker}` value is not a number"))?;
+        .map_err(crate::error::XtaskError::io(format!("`{marker}` value is not a number")))?;
     let mut result = text.to_owned();
     result.replace_range(start..start + end_offset, &(old + 1).to_string());
     Ok(result)

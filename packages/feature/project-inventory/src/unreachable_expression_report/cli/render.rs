@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
 
@@ -10,6 +10,6 @@ pub fn print_unreachable_report(
     reports: &[FileFindings<UnreachableExpression>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     print_report("inspect unreachable-expressions", reports, policy, output)
 }

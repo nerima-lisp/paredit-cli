@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::struct_cycle_report::cli::args::StructCycleReportArgs;
 use crate::struct_cycle_report::cli::render::print_struct_cycle_report;
@@ -8,7 +8,7 @@ use crate::struct_cycle_report::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn struct_cycle_report(args: StructCycleReportArgs) -> Result<()> {
+pub fn struct_cycle_report(args: StructCycleReportArgs) -> CommandResult {
     let mut edges = Vec::new();
 
     for file in &args.files {

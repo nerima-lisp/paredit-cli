@@ -173,40 +173,59 @@ fn every_workspace_member_declares_the_shared_lints() {
     }
 }
 
+/// Modules that genuinely belong in the root, by the stated criterion.
+///
+/// Section 11.5.1: a module that *enumerates or aggregates several features*
+/// can live neither in core (which may not name a feature) nor in any one
+/// feature (which would have to name its siblings). `REGISTRY` naming all 169
+/// lint rules is the canonical case: every rule depends on the engine, so a
+/// registry inside the engine would be a cycle.
+const COMPOSITION_ROOT: &[&str] = &[
+    // Enumerates every lint rule; see section 4.2.
+    "lint",
+    // Runs the registry, so it cannot be core or a feature.
+    "lint_report",
+    "lint_suppression",
+    // Re-exports policy types owned by three separate features.
+    "report_policy",
+    // A development harness measured against the semantics layer, reached
+    // by examples/semantic_coverage.rs through the public API.
+    "semantic_coverage",
+];
+
+/// Modules in the root that do **not** meet the criterion above.
+///
+/// Kept separate from [`COMPOSITION_ROOT`] because they are there for a
+/// different reason — nobody has moved them yet — and merging the two lists is
+/// how "temporarily in the root" becomes permanent. Measured: not one of these
+/// aggregates several features. Their imports resolve, through the `crate::domain`
+/// re-export facade, to `packages/core/*` only, except `duplicate_export_report`,
+/// which additionally reaches one feature (`paredit-feature-package`) — and a
+/// feature depending on one other feature is already an allowed shape.
+///
+/// So each is a self-contained slice that belongs in a feature package. Moving
+/// them is a package extraction per module — new manifest, README, `cli/`
+/// wiring, and a `Cargo.toml` edge — which is why it is not folded into an
+/// unrelated change.
+///
+/// **This list may shrink. It may never grow**, which the test below enforces
+/// rather than merely asking for in a comment.
+const AWAITING_EXTRACTION: &[&str] = &[
+    "duplicate_export_report",
+    "duplicate_method_report",
+    "duplicate_slot_report",
+    "shadowed_binding_report",
+    "unused_parameter_report",
+    "mutation_safety",
+    "symbol_report",
+];
+
 /// Section 3.1.1: the root's layer modules must not accumulate code again.
 ///
 /// They are kept as the public API's namespace, and the cost of keeping them is
 /// this test. Without it, "just put it in domain for now" comes back.
-///
-/// The allowance below is the composition root: modules that enumerate or
-/// aggregate several features, which section 11.5.1 establishes cannot live in
-/// core or in a feature. `REGISTRY` naming all 134 lint rules is the canonical
-/// case; `lint_report` runs that registry, `lint_suppression` builds on it, and
-/// `report_policy` re-exports policy types owned by three different features.
 #[test]
 fn root_layer_modules_hold_only_facades_and_the_composition_root() {
-    const COMPOSITION_ROOT: &[&str] = &[
-        // Enumerates every lint rule; see section 4.2.
-        "lint",
-        // Runs the registry, so it cannot be core or a feature.
-        "lint_report",
-        "lint_suppression",
-        // Re-exports policy types owned by three separate features.
-        "report_policy",
-        // A development harness measured against the semantics layer, reached
-        // by examples/semantic_coverage.rs through the public API.
-        "semantic_coverage",
-        // Reports that still await a home; each is a candidate for its own
-        // feature package, and this list must shrink, never grow.
-        "duplicate_export_report",
-        "duplicate_method_report",
-        "duplicate_slot_report",
-        "shadowed_binding_report",
-        "unused_parameter_report",
-        "mutation_safety",
-        "symbol_report",
-    ];
-
     for (layer, dir) in [
         ("domain", "src/domain"),
         ("application", "src/application/usecase"),
@@ -221,7 +240,10 @@ fn root_layer_modules_hold_only_facades_and_the_composition_root() {
                 .file_stem()
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            if stem == "mod" || COMPOSITION_ROOT.contains(&stem.as_str()) {
+            if stem == "mod"
+                || COMPOSITION_ROOT.contains(&stem.as_str())
+                || AWAITING_EXTRACTION.contains(&stem.as_str())
+            {
                 continue;
             }
             panic!(
@@ -231,5 +253,49 @@ fn root_layer_modules_hold_only_facades_and_the_composition_root() {
                 path.display()
             );
         }
+    }
+}
+
+/// The backlog may shrink and may not grow.
+///
+/// Pinned to a count rather than left as a comment saying "this list must
+/// shrink", because a comment does not fail. Lowering the number when a module
+/// is extracted is the point; raising it means a new module was parked in the
+/// root instead of being given a package, which is the thing section 3.1.1
+/// exists to prevent.
+#[test]
+fn the_extraction_backlog_never_grows() {
+    const REMAINING: usize = 7;
+
+    assert!(
+        AWAITING_EXTRACTION.len() <= REMAINING,
+        "AWAITING_EXTRACTION grew to {}: a module was parked in the root rather than \
+         given a feature package. Extract it instead, or justify it in COMPOSITION_ROOT \
+         by the stated criterion (does it aggregate several features?).",
+        AWAITING_EXTRACTION.len()
+    );
+
+    assert_eq!(
+        AWAITING_EXTRACTION.len(),
+        REMAINING,
+        "AWAITING_EXTRACTION shrank to {} — extraction happened, which is the goal. \
+         Lower REMAINING to match.",
+        AWAITING_EXTRACTION.len()
+    );
+}
+
+/// Nothing in the backlog meets the composition-root criterion.
+///
+/// The two lists exist for different reasons and must not blur together: a
+/// module belongs in [`COMPOSITION_ROOT`] because it *cannot* live anywhere
+/// else, and in [`AWAITING_EXTRACTION`] because it simply has not moved yet.
+#[test]
+fn the_two_root_allowances_are_disjoint() {
+    for stem in AWAITING_EXTRACTION {
+        assert!(
+            !COMPOSITION_ROOT.contains(stem),
+            "`{stem}` is in both lists. If it aggregates several features it is \
+             composition root; if it does not, it is a package waiting to be made."
+        );
     }
 }

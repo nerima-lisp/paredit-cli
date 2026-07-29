@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -6,7 +6,7 @@ use crate::cohesion_report::cli::args::CohesionReportArgs;
 use crate::cohesion_report::cli::render::print_isolated_report;
 use crate::cohesion_report::usecase::{build_cohesion_report, evaluate_fail_on_isolated_policy};
 
-pub fn cohesion_report(args: CohesionReportArgs) -> Result<()> {
+pub fn cohesion_report(args: CohesionReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut reports = Vec::with_capacity(files.len());

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -7,7 +7,7 @@ use paredit_core_syntax::selector::Capture;
 
 use crate::resolve_report::usecase::{ResolveReport, ResolvedMatch};
 
-pub fn print_resolve_report(report: &ResolveReport, output: OutputFormat) -> Result<()> {
+pub fn print_resolve_report(report: &ResolveReport, output: OutputFormat) -> CliResult<()> {
     match output {
         OutputFormat::Text => print_text(report),
         OutputFormat::Json => println!(

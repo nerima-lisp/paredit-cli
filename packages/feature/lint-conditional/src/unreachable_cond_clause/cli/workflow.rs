@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::unreachable_cond_clause::cli::args::UnreachableCondClauseReportArgs;
 use crate::unreachable_cond_clause::cli::render::print_unreachable_cond_clause_report;
@@ -8,7 +8,7 @@ use crate::unreachable_cond_clause::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn unreachable_cond_clause_report(args: UnreachableCondClauseReportArgs) -> Result<()> {
+pub fn unreachable_cond_clause_report(args: UnreachableCondClauseReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut cond_form_count = 0;

@@ -3,7 +3,7 @@ use super::*;
 pub(super) fn print_shadowed_binding_report(
     reports: &[ShadowedBindingReportFile],
     policy: &ShadowedBindingPolicy,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

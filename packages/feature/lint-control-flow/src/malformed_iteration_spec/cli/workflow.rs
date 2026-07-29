@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::malformed_iteration_spec::cli::args::MalformedIterationSpecReportArgs;
 use crate::malformed_iteration_spec::cli::render::print_malformed_iteration_spec_report;
@@ -8,7 +8,7 @@ use crate::malformed_iteration_spec::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn malformed_iteration_spec_report(args: MalformedIterationSpecReportArgs) -> Result<()> {
+pub fn malformed_iteration_spec_report(args: MalformedIterationSpecReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut iteration_form_count = 0;

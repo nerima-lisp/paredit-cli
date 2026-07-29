@@ -536,3 +536,35 @@ impl From<SexprError> for FunctionParameterError {
 
 /// The result type the parameter-list refactors return.
 pub type FunctionParameterResult<T> = std::result::Result<T, FunctionParameterError>;
+
+// States which documented error code each parameter refusal earns.
+paredit_core_cli::impl_classified_refusal!(FunctionParameterError, |error| match error {
+    FunctionParameterError::Edit(edit) => paredit_core_cli::diagnosis::code_for_edit_refusal(edit),
+
+    // Which calls to act on is a command-line question: `--all-calls` with
+    // `--call-path`, or neither. Retrying the same line cannot help.
+    FunctionParameterError::CallSelection(CallSelectionError::AllCallsAndCallPath { .. })
+    | FunctionParameterError::CallSelection(CallSelectionError::NoCallSelector { .. }) =>
+        paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+
+    // `--all-calls` found nothing to act on: a selection outcome, and one a
+    // caller can respond to by widening.
+    FunctionParameterError::CallSelection(CallSelectionError::NoSameFileCalls { .. }) =>
+        paredit_core_cli::diagnosis::ErrorCode::SelectionNoMatch,
+
+    FunctionParameterError::CallSelection(_)
+    | FunctionParameterError::CallArgument(_)
+    | FunctionParameterError::LambdaList(_)
+    | FunctionParameterError::DefinitionShape(_)
+    | FunctionParameterError::ParameterSelection(_)
+    | FunctionParameterError::ListEdit(_)
+    | FunctionParameterError::ReaderConditional(_) =>
+        paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+
+    // Both the file and the `--argument` value reach here as a parse failure,
+    // and both mean the same thing to a caller: the text does not parse.
+    FunctionParameterError::Parse(_) | FunctionParameterError::ArgumentDoesNotParse { .. } =>
+        paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+
+    FunctionParameterError::Symbol(_) => paredit_core_cli::diagnosis::ErrorCode::InputSymbolInvalid,
+});

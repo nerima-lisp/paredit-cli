@@ -1,8 +1,8 @@
 use crate::remove_unused_binding::usecase::{
     RemoveUnusedBindingPlan, RemoveUnusedBindingRequest, plan_remove_unused_binding,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
@@ -35,20 +35,30 @@ pub struct RemoveUnusedBindingArgs {
     output: OutputFormat,
 }
 
-pub fn remove_unused_binding(args: RemoveUnusedBindingArgs) -> Result<()> {
+pub fn remove_unused_binding(args: RemoveUnusedBindingArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     if args.name.is_some() && args.all_bindings {
-        anyhow::bail!("remove-unused-binding accepts either --name or --all-bindings, not both");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "remove-unused-binding accepts either --name or --all-bindings, not both",
+        )
+        .into());
     }
     if args.name.is_none() && !args.all_bindings {
-        anyhow::bail!("remove-unused-binding requires --name or --all-bindings");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "remove-unused-binding requires --name or --all-bindings",
+        )
+        .into());
     }
     if args.write && !args.allow_drop_value {
-        anyhow::bail!(
-            "remove-unused-binding drops the binding value expression; pass --allow-drop-value to write"
-        );
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+    "remove-unused-binding drops the binding value expression; pass --allow-drop-value to write",
+)
+.into());
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
@@ -82,7 +92,7 @@ fn print_remove_unused_binding_plan(
     plan: &RemoveUnusedBindingPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

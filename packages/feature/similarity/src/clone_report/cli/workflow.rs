@@ -1,6 +1,6 @@
 //! The five command entry points.
 
-use anyhow::Result;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use paredit_core_cli::gate::gate_failure;
 
@@ -23,7 +23,7 @@ use super::render::{
     print_clone_threshold,
 };
 
-pub fn clone_classes(args: CloneClassReportArgs) -> Result<()> {
+pub fn clone_classes(args: CloneClassReportArgs) -> CommandResult {
     let options = similarity_options(&args.matching)?;
     let corpus = collect_candidates(&args.discovery.roots, &args.discovery, &options)?;
     let class_options = CloneClassOptions {
@@ -33,11 +33,18 @@ pub fn clone_classes(args: CloneClassReportArgs) -> Result<()> {
         clone_type: args.clone_type.map(clone_type_from_number),
         helper_overhead_lines: args.extraction.helper_overhead_lines,
     };
-    anyhow::ensure!(args.min_members >= 2, "--min-members must be at least 2");
-    anyhow::ensure!(
-        args.max_classes != Some(0),
-        "--max-classes must be at least 1"
-    );
+    if !(args.min_members >= 2) {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--min-members must be at least 2".to_owned(),
+        }
+        .into());
+    }
+    if !(args.max_classes != Some(0)) {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--max-classes must be at least 1".to_owned(),
+        }
+        .into());
+    }
 
     let report = build_clone_class_report(
         corpus.candidates,
@@ -61,7 +68,7 @@ pub fn clone_classes(args: CloneClassReportArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn clone_sequences(args: CloneSequenceReportArgs) -> Result<()> {
+pub fn clone_sequences(args: CloneSequenceReportArgs) -> CommandResult {
     let options = CloneSequenceOptions {
         min_run_length: args.min_run_length,
         max_run_length: args.max_run_length,
@@ -103,7 +110,7 @@ pub fn clone_sequences(args: CloneSequenceReportArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn clone_external(args: CloneExternalReportArgs) -> Result<()> {
+pub fn clone_external(args: CloneExternalReportArgs) -> CommandResult {
     let options = similarity_options(&args.matching)?;
     let project = collect_candidates(&args.discovery.roots, &args.discovery, &options)?;
     // The reference corpus is read with the project's error policy but the
@@ -140,15 +147,19 @@ pub fn clone_external(args: CloneExternalReportArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn clone_threshold(args: CloneThresholdReportArgs) -> Result<()> {
-    anyhow::ensure!(
-        (0.0..=1.0).contains(&args.floor),
-        "--floor must be between 0.0 and 1.0"
-    );
-    anyhow::ensure!(
-        args.bucket_width > 0.0 && args.bucket_width <= 1.0,
-        "--bucket-width must be greater than 0.0 and at most 1.0"
-    );
+pub fn clone_threshold(args: CloneThresholdReportArgs) -> CliResult<()> {
+    if !((0.0..=1.0).contains(&args.floor)) {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--floor must be between 0.0 and 1.0".to_owned(),
+        }
+        .into());
+    }
+    if !(args.bucket_width > 0.0 && args.bucket_width <= 1.0) {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--bucket-width must be greater than 0.0 and at most 1.0".to_owned(),
+        }
+        .into());
+    }
 
     let options = similarity_options(&args.matching)?;
     let corpus = collect_candidates(&args.discovery.roots, &args.discovery, &options)?;
@@ -169,12 +180,19 @@ pub fn clone_threshold(args: CloneThresholdReportArgs) -> Result<()> {
     )
 }
 
-pub fn clone_genealogy(args: CloneGenealogyReportArgs) -> Result<()> {
-    anyhow::ensure!(args.min_members >= 2, "--min-members must be at least 2");
-    anyhow::ensure!(
-        args.max_classes != Some(0),
-        "--max-classes must be at least 1"
-    );
+pub fn clone_genealogy(args: CloneGenealogyReportArgs) -> CommandResult {
+    if !(args.min_members >= 2) {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--min-members must be at least 2".to_owned(),
+        }
+        .into());
+    }
+    if !(args.max_classes != Some(0)) {
+        return Err(paredit_core_cli::ArgumentError::FlagCombination {
+            message: "--max-classes must be at least 1".to_owned(),
+        }
+        .into());
+    }
 
     let options = similarity_options(&args.matching)?;
     let corpus = collect_candidates(&args.discovery.roots, &args.discovery, &options)?;
@@ -210,7 +228,7 @@ pub fn clone_genealogy(args: CloneGenealogyReportArgs) -> Result<()> {
     Ok(())
 }
 
-fn similarity_options(args: &CloneMatchArgs) -> Result<SimilarityReportOptions> {
+fn similarity_options(args: &CloneMatchArgs) -> CliResult<SimilarityReportOptions> {
     Ok(SimilarityReportOptions::new(
         args.threshold,
         args.min_node_count,

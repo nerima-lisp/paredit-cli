@@ -10,7 +10,7 @@ use crate::refactor::usecase::plan::{
     RefactorPlanPolicyOptions as DomainRefactorPlanPolicyOptions, RefactorPlanRequest,
     build_refactor_plan_decision,
 };
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_syntax::sexpr::SymbolName;
@@ -20,7 +20,7 @@ use paredit_feature_project_analysis::impact_report::usecase::{
 };
 use std::path::PathBuf;
 
-pub fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
+pub fn refactor_plan(args: RefactorPlanArgs) -> CommandResult {
     emit_refactor_plan(RefactorPlanEmission {
         paths: &args.files,
         dialect: args.dialect,
@@ -37,7 +37,7 @@ pub fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
     })
 }
 
-pub fn workspace_refactor_plan(args: WorkspaceRefactorPlanArgs) -> Result<()> {
+pub fn workspace_refactor_plan(args: WorkspaceRefactorPlanArgs) -> CommandResult {
     let resolved = args.input.resolve(&args.roots)?;
     let workspace = discover_workspace_refactor_scope(&args.input, args.roots.clone(), &resolved)?;
 
@@ -68,7 +68,7 @@ struct RefactorPlanEmission<'a> {
     failure_label: &'static str,
 }
 
-fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
+fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> CommandResult {
     let RefactorPlanEmission {
         paths,
         dialect,
@@ -94,7 +94,7 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
             policy_options.require_definitions,
             policy_options.require_references,
         )
-        .map_err(anyhow::Error::msg)?,
+        .map_err(|message| paredit_core_cli::ArgumentError::FlagCombination { message })?,
         risks: raw_refactor_risks(&summary),
     });
     let policy = decision.policy;

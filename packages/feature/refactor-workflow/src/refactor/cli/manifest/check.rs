@@ -7,7 +7,7 @@ use super::io::read_refactor_manifest_file;
 use super::parse::parse_refactor_apply_manifest;
 use super::root::{MAX_MANIFEST_SOURCE_TOTAL_BYTES, read_refactor_manifest_source};
 use super::validation::validate_manifest_edits;
-use anyhow::{Context, Result};
+use paredit_core_cli::CliResult;
 use paredit_core_cli::shared::apply_byte_span_edits;
 use paredit_core_cli::shared::stable_text_hash;
 use paredit_core_syntax::sexpr::SyntaxTree;
@@ -17,7 +17,7 @@ pub fn build_refactor_check_result(
     manifest_path: &FsPath,
     root: Option<&FsPath>,
     expected_manifest_hash: Option<&str>,
-) -> Result<RefactorCheckResult> {
+) -> CliResult<RefactorCheckResult> {
     let loaded_manifest = read_refactor_manifest_file(manifest_path, expected_manifest_hash)?;
     let manifest = parse_refactor_apply_manifest(&loaded_manifest.value)?;
     let root_guard = root.map(RefactorRootGuard::new).transpose()?;
@@ -32,9 +32,11 @@ pub fn build_refactor_check_result(
             read_refactor_manifest_source(&file.path, root_guard.as_ref())?;
         source_bytes = source_bytes.saturating_add(input.len() as u64);
         if source_bytes > MAX_MANIFEST_SOURCE_TOTAL_BYTES {
-            anyhow::bail!(
-                "refusing manifest sources: cumulative input exceeds {MAX_MANIFEST_SOURCE_TOTAL_BYTES} bytes"
-            );
+            return Err(paredit_core_cli::error::FeatureRefusal::message(
+    paredit_core_cli::diagnosis::ErrorCode::RefusalInputTooLarge,
+    format!("refusing manifest sources: cumulative input exceeds {MAX_MANIFEST_SOURCE_TOTAL_BYTES} bytes"),
+)
+.into());
         }
         let input_hash = stable_text_hash(&input);
         let edits = file
@@ -42,8 +44,9 @@ pub fn build_refactor_check_result(
             .iter()
             .map(|edit| (edit.span, edit.replacement.clone()))
             .collect::<Vec<_>>();
-        validate_manifest_edits(&input, &edits)
-            .with_context(|| format!("manifest edits are invalid for {}", file.path.display()))?;
+        validate_manifest_edits(&input, &edits).map_err(crate::error::RefactorContext::new(
+            format!("manifest edits are invalid for {}", file.path.display()),
+        ))?;
         let rewritten = apply_byte_span_edits(&input, edits)?;
         let output_hash = stable_text_hash(&rewritten);
         let output_parse_ok = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).is_ok();

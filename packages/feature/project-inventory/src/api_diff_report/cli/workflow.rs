@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use paredit_core_cli::{CliError, CommandResult};
 
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
@@ -8,11 +8,16 @@ use crate::api_diff_report::usecase::{
     build_api_diff_report, evaluate_api_diff_policy, read_baseline,
 };
 
-pub fn api_diff_report(args: ApiDiffReportArgs) -> Result<()> {
-    let document = std::fs::read_to_string(&args.baseline)
-        .with_context(|| format!("read baseline {}", args.baseline.display()))?;
-    let document: serde_json::Value = serde_json::from_str(&document)
-        .with_context(|| format!("parse baseline {}", args.baseline.display()))?;
+pub fn api_diff_report(args: ApiDiffReportArgs) -> CommandResult {
+    let document = std::fs::read_to_string(&args.baseline).map_err(CliError::io(format!(
+        "read baseline {}",
+        args.baseline.display()
+    )))?;
+    let document: serde_json::Value =
+        serde_json::from_str(&document).map_err(|source| CliError::Json {
+            context: format!("parse baseline {}", args.baseline.display()),
+            source,
+        })?;
     let baseline = read_baseline(&document);
 
     let files = expand_input_files(&args.files, args.dialect)?;

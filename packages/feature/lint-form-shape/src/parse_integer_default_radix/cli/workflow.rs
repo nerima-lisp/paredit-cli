@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::parse_integer_default_radix::cli::args::ParseIntegerDefaultRadixReportArgs;
 use crate::parse_integer_default_radix::cli::render::print_parse_integer_default_radix_report;
@@ -8,7 +8,9 @@ use crate::parse_integer_default_radix::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn parse_integer_default_radix_report(args: ParseIntegerDefaultRadixReportArgs) -> Result<()> {
+pub fn parse_integer_default_radix_report(
+    args: ParseIntegerDefaultRadixReportArgs,
+) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_form_count = 0;

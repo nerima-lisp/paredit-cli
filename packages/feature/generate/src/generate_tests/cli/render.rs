@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
@@ -13,7 +13,7 @@ pub fn print_test_stub_plan(
     skipped_dialect: &[std::path::PathBuf],
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("stub_count\t{}", stubs.len());

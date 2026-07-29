@@ -1,5 +1,5 @@
 use crate::refactor::usecase::plan::RefactorPlanSummary;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::{Value, json};
 
 use super::super::super::types::execute::{
@@ -9,7 +9,9 @@ use super::super::super::types::verification::RefactorVerification;
 use super::super::write_plan::refactor_write_plan_json;
 use crate::refactor::usecase::execute::RefactorExecuteDecision;
 
-pub fn print_workspace_refactor_execute_json(execution: &WorkspaceRefactorExecute) -> Result<()> {
+pub fn print_workspace_refactor_execute_json(
+    execution: &WorkspaceRefactorExecute,
+) -> CliResult<()> {
     let write_plan = execution.preview.write_plan();
     let writable_files = execution.preview.writable_paths_for_write_plan(&write_plan);
     let refused_files = execution.preview.refused_paths_for_write_plan(&write_plan);

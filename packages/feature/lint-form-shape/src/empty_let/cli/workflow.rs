@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::empty_let::cli::args::EmptyLetReportArgs;
 use crate::empty_let::cli::render::print_empty_let_report;
@@ -7,7 +7,7 @@ use crate::empty_let::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn empty_let_report(args: EmptyLetReportArgs) -> Result<()> {
+pub fn empty_let_report(args: EmptyLetReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut let_form_count = 0;

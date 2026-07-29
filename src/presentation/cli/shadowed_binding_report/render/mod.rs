@@ -10,7 +10,7 @@ pub(in crate::presentation::cli) fn print_shadowed_binding_report(
     reports: &[ShadowedBindingReportFile],
     policy: &ShadowedBindingPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => text::print_shadowed_binding_report(reports, policy),
         OutputFormat::Json => json::print_shadowed_binding_report(reports, policy)?,

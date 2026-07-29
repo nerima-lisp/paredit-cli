@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::duplicate_lambda_list_keyword::cli::args::DuplicateLambdaListKeywordReportArgs;
 use crate::duplicate_lambda_list_keyword::cli::render::print_duplicate_lambda_list_keyword_report;
@@ -10,7 +10,7 @@ use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 pub fn duplicate_lambda_list_keyword_report(
     args: DuplicateLambdaListKeywordReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut definition_count = 0;

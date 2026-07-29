@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::accessor_arity::cli::args::AccessorArityReportArgs;
 use crate::accessor_arity::cli::render::print_accessor_arity_report;
@@ -8,7 +8,7 @@ use crate::accessor_arity::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn accessor_arity_report(args: AccessorArityReportArgs) -> Result<()> {
+pub fn accessor_arity_report(args: AccessorArityReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut call_count = 0;

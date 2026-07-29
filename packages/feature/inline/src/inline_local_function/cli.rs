@@ -1,8 +1,8 @@
 use crate::inline_local_function::usecase::{
     InlineLocalFunctionPlan, InlineLocalFunctionRequest, plan_inline_local_function,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
@@ -32,9 +32,9 @@ pub struct InlineLocalFunctionArgs {
     output: OutputFormat,
 }
 
-pub fn inline_local_function(args: InlineLocalFunctionArgs) -> Result<()> {
+pub fn inline_local_function(args: InlineLocalFunctionArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;
     let plan = plan_inline_local_function(InlineLocalFunctionRequest {
@@ -50,7 +50,11 @@ pub fn inline_local_function(args: InlineLocalFunctionArgs) -> Result<()> {
     print_plan(&plan, written, args.output)
 }
 
-fn print_plan(plan: &InlineLocalFunctionPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_plan(
+    plan: &InlineLocalFunctionPlan,
+    written: bool,
+    output: OutputFormat,
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

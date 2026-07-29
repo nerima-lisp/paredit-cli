@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::single_value_bind::cli::args::SingleValueBindReportArgs;
 use crate::single_value_bind::cli::render::print_single_value_bind_report;
@@ -8,7 +8,7 @@ use crate::single_value_bind::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn single_value_bind_report(args: SingleValueBindReportArgs) -> Result<()> {
+pub fn single_value_bind_report(args: SingleValueBindReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut bind_form_count = 0;

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::application::usecase::emacs_lisp_file_report::{
     EmacsLispFilePolicyOptions, collect_emacs_lisp_file_facts, evaluate_emacs_lisp_file_policy,
@@ -9,7 +9,7 @@ use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 pub(in crate::presentation::cli) fn emacs_lisp_file_report(
     args: EmacsLispFileReportArgs,
-) -> Result<()> {
+) -> CommandResult {
     let mut files = Vec::new();
 
     for file in &args.files {

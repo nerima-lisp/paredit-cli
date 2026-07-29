@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::application::usecase::duplicate_export_report::{
@@ -10,7 +10,7 @@ pub(super) fn print_duplicate_export_report(
     summary: &DuplicateExportSummary,
     policy: &DuplicateExportPolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("defpackage_count\t{}", summary.defpackage_count);

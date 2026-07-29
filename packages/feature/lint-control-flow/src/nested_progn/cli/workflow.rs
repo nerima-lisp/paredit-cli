@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::nested_progn::cli::args::NestedPrognReportArgs;
 use crate::nested_progn::cli::render::print_nested_progn_report;
@@ -8,7 +8,7 @@ use crate::nested_progn::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn nested_progn_report(args: NestedPrognReportArgs) -> Result<()> {
+pub fn nested_progn_report(args: NestedPrognReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut progn_form_count = 0;

@@ -1,11 +1,11 @@
 use super::*;
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use serde_json::json;
 
 pub fn print_unused_local_callable_report(
     reports: &[UnusedLocalCallableReportFile],
     policy: &UnusedLocalCallablePolicy,
-) -> Result<()> {
+) -> CliResult<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

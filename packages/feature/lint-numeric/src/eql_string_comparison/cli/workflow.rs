@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::eql_string_comparison::cli::args::EqlStringComparisonReportArgs;
 use crate::eql_string_comparison::cli::render::print_eql_string_comparison_report;
@@ -8,7 +8,7 @@ use crate::eql_string_comparison::usecase::{
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
-pub fn eql_string_comparison_report(args: EqlStringComparisonReportArgs) -> Result<()> {
+pub fn eql_string_comparison_report(args: EqlStringComparisonReportArgs) -> CommandResult {
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
 

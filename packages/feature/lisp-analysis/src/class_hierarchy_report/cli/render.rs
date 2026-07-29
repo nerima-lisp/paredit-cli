@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
 
@@ -65,6 +65,6 @@ pub fn print_shadowed_slot_report(
     reports: &[FileFindings<ClassFinding>],
     policy: &ReportPolicy,
     output: ReportFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     print_report("inspect class-hierarchy", reports, policy, output)
 }

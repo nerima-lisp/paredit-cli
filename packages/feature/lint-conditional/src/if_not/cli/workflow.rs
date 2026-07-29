@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CommandResult;
 
 use crate::if_not::cli::args::IfNotReportArgs;
 use crate::if_not::cli::render::print_if_not_report;
@@ -7,7 +7,7 @@ use crate::if_not::usecase::{
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
-pub fn if_not_report(args: IfNotReportArgs) -> Result<()> {
+pub fn if_not_report(args: IfNotReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
     let mut if_form_count = 0;

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use paredit_core_cli::CliResult;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -10,19 +10,36 @@ use super::shared::insert_top_level_form;
 use paredit_core_cli::args::{MoveInsert, OutputFormat};
 use paredit_core_cli::shared::{read_input_dialect_and_tree, write_file_with_rollback};
 
-pub fn insert_top_level(args: InsertTopLevelArgs) -> Result<()> {
+pub fn insert_top_level(args: InsertTopLevelArgs) -> CliResult<()> {
     if args.insert == MoveInsert::Append && args.anchor_path.is_some() {
-        bail!("--anchor-path is only valid with --insert before or --insert after");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--anchor-path is only valid with --insert before or --insert after",
+        )
+        .into());
     }
     if matches!(args.insert, MoveInsert::Before | MoveInsert::After) && args.anchor_path.is_none() {
-        bail!("--insert before/after requires --anchor-path");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--insert before/after requires --anchor-path",
+        )
+        .into());
     }
 
     let dialect = Dialect::detect(Some(&args.file), args.dialect.map(Into::into));
-    let replacement_tree = SyntaxTree::parse_with_dialect(&args.with, dialect)
-        .context("--with must contain a valid, complete top-level S-expression")?;
+    let replacement_tree =
+        SyntaxTree::parse_with_dialect(&args.with, dialect).map_err(|source| {
+            crate::error::DefinitionMovementError::WithArgument {
+                summary: "--with must contain a valid, complete top-level S-expression",
+                source,
+            }
+        })?;
     if replacement_tree.root_children().len() != 1 {
-        bail!("--with must contain exactly one top-level S-expression");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--with must contain exactly one top-level S-expression",
+        )
+        .into());
     }
 
     let (input, dialect, tree) =
@@ -37,7 +54,7 @@ pub fn insert_top_level(args: InsertTopLevelArgs) -> Result<()> {
     )?;
 
     SyntaxTree::parse_with_dialect(&rewritten, dialect)
-        .context("insertion produced invalid Lisp syntax")?;
+        .map_err(|source| crate::error::DefinitionMovementError::InsertionInvalid { source })?;
 
     let changed = input.text != rewritten;
     let written = args.write && changed;

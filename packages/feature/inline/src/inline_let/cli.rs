@@ -1,6 +1,6 @@
 use crate::inline_let::usecase::{InlineLetPlan, InlineLetRequest, plan_inline_let};
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
@@ -28,9 +28,9 @@ pub struct InlineLetArgs {
     output: OutputFormat,
 }
 
-pub fn inline_let(args: InlineLetArgs) -> Result<()> {
+pub fn inline_let(args: InlineLetArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
@@ -53,7 +53,11 @@ pub fn inline_let(args: InlineLetArgs) -> Result<()> {
     print_inline_let_plan(&plan, written, args.output)
 }
 
-fn print_inline_let_plan(plan: &InlineLetPlan, written: bool, output: OutputFormat) -> Result<()> {
+fn print_inline_let_plan(
+    plan: &InlineLetPlan,
+    written: bool,
+    output: OutputFormat,
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

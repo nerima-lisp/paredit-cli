@@ -1,8 +1,8 @@
 use crate::extract_function::usecase::{
     ExtractFunctionInsert, ExtractFunctionPlan, ExtractFunctionRequest, plan_extract_function,
 };
-use anyhow::Result;
 use clap::Args;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::MoveInsert;
@@ -50,15 +50,23 @@ pub struct ExtractFunctionArgs {
     output: OutputFormat,
 }
 
-pub fn extract_function(args: ExtractFunctionArgs) -> Result<()> {
+pub fn extract_function(args: ExtractFunctionArgs) -> CliResult<()> {
     if args.write && args.file.is_none() {
-        anyhow::bail!("--write requires --file");
+        return Err(paredit_core_cli::ArgumentError::WriteRequiresFile.into());
     }
     if args.insert == MoveInsert::Append && args.anchor_path.is_some() {
-        anyhow::bail!("--anchor-path is only valid with --insert before or --insert after");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--anchor-path is only valid with --insert before or --insert after",
+        )
+        .into());
     }
     if matches!(args.insert, MoveInsert::Before | MoveInsert::After) && args.anchor_path.is_none() {
-        anyhow::bail!("--insert before/after requires --anchor-path");
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::ArgumentFlagCombination,
+            "--insert before/after requires --anchor-path",
+        )
+        .into());
     }
 
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
@@ -95,7 +103,7 @@ fn print_extract_function_plan(
     plan: &ExtractFunctionPlan,
     written: bool,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());

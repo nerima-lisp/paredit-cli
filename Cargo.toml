@@ -84,7 +84,6 @@ paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }
 paredit-feature-generate = { path = "packages/feature/generate" }
-anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"
 clap = { version = "4.6", features = ["derive"] }
@@ -158,7 +157,6 @@ repository = "https://github.com/nerima-lisp/paredit-cli"
 # Single source of truth for dependency versions, so 26 members cannot drift
 # apart. Verify with `cargo tree --duplicates` when adding one.
 [workspace.dependencies]
-anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"
 clap = { version = "4.6", features = ["derive"] }

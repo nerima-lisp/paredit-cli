@@ -1,4 +1,4 @@
-use anyhow::Result;
+use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::safe_text;
 use serde_json::json;
@@ -12,7 +12,7 @@ pub fn print_replace_function_calls_report(
     args: &ReplaceFunctionCallsArgs,
     policy: &CallSitePolicy,
     output: OutputFormat,
-) -> Result<()> {
+) -> CliResult<()> {
     let call_count = reports
         .iter()
         .map(|report| report.calls.len())
