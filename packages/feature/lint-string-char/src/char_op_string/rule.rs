@@ -91,7 +91,7 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_call(
             view,
-            context.path(),
+            context.source(),
             &is_non_character,
             &mut char_call_count,
             &mut items,

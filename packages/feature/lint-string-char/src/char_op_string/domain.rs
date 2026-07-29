@@ -27,13 +27,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Functions that require character arguments (a string literal is a type error
 /// in any argument position).
@@ -106,13 +108,71 @@ pub enum CharacterMismatch {
     InferredType,
 }
 
+impl CharacterMismatch {
+    /// How the argument was recognized, as a stable token.
+    ///
+    /// The two are separable without parsing JSON because they answer
+    /// different questions: a string literal is a typo the author can see in
+    /// the source, an inferred type is a conclusion drawn from elsewhere in
+    /// the file, and a consumer filtering on one of them is asking a real
+    /// question.
+    #[must_use]
+    pub const fn label(&self) -> &'static str {
+        match self {
+            Self::StringLiteral(_) => "string-literal",
+            Self::InferredType => "inferred-type",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CharOpStringItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The 1-based line the call starts on.
+    pub line: usize,
     /// The character function (`char=`, `char-code`, …).
     pub operator: String,
     pub mismatch: CharacterMismatch,
+}
+
+impl Finding for CharOpStringItem {
+    fn kind(&self) -> &'static str {
+        self.mismatch.label()
+    }
+
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.operator.clone(), format!("literal={}", self.literal())]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("literal", json!(self.literal())),
+        ]
+    }
+
+    /// The same sentence the `char-op-string` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        match &self.mismatch {
+            CharacterMismatch::StringLiteral(literal) => format!(
+                "{} is given string literal {literal}; it requires a character (type error)",
+                self.operator
+            ),
+            CharacterMismatch::InferredType => format!(
+                "{} is given an argument of an inferred non-character type; it requires a character (type error)",
+                self.operator
+            ),
+        }
+    }
 }
 
 impl CharOpStringItem {
@@ -128,38 +188,6 @@ impl CharOpStringItem {
             CharacterMismatch::InferredType => "",
         }
     }
-}
-
-#[derive(Debug)]
-pub struct CharOpStringSummary {
-    pub char_call_count: usize,
-    pub violations: Vec<CharOpStringItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CharOpStringPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl CharOpStringPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
-    }
-
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
-    }
-}
-
-#[derive(Debug)]
-pub struct CharOpStringPolicy {
-    pub fail_on_violation: bool,
-    pub char_call_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
 }
 
 /// Whether an argument is provably not a character without being spelled as a
@@ -181,7 +209,7 @@ const fn never(_: &ExpressionView) -> bool {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     is_non_character: IsNonCharacterArgument<'_>,
     char_call_count: &mut usize,
     violations: &mut Vec<CharOpStringItem>,
@@ -199,76 +227,91 @@ pub fn examine_call(
 
     if let Some((_, mismatch)) = first_non_character_argument(view, is_non_character) {
         violations.push(CharOpStringItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             operator: head.to_ascii_lowercase(),
             mismatch,
         });
     }
 }
 
-/// Collects every character-function call with a string-literal argument across
-/// a whole file, along with the total number of character-function calls
-/// scanned.
-pub fn collect_char_op_strings(
+/// Collects every character-function call with a string-literal argument in one
+/// file, with the number of character-function calls scanned as the denominator
+/// beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every character function here is given a
+/// character" for Common Lisp and "nothing was looked for" for Clojure, and the
+/// two read identically without the flag.
+pub fn build_char_op_string_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<CharOpStringItem>)> {
+) -> LintResult<FileFindings<CharOpStringItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("char_call_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut char_call_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &never, &mut char_call_count, &mut violations);
+            examine_call(
+                subview,
+                source,
+                &never,
+                &mut char_call_count,
+                &mut violations,
+            );
         });
     }
-    Ok((char_call_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("char_call_count", json!(char_call_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_char_op_strings(
-    char_call_count: usize,
-    violations: Vec<CharOpStringItem>,
-) -> CharOpStringSummary {
-    CharOpStringSummary {
-        char_call_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_char_op_string_policy(
-    options: CharOpStringPolicyOptions,
-    summary: &CharOpStringSummary,
-) -> CharOpStringPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    CharOpStringPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        char_call_count: summary.char_call_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<CharOpStringItem>) {
+    fn report(input: &str) -> FileFindings<CharOpStringItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_char_op_strings(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect char op strings")
+        build_char_op_string_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build char op string report")
+    }
+
+    /// The `(char_call_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<CharOpStringItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "char_call_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("char_call_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -332,27 +375,48 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(char= \"a\" c)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_char_op_strings(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect char op strings");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_char_op_string_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build char op string report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("char_call_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(char= \"a\" c)");
-        let summary = summarize_char_op_strings(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(char= a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_char_op_string_policy(CharOpStringPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_literal() {
+        let report = report("(defun f (c)\n  (char= c \"a\"))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "string-literal");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("char=")), ("literal", json!("\"a\""))]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["char=".to_owned(), "literal=\"a\"".to_owned()]
+        );
+        assert_eq!(
+            finding.message(),
+            "char= is given string literal \"a\"; it requires a character (type error)"
+        );
+    }
 
-        let strict = evaluate_char_op_string_policy(CharOpStringPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_character_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(char= \"a\" c)\n(char= a b)\n(char-code c)\n");
+        assert_eq!(report.summary, vec![("char_call_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
