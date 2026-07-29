@@ -2225,6 +2225,199 @@ fn cli_lint_remove_unused_suppressions_narrows_a_partly_stale_directive() {
 }
 
 #[test]
+fn cli_lint_report_expired_suppressions_flags_a_past_date() {
+    let dir = fresh_temp_dir("lint-expired-past");
+    let file = dir.join("a.lisp");
+    // Still silences the finding — expiry is independent of use.
+    fs::write(
+        &file,
+        ";; paredit:ignore-until 2000-01-01 redundant-quote\n(list '5)\n",
+    )
+    .expect("write a.lisp");
+
+    let assert = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--report-expired-suppressions",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .code(3);
+    let value: serde_json::Value =
+        serde_json::from_slice(&assert.get_output().stdout).expect("JSON");
+    assert_eq!(value["expired_suppression_count"], 1);
+    assert_eq!(
+        value["expired_suppressions"][0]["rules"][0],
+        "redundant-quote"
+    );
+
+    // And the plain report still shows nothing: the expired directive kept
+    // silencing the finding.
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 0);
+}
+
+#[test]
+fn cli_lint_report_expired_suppressions_is_clean_for_a_future_date() {
+    let dir = fresh_temp_dir("lint-expired-future");
+    let file = dir.join("a.lisp");
+    fs::write(&file, ";; paredit:ignore-until 2099-01-01\n(list '5)\n").expect("write a.lisp");
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--report-expired-suppressions",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"expired_suppression_count\": 0"));
+}
+
+#[test]
+fn cli_lint_report_expired_suppressions_ignores_a_directive_with_no_until() {
+    let dir = fresh_temp_dir("lint-expired-none");
+    let file = dir.join("a.lisp");
+    fs::write(&file, ";; paredit:ignore redundant-quote\n(list '5)\n").expect("write a.lisp");
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--report-expired-suppressions",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"expired_suppression_count\": 0"));
+}
+
+#[test]
+fn cli_lint_report_suppressions_lists_every_directive_used_or_not() {
+    let dir = fresh_temp_dir("lint-suppression-inventory");
+    let file = dir.join("a.lisp");
+    fs::write(
+        &file,
+        ";; paredit:ignore redundant-quote -- kept for readability\n(list '5)\n\
+         ;; paredit:ignore no-such-rule\n(clean-form)\n",
+    )
+    .expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--report-suppressions",
+                "--output",
+                "json",
+            ])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["suppression_count"], 2);
+    assert_eq!(value["unused_count"], 1);
+    let entries = value["suppressions"].as_array().expect("array");
+    let used = entries
+        .iter()
+        .find(|entry| entry["comment_line"] == 1)
+        .expect("first directive");
+    assert_eq!(used["used"], true);
+    assert_eq!(used["reason"], "kept for readability");
+    let unused = entries
+        .iter()
+        .find(|entry| entry["comment_line"] == 3)
+        .expect("second directive");
+    assert_eq!(unused["used"], false);
+}
+
+#[test]
+fn cli_lint_report_suppressions_never_gates_the_run() {
+    let dir = fresh_temp_dir("lint-suppression-inventory-exit");
+    let file = dir.join("a.lisp");
+    // A stale directive would fail --report-unused-suppressions; the
+    // inventory is a survey and must exit 0 regardless.
+    fs::write(&file, ";; paredit:ignore no-such-rule\n(clean-form)\n").expect("write a.lisp");
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--report-suppressions",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+}
+
+#[test]
+fn cli_lint_suppress_path_silences_a_whole_file() {
+    let dir = fresh_temp_dir("lint-suppress-path");
+    let vendor = dir.join("vendor");
+    fs::create_dir(&vendor).expect("mkdir vendor");
+    let vendored = vendor.join("generated.lisp");
+    let own = dir.join("a.lisp");
+    // Neither file carries an inline suppression; both would normally report.
+    fs::write(&vendored, "(list '5)\n").expect("write vendor/generated.lisp");
+    fs::write(&own, "(list '6)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--output", "json"])
+            .arg("--suppress-path")
+            .arg(&vendor)
+            .arg(&vendored)
+            .arg(&own)
+            .assert(),
+    );
+    // Only a.lisp's finding survives; the vendored file's is gone entirely,
+    // not merely marked suppressed.
+    assert_eq!(value["finding_count"], 1);
+    let findings = value["findings"].as_array().expect("array");
+    assert!(findings.iter().all(|finding| {
+        !finding["path"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("vendor")
+    }));
+}
+
+#[test]
+fn cli_lint_suppress_path_leaves_other_commands_untouched() {
+    let dir = fresh_temp_dir("lint-suppress-path-scope");
+    let vendor = dir.join("vendor");
+    fs::create_dir(&vendor).expect("mkdir vendor");
+    let vendored = vendor.join("generated.lisp");
+    fs::write(&vendored, "(defun g () 1)\n").expect("write vendor/generated.lisp");
+
+    // `--suppress-path` is a lint-only flag; `inspect definitions` still sees
+    // the file, confirming this does not reach for the workspace-wide
+    // `paths.exclude` mechanism.
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "definitions", "--output", "json"])
+            .arg(&vendored)
+            .assert(),
+    );
+    assert_eq!(value["definition_count"], 1);
+}
+
+#[test]
 fn cli_lint_docs_generates_a_markdown_reference() {
     let output = paredit()
         .args(["inspect", "lint", "--docs"])

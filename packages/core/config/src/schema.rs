@@ -150,7 +150,7 @@ const FAIL_SEVERITIES: &[&str] = &["never", "warning", "error"];
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 27;
+pub const KEY_COUNT: usize = 28;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -298,6 +298,13 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         default: DefaultValue::Boolean(false),
         summary: "Treat a `paredit:ignore` with no `-- reason` as an unused suppression.",
     },
+    KeySchema {
+        key: "lint.suppress-paths",
+        kind: ValueKind::TextList,
+        default: DefaultValue::EmptyList,
+        summary: "Silence every lint finding under these paths, relative to the file that sets \
+                  them, as generated code or vendored dependencies cannot carry an inline ignore.",
+    },
     // --- [output] ---
     KeySchema {
         key: "output.format",
@@ -339,6 +346,7 @@ pub const PATH_KEYS: &[&str] = &[
     "paths.exclude",
     "lint.baseline",
     "lint.custom-rules",
+    "lint.suppress-paths",
 ];
 
 /// Looks a key up by its full dotted name.

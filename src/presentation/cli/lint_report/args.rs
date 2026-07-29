@@ -115,6 +115,7 @@ pub(in crate::presentation::cli) struct LintReportArgs {
         "list_rules", "list_presets", "list_tags", "explain", "docs", "sarif",
         "github", "fix", "fix_plan", "stats", "timings", "test_rules",
         "report_unused_suppressions", "write_baseline", "remove_unused_suppressions",
+        "report_expired_suppressions", "report_suppressions",
     ])]
     pub(in crate::presentation::cli::lint_report) emit: Option<EmitFormat>,
     /// Emit findings as SARIF 2.1.0 for CI code scanning (ignores --output).
@@ -140,7 +141,10 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// Instead of applying fixes, emit the machine-readable fix plan: every
     /// fixable finding's exact byte-region replacements, without writing (for
     /// editors/agents to preview or apply one fix at a time).
-    #[arg(long, conflicts_with_all = ["list_rules", "sarif", "github", "fix", "stats", "report_unused_suppressions", "write_baseline"])]
+    #[arg(long, conflicts_with_all = [
+        "list_rules", "sarif", "github", "fix", "stats", "report_unused_suppressions",
+        "write_baseline", "report_expired_suppressions", "report_suppressions",
+    ])]
     pub(in crate::presentation::cli::lint_report) fix_plan: bool,
     /// Instead of listing findings, print a rollup of finding counts by
     /// severity, category, and rule (a lint-debt dashboard).
@@ -150,13 +154,35 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// silence no finding (stale ignores or typo'd rule names); exit 3 if any.
     #[arg(long, conflicts_with_all = ["list_rules", "sarif", "github", "fix", "stats"])]
     pub(in crate::presentation::cli::lint_report) report_unused_suppressions: bool,
+    /// Instead of scanning, report inline suppression directives whose
+    /// `-until <date>` has passed, whether or not they still silence
+    /// anything; exit 3 if any are found. The write-once counterpart to
+    /// `--report-unused-suppressions`: an expiry is a prompt to renew or
+    /// delete a directive, not evidence it did nothing.
+    #[arg(long, conflicts_with_all = ["list_rules", "sarif", "github", "fix", "stats"])]
+    pub(in crate::presentation::cli::lint_report) report_expired_suppressions: bool,
+    /// Instead of scanning, list every inline suppression directive — used or
+    /// not, with its scope, rules, reason, and expiry — for auditing how much
+    /// of the file is silenced. One step past
+    /// --report-unused-suppressions, which lists only the stale ones. Exits 0.
+    #[arg(long, conflicts_with_all = ["list_rules", "sarif", "github", "fix", "stats"])]
+    pub(in crate::presentation::cli::lint_report) report_suppressions: bool,
+    /// Suppress every lint finding under this path, as if the whole file
+    /// carried `paredit:ignore-file` (repeatable). For generated code and
+    /// vendored dependencies that cannot carry an inline suppression comment
+    /// because they are regenerated; other commands still see these files.
+    #[arg(long = "suppress-path", value_name = "PATH")]
+    pub(in crate::presentation::cli::lint_report) suppress_paths: Vec<PathBuf>,
     /// Suppress findings recorded in this baseline file, so only new findings
     /// are reported/gated (works with the default, --sarif, and --github output).
     #[arg(long, value_name = "FILE", conflicts_with_all = ["list_rules", "fix"])]
     pub(in crate::presentation::cli::lint_report) baseline: Option<PathBuf>,
     /// Instead of scanning, write the current findings to this file as a
     /// baseline of known findings (for later use with --baseline); exit 0.
-    #[arg(long, value_name = "FILE", conflicts_with_all = ["list_rules", "sarif", "github", "fix", "baseline", "report_unused_suppressions"])]
+    #[arg(long, value_name = "FILE", conflicts_with_all = [
+        "list_rules", "sarif", "github", "fix", "baseline", "report_unused_suppressions",
+        "report_expired_suppressions", "report_suppressions",
+    ])]
     pub(in crate::presentation::cli::lint_report) write_baseline: Option<PathBuf>,
     /// Reuse results for files whose content has not changed, cached here.
     ///
@@ -228,6 +254,7 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     #[arg(long, conflicts_with_all = [
         "list_rules", "sarif", "github", "fix", "fix_plan", "stats",
         "report_unused_suppressions", "write_baseline",
+        "report_expired_suppressions", "report_suppressions",
     ])]
     pub(in crate::presentation::cli::lint_report) remove_unused_suppressions: bool,
     /// Exit with failure when any lint finding is reported.
