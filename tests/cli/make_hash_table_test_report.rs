@@ -14,14 +14,19 @@ fn cli_flags_eql_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains(
+            "\"make_hash_table_form_count\": 1",
+        ))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"removal_span\""));
 }
 
 #[test]
 fn cli_does_not_flag_custom_test() {
     let dir = fresh_temp_dir("make-hash-table-test-report-clean");
     let file = dir.join("a.lisp");
-    fs::write(&file, "(make-hash-table :test 'equal)\n").expect("write a.lisp");
+    fs::write(&file, "(make-hash-table :test 'equal)\n(make-hash-table)\n").expect("write a.lisp");
 
     let mut cmd = paredit();
     cmd.arg("inspect")
@@ -31,7 +36,52 @@ fn cli_does_not_flag_custom_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no redundant :test in two
+        // `make-hash-table` calls" from "no `make-hash-table` call at all".
+        .stdout(predicate::str::contains(
+            "\"make_hash_table_form_count\": 2",
+        ))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("make-hash-table-test-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn build [] (make-hash-table :test 'eql))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "make-hash-table-test", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_make_hash_table_test_emits_sarif() {
+    let dir = fresh_temp_dir("make-hash-table-test-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(make-hash-table :test 'eql)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "make-hash-table-test", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/make-hash-table-test/make-hash-table-test\"",
+        ))
+        .stdout(predicate::str::contains(
+            "the make-hash-table :test defaults to eql; drop the explicit :test 'eql",
+        ));
 }
 
 #[test]
