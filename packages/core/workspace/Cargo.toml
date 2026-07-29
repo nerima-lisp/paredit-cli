@@ -13,6 +13,7 @@ repository.workspace = true
 paredit-core-syntax = { path = "../syntax" }
 thiserror.workspace = true
 blake3.workspace = true
+serde_json.workspace = true
 cap-std.workspace = true
 libc.workspace = true
 

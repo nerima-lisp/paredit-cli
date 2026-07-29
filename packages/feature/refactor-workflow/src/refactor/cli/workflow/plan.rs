@@ -14,7 +14,6 @@ use anyhow::Result;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_syntax::sexpr::SymbolName;
-use paredit_core_workspace::workspace::WorkspaceDiscoveryOptions;
 use paredit_feature_project_analysis::impact_report::cli as impact_report;
 use paredit_feature_project_analysis::impact_report::usecase::{
     raw_refactor_risks, summarize_impact_reports,
@@ -39,14 +38,8 @@ pub fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
 }
 
 pub fn workspace_refactor_plan(args: WorkspaceRefactorPlanArgs) -> Result<()> {
-    let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
-        roots: args.roots.clone(),
-        include_unknown: args.include_unknown,
-        include_hidden: args.include_hidden,
-        include_generated: args.include_generated,
-        max_depth: args.max_depth,
-        exclude: Vec::new(),
-    })?;
+    let resolved = args.input.resolve(&args.roots)?;
+    let workspace = discover_workspace_refactor_scope(&args.input, args.roots.clone(), &resolved)?;
 
     emit_refactor_plan(RefactorPlanEmission {
         paths: &workspace.paths,

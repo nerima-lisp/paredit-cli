@@ -125,6 +125,7 @@ nav:
       - Installation: installation.md
       - Command Model: commands.md
       - Selecting Forms: selectors.md
+      - Choosing Files: workspace-inputs.md
   - Guide:
       - Refactor Workflow: workflows.md
       - Safety Reference: safety.md

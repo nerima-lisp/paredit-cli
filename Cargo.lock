@@ -769,6 +769,7 @@ dependencies = [
  "libc",
  "paredit-core-syntax",
  "proptest",
+ "serde_json",
  "thiserror",
 ]
 

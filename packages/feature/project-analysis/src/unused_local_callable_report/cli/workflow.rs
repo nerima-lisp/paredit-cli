@@ -60,6 +60,7 @@ fn expand_unused_local_callable_report_inputs(
                 include_generated: false,
                 max_depth: None,
                 exclude: Vec::new(),
+                ..WorkspaceDiscoveryOptions::default()
             })?;
 
             for discovered in discovery.into_files() {

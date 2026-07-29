@@ -30,6 +30,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Workspace(args) => {
                 workspace_report::workflow::workspace_report(args)?;
             }
+            command::InspectCommand::Sources(args) => {
+                source_report::workflow::source_report(args)?;
+            }
             command::InspectCommand::Dependencies(args) => {
                 dependency_report::workflow::dependency_report(args)?;
             }

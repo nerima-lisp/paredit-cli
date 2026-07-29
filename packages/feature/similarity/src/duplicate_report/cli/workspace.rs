@@ -12,6 +12,7 @@ pub fn discover_duplicate_report_files(
         include_generated: false,
         max_depth: None,
         exclude: Vec::new(),
+        ..WorkspaceDiscoveryOptions::default()
     })?;
 
     Ok(discovery.into_files())

@@ -21,6 +21,13 @@ the entire surface in one call, run:
 paredit inspect capabilities --output json
 ```
 
+Commands that take roots rather than explicit files share one set of input
+selectors and filters — `--since`, `--from-git`, `--from-manifest`,
+`--paths-from`, `--from-archive`, `--include`, `--exclude-glob`,
+`--no-gitignore` and the rest. See [Choosing Files](workspace-inputs.md), and
+run `paredit inspect sources` to see exactly which files a given combination
+selects.
+
 ## Inspect
 
 `paredit inspect` never writes source files. Prefer these commands for
@@ -43,6 +50,7 @@ discovery, impact analysis, and preflight checks.
 | `call-graph` | Report internal and optional external call graph edges. |
 | `impact` | Report refactoring impact risks for one symbol across explicit files. |
 | `workspace` | Discover Lisp sources under roots and report parse/refactor inventory. |
+| `sources` | Report which files an analysis would select, and which rule dropped the rest. |
 | `dependencies` | Report package, system, load, and qualified-symbol dependencies. |
 | `packages` | Report Common Lisp package declarations across explicit files. |
 | `definitions` | Report definition-like top-level forms across explicit files. |
