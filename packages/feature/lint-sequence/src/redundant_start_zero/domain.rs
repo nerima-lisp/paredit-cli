@@ -19,13 +19,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Single-sequence operators whose `:start` keyword defaults to `0` per CLHS.
 const START_HEADS: [&str; 35] = [
@@ -79,52 +81,67 @@ fn is_zero_literal(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct RedundantStartZeroItem {
-    pub path: PathBuf,
     /// The span of the whole call form.
     pub span: ByteSpan,
+    /// The 1-based line the call starts on.
+    pub line: usize,
     /// The span to delete: the ` :start 0` argument pair.
     pub removal_span: ByteSpan,
-    /// The operator name, for the finding message.
+    /// The operator name, as spelled at the call site.
     pub head: String,
 }
 
-#[derive(Debug)]
-pub struct RedundantStartZeroSummary {
-    pub call_form_count: usize,
-    pub violations: Vec<RedundantStartZeroItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantStartZeroPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantStartZeroPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantStartZeroItem {
+    /// The rule's own name. The operator varies per finding, but it is a
+    /// source-cased `String` off the call site rather than a canonical tag, so
+    /// it stays data in `head` and the kind names the rule.
+    fn kind(&self) -> &'static str {
+        "redundant-start-zero"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantStartZeroPolicy {
-    pub fail_on_violation: bool,
-    pub call_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.head.clone()]
+    }
+
+    /// `removal_span` is a fix input, but this report has always published it,
+    /// so it stays: a consumer scripting the deletion around this command
+    /// depends on it.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            (
+                "removal_span",
+                json!({
+                    "start": self.removal_span.start().get(),
+                    "end": self.removal_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `redundant-start-zero` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} :start defaults to 0; drop the explicit :start 0",
+            self.head
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     call_form_count: &mut usize,
     violations: &mut Vec<RedundantStartZeroItem>,
 ) {
@@ -151,8 +168,8 @@ pub fn examine(
             view.children[index + 1].span.end(),
         );
         violations.push(RedundantStartZeroItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             removal_span,
             head: head.to_owned(),
         });
@@ -160,67 +177,76 @@ pub fn examine(
     }
 }
 
-/// Collects every bounded-sequence call with a redundant `:start 0` across a
-/// whole file, along with the total number of such calls scanned.
-pub fn collect_redundant_start_zeros(
+/// Collects every bounded-sequence call with a redundant `:start 0` in one
+/// file, with the number of such calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant `:start 0` here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_start_zero_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantStartZeroItem>)> {
+) -> LintResult<FileFindings<RedundantStartZeroItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("call_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut call_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut call_form_count, &mut violations);
+            examine(subview, source, &mut call_form_count, &mut violations);
         });
     }
-    Ok((call_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("call_form_count", json!(call_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_redundant_start_zeros(
-    call_form_count: usize,
-    violations: Vec<RedundantStartZeroItem>,
-) -> RedundantStartZeroSummary {
-    RedundantStartZeroSummary {
-        call_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_start_zero_policy(
-    options: RedundantStartZeroPolicyOptions,
-    summary: &RedundantStartZeroSummary,
-) -> RedundantStartZeroPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantStartZeroPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        call_form_count: summary.call_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<RedundantStartZeroItem>) {
+    fn report(input: &str) -> FileFindings<RedundantStartZeroItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_start_zeros(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant start zeros")
+        build_redundant_start_zero_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant start zero report")
+    }
+
+    /// The `(call_form_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<RedundantStartZeroItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "call_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("call_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -270,33 +296,53 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(find x seq :start 0)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_redundant_start_zeros(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant start zeros");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_redundant_start_zero_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build redundant start zero report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("call_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(find x seq :start 0)");
-        let summary = summarize_redundant_start_zeros(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(find x seq)").dialect_modelled);
+    }
 
-        let quiet = evaluate_redundant_start_zero_policy(
-            RedundantStartZeroPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_head_and_its_removal_span() {
+        let source = "(defun f (x seq)\n  (find x seq :start 0))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "redundant-start-zero");
+        assert_eq!(finding.text_columns(), vec!["find".to_owned()]);
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("head", json!("find")),
+                (
+                    "removal_span",
+                    json!({
+                        "start": finding.removal_span.start().get(),
+                        "end": finding.removal_span.end().get(),
+                    })
+                ),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(slice(source, finding.removal_span), " :start 0");
+    }
 
-        let strict = evaluate_redundant_start_zero_policy(
-            RedundantStartZeroPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(find x seq :start 0)\n(position y xs)\n(count z zs :start 2)\n");
+        assert_eq!(report.summary, vec![("call_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
