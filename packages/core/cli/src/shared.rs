@@ -400,8 +400,18 @@ pub fn resolve_target<'a>(
 /// and for the `.scm`-named Racket files that turn up in mixed projects,
 /// where reading Racket as R7RS Scheme applies the wrong reader to `#:keyword`
 /// literals and the wrong rules to `struct`.
+///
+/// After all of that, `[dialect]` in the configuration gets its say — as a
+/// fallback for what detection could not place, or, with `dialect.force`, as
+/// an override. It is consulted last precisely so that an explicit flag and a
+/// recognised extension both still win over a file nobody re-read today.
 pub fn detect_dialect(input: &SourceInput, explicit: Option<DialectArg>) -> Dialect {
-    Dialect::detect_in_source(input.file.as_deref(), explicit.map(Into::into), &input.text)
+    let detected =
+        Dialect::detect_in_source(input.file.as_deref(), explicit.map(Into::into), &input.text);
+    if explicit.is_some() {
+        return detected;
+    }
+    crate::runtime::current().resolve_dialect(detected)
 }
 
 pub fn require_output_file(file: Option<&PathBuf>) -> CliResult<&PathBuf> {
@@ -414,12 +424,18 @@ pub fn require_output_file(file: Option<&PathBuf>) -> CliResult<&PathBuf> {
 /// path) are dropped. When `dialect` is set, unknown-extension files under a
 /// directory are included, since the caller will parse them with that
 /// dialect regardless of extension.
+///
+/// The `[paths]` configuration applies here, and only to the directory branch:
+/// a file named outright on the command line is always processed. Excluding a
+/// path someone typed would be the tool second-guessing an explicit request,
+/// which is a different thing from bounding a directory walk.
 pub fn expand_input_files(
     inputs: &[PathBuf],
     dialect: Option<DialectArg>,
 ) -> CliResult<Vec<PathBuf>> {
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
+    let runtime = crate::runtime::current();
 
     let limits = workspace_limits();
     for input in inputs {
@@ -428,19 +444,23 @@ pub fn expand_input_files(
                 &WorkspaceDiscoveryOptions {
                     roots: vec![input.clone()],
                     include_unknown: dialect.is_some(),
-                    include_hidden: false,
-                    include_generated: false,
-                    max_depth: None,
-                    exclude: Vec::new(),
+                    include_hidden: runtime.include_hidden,
+                    include_generated: runtime.include_generated,
+                    max_depth: runtime.max_depth,
+                    exclude: runtime.exclude_paths.clone(),
                     // These commands take explicit paths and have no input flags of
-                    // their own, so the environment is the only place a caller can
-                    // say "look at the generated files too".
-                    ignore: IgnoreOptions::from_environment(),
+                    // their own, so `[paths]` in `paredit.toml` and the environment
+                    // are the only places a caller can say "look at the generated
+                    // files too". The environment narrows what the file allowed,
+                    // which is the precedence every other setting follows.
+                    ignore: runtime.ignore_options(IgnoreOptions::from_environment()),
                     ..WorkspaceDiscoveryOptions::default()
                 },
                 limits,
             )?;
-            for discovered in discovery.into_files() {
+            let files = discovery.into_files();
+            crate::progress::discovered(files.len(), input);
+            for discovered in files {
                 push_unique_path(&mut expanded, &mut seen, discovered);
             }
         } else {

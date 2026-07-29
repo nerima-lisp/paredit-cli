@@ -84,6 +84,41 @@ fn definitions(version: u8) -> Value {
                 "about": { "type": ["string", "null"] },
                 "args": { "type": "array", "items": { "$ref": "#/$defs/argument" } },
                 "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } },
+                "gates": {
+                    "type": "array",
+                    "description":
+                        "The policy gates this command offers. Absent, not empty, on a \
+                         command that has none, so \"cannot fail on a policy\" and \"we \
+                         did not look\" stay distinguishable.",
+                    "items": { "$ref": "#/$defs/gate" },
+                },
+            },
+        },
+        "gate": {
+            "type": "object",
+            "description":
+                "One flag that makes the command exit non-zero after its report is \
+                 printed. The spelling determines the kind.",
+            "required": ["flag", "kind", "exit_code"],
+            "additionalProperties": false,
+            "properties": {
+                "flag": {
+                    "type": "string",
+                    "description": "The long flag, with its leading dashes.",
+                },
+                "kind": {
+                    "enum": ["severity", "presence", "minimum"],
+                    "description":
+                        "`severity` fails on a finding at or above a level \
+                         (`--fail-on <severity>`); `presence` fails when any of the \
+                         named thing was found (`--fail-on-<thing>`); `minimum` fails \
+                         when fewer than N were (`--require-<thing> <N>`).",
+                },
+                "help": { "type": ["string", "null"] },
+                "exit_code": {
+                    "type": "integer",
+                    "description": "The process exit status this gate produces.",
+                },
             },
         },
         "argument": {

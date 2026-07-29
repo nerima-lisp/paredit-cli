@@ -10,6 +10,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 analysis_report::workflow::agent_report(args)?;
             }
             command::InspectCommand::Capabilities(args) => capabilities::capabilities(args)?,
+            command::InspectCommand::Change(args) => change_summary::change_summary(args)?,
             command::InspectCommand::Outline(args) => analysis_report::workflow::outline(args)?,
             command::InspectCommand::Form(args) => form_report::workflow::form_report(args)?,
             command::InspectCommand::Resolve(args) => {
@@ -880,6 +881,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::RemoveUnusedBinding(args) => {
                 remove_unused_binding::remove_unused_binding(args)?;
             }
+        },
+        Command::Config { command } => match command {
+            command::ConfigCommand::Check(args) => config::workflow::check(args)?,
+            command::ConfigCommand::Show(args) => config::workflow::show(args)?,
+            command::ConfigCommand::Schema(args) => config::workflow::schema_report(args)?,
+            command::ConfigCommand::Init(args) => config::workflow::init(args)?,
         },
         // Handled in `run`, before dispatch, because they own their exit
         // status: a closed pipe is how a protocol session normally ends.
