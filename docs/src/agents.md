@@ -132,6 +132,274 @@ accepts `--fail-on-no-change`, which turns a zero-match rename from a silent
 no-op into an exit-1 failure — pass it whenever you expect the rename to do
 something.
 
+## Run-wide controls
+
+Three flags apply to every command, so a harness can append them to a command
+line it did not construct.
+
+**`--dry-run`** (or `PAREDIT_DRY_RUN=1`) writes nothing, and that is enforced
+in two places.
+
+At the argument layer it removes `--write` before the command sees it, and says
+on stderr that it did. `--write` is how ~80 mutating commands spell writing, so
+those turn into a preview: the result still goes to stdout.
+
+At the write layer, every write in this tool funnels through one function, and
+that function refuses outright while `--dry-run` is in force. That covers the
+commands that spell writing some other way — `inspect lint --fix` is the live
+example — and it covers commands added later without anyone remembering to. You
+get `refusal.dry-run` and a pointer to that command's own preview flag, rather
+than a silent write:
+
+```
+$ paredit inspect lint --fix --dry-run src/
+Error [refusal.dry-run]: refusing to write: --dry-run is in force. ...
+  try: or use this command's own preview: --diff on an edit, --fix --diff on lint
+```
+
+Refusing rather than skipping is deliberate: a command reporting success
+without doing what it said is worse than an error naming the flag.
+
+**`--progress`** emits JSON Lines on stderr, one object per line:
+
+```
+{"event":"discovered","files":214,"root":"src"}
+{"event":"file","sequence":1,"path":"src/core.lisp"}
+{"event":"file","sequence":2,"path":"src/reader.lisp"}
+```
+
+stderr because stdout is the report contract; JSON Lines because a line is
+complete the moment it is written, so a reader can act on it before the run
+ends. `sequence` counts up, so a consumer can tell it missed a line. Progress
+never changes stdout.
+
+**`--no-config` / `--config` / `--no-config-env`** are the configuration
+controls — see [Configuration](configuration.md).
+
+## Discovering the gates
+
+Every command that can fail on a policy publishes its gates in
+`inspect capabilities`:
+
+```json
+{
+  "name": "lint",
+  "gates": [
+    { "flag": "--fail-on", "kind": "severity", "exit_code": 3, "help": "..." },
+    { "flag": "--fail-on-finding", "kind": "presence", "exit_code": 3, "help": "..." }
+  ]
+}
+```
+
+There are three kinds, and the spelling tells you which:
+
+| Spelling | `kind` | Fails when |
+| --- | --- | --- |
+| `--fail-on <severity>` | `severity` | a finding at or above the level |
+| `--fail-on-<thing>` | `presence` | any `<thing>` was found |
+| `--require-<thing> <N>` | `minimum` | fewer than `N` were found |
+
+The field is **absent**, not empty, on a command with no gate, so "cannot fail
+on a policy" and "we did not look" stay distinguishable. A contract test
+enforces the convention, so a gate that does not follow it cannot ship.
+
+## Determinism
+
+Same input, same bytes. Identical invocations over identical sources produce
+byte-identical stdout, across processes and across runs — which is what makes
+it safe to cache a report, diff two of them, or hash one into a manifest.
+
+This is checked rather than intended: a contract test runs a sample of reports
+and edits twice in separate processes and compares bytes. Rust randomises its
+hash seed per process, so a finding rendered in `HashMap` iteration order fails
+that test immediately rather than intermittently in your pipeline.
+
+## Fitting a report in a context window
+
+`inspect agent-report` takes three flags that matter when the report has to
+share a budget with everything else you are holding.
+
+**`--verbosity quiet | normal | detailed`.** `quiet` drops the outline and atom
+lists and keeps every count, so you still learn the file's shape — how many
+top-level forms, how many definitions, how many atoms — and can decide whether
+the detail is worth asking for. `detailed` adds the document digest and the
+distinct-atom count. `normal` is the default and is unchanged.
+
+**`--max-tokens <N>`.** An approximate ceiling. Lists are trimmed from the end,
+so what remains is a prefix in source order, and the report says exactly what
+went:
+
+```json
+"truncation": {
+  "truncated": true,
+  "budget_tokens": 1500,
+  "approximate_tokens": 1498,
+  "arrays": [{ "key": "atoms", "kept": 25, "total": 812, "dropped": 787 }]
+}
+```
+
+The counts in `metrics` are never trimmed: they are how you learn what you are
+missing. Atoms are given up before the outline, because an outline entry
+carries far more per token and a specific atom can be fetched directly with
+`inspect find-symbol`. A budget that is met leaves the report byte-identical to
+one produced without the flag. A budget the envelope cannot meet is reported
+honestly rather than faked.
+
+**`--since <FILE>`.** Compare against a previous `--output json` report from the
+same command and add a `delta`:
+
+```json
+"delta": {
+  "comparable": true,
+  "unchanged": false,
+  "outline": {
+    "added":   [{ "head": "defun", "name": "new", "path": "0" }],
+    "removed": [],
+    "moved":   [{ "name": "defun f", "from": "0", "to": "1" }]
+  },
+  "atom_occurrences": { "previous": 9, "current": 13 }
+}
+```
+
+Definitions are matched on `head` plus `name`, not on path. That is what makes
+`moved` meaningful: inserting one definition at the top of a file is one
+addition and *n* moves, not *n+1* additions — and `from`/`to` is exactly what
+you need to update stored `--path` selectors. `comparable` is `false` when the
+baseline was written at `--verbosity quiet` and has no outline to compare
+against.
+
+## What to run next
+
+Reports carry a `next_commands` array when their own contents justify one:
+
+```json
+"next_commands": [
+  {
+    "command": "paredit inspect lint --output json src/core.lisp",
+    "why": "2 definition-like forms are present; lint reports logic bugs in them"
+  }
+]
+```
+
+Each `command` runs exactly as written, paths quoted where they need it. The
+field is absent — not empty — when the report has nothing to suggest, so
+"nothing to suggest" and "we did not look" stay distinguishable. Suggestions
+are derived from what the report found, never emitted unconditionally.
+
+## Explaining a change
+
+`inspect change --before <FILE> --after <FILE>` compares two versions
+structurally and answers in a reviewer's terms rather than a diff's:
+
+```
+$ paredit inspect change --before old.lisp --after new.lisp --output text
+1 added, 1 renamed and 1 modified definitions.
+
+- Added `defun read-config` (line 2).
+- Changed the body of `defun parse-header` (line 3, was line 2).
+- Renamed `old-body` to `new-body` (line 4); the body is unchanged.
+```
+
+The JSON carries both that draft and the facts it was rendered from, so you
+can paste one or compute with the other.
+
+Three properties make it worth reading:
+
+- **A rename is a rename.** A removal and an addition whose bodies match once
+  the name is set aside is reported as one rename, not two changes. It is only
+  inferred from an exact match: a rename that also changed the body is reported
+  as the addition and removal it literally is, because a confidently wrong
+  summary in a pull request costs more than a vague one.
+- **Formatting is called formatting.** The comparison runs over the normalised
+  shape, so reindenting a definition is not a change to it. `formatting_only`
+  is the single most useful thing this command can tell a reviewer.
+- **Definitions are matched by identity, not position.** Inserting one
+  definition at the top of a file is one addition and *n* moves, each with its
+  old and new path.
+
+`--fail-on-change` gates on substance: a reformat does not trip it.
+
+## Message language
+
+`output.language = "ja"` (or `PAREDIT_OUTPUT_LANGUAGE=ja`) translates
+diagnostics — the error prefix, the repair suggestions, the failure-category
+descriptions, and the run-control notes.
+
+Everything a *program* matches on stays English in every language: error
+`code`s, `category` labels, repair `action`s, finding `kind`s, rule names, and
+every JSON key. Report payloads stay English too, and are byte-identical
+whatever the language is set to. Translating an identifier would break every
+consumer to help nobody.
+
+## Error identity and repairs
+
+An exit code says *that* a command failed. Every failure also carries a stable
+code saying *what kind*, and whatever steps would plausibly get past it.
+
+The rendering follows the format the command's own report would have used, so a
+command that answers in JSON also fails in JSON — on stderr:
+
+```json
+{
+  "schema_version": 1,
+  "status": "error",
+  "command": "inspect form",
+  "error": {
+    "code": "selection.path-not-reachable",
+    "category": "selection",
+    "retryable": false,
+    "exit_code": 1,
+    "message": "path segment 9 is out of range: the form at path 0 has 4 child expressions (valid indexes 0..=3)",
+    "repairs": [
+      {
+        "action": "inspect-first",
+        "detail": "list the paths this document actually has, then select one of them",
+        "command": "paredit inspect outline --output json --file src/a.lisp"
+      },
+      {
+        "action": "change-selection",
+        "detail": "select by byte offset instead of by path, with --at <offset>",
+        "command": null
+      }
+    ]
+  }
+}
+```
+
+For a command whose report is text, the same failure reads:
+
+```
+Error [selection.path-not-reachable]: path segment 9 is out of range: ...
+  try: list the paths this document actually has, then select one of them — paredit inspect outline --output json --file src/a.lisp
+  try: select by byte offset instead of by path, with --at <offset>
+```
+
+**Branch on `category`, not on the message.** There are seven, and they answer
+different questions:
+
+| Category | Meaning | Retryable |
+| --- | --- | --- |
+| `argument` | The command line does not describe a runnable request | no |
+| `selection` | `--path` or `--at` did not resolve; a different one might | no |
+| `input` | The source is not what the operation needs | no |
+| `refusal` | Declined for safety; the state has to change first | no |
+| `environment` | The filesystem or environment failed | **yes** |
+| `gate` | A requested gate tripped. The report was printed first | no |
+| `internal` | Unclassified — a defect in this tool, not in your call | no |
+
+`retryable` is stated outright so an agent does not have to infer it. Only
+`environment` is: re-running an identical command after a selection failure
+will fail identically.
+
+A `repairs[].command` is a command line that runs exactly as written; it is
+`null` when the failure did not carry enough context to build one, and the
+`detail` is then the whole answer. `action` is the machine-readable kind:
+`inspect-first`, `change-selection`, `pass-flag`, `re-read`, `fix-source`,
+`check-configuration`.
+
+Codes are namespaced `<category>.<name>`. Adding one is a compatible change;
+renaming one is not.
+
 ## Output contract
 
 - `--output json` is the stable, parseable contract; prefer it everywhere it

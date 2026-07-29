@@ -1,6 +1,6 @@
 use super::{
-    accessor_arity_report, api_diff_report, api_surface_report, append_list_to_cons_report,
-    append_nil_report,
+    accessor_arity_report, analysis_report, api_diff_report, api_surface_report,
+    append_list_to_cons_report, append_nil_report,
     args::{
         AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
         NewlineArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs,
@@ -8,40 +8,41 @@ use super::{
     },
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
-    case_nil_key_report, char_case_fold_report, char_op_string_report, circular_literal_report,
-    class_cycle_report, class_hierarchy_report, code_char_char_code_report, coerce_to_t_report,
-    cohesion_report, complexity_report, cond_t_clause_report, cons_to_list_report,
-    constant_if_test_report, constant_report, constant_when_test_report, context_report,
-    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
-    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
-    convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
-    dead_boolean_operand_report, debt_score_report, definition_movement, definition_removal,
-    definition_report, defpackage_quoted_report, dependency_report, destructive_literal_report,
-    docstring_report, double_reverse_report, duplicate_boolean_operand_report,
-    duplicate_case_key_report, duplicate_cond_test_report, duplicate_export_report,
-    duplicate_keyword_report, duplicate_lambda_list_keyword_report, duplicate_let_binding_report,
-    duplicate_method_report, duplicate_parameter_report, duplicate_report,
-    duplicate_setf_place_report, duplicate_slot_report, duplication_ratio_report, effect_report,
-    eliminate_empty_binding_form, emacs_lisp_file_report, empty_body_report, empty_let_report,
-    eq_char_comparison_report, eq_number_comparison_report, eql_list_comparison_report,
-    eql_search_literal_report, eql_string_comparison_report, equality_arity_report,
-    eval_when_situation_report, exhaustive_case_otherwise_report, explicit_nil_return_report,
-    explicit_step_delta_report, external_system_report, extract_constant, extract_function,
-    extract_local_function, flatten_progn, form_report, format_directive_report,
-    format_missing_destination_report, format_newline_report, format_to_string_report,
-    funcall_lambda_report, function_parameter, generic_dispatch_report, getf_default_nil_report,
-    gethash_default_report, handler_case_no_clauses_report, hotspot_report,
-    identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_not_report,
-    if_to_or_report, if_to_unless_report, impact_report, indentation_report, inline_function,
-    inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
-    introduce_let, keyword_arity_report, lambda_list_keyword_order_report,
-    last_default_count_report, let_report, license_report, line_metrics_report, lint_report,
-    list_star_nil_report, list_star_to_cons_report, literal_place_report, loop_report,
-    macro_expansion_report, macro_hygiene_report, make_array_default_keyword_report,
-    make_hash_table_test_report, make_list_default_element_report, malformed_case_clause_report,
-    malformed_cond_clause_report, malformed_iteration_spec_report, malformed_let_binding_report,
-    manual_incf_report, manual_push_report, manual_pushnew_report, merge_nested_flet,
-    merge_nested_let, merge_nested_let_star, method_combination_report, modify_macro_arity_report,
+    case_nil_key_report, change_summary, char_case_fold_report, char_op_string_report,
+    circular_literal_report, class_cycle_report, class_hierarchy_report,
+    code_char_char_code_report, coerce_to_t_report, cohesion_report, complexity_report,
+    cond_t_clause_report, config, cons_to_list_report, constant_if_test_report, constant_report,
+    constant_when_test_report, context_report, convert_cond_to_if, convert_flet_to_labels,
+    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
+    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
+    convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
+    debt_score_report, definition_movement, definition_removal, definition_report,
+    defpackage_quoted_report, dependency_report, destructive_literal_report, docstring_report,
+    double_reverse_report, duplicate_boolean_operand_report, duplicate_case_key_report,
+    duplicate_cond_test_report, duplicate_export_report, duplicate_keyword_report,
+    duplicate_lambda_list_keyword_report, duplicate_let_binding_report, duplicate_method_report,
+    duplicate_parameter_report, duplicate_report, duplicate_setf_place_report,
+    duplicate_slot_report, duplication_ratio_report, effect_report, eliminate_empty_binding_form,
+    emacs_lisp_file_report, empty_body_report, empty_let_report, eq_char_comparison_report,
+    eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
+    eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
+    exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
+    external_system_report, extract_constant, extract_function, extract_local_function,
+    flatten_progn, form_report, format_directive_report, format_missing_destination_report,
+    format_newline_report, format_to_string_report, funcall_lambda_report, function_parameter,
+    generic_dispatch_report, getf_default_nil_report, gethash_default_report,
+    handler_case_no_clauses_report, hotspot_report, identical_if_branch_report,
+    identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report,
+    if_to_unless_report, impact_report, indentation_report, inline_function, inline_lambda,
+    inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let,
+    keyword_arity_report, lambda_list_keyword_order_report, last_default_count_report, let_report,
+    license_report, line_metrics_report, lint_report, list_star_nil_report,
+    list_star_to_cons_report, literal_place_report, loop_report, macro_expansion_report,
+    macro_hygiene_report, make_array_default_keyword_report, make_hash_table_test_report,
+    make_list_default_element_report, malformed_case_clause_report, malformed_cond_clause_report,
+    malformed_iteration_spec_report, malformed_let_binding_report, manual_incf_report,
+    manual_push_report, manual_pushnew_report, merge_nested_flet, merge_nested_let,
+    merge_nested_let_star, method_combination_report, modify_macro_arity_report,
     multiple_value_list_of_values_report, naming_report, narrowing_report,
     negated_comparison_report, negated_if_report, negated_step_delta_report,
     negated_when_unless_report, nested_boolean_report, nested_char_case_report, nested_cxr_report,
@@ -90,9 +91,11 @@ pub(super) enum InspectCommand {
     /// Print parse, dialect, and structural metrics for agent planning.
     Stats(AnalyzeArgs),
     /// Print a complete JSON report for AI coding agent refactor planning.
-    AgentReport(AnalyzeArgs),
+    AgentReport(analysis_report::args::AgentReportArgs),
     /// Print a machine-readable catalog of every command, flag, default, and enum value.
     Capabilities(capabilities::CapabilitiesArgs),
+    /// Describe what changed between two versions of a file, as prose a pull request can use.
+    Change(change_summary::ChangeSummaryArgs),
     /// Print top-level forms with paths, spans, and definition hints.
     Outline(AnalyzeArgs),
     /// Report one selected form with local structure for agent refactor planning.
@@ -790,6 +793,22 @@ pub(super) enum RefactorCommand {
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }
 
+/// Configuration introspection. Reads `paredit.toml`; never reads source.
+#[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit config check\n  paredit config show --changed-only --output text\n  paredit config show --key lint.preset\n  paredit config schema --output text\n  paredit config init --dry-run\n\nLayers, lowest precedence first: built-in defaults, the user's file, the\nrepository's file, each nested directory's file, then PAREDIT_* variables."
+)]
+pub(super) enum ConfigCommand {
+    /// Validate every discovered configuration file and exit 3 if any key is unusable.
+    Check(config::args::ConfigCheckArgs),
+    /// Print the effective configuration with the file and line that set each key.
+    Show(config::args::ConfigShowArgs),
+    /// Print every recognised key with its type, default, and environment variable.
+    Schema(config::args::ConfigSchemaArgs),
+    /// Write a documented starter paredit.toml generated from the schema.
+    Init(config::args::ConfigInitArgs),
+}
+
 #[derive(Debug, Subcommand)]
 pub(super) enum Command {
     /// Read-only inventory, validation, and analysis.
@@ -806,6 +825,11 @@ pub(super) enum Command {
     Refactor {
         #[command(subcommand)]
         command: RefactorCommand,
+    },
+    /// Inspect, validate, and scaffold the layered paredit.toml configuration.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
     },
     /// Run a Language Server Protocol server over stdio.
     Lsp(crate::presentation::lsp::LspArgs),

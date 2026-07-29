@@ -8,9 +8,13 @@ automation a stable first decision: inspect, edit, or refactor.
   for a unified diff, `--write` to update the file in place.
 - `paredit refactor` plans, previews, verifies, and applies semantic changes.
 
-The only command outside these namespaces is the `paredit completions
-<shell>` meta command, which prints shell completion scripts for bash, zsh,
-fish, elvish, and powershell.
+Two namespaces sit outside that decision because they report on the tool
+rather than on source:
+
+- `paredit config` inspects, validates, and scaffolds the layered
+  `paredit.toml`. See [Configuration](configuration.md).
+- `paredit completions <shell>` prints shell completion scripts for bash,
+  zsh, fish, elvish, and powershell.
 
 Run `paredit <namespace> --help` for the authoritative list on your installed
 version, and `paredit <namespace> <command> --help` for each command's
@@ -39,6 +43,7 @@ discovery, impact analysis, and preflight checks.
 | `dialect` | Detect Lisp dialect from `--file` extension or explicit `--dialect`. |
 | `stats` | Print parse, dialect, and structural metrics for agent planning. |
 | `agent-report` | Print a complete JSON report for AI coding agent refactor planning. |
+| `change` | Describe what changed between two versions of a file, as prose a pull request can use. |
 | `capabilities` | Print a machine-readable catalog of every command, flag, default, and enum value. |
 | `outline` | Print top-level forms with paths, spans, and definition hints. |
 | `form` | Report one selected form with local structure for refactor planning. |
@@ -551,3 +556,27 @@ plan/preview/verify/apply lifecycle.
 | `convert-if-to-when` | Convert a Common Lisp or Emacs Lisp `if` without a meaningful else to `when`. |
 | `convert-if-to-unless` | Convert a Common Lisp or Emacs Lisp `if` with a literal `nil` then branch to `unless`. |
 | `remove-unused-binding` | Plan or remove one unused local let binding. |
+
+## Config
+
+`paredit config` reads `paredit.toml`, never source. It answers what this build
+is going to do and why, which is a different question from any `inspect`
+report. See [Configuration](configuration.md) for the file format, the layer
+order, and `extends`.
+
+| Command | Purpose |
+| --- | --- |
+| `check` | Validate every discovered file and exit 3 if any key is unusable. |
+| `show` | Print the effective configuration with the file and line that set each key. |
+| `schema` | Print every recognised key with its type, default, and environment variable. |
+| `init` | Write a documented starter `paredit.toml` generated from the schema. |
+
+All four accept `--config <FILE>`, `--no-config`, `--no-config-env`, and
+`--from <DIR>` to control which layers are consulted.
+
+```sh
+paredit config check
+paredit config show --changed-only --output text
+paredit config show --key lint.preset
+paredit config init --dry-run
+```
