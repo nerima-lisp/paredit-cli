@@ -196,6 +196,27 @@ pub fn effective() -> ResourceLimits {
     EFFECTIVE_LIMITS.get().copied().unwrap_or_default()
 }
 
+/// How many workers a multi-file analysis may use.
+///
+/// Separate from [`ResourceLimits`] because it is not a ratchet: a caller may
+/// legitimately ask for *more* parallelism than the default as well as less,
+/// and unlike a byte ceiling, a large value cannot exhaust anything a small
+/// one would not.
+static EFFECTIVE_JOBS: OnceLock<usize> = OnceLock::new();
+
+/// Publishes the worker count for this process. The first call wins.
+///
+/// `0` means "as many as the machine reports", which is also the default.
+pub fn install_jobs(jobs: usize) -> Result<(), usize> {
+    EFFECTIVE_JOBS.set(jobs).map_err(|_| effective_jobs())
+}
+
+/// The worker count in force, or `0` for "as many as the machine reports".
+#[must_use]
+pub fn effective_jobs() -> usize {
+    EFFECTIVE_JOBS.get().copied().unwrap_or(0)
+}
+
 /// Reads the `PAREDIT_MAX_*` environment overrides.
 ///
 /// The environment is how a container states its own budget, and it reaches

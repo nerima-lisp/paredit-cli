@@ -20,8 +20,8 @@ use crate::presentation::cli::lint_report::render::{
     print_lint_unused_suppressions,
 };
 use crate::presentation::cli::shared::{
-    apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree, stable_text_hash,
-    unified_diff, write_file_with_rollback,
+    analyze_files, apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree,
+    stable_text_hash, unified_diff, write_file_with_rollback,
 };
 
 /// The 1-based line and byte-based column of a byte offset in `text`.
@@ -397,12 +397,15 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     let mut findings = Vec::new();
     let mut ids: FindingIds = Vec::new();
 
-    for file in &files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+    // The 170-rule pass over each file is the heaviest per-file work in this
+    // tool and has no dependency between files, so it runs on every core.
+    // `analyze_files` returns results in input order, which is what keeps the
+    // report byte-identical however the workers were scheduled.
+    let per_file = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
         let file_findings = run_lint_pass(
             file,
             dialect,
-            &tree,
+            tree,
             &input.text,
             LintPassRequest {
                 active: &[],
@@ -411,8 +414,8 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
             },
         )?
         .findings;
-        let file_findings = merge_custom(file_findings, &custom, file, &tree, &input.text);
-        let file_findings = retain_unsuppressed(file_findings, &input.text, &tree);
+        let file_findings = merge_custom(file_findings, &custom, file, tree, &input.text);
+        let file_findings = retain_unsuppressed(file_findings, &input.text, tree);
         let file_findings = retain_unbaselined(file_findings, &input.text, baseline.as_ref());
         // Ids are assigned per file, against that file's source, and the
         // summary keeps the findings in the order they arrive — so the two
@@ -422,7 +425,12 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
             .into_iter()
             .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
-        ids.extend(assign_finding_ids(&kept, &input.text));
+        let file_ids = assign_finding_ids(&kept, &input.text);
+        Ok((kept, file_ids))
+    })?;
+
+    for (kept, file_ids) in per_file {
+        ids.extend(file_ids);
         findings.extend(kept);
     }
 
@@ -452,6 +460,10 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
 /// the real pass is the only way to measure the real cost. Files are scanned
 /// with every rule the selection admits, so the numbers describe the run the
 /// caller would otherwise have made.
+///
+/// Deliberately serial, unlike the report and SARIF paths. Sixteen workers
+/// contending for memory bandwidth measure the machine rather than the rules,
+/// and a per-rule cost that changes with `--jobs` is not a per-rule cost.
 fn lint_report_timings(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
@@ -601,12 +613,16 @@ fn lint_report_sarif(
     let mut fingerprint_seen: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
 
-    for file in files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+    // The analysis is parallel; the *fingerprint* assignment is not, and must
+    // not be. `fingerprint_seen` counts occurrences across the whole run, so a
+    // finding's suffix depends on how many identical-looking lines preceded it
+    // — which is only well defined in file order. Computing per file in
+    // parallel and numbering afterwards keeps both properties.
+    let per_file = analyze_files(files, args.dialect, |file, dialect, tree, input| {
         let pass = run_lint_pass(
             file,
             dialect,
-            &tree,
+            tree,
             &input.text,
             LintPassRequest {
                 active,
@@ -615,21 +631,25 @@ fn lint_report_sarif(
             },
         )?;
         let mut fixes = fix_map(pass.fixes);
-        let findings = merge_custom(pass.findings, custom, file, &tree, &input.text);
-        custom_fixes(custom, file, &tree, &input.text, &mut fixes);
-        let findings = retain_unsuppressed(findings, &input.text, &tree);
+        let findings = merge_custom(pass.findings, custom, file, tree, &input.text);
+        custom_fixes(custom, file, tree, &input.text, &mut fixes);
+        let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let findings: Vec<LintFinding> = findings
             .into_iter()
             .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
             .collect();
         let ids = assign_finding_ids(&findings, &input.text);
+        Ok((findings, ids, fixes, input.text.clone()))
+    })?;
+
+    for (findings, ids, fixes, text) in per_file {
         for (index, finding) in findings.into_iter().enumerate() {
             let start = finding.span.start().get();
             let end = finding.span.end().get();
-            let (start_line, start_column) = line_and_column(&input.text, start);
+            let (start_line, start_column) = line_and_column(&text, start);
             let fingerprint =
-                line_fingerprint(finding.rule, &input.text, start_line, &mut fingerprint_seen);
+                line_fingerprint(finding.rule, &text, start_line, &mut fingerprint_seen);
             let fix = fixes.get(&(finding.rule, start, end)).cloned();
             results.push(LintSarifResult {
                 rule: finding.rule,
@@ -1070,32 +1090,40 @@ fn lint_report_github(
     let baseline = load_baseline(args)?;
     let mut finding_rules: Vec<&'static str> = Vec::new();
 
-    for file in files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+    // Analysed in parallel, *printed* serially: an annotation stream that
+    // interleaved by thread would be unreadable and, worse, unstable between
+    // runs. The split is the general shape for adopting `analyze_files` in a
+    // command that emits as it goes — compute per file, emit in file order.
+    let annotated = analyze_files(files, args.dialect, |file, dialect, tree, input| {
         let findings = merge_custom(
-            collect_lint_findings(file, dialect, &tree)?,
+            collect_lint_findings(file, dialect, tree)?,
             custom,
             file,
-            &tree,
+            tree,
             &input.text,
         );
-        let findings = retain_unsuppressed(findings, &input.text, &tree);
+        let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
-        for finding in findings {
-            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
-                continue;
-            }
-            finding_rules.push(finding.rule);
-            let (line, column) = line_and_column(&input.text, finding.span.start().get());
-            print_lint_github_annotation(
-                &finding.path.display().to_string(),
-                line,
-                column,
-                finding.rule,
-                &finding.message,
-                meta.severity(finding.rule),
-            );
-        }
+        Ok(findings
+            .into_iter()
+            .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
+            .map(|finding| {
+                let (line, column) = line_and_column(&input.text, finding.span.start().get());
+                (finding, line, column)
+            })
+            .collect::<Vec<_>>())
+    })?;
+
+    for (finding, line, column) in annotated.into_iter().flatten() {
+        finding_rules.push(finding.rule);
+        print_lint_github_annotation(
+            &finding.path.display().to_string(),
+            line,
+            column,
+            finding.rule,
+            &finding.message,
+            meta.severity(finding.rule),
+        );
     }
 
     if let Some(message) = gate_message(&finding_rules, args, meta.overrides()) {

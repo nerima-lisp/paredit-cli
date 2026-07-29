@@ -128,6 +128,9 @@ struct BudgetArgs {
     /// Ceiling on the files one scan may yield. May lower the default, never raise it.
     #[arg(long, global = true, value_name = "COUNT")]
     max_files: Option<usize>,
+    /// Workers for multi-file analysis. 0 uses every core; 1 is fully serial.
+    #[arg(long, global = true, value_name = "COUNT", default_value_t = 0)]
+    jobs: usize,
 }
 
 #[must_use]
@@ -179,6 +182,7 @@ fn install_budget(args: &BudgetArgs) -> Result<()> {
     // the result keeps a second entry point (a test harness, a future embedded
     // caller) from aborting the run over a benign race.
     let _ = limits::install(resolved);
+    let _ = limits::install_jobs(args.jobs);
     let _ = deadline::install(Deadline::from_millis(args.timeout_ms));
     Ok(())
 }

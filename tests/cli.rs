@@ -305,6 +305,8 @@ mod package_boundary_report;
 mod package_conflict_report;
 #[path = "cli/package_cycle_report.rs"]
 mod package_cycle_report;
+#[path = "cli/parallel_analysis.rs"]
+mod parallel_analysis;
 #[path = "cli/parse_integer_default_radix_report.rs"]
 mod parse_integer_default_radix_report;
 #[path = "cli/plan_steps_contract.rs"]

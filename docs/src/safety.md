@@ -152,6 +152,23 @@ Unset, they behave exactly as before they existed. A timeout names the file
 that was in flight and how many were already done, so a bounded run reports
 progress rather than only failure.
 
+## Parallelism does not change the answer
+
+`--jobs` controls how many workers a multi-file analysis uses: `0` (the
+default) uses every core, `1` is fully serial. On 1065 real Common Lisp files
+`inspect lint` runs about 5× faster on 16 cores than on one, and the report is
+**byte-identical** at every worker count — as are `--sarif` and `--github`.
+
+That is a property of the design rather than a happy accident. Per-file results
+are written into pre-indexed slots and read back in input order, so the output
+cannot depend on which worker finished first; and the first failure by *input*
+order is the one reported, so a tree with two broken files names the same one
+on every run. A test asserts both at four different worker counts.
+
+Two paths stay serial on purpose. `--fix` writes files, and `--timings`
+measures per-rule cost, which sixteen workers contending for memory bandwidth
+would turn into a measurement of the machine.
+
 ## Workspace scope
 
 For workspace operations, start with `paredit inspect workspace` to identify the affected files. Use the workspace planning and preview commands before `paredit refactor workspace-execute`.
