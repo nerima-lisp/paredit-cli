@@ -386,7 +386,7 @@ pub fn emit_document(
     diff: bool,
     rewritten: String,
 ) -> CliResult<()> {
-    let rewritten = restore_line_ending(&input.text, rewritten);
+    let rewritten = restore_line_ending(&input.text, rewritten, dialect);
     if write {
         let path = require_output_file(input.file.as_ref())?.clone();
         SyntaxTree::parse_with_dialect(&rewritten, dialect)
@@ -415,11 +415,75 @@ pub fn emit_document(
 /// untouched region (a targeted edit's output) as well as one that has none
 /// at all (a whole-document reformat) — either way the result ends up with
 /// exactly one line ending throughout, matching `original`.
-fn restore_line_ending(original: &str, rewritten: String) -> String {
+///
+/// Only newlines *outside* every atom are touched. A newline inside an atom is
+/// not a line ending at all, it is program data — the `\n` in a multi-line
+/// string literal, or the newline that *is* the character in Common Lisp's
+/// `#\<newline>` — and a whole-document substitution turns it into `\r\n`,
+/// silently changing what the program means. Atom text is copied verbatim from
+/// the source by every rewrite, so a CRLF file's multi-line atoms already carry
+/// `\r\n` and need nothing done to them; leaving them alone is both the safe
+/// choice and the correct one.
+///
+/// A rewrite that no longer parses is returned untouched: the write path
+/// refuses it a few lines below anyway, and guessing at line endings in text
+/// whose structure is unknown is exactly how the data above gets corrupted.
+fn restore_line_ending(original: &str, rewritten: String, dialect: Dialect) -> String {
     if !rewritten.contains('\n') || !prefers_crlf(original) {
         return rewritten;
     }
-    rewritten.replace("\r\n", "\n").replace('\n', "\r\n")
+    let Ok(tree) = SyntaxTree::parse_with_dialect(&rewritten, dialect) else {
+        return rewritten;
+    };
+    let mut atoms = Vec::new();
+    collect_atom_spans(&tree.root_view(), &mut atoms);
+    atoms.sort_by_key(ByteSpan::start);
+
+    let mut restored = String::with_capacity(rewritten.len());
+    let mut cursor = 0usize;
+    for atom in atoms {
+        let (start, end) = (atom.start().get(), atom.end().get());
+        if start < cursor {
+            continue;
+        }
+        push_crlf_line_endings(&mut restored, &rewritten[cursor..start]);
+        restored.push_str(&rewritten[start..end]);
+        cursor = end;
+    }
+    push_crlf_line_endings(&mut restored, &rewritten[cursor..]);
+    restored
+}
+
+/// Collects every atom's content span (its text past any reader prefix), in
+/// document order for a well-formed tree.
+fn collect_atom_spans(view: &ExpressionView, spans: &mut Vec<ByteSpan>) {
+    if view.kind == ExpressionKind::Atom {
+        spans.push(view.content_span);
+    }
+    for child in &view.children {
+        collect_atom_spans(child, spans);
+    }
+}
+
+/// Appends `segment` with every line ending rewritten to `\r\n`, whichever of
+/// the two it arrived as.
+fn push_crlf_line_endings(out: &mut String, segment: &str) {
+    let bytes = segment.as_bytes();
+    let mut start = 0usize;
+    for (index, &byte) in bytes.iter().enumerate() {
+        if byte != b'\n' {
+            continue;
+        }
+        let end = if index > 0 && bytes[index - 1] == b'\r' {
+            index - 1
+        } else {
+            index
+        };
+        out.push_str(&segment[start..end]);
+        out.push_str("\r\n");
+        start = index + 1;
+    }
+    out.push_str(&segment[start..]);
 }
 
 /// Whether `text` uses `\r\n` line endings more often than a bare `\n`.
@@ -671,9 +735,13 @@ fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, p
 #[cfg(test)]
 mod tests {
     use super::{
-        prefers_crlf, require_output_file, restore_line_ending, terminal_safe,
+        Dialect, prefers_crlf, require_output_file, restore_line_ending, terminal_safe,
         terminal_safe_error_chain,
     };
+
+    fn restore(original: &str, rewritten: &str) -> String {
+        restore_line_ending(original, rewritten.to_owned(), Dialect::CommonLisp)
+    }
 
     #[test]
     fn require_output_file_rejects_missing_file() {
@@ -703,25 +771,52 @@ mod tests {
 
     #[test]
     fn restore_line_ending_converts_a_bare_lf_rewrite_back_to_crlf() {
-        let original = "(a)\r\n(b)\r\n";
-        let rewritten = "(a)\n(b)\n".to_owned();
-        assert_eq!(restore_line_ending(original, rewritten), "(a)\r\n(b)\r\n");
+        assert_eq!(restore("(a)\r\n(b)\r\n", "(a)\n(b)\n"), "(a)\r\n(b)\r\n");
     }
 
     #[test]
     fn restore_line_ending_does_not_double_convert_an_already_crlf_rewrite() {
         // A targeted edit's rewrite can already carry CRLF in an untouched
         // region; restore_line_ending must not turn that into `\r\r\n`.
-        let original = "(a)\r\n(b)\r\n";
-        let rewritten = "(a)\r\n(new)\n".to_owned();
-        assert_eq!(restore_line_ending(original, rewritten), "(a)\r\n(new)\r\n");
+        assert_eq!(
+            restore("(a)\r\n(b)\r\n", "(a)\r\n(new)\n"),
+            "(a)\r\n(new)\r\n"
+        );
     }
 
     #[test]
     fn restore_line_ending_leaves_an_lf_document_untouched() {
-        let original = "(a)\n(b)\n";
-        let rewritten = "(a)\n(c)\n".to_owned();
-        assert_eq!(restore_line_ending(original, rewritten.clone()), rewritten);
+        let rewritten = "(a)\n(c)\n";
+        assert_eq!(restore("(a)\n(b)\n", rewritten), rewritten);
+    }
+
+    #[test]
+    fn restore_line_ending_leaves_a_newline_inside_a_string_literal_alone() {
+        // The `\n` between `one` and `two` is the string's own content, not a
+        // line ending: turning it into `\r\n` changes the value the program
+        // computes. Only the two real line endings may be converted.
+        let original = "(defun f ()\r\n  \"line one\nline two\")\r\n";
+        assert_eq!(
+            restore(original, "(defun f ()\n  \"line one\nline two\")\n"),
+            "(defun f ()\r\n  \"line one\nline two\")\r\n"
+        );
+    }
+
+    #[test]
+    fn restore_line_ending_leaves_a_newline_character_literal_alone() {
+        // `#\` followed by a newline byte *is* the newline character in Common
+        // Lisp; rewriting it to `\r\n` makes it the return character instead.
+        let original = "(list #\\\n 1)\r\n(b)\r\n";
+        assert_eq!(
+            restore(original, "(list #\\\n 1)\n(b)\n"),
+            "(list #\\\n 1)\r\n(b)\r\n"
+        );
+    }
+
+    #[test]
+    fn restore_line_ending_returns_an_unparseable_rewrite_untouched() {
+        let rewritten = "(a\n";
+        assert_eq!(restore("(a)\r\n(b)\r\n", rewritten), rewritten);
     }
 
     #[test]
