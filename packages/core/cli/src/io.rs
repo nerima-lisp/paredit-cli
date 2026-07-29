@@ -1015,6 +1015,73 @@ pub fn write_artifact_with_rollback(path: PathBuf, content: String) -> CliResult
     write_files_transactionally(vec![(path, content, None)])
 }
 
+/// The result of probing whether a write to a target would succeed, without
+/// writing anything durable.
+#[derive(Debug, Clone)]
+pub struct WritabilityCheck {
+    pub target_existed: bool,
+    pub writable: bool,
+    /// Why the write would be refused. `None` exactly when `writable` is
+    /// `true`.
+    pub reason: Option<String>,
+}
+
+/// Checks whether `path` could be written to right now, changing nothing.
+///
+/// Reuses the exact staging step a real write goes through — the same
+/// symlink/regular-file refusals, the same parent-directory permission
+/// check, the same write lock (see [`acquire_write_lock`]), and, because
+/// staging writes a same-size placeholder into a sibling file on the same
+/// filesystem before ever touching `path` itself, the same evidence of
+/// whether there is room for a write of about this size — then discards the
+/// staged (and, if `path` already exists, backup) sibling it created instead
+/// of publishing it.
+///
+/// `--dry-run` refuses a write outright, unconditionally, so a wrapper can
+/// append it without inspecting what it is wrapping; this instead answers
+/// "would it work", for a caller that wants to know before committing to one.
+#[must_use]
+pub fn check_writable(path: PathBuf) -> WritabilityCheck {
+    let target_existed = fs::symlink_metadata(&path).is_ok();
+    // Bounded rather than the file's exact size: a giant existing file would
+    // otherwise turn a permission probe into copying gigabytes.
+    const PLACEHOLDER_CEILING: u64 = 64 * 1024 * 1024;
+    let placeholder_len = fs::metadata(&path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0)
+        .min(PLACEHOLDER_CEILING);
+    let placeholder = "x".repeat(placeholder_len as usize);
+
+    #[cfg(unix)]
+    let staged = stage_write_target_expected(path, placeholder, None);
+    #[cfg(not(unix))]
+    let staged = stage_write_target_portable(path, placeholder, None);
+
+    match staged {
+        Ok(target) => {
+            #[cfg(unix)]
+            {
+                let mut errors = Vec::new();
+                cleanup_unapplied_write(&target, &mut errors);
+            }
+            #[cfg(not(unix))]
+            {
+                cleanup_unstaged_writes_portable(std::slice::from_ref(&target));
+            }
+            WritabilityCheck {
+                target_existed,
+                writable: true,
+                reason: None,
+            }
+        }
+        Err(error) => WritabilityCheck {
+            target_existed,
+            writable: false,
+            reason: Some(error.chain()),
+        },
+    }
+}
+
 #[cfg(unix)]
 struct StagedWriteTarget {
     path: PathBuf,
@@ -3864,6 +3931,94 @@ mod tests {
         let error =
             acquire_write_lock(&target).expect_err("a lock held by a live process must persist");
         assert!(error.chain().contains("holds its write lock"));
+
+        drop(lock);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn check_writable_reports_a_new_file_as_writable_and_leaves_nothing_behind() {
+        let directory = test_directory("check-writable-new");
+        let target = directory.join("new.lisp");
+
+        let check = check_writable(target.clone());
+
+        assert!(!check.target_existed);
+        assert!(check.writable);
+        assert!(check.reason.is_none());
+        assert!(!target.exists(), "the probe must not create the target");
+        // The unix cleanup path may leave its `.paredit.cleanup` quarantine
+        // directory behind (it deliberately outlives one batch — see
+        // `source_entry_names` below) — everything *else* must be gone.
+        let entries: Vec<_> = fs::read_dir(&directory)
+            .expect("read test directory")
+            .map(|entry| entry.expect("read directory entry").file_name())
+            .filter(|name| name != ".paredit.cleanup")
+            .collect();
+        assert_eq!(entries, Vec::<OsString>::new());
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn check_writable_reports_an_existing_file_as_writable_and_preserves_its_content() {
+        let directory = test_directory("check-writable-existing");
+        let target = directory.join("existing.lisp");
+        fs::write(&target, "(untouched)").expect("write existing target");
+
+        let check = check_writable(target.clone());
+
+        assert!(check.target_existed);
+        assert!(check.writable);
+        assert!(check.reason.is_none());
+        assert_eq!(
+            fs::read_to_string(&target).expect("read target"),
+            "(untouched)",
+            "the probe must not modify the existing target's content"
+        );
+        let entries: Vec<_> = fs::read_dir(&directory)
+            .expect("read test directory")
+            .map(|entry| entry.expect("read directory entry").file_name())
+            .filter(|name| name != ".paredit.cleanup")
+            .collect();
+        assert_eq!(entries, [OsString::from("existing.lisp")]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn check_writable_reports_a_symlinked_target_as_not_writable() {
+        let directory = test_directory("check-writable-symlink");
+        let real = directory.join("real.lisp");
+        let link = directory.join("link.lisp");
+        fs::write(&real, "(old)").expect("write link destination");
+        std::os::unix::fs::symlink(&real, &link).expect("create symlink target");
+
+        let check = check_writable(link);
+
+        assert!(!check.writable);
+        assert!(
+            check
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("refusing to write symlink"))
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn check_writable_reports_a_locked_target_as_not_writable() {
+        let directory = test_directory("check-writable-locked");
+        let target = directory.join("target.lisp");
+
+        let lock = acquire_write_lock(&target).expect("acquire lock");
+        let check = check_writable(target);
+        assert!(!check.writable);
+        assert!(
+            check
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("holds its write lock"))
+        );
 
         drop(lock);
         fs::remove_dir_all(directory).expect("remove test directory");
