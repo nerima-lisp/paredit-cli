@@ -164,6 +164,8 @@ The input is not what the operation needs. The source itself has to change.
 
 The source failed to parse. The failure names the byte position — see the
 `offset` field, or the caret excerpt in the human-readable rendering.
+`paredit inspect check` reports every syntax problem it can find in one
+pass, not only this first one — see its `errors` array.
 
 ### `input.not-utf8` { #input.not-utf8 }
 

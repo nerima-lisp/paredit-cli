@@ -36,6 +36,77 @@ pub enum ParseError {
     ResourceLimitExceeded { position: usize, limit: usize },
 }
 
+impl ParseError {
+    /// The byte position this failure names.
+    ///
+    /// Every variant carries exactly one. Pulled out as its own accessor
+    /// rather than matched at each call site: [`SyntaxTree::find_parse_errors`]
+    /// uses it to decide where recovery resumes, and
+    /// `paredit_core_cli::diagnosis` uses the same accessor to fill in a
+    /// `--output json` error envelope's `offset` field.
+    #[must_use]
+    pub const fn position(&self) -> usize {
+        match self {
+            Self::UnexpectedClose { position, .. }
+            | Self::UnsupportedReaderDispatch { position, .. }
+            | Self::MismatchedClose { position, .. }
+            | Self::ResourceLimitExceeded { position, .. }
+            | Self::UnclosedList(position)
+            | Self::UnterminatedString(position)
+            | Self::UnterminatedBlockComment(position)
+            | Self::UnterminatedSymbol(position)
+            | Self::DanglingSingleEscape(position)
+            | Self::MissingReaderForm(position) => *position,
+        }
+    }
+
+    /// This failure, with its position(s) shifted forward by `shift` bytes.
+    ///
+    /// [`SyntaxTree::find_parse_errors`] recovers by re-parsing independent
+    /// suffixes of the document, each indexed from byte zero by the parser
+    /// that produced it; a failure's position has to be translated back to
+    /// where it actually sits in the original document before it is usable.
+    #[must_use]
+    pub(in crate::sexpr) fn shifted(self, shift: usize) -> Self {
+        match self {
+            Self::UnexpectedClose {
+                delimiter,
+                position,
+            } => Self::UnexpectedClose {
+                delimiter,
+                position: position + shift,
+            },
+            Self::UnsupportedReaderDispatch { dispatch, position } => {
+                Self::UnsupportedReaderDispatch {
+                    dispatch,
+                    position: position + shift,
+                }
+            }
+            Self::MismatchedClose {
+                found,
+                expected,
+                position,
+            } => Self::MismatchedClose {
+                found,
+                expected,
+                position: position + shift,
+            },
+            Self::UnclosedList(position) => Self::UnclosedList(position + shift),
+            Self::UnterminatedString(position) => Self::UnterminatedString(position + shift),
+            Self::UnterminatedBlockComment(position) => {
+                Self::UnterminatedBlockComment(position + shift)
+            }
+            Self::UnterminatedSymbol(position) => Self::UnterminatedSymbol(position + shift),
+            Self::DanglingSingleEscape(position) => Self::DanglingSingleEscape(position + shift),
+            Self::MissingReaderForm(position) => Self::MissingReaderForm(position + shift),
+            Self::ResourceLimitExceeded { position, limit } => Self::ResourceLimitExceeded {
+                position: position + shift,
+                limit,
+            },
+        }
+    }
+}
+
 pub(super) const MAX_DISCARDED_FORM_STACK_FRAMES: usize = 65_536;
 
 pub(in crate::sexpr) struct Parser<'a> {

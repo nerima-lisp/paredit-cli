@@ -219,6 +219,17 @@ model, a binding table, nine lint rules, and a per-file report.
   reported as a structured JSON warning (`"status": "warning"`) when the
   command that follows defaults to `--output json`, matching the JSON
   contract errors already keep. Text-mode output is unchanged.
+- `inspect check` reports every syntax error in a document, not only the
+  first: `SyntaxTree::find_parse_errors` recovers after a failure by
+  resuming at the next line that starts a top-level form and keeps scanning,
+  so a file with three unrelated problems is now one round trip instead of
+  three. The existing singular `error` field is unchanged; `errors` is the
+  new, additive array carrying all of them, each with its own byte offset.
+- A lint run over many files no longer discards every result when one file
+  fails to parse. `paredit inspect lint`, `--sarif`, and `--github` now
+  report findings from every file that *did* analyze cleanly, name the ones
+  that did not in a new `partial_failures` field (and on stderr), and only
+  fail outright when nothing in the request could be analyzed at all.
 
 ### Fixed
 

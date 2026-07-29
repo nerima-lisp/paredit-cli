@@ -7,35 +7,63 @@ use paredit_core_cli::report::budget::Budget;
 
 use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::args::{AnalyzeArgs, OutputFormat};
-use crate::presentation::cli::shared::{read_input_and_dialect, read_input_dialect_and_tree};
+use crate::presentation::cli::shared::{
+    check_deadline_for_read, read_input_and_dialect, read_input_dialect_and_tree,
+};
 
 use super::args::AgentReportArgs;
 use super::render::{
     AgentReportOptions, print_agent_report, print_dialect, print_outline, print_stats,
 };
 
+/// Validates that input is a balanced S-expression document.
+///
+/// Reports every syntax problem `SyntaxTree::find_parse_errors` finds, not
+/// only the first — a file with three unrelated syntax errors used to cost
+/// three round trips: fix one, re-run, hit the next. The singular `error`
+/// field is unchanged, still the first problem found, so an existing
+/// consumer reading only that field sees exactly what it always has; `errors`
+/// is the new, additive way to see all of them at once.
 pub(in crate::presentation::cli) fn check(args: AnalyzeArgs) -> Result<()> {
+    check_deadline_for_read(args.file.as_deref())?;
+    let (input, dialect) = read_input_and_dialect(args.file, args.dialect)?;
+    let mut errors = SyntaxTree::find_parse_errors(&input.text, dialect);
+
     match args.output {
         OutputFormat::Text => {
-            read_input_dialect_and_tree(args.file, args.dialect)?;
-            println!("ok");
-            Ok(())
+            if errors.is_empty() {
+                println!("ok");
+                return Ok(());
+            }
+            for error in &errors {
+                println!("error: {error}");
+            }
+            Err(errors.remove(0)).context("input is not a balanced S-expression document")
         }
         OutputFormat::Json => {
-            let (input, dialect) = read_input_and_dialect(args.file, args.dialect)?;
             let file = input.file.as_deref().map(|path| path.display().to_string());
-            let parse_error = SyntaxTree::parse_with_dialect(&input.text, dialect).err();
+            let errors_json: Vec<_> = errors
+                .iter()
+                .map(|error| {
+                    json!({
+                        "message": error.to_string(),
+                        "offset": error.position(),
+                    })
+                })
+                .collect();
             let report = json!({
                 "schema_version": 1,
-                "status": if parse_error.is_none() { "ok" } else { "error" },
+                "status": if errors.is_empty() { "ok" } else { "error" },
                 "file": file,
                 "dialect": dialect.label(),
-                "error": parse_error.as_ref().map(ToString::to_string),
+                "error": errors.first().map(ToString::to_string),
+                "errors": errors_json,
             });
             println!("{}", serde_json::to_string_pretty(&report)?);
-            match parse_error {
-                None => Ok(()),
-                Some(error) => Err(error).context("input is not a balanced S-expression document"),
+            if errors.is_empty() {
+                Ok(())
+            } else {
+                Err(errors.remove(0)).context("input is not a balanced S-expression document")
             }
         }
     }
