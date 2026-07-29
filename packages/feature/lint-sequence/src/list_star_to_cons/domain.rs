@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled operand list.
@@ -33,52 +35,65 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct ListStarToConsItem {
-    pub path: PathBuf,
     /// The span of the whole `(list* a b)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the first operand `a`.
+    ///
+    /// The rewrite's input, but the old report published it and a consumer
+    /// synthesizing its own `(cons a b)` needs it, so it stays on the report.
     pub car_span: ByteSpan,
-    /// The span of the second operand `b`.
+    /// The span of the second operand `b`. Published for the same reason as
+    /// `car_span`.
     pub cdr_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct ListStarToConsSummary {
-    pub list_star_form_count: usize,
-    pub violations: Vec<ListStarToConsItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ListStarToConsPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ListStarToConsPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ListStarToConsItem {
+    /// The rule's own name. Every finding is the same two-argument `list*`, so
+    /// there is nothing for a per-finding discriminator to say.
+    fn kind(&self) -> &'static str {
+        "list-star-to-cons"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the path and line the envelope already prints: the old
+    /// text row carried exactly those two. `message` carries the description.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("car_span", span_json(self.car_span)),
+            ("cdr_span", span_json(self.cdr_span)),
+        ]
+    }
+
+    /// The same sentence the `list-star-to-cons` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "a two-argument list* is just a cons; (list* a b) is (cons a b)".to_owned()
     }
 }
 
-#[derive(Debug)]
-pub struct ListStarToConsPolicy {
-    pub fail_on_violation: bool,
-    pub list_star_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+/// A sub-span in the shape the old hand-written report published it.
+fn span_json(span: ByteSpan) -> Value {
+    json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     list_star_form_count: &mut usize,
     violations: &mut Vec<ListStarToConsItem>,
 ) {
@@ -101,74 +116,83 @@ pub fn examine(
     }
 
     violations.push(ListStarToConsItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         car_span: car.span,
         cdr_span: cdr.span,
     });
 }
 
-/// Collects every two-argument `(list* a b)` across a whole file, along with the
-/// total number of `list*` forms scanned.
-pub fn collect_list_star_to_cons(
+/// Collects every two-argument `(list* a b)` in one file, with the number of
+/// `list*` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no two-argument list* here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_list_star_to_cons_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ListStarToConsItem>)> {
+) -> LintResult<FileFindings<ListStarToConsItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("list_star_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut list_star_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut list_star_form_count, &mut violations);
+            examine(subview, source, &mut list_star_form_count, &mut violations);
         });
     }
-    Ok((list_star_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("list_star_form_count", json!(list_star_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_list_star_to_cons(
-    list_star_form_count: usize,
-    violations: Vec<ListStarToConsItem>,
-) -> ListStarToConsSummary {
-    ListStarToConsSummary {
-        list_star_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_list_star_to_cons_policy(
-    options: ListStarToConsPolicyOptions,
-    summary: &ListStarToConsSummary,
-) -> ListStarToConsPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ListStarToConsPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        list_star_form_count: summary.list_star_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<ListStarToConsItem>) {
+    fn report(input: &str) -> FileFindings<ListStarToConsItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_list_star_to_cons(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect list* to cons")
+        build_list_star_to_cons_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build list* to cons report")
+    }
+
+    /// The `(list_star_form_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<ListStarToConsItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "list_star_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("list_star_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -219,28 +243,46 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(list* a b)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_list_star_to_cons(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect list* to cons");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_list_star_to_cons_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build list* to cons report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("list_star_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(list* a b)");
-        let summary = summarize_list_star_to_cons(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(list* a b c)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_list_star_to_cons_policy(ListStarToConsPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_both_operand_spans_the_fix_needs() {
+        let source = "(defun f (a b)\n  (list* (car a) (cdr b)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "list-star-to-cons");
+        assert_eq!(slice(source, finding.car_span), "(car a)");
+        assert_eq!(slice(source, finding.cdr_span), "(cdr b)");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("car_span", span_json(finding.car_span)),
+                ("cdr_span", span_json(finding.cdr_span)),
+            ]
+        );
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_list_star_to_cons_policy(ListStarToConsPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_list_star_form_not_only_the_flagged_ones() {
+        let report = report("(list* a b)\n(list* a b c)\n(list* x)\n");
+        assert_eq!(report.summary, vec![("list_star_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
