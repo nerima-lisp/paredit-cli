@@ -14,7 +14,12 @@ fn cli_flags_when_with_a_not_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"conditional_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // The head is the `kind` and still its own field, as the old JSON had.
+        .stdout(predicate::str::contains("\"kind\": \"when\""))
+        .stdout(predicate::str::contains("\"head\": \"when\""))
         .stdout(predicate::str::contains("\"suggested_head\": \"unless\""));
 }
 
@@ -32,7 +37,8 @@ fn cli_flags_unless_with_a_null_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"unless\""))
         .stdout(predicate::str::contains("\"negator\": \"null\""))
         .stdout(predicate::str::contains("\"suggested_head\": \"when\""));
 }
@@ -51,7 +57,52 @@ fn cli_does_not_flag_a_plain_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no negated test among two
+        // conditionals" from "no when/unless at all".
+        .stdout(predicate::str::contains("\"conditional_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("negated-when-unless-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn go [] (when (not ready) (run)))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "negated-when-unless", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_negated_when_unless_emits_sarif() {
+    let dir = fresh_temp_dir("negated-when-unless-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(when (not ready) (go))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "negated-when-unless", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        // The head is the `kind`, so `when` and `unless` are separate rules to
+        // a SARIF consumer.
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/negated-when-unless/when\"",
+        ))
+        .stdout(predicate::str::contains(
+            "when test is (not …); use unless on the un-negated test",
+        ));
 }
 
 #[test]
@@ -68,7 +119,8 @@ fn cli_does_not_flag_a_malformed_negation() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        .stdout(predicate::str::contains("\"conditional_form_count\": 1"));
 }
 
 #[test]
@@ -105,5 +157,5 @@ fn cli_negated_when_unless_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }

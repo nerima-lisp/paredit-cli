@@ -43,7 +43,7 @@ impl LintRule for Rule {
         let context_slice = |span| context.slice(span).to_owned();
         let mut negation_form_count = 0;
         let mut items = Vec::new();
-        examine_negation(view, context.path(), &mut negation_form_count, &mut items);
+        examine_negation(view, context.source(), &mut negation_form_count, &mut items);
         for item in items {
             let span = item.span;
             let fix = {
