@@ -41,6 +41,8 @@ mod car_nthcdr_report;
 mod car_reverse_report;
 #[path = "cli/case_nil_key_report.rs"]
 mod case_nil_key_report;
+#[path = "cli/change_summary.rs"]
+mod change_summary;
 #[path = "cli/char_case_fold_report.rs"]
 mod char_case_fold_report;
 #[path = "cli/char_op_string_report.rs"]

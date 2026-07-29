@@ -28,6 +28,7 @@ use serde_json::{Value as Json, json};
 
 use crate::error::{ArgumentError, CleanupFailure, CliError, IoRefusal, WriteTargetError};
 use crate::gate::{GATE_FAILURE_EXIT_CODE, GateFailure};
+use crate::messages::{Message, say};
 
 /// The class of a failure, from the caller's point of view.
 ///
@@ -65,6 +66,24 @@ impl Category {
             Self::Gate => "gate",
             Self::Internal => "internal",
         }
+    }
+
+    /// One line describing this category, in the configured language.
+    ///
+    /// The *label* stays English in every language: it is an identifier a
+    /// consumer matches on. Only the description is translated.
+    #[must_use]
+    pub fn describe(self) -> &'static str {
+        use crate::messages::{Message, say};
+        say(match self {
+            Self::Argument => Message::CategoryArgument,
+            Self::Selection => Message::CategorySelection,
+            Self::Input => Message::CategoryInput,
+            Self::Refusal => Message::CategoryRefusal,
+            Self::Environment => Message::CategoryEnvironment,
+            Self::Gate => Message::CategoryGate,
+            Self::Internal => Message::CategoryInternal,
+        })
     }
 
     /// Whether re-running the identical command could plausibly succeed.
@@ -256,20 +275,30 @@ pub struct Repair {
     /// read: `inspect-first`, `change-selection`, `pass-flag`, `re-read`,
     /// `fix-source`, `check-configuration`.
     pub action: &'static str,
-    /// One line, in English, saying what to do.
-    pub detail: String,
+    /// What to do, as a catalogue entry rather than a string.
+    ///
+    /// A `Message` rather than text so that adding a repair without adding its
+    /// translation fails to compile. A silent English fallback in a Japanese
+    /// run reads as "this one is untranslatable" rather than "we forgot".
+    pub detail: Message,
     /// A command line that can be run exactly as written, when the failure
     /// carried enough context to build one.
     pub command: Option<String>,
 }
 
 impl Repair {
-    fn new(action: &'static str, detail: impl Into<String>) -> Self {
+    const fn new(action: &'static str, detail: Message) -> Self {
         Self {
             action,
-            detail: detail.into(),
+            detail,
             command: None,
         }
+    }
+
+    /// The instruction, in the language this run is configured for.
+    #[must_use]
+    pub fn detail(&self) -> &'static str {
+        say(self.detail)
     }
 
     fn with_command(mut self, command: Option<String>) -> Self {
@@ -288,7 +317,7 @@ impl Repair {
     pub fn to_json(&self) -> Json {
         json!({
             "action": self.action,
-            "detail": crate::shared::terminal_safe(&self.detail).to_string(),
+            "detail": self.detail(),
             "command": self
                 .command
                 .as_ref()
@@ -334,6 +363,7 @@ impl Diagnosis {
         json!({
             "code": self.code.label(),
             "category": self.code.category().label(),
+            "category_description": self.code.category().describe(),
             "retryable": self.code.category().retryable(),
             "exit_code": self.code.exit_code(),
             // Escaped for the same reason a `Repair`'s strings are: this one
@@ -467,156 +497,87 @@ const fn classify_workspace(error: &WorkspaceError) -> ErrorCode {
 
 fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Repair> {
     match code {
-        ErrorCode::ArgumentNoInput => vec![Repair::new(
-            "pass-flag",
-            "name the source with --file <path>, or pipe it on stdin",
-        )],
+        ErrorCode::ArgumentNoInput => vec![Repair::new("pass-flag", Message::RepairNameTheSource)],
 
         ErrorCode::ArgumentTargetRequired | ErrorCode::SelectionPathNotReachable => vec![
-            Repair::new(
-                "inspect-first",
-                "list the paths this document actually has, then select one of them",
-            )
-            .with_command(context.command("inspect outline --output json")),
-            Repair::new(
-                "change-selection",
-                "select by byte offset instead of by path, with --at <offset>",
-            ),
+            Repair::new("inspect-first", Message::RepairListPaths)
+                .with_command(context.command("inspect outline --output json")),
+            Repair::new("change-selection", Message::RepairSelectByOffset),
         ],
 
-        ErrorCode::SelectionPathInvalid => vec![Repair::new(
-            "change-selection",
-            "a path is dot-separated child indexes counted from zero, such as 0.2.1",
-        )],
+        ErrorCode::SelectionPathInvalid => {
+            vec![Repair::new("change-selection", Message::RepairPathShape)]
+        }
 
         ErrorCode::SelectionOffsetNotFound => vec![
-            Repair::new(
-                "inspect-first",
-                "check the document's length and structure before choosing an offset",
-            )
-            .with_command(context.command("inspect stats --output json")),
-            Repair::new(
-                "change-selection",
-                "select by path instead of by offset, with --path <a.b.c>",
-            ),
+            Repair::new("inspect-first", Message::RepairCheckLength)
+                .with_command(context.command("inspect stats --output json")),
+            Repair::new("change-selection", Message::RepairSelectByPath),
         ],
 
         ErrorCode::SelectionStale | ErrorCode::RefusalTargetChanged => vec![
-            Repair::new(
-                "re-read",
-                "the file changed since it was read; read it again and redo the operation",
-            )
-            .with_command(context.command("inspect stats --output json")),
+            Repair::new("re-read", Message::RepairRereadFile)
+                .with_command(context.command("inspect stats --output json")),
         ],
 
         ErrorCode::ArgumentTargetAmbiguous => {
-            vec![Repair::new("pass-flag", "pass --path or --at, not both")]
+            vec![Repair::new("pass-flag", Message::RepairOneSelector)]
         }
 
         ErrorCode::ArgumentWriteRequiresFile => vec![
-            Repair::new(
-                "pass-flag",
-                "add --file <path>, which is what --write writes to",
-            ),
-            Repair::new(
-                "pass-flag",
-                "or drop --write and take the rewritten document from stdout",
-            ),
+            Repair::new("pass-flag", Message::RepairAddFile),
+            Repair::new("pass-flag", Message::RepairDropWrite),
         ],
 
         ErrorCode::InputUnparsable => vec![
-            Repair::new(
-                "inspect-first",
-                "get the byte offset where the parse failed",
-            )
-            .with_command(context.command("inspect check --output json")),
-            Repair::new(
-                "fix-source",
-                "if the only problem is unclosed lists, this can close them",
-            )
-            .with_command(context.command("edit repair-unclosed-lists --diff")),
+            Repair::new("inspect-first", Message::RepairGetParseOffset)
+                .with_command(context.command("inspect check --output json")),
+            Repair::new("fix-source", Message::RepairCloseLists)
+                .with_command(context.command("edit repair-unclosed-lists --diff")),
         ],
 
         ErrorCode::InputShapeRefused => vec![
-            Repair::new(
-                "inspect-first",
-                "confirm what the selection actually points at before retrying",
-            )
-            .with_command(context.command("inspect form --output json")),
-            Repair::new(
-                "change-selection",
-                "this operation needs a different shape of form; select its parent or a sibling",
-            ),
+            Repair::new("inspect-first", Message::RepairConfirmSelection)
+                .with_command(context.command("inspect form --output json")),
+            Repair::new("change-selection", Message::RepairDifferentShape),
         ],
 
-        ErrorCode::InputSymbolInvalid => vec![Repair::new(
-            "pass-flag",
-            "a symbol may not be empty or contain whitespace or reader delimiters",
-        )],
+        ErrorCode::InputSymbolInvalid => vec![Repair::new("pass-flag", Message::RepairSymbolShape)],
 
-        ErrorCode::RefusalInputTooLarge => vec![Repair::new(
-            "change-selection",
-            "split the input, or point the command at a smaller file",
-        )],
+        ErrorCode::RefusalInputTooLarge => {
+            vec![Repair::new("change-selection", Message::RepairSmallerInput)]
+        }
 
-        ErrorCode::RefusalWriteTarget => vec![Repair::new(
-            "fix-source",
-            "the write target must be a regular file this process may replace; \
-             resolve symlinks and check the parent directory's permissions",
-        )],
+        ErrorCode::RefusalWriteTarget => {
+            vec![Repair::new("fix-source", Message::RepairWriteTargetShape)]
+        }
 
         ErrorCode::RefusalRewriteDoesNotReparse => vec![
-            Repair::new(
-                "inspect-first",
-                "nothing was written. See what the rewrite would have produced",
-            ),
-            Repair::new(
-                "fix-source",
-                "this is a defect in the transform for this input; \
-                 please report it with the source that triggered it",
-            ),
+            Repair::new("inspect-first", Message::RepairNothingWritten),
+            Repair::new("fix-source", Message::RepairReportDefect),
         ],
 
         ErrorCode::RefusalOverlappingSpans | ErrorCode::RefusalSpanOutOfBounds => {
-            vec![Repair::new(
-                "re-read",
-                "the edit spans do not fit the current source; regenerate the plan against it",
-            )]
+            vec![Repair::new("re-read", Message::RepairRegeneratePlan)]
         }
 
         ErrorCode::RefusalWorkspace | ErrorCode::EnvironmentWorkspaceLimit => vec![
-            Repair::new(
-                "pass-flag",
-                "bound the walk with --max-depth, or narrow the roots you passed",
-            ),
-            Repair::new(
-                "check-configuration",
-                "[paths] in paredit.toml can exclude directories for every command",
-            )
-            .with_command(Some("paredit config show --changed-only".to_owned())),
+            Repair::new("pass-flag", Message::RepairBoundTheWalk),
+            Repair::new("check-configuration", Message::RepairConfigureExcludes)
+                .with_command(Some("paredit config show --changed-only".to_owned())),
         ],
 
-        ErrorCode::EnvironmentRollbackFailed => vec![Repair::new(
-            "re-read",
-            "a write failed and undoing it also failed; \
-             the working tree may be partly written, so check it before retrying",
-        )],
+        ErrorCode::EnvironmentRollbackFailed => {
+            vec![Repair::new("re-read", Message::RepairPartialWrite)]
+        }
 
-        ErrorCode::EnvironmentCleanupAfterCommit => vec![Repair::new(
-            "re-read",
-            "the writes did land; only removing the backup did not. \
-             Do not redo the operation, remove the leftover backup file",
-        )],
+        ErrorCode::EnvironmentCleanupAfterCommit => {
+            vec![Repair::new("re-read", Message::RepairBackupLeftover)]
+        }
 
-        ErrorCode::GateFailed => vec![Repair::new(
-            "inspect-first",
-            "the report was printed before this; the gate named in the message is what tripped",
-        )],
+        ErrorCode::GateFailed => vec![Repair::new("inspect-first", Message::RepairReadTheReport)],
 
-        ErrorCode::InputNotUtf8 => vec![Repair::new(
-            "fix-source",
-            "this tool reads UTF-8 only; convert the file's encoding first",
-        )],
+        ErrorCode::InputNotUtf8 => vec![Repair::new("fix-source", Message::RepairConvertEncoding)],
 
         ErrorCode::EnvironmentIo | ErrorCode::EnvironmentUnavailable | ErrorCode::Internal => {
             // Nothing specific to say, and inventing something would cost a
@@ -626,10 +587,9 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
             Vec::new()
         }
 
-        ErrorCode::SelectionSpanInvalid => vec![Repair::new(
-            "re-read",
-            "the span does not lie on character boundaries of the current source",
-        )],
+        ErrorCode::SelectionSpanInvalid => {
+            vec![Repair::new("re-read", Message::RepairSpanBoundaries)]
+        }
     }
 }
 
@@ -728,7 +688,7 @@ mod tests {
             diagnosis
                 .repairs
                 .iter()
-                .all(|repair| !repair.detail.is_empty())
+                .all(|repair| !repair.detail().is_empty())
         );
     }
 
@@ -752,7 +712,7 @@ mod tests {
             diagnosis
                 .repairs
                 .iter()
-                .any(|repair| repair.detail.contains("--at")),
+                .any(|repair| repair.detail().contains("--at")),
             "{:?}",
             diagnosis.repairs
         );
@@ -768,7 +728,7 @@ mod tests {
             diagnosis
                 .repairs
                 .iter()
-                .any(|repair| repair.detail.contains("--path"))
+                .any(|repair| repair.detail().contains("--path"))
         );
     }
 
@@ -808,7 +768,7 @@ mod tests {
         });
         assert_eq!(diagnosis.code, ErrorCode::EnvironmentCleanupAfterCommit);
         assert!(
-            diagnosis.repairs[0].detail.contains("Do not redo"),
+            diagnosis.repairs[0].detail().contains("Do not redo"),
             "{:?}",
             diagnosis.repairs
         );

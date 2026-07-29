@@ -218,6 +218,51 @@ field is absent — not empty — when the report has nothing to suggest, so
 "nothing to suggest" and "we did not look" stay distinguishable. Suggestions
 are derived from what the report found, never emitted unconditionally.
 
+## Explaining a change
+
+`inspect change --before <FILE> --after <FILE>` compares two versions
+structurally and answers in a reviewer's terms rather than a diff's:
+
+```
+$ paredit inspect change --before old.lisp --after new.lisp --output text
+1 added, 1 renamed and 1 modified definitions.
+
+- Added `defun read-config` (line 2).
+- Changed the body of `defun parse-header` (line 3, was line 2).
+- Renamed `old-body` to `new-body` (line 4); the body is unchanged.
+```
+
+The JSON carries both that draft and the facts it was rendered from, so you
+can paste one or compute with the other.
+
+Three properties make it worth reading:
+
+- **A rename is a rename.** A removal and an addition whose bodies match once
+  the name is set aside is reported as one rename, not two changes. It is only
+  inferred from an exact match: a rename that also changed the body is reported
+  as the addition and removal it literally is, because a confidently wrong
+  summary in a pull request costs more than a vague one.
+- **Formatting is called formatting.** The comparison runs over the normalised
+  shape, so reindenting a definition is not a change to it. `formatting_only`
+  is the single most useful thing this command can tell a reviewer.
+- **Definitions are matched by identity, not position.** Inserting one
+  definition at the top of a file is one addition and *n* moves, each with its
+  old and new path.
+
+`--fail-on-change` gates on substance: a reformat does not trip it.
+
+## Message language
+
+`output.language = "ja"` (or `PAREDIT_OUTPUT_LANGUAGE=ja`) translates
+diagnostics — the error prefix, the repair suggestions, the failure-category
+descriptions, and the run-control notes.
+
+Everything a *program* matches on stays English in every language: error
+`code`s, `category` labels, repair `action`s, finding `kind`s, rule names, and
+every JSON key. Report payloads stay English too, and are byte-identical
+whatever the language is set to. Translating an identifier would break every
+consumer to help nobody.
+
 ## Error identity and repairs
 
 An exit code says *that* a command failed. Every failure also carries a stable

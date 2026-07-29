@@ -18,8 +18,9 @@ mod dependency_report;
 // macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
 // it enumerates three features' capabilities, which makes it composition root
 // (section 11.5.1).
-use paredit_core_cli::{args, diagnosis, gate, shared};
+use paredit_core_cli::{args, diagnosis, gate, messages, shared};
 // Phase 3 facade: the composition root sees each slice's Args type and run fn.
+use paredit_feature_change_summary::change_summary::cli as change_summary;
 use paredit_feature_code_metrics::cohesion_report::cli as cohesion_report;
 use paredit_feature_code_metrics::debt_score_report::cli as debt_score_report;
 use paredit_feature_code_metrics::docstring_report::cli as docstring_report;
@@ -169,7 +170,10 @@ fn suppress_writes_when_dry(argv: Vec<String>) -> Vec<String> {
 
     // Never silent: the caller asked for a write and is not getting one.
     if suppressed {
-        eprintln!("Note: --dry-run suppressed --write; nothing will be written.");
+        eprintln!(
+            "Note: {}",
+            messages::say(messages::Message::DryRunSuppressedWrite)
+        );
     }
     kept
 }
@@ -205,7 +209,8 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
         );
     } else {
         eprintln!(
-            "Error [{}]: {}",
+            "{} [{}]: {}",
+            messages::say(messages::Message::ErrorPrefix),
             diagnosis.code,
             terminal_safe_error_chain(error)
         );
@@ -213,12 +218,17 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
             match &repair.command {
                 Some(command) => {
                     eprintln!(
-                        "  try: {} — {}",
-                        terminal_safe(&repair.detail),
+                        "  {}: {} — {}",
+                        messages::say(messages::Message::RepairPrefix),
+                        repair.detail(),
                         terminal_safe(command)
                     );
                 }
-                None => eprintln!("  try: {}", terminal_safe(&repair.detail)),
+                None => eprintln!(
+                    "  {}: {}",
+                    messages::say(messages::Message::RepairPrefix),
+                    repair.detail()
+                ),
             }
         }
     }
@@ -242,7 +252,8 @@ fn bootstrap() -> Cli {
         Ok(loaded) => loaded,
         Err(error) => {
             eprintln!(
-                "Warning: ignoring the configuration: {}",
+                "Warning: {}: {}",
+                messages::say(messages::Message::ConfigIgnored),
                 terminal_safe_error_chain(&error)
             );
             return Cli::parse_from(argv);
@@ -260,8 +271,8 @@ fn bootstrap() -> Cli {
     // baffling error about flags the caller never typed.
     if loaded.has_errors() {
         eprintln!(
-            "Warning: the configuration has errors and was not applied; \
-             run `paredit config check` for the details"
+            "Warning: {}",
+            messages::say(messages::Message::ConfigHasErrors)
         );
         return Cli::parse_from(argv);
     }
@@ -285,8 +296,8 @@ fn bootstrap() -> Cli {
                 .collect::<Vec<_>>()
                 .join(", ");
             eprintln!(
-                "Warning: these configured keys do not combine with the given flags \
-                 and were not applied: {dropped}"
+                "Warning: {}: {dropped}",
+                messages::say(messages::Message::ConfigKeysNotApplied)
             );
             Cli::parse_from(argv)
         }

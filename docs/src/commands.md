@@ -36,6 +36,7 @@ discovery, impact analysis, and preflight checks.
 | `dialect` | Detect Lisp dialect from `--file` extension or explicit `--dialect`. |
 | `stats` | Print parse, dialect, and structural metrics for agent planning. |
 | `agent-report` | Print a complete JSON report for AI coding agent refactor planning. |
+| `change` | Describe what changed between two versions of a file, as prose a pull request can use. |
 | `capabilities` | Print a machine-readable catalog of every command, flag, default, and enum value. |
 | `outline` | Print top-level forms with paths, spans, and definition hints. |
 | `form` | Report one selected form with local structure for refactor planning. |

@@ -386,3 +386,102 @@ fn a_command_with_no_gate_has_no_gates_field() {
         .expect("edit select");
     assert!(select.1["gates"].is_null(), "{}", select.1);
 }
+
+// --- H18: the message language ---
+
+/// The scope, checked: what a person reads is translated, what a program
+/// matches on is not.
+#[test]
+fn japanese_translates_the_diagnostic_and_leaves_the_identifiers_alone() {
+    let file = fixture("language-ja");
+    let stderr = paredit()
+        .args(["edit", "select", "--path", "0.9", "--file"])
+        .arg(&file)
+        .env("PAREDIT_OUTPUT_LANGUAGE", "ja")
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    let text = String::from_utf8(stderr).expect("UTF-8");
+
+    assert!(text.starts_with("エラー ["), "{text}");
+    assert!(text.contains("対処: "), "{text}");
+    // The code is an identifier a consumer matches on, so it stays.
+    assert!(text.contains("selection.path-not-reachable"), "{text}");
+    // And a suggested command has to remain runnable.
+    assert!(text.contains("paredit inspect outline"), "{text}");
+    assert!(text.contains("--at"), "{text}");
+}
+
+#[test]
+fn the_json_error_keeps_english_identifiers_and_translates_the_description() {
+    let file = fixture("language-ja-json");
+    let stderr = paredit()
+        .args(["inspect", "form", "--path", "0.9", "--file"])
+        .arg(&file)
+        .env("PAREDIT_OUTPUT_LANGUAGE", "ja")
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&stderr).expect("stderr is JSON");
+
+    assert_eq!(report["error"]["code"], "selection.path-not-reachable");
+    assert_eq!(report["error"]["category"], "selection");
+    assert_eq!(
+        report["error"]["category_description"],
+        "選択が解決できませんでした"
+    );
+    assert!(
+        report["error"]["repairs"][0]["action"]
+            .as_str()
+            .expect("action")
+            .is_ascii(),
+        "the action is an identifier and must stay ASCII"
+    );
+}
+
+/// A report payload is not a diagnostic: translating a finding's `kind` would
+/// break every consumer to help nobody.
+#[test]
+fn a_report_payload_stays_english_whatever_the_language() {
+    let dir = fresh_temp_dir("language-payload");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun f (x) (if (eq x nil) 1 2))\n").expect("write");
+
+    let english = paredit()
+        .args(["inspect", "lint", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let japanese = paredit()
+        .args(["inspect", "lint", "--output", "json"])
+        .arg(&file)
+        .env("PAREDIT_OUTPUT_LANGUAGE", "ja")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    assert_eq!(
+        String::from_utf8_lossy(&english),
+        String::from_utf8_lossy(&japanese)
+    );
+}
+
+#[test]
+fn english_is_the_default() {
+    let file = fixture("language-default");
+    paredit()
+        .args(["edit", "select", "--path", "0.9", "--file"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(predicate::str::starts_with("Error ["));
+}
