@@ -477,12 +477,13 @@ const SEMANTIC_COMMANDS: [&str; 78] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 9] = [
+const SYNTAX_TIER_REPORTS: [&str; 10] = [
     "inspect elisp-file",
     "inspect check",
     "inspect dialect",
     "inspect stats",
     "inspect capabilities",
+    "inspect change",
     "inspect outline",
     "inspect form",
     "inspect find-symbol",

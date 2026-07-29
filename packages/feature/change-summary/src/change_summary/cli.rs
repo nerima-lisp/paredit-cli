@@ -120,17 +120,6 @@ fn definition_json(definition: &Definition) -> Value {
     })
 }
 
-/// Whether this report's analysis covers a dialect.
-///
-/// Every dialect: the comparison needs only the balanced-parens tree and the
-/// dialect's own definition-head list, both of which every parsed dialect has.
-#[must_use]
-pub const fn supports_change_summary_dialect(
-    _dialect: paredit_core_syntax::dialect::Dialect,
-) -> bool {
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::domain::ChangeSummary;
