@@ -50,6 +50,36 @@ paredit inspect lint --emit junit . > junit.xml
 `--emit sarif` and `--emit github` are the older `--sarif` and `--github` flags
 under one option; those flags still work and produce byte-identical output.
 
+## Drawing a graph report
+
+Three reports answer with a graph rather than a list, and `--graph` draws it:
+
+```sh
+paredit inspect call-graph --graph dot . | dot -Tsvg > calls.svg
+paredit inspect dependencies --graph mermaid .
+paredit inspect class-hierarchy --graph mermaid src/
+```
+
+`--graph` is a separate option from `--output`, not another `--output` value,
+because it selects a different *view*. `--output json` carries every field the
+report computed; a drawing carries the node and edge structure and drops the
+spans, counts, and policy verdict that do not belong in a picture. The gate
+still applies — a `--fail-on-*` run that draws its graph still exits 3.
+
+Three conventions run through all three drawings:
+
+- A **dashed, open** node is something referenced but not defined in the
+  scanned sources: an external callee, a superclass no file declares. The edge
+  is real; its far end was never verified.
+- **Parallel edges collapse** into one arrow labelled with the count. Three
+  calls to the same function are one `×3` arrow.
+- Nodes are **grouped by their file**, drawn as a Graphviz cluster or a Mermaid
+  subgraph.
+
+Identifiers in the output are generated (`n0`, `n1`, …) with the real name in
+the label, because Lisp symbols are mostly punctuation and Mermaid identifiers
+may not contain any.
+
 ## GitHub Actions
 
 The repository ships a composite action that runs the structural lint and

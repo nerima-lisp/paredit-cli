@@ -183,6 +183,8 @@ mod function_parameter;
 mod getf_default_nil_report;
 #[path = "cli/gethash_default_report.rs"]
 mod gethash_default_report;
+#[path = "cli/graph_output.rs"]
+mod graph_output;
 #[path = "cli/handler_case_no_clauses_report.rs"]
 mod handler_case_no_clauses_report;
 #[path = "cli/help_contract.rs"]

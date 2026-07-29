@@ -11,6 +11,7 @@
 //! now produce reports of this shape, and a copy per package is three places
 //! for the output contract to drift.
 
+pub mod graph;
 pub mod interop;
 pub mod render;
 

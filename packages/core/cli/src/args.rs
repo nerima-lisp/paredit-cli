@@ -220,6 +220,32 @@ pub enum ReportFormat {
     Github,
 }
 
+/// The drawing languages `--graph` can emit.
+///
+/// A separate option from `--output` rather than more `--output` values,
+/// because it selects a different *view*, not a different serialization of the
+/// same one. `--output json` and `--output csv` carry every field a report
+/// computed; a graph carries the node and edge structure and drops the spans,
+/// counts, and policy verdict that do not belong in a picture. Presenting that
+/// as one more encoding of the report would misdescribe what a caller gets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum GraphFormat {
+    /// Graphviz DOT, for `dot -Tsvg`.
+    Dot,
+    /// Mermaid `flowchart`, which GitHub and GitLab render inline in Markdown.
+    Mermaid,
+}
+
+impl GraphFormat {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Dot => "dot",
+            Self::Mermaid => "mermaid",
+        }
+    }
+}
+
 impl From<OutputFormat> for ReportFormat {
     fn from(value: OutputFormat) -> Self {
         match value {
