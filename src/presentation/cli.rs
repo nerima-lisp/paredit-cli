@@ -269,6 +269,12 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
             diagnosis.code,
             terminal_safe_error_chain(error)
         );
+        // Best-effort: the file may have moved or changed since the failure,
+        // in which case there is nothing to point a caret at and this simply
+        // prints no excerpt rather than a wrong one.
+        if let Some(caret) = caret_for_failure(&diagnosis, context.file.as_deref()) {
+            eprintln!("{caret}");
+        }
         for repair in &diagnosis.repairs {
             match &repair.command {
                 Some(command) => {
@@ -291,6 +297,50 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
     ExitCode::from(diagnosis.code.exit_code())
 }
 
+/// The caret excerpt for a failure, when it named a byte position and a file
+/// to read it from.
+///
+/// Re-reads the file rather than reusing whatever the command already had in
+/// memory: by the time a failure is reported, that buffer is gone, and a
+/// second read is the same trade the rest of the repair suggestions already
+/// make (`RepairRereadFile` and friends). A read that fails - the file moved,
+/// permissions changed - is silently swallowed: the error already printed is
+/// the operative one, and a second, unrelated I/O failure here would only
+/// obscure it.
+fn caret_for_failure(diagnosis: &diagnosis::Diagnosis, file: Option<&str>) -> Option<String> {
+    let offset = diagnosis.offset?;
+    let source = std::fs::read_to_string(file?).ok()?;
+    diagnosis::render_caret(&source, offset)
+}
+
+/// Prints a warning — the run continues, but not quite as asked — in the
+/// format this invocation was already going to be read in.
+///
+/// Mirrors [`report_failure`]'s JSON/text split for the same reason: a
+/// caller that asked for `--output json` should not have to fall back to
+/// parsing English stderr to learn a configuration file was ignored. Text
+/// mode is unchanged from before this existed - `"Warning: {message}"` on
+/// stderr - so this only adds a reading, never removes one.
+fn report_warning(message: &str, argv: &[String]) {
+    use clap::CommandFactory;
+
+    let root = Cli::command();
+    if argv::effective_output_format(argv, &root).as_deref() == Some("json") {
+        let envelope = json!({
+            "schema_version": 1,
+            "status": "warning",
+            "command": argv::resolve_leaf(argv, &root).map(|(_, path)| path),
+            "warning": { "message": terminal_safe(message).to_string() },
+        });
+        eprintln!(
+            "{}",
+            serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
+        );
+    } else {
+        eprintln!("Warning: {}", terminal_safe(message));
+    }
+}
+
 /// Reads the configuration, installs what acts below the argument layer, and
 /// parses the command line the configuration has contributed to.
 ///
@@ -306,10 +356,13 @@ fn bootstrap() -> Cli {
     let loaded = match config::workflow::load(&config::args::ConfigLocationArgs::default()) {
         Ok(loaded) => loaded,
         Err(error) => {
-            eprintln!(
-                "Warning: {}: {}",
-                messages::say(messages::Message::ConfigIgnored),
-                terminal_safe_error_chain(&error)
+            report_warning(
+                &format!(
+                    "{}: {:#}",
+                    messages::say(messages::Message::ConfigIgnored),
+                    error
+                ),
+                &argv,
             );
             return Cli::parse_from(argv);
         }
@@ -325,10 +378,7 @@ fn bootstrap() -> Cli {
     // that `config check` would reject turns a fixable diagnostic into a
     // baffling error about flags the caller never typed.
     if loaded.has_errors() {
-        eprintln!(
-            "Warning: {}",
-            messages::say(messages::Message::ConfigHasErrors)
-        );
+        report_warning(messages::say(messages::Message::ConfigHasErrors), &argv);
         return Cli::parse_from(argv);
     }
 
@@ -350,9 +400,12 @@ fn bootstrap() -> Cli {
                 .map(|injection| injection.key)
                 .collect::<Vec<_>>()
                 .join(", ");
-            eprintln!(
-                "Warning: {}: {dropped}",
-                messages::say(messages::Message::ConfigKeysNotApplied)
+            report_warning(
+                &format!(
+                    "{}: {dropped}",
+                    messages::say(messages::Message::ConfigKeysNotApplied)
+                ),
+                &argv,
             );
             Cli::parse_from(argv)
         }

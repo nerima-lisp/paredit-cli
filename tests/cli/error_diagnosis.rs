@@ -309,3 +309,69 @@ fn no_selector_reuses_the_target_required_code() {
     let report = error_json(command);
     assert_eq!(code_of(&report), "argument.target-required");
 }
+
+// --- offsets, doc links, and the caret excerpt (section Q) ---
+
+/// A parse failure always names a byte position, and the JSON envelope
+/// carries it and a stable link to the code's documentation.
+#[test]
+fn a_parse_failure_carries_its_offset_and_a_doc_link() {
+    let dir = fresh_temp_dir("diagnosis-offset-json");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun f (x)\n").expect("write fixture");
+
+    let mut command = paredit();
+    command
+        .args(["inspect", "form", "--path", "0", "--file"])
+        .arg(&file);
+
+    let report = error_json(command);
+    assert_eq!(code_of(&report), "input.unparsable");
+    assert!(report["error"]["offset"].is_u64(), "{report}");
+    assert_eq!(
+        report["error"]["doc_url"],
+        "https://nerima-lisp.github.io/paredit-cli/errors/#input.unparsable"
+    );
+}
+
+/// A failure that names no position — a shape refusal, not a location —
+/// prints no caret rather than pointing at a guessed one. `edit raise` has
+/// no `--output`, so this is checked against the text rendering.
+#[test]
+fn a_shape_refusal_prints_no_caret() {
+    let file = lisp("diagnosis-no-offset");
+    let stderr = paredit()
+        .args(["edit", "raise", "--path", "0", "--file"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    let text = String::from_utf8(stderr).expect("UTF-8");
+    assert!(text.starts_with("Error [input.shape-refused]:"), "{text}");
+    assert!(!text.contains(" | "), "{text}");
+}
+
+/// The text rendering of a parse failure shows a caret under the exact
+/// source line, the way `rustc` does — not just the byte number.
+#[test]
+fn a_parse_failure_prints_a_caret_at_the_source_line_in_text_mode() {
+    let dir = fresh_temp_dir("diagnosis-caret");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun f (x)\n  (list x)\n").expect("write fixture");
+
+    // `edit` commands have no `--output`; text is the only format they print.
+    let stderr = paredit()
+        .args(["edit", "raise", "--path", "0", "--file"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    let text = String::from_utf8(stderr).expect("UTF-8");
+    assert!(text.starts_with("Error [input.unparsable]:"), "{text}");
+    assert!(text.contains(" | (defun f (x)"), "{text}");
+    assert!(text.contains('^'), "{text}");
+}
