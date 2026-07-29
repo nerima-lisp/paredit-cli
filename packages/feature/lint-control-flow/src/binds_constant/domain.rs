@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const BINDING_HEADS: [&str; 4] = ["let", "let*", "do", "do*"];
 
@@ -50,49 +52,58 @@ fn binding_variable(binding: &ExpressionView) -> Option<&str> {
 
 #[derive(Debug, Clone)]
 pub struct BindsConstantItem {
-    pub path: PathBuf,
+    /// The span of the offending binding.
     pub span: ByteSpan,
+    /// The 1-based line the binding starts on.
+    pub line: usize,
+    /// The binding operator (`let`, `let*`, `do`, `do*`) as written.
     pub head: String,
+    /// The constant that cannot be bound, as written.
     pub variable: String,
 }
 
-#[derive(Debug)]
-pub struct BindsConstantSummary {
-    pub binding_form_count: usize,
-    pub violations: Vec<BindsConstantItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct BindsConstantPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl BindsConstantPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for BindsConstantItem {
+    /// The rule's own name. The binding operator and the constant are both
+    /// per-finding strings rather than a fixed vocabulary, so neither can be a
+    /// `&'static str` variant; both are reported as fields instead.
+    fn kind(&self) -> &'static str {
+        "binds-constant"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct BindsConstantPolicy {
-    pub fail_on_violation: bool,
-    pub binding_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("head={}", self.head),
+            format!("variable={}", self.variable),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("variable", json!(self.variable)),
+        ]
+    }
+
+    /// The same sentence the `binds-constant` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!("{} cannot bind the constant {}", self.head, self.variable)
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_binding_form(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     binding_form_count: &mut usize,
     violations: &mut Vec<BindsConstantItem>,
 ) {
@@ -123,8 +134,8 @@ pub fn examine_binding_form(
         };
         if is_constant_variable(variable) {
             violations.push(BindsConstantItem {
-                path: path.to_path_buf(),
                 span: binding.span,
+                line: line_of(source, binding.span.start().get()),
                 head: head.to_owned(),
                 variable: variable.to_owned(),
             });
@@ -132,67 +143,77 @@ pub fn examine_binding_form(
     }
 }
 
-/// Collects every `let`/`let*`/`do`/`do*` binding of a constant variable across
-/// a whole file, along with the total number of such binding forms scanned.
-pub fn collect_binds_constant(
+/// Collects every `let`/`let*`/`do`/`do*` binding of a constant variable in one
+/// file, with the number of binding forms scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no constant binding here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_binds_constant_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<BindsConstantItem>)> {
+) -> LintResult<FileFindings<BindsConstantItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("binding_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut binding_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_binding_form(subview, path, &mut binding_form_count, &mut violations);
+            examine_binding_form(subview, source, &mut binding_form_count, &mut violations);
         });
     }
-    Ok((binding_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("binding_form_count", json!(binding_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_binds_constant(
-    binding_form_count: usize,
-    violations: Vec<BindsConstantItem>,
-) -> BindsConstantSummary {
-    BindsConstantSummary {
-        binding_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_binds_constant_policy(
-    options: BindsConstantPolicyOptions,
-    summary: &BindsConstantSummary,
-) -> BindsConstantPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    BindsConstantPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        binding_form_count: summary.binding_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<BindsConstantItem>) {
+    fn report(input: &str) -> FileFindings<BindsConstantItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_binds_constant(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect binds constant")
+        build_binds_constant_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build binds constant report")
+    }
+
+    /// The `(binding_form_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<BindsConstantItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "binding_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("binding_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -271,29 +292,45 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(let ((nil 1)) nil)", Dialect::Clojure).expect("parse");
-        let (binding_form_count, items) =
-            collect_binds_constant(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect binds constant");
-        assert_eq!(binding_form_count, 0);
-        assert!(items.is_empty());
+        let report = build_binds_constant_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build binds constant report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("binding_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (binding_form_count, items) = violations("(let ((nil 1)) nil)");
-        let summary = summarize_binds_constant(binding_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(let ((x 1)) x)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_binds_constant_policy(BindsConstantPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_head_and_its_variable() {
+        let report = report("(defun f ()\n  (let ((t 1)) t))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "binds-constant");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("head", json!("let")), ("variable", json!("t"))]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["head=let".to_owned(), "variable=t".to_owned()]
+        );
+        assert_eq!(finding.message(), "let cannot bind the constant t");
+    }
 
-        let strict =
-            evaluate_binds_constant_policy(BindsConstantPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_binding_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(let ((nil 1)) nil)\n(let ((x 1)) x)\n");
+        assert_eq!(report.summary, vec![("binding_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
