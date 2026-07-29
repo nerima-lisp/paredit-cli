@@ -52,7 +52,7 @@ impl RefactorRootGuard {
                     "refactor root capability identity is unavailable",
                 )
             })?;
-        if !(FilesystemIdentity::from_std(&ambient_metadata) == Some(root_identity)) {
+        if FilesystemIdentity::from_std(&ambient_metadata) != Some(root_identity) {
             return Err(paredit_core_cli::error::FeatureRefusal::message(
                 paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
                 format!(
@@ -83,10 +83,13 @@ impl RefactorRootGuard {
                     "failed to inspect refactor root capability {}",
                     self.canonical_root.display()
                 )))?;
-        if !(ambient_metadata.is_dir()
+        // Named rather than negated inline: the guard is "the root is still
+        // the same directory we opened", and reading that backwards through a
+        // `!(a && b && c)` is how a TOCTOU check gets misread.
+        let root_is_unchanged = ambient_metadata.is_dir()
             && FilesystemIdentity::from_std(&ambient_metadata) == Some(self.root_identity)
-            && FilesystemIdentity::from_cap(&capability_metadata) == Some(self.root_identity))
-        {
+            && FilesystemIdentity::from_cap(&capability_metadata) == Some(self.root_identity);
+        if !root_is_unchanged {
             return Err(paredit_core_cli::error::FeatureRefusal::message(
                 paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
                 format!(
@@ -135,7 +138,9 @@ impl RefactorRootGuard {
             fs::symlink_metadata(&canonical_path).map_err(paredit_core_cli::CliError::io(
                 format!("failed to inspect manifest source {}", path.display()),
             ))?;
-        if !(ambient_metadata.is_file() && !ambient_metadata.file_type().is_symlink()) {
+        let source_is_a_plain_file =
+            ambient_metadata.is_file() && !ambient_metadata.file_type().is_symlink();
+        if !source_is_a_plain_file {
             return Err(paredit_core_cli::error::FeatureRefusal::message(
                 paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
                 format!("refusing non-regular manifest source {}", path.display()),
@@ -164,7 +169,7 @@ impl RefactorRootGuard {
                 "failed to inspect manifest source {}",
                 path.display()
             )))?;
-        if !(metadata.file_type().is_file()) {
+        if !metadata.file_type().is_file() {
             return Err(paredit_core_cli::error::FeatureRefusal::message(
                 paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
                 format!("refusing non-regular manifest source {}", path.display()),
@@ -177,7 +182,7 @@ impl RefactorRootGuard {
                 "manifest source identity is unavailable",
             )
         })?;
-        if !(FilesystemIdentity::from_std(&ambient_metadata) == Some(opened_identity)) {
+        if FilesystemIdentity::from_std(&ambient_metadata) != Some(opened_identity) {
             return Err(paredit_core_cli::error::FeatureRefusal::message(
                 paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
                 format!(
@@ -193,10 +198,10 @@ impl RefactorRootGuard {
             fs::symlink_metadata(&canonical_path).map_err(paredit_core_cli::CliError::io(
                 format!("failed to re-inspect manifest source {}", path.display()),
             ))?;
-        if !(current_ambient_metadata.is_file()
+        let source_is_unchanged = current_ambient_metadata.is_file()
             && !current_ambient_metadata.file_type().is_symlink()
-            && FilesystemIdentity::from_std(&current_ambient_metadata) == Some(opened_identity))
-        {
+            && FilesystemIdentity::from_std(&current_ambient_metadata) == Some(opened_identity);
+        if !source_is_unchanged {
             return Err(paredit_core_cli::error::FeatureRefusal::message(
                 paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
                 format!("manifest source changed while reading: {}", path.display()),

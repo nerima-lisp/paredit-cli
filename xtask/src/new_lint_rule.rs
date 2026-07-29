@@ -41,7 +41,9 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     let rule_dir = package_dir.join("src").join(&snake);
 
     if rule_dir.exists() {
-        return Err(crate::error::XtaskError::refused(format!("{} already exists", rule_dir.display())));
+        return Err(crate::error::XtaskError::refused(format!(
+            "{} already exists", rule_dir.display()
+        )));
     }
 
     write_new_file(

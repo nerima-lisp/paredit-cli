@@ -64,13 +64,13 @@ fn collect_duplicate_candidate_groups(
 }
 
 fn ensure_thresholds(min_group_size: usize, min_node_count: usize) -> CliResult<()> {
-    if !(min_group_size >= 2) {
+    if min_group_size < 2 {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--min-group-size must be at least 2".to_owned(),
         }
         .into());
     }
-    if !(min_node_count >= 2) {
+    if min_node_count < 2 {
         return Err(paredit_core_cli::ArgumentError::FlagCombination {
             message: "--min-node-count must be at least 2".to_owned(),
         }

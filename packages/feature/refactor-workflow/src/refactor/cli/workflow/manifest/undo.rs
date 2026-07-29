@@ -105,7 +105,7 @@ pub fn restore_from_journal(
     root_guard: Option<&RefactorRootGuard>,
 ) -> CliResult<usize> {
     let plan = plan_undo(journal, root_guard)?;
-    if !(plan.blocked.is_empty()) {
+    if !plan.blocked.is_empty() {
         return Err(paredit_core_cli::error::FeatureRefusal::message(
             paredit_core_cli::diagnosis::ErrorCode::RefusalTargetChanged,
             format!(

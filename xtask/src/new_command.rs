@@ -31,7 +31,9 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
     let module_dir = package_dir.join("src").join(&snake);
 
     if module_dir.exists() {
-        return Err(crate::error::XtaskError::refused(format!("{} already exists", module_dir.display())));
+        return Err(crate::error::XtaskError::refused(format!(
+            "{} already exists", module_dir.display()
+        )));
     }
 
     write_new_file(
