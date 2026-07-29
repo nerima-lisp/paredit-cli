@@ -385,6 +385,8 @@ impl Binding {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
+
     use clap::{CommandFactory, Parser};
 
     use paredit_core_config::Origin;
@@ -726,6 +728,64 @@ mod tests {
                     binding.flag
                 );
             }
+        }
+    }
+
+    /// `Scope::Anywhere` is a claim that the flag means the same thing on
+    /// every command declaring it. `--exclude` is the counter-example that
+    /// forced `Scope::Only` to exist — a rule name on `inspect lint`, a path
+    /// on `inspect similarity` — so the claim is checked rather than trusted.
+    ///
+    /// Sameness is approximated by the two things a value can disagree about:
+    /// whether the flag takes one at all, and which values it accepts. A flag
+    /// that is a switch here and an option there is two different flags.
+    #[test]
+    fn an_anywhere_binding_means_the_same_thing_on_every_command() {
+        let root = root();
+        for binding in BINDINGS {
+            if !matches!(binding.scope, Scope::Anywhere) {
+                continue;
+            }
+            let mut shapes = BTreeSet::new();
+            collect_flag_shapes(&root, binding.flag, &mut shapes);
+            assert!(
+                !shapes.is_empty(),
+                "--{} is bound Anywhere but no command declares it",
+                binding.flag
+            );
+            assert_eq!(
+                shapes.len(),
+                1,
+                "--{} is declared with more than one shape, so `Anywhere` is \
+                 claiming two flags are one: {shapes:?}",
+                binding.flag
+            );
+        }
+    }
+
+    /// `(takes a value, accepted values)` for each command declaring `flag`.
+    fn collect_flag_shapes(
+        command: &ClapCommand,
+        flag: &str,
+        shapes: &mut BTreeSet<(bool, Vec<String>)>,
+    ) {
+        for argument in command.get_arguments() {
+            if argument.get_long() != Some(flag) {
+                continue;
+            }
+            let takes_value = matches!(
+                argument.get_action(),
+                clap::ArgAction::Set | clap::ArgAction::Append
+            );
+            let values = argument
+                .get_possible_values()
+                .iter()
+                .map(|value| value.get_name().to_owned())
+                .collect();
+            shapes.insert((takes_value, values));
+        }
+        for subcommand in command.get_subcommands() {
+            collect_flag_shapes(subcommand, flag, shapes);
         }
     }
 
