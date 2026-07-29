@@ -3,36 +3,26 @@ use paredit_core_cli::CommandResult;
 use crate::identical_if_branches::cli::args::IdenticalIfBranchReportArgs;
 use crate::identical_if_branches::cli::render::print_identical_if_branch_report;
 use crate::identical_if_branches::usecase::{
-    IdenticalIfBranchPolicyOptions, collect_identical_if_branches,
-    evaluate_identical_if_branch_policy, summarize_identical_if_branches,
+    build_identical_if_branch_report, evaluate_fail_on_identical_policy,
 };
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn identical_if_branch_report(args: IdenticalIfBranchReportArgs) -> CommandResult {
-    let mut if_form_count = 0;
-    let mut identical = Vec::new();
-
+    let mut reports = Vec::with_capacity(args.files.len());
     for file in &args.files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_if_form_count, file_identical) =
-            collect_identical_if_branches(file, dialect, &tree)?;
-        if_form_count += file_if_form_count;
-        identical.extend(file_identical);
+        reports.push(build_identical_if_branch_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_identical_if_branches(if_form_count, identical);
-    let policy = evaluate_identical_if_branch_policy(
-        IdenticalIfBranchPolicyOptions::new(args.fail_on_identical),
-        &summary,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_identical_policy(args.fail_on_identical, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_identical_if_branch_report(&summary, &policy, args.output)?;
+    print_identical_if_branch_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "identical-if-branch-report policy failed: {policy_message}"
+            "identical-if-branch-report policy failed: {message}"
         )));
     }
 

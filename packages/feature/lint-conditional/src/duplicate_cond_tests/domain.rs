@@ -16,60 +16,72 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateCondTestItem {
-    pub path: PathBuf,
+    /// The span of the whole `cond` form the repeat was found in.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     pub test: String,
     pub occurrence_count: usize,
 }
 
-#[derive(Debug)]
-pub struct DuplicateCondTestSummary {
-    pub cond_form_count: usize,
-    pub duplicates: Vec<DuplicateCondTestItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateCondTestPolicyOptions {
-    fail_on_duplicate: bool,
-}
-
-impl DuplicateCondTestPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_duplicate: bool) -> Self {
-        Self { fail_on_duplicate }
+impl Finding for DuplicateCondTestItem {
+    /// The rule's own name rather than the repeated test: a `cond` test is an
+    /// arbitrary expression, so there is no closed set of `&'static str` names
+    /// to draw a kind from. The test itself stays a JSON field and a column.
+    fn kind(&self) -> &'static str {
+        "duplicate-cond-tests"
     }
 
-    #[must_use]
-    pub const fn fail_on_duplicate(self) -> bool {
-        self.fail_on_duplicate
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DuplicateCondTestPolicy {
-    pub fail_on_duplicate: bool,
-    pub cond_form_count: usize,
-    pub duplicate_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("test={}", self.test),
+            format!("count={}", self.occurrence_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("test", json!(self.test)),
+            ("occurrence_count", json!(self.occurrence_count)),
+        ]
+    }
+
+    /// The same sentence the `duplicate-cond-tests` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "cond repeats test {} ({}×)",
+            self.test, self.occurrence_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cond(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     cond_form_count: &mut usize,
     duplicates: &mut Vec<DuplicateCondTestItem>,
 ) {
@@ -106,8 +118,8 @@ pub fn examine_cond(
         }
         if occurrence_count >= 2 {
             duplicates.push(DuplicateCondTestItem {
-                path: path.to_path_buf(),
                 span: view.span,
+                line: line_of(source, view.span.start().get()),
                 test: render_expression(tests[anchor]),
                 occurrence_count,
             });
@@ -115,67 +127,76 @@ pub fn examine_cond(
     }
 }
 
-/// Collects every duplicated `cond` test across a whole file, along with the
-/// total number of `cond` forms scanned.
-pub fn collect_duplicate_cond_tests(
+/// Collects every duplicated `cond` test in one file, with the number of `cond`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated test here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_duplicate_cond_test_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateCondTestItem>)> {
+) -> LintResult<FileFindings<DuplicateCondTestItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("cond_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut cond_form_count = 0;
     let mut duplicates = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_cond(subview, path, &mut cond_form_count, &mut duplicates);
+            examine_cond(subview, source, &mut cond_form_count, &mut duplicates);
         });
     }
-    Ok((cond_form_count, duplicates))
-}
 
-#[must_use]
-pub const fn summarize_duplicate_cond_tests(
-    cond_form_count: usize,
-    duplicates: Vec<DuplicateCondTestItem>,
-) -> DuplicateCondTestSummary {
-    DuplicateCondTestSummary {
-        cond_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
         duplicates,
-    }
+        vec![("cond_form_count", json!(cond_form_count))],
+    ))
 }
 
-#[must_use]
-pub fn evaluate_duplicate_cond_test_policy(
-    options: DuplicateCondTestPolicyOptions,
-    summary: &DuplicateCondTestSummary,
-) -> DuplicateCondTestPolicy {
-    let duplicate_count = summary.duplicates.len();
-    let mut violations = Vec::new();
-    if options.fail_on_duplicate() && duplicate_count > 0 {
-        violations.push(format!("duplicate_count {duplicate_count} exceeds 0"));
-    }
-
-    DuplicateCondTestPolicy {
-        fail_on_duplicate: options.fail_on_duplicate(),
-        cond_form_count: summary.cond_form_count,
-        duplicate_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn duplicates(input: &str) -> (usize, Vec<DuplicateCondTestItem>) {
+    fn report(input: &str) -> FileFindings<DuplicateCondTestItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_duplicate_cond_tests(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect duplicate cond tests")
+        build_duplicate_cond_test_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build duplicate cond test report")
+    }
+
+    /// The `(cond_form_count, duplicates)` pair the report is built from.
+    fn duplicates(input: &str) -> (u64, Vec<DuplicateCondTestItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "cond_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("cond_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -214,32 +235,44 @@ mod tests {
         assert_eq!(duplicates.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(cond ((foo) 1) ((foo) 2))").expect("parse input");
-        let (cond_form_count, duplicates) =
-            collect_duplicate_cond_tests(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect duplicate cond tests");
-        assert_eq!(cond_form_count, 0);
-        assert!(duplicates.is_empty());
+        let report =
+            build_duplicate_cond_test_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build duplicate cond test report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("cond_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (cond_form_count, items) = duplicates("(cond ((foo) 1) ((foo) 2))");
-        let summary = summarize_duplicate_cond_tests(cond_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(cond ((foo) 1) ((bar) 2))").dialect_modelled);
+    }
 
-        let quiet = evaluate_duplicate_cond_test_policy(
-            DuplicateCondTestPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_test_and_its_count() {
+        let report = report("(defun f ()\n  (cond ((foo) 1) ((foo) 2)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "duplicate-cond-tests");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("test", json!("(foo)")), ("occurrence_count", json!(2))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.duplicate_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["test=(foo)".to_owned(), "count=2".to_owned()]
+        );
+    }
 
-        let strict = evaluate_duplicate_cond_test_policy(
-            DuplicateCondTestPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_cond_scanned_not_only_the_flagged_ones() {
+        let report = report("(cond ((foo) 1) ((foo) 2))\n(cond ((a) 1) ((b) 2))\n");
+        assert_eq!(report.summary, vec![("cond_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

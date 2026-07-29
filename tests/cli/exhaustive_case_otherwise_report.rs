@@ -14,7 +14,9 @@ fn cli_reports_a_t_clause_in_ecase() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"case_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"ecase\""))
         .stdout(predicate::str::contains("\"designator\": \"t\""));
 }
@@ -33,7 +35,7 @@ fn cli_reports_an_otherwise_clause_in_etypecase() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"etypecase\""));
 }
 
@@ -51,7 +53,11 @@ fn cli_does_not_flag_case_default_or_normal_ecase() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "the one exhaustive form here has
+        // no default" from "no exhaustive form at all"; `case` is not counted.
+        .stdout(predicate::str::contains("\"case_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
 #[test]
@@ -68,7 +74,46 @@ fn cli_does_not_flag_a_literal_t_key_list() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("exhaustive-case-otherwise-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn f [x] (ecase x (1 :a) (t :b)))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "exhaustive-case-otherwise", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_exhaustive_case_otherwise_emits_sarif() {
+    let dir = fresh_temp_dir("exhaustive-case-otherwise-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(ecase x (1 :one) (t :default))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "exhaustive-case-otherwise", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/exhaustive-case-otherwise/exhaustive-case-otherwise\"",
+        ))
+        .stdout(predicate::str::contains(
+            "ecase does not permit a t clause (it is exhaustive)",
+        ));
 }
 
 #[test]
@@ -105,5 +150,5 @@ fn cli_exhaustive_case_otherwise_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
