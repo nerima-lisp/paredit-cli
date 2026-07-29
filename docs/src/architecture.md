@@ -17,7 +17,7 @@ core/syntax ──▶ core/semantics ──▶ core/edit ──▶ core/cli
      └──▶ core/workspace          core/lint-engine ──┘
                     │
                     ▼
-              feature/*  (24 packages, mostly independent of each other)
+              feature/*  (29 packages, mostly independent of each other)
                     │
                     ▼
               paredit-cli  (command tree, dispatch, REGISTRY)
