@@ -33,12 +33,21 @@ pub struct FormatArgs {
     /// Number of spaces per nesting level.
     #[arg(long, default_value_t = 2)]
     pub indent: usize,
+    /// Width, in columns, one inline (non-wrapped) line may reach before
+    /// falling back to a multi-line layout. Unset keeps the built-in 80.
+    #[arg(long, value_name = "COLUMNS")]
+    pub max_width: Option<usize>,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
     pub write: bool,
     /// Print a unified diff against the input instead of the rewritten document.
     #[arg(long)]
     pub diff: bool,
+    /// Exit non-zero if --file is not already canonically formatted. Writes
+    /// and prints nothing either way; for a CI gate that only wants an exit
+    /// code, not `--diff`'s output on every clean file too.
+    #[arg(long, conflicts_with_all = ["write", "diff"])]
+    pub check: bool,
 }
 
 #[derive(Debug, Args)]

@@ -854,3 +854,45 @@ fn clojure_layouts_do_not_leak_into_other_dialects() {
         )
     );
 }
+
+#[test]
+fn with_max_width_narrows_the_inline_fit_threshold() {
+    // A plain call (`ListStyle::General`) is the one shape `compact_node`
+    // will inline at all — binding/definition-style heads like `defun`/`let`
+    // always break onto multiple lines regardless of width.
+    let input = "(foo (bar 1 2) (baz 3 4))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let default = Formatter::new(2).format(&tree);
+    assert_eq!(
+        default, "(foo (bar 1 2) (baz 3 4))\n",
+        "fits inline by default"
+    );
+
+    let narrowed = Formatter::new(2).with_max_width(10).format(&tree);
+    assert_ne!(
+        narrowed, default,
+        "a budget narrower than the form itself must stop it fitting inline"
+    );
+    assert!(narrowed.contains('\n'));
+}
+
+#[test]
+fn with_max_width_widens_the_inline_fit_threshold() {
+    // 89 columns: past the compiled-in 80-column default, so this wraps
+    // there, but comfortably inside a widened budget.
+    let input =
+        "(some-function-name argument-one argument-two argument-three argument-four argument-five)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let default = Formatter::new(2).format(&tree);
+    assert!(
+        default.contains('\n'),
+        "89 columns must not fit inline at the compiled-in default"
+    );
+
+    let widened = Formatter::new(2).with_max_width(200).format(&tree);
+    assert_eq!(
+        widened,
+        format!("{input}\n"),
+        "fits on one line once widened"
+    );
+}

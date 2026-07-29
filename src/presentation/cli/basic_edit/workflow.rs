@@ -19,8 +19,30 @@ use paredit_core_cli::kill_ring::{KillRingEntry, read_ring, ring_path, write_rin
 use paredit_core_syntax::selector::target_text;
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
+    let check = args.check;
+    let max_width = args.max_width;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    let rendered = Formatter::with_dialect(args.indent, dialect).format(&tree);
+    let mut formatter = Formatter::with_dialect(args.indent, dialect);
+    if let Some(max_width) = max_width {
+        formatter = formatter.with_max_width(max_width);
+    }
+    let rendered = formatter.format(&tree);
+
+    if check {
+        // Neither writes nor prints a diff: a CI gate that runs this over
+        // every file in a tree wants one exit code per file, not a diff
+        // dumped for every clean one too. `edit format --diff` is still
+        // there for "and show me what changed".
+        if rendered == input.text {
+            return Ok(());
+        }
+        let where_ = input
+            .file
+            .as_deref()
+            .map_or_else(|| "stdin".to_owned(), |path| path.display().to_string());
+        bail!("{where_} is not formatted; drop --check to see the diff or write it");
+    }
+
     Ok(emit_document(
         &input, dialect, args.write, args.diff, rendered,
     )?)
