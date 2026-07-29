@@ -149,6 +149,8 @@ mod emacs_lisp_file_report;
 mod empty_body_report;
 #[path = "cli/empty_let_report.rs"]
 mod empty_let_report;
+#[path = "cli/encoding_write.rs"]
+mod encoding_write;
 #[path = "cli/eq_char_comparison_report.rs"]
 mod eq_char_comparison_report;
 #[path = "cli/eq_number_comparison_report.rs"]
@@ -537,6 +539,8 @@ mod verbose_negation_report;
 mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]
 mod workspace_report;
+#[path = "cli/writability_report.rs"]
+mod writability_report;
 #[path = "cli/write_scope.rs"]
 mod write_scope;
 #[path = "cli/zero_divisor_report.rs"]
