@@ -72,7 +72,16 @@ fn capabilities_reports_the_canonical_namespaces_and_meta_commands() {
         .collect::<Vec<_>>();
     assert_eq!(
         commands,
-        ["inspect", "edit", "refactor", "config", "completions"]
+        [
+            "inspect",
+            "edit",
+            "refactor",
+            "config",
+            "lsp",
+            "mcp",
+            "serve",
+            "completions"
+        ]
     );
 }
 

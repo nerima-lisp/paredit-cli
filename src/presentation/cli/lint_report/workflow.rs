@@ -8,7 +8,7 @@ use crate::application::usecase::lint_report::{
     run_lint_pass, summarize_lint_findings,
 };
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
-use crate::presentation::cli::lint_report::args::LintReportArgs;
+use crate::presentation::cli::lint_report::args::{EmitFormat, LintReportArgs};
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
 use crate::presentation::cli::lint_report::render::{
@@ -19,6 +19,9 @@ use crate::presentation::cli::lint_report::render::{
     print_lint_suppression_removal, print_lint_tags, print_lint_timings,
     print_lint_unused_suppressions,
 };
+use paredit_core_cli::report::FindingSeverity;
+use paredit_core_cli::report::interop::{self, Flattened, Row};
+
 use crate::presentation::cli::shared::{
     apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree, stable_text_hash,
     unified_diff, write_file_with_rollback,
@@ -361,12 +364,16 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
         return lint_report_timings(&args, &files, &active, &settings);
     }
 
-    if args.sarif {
+    if args.sarif || args.emit == Some(EmitFormat::Sarif) {
         return lint_report_sarif(&args, &files, &active, &meta, &custom, &settings);
     }
 
-    if args.github {
+    if args.github || args.emit == Some(EmitFormat::Github) {
         return lint_report_github(&args, &files, &active, &meta, &custom);
+    }
+
+    if let Some(format) = args.emit {
+        return lint_report_interop(format, &args, &files, &active, &meta, &custom);
     }
 
     if args.stats {
@@ -1054,6 +1061,112 @@ fn lint_report_unused_suppressions(
     }
 
     Ok(())
+}
+
+/// Emits findings in one of the interchange formats the report envelope
+/// already knows how to write.
+///
+/// Lint findings are not `FileFindings`, so this builds the flattened rows the
+/// envelope's emitters consume directly rather than routing through a trait
+/// impl. That is the whole adapter: a lint finding is already a rule, a path, a
+/// span, and a message, which is exactly a row.
+///
+/// SARIF and GitHub annotations are deliberately *not* handled here. Both have
+/// a richer lint-specific rendering — SARIF advertises the whole rule catalogue
+/// and carries the auto-fixes, GitHub carries a column — and reaching them
+/// through the generic path would be a downgrade.
+fn lint_report_interop(
+    format: EmitFormat,
+    args: &LintReportArgs,
+    files: &[std::path::PathBuf],
+    active: &[&str],
+    meta: &RuleMetaResolver<'_>,
+    custom: &CustomRules,
+) -> Result<()> {
+    let baseline = load_baseline(args)?;
+    let mut rows = Vec::new();
+    let mut finding_rules: Vec<&'static str> = Vec::new();
+
+    for file in files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let findings = merge_custom(
+            collect_lint_findings(file, dialect, &tree)?,
+            custom,
+            file,
+            &tree,
+            &input.text,
+        );
+        let findings = retain_unsuppressed(findings, &input.text, &tree);
+        let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
+        for finding in findings {
+            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
+                continue;
+            }
+            finding_rules.push(finding.rule);
+            let start = finding.span.start().get();
+            let (line, _) = line_and_column(&input.text, start);
+            rows.push(Row {
+                path: finding.path.display().to_string(),
+                dialect: dialect.label(),
+                kind: finding.rule,
+                severity: match meta.severity(finding.rule) {
+                    Severity::Error => FindingSeverity::Error,
+                    Severity::Warning => FindingSeverity::Warning,
+                },
+                line,
+                span_start: start,
+                span_end: finding.span.end().get(),
+                message: finding.message,
+                fields: vec![("category", serde_json::json!(meta.category(finding.rule)))],
+            });
+        }
+    }
+
+    let gate = gate_message(&finding_rules, args, meta.overrides());
+    let flat = Flattened {
+        command: "inspect lint",
+        rows,
+        // Every dialect this build parses has at least one applicable rule, so
+        // lint has no "not examined" class to report.
+        skipped: Vec::new(),
+        file_count: files.len(),
+        gate: gate_flag(args),
+        gate_passed: gate.is_none(),
+        violations: gate.iter().cloned().collect(),
+    };
+
+    match format {
+        EmitFormat::Junit => print!("{}", interop::junit(&flat)),
+        EmitFormat::CodeClimate => println!(
+            "{}",
+            serde_json::to_string_pretty(&interop::code_climate(&flat))?
+        ),
+        EmitFormat::Csv => print!("{}", interop::delimited(&flat, true)),
+        EmitFormat::Tsv => print!("{}", interop::delimited(&flat, false)),
+        EmitFormat::Html => print!("{}", interop::html(&flat)),
+        EmitFormat::Markdown => print!("{}", interop::markdown(&flat)),
+        // Routed to their richer lint-specific renderers before this call.
+        EmitFormat::Sarif | EmitFormat::Github => unreachable!(),
+    }
+
+    if let Some(message) = gate {
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
+            "lint-report policy failed: {message}"
+        )));
+    }
+
+    Ok(())
+}
+
+/// Which flag armed the gate, for the formats that report it.
+const fn gate_flag(args: &LintReportArgs) -> Option<&'static str> {
+    if args.fail_on.is_some() {
+        Some("--fail-on")
+    } else if args.fail_on_finding {
+        Some("--fail-on-finding")
+    } else {
+        None
+    }
 }
 
 /// Emits findings from the active rules as GitHub Actions annotations

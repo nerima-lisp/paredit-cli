@@ -653,6 +653,7 @@ dependencies = [
  "paredit-core-cli",
  "paredit-core-config",
  "paredit-core-edit",
+ "paredit-core-jsonrpc",
  "paredit-core-lint-engine",
  "paredit-core-semantics",
  "paredit-core-syntax",
@@ -687,6 +688,7 @@ dependencies = [
  "paredit-feature-selector",
  "paredit-feature-semantic-report",
  "paredit-feature-similarity",
+ "paredit-feature-structural-diff",
  "predicates",
  "proptest",
  "serde_json",
@@ -731,6 +733,14 @@ dependencies = [
  "paredit-core-semantics",
  "paredit-core-syntax",
  "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-core-jsonrpc"
+version = "1.2.1"
+dependencies = [
+ "serde_json",
  "thiserror",
 ]
 
@@ -1180,6 +1190,18 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-structural-diff"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

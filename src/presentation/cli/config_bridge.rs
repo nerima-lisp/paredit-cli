@@ -731,43 +731,72 @@ mod tests {
         }
     }
 
-    /// `Scope::Anywhere` is a claim that the flag means the same thing on
-    /// every command declaring it. `--exclude` is the counter-example that
-    /// forced `Scope::Only` to exist — a rule name on `inspect lint`, a path
-    /// on `inspect similarity` — so the claim is checked rather than trusted.
+    /// `Scope::Anywhere` is a claim, and the claim that matters is narrower
+    /// than "same flag everywhere": it is *every value this key can inject is
+    /// a value every command declaring the flag accepts*.
     ///
-    /// Sameness is approximated by the two things a value can disagree about:
-    /// whether the flag takes one at all, and which values it accepts. A flag
-    /// that is a switch here and an option there is two different flags.
+    /// The distinction is live. `--output` accepts `text` and `json`
+    /// everywhere, and additionally `sarif`, `junit`, `csv` and the rest on
+    /// the reports that carry CI interchange formats. That is not two flags —
+    /// it is one flag with a wider vocabulary in some places — and
+    /// `output.format` is a `Choice` of `text` and `json`, so nothing it can
+    /// produce is ever rejected.
+    ///
+    /// What would be two flags is a `--flag` that takes a value here and none
+    /// there, so that is checked too.
     #[test]
-    fn an_anywhere_binding_means_the_same_thing_on_every_command() {
+    fn an_anywhere_binding_can_only_inject_values_every_command_accepts() {
         let root = root();
         for binding in BINDINGS {
             if !matches!(binding.scope, Scope::Anywhere) {
                 continue;
             }
-            let mut shapes = BTreeSet::new();
-            collect_flag_shapes(&root, binding.flag, &mut shapes);
+            let mut declarations = Vec::new();
+            collect_flag_declarations(&root, binding.flag, &mut declarations);
             assert!(
-                !shapes.is_empty(),
+                !declarations.is_empty(),
                 "--{} is bound Anywhere but no command declares it",
                 binding.flag
             );
+
+            let takes_value: BTreeSet<bool> =
+                declarations.iter().map(|(takes, _)| *takes).collect();
             assert_eq!(
-                shapes.len(),
+                takes_value.len(),
                 1,
-                "--{} is declared with more than one shape, so `Anywhere` is \
-                 claiming two flags are one: {shapes:?}",
+                "--{} takes a value on some commands and not others, so `Anywhere` \
+                 is claiming two flags are one",
                 binding.flag
             );
+
+            let Some(choices) = paredit_core_config::schema::lookup(binding.key)
+                .and_then(|entry| entry.kind.choices())
+            else {
+                continue;
+            };
+            for (_, accepted) in &declarations {
+                if accepted.is_empty() {
+                    // The command constrains nothing, so it accepts anything.
+                    continue;
+                }
+                for choice in choices {
+                    assert!(
+                        accepted.iter().any(|value| value == choice),
+                        "`{}` can be set to \"{choice}\", which --{} does not accept \
+                         on every command ({accepted:?})",
+                        binding.key,
+                        binding.flag
+                    );
+                }
+            }
         }
     }
 
     /// `(takes a value, accepted values)` for each command declaring `flag`.
-    fn collect_flag_shapes(
+    fn collect_flag_declarations(
         command: &ClapCommand,
         flag: &str,
-        shapes: &mut BTreeSet<(bool, Vec<String>)>,
+        found: &mut Vec<(bool, Vec<String>)>,
     ) {
         for argument in command.get_arguments() {
             if argument.get_long() != Some(flag) {
@@ -782,10 +811,10 @@ mod tests {
                 .iter()
                 .map(|value| value.get_name().to_owned())
                 .collect();
-            shapes.insert((takes_value, values));
+            found.push((takes_value, values));
         }
         for subcommand in command.get_subcommands() {
-            collect_flag_shapes(subcommand, flag, shapes);
+            collect_flag_declarations(subcommand, flag, found);
         }
     }
 

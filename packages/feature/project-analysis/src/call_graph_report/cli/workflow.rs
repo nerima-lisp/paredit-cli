@@ -1,11 +1,12 @@
 use anyhow::Result;
 
 use crate::call_graph_report::cli::args::CallGraphArgs;
-use crate::call_graph_report::cli::render::print_call_graph_report;
+use crate::call_graph_report::cli::render::{call_graph_drawing, print_call_graph_report};
 use crate::call_graph_report::usecase::{
     CallGraphPolicyOptions, CallGraphReportSource, build_call_graph_report,
     evaluate_call_graph_policy,
 };
+use paredit_core_cli::report::graph::print_graph;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn call_graph(args: CallGraphArgs) -> Result<()> {
@@ -33,14 +34,17 @@ pub fn call_graph(args: CallGraphArgs) -> Result<()> {
         )
         .map_err(anyhow::Error::msg)?,
     );
-    print_call_graph_report(
-        &report.files,
-        &report.nodes_by_name,
-        symbol,
-        args.include_external,
-        &policy,
-        args.output,
-    )?;
+    match args.graph {
+        Some(format) => print_graph(&call_graph_drawing(&report.files, symbol), format),
+        None => print_call_graph_report(
+            &report.files,
+            &report.nodes_by_name,
+            symbol,
+            args.include_external,
+            &policy,
+            args.output,
+        )?,
+    }
     if !policy.passed {
         return Err(paredit_core_cli::gate::gate_failure(
             "call-graph policy failed",

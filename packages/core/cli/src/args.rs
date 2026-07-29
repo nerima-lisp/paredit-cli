@@ -361,6 +361,106 @@ pub enum OutputFormat {
     Json,
 }
 
+/// The formats a *finding report* can be printed in.
+///
+/// A superset of [`OutputFormat`], and deliberately a separate type rather than
+/// extra variants on it. `--output` is on nearly every command in this tool,
+/// but only the commands that go through the shared report envelope produce a
+/// list of located findings — the shape SARIF, JUnit, and Code Climate all
+/// describe. Widening [`OutputFormat`] would advertise `--output sarif` on
+/// `edit format`, which has nothing to put in a SARIF result, and the failure
+/// would arrive at runtime instead of in the catalog.
+///
+/// Keeping the two apart means `inspect capabilities` reports the true format
+/// set per command, so an agent can read what a command accepts rather than
+/// discover it by being rejected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ReportFormat {
+    /// Tab-separated rows, one per finding. The default for terminal reading.
+    Text,
+    /// The tool's own JSON envelope.
+    Json,
+    /// SARIF 2.1.0, for GitHub code scanning and other SARIF ingesters.
+    Sarif,
+    /// JUnit XML, for the test-report panel of a CI system.
+    Junit,
+    /// Code Climate issue JSON, which GitLab Code Quality consumes.
+    CodeClimate,
+    /// RFC 4180 comma-separated values, for a spreadsheet.
+    Csv,
+    /// Tab-separated values with a header row, for `cut`/`awk`.
+    Tsv,
+    /// A standalone HTML page, shareable without the tool.
+    Html,
+    /// A Markdown table, for a pull request comment or an issue.
+    Markdown,
+    /// GitHub Actions workflow commands, rendered inline on the pull request.
+    Github,
+}
+
+/// The drawing languages `--graph` can emit.
+///
+/// A separate option from `--output` rather than more `--output` values,
+/// because it selects a different *view*, not a different serialization of the
+/// same one. `--output json` and `--output csv` carry every field a report
+/// computed; a graph carries the node and edge structure and drops the spans,
+/// counts, and policy verdict that do not belong in a picture. Presenting that
+/// as one more encoding of the report would misdescribe what a caller gets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum GraphFormat {
+    /// Graphviz DOT, for `dot -Tsvg`.
+    Dot,
+    /// Mermaid `flowchart`, which GitHub and GitLab render inline in Markdown.
+    Mermaid,
+}
+
+impl GraphFormat {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Dot => "dot",
+            Self::Mermaid => "mermaid",
+        }
+    }
+}
+
+impl From<OutputFormat> for ReportFormat {
+    fn from(value: OutputFormat) -> Self {
+        match value {
+            OutputFormat::Text => Self::Text,
+            OutputFormat::Json => Self::Json,
+        }
+    }
+}
+
+impl ReportFormat {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Json => "json",
+            Self::Sarif => "sarif",
+            Self::Junit => "junit",
+            Self::CodeClimate => "code-climate",
+            Self::Csv => "csv",
+            Self::Tsv => "tsv",
+            Self::Html => "html",
+            Self::Markdown => "markdown",
+            Self::Github => "github",
+        }
+    }
+
+    /// Whether this format is one of the two the tool defines itself.
+    ///
+    /// The rest are other people's schemas, which is what makes them worth
+    /// keeping apart: a change to `text` or `json` is this tool's decision, and
+    /// a change to SARIF is not.
+    #[must_use]
+    pub const fn is_native(self) -> bool {
+        matches!(self, Self::Text | Self::Json)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum MoveInsert {
     Append,

@@ -6,7 +6,23 @@ use clap::builder::Command as ClapCommand;
 use clap::{Arg, ArgAction, Args, CommandFactory, ValueEnum};
 use serde_json::{Value, json};
 
+mod schema;
+
 use super::args::OutputFormat;
+
+/// What the command prints: the catalog, or the schema the catalog conforms to.
+///
+/// A mode rather than a separate command because the two share the version
+/// selector, and pairing them means a caller cannot ask for a version 3 schema
+/// and read a version 1 catalog by mistyping a subcommand.
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CapabilitiesEmit {
+    /// The catalog of every command, flag, default, and enum value.
+    Catalog,
+    /// The JSON Schema (draft 2020-12) the catalog conforms to, so a consumer
+    /// can generate types from it or validate against it.
+    Schema,
+}
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum CapabilitiesSchemaVersion {
@@ -42,9 +58,24 @@ pub(super) struct CapabilitiesArgs {
     /// Machine-readable schema version.
     #[arg(long, value_enum, default_value = "1")]
     schema_version: CapabilitiesSchemaVersion,
+
+    /// Print the JSON Schema the catalog conforms to instead of the catalog.
+    /// Honours --schema-version; ignores --output, since a schema is JSON.
+    #[arg(long, value_enum, default_value_t = CapabilitiesEmit::Catalog)]
+    emit: CapabilitiesEmit,
 }
 
 pub(super) fn capabilities(args: CapabilitiesArgs) -> Result<()> {
+    if matches!(args.emit, CapabilitiesEmit::Schema) {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&schema::capabilities_schema(
+                args.schema_version.number()
+            ))?
+        );
+        return Ok(());
+    }
+
     // Built, not merely constructed: `clap` copies a `global = true` argument
     // into each subcommand during `build`, and an unbuilt tree would publish a
     // catalogue missing the flags that apply everywhere.
