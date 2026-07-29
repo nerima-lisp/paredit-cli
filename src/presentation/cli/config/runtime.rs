@@ -60,6 +60,7 @@ pub fn resolve(settings: &Settings) -> RuntimeSettings {
         dry_run: false,
         new_file_mode: None,
         refuse_symlinked_ancestors: false,
+        source_encoding: None,
     }
 }
 

@@ -135,6 +135,41 @@ pub struct RuntimeSettings {
     /// for a caller who wants the stricter policy — CI writing into a
     /// less-trusted checkout, for instance — not a universal default.
     pub refuse_symlinked_ancestors: bool,
+    /// The declared encoding of source files this run reads, when it is not
+    /// UTF-8.
+    ///
+    /// `None` keeps the existing strict-UTF-8 read path. Read-only commands
+    /// work normally against a legacy (Shift_JIS, EUC-JP, ISO-8859-1, ...)
+    /// source file once this is set; a write is refused instead of silently
+    /// re-encoding the file to UTF-8 — see [`writes_are_supported`].
+    pub source_encoding: Option<&'static encoding_rs::Encoding>,
+}
+
+impl RuntimeSettings {
+    /// Whether this run's declared encoding still allows a write.
+    ///
+    /// Only UTF-8 (the built-in default) round-trips today: decoding a
+    /// legacy encoding to the UTF-8 this tool works in internally, then
+    /// writing that UTF-8 back out, would silently change the file's
+    /// encoding. Refusing is safer than guessing which of "keep re-encoding
+    /// it back" or "this file's encoding never actually mattered to you" the
+    /// caller meant.
+    #[must_use]
+    pub fn writes_are_supported(&self) -> bool {
+        self.source_encoding
+            .is_none_or(|encoding| std::ptr::eq(encoding, encoding_rs::UTF_8))
+    }
+}
+
+/// Parses `--encoding`'s value: a WHATWG encoding label (`shift_jis`,
+/// `euc-jp`, `iso-8859-1`, `windows-1252`, `utf-8`, ...), case-insensitive,
+/// including the common aliases browsers accept.
+///
+/// # Errors
+///
+/// Returns the label back, unrecognized, if it names no known encoding.
+pub fn parse_source_encoding(label: &str) -> Result<&'static encoding_rs::Encoding, &str> {
+    encoding_rs::Encoding::for_label(label.as_bytes()).ok_or(label)
 }
 
 static RUNTIME: OnceLock<RuntimeSettings> = OnceLock::new();

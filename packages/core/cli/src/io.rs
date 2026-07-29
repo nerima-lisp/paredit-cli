@@ -303,10 +303,48 @@ pub fn read_text_with_limit(reader: impl Read, limit: u64, description: &str) ->
         }
         .into());
     }
-    String::from_utf8(bytes).map_err(|source| CliError::NotUtf8 {
-        description: description.to_owned(),
-        source,
-    })
+    decode_source_bytes(bytes, description)
+}
+
+/// Decodes a document's bytes to the `String` every reader downstream works
+/// in, honoring `--encoding` when one was given.
+///
+/// Strict either way: with no declared encoding, invalid UTF-8 is a hard
+/// error exactly as `String::from_utf8` already made it; with one declared,
+/// a byte sequence that encoding cannot represent is a hard error too, rather
+/// than the lossy replacement-character decode `encoding_rs` would produce by
+/// default. A caller that silently got `\u{fffd}` in place of real text could
+/// analyze or rewrite around it without ever finding out the input was wrong.
+fn decode_source_bytes(bytes: Vec<u8>, description: &str) -> CliResult<String> {
+    decode_source_bytes_as(
+        bytes,
+        description,
+        crate::runtime::current().source_encoding,
+    )
+}
+
+/// The encoding-parameterized half of [`decode_source_bytes`], split out so a
+/// test can exercise every branch without touching the process-wide runtime
+/// setting.
+fn decode_source_bytes_as(
+    bytes: Vec<u8>,
+    description: &str,
+    encoding: Option<&'static encoding_rs::Encoding>,
+) -> CliResult<String> {
+    let Some(encoding) = encoding else {
+        return String::from_utf8(bytes).map_err(|source| CliError::NotUtf8 {
+            description: description.to_owned(),
+            source,
+        });
+    };
+    let (decoded, _, had_errors) = encoding.decode(&bytes);
+    if had_errors {
+        return Err(CliError::NotValidEncoding {
+            description: description.to_owned(),
+            encoding: encoding.name(),
+        });
+    }
+    Ok(decoded.into_owned())
 }
 
 pub fn read_text_file_with_limit(path: &FsPath, limit: u64) -> CliResult<String> {
@@ -857,9 +895,7 @@ fn stage_and_apply_portable<T>(
     files: Vec<T>,
     mut stage: impl FnMut(T) -> CliResult<PortableStagedWrite>,
 ) -> CliResult<()> {
-    if crate::runtime::current().dry_run {
-        return Err(IoRefusal::DryRun.into());
-    }
+    ensure_writes_are_permitted()?;
 
     let mut staged = Vec::with_capacity(files.len());
     for file in files {
@@ -934,24 +970,43 @@ fn restore_published_writes_portable(staged: &[PortableStagedWrite], failed_inde
     }
 }
 
+/// The backstop shared by both write paths, checked once per batch before any
+/// staging begins.
+///
+/// `--dry-run`: the argument layer already removes `--write`, which covers
+/// the ~80 commands that spell writing that way and leaves them printing a
+/// preview. It does *not* cover the ones that spell it differently —
+/// `inspect lint --fix` and `--write-baseline` are the live examples — and
+/// "nothing is written" has to be true for all of them or it is not a
+/// guarantee anyone can rely on. Refusing here rather than silently
+/// skipping: a command that reports success without doing what it said would
+/// be a worse failure than an error naming the flag responsible.
+///
+/// `--encoding`: this tool works in UTF-8 internally regardless of what
+/// `--encoding` declared, so writing that back out under a non-UTF-8 label
+/// without re-encoding would silently change the file's on-disk bytes.
+/// Refused for the same reason as dry-run — quietly doing something other
+/// than what was asked is worse than naming the conflicting flag.
+fn ensure_writes_are_permitted() -> CliResult<()> {
+    if crate::runtime::current().dry_run {
+        return Err(IoRefusal::DryRun.into());
+    }
+    if !crate::runtime::current().writes_are_supported() {
+        let encoding = crate::runtime::current()
+            .source_encoding
+            .expect("writes_are_supported already confirmed a non-UTF-8 encoding is set")
+            .name();
+        return Err(IoRefusal::WriteRequiresUtf8Encoding { encoding }.into());
+    }
+    Ok(())
+}
+
 #[cfg(unix)]
 fn stage_and_apply<T>(
     files: Vec<T>,
     mut stage: impl FnMut(T) -> CliResult<StagedWriteTarget>,
 ) -> CliResult<()> {
-    // The backstop for `--dry-run`. The argument layer already removes
-    // `--write`, which covers the ~80 commands that spell writing that way and
-    // leaves them printing a preview. It does *not* cover the ones that spell
-    // it differently — `inspect lint --fix` and `--write-baseline` are the
-    // live examples — and "nothing is written" has to be true for all of them
-    // or it is not a guarantee anyone can rely on.
-    //
-    // Refusing here rather than silently skipping: a command that reports
-    // success without doing what it said would be a worse failure than an
-    // error naming the flag responsible.
-    if crate::runtime::current().dry_run {
-        return Err(IoRefusal::DryRun.into());
-    }
+    ensure_writes_are_permitted()?;
 
     let mut staged = Vec::with_capacity(files.len());
     for file in files {
@@ -3615,6 +3670,7 @@ fn lock_holder_is_stale(_lock_path: &FsPath) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::RuntimeSettings;
 
     #[cfg(unix)]
     #[test]
@@ -4299,6 +4355,59 @@ mod tests {
             .expect_err("invalid UTF-8 must be rejected");
 
         assert!(error.chain().contains("not valid UTF-8"));
+    }
+
+    #[test]
+    fn decode_source_bytes_with_no_declared_encoding_is_strict_utf8() {
+        let error = decode_source_bytes_as(vec![0xff], "test input", None)
+            .expect_err("invalid UTF-8 must be rejected with no --encoding");
+        assert!(error.chain().contains("not valid UTF-8"));
+    }
+
+    #[test]
+    fn decode_source_bytes_decodes_a_declared_legacy_encoding() {
+        // ";; コメント" (a Lisp comment containing Japanese) as Shift_JIS bytes.
+        let shift_jis_bytes = vec![
+            0x3b, 0x3b, 0x20, 0x83, 0x52, 0x83, 0x81, 0x83, 0x93, 0x83, 0x67,
+        ];
+        let decoded =
+            decode_source_bytes_as(shift_jis_bytes, "test input", Some(encoding_rs::SHIFT_JIS))
+                .expect("valid Shift_JIS must decode");
+        assert_eq!(decoded, ";; コメント");
+    }
+
+    #[test]
+    fn decode_source_bytes_rejects_bytes_invalid_in_the_declared_encoding() {
+        // 0x81 is a Shift_JIS lead byte; 0x00 is not a valid trail byte for it.
+        let error =
+            decode_source_bytes_as(vec![0x81, 0x00], "test input", Some(encoding_rs::SHIFT_JIS))
+                .expect_err(
+                    "a byte sequence the declared encoding cannot represent must be rejected",
+                );
+        assert!(error.chain().contains("not valid Shift_JIS"));
+    }
+
+    #[test]
+    fn declaring_utf_8_explicitly_still_permits_writes() {
+        let settings = RuntimeSettings {
+            source_encoding: Some(encoding_rs::UTF_8),
+            ..RuntimeSettings::default()
+        };
+        assert!(settings.writes_are_supported());
+    }
+
+    #[test]
+    fn declaring_a_non_utf_8_encoding_blocks_writes() {
+        let settings = RuntimeSettings {
+            source_encoding: Some(encoding_rs::SHIFT_JIS),
+            ..RuntimeSettings::default()
+        };
+        assert!(!settings.writes_are_supported());
+    }
+
+    #[test]
+    fn no_declared_encoding_permits_writes() {
+        assert!(RuntimeSettings::default().writes_are_supported());
     }
 
     #[cfg(unix)]

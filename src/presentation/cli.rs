@@ -125,6 +125,13 @@ struct Cli {
     /// would refuse writes there along with any similar stable redirection.
     #[arg(long, global = true)]
     refuse_symlinked_ancestors: bool,
+    /// Declared encoding of source files this run reads (shift_jis, euc-jp,
+    /// iso-8859-1, windows-1252, utf-8, ...); a WHATWG label, case
+    /// insensitive. Only utf-8 (the default) supports --write: a write under
+    /// any other declared encoding is refused rather than silently
+    /// re-encoded.
+    #[arg(long, global = true, value_name = "LABEL")]
+    encoding: Option<String>,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -356,6 +363,16 @@ fn bootstrap() -> Cli {
     runtime.refuse_symlinked_ancestors = raw
         .iter()
         .any(|token| token == "--refuse-symlinked-ancestors");
+    runtime.source_encoding = match argv::long_flag_value(&raw, "encoding") {
+        Some(value) => match paredit_core_cli::runtime::parse_source_encoding(&value) {
+            Ok(encoding) => Some(encoding),
+            Err(label) => {
+                eprintln!("Error: --encoding {label}: unrecognized encoding label");
+                std::process::exit(2);
+            }
+        },
+        None => None,
+    };
     paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file

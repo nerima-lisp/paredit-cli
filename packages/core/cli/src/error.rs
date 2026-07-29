@@ -102,6 +102,16 @@ pub enum IoRefusal {
     #[error("refusing to write {path}: another process holds its write lock")]
     WriteTargetLocked { path: String },
 
+    /// `--encoding <e>` named something other than UTF-8, and this run tried
+    /// to write.
+    ///
+    /// The tool works in UTF-8 internally regardless of `--encoding`; writing
+    /// what it holds back out under a different declared encoding, without
+    /// re-encoding it, would silently change the file's on-disk bytes to
+    /// UTF-8. Refused rather than done quietly.
+    #[error("refusing to write: --encoding {encoding} does not support --write yet")]
+    WriteRequiresUtf8Encoding { encoding: &'static str },
+
     /// `--dry-run` reached a write the argument layer could not turn into a
     /// preview, because the command does not spell writing as `--write`.
     #[error(
@@ -283,6 +293,17 @@ pub enum CliError {
         description: String,
         #[source]
         source: FromUtf8Error,
+    },
+
+    /// `--encoding` named an encoding, and this input's bytes are not valid
+    /// in it. `encoding_rs` decodes leniently by default (replacement
+    /// characters for a malformed sequence); refusing here instead keeps a
+    /// bad `--encoding` guess from silently reaching an analysis or a diff as
+    /// mangled text.
+    #[error("{description} is not valid {encoding}")]
+    NotValidEncoding {
+        description: String,
+        encoding: &'static str,
     },
 
     #[error("failed to parse {origin} ({location})")]

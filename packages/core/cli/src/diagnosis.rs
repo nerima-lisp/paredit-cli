@@ -140,6 +140,7 @@ pub enum ErrorCode {
     RefusalWorkspace,
     RefusalDryRun,
     RefusalMatchShifted,
+    RefusalEncodingWrite,
 
     EnvironmentIo,
     EnvironmentWorkspaceLimit,
@@ -194,6 +195,7 @@ impl ErrorCode {
             Self::RefusalWorkspace => "refusal.workspace",
             Self::RefusalDryRun => "refusal.dry-run",
             Self::RefusalMatchShifted => "refusal.match-shifted",
+            Self::RefusalEncodingWrite => "refusal.encoding-write",
 
             Self::EnvironmentIo => "environment.io",
             Self::EnvironmentWorkspaceLimit => "environment.workspace-limit",
@@ -244,7 +246,8 @@ impl ErrorCode {
             | Self::RefusalSpanOutOfBounds
             | Self::RefusalWorkspace
             | Self::RefusalDryRun
-            | Self::RefusalMatchShifted => Category::Refusal,
+            | Self::RefusalMatchShifted
+            | Self::RefusalEncodingWrite => Category::Refusal,
 
             Self::EnvironmentIo
             | Self::EnvironmentWorkspaceLimit
@@ -273,7 +276,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 41] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -306,6 +309,7 @@ impl ErrorCode {
         Self::RefusalWorkspace,
         Self::RefusalDryRun,
         Self::RefusalMatchShifted,
+        Self::RefusalEncodingWrite,
         Self::EnvironmentIo,
         Self::EnvironmentWorkspaceLimit,
         Self::EnvironmentUnavailable,
@@ -471,7 +475,7 @@ const fn classify_cli(error: &CliError) -> ErrorCode {
         CliError::Workspace(workspace) => classify_workspace(workspace),
         CliError::Argument(argument) => classify_argument(argument),
         CliError::Selector(selector) => classify_selector(selector),
-        CliError::NotUtf8 { .. } => ErrorCode::InputNotUtf8,
+        CliError::NotUtf8 { .. } | CliError::NotValidEncoding { .. } => ErrorCode::InputNotUtf8,
         CliError::Parse { .. } => ErrorCode::InputUnparsable,
         // A sidecar this tool owns did not parse. Same code as a source file
         // that did not: to a caller both mean "something read is malformed",
@@ -523,6 +527,7 @@ const fn classify_refusal(error: &IoRefusal) -> ErrorCode {
         | IoRefusal::WritableParentDirectory { .. }
         | IoRefusal::SymlinkedAncestorDirectory { .. } => ErrorCode::RefusalWriteTarget,
         IoRefusal::DryRun => ErrorCode::RefusalDryRun,
+        IoRefusal::WriteRequiresUtf8Encoding { .. } => ErrorCode::RefusalEncodingWrite,
         IoRefusal::OverlappingRewriteSpans => ErrorCode::RefusalOverlappingSpans,
         IoRefusal::RewriteSpanOutOfBounds => ErrorCode::RefusalSpanOutOfBounds,
         IoRefusal::RewriteDoesNotReparse | IoRefusal::NamedRewriteDoesNotReparse { .. } => {
@@ -786,6 +791,13 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
             Repair::new("pass-flag", Message::RepairDropDryRun),
             Repair::new("pass-flag", Message::RepairUsePreviewFlag),
         ],
+
+        ErrorCode::RefusalEncodingWrite => {
+            vec![Repair::new(
+                "pass-flag",
+                Message::RepairDropEncodingForWrite,
+            )]
+        }
     }
 }
 
