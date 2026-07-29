@@ -1,7 +1,7 @@
 ---
 name: paredit-cli
 description: This skill should be used when refactoring Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming scoped symbols, functions, control targets, or packages; moving definitions; extracting or inlining local code; reshaping bindings, conditionals, calls, or parameters; or removing unused code. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
-version: 1.3.0
+version: 1.4.0
 ---
 
 <purpose>
@@ -178,6 +178,36 @@ version: 1.3.0
     <command>paredit edit transpose-forward --file f.lisp --path 0.3 --write</command>
     <command>paredit edit transpose-backward --file f.lisp --path 0.3 --write</command>
     <command>paredit edit select --file f.lisp --path 0.3</command>
+  </group>
+
+  <group name="structural_diff_and_patch">
+    <description>
+      Compare and carry changes by the parse rather than by lines. `inspect diff` reports which
+      forms were inserted, deleted, or replaced, ignoring whitespace and comments — so a
+      reformatting reports nothing and an edited argument reports as that argument rather than
+      as the whole wrapped line. Use it to check that a rewrite changed only what you meant.
+      `refactor patch` carries the difference between two versions of one file onto a third,
+      matching each change by structure, so a fix made in one place lands in the others whatever
+      their formatting. It plans by default; add --write to apply.
+    </description>
+    <command>paredit inspect diff --output json before.lisp after.lisp</command>
+    <command>paredit inspect diff --fail-on-change --output json before.lisp after.lisp</command>
+    <command>paredit refactor patch --from before.lisp --to after.lisp --apply-to other.lisp --output json</command>
+    <command>paredit refactor patch --from before.lisp --to after.lisp --apply-to other.lisp --diff</command>
+    <command>paredit refactor patch --from before.lisp --to after.lisp --apply-to other.lisp --write --fail-on-unapplied --output json</command>
+  </group>
+
+  <group name="stepping_a_manifest">
+    <description>
+      `refactor apply` writes every edit in a manifest. `refactor step` numbers them and takes
+      only the ones you accept, for reviewing a large rewrite without discarding it. Numbering is
+      by source position, so a step number means the same thing on every run. Both hash guards
+      still apply and a subset that would not parse is refused before any write.
+    </description>
+    <command>paredit refactor step --manifest rename.preview.json --output json</command>
+    <command>paredit refactor step --manifest rename.preview.json --accept 1,3-5 --diff</command>
+    <command>paredit refactor step --manifest rename.preview.json --accept 1,3-5 --write --output json</command>
+    <command>paredit refactor step --manifest rename.preview.json --skip 2 --fail-on-partial --output json</command>
   </group>
 </command_groups>
 
