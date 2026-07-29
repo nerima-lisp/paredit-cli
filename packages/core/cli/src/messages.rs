@@ -68,6 +68,7 @@ pub enum Message {
     RepairSpanBoundaries,
     RepairDropDryRun,
     RepairUsePreviewFlag,
+    RepairDropEncodingForWrite,
     RepairKillRingIndex,
     RepairNarrowSelector,
     RepairWidenSelector,
@@ -179,7 +180,7 @@ impl Message {
                 "nothing is wrong with the input; re-run with a larger --timeout-ms, or without one"
             }
             Self::RepairConvertEncoding => {
-                "this tool reads UTF-8 only; convert the file's encoding first"
+                "pass --encoding <label> (e.g. shift_jis, euc-jp) naming the file's actual encoding — or, if one was already given, its label is wrong — or convert the file to UTF-8 first"
             }
             Self::RepairSpanBoundaries => {
                 "the span does not lie on character boundaries of the current source"
@@ -189,6 +190,9 @@ impl Message {
             }
             Self::RepairUsePreviewFlag => {
                 "or use this command's own preview: --diff on an edit, --fix --diff on lint"
+            }
+            Self::RepairDropEncodingForWrite => {
+                "drop --encoding to write in UTF-8, or drop --write and pipe stdout through your own re-encoder"
             }
             Self::RepairNarrowSelector => {
                 "narrow the selector, or pass --all to act on every match"
@@ -313,7 +317,7 @@ impl Message {
                 "入力に問題はありません。--timeout-ms を大きくするか、指定せずに再実行してください"
             }
             Self::RepairConvertEncoding => {
-                "本ツールは UTF-8 のみを読みます。先にファイルの文字コードを変換してください"
+                "--encoding <label>（例: shift_jis、euc-jp）でファイルの実際の文字コードを指定してください。指定済みならその値が誤っている可能性があります。あるいは先にファイルを UTF-8 に変換してください"
             }
             Self::RepairSpanBoundaries => "範囲が現在のソースの文字境界に一致していません",
             Self::RepairDropDryRun => {
@@ -321,6 +325,9 @@ impl Message {
             }
             Self::RepairUsePreviewFlag => {
                 "あるいは各コマンドのプレビューを使ってください（編集系は --diff、lint は --fix --diff）"
+            }
+            Self::RepairDropEncodingForWrite => {
+                "UTF-8 で書き込むには --encoding を外してください。あるいは --write を外し、標準出力を自分で再エンコードしてください"
             }
             Self::RepairNarrowSelector => {
                 "セレクタを絞り込むか、全一致に対して実行するなら --all を指定してください"
@@ -355,7 +362,7 @@ impl Message {
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 54] = [
+    pub const ALL: [Self; 55] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -398,6 +405,7 @@ impl Message {
         Self::RepairSpanBoundaries,
         Self::RepairDropDryRun,
         Self::RepairUsePreviewFlag,
+        Self::RepairDropEncodingForWrite,
         Self::RepairNarrowSelector,
         Self::RepairWidenSelector,
         Self::RepairShowMatches,

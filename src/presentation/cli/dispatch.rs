@@ -663,6 +663,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::ContextAt(args) => {
                 context_report::workflow::context_at_report(args)?;
             }
+            command::InspectCommand::Writability(args) => {
+                writability_report::workflow::writability(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

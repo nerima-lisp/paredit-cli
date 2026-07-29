@@ -77,6 +77,26 @@ fn edit_format_write_updates_file_in_place() {
 }
 
 #[test]
+fn edit_format_write_restores_crlf_without_touching_a_newline_inside_a_string() {
+    let dir = fresh_temp_dir("edit-format-write-crlf-string");
+    let file = dir.join("source.lisp");
+    // A CRLF-authored document whose string literal holds a real newline byte:
+    // the two line endings must come back as CRLF, the string's own newline
+    // must not, because it is the value the program computes with.
+    let source = "(defun f ()\r\n  \"line one\nline two\")\r\n";
+    fs::write(&file, source).expect("write source fixture");
+
+    paredit()
+        .args(["edit", "format", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, source);
+}
+
+#[test]
 fn edit_write_requires_file_input() {
     paredit()
         .args(["edit", "kill", "--path", "0", "--write"])
