@@ -862,6 +862,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 remove_unused_binding::remove_unused_binding(args)?;
             }
         },
+        Command::Config { command } => match command {
+            command::ConfigCommand::Check(args) => config::workflow::check(args)?,
+            command::ConfigCommand::Show(args) => config::workflow::show(args)?,
+            command::ConfigCommand::Schema(args) => config::workflow::schema_report(args)?,
+            command::ConfigCommand::Init(args) => config::workflow::init(args)?,
+        },
         Command::Completions { shell } => {
             use clap::CommandFactory;
             let mut root = super::Cli::command();

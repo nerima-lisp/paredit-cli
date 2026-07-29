@@ -8,7 +8,7 @@ use super::{
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
     case_nil_key_report, char_case_fold_report, char_op_string_report, circular_literal_report,
     class_cycle_report, class_hierarchy_report, code_char_char_code_report, coerce_to_t_report,
-    cohesion_report, complexity_report, cond_t_clause_report, cons_to_list_report,
+    cohesion_report, complexity_report, cond_t_clause_report, config, cons_to_list_report,
     constant_if_test_report, constant_report, constant_when_test_report, convert_cond_to_if,
     convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless, convert_if_to_when,
     convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
@@ -748,6 +748,22 @@ pub(super) enum RefactorCommand {
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }
 
+/// Configuration introspection. Reads `paredit.toml`; never reads source.
+#[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit config check\n  paredit config show --changed-only --output text\n  paredit config show --key lint.preset\n  paredit config schema --output text\n  paredit config init --dry-run\n\nLayers, lowest precedence first: built-in defaults, the user's file, the\nrepository's file, each nested directory's file, then PAREDIT_* variables."
+)]
+pub(super) enum ConfigCommand {
+    /// Validate every discovered configuration file and exit 3 if any key is unusable.
+    Check(config::args::ConfigCheckArgs),
+    /// Print the effective configuration with the file and line that set each key.
+    Show(config::args::ConfigShowArgs),
+    /// Print every recognised key with its type, default, and environment variable.
+    Schema(config::args::ConfigSchemaArgs),
+    /// Write a documented starter paredit.toml generated from the schema.
+    Init(config::args::ConfigInitArgs),
+}
+
 #[derive(Debug, Subcommand)]
 pub(super) enum Command {
     /// Read-only inventory, validation, and analysis.
@@ -764,6 +780,11 @@ pub(super) enum Command {
     Refactor {
         #[command(subcommand)]
         command: RefactorCommand,
+    },
+    /// Inspect, validate, and scaffold the layered paredit.toml configuration.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
     },
     /// Print a shell completion script to stdout.
     Completions {

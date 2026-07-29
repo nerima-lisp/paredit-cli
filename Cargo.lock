@@ -651,6 +651,7 @@ dependencies = [
  "criterion",
  "libc",
  "paredit-core-cli",
+ "paredit-core-config",
  "paredit-core-edit",
  "paredit-core-lint-engine",
  "paredit-core-semantics",
@@ -709,6 +710,16 @@ dependencies = [
  "serde_json",
  "thiserror",
  "xattr",
+]
+
+[[package]]
+name = "paredit-core-config"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "paredit-core-syntax",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

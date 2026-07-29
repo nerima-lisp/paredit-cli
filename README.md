@@ -20,6 +20,7 @@ interface, and integration guides — is published at
 paredit inspect <report> [args]    # read-only inventory, validation, analysis
 paredit edit <transform> [args]    # one structural edit (stdout, --diff, or --write)
 paredit refactor <workflow> [args] # plan, preview, verify, and apply changes
+paredit config <command>           # inspect and validate the layered paredit.toml
 paredit completions <shell>        # shell completion scripts (bash/zsh/fish/...)
 ```
 

@@ -61,6 +61,8 @@ mod complexity_report;
 mod cond_t_clause_report;
 #[path = "cli/conditional_conversion.rs"]
 mod conditional_conversion;
+#[path = "cli/config_command.rs"]
+mod config_command;
 #[path = "cli/cons_to_list_report.rs"]
 mod cons_to_list_report;
 #[path = "cli/constant_if_test_report.rs"]

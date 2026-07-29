@@ -70,7 +70,10 @@ fn capabilities_reports_the_canonical_namespaces_and_meta_commands() {
         .iter()
         .map(|command| command["name"].as_str().expect("command name"))
         .collect::<Vec<_>>();
-    assert_eq!(commands, ["inspect", "edit", "refactor", "completions"]);
+    assert_eq!(
+        commands,
+        ["inspect", "edit", "refactor", "config", "completions"]
+    );
 }
 
 #[test]

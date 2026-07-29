@@ -8,6 +8,7 @@ mod analysis_report;
 mod basic_edit;
 mod capabilities;
 mod command;
+mod config;
 mod contract;
 mod dependency_report;
 
