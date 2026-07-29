@@ -373,6 +373,12 @@ pub fn edit_target_with(
 /// Print the rewritten document to stdout, or with `write` persist it back to
 /// the source file after confirming the result reparses with the input dialect.
 /// With `diff`, stdout carries a unified diff instead of the whole document.
+///
+/// The rewrite always arrives with bare `\n` line endings — a whole-document
+/// reformat has no other line ending to work from — so a CRLF-authored input
+/// is restored to CRLF here, once, rather than in every command that produces
+/// one. Without this, `format --diff` on a CRLF file would show every line as
+/// changed, and `--write` would silently convert the file's line endings.
 pub fn emit_document(
     input: &SourceInput,
     dialect: Dialect,
@@ -380,6 +386,7 @@ pub fn emit_document(
     diff: bool,
     rewritten: String,
 ) -> CliResult<()> {
+    let rewritten = restore_line_ending(&input.text, rewritten);
     if write {
         let path = require_output_file(input.file.as_ref())?.clone();
         SyntaxTree::parse_with_dialect(&rewritten, dialect)
@@ -398,6 +405,42 @@ pub fn emit_document(
 
     print!("{rewritten}");
     Ok(())
+}
+
+/// Re-applies `original`'s line ending to `rewritten` when `original` is
+/// CRLF-dominant.
+///
+/// Normalizes any `\r\n` already in `rewritten` back to a bare `\n` first, so
+/// this is safe to call on a rewrite that already preserved CRLF in an
+/// untouched region (a targeted edit's output) as well as one that has none
+/// at all (a whole-document reformat) — either way the result ends up with
+/// exactly one line ending throughout, matching `original`.
+fn restore_line_ending(original: &str, rewritten: String) -> String {
+    if !rewritten.contains('\n') || !prefers_crlf(original) {
+        return rewritten;
+    }
+    rewritten.replace("\r\n", "\n").replace('\n', "\r\n")
+}
+
+/// Whether `text` uses `\r\n` line endings more often than a bare `\n`.
+///
+/// Strictly more, not merely as often: a file with no clear majority is left
+/// exactly as the rewrite produced it rather than guessed at.
+fn prefers_crlf(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut crlf = 0usize;
+    let mut lone_lf = 0usize;
+    for (index, &byte) in bytes.iter().enumerate() {
+        if byte != b'\n' {
+            continue;
+        }
+        if index > 0 && bytes[index - 1] == b'\r' {
+            crlf += 1;
+        } else {
+            lone_lf += 1;
+        }
+    }
+    crlf > lone_lf
 }
 
 pub fn resolve_target<'a>(
@@ -627,12 +670,58 @@ fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, p
 
 #[cfg(test)]
 mod tests {
-    use super::{require_output_file, terminal_safe, terminal_safe_error_chain};
+    use super::{
+        prefers_crlf, require_output_file, restore_line_ending, terminal_safe,
+        terminal_safe_error_chain,
+    };
 
     #[test]
     fn require_output_file_rejects_missing_file() {
         let error = require_output_file(None).unwrap_err();
         assert_eq!(error.to_string(), "--write requires --file");
+    }
+
+    #[test]
+    fn a_crlf_majority_is_detected_even_with_one_stray_lf() {
+        assert!(prefers_crlf("(a)\r\n(b)\r\n(c)\n"));
+    }
+
+    #[test]
+    fn a_pure_lf_document_does_not_prefer_crlf() {
+        assert!(!prefers_crlf("(a)\n(b)\n"));
+    }
+
+    #[test]
+    fn a_tie_does_not_prefer_crlf() {
+        assert!(!prefers_crlf("(a)\r\n(b)\n"));
+    }
+
+    #[test]
+    fn a_single_line_document_has_no_preference() {
+        assert!(!prefers_crlf("(a)"));
+    }
+
+    #[test]
+    fn restore_line_ending_converts_a_bare_lf_rewrite_back_to_crlf() {
+        let original = "(a)\r\n(b)\r\n";
+        let rewritten = "(a)\n(b)\n".to_owned();
+        assert_eq!(restore_line_ending(original, rewritten), "(a)\r\n(b)\r\n");
+    }
+
+    #[test]
+    fn restore_line_ending_does_not_double_convert_an_already_crlf_rewrite() {
+        // A targeted edit's rewrite can already carry CRLF in an untouched
+        // region; restore_line_ending must not turn that into `\r\r\n`.
+        let original = "(a)\r\n(b)\r\n";
+        let rewritten = "(a)\r\n(new)\n".to_owned();
+        assert_eq!(restore_line_ending(original, rewritten), "(a)\r\n(new)\r\n");
+    }
+
+    #[test]
+    fn restore_line_ending_leaves_an_lf_document_untouched() {
+        let original = "(a)\n(b)\n";
+        let rewritten = "(a)\n(c)\n".to_owned();
+        assert_eq!(restore_line_ending(original, rewritten.clone()), rewritten);
     }
 
     #[test]
