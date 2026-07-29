@@ -14,7 +14,9 @@ fn cli_flags_single_arg_less_than() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"comparison_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"operator\": \"<\""));
 }
 
@@ -32,7 +34,7 @@ fn cli_flags_single_arg_equal() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"operator\": \"=\""));
 }
 
@@ -50,7 +52,11 @@ fn cli_does_not_flag_two_argument_comparison() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "both scanned comparisons have
+        // their operands" from "no comparison form at all".
+        .stdout(predicate::str::contains("\"comparison_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
 #[test]
@@ -68,7 +74,50 @@ fn cli_does_not_flag_equality_predicates() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // Not merely unflagged: never scanned, so the denominator is 0 too.
+        .stdout(predicate::str::contains("\"comparison_form_count\": 0"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("single-arg-comparison-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn f [x] (< x))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "single-arg-comparison", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_single_arg_comparison_emits_sarif() {
+    let dir = fresh_temp_dir("single-arg-comparison-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(> n)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "single-arg-comparison", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        // The operators are punctuation, so the rule's own name is the kind
+        // and the operator rides along in the message.
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/single-arg-comparison/single-arg-comparison\"",
+        ))
+        .stdout(predicate::str::contains(
+            "> has a single argument; the comparison is always true (missing an operand?)",
+        ));
 }
 
 #[test]
@@ -105,5 +154,5 @@ fn cli_single_arg_comparison_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }

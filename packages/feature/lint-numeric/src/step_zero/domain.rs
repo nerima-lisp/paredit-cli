@@ -14,13 +14,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare integer `0` literal (no reader prefixes; `0.0` is a
 /// different spelling, excluded).
@@ -36,50 +38,55 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct StepZeroItem {
-    pub path: PathBuf,
     /// The span of the whole `(incf place 0)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The operator, lowercased (`incf` or `decf`).
     pub operator: &'static str,
 }
 
-#[derive(Debug)]
-pub struct StepZeroSummary {
-    pub step_form_count: usize,
-    pub violations: Vec<StepZeroItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct StepZeroPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl StepZeroPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for StepZeroItem {
+    /// Which direction the no-op step was going, so `incf` and `decf` are
+    /// separable without parsing JSON.
+    ///
+    /// A closed set of two, already normalized to lowercase `&'static str` by
+    /// [`examine`] — the source casing is not retained, so this is the
+    /// canonical name rather than whatever the file spelled.
+    fn kind(&self) -> &'static str {
+        self.operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct StepZeroPolicy {
-    pub fail_on_violation: bool,
-    pub step_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the leading `kind`: the old text row's only column was
+    /// the bare operator, which the `kind` column now carries.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("operator", json!(self.operator))]
+    }
+
+    /// The same sentence the `step-zero` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!("{} by 0 is a no-op that changes nothing", self.operator)
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     step_form_count: &mut usize,
     violations: &mut Vec<StepZeroItem>,
 ) {
@@ -109,73 +116,82 @@ pub fn examine(
     }
 
     violations.push(StepZeroItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         operator,
     });
 }
 
-/// Collects every `(incf place 0)`/`(decf place 0)` across a whole file, along
-/// with the total number of `incf`/`decf` forms scanned.
-pub fn collect_step_zeros(
+/// Collects every `(incf place 0)`/`(decf place 0)` in one file, with the
+/// number of `incf`/`decf` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no zero step here" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_step_zero_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<StepZeroItem>)> {
+) -> LintResult<FileFindings<StepZeroItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("step_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut step_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut step_form_count, &mut violations);
+            examine(subview, source, &mut step_form_count, &mut violations);
         });
     }
-    Ok((step_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("step_form_count", json!(step_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_step_zeros(
-    step_form_count: usize,
-    violations: Vec<StepZeroItem>,
-) -> StepZeroSummary {
-    StepZeroSummary {
-        step_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_step_zero_policy(
-    options: StepZeroPolicyOptions,
-    summary: &StepZeroSummary,
-) -> StepZeroPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    StepZeroPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        step_form_count: summary.step_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn steps(input: &str) -> (usize, Vec<StepZeroItem>) {
+    fn report(input: &str) -> FileFindings<StepZeroItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_step_zeros(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect step zeros")
+        build_step_zero_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build step zero report")
+    }
+
+    /// The `(step_form_count, violations)` pair the report is built from.
+    fn steps(input: &str) -> (u64, Vec<StepZeroItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "step_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("step_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -222,26 +238,41 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(incf x 0)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_step_zeros(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect step zeros");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_step_zero_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build step zero report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("step_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = steps("(incf x 0)");
-        let summary = summarize_step_zeros(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(incf x 2)").dialect_modelled);
+    }
 
-        let quiet = evaluate_step_zero_policy(StepZeroPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(defun bump (x)\n  (decf x 0))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "decf");
+        assert_eq!(finding.json_fields(), vec![("operator", json!("decf"))]);
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.message(),
+            "decf by 0 is a no-op that changes nothing"
+        );
+    }
 
-        let strict = evaluate_step_zero_policy(StepZeroPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_step_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(incf x 0)\n(incf y 2)\n(decf z)\n");
+        assert_eq!(report.summary, vec![("step_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

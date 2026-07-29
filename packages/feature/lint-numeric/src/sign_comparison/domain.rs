@@ -22,13 +22,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare integer `0` literal (no reader prefixes, so `#x0`
 /// and a prefixed `,0` are excluded; `0.0` is a different spelling and excluded).
@@ -56,50 +58,61 @@ fn sign_predicate(op: &str, zero_on_left: bool) -> Option<&'static str> {
 
 #[derive(Debug, Clone)]
 pub struct SignComparisonItem {
-    pub path: PathBuf,
     /// The span of the whole `(= X 0)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The suggested predicate (`zerop`/`plusp`/`minusp`).
     pub predicate: &'static str,
-    /// The span of the non-zero operand `X` (for reconstructing the fix).
+    /// The span of the non-zero operand `X`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies `X`'s source
+    /// to build `(predicate X)`, and the command has never printed it.
     pub operand_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct SignComparisonSummary {
-    pub comparison_form_count: usize,
-    pub violations: Vec<SignComparisonItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SignComparisonPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SignComparisonPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SignComparisonItem {
+    /// The predicate this comparison should have been written as, so
+    /// `zerop`, `plusp` and `minusp` are separable without parsing JSON.
+    ///
+    /// The operator would not do: `=`, `>` and `<` are punctuation, and the
+    /// same operator maps to two different predicates depending on which side
+    /// the `0` is on. The predicate is the closed, named set here.
+    fn kind(&self) -> &'static str {
+        self.predicate
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SignComparisonPolicy {
-    pub fail_on_violation: bool,
-    pub comparison_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the leading `kind`: the old text row's only column was
+    /// `predicate=…`, which the `kind` column now carries.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("predicate", json!(self.predicate))]
+    }
+
+    /// The same sentence the `sign-comparison` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "comparison against 0 has a dedicated predicate; use {}",
+            self.predicate
+        )
+    }
 }
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     comparison_form_count: &mut usize,
     violations: &mut Vec<SignComparisonItem>,
 ) {
@@ -133,74 +146,83 @@ pub fn examine_comparison(
     };
 
     violations.push(SignComparisonItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         predicate,
         operand_span: operand.span,
     });
 }
 
-/// Collects every sign comparison across a whole file, along with the total
-/// number of `=`/`>`/`<` forms scanned.
-pub fn collect_sign_comparisons(
+/// Collects every sign comparison in one file, with the number of `=`/`>`/`<`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no comparison against 0 here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_sign_comparison_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SignComparisonItem>)> {
+) -> LintResult<FileFindings<SignComparisonItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("comparison_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(subview, path, &mut comparison_form_count, &mut violations);
+            examine_comparison(subview, source, &mut comparison_form_count, &mut violations);
         });
     }
-    Ok((comparison_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("comparison_form_count", json!(comparison_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_sign_comparisons(
-    comparison_form_count: usize,
-    violations: Vec<SignComparisonItem>,
-) -> SignComparisonSummary {
-    SignComparisonSummary {
-        comparison_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_sign_comparison_policy(
-    options: SignComparisonPolicyOptions,
-    summary: &SignComparisonSummary,
-) -> SignComparisonPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SignComparisonPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        comparison_form_count: summary.comparison_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn comparisons(input: &str) -> (usize, Vec<SignComparisonItem>) {
+    fn report(input: &str) -> FileFindings<SignComparisonItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_sign_comparisons(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect sign comparisons")
+        build_sign_comparison_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build sign comparison report")
+    }
+
+    /// The `(comparison_form_count, violations)` pair the report is built from.
+    fn comparisons(input: &str) -> (u64, Vec<SignComparisonItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "comparison_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("comparison_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -295,28 +317,41 @@ mod tests {
         assert_eq!(violations[0].predicate, "plusp");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(= n 0)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_sign_comparisons(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect sign comparisons");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_sign_comparison_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build sign comparison report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = comparisons("(= n 0)");
-        let summary = summarize_sign_comparisons(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(= n 0)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_sign_comparison_policy(SignComparisonPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_predicate() {
+        let report = report("(defun empty? (n)\n  (= n 0))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "zerop");
+        assert_eq!(finding.json_fields(), vec![("predicate", json!("zerop"))]);
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.message(),
+            "comparison against 0 has a dedicated predicate; use zerop"
+        );
+    }
 
-        let strict =
-            evaluate_sign_comparison_policy(SignComparisonPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_comparison_scanned_not_only_the_flagged_ones() {
+        let report = report("(= x 0)\n(= x 5)\n(> a b)\n");
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
