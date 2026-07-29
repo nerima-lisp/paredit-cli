@@ -150,6 +150,75 @@ pub enum StructureError {
 
     #[error("nothing precedes the selection to keep")]
     NothingPrecedesSelection,
+
+    // --- reader prefixes ---
+    #[error("selected expression carries no reader prefix to unwrap")]
+    NoReaderPrefixToUnwrap,
+
+    // --- raise --levels ---
+    #[error("cannot raise {requested} levels: the selection is only {available} levels deep")]
+    RaiseLevelsExceedDepth { requested: usize, available: usize },
+
+    // --- transpose between arbitrary siblings ---
+    #[error("transpose requires two expressions inside the same list")]
+    TransposeNotSiblings,
+
+    #[error("cannot transpose an expression with itself")]
+    TransposeSameExpression,
+
+    // --- navigation ---
+    #[error("selected expression has no next sibling")]
+    NoNextSibling,
+
+    #[error("selected expression has no previous sibling")]
+    NoPreviousSibling,
+
+    #[error("selected expression has no enclosing expression to move up to")]
+    NoEnclosingExpression,
+
+    #[error("selected expression has no child expression to move down into")]
+    NoChildExpression,
+
+    // --- strings ---
+    #[error("operation requires a string literal")]
+    NotAStringLiteral,
+
+    #[error("byte offset {offset} is not inside a string literal")]
+    NotInsideStringLiteral { offset: usize },
+
+    #[error("cannot split a string at its own delimiter")]
+    SplitStringAtDelimiter,
+
+    #[error("cannot split a string inside an escape sequence")]
+    SplitStringInEscape,
+
+    #[error("cannot unescape `\\{character}`: unescape only reverses \\\\ and \\\"")]
+    UnescapeUnsupportedSequence { character: char },
+
+    #[error("string literal ends with a dangling backslash")]
+    UnescapeDanglingBackslash,
+
+    #[error("cannot wrap a string literal carrying a reader prefix")]
+    StringReaderPrefix,
+
+    // --- cursor edits ---
+    #[error("byte offset {offset} is outside the document, which is {length} bytes")]
+    OffsetOutsideDocument { offset: usize, length: usize },
+
+    #[error("nothing to delete at byte offset {offset}")]
+    NothingToDelete { offset: usize },
+
+    #[error("refusing to delete {delimiter}: it would unbalance the enclosing form")]
+    DeleteWouldUnbalance { delimiter: char },
+
+    #[error("refusing to delete the whitespace that keeps two symbols apart")]
+    DeleteWouldFuseSymbols,
+
+    #[error("refusing to delete the character that opens a comment")]
+    DeleteWouldUncomment,
+
+    #[error("cannot insert a newline inside {context}")]
+    NewlineInsideOpaqueText { context: &'static str },
 }
 
 /// A byte span that cannot safely index the source it is applied to.

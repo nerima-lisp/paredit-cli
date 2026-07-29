@@ -2,16 +2,18 @@ use super::{
     accessor_arity_report, api_diff_report, api_surface_report, append_list_to_cons_report,
     append_nil_report,
     args::{
-        AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
+        AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
+        NewlineArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs,
+        UnwrapPrefixArgs, WrapArgs, YankArgs,
     },
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
     case_nil_key_report, char_case_fold_report, char_op_string_report, circular_literal_report,
     class_cycle_report, class_hierarchy_report, code_char_char_code_report, coerce_to_t_report,
     cohesion_report, complexity_report, cond_t_clause_report, cons_to_list_report,
-    constant_if_test_report, constant_report, constant_when_test_report, convert_cond_to_if,
-    convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless, convert_if_to_when,
-    convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    constant_if_test_report, constant_report, constant_when_test_report, context_report,
+    convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond, convert_if_to_unless,
+    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
     convert_sequential_binding, convert_unless_to_if, convert_when_to_if, de_morgan_report,
     dead_boolean_operand_report, debt_score_report, definition_movement, definition_removal,
     definition_report, defpackage_quoted_report, dependency_report, destructive_literal_report,
@@ -534,6 +536,8 @@ pub(super) enum InspectCommand {
     Effects(effect_report::args::EffectReportArgs),
     /// Report in-package forms naming a package no analyzed defpackage declares.
     UndefinedPackages(undefined_package_report::args::UndefinedPackageReportArgs),
+    /// Report whether a byte offset is code, a string, a comment, a delimiter, or reader sugar.
+    ContextAt(context_report::args::ContextAtArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source
@@ -541,7 +545,7 @@ pub(super) enum InspectCommand {
 /// place with reparse validation and rollback.
 #[derive(Debug, Subcommand)]
 #[command(
-    after_help = "Examples:\n  paredit edit select --file src/foo.lisp --path 0.2\n  paredit edit wrap --file src/foo.lisp --path 0.2 --diff\n  paredit edit wrap --file src/foo.lisp --path 0.2 --write\n  paredit edit replace --file src/foo.lisp --at 120 --with '(new-form)' --write\n\nWithout --write the rewritten document is printed to stdout and the file is untouched.\nUse --diff to print a unified diff instead of the whole rewritten document."
+    after_help = "Examples:\n  paredit edit select --file src/foo.lisp --path 0.2\n  paredit edit wrap --file src/foo.lisp --path 0.2 --diff\n  paredit edit wrap --file src/foo.lisp --path 0.2 --write\n  paredit edit replace --file src/foo.lisp --at 120 --with '(new-form)' --write\n  paredit edit navigate --file src/foo.lisp --path 0.2 --direction forward\n\nWithout --write the rewritten document is printed to stdout and the file is untouched.\nUse --diff to print a unified diff instead of the whole rewritten document."
 )]
 pub(super) enum EditCommand {
     /// Print a canonical, indentation-based rendering.
@@ -552,10 +556,16 @@ pub(super) enum EditCommand {
     Select(TargetArgs),
     /// Replace the selected S-expression with replacement text.
     Replace(ReplaceArgs),
-    /// Remove the selected S-expression.
-    Kill(EditTargetArgs),
-    /// Wrap the selected S-expression in a new list, optionally choosing the delimiter.
+    /// Remove the selected S-expression, optionally pushing it onto the kill ring.
+    Kill(KillArgs),
+    /// Print the selected S-expression with the comment block written above it.
+    Copy(CopyArgs),
+    /// Paste a kill ring entry beside, or over, the selected S-expression.
+    Yank(YankArgs),
+    /// Wrap the selected S-expression in a delimiter pair, a string, or a reader prefix.
     Wrap(WrapArgs),
+    /// Remove the selected S-expression's reader prefix, outermost first.
+    UnwrapPrefix(UnwrapPrefixArgs),
     /// Remove one list pair while keeping its children.
     Splice(EditTargetArgs),
     /// Split the enclosing list in two immediately before the selected expression.
@@ -568,12 +578,14 @@ pub(super) enum EditCommand {
     SpliceKillingForward(EditTargetArgs),
     /// Reverse the nesting of the two lists enclosing the selected list.
     Convolute(EditTargetArgs),
-    /// Replace the selected expression's parent list with the selected expression.
-    Raise(EditTargetArgs),
+    /// Replace an enclosing list with the selected expression, --levels deep.
+    Raise(RaiseArgs),
     /// Exchange the selected expression with its next sibling.
     TransposeForward(EditTargetArgs),
     /// Exchange the selected expression with its previous sibling.
     TransposeBackward(EditTargetArgs),
+    /// Exchange the selected expression with any other expression in the same list.
+    Transpose(TransposeArgs),
     /// Pull the next sibling into the selected list.
     SlurpForward(EditTargetArgs),
     /// Pull the previous sibling into the selected list.
@@ -582,6 +594,22 @@ pub(super) enum EditCommand {
     BarfForward(EditTargetArgs),
     /// Push the first child out of the selected list.
     BarfBackward(EditTargetArgs),
+    /// Report the --path one structural move lands on.
+    Navigate(NavigateArgs),
+    /// Delete the character at --at, refusing anything that unbalances the document.
+    DeleteForward(CursorArgs),
+    /// Delete the character before --at, refusing anything that unbalances the document.
+    DeleteBackward(CursorArgs),
+    /// Insert a newline at --at and reindent the definition it lands in.
+    Newline(NewlineArgs),
+    /// Reindent the selected definition without rewrapping its lines.
+    ReindentDefun(ReindentArgs),
+    /// Split the string literal containing --at into two adjacent literals.
+    SplitString(CursorArgs),
+    /// Escape the selected string literal's contents one level.
+    EscapeString(EditTargetArgs),
+    /// Reverse one level of escaping in the selected string literal.
+    UnescapeString(EditTargetArgs),
 }
 
 #[derive(Debug, Subcommand)]

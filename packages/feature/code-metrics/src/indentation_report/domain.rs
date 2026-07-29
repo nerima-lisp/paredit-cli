@@ -19,8 +19,8 @@
 //!   `lisp-indent-function` encodes, and it is why a purely structural rule
 //!   gets `defun` wrong.
 //!
-//! Only the body rule is checked, and only for forms whose head is in the
-//! table. That is the deviation that actually happens: nobody hand-indents a
+//! Only the body rule is checked, and only for forms whose head is in
+//! [`body_form_distinguished`]'s table. That is the deviation that actually happens: nobody hand-indents a
 //! `defun` body to four spaces by choice, and a form this table does not know
 //! is one where Emacs itself would fall back to the structural rule that the
 //! author already followed.
@@ -29,48 +29,11 @@ use std::path::Path;
 
 use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, ExpressionView, SyntaxTree};
+use paredit_core_syntax::sexpr::{
+    ByteOffset, ByteSpan, ExpressionView, SyntaxTree, body_form_distinguished,
+};
 use paredit_core_syntax::view_query::list_head;
 use serde_json::{Value, json};
-
-/// Heads whose body Emacs indents by two spaces, paired with how many
-/// distinguished arguments precede that body.
-///
-/// The count is what `lisp-indent-function` calls the form's "number of
-/// distinguished arguments": `defun` has two (name and lambda list), `when` has
-/// one (the test), `progn` has none.
-const BODY_FORMS: [(&str, usize); 30] = [
-    ("defun", 2),
-    ("defmacro", 2),
-    ("defmethod", 2),
-    ("defgeneric", 2),
-    ("defclass", 3),
-    ("define-condition", 3),
-    ("lambda", 1),
-    ("let", 1),
-    ("let*", 1),
-    ("flet", 1),
-    ("labels", 1),
-    ("macrolet", 1),
-    ("symbol-macrolet", 1),
-    ("when", 1),
-    ("unless", 1),
-    ("dolist", 1),
-    ("dotimes", 1),
-    ("do", 2),
-    ("do*", 2),
-    ("case", 1),
-    ("ecase", 1),
-    ("typecase", 1),
-    ("etypecase", 1),
-    ("with-open-file", 1),
-    ("with-slots", 2),
-    ("with-accessors", 2),
-    ("multiple-value-bind", 2),
-    ("destructuring-bind", 2),
-    ("handler-case", 1),
-    ("progn", 0),
-];
 
 /// One body form indented differently from the convention.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,10 +111,10 @@ fn collect(
     findings: &mut Vec<IndentFinding>,
 ) {
     if let Some(head) = list_head(view) {
-        if let Some((_, distinguished)) = BODY_FORMS
-            .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case(head))
-        {
+        // The table lives in `paredit-core-syntax` because `edit
+        // reindent-defun` *produces* this convention while this report
+        // *measures* deviation from it. Two copies would be two conventions.
+        if let Some(distinguished) = body_form_distinguished(head) {
             *checked += 1;
             let expected = column_of(source, view.span.start().get()) + BODY_INDENT;
             for body in view.children.iter().skip(distinguished + 1) {

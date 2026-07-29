@@ -286,6 +286,7 @@ use paredit_feature_project_analysis::call_graph_report::cli as call_graph_repor
 use paredit_feature_project_analysis::call_report::cli as call_report;
 use paredit_feature_project_analysis::class_cycle_report::cli as class_cycle_report;
 use paredit_feature_project_analysis::complexity_report::cli as complexity_report;
+use paredit_feature_project_analysis::context_report::cli as context_report;
 use paredit_feature_project_analysis::form_report::cli as form_report;
 use paredit_feature_project_analysis::impact_report::cli as impact_report;
 use paredit_feature_project_analysis::naming_report::cli as naming_report;

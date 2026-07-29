@@ -120,6 +120,19 @@ pub enum ArgumentError {
 
     #[error("--write requires --file")]
     WriteRequiresFile,
+
+    #[error("second target required: pass --with-path or --with-at")]
+    SecondTargetRequired,
+
+    #[error("pass only one of --with-path or --with-at")]
+    SecondTargetAmbiguous,
+
+    #[error("kill ring {path} holds {available} entries; --index {index} is out of range")]
+    KillRingIndexOutOfRange {
+        path: String,
+        index: usize,
+        available: usize,
+    },
 }
 
 /// A write failed, and then undoing it failed too.
@@ -205,6 +218,18 @@ pub enum CliError {
 
     #[error(transparent)]
     WriteTarget(#[from] WriteTargetError),
+
+    /// A JSON artifact this tool owns did not parse or did not render.
+    ///
+    /// Distinct from [`CliError::Parse`], which is about *source* text. This
+    /// one is about the tool's own sidecar files - the kill ring today - where
+    /// a malformed file is a refusal rather than an empty result.
+    #[error("{context}")]
+    Json {
+        context: String,
+        #[source]
+        source: serde_json::Error,
+    },
 
     /// The writes landed; only tidying up after them did not.
     ///
