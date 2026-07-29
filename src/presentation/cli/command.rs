@@ -852,6 +852,8 @@ pub(super) enum Command {
     /// Run a resident analysis server over HTTP and JSON-RPC, sharing one
     /// parse and lint cache across calls.
     Serve(crate::presentation::serve::ServeArgs),
+    /// Interactively browse one file's tree; prints the last selected --path on exit.
+    Tui(crate::presentation::tui::TuiArgs),
     /// Print a shell completion script to stdout.
     Completions {
         /// Shell to generate a completion script for.

@@ -182,6 +182,7 @@ pub fn run() -> ExitCode {
         Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
         Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
         Command::Serve(args) => return crate::presentation::serve::serve(args),
+        Command::Tui(args) => return crate::presentation::tui::tui(args),
         command => command,
     };
 
