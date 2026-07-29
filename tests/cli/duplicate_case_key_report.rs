@@ -14,8 +14,12 @@ fn cli_reports_a_key_repeated_across_two_clauses() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 1"))
-        .stdout(predicate::str::contains("\"key\": \":a\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"case_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"head\": \"case\""))
+        .stdout(predicate::str::contains("\"key\": \":a\""))
+        .stdout(predicate::str::contains("\"occurrence_count\": 2"));
 }
 
 #[test]
@@ -32,7 +36,7 @@ fn cli_finds_a_case_nested_in_a_function_body() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
 
 #[test]
@@ -49,7 +53,48 @@ fn cli_does_not_flag_distinct_keys() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no repeat in one `case` form" from
+        // "no `case` form at all".
+        .stdout(predicate::str::contains("\"case_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_duplicate_case_keys_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("duplicate-case-key-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn pick [x] (case x (:a 1) (:a 2)))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "duplicate-case-keys", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_duplicate_case_keys_emits_sarif() {
+    let dir = fresh_temp_dir("duplicate-case-key-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(case x (:a 1) (:b 2) (:a 3))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "duplicate-case-keys", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/duplicate-case-keys/duplicate-case-keys\"",
+        ))
+        .stdout(predicate::str::contains("case repeats key :a (2×)"));
 }
 
 #[test]
@@ -85,5 +130,5 @@ fn cli_duplicate_case_keys_passes_gate_when_all_keys_are_distinct() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"duplicate_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
