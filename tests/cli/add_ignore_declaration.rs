@@ -110,6 +110,39 @@ fn cli_diff_shows_only_the_inserted_declarations() {
 }
 
 #[test]
+fn cli_keeps_a_single_line_definition_on_one_line() {
+    // Every fixture above is multi-line, which is what hid this: the insertion
+    // assumed its offset began a line and wrote
+    // `(defun f (x y) (declare (ignore y))\nx)`, stranding the body at column
+    // zero.
+    let dir = fresh_temp_dir("add-ignore-single-line");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun f (x y) x)\n").expect("write fixture");
+
+    paredit()
+        .args(["refactor", "add-ignore-declaration", "--write"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read rewritten fixture"),
+        "(defun f (x y) (declare (ignore y)) x)\n"
+    );
+
+    let after = paredit()
+        .args(["inspect", "unused-parameters", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&after).expect("report is valid JSON");
+    assert_eq!(report["unused_parameter_count"], 0);
+}
+
+#[test]
 fn cli_plans_nothing_for_a_dialect_without_declare() {
     let dir = fresh_temp_dir("add-ignore-clojure");
     let file = dir.join("source.clj");

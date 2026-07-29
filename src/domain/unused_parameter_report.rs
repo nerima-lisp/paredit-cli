@@ -373,11 +373,19 @@ pub fn plan_ignore_declarations(
     let mut rewritten = input.to_owned();
     for item in &ordered {
         let names = item.parameter_names.join(" ");
-        let indent = line_indent_at(&rewritten, item.insert_at);
-        rewritten.insert_str(
-            item.insert_at,
-            &format!("(declare (ignore {names}))\n{}", " ".repeat(indent)),
-        );
+        let declaration = format!("(declare (ignore {names}))");
+        let insertion = match own_line_indent_at(&rewritten, item.insert_at) {
+            // The body form the declaration is placed above starts its own
+            // line, so the declaration takes a line of its own and is aligned
+            // with it.
+            Some(indent) => format!("{declaration}\n{indent}"),
+            // A single-line definition. Breaking the line here would leave the
+            // rest of the definition at column 0 —
+            // `(defun f (x y) (declare (ignore y))\nx)` — so the declaration
+            // stays on the line it was inserted into instead.
+            None => inline_declaration(&rewritten, item.insert_at, &declaration),
+        };
+        rewritten.insert_str(item.insert_at, &insertion);
     }
 
     Ok(IgnoreDeclarationPlan {
@@ -422,14 +430,40 @@ fn declaration_insertion_offset(view: &ExpressionView, body: &[ExpressionView]) 
     )
 }
 
-/// The indentation of the line `offset` sits on, for keeping an inserted form
-/// aligned with the one it was placed above.
-fn line_indent_at(input: &str, offset: usize) -> usize {
+/// The literal indentation of the line `offset` sits on, for keeping an
+/// inserted form aligned with the one it was placed above.
+///
+/// `None` when something other than whitespace precedes `offset` on its line,
+/// which is exactly the case where an inserted newline would strand the rest
+/// of the definition on an unindented line. Returning the source's own
+/// indentation rather than a count of spaces keeps a tab-indented file
+/// tab-indented.
+fn own_line_indent_at(input: &str, offset: usize) -> Option<&str> {
     let line_start = input[..offset].rfind('\n').map_or(0, |index| index + 1);
-    input[line_start..offset]
+    let indent = &input[line_start..offset];
+    indent.chars().all(char::is_whitespace).then_some(indent)
+}
+
+/// The declaration plus whatever spacing keeps it a separate form from its
+/// neighbours on the line it is spliced into.
+///
+/// Both sides are checked because the two insertion points differ: a body form
+/// already has a space before it and needs one after, while the no-body case
+/// inserts against the definition's own closing delimiter and needs the
+/// opposite.
+fn inline_declaration(input: &str, offset: usize, declaration: &str) -> String {
+    let needs_space_before = input[..offset]
         .chars()
-        .take_while(|character| *character == ' ')
-        .count()
+        .next_back()
+        .is_some_and(|character| {
+            !character.is_whitespace() && !matches!(character, '(' | '[' | '{')
+        });
+    let needs_space_after = input[offset..].chars().next().is_some_and(|character| {
+        !character.is_whitespace() && !matches!(character, ')' | ']' | '}')
+    });
+    let before = if needs_space_before { " " } else { "" };
+    let after = if needs_space_after { " " } else { "" };
+    format!("{before}{declaration}{after}")
 }
 
 #[cfg(test)]
@@ -527,11 +561,44 @@ mod ignore_declaration_tests {
     }
 
     #[test]
+    fn a_single_line_definition_stays_on_one_line() {
+        // Every other fixture here is multi-line, which is why this went
+        // unnoticed: the insertion assumed its offset began a line, and
+        // produced `(defun f (x y) (declare (ignore y))\nx)` — the body left
+        // at column 0, outside the header it belongs under.
+        let planned = plan("(defun f (x y) x)\n");
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y) (declare (ignore y)) x)\n"
+        );
+    }
+
+    #[test]
+    fn a_single_line_definition_with_no_body_keeps_its_delimiters_tidy() {
+        let planned = plan("(defun f (x y))\n");
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y) (declare (ignore x y)))\n"
+        );
+    }
+
+    #[test]
+    fn a_tab_indented_body_keeps_its_own_indentation() {
+        let planned = plan("(defun f (x y)\n\tx)\n");
+        assert_eq!(
+            planned.rewritten,
+            "(defun f (x y)\n\t(declare (ignore y))\n\tx)\n"
+        );
+    }
+
+    #[test]
     fn the_rewrite_still_parses() {
         for source in [
             "(defun f (x y)\n  x)\n",
             "(defun f (x y)\n  \"Doc.\"\n  x)\n",
             "(defun f (x y z)\n  x)\n",
+            "(defun f (x y) x)\n",
+            "(defun f (x y))\n",
         ] {
             let planned = plan(source);
             SyntaxTree::parse_with_dialect(&planned.rewritten, Dialect::CommonLisp)
