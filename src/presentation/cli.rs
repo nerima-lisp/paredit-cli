@@ -114,6 +114,15 @@ struct Cli {
     /// operations long enough that silence looks like a hang.
     #[arg(long, global = true)]
     progress: bool,
+    /// Whether text output may use ANSI color. `auto` follows the
+    /// destination terminal and `NO_COLOR`/`CLICOLOR_FORCE`.
+    #[arg(long, global = true, value_enum)]
+    color: Option<paredit_core_cli::color::ColorMode>,
+    /// Delegate stdout to `$PAGER` (falling back to `less`) when it is a
+    /// terminal. Never on by default: unlike `--color`, this changes the
+    /// interaction itself.
+    #[arg(long, global = true)]
+    paginate: bool,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -173,12 +182,21 @@ pub fn run() -> ExitCode {
         Command::Lsp(args) => return crate::presentation::lsp::lsp(args),
         Command::Mcp(args) => return crate::presentation::mcp::mcp(args),
         Command::Serve(args) => return crate::presentation::serve::serve(args),
+        Command::Tui(args) => return crate::presentation::tui::tui(args),
         command => command,
     };
-    match dispatch::dispatch(command) {
+
+    #[cfg(unix)]
+    let pager = paredit_core_cli::pager::maybe_start();
+    let exit_code = match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_failure(&error, &invocation),
+    };
+    #[cfg(unix)]
+    if let Some(pager) = pager {
+        pager.finish();
     }
+    exit_code
 }
 
 /// Whether this run may not write.
@@ -263,9 +281,10 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
             serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
         );
     } else {
+        let painter = paredit_core_cli::color::Painter::stderr();
         eprintln!(
             "{} [{}]: {}",
-            messages::say(messages::Message::ErrorPrefix),
+            painter.red(messages::say(messages::Message::ErrorPrefix)),
             diagnosis.code,
             terminal_safe_error_chain(error)
         );
@@ -280,14 +299,14 @@ fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
                 Some(command) => {
                     eprintln!(
                         "  {}: {} — {}",
-                        messages::say(messages::Message::RepairPrefix),
+                        painter.cyan(messages::say(messages::Message::RepairPrefix)),
                         repair.detail(),
                         terminal_safe(command)
                     );
                 }
                 None => eprintln!(
                     "  {}: {}",
-                    messages::say(messages::Message::RepairPrefix),
+                    painter.cyan(messages::say(messages::Message::RepairPrefix)),
                     repair.detail()
                 ),
             }
@@ -372,6 +391,13 @@ fn bootstrap() -> Cli {
     let raw: Vec<String> = std::env::args().collect();
     runtime.dry_run = is_dry_run(&raw);
     runtime.progress = raw.iter().any(|token| token == "--progress");
+    runtime.paginate = raw.iter().any(|token| token == "--paginate");
+    if let Some(mode) = argv::long_flag_value(&raw, "color")
+        .as_deref()
+        .and_then(paredit_core_cli::color::ColorMode::from_label)
+    {
+        runtime.color = mode;
+    }
     paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file

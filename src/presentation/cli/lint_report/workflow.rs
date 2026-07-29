@@ -985,7 +985,13 @@ fn lint_report_fix(
             if args.diff {
                 // Preview only: the unified diff is the payload (stdout, so it
                 // pipes to a file/pager), and nothing is written.
-                print!("{}", unified_diff(file, &input.text, &text));
+                print!(
+                    "{}",
+                    paredit_core_cli::color::colorize_diff(
+                        paredit_core_cli::color::Painter::stdout(),
+                        &unified_diff(file, &input.text, &text)
+                    )
+                );
             } else if !args.check {
                 write_file_with_rollback(file.clone(), text)?;
             }

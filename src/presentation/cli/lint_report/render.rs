@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::Result;
+use paredit_core_cli::color::Painter;
 use serde_json::json;
 
 use crate::application::usecase::lint_report::{
@@ -18,6 +19,17 @@ use crate::presentation::cli::shared::FileFailure;
 /// renderer, because the id is derived from the reported form's text and a
 /// `LintFinding` carries only a span.
 pub(super) type FindingIds = Vec<String>;
+
+/// Colors a severity word for a terminal; passed through unchanged for a
+/// pipe, a file, or any value this tool did not itself just print as
+/// `"error"`/`"warning"`.
+fn paint_severity(painter: Painter, severity: &str) -> String {
+    match severity {
+        "error" => painter.red(severity),
+        "warning" => painter.yellow(severity),
+        _ => severity.to_owned(),
+    }
+}
 
 pub(super) fn print_lint_report(
     summary: &LintSummary,
@@ -37,11 +49,12 @@ pub(super) fn print_lint_report(
             if policy.fail_on_finding {
                 println!("policy\tfail_on_finding=true\tpassed={}", policy.passed);
             }
+            let painter = Painter::stdout();
             for (index, finding) in summary.findings.iter().enumerate() {
                 println!(
                     "finding\t{}\t{}\t{}\tfixable={}\t{}\t{}\t{}\t{}",
                     safe_text!(finding.rule),
-                    severity_of(finding.rule),
+                    paint_severity(painter, severity_of(finding.rule)),
                     meta.category(finding.rule).unwrap_or(""),
                     meta.is_fixable(finding.rule),
                     safe_text!(finding.path.display()),
