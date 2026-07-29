@@ -145,16 +145,30 @@ impl DialectReaderPolicy {
         })
     }
 
+    /// How many bytes introduce a character literal at `pos`, if one starts
+    /// there.
+    ///
+    /// A prefix is only a prefix when something follows it. `#\` at end of
+    /// input is not the character literal for nothing — it is a truncated one,
+    /// and reading it as a complete atom had a consequence beyond pedantry:
+    /// the formatter appends a trailing newline, the truncated literal
+    /// swallowed it as its character, and `format(format(x))` differed from
+    /// `format(x)`. A robustness property found it on `"#\\"` in Scheme.
+    ///
+    /// The permissive legacy reader already rejects the same input
+    /// ("single escape is missing an escaped character"), so this makes the
+    /// dialect readers agree with it rather than inventing a new rule.
     pub(super) fn character_literal_prefix_width(self, bytes: &[u8], pos: usize) -> Option<usize> {
         let byte = *bytes.get(pos)?;
         let next = bytes.get(pos + 1).copied();
-        match self.dialect {
-            Dialect::Scheme | Dialect::Racket if byte == b'#' && next == Some(b'\\') => Some(2),
-            Dialect::Clojure if byte == b'\\' => Some(1),
-            Dialect::EmacsLisp if byte == b'?' && next == Some(b'\\') => Some(2),
-            Dialect::EmacsLisp if byte == b'?' => Some(1),
-            _ => None,
-        }
+        let width = match self.dialect {
+            Dialect::Scheme | Dialect::Racket if byte == b'#' && next == Some(b'\\') => 2,
+            Dialect::Clojure if byte == b'\\' => 1,
+            Dialect::EmacsLisp if byte == b'?' && next == Some(b'\\') => 2,
+            Dialect::EmacsLisp if byte == b'?' => 1,
+            _ => return None,
+        };
+        bytes.get(pos + width).is_some().then_some(width)
     }
 
     pub(super) fn classify_reader_macro(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
@@ -243,7 +257,15 @@ impl DialectReaderPolicy {
             Some(b':' | b'\\' | b'*' | b'b' | b'B' | b'o' | b'O' | b'd' | b'D' | b'x' | b'X') => {
                 None
             }
-            Some(b'p' | b'P' | b's' | b'S') => Some(ReaderMacro::MultiDatum {
+            // `#p"..."` pathname, `#s(...)` structure, `#c(re im)` complex.
+            // All three are a two-byte dispatch followed by exactly one datum.
+            //
+            // `#c` was missing until a corpus run over Quicklisp found it:
+            // `(equal '(#C(0.0 0.0) #C(0.0 2.0)) ...)` in alexandria's test
+            // suite failed to parse, and a file that does not parse is a file
+            // none of this tool's 275 commands can say anything about. It is
+            // CLHS 2.4.8.11, not an implementation extension.
+            Some(b'p' | b'P' | b's' | b'S' | b'c' | b'C') => Some(ReaderMacro::MultiDatum {
                 width: 2,
                 payload_forms: 1,
             }),
@@ -290,6 +312,16 @@ impl DialectReaderPolicy {
                 width: 3,
                 payload_forms: 1,
             });
+        }
+        // `#\` at end of input is a truncated character literal, not the
+        // character literal for nothing. Reading it as a complete atom made
+        // the formatter non-idempotent: it appends a trailing newline, the
+        // truncated literal claims it as its character, and the next pass
+        // appends another. Common Lisp, Emacs Lisp and Clojure already reject
+        // it through their own escape rules; this makes Scheme and Racket
+        // agree rather than being the two that do not.
+        if next == Some(b'\\') && bytes.get(pos + 2).is_none() {
+            return Some(ReaderMacro::UnsupportedDispatch { width: 1 });
         }
         match next {
             Some(b'(') => prefix(ReaderPrefix::HashLiteral, 1),

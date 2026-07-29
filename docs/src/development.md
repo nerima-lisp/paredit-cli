@@ -117,6 +117,52 @@ Restoring the matrix is a small change to `.github/workflows/ci.yml`: the
 contract test beside it asserts the *gates* rather than the hosts, precisely so
 that stays a free choice.
 
+## Robustness: corpora and fuzzing
+
+Three layers, from "runs on every commit" to "runs when a maintainer asks".
+
+### The corpus test
+
+`cargo test --test corpus` asserts four invariants over every file it reads:
+parsing terminates without panicking, parsing is lossless, formatting is
+idempotent, and every path the tree reports resolves. It runs against the
+vendored fixtures in `tests/fixtures/corpus` with no network access.
+
+Point it at real code to make it mean something:
+
+```sh
+./scripts/fetch-corpus.sh                    # clones ~9 projects into .corpus/
+PAREDIT_CORPUS_DIR=.corpus cargo test --test corpus -- --nocapture
+```
+
+It reads at most 4000 files per run and says so when it stops early. This is
+where `#c(1.0 2.0)` — an ANSI complex literal the reader did not know — was
+found, in alexandria's test suite.
+
+### The robustness properties
+
+`cargo test --test parser_robustness` drives the same invariants from proptest
+on stable: reader-significant token soup, arbitrary text, deep nesting,
+unbalanced input, and every structural edit at an arbitrary byte offset. It
+also replays everything under `fuzz/corpus` and `fuzz/artifacts`, so a crasher
+found by a nightly fuzzer becomes a permanent regression test the moment its
+artifact is committed.
+
+### The fuzz targets
+
+`fuzz/` is a cargo-fuzz package, excluded from the workspace because it needs a
+nightly toolchain and links libFuzzer:
+
+```sh
+cargo install cargo-fuzz
+cargo +nightly fuzz run parse               # reader, every dialect
+cargo +nightly fuzz run format_idempotence  # format(format(x)) == format(x)
+cargo +nightly fuzz run edit_at_offset      # every edit at a caller's offset
+```
+
+When a run finds a crash, commit the artifact under `fuzz/artifacts/<target>/`.
+The stable replay test picks it up without anyone needing nightly again.
+
 ## Documentation is tested
 
 The repository treats documentation as part of the public contract. Tests in

@@ -114,6 +114,12 @@ workspace = true
 # Note that Cargo rejects a glob matching nothing, so this line can only exist
 # while at least one packages/*/* member does.
 members = ["packages/*/*"]
+# `fuzz/` is a cargo-fuzz package: it needs a nightly toolchain and links
+# libFuzzer, neither of which belongs in `cargo build --workspace` or the Nix
+# build. It declares its own `[workspace]` as well, so this line is belt and
+# braces — but the failure without it is "package is not included in the
+# workspace", which stops every build rather than only the fuzz one.
+exclude = ["fuzz"]
 
 # Required, not cosmetic. This workspace has a root package, so a bare
 # `cargo test` / `cargo nextest run` would otherwise build only the root and
