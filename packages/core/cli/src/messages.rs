@@ -70,6 +70,7 @@ pub enum Message {
     RepairUsePreviewFlag,
     RepairDropEncodingForWrite,
     RepairKillRingIndex,
+    RepairListAvailableNames,
     RepairNarrowSelector,
     RepairWidenSelector,
     RepairShowMatches,
@@ -129,6 +130,10 @@ impl Message {
             }
             Self::RepairKillRingIndex => {
                 "read the ring file, or pass --index 0 for the most recent entry"
+            }
+            Self::RepairListAvailableNames => {
+                "the message lists the names this build accepts; list them again with the \
+                 namespace's own `list` command"
             }
             Self::RepairSelectByPath => "select by path instead of by offset, with --path <a.b.c>",
             Self::RepairRereadFile => {
@@ -263,6 +268,10 @@ impl Message {
             Self::RepairKillRingIndex => {
                 "kill ring ファイルを確認するか、最新の項目を指す --index 0 を渡してください"
             }
+            Self::RepairListAvailableNames => {
+                "利用できる名前はメッセージ中に列挙されています。名前空間の `list` \
+                 コマンドでも一覧できます"
+            }
             Self::RepairSelectByPath => {
                 "バイト位置ではなくパスで選択してください（--path <a.b.c>）"
             }
@@ -362,7 +371,7 @@ impl Message {
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 55] = [
+    pub const ALL: [Self; 56] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -418,6 +427,7 @@ impl Message {
         Self::RepairNoInputsProduced,
         Self::RepairArchiveDestination,
         Self::RepairKillRingIndex,
+        Self::RepairListAvailableNames,
     ];
 }
 

@@ -321,7 +321,7 @@ fn fixture_source(dialect: &str) -> (&'static str, String) {
 /// Each entry is the command and the arguments that select something in the
 /// fixture, so a claim of `supported` is checked by running the command rather
 /// than by trusting the table that produced it.
-const SAMPLED_COMMANDS: [(&str, &[&str]); 8] = [
+const SAMPLED_COMMANDS: [(&str, &[&str]); 11] = [
     ("inspect outline", &[]),
     ("inspect definitions", &[]),
     ("inspect lint", &[]),
@@ -330,6 +330,13 @@ const SAMPLED_COMMANDS: [(&str, &[&str]); 8] = [
     ("edit select", &["--path", "0"]),
     ("refactor convert-let-to-let-star", &["--path", "0.3"]),
     ("refactor convert-labels-to-flet", &["--path", "0"]),
+    // The three namespaces added by section O. All three claim `supported`
+    // for every dialect — pattern matching and template splicing read the
+    // tree and the dialect's own reader and nothing above them — and a claim
+    // of support on ten dialects is worth one real invocation each.
+    ("query find", &["--query", "(defun ?name ...)"]),
+    ("query count", &["--query", "(defun ?name ...)"]),
+    ("migrate run", &[]),
 ];
 
 #[test]
@@ -351,7 +358,15 @@ fn sampled_cells_behave_the_way_the_matrix_says_they_do() {
 
             let mut invocation = paredit();
             invocation.args(command.split(' '));
-            if command.starts_with("inspect ") {
+            // `migrate run` takes its recipe name before its roots, so it goes
+            // in ahead of the file rather than in the flag list.
+            if command == "migrate run" {
+                invocation.arg("nil-conditionals");
+            }
+            if ["inspect ", "query ", "migrate "]
+                .iter()
+                .any(|prefix| command.starts_with(prefix))
+            {
                 invocation.arg(&file);
             } else {
                 invocation.args(["--file", file.to_str().expect("utf-8 path")]);

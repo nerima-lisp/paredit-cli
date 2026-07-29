@@ -30,6 +30,7 @@
 //! which is only correct for rewrites that are dialect-neutral.
 
 use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::selector::normalized_form_text;
 use paredit_core_syntax::sexpr::{ExpressionKind, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, list_head};
 use thiserror::Error;
@@ -253,9 +254,20 @@ fn keyword_value<'a>(form: &'a ExpressionView, keyword: &str) -> Option<&'a Expr
         .and_then(|index| form.children.get(index + 1))
 }
 
-/// A form's source text, verbatim — which is what a query or a rewrite is.
+/// A form's source text, with runs of whitespace collapsed.
+///
+/// Normalized rather than verbatim, and that matters: recipe files go through
+/// this repository's own formatter, which indents `(if (not ?test) ?then nil)`
+/// across three lines because it treats `if` as a special form with a body.
+/// It is not wrong to — but a step whose `:query` string then carried those
+/// newlines would make the recipe's *text* depend on its *layout*, and
+/// `migrate explain` would print a tab-separated row with newlines in a
+/// column. A pattern is whitespace-insensitive anyway, so nothing is lost.
+///
+/// Whitespace inside a string literal is preserved; see
+/// [`normalized_form_text`].
 fn span_text(view: &ExpressionView, source: &str) -> String {
-    source[view.span.start().get()..view.span.end().get()].to_owned()
+    normalized_form_text(source, view.span)
 }
 
 /// A `"…"` literal's contents, with the reader's escapes resolved.
@@ -316,6 +328,33 @@ mod tests {
         let recipe = &parse_recipes(text, "sample").expect("parse")[0];
         assert!(recipe.covers(Dialect::Clojure));
         assert_eq!(recipe.dialect_labels(), vec!["any"]);
+    }
+
+    /// The repository formats its own `.lisp` files, recipes included, and
+    /// indents an `if` across lines. A step read from a formatted file has to
+    /// be the same step.
+    #[test]
+    fn a_step_reads_the_same_however_the_file_is_laid_out() {
+        let inline = r#"(defmigration p :description "d"
+             :steps ((:query (if (not ?t) ?a nil) :rewrite (unless ?t ?a))))"#;
+        // Laid out the way this repository's own formatter lays it out: `if`,
+        // `unless` and `when` all take a body, so their last argument goes on
+        // its own line.
+        let formatted = r#"(defmigration
+  p
+  :description
+  "d"
+  :steps
+  ((:query
+      (if (not ?t) ?a
+        nil)
+      :rewrite
+      (unless ?t
+        ?a))))"#;
+        let one = parse_recipes(inline, "inline").expect("parse");
+        let other = parse_recipes(formatted, "formatted").expect("parse");
+        assert_eq!(one[0].steps, other[0].steps);
+        assert_eq!(one[0].steps[0].query, "(if (not ?t) ?a nil)");
     }
 
     #[test]

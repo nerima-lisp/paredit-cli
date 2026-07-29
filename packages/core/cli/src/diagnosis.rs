@@ -20,7 +20,7 @@
 
 use std::fmt;
 
-use paredit_core_syntax::selector::error::SelectorError;
+use paredit_core_syntax::selector::error::{RewriteError, SelectorError};
 use paredit_core_syntax::sexpr::{
     ParseError, PathError, SelectionError, SexprError, SpanError, StructureError, SymbolError,
 };
@@ -115,6 +115,7 @@ pub enum ErrorCode {
     ArgumentNoInputsProduced,
     ArgumentArchiveDestination,
     ArgumentKillRingIndex,
+    ArgumentUnknownName,
 
     SelectionPathNotReachable,
     SelectionPathInvalid,
@@ -170,6 +171,7 @@ impl ErrorCode {
             Self::ArgumentNoInputsProduced => "argument.no-inputs-produced",
             Self::ArgumentArchiveDestination => "argument.archive-destination",
             Self::ArgumentKillRingIndex => "argument.kill-ring-index",
+            Self::ArgumentUnknownName => "argument.unknown-name",
 
             Self::SelectionPathNotReachable => "selection.path-not-reachable",
             Self::SelectionPathInvalid => "selection.path-invalid",
@@ -221,7 +223,8 @@ impl ErrorCode {
             | Self::ArgumentNeedsRepository
             | Self::ArgumentNoInputsProduced
             | Self::ArgumentArchiveDestination
-            | Self::ArgumentKillRingIndex => Category::Argument,
+            | Self::ArgumentKillRingIndex
+            | Self::ArgumentUnknownName => Category::Argument,
 
             Self::SelectionPathNotReachable
             | Self::SelectionPathInvalid
@@ -290,7 +293,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 42] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -301,6 +304,7 @@ impl ErrorCode {
         Self::ArgumentNoInputsProduced,
         Self::ArgumentArchiveDestination,
         Self::ArgumentKillRingIndex,
+        Self::ArgumentUnknownName,
         Self::SelectionPathNotReachable,
         Self::SelectionPathInvalid,
         Self::SelectionOffsetNotFound,
@@ -573,6 +577,22 @@ fn classify(error: &anyhow::Error) -> ErrorCode {
     if let Some(selector) = error.downcast_ref::<SelectorError>() {
         return classify_selector(selector);
     }
+    // A `--rewrite` template is the pattern language's other half, and every
+    // way it can be wrong is the caller's command line: an unbalanced
+    // template, two forms where one was wanted, a `?name` the pattern does not
+    // bind. Left unclassified these reported as `internal.unclassified`, whose
+    // documented meaning is "a defect in this tool, please report it" — which
+    // sends someone to file a bug about their own typo.
+    if error.downcast_ref::<RewriteError>().is_some() {
+        return ErrorCode::SelectionPatternInvalid;
+    }
+    // A bare `ArgumentError`, not wrapped in `CliError`. Both spellings reach
+    // here from feature packages, and the difference is invisible at the call
+    // site — an `ArgumentError` converted straight into `anyhow::Error` used
+    // to fall through to `Internal`.
+    if let Some(argument) = error.downcast_ref::<ArgumentError>() {
+        return classify_argument(argument);
+    }
     if let Some(workspace) = error.downcast_ref::<WorkspaceError>() {
         return classify_workspace(workspace);
     }
@@ -632,6 +652,7 @@ const fn classify_argument(error: &ArgumentError) -> ErrorCode {
         // `--path`'s absence means, so the same code.
         ArgumentError::SecondTargetRequired => ErrorCode::ArgumentTargetRequired,
         ArgumentError::KillRingIndexOutOfRange { .. } => ErrorCode::ArgumentKillRingIndex,
+        ArgumentError::UnknownName { .. } => ErrorCode::ArgumentUnknownName,
     }
 }
 
@@ -874,6 +895,9 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
         }
         ErrorCode::ArgumentKillRingIndex => {
             vec![Repair::new("pass-flag", Message::RepairKillRingIndex)]
+        }
+        ErrorCode::ArgumentUnknownName => {
+            vec![Repair::new("pass-flag", Message::RepairListAvailableNames)]
         }
 
         ErrorCode::SelectionMalformed => vec![

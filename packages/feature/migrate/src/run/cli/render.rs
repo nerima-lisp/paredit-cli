@@ -17,7 +17,7 @@ pub fn print_list(entries: &[CatalogEntry], output: OutputFormat) -> Result<()> 
                     safe_text!(entry.migration.name),
                     entry.migration.steps.len(),
                     entry.migration.dialect_labels().join(","),
-                    entry.origin,
+                    safe_text!(entry.origin),
                     safe_text!(entry.migration.description)
                 );
             }
@@ -41,7 +41,7 @@ pub fn print_explain(entry: &CatalogEntry, output: OutputFormat) -> Result<()> {
                 "recipe\t{}\t{}\t{}",
                 safe_text!(entry.migration.name),
                 entry.migration.dialect_labels().join(","),
-                entry.origin
+                safe_text!(entry.origin)
             );
             println!("description\t{}", safe_text!(entry.migration.description));
             for (index, step) in entry.migration.steps.iter().enumerate() {
@@ -49,7 +49,9 @@ pub fn print_explain(entry: &CatalogEntry, output: OutputFormat) -> Result<()> {
                     "step\t{index}\t{}\t{}\t{}",
                     safe_text!(step.query),
                     safe_text!(step.rewrite),
-                    step.note.as_deref().map_or("-", |note| note)
+                    step.note
+                        .as_deref()
+                        .map_or_else(|| "-".to_owned(), |note| safe_text!(note).to_string())
                 );
             }
         }
@@ -100,7 +102,7 @@ pub fn print_run_report(
             for file in touched {
                 println!(
                     "file\t{}\t{}\t{}",
-                    file.path.display(),
+                    safe_text!(file.path.display()),
                     file.replacements(),
                     file.skipped()
                 );

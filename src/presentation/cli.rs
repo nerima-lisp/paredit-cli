@@ -118,7 +118,7 @@ pub(crate) use shared::{read_input_dialect_and_tree, terminal_safe, terminal_saf
     version,
     about,
     long_about = None,
-    after_help = "Canonical namespaces:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form; stdout by default, --write to update the file.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAll source-facing commands live in these three namespaces.\n`paredit completions <shell>` prints a shell completion script.\nRun `paredit inspect capabilities --output json` for a machine-readable catalog of every command and flag."
+    after_help = "Canonical namespaces, by what a change costs to undo:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form; stdout by default, --write to update the file.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAnd by what you are trying to do, over a file set rather than one form:\n  `paredit query ...` searches, counts, and rewrites by S-expression pattern.\n  `paredit fix ...` applies the lint auto-fixes (the write side of `inspect lint`).\n  `paredit migrate ...` runs a named, dialect-scoped codemod recipe.\n\nAll source-facing commands live in these six namespaces.\n`paredit completions <shell>` prints a shell completion script.\nRun `paredit inspect capabilities --output json` for a machine-readable catalog of every command and flag."
 )]
 struct Cli {
     /// Write nothing to disk. Suppresses --write on every command, whatever

@@ -33,7 +33,7 @@ pub fn print_count_report(
                 for file in files {
                     println!(
                         "file\t{}\t{}",
-                        file.path.display(),
+                        safe_text!(file.path.display()),
                         file.counts
                             .iter()
                             .map(ToString::to_string)

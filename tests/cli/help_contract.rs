@@ -6,7 +6,9 @@ fn top_level_help_routes_new_automation_to_grouped_namespaces() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Canonical namespaces:"))
+        .stdout(predicate::str::contains(
+            "Canonical namespaces, by what a change costs to undo:",
+        ))
         .stdout(predicate::str::contains(
             "`paredit inspect ...` reads and reports without writing.",
         ))
@@ -15,6 +17,18 @@ fn top_level_help_routes_new_automation_to_grouped_namespaces() {
         ))
         .stdout(predicate::str::contains(
             "`paredit refactor ...` plans, previews, verifies, and applies semantic changes.",
+        ))
+        // The three task-oriented namespaces have to be reachable from the
+        // same screen, or an agent that reads `--help` and stops still
+        // believes `inspect lint --fix` is the only way to fix anything.
+        .stdout(predicate::str::contains(
+            "`paredit query ...` searches, counts, and rewrites by S-expression pattern.",
+        ))
+        .stdout(predicate::str::contains(
+            "`paredit fix ...` applies the lint auto-fixes",
+        ))
+        .stdout(predicate::str::contains(
+            "`paredit migrate ...` runs a named, dialect-scoped codemod recipe.",
         ))
         .stdout(predicate::str::contains(
             "paredit inspect capabilities --output json",

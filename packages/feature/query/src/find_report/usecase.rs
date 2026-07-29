@@ -2,12 +2,13 @@
 
 pub use crate::find_report::domain::{DEFAULT_PREVIEW_BYTES, PatternHit};
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use paredit_core_cli::report::{FileFindings, ReportPolicy};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::selector::{LineIndex, Pattern, match_all, stable_selector_ids};
-use paredit_core_syntax::sexpr::SyntaxTree;
+use paredit_core_syntax::sexpr::{ExpressionPath, SyntaxTree};
 use serde_json::json;
 
 /// Every form in `tree` that `pattern` matches.
@@ -23,15 +24,21 @@ pub fn build_find_report(
     let index = LineIndex::new(source);
     // One pass for the whole file: an id cannot be computed for one form
     // alone, since its ordinal depends on the forms around it.
-    let ids = stable_selector_ids(tree, dialect);
+    // Indexed rather than scanned. `stable_selector_ids` returns one entry per
+    // form in the file, and looking each match up with a linear `find` over
+    // that — comparing an `ExpressionPath`, which is a `Vec`, every step — is
+    // quadratic in a file's size. It showed: a 700 KB source took two seconds
+    // to *report* matches that took 70 ms to rewrite.
+    let all_ids = stable_selector_ids(tree, dialect);
+    let ids: HashMap<&ExpressionPath, &str> = all_ids
+        .iter()
+        .map(|(path, id)| (path, id.as_str()))
+        .collect();
 
     let hits: Vec<PatternHit> = match_all(tree, pattern, dialect)
         .iter()
         .map(|found| {
-            let id = ids
-                .iter()
-                .find(|(path, _)| *path == found.path)
-                .map(|(_, id)| id.as_str().to_owned());
+            let id = ids.get(&found.path).map(|id| (*id).to_owned());
             PatternHit::new(found, source, &index, id, preview_bytes)
         })
         .collect();

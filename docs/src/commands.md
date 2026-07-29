@@ -280,7 +280,7 @@ discovery, impact analysis, and preflight checks.
 | `eql-list-comparison` | Report eq/eql calls that compare against a quoted list literal (never reliably eql). |
 | `eql-search-literal` | Report `member`/`assoc`/`find`/`position`/`count`/`remove`/`delete`/`adjoin`/`pushnew` (item first) and `substitute`/`nsubstitute`/`subst`/`nsubst` (item second) searching for a string or quoted-list literal with no `:test`; the default `eql` never matches a string/list literal — add `:test #'equal`. |
 | `setf-arity` | Report setq/setf/psetq/psetf forms with an odd argument count (a place missing its value). |
-| `lint` | Run every within-file logic-bug lint at once and report all findings, tagged by rule and category. Each finding is self-describing — it carries its `severity`, `category`, and a `fixable` flag inline (so an agent can triage and decide whether to run `--fix` without cross-referencing `--list-rules`). `--list-rules` prints the rule catalog with categories, descriptions, a `severity` (`error` for likely/certain bugs, `warning` for redundant/non-idiomatic style), and a `fixable` flag marking the rules `--fix` can repair — and it honors the same `--rule`/`--exclude`/`--category` selectors, so `--list-rules --category dead-code` lists just that group; `--rule`/`--exclude` select rules; `--category` selects a whole group (see `--list-rules` for the current set); `--sarif` emits a SARIF 2.1.0 log for CI code scanning (with stable fingerprints and one-click `fixes` for every rule `--list-rules` marks fixable); `--github` emits GitHub Actions `::error::` annotations for inline PR review; `--fix` applies those auto-fixes in place, iterating to a fixpoint (so nested redundancies collapse fully) and reporting the per-file/per-rule counts; add `--diff` to preview the changes as a unified diff without writing, or `--check` to write nothing and exit 3 when any auto-fix is still pending (a CI gate that stays green only when fixable lint has been cleaned up — distinct from `--fail-on-finding`, which also gates on report-only findings). `--check` and `--diff` combine (show the diff and fail). `--fix-plan` instead emits the machine-readable fix plan — each fixable finding's exact byte-region replacements as JSON (or tab-separated text) — without writing, so an editor or agent can preview or apply fixes one at a time (honoring the same suppressions and `--baseline` as `--fix`). Findings can be silenced in source with an inline `; paredit:ignore [rule…]` comment: on its own line it suppresses the next line, trailing after code it suppresses that line, and with no rule names it suppresses every rule — honored uniformly across the report, SARIF, GitHub, and `--fix` outputs. `--fail-on <error\|warning>` gates only on findings at or above a severity (so CI can block on bugs while still reporting style warnings), and SARIF `level` reflects each finding's severity. `--stats` prints a lint-debt rollup instead of individual findings — finding counts by severity, by category, and by rule, plus files-scanned/files-with-findings — honoring the same `--rule`/`--category`/`--baseline` filters. `--report-unused-suppressions` instead reports any `; paredit:ignore` that silences no finding (a stale ignore or a typo'd rule name) and exits 3 if any are found, keeping the ignore list honest in CI. A directive may also carry `-until <date>`; `--report-expired-suppressions` reports any past its date (used or not) and exits 3 if any are found, and `--report-suppressions` lists every directive, used or not, with its scope, rules, reason, and expiry, and always exits 0. `--suppress-path <path>` (repeatable) silences every finding under a path as if it carried `paredit:ignore-file`, for generated/vendored code that cannot hold an inline directive. For adopting the linter on an existing codebase, `--write-baseline <file>` snapshots today's findings and `--baseline <file>` then suppresses those known findings (matched by rule and trimmed-line content, so they survive line shifts) — reporting and gating only on new findings, across the default, `--sarif`, and `--github` outputs. |
+| `lint` | Run every within-file logic-bug lint at once and report all findings, tagged by rule and category. Each finding is self-describing — it carries its `severity`, `category`, and a `fixable` flag inline (so an agent can triage and decide whether to run `--fix` without cross-referencing `--list-rules`). `--list-rules` prints the rule catalog with categories, descriptions, a `severity` (`error` for likely/certain bugs, `warning` for redundant/non-idiomatic style), and a `fixable` flag marking the rules `--fix` can repair — and it honors the same `--rule`/`--exclude`/`--category` selectors, so `--list-rules --category dead-code` lists just that group; `--rule`/`--exclude` select rules; `--category` selects a whole group (see `--list-rules` for the current set); `--sarif` emits a SARIF 2.1.0 log for CI code scanning (with stable fingerprints and one-click `fixes` for every rule `--list-rules` marks fixable); `--github` emits GitHub Actions `::error::` annotations for inline PR review; `--fix` applies those auto-fixes in place, iterating to a fixpoint (so nested redundancies collapse fully) and reporting the per-file/per-rule counts; add `--diff` to preview the changes as a unified diff without writing, or `--check` to write nothing and exit 3 when any auto-fix is still pending (a CI gate that stays green only when fixable lint has been cleaned up — distinct from `--fail-on-finding`, which also gates on report-only findings). `--check` and `--diff` combine (show the diff and fail). `--fix-plan` instead emits the machine-readable fix plan — each fixable finding's exact byte-region replacements as JSON (or tab-separated text) — without writing, so an editor or agent can preview or apply fixes one at a time (honoring the same suppressions and `--baseline` as `--fix`). Findings can be silenced in source with an inline `; paredit:ignore [rule…]` comment: on its own line it suppresses the next line, trailing after code it suppresses that line, and with no rule names it suppresses every rule — honored uniformly across the report, SARIF, GitHub, and `--fix` outputs. `--fail-on <error\|warning>` gates only on findings at or above a severity (so CI can block on bugs while still reporting style warnings), and SARIF `level` reflects each finding's severity. `--stats` prints a lint-debt rollup instead of individual findings — finding counts by severity, by category, and by rule, plus files-scanned/files-with-findings — honoring the same `--rule`/`--category`/`--baseline` filters. `--report-unused-suppressions` instead reports any `; paredit:ignore` that silences no finding (a stale ignore or a typo'd rule name) and exits 3 if any are found, keeping the ignore list honest in CI. A directive may also carry `-until <date>`; `--report-expired-suppressions` reports any past its date (used or not) and exits 3 if any are found, and `--report-suppressions` lists every directive, used or not, with its scope, rules, reason, and expiry, and always exits 0. `--suppress-path <path>` (repeatable) silences every finding under a path as if it carried `paredit:ignore-file`, for generated/vendored code that cannot hold an inline directive. For adopting the linter on an existing codebase, `--write-baseline <file>` snapshots today's findings and `--baseline <file>` then suppresses those known findings (matched by rule and trimmed-line content, so they survive line shifts) — reporting and gating only on new findings, across the default, `--sarif`, and `--github` outputs. `--fixable` narrows `--list-rules` to just the rules that carry an auto-fix — `paredit fix list` is this pair under a name that says so. |
 
 Most reports accept `--output json` for machine-readable results. Reports whose
 output is a list of located findings accept the interchange formats as well —
@@ -615,11 +615,11 @@ capability of its own. The difference is reach and direction: a selector names
 a form in one named file, and these ask about a whole workspace and can
 rewrite what they find.
 
-| Command | Purpose |
-| --- | --- |
-| `find` | Report every form in the workspace whose shape matches `--query`, with its captures, path, and stable selector id. |
-| `count` | Count matches per pattern and per file, for several `--query` patterns side by side. |
-| `replace` | Rewrite every match with a `--rewrite` template. Prints the plan by default; `--diff` previews, `--write` applies. |
+| Command | Purpose | Its own flags |
+| --- | --- | --- |
+| `find` | Report every form in the workspace whose shape matches `--query`, with its captures, path, and stable selector id. | `--preview-bytes N` bounds the source shown per match; `--fail-on-match` and `--fail-on-no-match` are the two CI gates — a shape that must not appear, and one that must. |
+| `count` | Count matches per pattern and per file, for several `--query` patterns side by side. | `--per-file` breaks the totals down by file, and `--include-empty` keeps the files no pattern reached (off by default: over a repository they are the overwhelming majority). `--fail-on-match` gates. |
+| `replace` | Rewrite every match with a `--rewrite` template. Prints the plan by default; `--diff` previews, `--write` applies. | `--check` writes nothing and exits 3 if any replacement is pending. `--allow-comment-loss` and `--include-quoted` waive the guards below. |
 
 All three take the full workspace input surface (`--since`, `--from-git`,
 `--include`, …), so `query find --query '(eq ?x ?x)' --fail-on-match --since
@@ -641,9 +641,10 @@ paredit query replace --query '(old-name ?args...)' --rewrite '(new-name ?args..
 
 The rewrite is a splice of verbatim source: `?name` in the template is
 replaced by exactly the bytes the pattern's `?name` matched, so a captured
-`1.0d0` stays a double float and a captured string keeps its escapes. Two
-situations are refused rather than rewritten, because both would leave source
-that still parses and is still wrong:
+`1.0d0` stays a double float and a captured string keeps its escapes. Three
+situations are refused rather than rewritten, because all three would leave
+source that still parses and is still wrong — which is exactly what the
+reparse guard cannot see:
 
 | skipped as | why |
 | --- | --- |
@@ -651,8 +652,9 @@ that still parses and is still wrong:
 | `comment-loss` | A comment inside the match is carried by no capture the template uses, so the rewrite would delete it. `--allow-comment-loss` overrides. |
 | `quoted` | The match is inside quoted data. `'(a (if x y nil) b)` is a *list literal*: it has the shape the pattern matches, and rewriting it changes the program's data rather than its code. `--include-quoted` overrides. |
 
-Both are counted in every output format, including when the count is zero, so
-"37 matched, 35 rewritten" is never something to discover by reading a diff.
+All three are counted in every output format, including when the count is
+zero, so "37 matched, 35 rewritten" is never something to discover by reading
+a diff.
 
 A rewrite reflows the matched form onto the template's own layout. Running
 `paredit edit format --write` afterwards is usual.
@@ -670,6 +672,11 @@ writes. It reimplements nothing: each leaf builds the arguments its
 | `plan` | Emit the machine-readable fix plan without writing. | `inspect lint --fix-plan` |
 | `list` | List the rules that carry an auto-fix. | `inspect lint --list-rules --fixable` |
 
+Unlike every other writing command here, `fix apply` writes in place with **no
+`--write`**. That is inherited from `inspect lint --fix`, and inheriting it
+exactly is what makes the two spellings the same bytes. Use `--diff` to
+preview, `fix check` to gate, and the global `--dry-run` to refuse the write.
+
 All four take the rule-selection flags (`--rule`, `--category`, `--exclude`,
 `--tag`, `--preset`, `--experimental`, `--custom-rules`) and
 `--no-destructive-fixes`. The flags that shape a *report* rather than a fix
@@ -679,7 +686,7 @@ run — `--emit`, `--baseline`, `--stats`, `--timings`, `--fail-on` — stay on
 ```sh
 paredit fix list
 paredit fix apply --diff src/
-paredit fix apply --rule redundant-progn --no-destructive-fixes --write src/
+paredit fix apply --rule redundant-progn --no-destructive-fixes src/
 paredit fix check src/          # exit 3 when fixable lint is outstanding
 ```
 
@@ -701,7 +708,11 @@ properties are why this is not just repeated `query replace` invocations:
 | --- | --- |
 | `list` | List the recipes this run can reach, with each one's step count, dialect scope, and origin. |
 | `explain` | Print one recipe's steps and notes before running it. |
-| `run` | Apply a recipe's steps in order. Prints the plan by default; `--diff` previews, `--write` applies. |
+| `run` | Apply a recipe's steps in order. Prints the plan by default; `--diff` previews, `--write` applies, `--check` exits 3 when the migration is not yet applied. |
+
+All three take `--recipes <DIR>` to load a project's own recipes from
+somewhere other than `.paredit/migrations`. `explain` and `run` resolve the
+same catalogue, so what `explain` prints is what `run` will do.
 
 Shipped recipes:
 

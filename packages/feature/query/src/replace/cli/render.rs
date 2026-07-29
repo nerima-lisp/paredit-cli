@@ -53,7 +53,7 @@ pub fn print_replace_report(
                 for edit in &file.edits {
                     println!(
                         "replace\t{}\t{}:{}\t{}\t{}",
-                        file.path.display(),
+                        safe_text!(file.path.display()),
                         edit.line,
                         edit.column,
                         safe_text!(edit.before),
@@ -63,7 +63,7 @@ pub fn print_replace_report(
                 for skipped in &file.skipped {
                     println!(
                         "skip\t{}\t{}\t{}",
-                        file.path.display(),
+                        safe_text!(file.path.display()),
                         skipped.line,
                         skipped.reason.as_str()
                     );

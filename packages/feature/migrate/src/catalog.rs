@@ -8,7 +8,9 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
+use paredit_core_cli::error::{ArgumentError, CliError};
+use paredit_core_cli::shared::{MAX_SOURCE_INPUT_BYTES, read_text_file_with_limit};
 
 use crate::recipe::{Migration, parse_recipes};
 
@@ -79,7 +81,14 @@ pub fn from_directory(directory: &Path) -> Result<Vec<CatalogEntry>> {
     let mut entries = Vec::new();
     for path in paths {
         let origin = path.display().to_string();
-        let text = std::fs::read_to_string(&path)
+        // The same bounded, regular-file-only reader every *source* file goes
+        // through — not `fs::read_to_string`. A recipe directory is repository
+        // content, so `boom.lisp -> /dev/zero` is a file an attacker can put
+        // there, and `read_to_string` on a character device never reaches EOF:
+        // it allocates until the process dies. A FIFO blocks forever the same
+        // way. `migrate list`, `explain` and `run` all resolve the catalogue,
+        // so all three were reachable.
+        let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES)
             .with_context(|| format!("reading migration recipe {origin}"))?;
         for migration in parse_recipes(&text, &origin)? {
             entries.push(CatalogEntry {
@@ -126,14 +135,20 @@ pub fn find(entries: &[CatalogEntry], name: &str) -> Result<CatalogEntry> {
         .map(|entry| entry.migration.name.as_str())
         .collect::<Vec<_>>()
         .join(", ");
-    bail!(
-        "no migration named {name:?}; available: {}",
-        if available.is_empty() {
+    // A typed argument error rather than a bare `bail!`: an untyped one
+    // classifies as `internal.unclassified`, whose documented meaning is "a
+    // defect in this tool, please report it" — which sends someone to file a
+    // bug about their own typo.
+    Err(CliError::from(ArgumentError::UnknownName {
+        what: "migration",
+        name: name.to_owned(),
+        available: if available.is_empty() {
             "none".to_owned()
         } else {
             available
-        }
-    )
+        },
+    })
+    .into())
 }
 
 #[cfg(test)]

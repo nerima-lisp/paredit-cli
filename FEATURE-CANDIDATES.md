@@ -13,7 +13,7 @@
 | 軸 | 現状 |
 | --- | --- |
 | コマンド数 | 約 275（`inspect` 130 / `edit` 20 / `refactor` 80 / lint ルール 170 弱） |
-| 名前空間 | `inspect`（読み取り専用） / `edit`（単一形変換） / `refactor`（plan→preview→verify→apply） |
+| 名前空間 | `inspect` / `edit` / `refactor`（取り消しコスト順）＋ `query` / `fix` / `migrate`（利用者の意図順、セクション O で追加） |
 | 方言 | 宣言上 10 方言。解析の深さは **CL >> Elisp > その他 7 方言**（`dialect/capability.rs` は多くの方言で「定義ヘッドの名前一覧」止まり） |
 | lint | within-file の論理バグ中心。`--sarif` `--github` `--fix` `--fix-plan` `--baseline` `--suppressions` を既に持つ |
 | 安全機構 | preview manifest + blake3 ハッシュガード、`refactor verify`、`mutation_safety` |
@@ -537,14 +537,17 @@
 文字列中の改行を文字 `n` に変える（[[report-to-edit-commands-need-adversarial-review]]
 と同じ罠）。テンプレートの `?name` は捕捉スパンの原文スライスで置換する。
 
-**再パース検査では足りない 2 つの黙示的破壊を明示的に拒否する。**
+**再パース検査では足りない 3 つの黙示的破壊を明示的に拒否する。**
 
 | 拒否 | なぜ再パースで気づけないか |
 | --- | --- |
 | `overlapping` | 入れ子の match を両方書き換えると、片方が捨てた領域に他方を差し込む。結果は妥当な Lisp になる |
 | `comment-loss` | コメントはノード木の外にあるため、消しても構文的には無傷 |
+| `quoted` | `'(a (if x y nil) b)` は*リストリテラル*。パターンに合致する形をしているが、書き換えるとコードではなくデータが変わる。両方とも読める |
 
-どちらも件数を必ず出力する（0 件でも出す）。
+いずれも件数を必ず出力する（0 件でも出す）。`quoted` は敵対的レビューで**後から**
+見つかった — 初版には無かった。テストが浅い階層しか見ておらず、`fold-constants` と
+同じ罠を踏んでいた（[[report-to-edit-commands-need-adversarial-review]]）。
 
 ### この作業で見つかった構造的重複（未着手）
 

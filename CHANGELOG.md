@@ -51,11 +51,14 @@ model, a binding table, nine lint rules, and a per-file report.
   ship (`elisp-cl-lib`, `nil-conditionals`), as embedded Lisp source parsed by
   the same reader a project's own `.paredit/migrations/*.lisp` goes through.
 
-  Both writing commands refuse two situations that leave source which still
+  Both writing commands refuse three situations that leave source which still
   parses and is still wrong, and which the reparse guard therefore cannot
-  catch: a match nested inside one already rewritten, and a rewrite that would
-  delete a comment no capture carries over. Both are counted in every output
-  format, including as zeroes.
+  catch: a match nested inside one already rewritten, a rewrite that would
+  delete a comment no capture carries over, and a match inside quoted data —
+  `'(a (if x y nil) b)` is a *list literal*, and rewriting it changes the
+  program's data rather than its code. All three are counted in every output
+  format, including as zeroes; `--allow-comment-loss` and `--include-quoted`
+  override the two that are overridable.
 
 - Five clone-detection commands built on the existing tree-edit-distance
   scorer, which `similarity` and `duplicates` had been under-using.

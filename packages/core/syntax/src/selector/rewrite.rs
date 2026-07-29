@@ -40,22 +40,35 @@
 //! Both are reported as [`SkipReason`]s rather than folded into a total, so a
 //! caller can say *why* a match it expected to see did not appear.
 
+use std::collections::HashSet;
+
 use crate::dialect::Dialect;
 use crate::sexpr::{
     ByteSpan, ExpressionKind, ExpressionPath, ExpressionView, ReaderPrefix, SyntaxTree,
 };
 
 use super::error::RewriteError;
-use super::matcher::{Capture, PatternMatch, match_all};
+use super::matcher::{Capture, PatternMatch, match_all, symbol_matches};
 use super::pattern::{AtomToken, Pattern, classify_atom};
 
 /// One `?name` placeholder in a template, located in the template's own text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Hole {
-    /// The placeholder's span within [`Template::body`].
+    /// The placeholder's span within [`Template::body`], covering the `?name`
+    /// token alone — not any reader prefix the template wrote in front of it.
     span: ByteSpan,
     /// The capture name, with any `:kind` suffix and trailing `...` removed.
     name: String,
+    /// Whether the template wrote reader prefixes on this placeholder, as in
+    /// `#'?fn`.
+    ///
+    /// It decides whether the captured text keeps its *own* prefixes. A bare
+    /// `?fn` matches `#'foo` as readily as `foo` and binds the whole thing,
+    /// prefix included — so `--rewrite "(g #'?fn)"` over `(f #'foo)` spliced
+    /// `#'foo` after the template's `#'` and produced `#'#'foo`. Running it
+    /// again produced `#'#'#'foo`; nothing converges and nothing complains,
+    /// because every step reparses.
+    prefixed: bool,
 }
 
 /// A parsed `--rewrite` template.
@@ -152,12 +165,23 @@ impl Template {
         let mut out = String::with_capacity(self.body.len());
         let mut cursor = 0usize;
         for hole in &self.holes {
-            let bound = captures
-                .iter()
-                .find(|capture| capture.name == hole.name)
+            let capture = captures.iter().find(|capture| capture.name == hole.name);
+            let bound = capture
                 .and_then(|capture| capture.span)
                 .map(|span| &source[span.start().get()..span.end().get()])
                 .unwrap_or_default();
+            // The template already wrote the prefixes it wants. Keeping the
+            // capture's own on top of them is how `#'?fn` doubles; dropping
+            // them is what `#'?fn` plainly means — "that form, function-quoted".
+            //
+            // Only when the template wrote prefixes. A bare `?x` must splice
+            // `'a` as `'a`: stripping there would turn `(f 'a)` into `(g a)`
+            // and change when the argument is evaluated.
+            let bound = if hole.prefixed {
+                strip_reader_prefixes(bound)
+            } else {
+                bound
+            };
 
             let mut start = hole.span.start().get();
             if bound.is_empty() {
@@ -305,9 +329,14 @@ pub fn plan_rewrite(
     // tree either way, and a pattern that matches a thousand forms would
     // otherwise walk it a thousand times.
     let quoted = if allow.quoted {
+        HashSet::new()
+    } else {
+        quoted_spans(tree, dialect)
+    };
+    let comments: Vec<ByteSpan> = if allow.comment_loss {
         Vec::new()
     } else {
-        quoted_spans(tree)
+        tree.comments().map(|comment| comment.span()).collect()
     };
 
     for found in match_all(tree, pattern, dialect) {
@@ -327,7 +356,7 @@ pub fn plan_rewrite(
             });
             continue;
         }
-        if !allow.comment_loss && drops_a_comment(tree, &found, &used) {
+        if !allow.comment_loss && drops_a_comment(&comments, &found, &used) {
             plan.skipped.push(SkippedMatch {
                 path: found.path,
                 span: found.span,
@@ -338,11 +367,16 @@ pub fn plan_rewrite(
 
         let before = source[found.span.start().get()..found.span.end().get()].to_owned();
         let after = template.render(source, &found.captures);
-        applied_end = found.span.end().get();
         if before == after {
+            // Deliberately *before* `applied_end` moves. A match that renders
+            // byte-identically discards nothing, so it shadows no nested match
+            // — and treating it as an applied replacement suppressed every
+            // inner match as `Overlapping` forever, under a `detail` that says
+            // "run the command again to reach this one". It never converged.
             plan.unchanged += 1;
             continue;
         }
+        applied_end = found.span.end().get();
         plan.replacements.push(Replacement {
             path: found.path,
             span: found.span,
@@ -356,16 +390,58 @@ pub fn plan_rewrite(
 
 /// Applies a plan to the source it was planned against.
 ///
-/// Right to left, so an earlier replacement's span stays valid while a later
-/// one is spliced. The plan's spans are disjoint by construction.
+/// One forward pass, copying the gaps between replacements and the
+/// replacements themselves into a fresh buffer. The obvious implementation —
+/// `replace_range` right to left over a copy of the source — is quadratic,
+/// because every splice memmoves the whole tail behind it: 400 000
+/// replacements over a 4 MB file took 34 seconds, and the tool's own 64 MB
+/// input ceiling put that at hours. The plan's spans are disjoint and in
+/// source order by construction, which is what makes a single pass possible.
 #[must_use]
 pub fn apply_plan(source: &str, plan: &RewritePlan) -> String {
-    let mut out = source.to_owned();
-    for replacement in plan.replacements.iter().rev() {
+    let mut out = String::with_capacity(source.len());
+    let mut cursor = 0usize;
+    for replacement in &plan.replacements {
         let (start, end) = (replacement.span.start().get(), replacement.span.end().get());
-        out.replace_range(start..end, &replacement.after);
+        // Defensive: a caller could hand over a hand-built plan whose spans
+        // are not ordered. Skipping is better than panicking on a slice that
+        // runs backwards.
+        if start < cursor {
+            continue;
+        }
+        out.push_str(&source[cursor..start]);
+        out.push_str(&replacement.after);
+        cursor = end;
     }
+    out.push_str(&source[cursor..]);
     out
+}
+
+/// How deeply a node sits inside quoted data.
+///
+/// Two counters, not one flag. A plain `'` is absolute — a `,` under it does
+/// not escape, because there is no backquote for it to belong to — while a
+/// `` ` `` nests, and a `,` cancels exactly one level of it. Collapsing the two
+/// made a `,` at quasiquote depth 2 look like an escape to code when it is
+/// still template data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct QuoteState {
+    /// Inside a `'` or `(quote …)`, from which nothing escapes.
+    hard: bool,
+    /// Enclosing quasiquotes not yet cancelled by an unquote.
+    quasiquote_depth: u32,
+}
+
+impl QuoteState {
+    const CODE: Self = Self {
+        hard: false,
+        quasiquote_depth: 0,
+    };
+
+    /// Whether a node in this state is data rather than code.
+    const fn is_data(self) -> bool {
+        self.hard || self.quasiquote_depth > 0
+    }
 }
 
 /// Every node that sits inside quoted data, by span.
@@ -376,54 +452,86 @@ pub fn apply_plan(source: &str, plan: &RewritePlan) -> String {
 /// to `'(a 3)` — the arithmetic is data and the node holding it carries no
 /// prefix of its own.
 ///
-/// Quasiquote is tracked with the same flag and `,` / `,@` clear it, because a
-/// `` `(a ,(if x y nil)) `` unquote *is* code again and refusing to rewrite it
-/// would be a different wrong answer.
-fn quoted_spans(tree: &SyntaxTree) -> Vec<ByteSpan> {
-    fn opens_data(view: &ExpressionView) -> Option<bool> {
-        if view.reader_prefixes.iter().any(|prefix| {
-            matches!(
-                prefix,
-                ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing
-            )
-        }) {
-            return Some(false);
-        }
-        if view
-            .reader_prefixes
-            .iter()
-            .any(|prefix| matches!(prefix, ReaderPrefix::Quote | ReaderPrefix::Quasiquote))
-        {
-            return Some(true);
-        }
-        // The spelled-out forms the reader macros abbreviate. A file that
-        // writes `(quote (a b))` means exactly what `'(a b)` means.
-        match head_symbol(view)? {
-            "quote" | "quasiquote" | "backquote" => Some(true),
-            "unquote" | "unquote-splicing" => Some(false),
-            _ => None,
-        }
-    }
-
-    let mut quoted = Vec::new();
+/// `dialect` is here because the *matcher* folds Common Lisp case and package
+/// qualifiers, so it finds a pattern inside `(QUOTE …)` and `(cl:quote …)`.
+/// A guard that compared head symbols with `==` found neither, and let the
+/// rewrite land in a data literal.
+fn quoted_spans(tree: &SyntaxTree, dialect: Dialect) -> HashSet<ByteSpan> {
+    let mut quoted = HashSet::new();
     // Bound rather than chained: `root_view` returns an owned tree whose
     // `Drop` would otherwise run while the walk still borrows into it.
     let root = tree.root_view();
-    let mut pending: Vec<(&ExpressionView, bool)> =
-        root.children.iter().map(|child| (child, false)).collect();
-    while let Some((view, inside)) = pending.pop() {
-        let opens = opens_data(view);
-        // A node that opens a *code* context is code, however deep inside a
-        // quasiquote it sits: `,(f x)` is evaluated. Marking it quoted because
-        // its ancestors are would refuse the one form in the template that a
-        // caller writing `,(f ?x)` was pointing at.
-        if inside && opens != Some(false) {
-            quoted.push(view.span);
+    let mut pending: Vec<(&ExpressionView, QuoteState)> = root
+        .children
+        .iter()
+        .map(|child| (child, QuoteState::CODE))
+        .collect();
+
+    while let Some((view, state)) = pending.pop() {
+        let below = descend(view, state, dialect);
+        // A node that *opens* code is code, however deep inside a quasiquote
+        // it sits: `,(f x)` is evaluated. Marking it data because its
+        // ancestors are would refuse the one form a caller writing `,(f ?x)`
+        // was pointing at.
+        if state.is_data() && below.is_data() {
+            quoted.insert(view.span);
         }
-        let below = opens.unwrap_or(inside);
         pending.extend(view.children.iter().map(|child| (child, below)));
     }
     quoted
+}
+
+/// The state `view`'s children sit in.
+fn descend(view: &ExpressionView, state: QuoteState, dialect: Dialect) -> QuoteState {
+    let names = |spellings: &[&str]| {
+        head_symbol(view).is_some_and(|head| {
+            spellings
+                .iter()
+                .any(|spelling| symbol_matches(head, spelling, dialect))
+        })
+    };
+
+    if view.reader_prefixes.iter().any(|prefix| {
+        matches!(
+            prefix,
+            ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing
+        )
+    }) || names(&["unquote", "unquote-splicing"])
+    {
+        // A `,` under a plain `'` cancels nothing: there is no backquote it
+        // belongs to, and the whole subtree is still the quoted datum.
+        return if state.hard {
+            state
+        } else {
+            QuoteState {
+                quasiquote_depth: state.quasiquote_depth.saturating_sub(1),
+                ..state
+            }
+        };
+    }
+    if view
+        .reader_prefixes
+        .iter()
+        .any(|prefix| matches!(prefix, ReaderPrefix::Quasiquote))
+        || names(&["quasiquote", "backquote"])
+    {
+        return QuoteState {
+            quasiquote_depth: state.quasiquote_depth.saturating_add(1),
+            ..state
+        };
+    }
+    if view
+        .reader_prefixes
+        .iter()
+        .any(|prefix| matches!(prefix, ReaderPrefix::Quote))
+        || names(&["quote"])
+    {
+        return QuoteState {
+            hard: true,
+            ..state
+        };
+    }
+    state
 }
 
 /// A paren list's head symbol, for the spelled-out `(quote …)` forms.
@@ -444,7 +552,7 @@ fn head_symbol(view: &ExpressionView) -> Option<&str> {
 /// A comment inside a capture the template substitutes is copied along with
 /// the capture's verbatim text and survives. Everything else inside the match
 /// span is discarded, so a comment there is lost.
-fn drops_a_comment(tree: &SyntaxTree, found: &PatternMatch, used: &[String]) -> bool {
+fn drops_a_comment(comments: &[ByteSpan], found: &PatternMatch, used: &[String]) -> bool {
     let carried: Vec<ByteSpan> = found
         .captures
         .iter()
@@ -452,14 +560,47 @@ fn drops_a_comment(tree: &SyntaxTree, found: &PatternMatch, used: &[String]) -> 
         .filter_map(|capture| capture.span)
         .collect();
 
-    tree.comments().any(|comment| {
-        let span = comment.span();
-        let inside_match = span.start() >= found.span.start() && span.end() <= found.span.end();
-        inside_match
-            && !carried
+    // The comments arrive in source order, so the ones inside this match are a
+    // contiguous run. Scanning all of them per match made a file with many
+    // comments and many matches quadratic — and paid that cost even when every
+    // match was going to be skipped anyway.
+    let first = comments.partition_point(|span| span.start() < found.span.start());
+    comments[first..]
+        .iter()
+        .take_while(|span| span.end() <= found.span.end())
+        .any(|span| {
+            !carried
                 .iter()
                 .any(|kept| span.start() >= kept.start() && span.end() <= kept.end())
-    })
+        })
+}
+
+/// `text` with any leading reader prefixes and the trivia after them removed.
+///
+/// Deliberately only the five spellings that **cannot begin an atom**. A bare
+/// `#` is a reader prefix in `#(1 2 3)` and is *not* one in `#\a`, `#xff` or
+/// `#b1010`, where the reader keeps the dispatch character on the atom itself
+/// (see [`super::pattern`]'s note on `is_number_literal`). Stripping it
+/// textually would turn a captured `#\a` into `\a`. Clojure's `#?` and `#{`
+/// are left alone for the same reason: the gain is a rarer template than the
+/// risk is worth.
+///
+/// Every leading prefix goes, not just one: `'?x` means "that form, quoted",
+/// and a capture that arrived as `''a` was already two quotes deep.
+fn strip_reader_prefixes(text: &str) -> &str {
+    // Longest first: `,@` must be tried before `,`.
+    const PREFIXES: [&str; 5] = [",@", "#'", "'", "`", ","];
+    let mut rest = text;
+    loop {
+        let trimmed = rest.trim_start();
+        let Some(stripped) = PREFIXES
+            .iter()
+            .find_map(|prefix| trimmed.strip_prefix(prefix))
+        else {
+            return trimmed;
+        };
+        rest = stripped;
+    }
 }
 
 /// Records every `?name` atom under `view`, with spans relative to `origin`.
@@ -503,6 +644,7 @@ fn collect_holes(
                 crate::sexpr::ByteOffset::new(span.end().get() - origin),
             ),
             name,
+            prefixed: !view.reader_prefixes.is_empty(),
         });
     }
     Ok(())
@@ -727,6 +869,112 @@ mod tests {
             allow,
         );
         assert_eq!(apply_plan(tree.source(), &plan), "'(a (when x y) b)");
+    }
+
+    /// A bare `?fn` matches `#'foo` and binds it *with* the prefix, so a
+    /// template writing its own `#'` used to emit `#'#'foo` — and again on the
+    /// next run, without bound. Every step reparsed, so nothing caught it.
+    #[test]
+    fn a_prefixed_template_hole_does_not_double_a_prefix_the_capture_carries() {
+        assert_eq!(rewritten("(f #'foo)", "(f ?fn)", "(g #'?fn)"), "(g #'foo)");
+    }
+
+    #[test]
+    fn a_prefixed_template_hole_is_idempotent_across_runs() {
+        let mut current = "(mapcar #'foo xs)".to_owned();
+        for _ in 0..3 {
+            current = rewritten(&current, "(mapcar ?fn ?xs)", "(mapcar #'?fn ?xs)");
+        }
+        assert_eq!(current, "(mapcar #'foo xs)");
+    }
+
+    /// A character literal is an *atom* whose text begins with `#`, not a
+    /// prefixed node, so
+    /// the prefix strip must not touch it. Stripping textually would leave
+    /// `\a`.
+    #[test]
+    fn a_character_literal_survives_a_prefixed_hole() {
+        assert_eq!(rewritten(r"(f #\a)", "(f ?x)", "(h #'?x)"), r"(h #'#\a)");
+    }
+
+    /// The strip happens only when the *template* wrote prefixes. A bare hole
+    /// must splice `'a` as `'a`, or `(f 'a)` becomes `(g a)` and the argument
+    /// starts being evaluated.
+    #[test]
+    fn a_bare_template_hole_keeps_the_captures_own_prefix() {
+        assert_eq!(rewritten("(f 'a)", "(f ?x)", "(g ?x)"), "(g 'a)");
+    }
+
+    /// The matcher folds Common Lisp case and package qualifiers, so it finds
+    /// the pattern inside `(QUOTE …)`. A guard comparing head symbols with
+    /// `==` did not, and the rewrite landed in a data literal.
+    #[test]
+    fn the_quote_guard_folds_case_the_way_the_matcher_does() {
+        for source in [
+            "(QUOTE (a (if x y nil)))",
+            "(Quote (a (if x y nil)))",
+            "(cl:quote (a (if x y nil)))",
+        ] {
+            let (_, plan) = plan(source, "(if ?t ?a nil)", "(when ?t ?a)");
+            assert!(plan.is_empty(), "{source} was rewritten inside quoted data");
+            assert_eq!(plan.skipped_for(SkipReason::Quoted), 1, "{source}");
+        }
+    }
+
+    /// A `,` at quasiquote depth 2 cancels one level and leaves the form
+    /// still inside the outer template. Treating any `,` as an escape to code
+    /// rewrote a literal.
+    #[test]
+    fn an_unquote_nested_two_quasiquotes_deep_is_still_data() {
+        let (_, plan) = plan(
+            "`(gen `(inner ,(f (if x y nil))))",
+            "(if ?t ?a nil)",
+            "(when ?t ?a)",
+        );
+        assert!(plan.is_empty());
+        assert_eq!(plan.skipped_for(SkipReason::Quoted), 1);
+    }
+
+    /// A `,` under a plain `'` cancels nothing — there is no backquote for it
+    /// to belong to, and the whole subtree is still the quoted datum.
+    #[test]
+    fn an_unquote_under_a_plain_quote_does_not_escape_to_code() {
+        // The match sits one level *under* the `,`, because the matcher is
+        // prefix-strict: `(if ?t ?a nil)` does not match `,(if x y nil)` at
+        // all. What is being tested is that the `,` did not turn the subtree
+        // back into code.
+        let (_, plan) = plan("'(a ,(f (if x y nil)))", "(if ?t ?a nil)", "(when ?t ?a)");
+        assert!(plan.is_empty());
+        assert_eq!(plan.skipped_for(SkipReason::Quoted), 1);
+    }
+
+    /// An outer match that renders byte-identically discards nothing, so it
+    /// shadows no nested match. Counting it as applied suppressed every inner
+    /// match as `Overlapping` — for ever, since re-running reproduced it — and
+    /// `SkipReason::Overlapping`'s advice is "run the command again".
+    #[test]
+    fn an_unchanged_outer_match_does_not_block_the_matches_inside_it() {
+        // The outer `(f (f a b) (f a b))` renders to itself — its two
+        // arguments are equal, so swapping them changes nothing. The two
+        // inner matches are the real work, and they used to be lost.
+        let (swapped_tree, swapped) = plan("(f (f a b) (f a b))", "(f ?x ?y)", "(f ?y ?x)");
+        assert_eq!(swapped.unchanged, 1);
+        assert_eq!(swapped.replacements.len(), 2);
+        assert_eq!(swapped.skipped_for(SkipReason::Overlapping), 0);
+        assert_eq!(
+            apply_plan(swapped_tree.source(), &swapped),
+            "(f (f b a) (f b a))"
+        );
+
+        // The genuinely-unchanged case: the outer render is identical, and the
+        // two inner matches are still reachable.
+        let (identical_tree, identical) = plan("(f (g a) (g a))", "(g ?x)", "(g ?x)");
+        assert_eq!(identical.unchanged, 2);
+        assert_eq!(identical.skipped_for(SkipReason::Overlapping), 0);
+        assert_eq!(
+            apply_plan(identical_tree.source(), &identical),
+            "(f (g a) (g a))"
+        );
     }
 
     #[test]

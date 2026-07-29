@@ -226,3 +226,50 @@ fn a_malformed_project_recipe_fails_the_run_rather_than_contributing_nothing() {
         .failure()
         .stderr(predicate::str::contains(":description"));
 }
+
+/// A recipe directory is *repository* content, so a hostile checkout can put
+/// `boom.lisp -> /dev/zero` in it. `fs::read_to_string` on a character device
+/// never reaches EOF — it allocates until the process dies — and all three
+/// `migrate` leaves resolve the catalogue.
+#[cfg(unix)]
+#[test]
+fn a_recipe_that_is_not_a_regular_file_is_refused_rather_than_read_forever() {
+    let dir = fresh_temp_dir("migrate-device");
+    let recipes = dir.join("recipes");
+    fs::create_dir_all(&recipes).expect("create recipe dir");
+    std::os::unix::fs::symlink("/dev/zero", recipes.join("boom.lisp")).expect("symlink");
+
+    paredit()
+        .args(["migrate", "list", "--recipes"])
+        .arg(&recipes)
+        .assert()
+        .failure();
+}
+
+/// `origin` is a path out of the repository, and a Unix filename may hold any
+/// byte but `/` and NUL — including ESC. It is also the one column that
+/// reveals a project recipe shadowing a built-in, which is exactly the column
+/// worth spoofing.
+#[test]
+fn a_recipe_filename_cannot_drive_the_terminal() {
+    let dir = fresh_temp_dir("migrate-escape");
+    let recipes = dir.join("recipes");
+    fs::create_dir_all(&recipes).expect("create recipe dir");
+    fs::write(
+        recipes.join("a\u{1b}[2Jb.lisp"),
+        "(defmigration spoofed :description \"d\" \
+         :steps ((:query (a) :rewrite (b))))\n",
+    )
+    .expect("write recipe");
+
+    let output = paredit()
+        .args(["migrate", "list", "--recipes", "--output", "text"])
+        .arg(&recipes)
+        .output()
+        .expect("run migrate list");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains('\u{1b}'),
+        "a raw escape reached the terminal: {stdout:?}"
+    );
+}

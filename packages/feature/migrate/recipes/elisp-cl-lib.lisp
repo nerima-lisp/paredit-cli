@@ -36,7 +36,6 @@
 ;;;
 ;;; Every step matches head position only, so a variable named `incf' or a
 ;;; quoted symbol `'case' is left alone.
-
 (defmigration elisp-cl-lib
   :description "cl.el's unprefixed names to their cl-lib `cl-' spellings"
   :dialects (emacs-lisp)

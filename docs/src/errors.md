@@ -107,6 +107,17 @@ resolved to no file inside the scanned roots.
 
 `--index` named an entry the kill ring file does not have.
 
+### `argument.unknown-name` { #argument.unknown-name }
+
+An argument named something this build does not have — a migration recipe that
+is not in the catalogue, for instance. The message lists what does exist, so
+the fix is usually visible in the error itself.
+
+This exists so a typo is an *argument* error. Left unclassified it reported as
+`internal.unclassified`, which asks the caller to file a bug against this tool
+for mistyping a name.
+
+
 ## Selection
 
 The selection did not resolve. A different `--path`, `--at`, or selector
