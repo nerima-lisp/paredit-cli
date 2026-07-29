@@ -62,15 +62,15 @@ use super::{
     similarity_report, single_arg_comparison_report, single_clause_cond_report,
     single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
     single_value_bind_report, split_let, split_let_star, step_zero_report, string_case_fold_report,
-    struct_cycle_report, subseq_zero_report, symbol_index_report, symbol_report,
-    system_conflict_report, system_cycle_report, t_comparison_report, test_map_report,
-    the_arity_report, thread_expression, todo_report, type_report, typecase_nil_key_report,
-    typep_predicate_report, undefined_package_report, unreachable_case_clause_report,
-    unreachable_cond_clause_report, unreachable_expression_report, unthread_expression,
-    unused_export_report, unused_local_callable_report, unused_nickname_report,
-    unused_package_report, unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
-    value_propagation_report, values_list_of_list_report, verbose_negation_report,
-    workspace_report, zero_divisor_report,
+    struct_cycle_report, structural_diff, structural_patch, subseq_zero_report,
+    symbol_index_report, symbol_report, system_conflict_report, system_cycle_report,
+    t_comparison_report, test_map_report, the_arity_report, thread_expression, todo_report,
+    type_report, typecase_nil_key_report, typep_predicate_report, undefined_package_report,
+    unreachable_case_clause_report, unreachable_cond_clause_report, unreachable_expression_report,
+    unthread_expression, unused_export_report, unused_local_callable_report,
+    unused_nickname_report, unused_package_report, unused_parameter_report,
+    unwind_protect_no_cleanup_report, unwrap_call, value_propagation_report,
+    values_list_of_list_report, verbose_negation_report, workspace_report, zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -118,6 +118,9 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Compare two documents by their parse: which forms were inserted,
+    /// deleted, or replaced, ignoring whitespace and comments.
+    Diff(structural_diff::args::StructuralDiffArgs),
     /// Report a setf/setq/psetf/psetq that assigns the same variable more than once.
     DuplicateSetfPlaces(duplicate_setf_place_report::args::DuplicateSetfPlaceReportArgs),
     /// Report defclass/define-condition/defstruct forms declaring the same slot name more than once.
@@ -603,6 +606,9 @@ pub(super) enum RefactorCommand {
     Apply(refactor::args::RefactorApplyArgs),
     /// Render a verified diff from a refactor preview manifest without writing files.
     Diff(refactor::args::RefactorDiffArgs),
+    /// Carry the difference between two versions of one file onto a third,
+    /// matching each change by structure rather than by position.
+    Patch(structural_patch::args::StructuralPatchArgs),
     /// Discover Lisp sources under roots and build a gated refactor plan.
     WorkspacePlan(refactor::args::WorkspaceRefactorPlanArgs),
     /// Discover Lisp sources under roots and preview exact refactoring rewrites.

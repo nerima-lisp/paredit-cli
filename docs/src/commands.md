@@ -47,6 +47,7 @@ discovery, impact analysis, and preflight checks.
 | `definitions` | Report definition-like top-level forms across explicit files. |
 | `unused-definitions` | Report definitions with no external exact atom references. |
 | `duplicates` | Report repeated structural S-expression shapes across explicit files. |
+| `diff` | Compare two documents by their parse rather than their lines: which forms were inserted, deleted, or replaced, and at what path. Whitespace, indentation, and comments are not part of the comparison, so a reformatted file reports no changes and an edited argument reports as that argument instead of as the whole wrapped line. `--max-depth` hides the deep edits and leaves the shape changes; `--fail-on-change` gates on the two documents differing structurally. **The blind spot is stated in every run's output:** an empty structural diff does not mean the files are identical, only that the programs are. |
 | `similarity` | Report structurally similar S-expression forms across explicit files. |
 | `lets` | Report local let bindings and inline safety for refactor planning. |
 | `complexity` | Report per-definition nesting depth and size metrics for refactor prioritization. |
@@ -409,6 +410,7 @@ plan/preview/verify/apply lifecycle.
 | `status` | Summarize a preview manifest into agent-safe next actions. |
 | `apply` | Apply a previously generated preview manifest with hash guards. |
 | `diff` | Render a verified diff from a preview manifest without writing files. |
+| `patch` | Carry the difference between two versions of one file (`--from`/`--to`, neither written) onto a third (`--apply-to`), matching each change by structure rather than by position — so it lands whatever the target's formatting and wherever in the file the form sits. Each change is reported as `applied`, `not-found` (the target never had the form), `ambiguous` (several sites match; `--all` applies to all of them), or `unportable` (a top-level insertion, which names no existing form to anchor on). Plans by default; `--diff` previews, `--write` applies, `--fail-on-unapplied` gates on a partial port. A patch that would produce source this tool cannot parse is refused before anything is written. |
 | `workspace-plan` | Discover Lisp sources under roots and build a gated refactor plan. |
 | `workspace-preview` | Discover sources and preview exact refactoring rewrites. |
 | `workspace-execute` | Execute a workspace refactor with preview gates and post-write verification. |

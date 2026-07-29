@@ -445,6 +445,8 @@ mod step_zero_report;
 mod string_case_fold_report;
 #[path = "cli/struct_cycle_report.rs"]
 mod struct_cycle_report;
+#[path = "cli/structural_diff.rs"]
+mod structural_diff;
 #[path = "cli/subseq_zero_report.rs"]
 mod subseq_zero_report;
 #[path = "cli/symbol_report.rs"]

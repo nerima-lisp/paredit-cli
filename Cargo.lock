@@ -684,6 +684,7 @@ dependencies = [
  "paredit-feature-rename",
  "paredit-feature-semantic-report",
  "paredit-feature-similarity",
+ "paredit-feature-structural-diff",
  "predicates",
  "proptest",
  "serde_json",
@@ -1145,6 +1146,18 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-structural-diff"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

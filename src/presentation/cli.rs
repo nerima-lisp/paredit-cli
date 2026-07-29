@@ -67,6 +67,8 @@ use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;
 use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
 use paredit_feature_similarity::similarity_report::cli as similarity_report;
+use paredit_feature_structural_diff::structural_diff::cli as structural_diff;
+use paredit_feature_structural_diff::structural_patch::cli as structural_patch;
 mod dispatch;
 mod duplicate_export_report;
 mod duplicate_method_report;
