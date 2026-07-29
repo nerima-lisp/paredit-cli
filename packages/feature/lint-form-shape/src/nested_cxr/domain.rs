@@ -18,13 +18,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The `a`/`d` middle of a `cXr` accessor symbol (`cadr` → `ad`), or `None` when
 /// `symbol` is not a one-to-four-letter `c…r` accessor. Case-insensitive.
@@ -42,52 +44,59 @@ fn cxr_middle(symbol: &str) -> Option<String> {
 
 #[derive(Debug, Clone)]
 pub struct NestedCxrItem {
-    pub path: PathBuf,
     /// The span of the whole `(OUTER (INNER x))` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The combined accessor name (`cadr` for `(car (cdr x))`).
     pub combined: String,
     /// The span of the innermost argument `x` (for reconstructing the fix).
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to splice
+    /// the argument into the combined accessor, and the command never printed
+    /// it.
     pub arg_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct NestedCxrSummary {
-    pub accessor_form_count: usize,
-    pub violations: Vec<NestedCxrItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NestedCxrPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NestedCxrPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NestedCxrItem {
+    /// The rule's own name. `combined` is one of thirty accessor spellings
+    /// built per finding, not a tag from a closed set, so it stays a JSON
+    /// field rather than becoming the kind.
+    fn kind(&self) -> &'static str {
+        "nested-cxr"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NestedCxrPolicy {
-    pub fail_on_violation: bool,
-    pub accessor_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("combined={}", self.combined)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("combined", json!(self.combined))]
+    }
+
+    /// The same sentence the `nested-cxr` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "nested car/cdr accessors combine into ({} …)",
+            self.combined
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_accessor(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     accessor_form_count: &mut usize,
     violations: &mut Vec<NestedCxrItem>,
 ) {
@@ -122,74 +131,83 @@ pub fn examine_accessor(
     let combined = format!("c{outer_middle}{inner_middle}r");
 
     violations.push(NestedCxrItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         combined,
         arg_span: inner.children[1].span,
     });
 }
 
-/// Collects every combinable nested `cXr` accessor across a whole file, along
-/// with the total number of `cXr` accessor forms scanned.
-pub fn collect_nested_cxrs(
+/// Collects every combinable nested `cXr` accessor in one file, with the number
+/// of `cXr` accessor forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no combinable accessor here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_nested_cxr_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NestedCxrItem>)> {
+) -> LintResult<FileFindings<NestedCxrItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("accessor_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut accessor_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_accessor(subview, path, &mut accessor_form_count, &mut violations);
+            examine_accessor(subview, source, &mut accessor_form_count, &mut violations);
         });
     }
-    Ok((accessor_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("accessor_form_count", json!(accessor_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_nested_cxrs(
-    accessor_form_count: usize,
-    violations: Vec<NestedCxrItem>,
-) -> NestedCxrSummary {
-    NestedCxrSummary {
-        accessor_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_nested_cxr_policy(
-    options: NestedCxrPolicyOptions,
-    summary: &NestedCxrSummary,
-) -> NestedCxrPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NestedCxrPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        accessor_form_count: summary.accessor_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn cxrs(input: &str) -> (usize, Vec<NestedCxrItem>) {
+    fn report(input: &str) -> FileFindings<NestedCxrItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_nested_cxrs(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect nested cxrs")
+        build_nested_cxr_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build nested cxr report")
+    }
+
+    /// The `(accessor_form_count, violations)` pair the report is built from.
+    fn cxrs(input: &str) -> (u64, Vec<NestedCxrItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "accessor_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("accessor_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -280,27 +298,38 @@ mod tests {
         assert_eq!(violations[0].combined, "cadr");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(car (cdr x))", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_nested_cxrs(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect nested cxrs");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_nested_cxr_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build nested cxr report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("accessor_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = cxrs("(car (cdr x))");
-        let summary = summarize_nested_cxrs(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(car x)").dialect_modelled);
+    }
 
-        let quiet = evaluate_nested_cxr_policy(NestedCxrPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_combined_accessor() {
+        let report = report("(defun second-of (pair)\n  (car (cdr pair)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "nested-cxr");
+        assert_eq!(finding.json_fields(), vec![("combined", json!("cadr"))]);
+        assert_eq!(finding.text_columns(), vec!["combined=cadr".to_owned()]);
+    }
 
-        let strict = evaluate_nested_cxr_policy(NestedCxrPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_accessor_scanned_not_only_the_flagged_ones() {
+        let report = report("(car (cdr x))\n(car y)\n");
+        assert_eq!(report.summary, vec![("accessor_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
