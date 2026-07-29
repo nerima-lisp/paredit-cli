@@ -34,15 +34,15 @@ pub use paredit_core_edit::{refactor_execute, refactor_plan, refactor_preview};
 pub use paredit_core_semantics::lexical_scope;
 pub(crate) use paredit_core_semantics::semantics;
 
-pub mod duplicate_export_report;
-pub mod duplicate_method_report;
-pub mod duplicate_slot_report;
+pub use paredit_feature_lisp_analysis::duplicate_method_report::domain as duplicate_method_report;
+pub use paredit_feature_lisp_analysis::duplicate_slot_report::domain as duplicate_slot_report;
+pub use paredit_feature_package::duplicate_export_report::domain as duplicate_export_report;
 pub(crate) mod lint;
 pub mod lint_report;
 pub mod lint_suppression;
 pub mod report_policy;
-pub mod shadowed_binding_report;
-pub mod unused_parameter_report;
+pub use paredit_feature_binding::shadowed_binding_report::domain as shadowed_binding_report;
+pub use paredit_feature_function_parameter::unused_parameter_report::domain as unused_parameter_report;
 
 // Facade re-exports for extracted feature packages (section 4.1).
 pub use paredit_feature_binding::convert_sequential_binding::domain as convert_sequential_binding;

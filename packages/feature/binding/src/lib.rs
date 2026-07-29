@@ -13,6 +13,7 @@ pub mod let_report;
 pub mod merge_nested_flet;
 pub mod merge_nested_let;
 pub mod merge_nested_let_star;
+pub mod shadowed_binding_report;
 pub mod split_let;
 pub mod split_let_star;
 
@@ -32,6 +33,7 @@ pub use let_report::cli::{LetReportArgs, let_report};
 pub use merge_nested_flet::cli::{MergeNestedFletArgs, merge_nested_flet};
 pub use merge_nested_let::cli::{MergeNestedLetArgs, merge_nested_let};
 pub use merge_nested_let_star::cli::{MergeNestedLetStarArgs, merge_nested_let_star};
+pub use shadowed_binding_report::cli::{ShadowedBindingReportArgs, shadowed_binding_report};
 pub use split_let::cli::{SplitLetArgs, split_let};
 pub use split_let_star::cli::{SplitLetStarArgs, split_let_star};
 

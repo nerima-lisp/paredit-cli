@@ -19,20 +19,19 @@ use super::{
     debt_score_report, definition_movement, definition_removal, definition_report,
     defpackage_quoted_report, dependency_report, destructive_literal_report, docstring_report,
     double_reverse_report, duplicate_boolean_operand_report, duplicate_case_key_report,
-    duplicate_cond_test_report, duplicate_export_report, duplicate_keyword_report,
-    duplicate_lambda_list_keyword_report, duplicate_let_binding_report, duplicate_method_report,
-    duplicate_parameter_report, duplicate_report, duplicate_setf_place_report,
-    duplicate_slot_report, duplication_ratio_report, effect_report, eliminate_empty_binding_form,
-    emacs_lisp_file_report, empty_body_report, empty_let_report, eq_char_comparison_report,
-    eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
-    eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
-    exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
-    external_diagnostics_report, external_system_report, extract_constant, extract_function,
-    extract_local_function, flatten_progn, fold_constants, form_report, format_directive_report,
-    format_missing_destination_report, format_newline_report, format_to_string_report,
-    funcall_lambda_report, function_parameter, generate_accessors, generate_defgeneric,
-    generate_defpackage, generate_defsystem, generate_docstring, generate_tests,
-    generic_dispatch_report, getf_default_nil_report, gethash_default_report,
+    duplicate_cond_test_report, duplicate_keyword_report, duplicate_lambda_list_keyword_report,
+    duplicate_let_binding_report, duplicate_parameter_report, duplicate_report,
+    duplicate_setf_place_report, duplication_ratio_report, effect_report,
+    eliminate_empty_binding_form, emacs_lisp_file_report, empty_body_report, empty_let_report,
+    eq_char_comparison_report, eq_number_comparison_report, eql_list_comparison_report,
+    eql_search_literal_report, eql_string_comparison_report, equality_arity_report,
+    eval_when_situation_report, exhaustive_case_otherwise_report, explicit_nil_return_report,
+    explicit_step_delta_report, external_diagnostics_report, external_system_report,
+    extract_constant, extract_function, extract_local_function, flatten_progn, fold_constants,
+    form_report, format_directive_report, format_missing_destination_report, format_newline_report,
+    format_to_string_report, funcall_lambda_report, function_parameter, generate_accessors,
+    generate_defgeneric, generate_defpackage, generate_defsystem, generate_docstring,
+    generate_tests, generic_dispatch_report, getf_default_nil_report, gethash_default_report,
     handler_case_no_clauses_report, hotspot_report, identical_if_branch_report,
     identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report,
     if_to_unless_report, impact_report, indentation_report, inline_function, inline_lambda,
@@ -63,18 +62,17 @@ use super::{
     redundant_the_report, refactor, refactor_step, remove_unused_binding, remove_unused_control,
     rename, rename_control, replace_forms, resolve_report, restart_report, self_assignment_report,
     self_comparison_report, serial_consistency_report, setf_arity_report, setq_non_variable_report,
-    shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
-    similarity_report, single_arg_comparison_report, single_clause_cond_report,
-    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
-    single_value_bind_report, source_report, split_let, split_let_star, step_zero_report,
-    string_case_fold_report, struct_cycle_report, structural_diff, structural_patch,
-    subseq_zero_report, symbol_index_report, symbol_report, system_conflict_report,
-    system_cycle_report, t_comparison_report, test_map_report, the_arity_report, thread_expression,
-    todo_report, type_report, typecase_nil_key_report, typep_predicate_report,
-    undefined_package_report, unreachable_case_clause_report, unreachable_cond_clause_report,
-    unreachable_expression_report, unthread_expression, unused_export_report,
-    unused_local_callable_report, unused_nickname_report, unused_package_report,
-    unused_parameter_report, unwind_protect_no_cleanup_report, unwrap_call,
+    sharp_quoted_lambda_report, sign_comparison_report, signature_report, similarity_report,
+    single_arg_comparison_report, single_clause_cond_report, single_operand_arithmetic_report,
+    single_operand_boolean_report, single_operand_list_op_report, single_value_bind_report,
+    source_report, split_let, split_let_star, step_zero_report, string_case_fold_report,
+    struct_cycle_report, structural_diff, structural_patch, subseq_zero_report,
+    symbol_index_report, system_conflict_report, system_cycle_report, t_comparison_report,
+    test_map_report, the_arity_report, thread_expression, todo_report, type_report,
+    typecase_nil_key_report, typep_predicate_report, undefined_package_report,
+    unreachable_case_clause_report, unreachable_cond_clause_report, unreachable_expression_report,
+    unthread_expression, unused_export_report, unused_local_callable_report,
+    unused_nickname_report, unused_package_report, unwind_protect_no_cleanup_report, unwrap_call,
     value_propagation_report, values_list_of_list_report, verbose_negation_report,
     workspace_report, writability_report, zero_divisor_report,
 };
@@ -105,9 +103,9 @@ pub(super) enum InspectCommand {
     /// Report which forms a selector names, with paths, coordinates and stable ids.
     Resolve(resolve_report::args::ResolveReportArgs),
     /// Find exact atom occurrences without touching strings or comments.
-    FindSymbol(symbol_report::args::SymbolQueryArgs),
+    FindSymbol(paredit_feature_project_inventory::SymbolQueryArgs),
     /// Report exact atom occurrences across explicit files for rename planning.
-    Symbols(symbol_report::args::SymbolReportArgs),
+    Symbols(paredit_feature_project_inventory::SymbolReportArgs),
     /// Report list-head call sites across explicit files for arity refactor planning.
     Calls(call_report::args::CallReportArgs),
     /// Compare callable definitions and call-site arity across explicit files.
@@ -146,11 +144,11 @@ pub(super) enum InspectCommand {
     /// Report a setf/setq/psetf/psetq that assigns the same variable more than once.
     DuplicateSetfPlaces(duplicate_setf_place_report::args::DuplicateSetfPlaceReportArgs),
     /// Report defclass/define-condition/defstruct forms declaring the same slot name more than once.
-    DuplicateSlots(duplicate_slot_report::args::DuplicateSlotReportArgs),
+    DuplicateSlots(paredit_feature_lisp_analysis::DuplicateSlotReportArgs),
     /// Report Emacs Lisp per-file facts: lexical-binding, provided and required features, autoload cookies.
     ElispFile(emacs_lisp_file_report::args::EmacsLispFileReportArgs),
     /// Report defmethod forms with the same name, qualifier, and specializers declared more than once.
-    DuplicateMethods(duplicate_method_report::args::DuplicateMethodReportArgs),
+    DuplicateMethods(paredit_feature_lisp_analysis::DuplicateMethodReportArgs),
     /// Report callable definitions whose lambda list names the same parameter more than once.
     DuplicateParameters(duplicate_parameter_report::args::DuplicateParameterReportArgs),
     /// Report lambda lists that repeat a lambda-list keyword (&optional, &rest, &key, ...).
@@ -456,9 +454,9 @@ pub(super) enum InspectCommand {
     /// Report an incf/decf with an explicit step of 0, a no-op ((incf x 0)).
     StepZero(step_zero_report::args::StepZeroReportArgs),
     /// Report declared function parameters with no unshadowed reference in their body.
-    UnusedParameters(unused_parameter_report::args::UnusedParameterReportArgs),
+    UnusedParameters(paredit_feature_function_parameter::UnusedParameterReportArgs),
     /// Report let-family bindings that shadow an enclosing parameter or let binding.
-    ShadowedBindings(shadowed_binding_report::args::ShadowedBindingReportArgs),
+    ShadowedBindings(paredit_feature_binding::ShadowedBindingReportArgs),
     /// Report flet/labels local callables never called anywhere in their visible scope.
     UnusedLocalCallables(unused_local_callable_report::args::UnusedLocalCallableReportArgs),
     /// Report package::symbol references that reach into another package's internal symbols.
@@ -482,7 +480,7 @@ pub(super) enum InspectCommand {
     /// Report defpackage :export symbols never reached by a qualified symbol reference.
     UnusedExports(unused_export_report::args::UnusedExportReportArgs),
     /// Report defpackage forms that export the same symbol more than once.
-    DuplicateExports(duplicate_export_report::args::DuplicateExportReportArgs),
+    DuplicateExports(paredit_feature_package::DuplicateExportReportArgs),
     /// Report defpackage :nicknames never used as a qualifier anywhere.
     UnusedNicknames(unused_nickname_report::args::UnusedNicknameReportArgs),
     /// Report every exported symbol with the signature its export commits to.

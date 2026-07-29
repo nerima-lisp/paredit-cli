@@ -1,6 +1,6 @@
 # paredit-feature-lisp-analysis
 
-Thirteen reports about the parts of Common Lisp that are not ordinary forms.
+Fifteen reports about the parts of Common Lisp that are not ordinary forms.
 
 ## Responsibilities
 
@@ -25,6 +25,9 @@ S-expression-shaped analysis sees nothing at all:
   every `defmethod`, and the method-combination rules. No single form holds
   it, which is why `method-combination`, `class-hierarchy`, and
   `generic-dispatch` are separate reports rather than fields on one.
+  `duplicate-methods` and `duplicate-slots` join them: both ask whether one
+  CLOS declaration was written twice, which needs the same reading of a
+  `defmethod` specializer list and a `defclass` slot specifier.
 - **Macros.** `macro-expansion` simulates a `defmacro` template against its own
   call sites; `macro-hygiene` reports the two ways a template goes wrong —
   capturing a caller's variable, and evaluating a caller's form more than once.

@@ -3,14 +3,13 @@
 //! These services orchestrate typed domain operations into agent-facing plans,
 //! reports, and workspace workflows without coupling to the CLI shell.
 
-pub mod duplicate_export_report;
-pub mod duplicate_method_report;
-pub mod duplicate_slot_report;
+pub use paredit_feature_lisp_analysis::duplicate_method_report::usecase as duplicate_method_report;
+pub use paredit_feature_lisp_analysis::duplicate_slot_report::usecase as duplicate_slot_report;
+pub use paredit_feature_package::duplicate_export_report::usecase as duplicate_export_report;
 pub mod lint_report;
-pub(crate) mod mutation_safety;
 pub mod semantic_coverage;
-pub mod shadowed_binding_report;
-pub mod unused_parameter_report;
+pub use paredit_feature_binding::shadowed_binding_report::usecase as shadowed_binding_report;
+pub use paredit_feature_function_parameter::unused_parameter_report::usecase as unused_parameter_report;
 
 // Phase 3 facade (section 4.1). benches/similarity_report.rs uses
 // `paredit_cli::application::usecase::similarity_report`, so this path stays.

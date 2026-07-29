@@ -14,6 +14,7 @@ paredit-core-syntax = { path = "../../core/syntax" }
 paredit-core-semantics = { path = "../../core/semantics" }
 paredit-core-edit = { path = "../../core/edit" }
 paredit-core-cli = { path = "../../core/cli" }
+paredit-core-workspace = { path = "../../core/workspace" }
 clap.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

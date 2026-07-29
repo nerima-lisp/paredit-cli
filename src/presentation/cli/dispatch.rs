@@ -24,9 +24,11 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                 resolve_report::workflow::resolve_report(args)?;
             }
             command::InspectCommand::FindSymbol(args) => {
-                symbol_report::workflow::find_symbol(args)?;
+                paredit_feature_project_inventory::find_symbol(args)?;
             }
-            command::InspectCommand::Symbols(args) => symbol_report::workflow::symbol_report(args)?,
+            command::InspectCommand::Symbols(args) => {
+                paredit_feature_project_inventory::symbol_report(args)?;
+            }
             command::InspectCommand::Calls(args) => call_report::workflow::call_report(args)?,
             command::InspectCommand::Signature(args) => {
                 signature_report::workflow::signature_report(args)?;
@@ -79,10 +81,10 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                 emacs_lisp_file_report::workflow::emacs_lisp_file_report(args)?;
             }
             command::InspectCommand::DuplicateSlots(args) => {
-                duplicate_slot_report::workflow::duplicate_slot_report(args)?;
+                paredit_feature_lisp_analysis::duplicate_slot_report(args)?;
             }
             command::InspectCommand::DuplicateMethods(args) => {
-                duplicate_method_report::workflow::duplicate_method_report(args)?;
+                paredit_feature_lisp_analysis::duplicate_method_report(args)?;
             }
             command::InspectCommand::DuplicateParameters(args) => {
                 duplicate_parameter_report::workflow::duplicate_parameter_report(args)?;
@@ -511,10 +513,10 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                 step_zero_report::workflow::step_zero_report(args)?;
             }
             command::InspectCommand::UnusedParameters(args) => {
-                unused_parameter_report::workflow::unused_parameter_report(args)?;
+                paredit_feature_function_parameter::unused_parameter_report(args)?;
             }
             command::InspectCommand::ShadowedBindings(args) => {
-                shadowed_binding_report::workflow::shadowed_binding_report(args)?;
+                paredit_feature_binding::shadowed_binding_report(args)?;
             }
             command::InspectCommand::UnusedLocalCallables(args) => {
                 unused_local_callable_report::workflow::unused_local_callable_report(args)?;
@@ -550,7 +552,7 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                 unused_export_report::workflow::unused_export_report(args)?;
             }
             command::InspectCommand::DuplicateExports(args) => {
-                duplicate_export_report::workflow::duplicate_export_report(args)?;
+                paredit_feature_package::duplicate_export_report(args)?;
             }
             command::InspectCommand::UnusedNicknames(args) => {
                 unused_nickname_report::workflow::unused_nickname_report(args)?;

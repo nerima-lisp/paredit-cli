@@ -1,0 +1,83 @@
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::PathBuf;
+
+use super::args::UnusedParameterReportArgs;
+use super::render::print_unused_parameter_report;
+use crate::unused_parameter_report::usecase::{
+    UnusedParameterReportPolicyOptions, build_unused_parameter_report,
+    evaluate_unused_parameter_policy,
+};
+use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::{CliResult, CommandResult};
+use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+
+pub fn unused_parameter_report(args: UnusedParameterReportArgs) -> CommandResult {
+    let files = expand_unused_parameter_report_inputs(&args.files, args.dialect)?;
+    let mut reports = Vec::with_capacity(files.len());
+
+    for file in &files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        reports.push(build_unused_parameter_report(
+            file.clone(),
+            dialect,
+            &tree,
+            &input.text,
+        )?);
+    }
+
+    let policy = evaluate_unused_parameter_policy(
+        UnusedParameterReportPolicyOptions::new(args.fail_on_unused),
+        &reports,
+    );
+    let policy_passed = policy.passed;
+    let policy_message = policy.violations.join("; ");
+
+    print_unused_parameter_report(&reports, &policy, args.output)?;
+
+    if !policy_passed {
+        return Err(paredit_core_cli::gate::gate_failure(format!(
+            "unused-parameter-report policy failed: {policy_message}"
+        )));
+    }
+
+    Ok(())
+}
+
+fn expand_unused_parameter_report_inputs(
+    files: &[PathBuf],
+    dialect: Option<DialectArg>,
+) -> CliResult<Vec<PathBuf>> {
+    let mut expanded = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for file in files {
+        if file.is_dir() {
+            let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+                roots: vec![file.clone()],
+                include_unknown: dialect.is_some(),
+                include_hidden: false,
+                include_generated: false,
+                max_depth: None,
+                exclude: Vec::new(),
+                ..WorkspaceDiscoveryOptions::default()
+            })?;
+
+            for discovered in discovery.into_files() {
+                push_unique(&mut expanded, &mut seen, discovered);
+            }
+        } else {
+            push_unique(&mut expanded, &mut seen, file.clone());
+        }
+    }
+
+    Ok(expanded)
+}
+
+fn push_unique(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: PathBuf) {
+    let canonical = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+    if seen.insert(canonical) {
+        expanded.push(path);
+    }
+}

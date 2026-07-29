@@ -1,11 +1,16 @@
 # paredit-feature-function-parameter
 
-Adding, removing, reordering and swapping function parameters, with call-site updates.
+Adding, removing, reordering and swapping function parameters, with call-site
+updates — and reporting on the parameters a definition declares.
 
 ## Responsibilities
 
-One slice, five subcommands, and the hardest problem in the refactoring set:
-changing a function's lambda list and every call to it, consistently.
+Two slices. The first is five subcommands and the hardest problem in the
+refactoring set: changing a function's lambda list and every call to it,
+consistently. The second, `unused_parameter_report`, only reads — but it reads
+the *same* lambda list with the *same* validated parser, which is why it lives
+here rather than in a reports package. Two parsers for one grammar would agree
+until the day one of them changed.
 
 - **`refactor add-function-parameter`** — inserts a parameter and supplies an
   argument at each call site.

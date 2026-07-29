@@ -87,17 +87,10 @@ use paredit_feature_similarity::similarity_report::cli as similarity_report;
 use paredit_feature_structural_diff::structural_diff::cli as structural_diff;
 use paredit_feature_structural_diff::structural_patch::cli as structural_patch;
 mod dispatch;
-mod duplicate_export_report;
-mod duplicate_method_report;
-mod duplicate_slot_report;
 mod emacs_lisp_file_report;
 mod lint_report;
-mod shadowed_binding_report;
-mod symbol_report;
-mod unused_parameter_report;
 mod writability_report;
 
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Args, Parser};
