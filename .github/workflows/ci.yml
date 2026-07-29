@@ -140,7 +140,12 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Compare this branch against its merge base
         run: |
-          set -euo pipefail
+          set -uo pipefail
           base="$(git merge-base HEAD "origin/${{ github.base_ref }}")"
           echo "merge base: $base"
-          nix develop --command ./scripts/bench-compare.sh "$base"
+          REPORT="$RUNNER_TEMP/bench-report.md" nix develop --command ./scripts/bench-compare.sh "$base"
+          status=$?
+          if [ -f "$RUNNER_TEMP/bench-report.md" ]; then
+            cat "$RUNNER_TEMP/bench-report.md" >>"$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"

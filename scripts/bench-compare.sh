@@ -4,6 +4,7 @@
 #   ./scripts/bench-compare.sh                    # against origin/main
 #   ./scripts/bench-compare.sh v1.2.0             # against a tag
 #   THRESHOLD=15 ./scripts/bench-compare.sh       # allow 15% instead of 10%
+#   REPORT=bench-report.md ./scripts/bench-compare.sh   # also write a Markdown table
 #
 # ## Why back to back
 #
@@ -25,13 +26,31 @@
 # statistics; this reads the `change/estimates.json` it writes and fails when a
 # benchmark's mean regressed by more than THRESHOLD percent. An improvement is
 # reported and never fails.
+#
+# ## The Markdown report
+#
+# `REPORT=<path>` additionally writes every benchmark's change as a Markdown
+# table — not just the ones over THRESHOLD, so a reviewer sees the whole
+# picture rather than only what failed. It is written whether the comparison
+# passes, fails, or (see below) cannot be made at all, so CI can attach it to
+# a job summary unconditionally.
 
 set -euo pipefail
 
 baseline_ref="${1:-origin/main}"
 threshold="${THRESHOLD:-10}"
+report_path="${REPORT:-}"
 repository_root="$(git rev-parse --show-toplevel)"
 cd "$repository_root"
+
+write_missing_report() {
+  [ -n "$report_path" ] || return 0
+  {
+    printf '## Benchmark comparison: %s vs working tree\n\n' "$baseline_ref"
+    printf 'The baseline could not be benchmarked, so nothing was compared. This is not a\n'
+    printf 'verdict on the working tree — see the job log for why.\n'
+  } >"$report_path"
+}
 
 if ! git rev-parse --verify --quiet "$baseline_ref" >/dev/null; then
   printf 'bench-compare: %s is not a revision in this repository\n' "$baseline_ref" >&2
@@ -98,6 +117,7 @@ This is not a verdict on the working tree. It usually means the branch adds or
 repairs a benchmark that the baseline does not have or cannot run. Nothing was
 compared.
 MESSAGE
+  write_missing_report
   exit 0
 fi
 
@@ -105,13 +125,18 @@ printf 'bench-compare: measuring working tree\n'
 cargo bench --quiet --package paredit-cli "${bench_targets[@]}" -- --baseline bench-compare-base "${bench_args[@]}" >/dev/null
 
 printf 'bench-compare: comparing (threshold %s%%)\n' "$threshold"
-python3 - "$repository_root/target/criterion" "$threshold" <<'PYTHON'
+python3 - "$repository_root/target/criterion" "$threshold" "$baseline_ref" "$report_path" <<'PYTHON'
 import json
 import os
 import sys
 
-criterion_root, threshold = sys.argv[1], float(sys.argv[2])
-regressions, improvements, compared = [], [], 0
+criterion_root, threshold, baseline_ref, report_path = (
+    sys.argv[1],
+    float(sys.argv[2]),
+    sys.argv[3],
+    sys.argv[4],
+)
+changes = []  # (name, change_percent)
 
 for directory, _, files in os.walk(criterion_root):
     if os.path.basename(directory) != "change" or "estimates.json" not in files:
@@ -121,11 +146,26 @@ for directory, _, files in os.walk(criterion_root):
     # Criterion reports the change as a fraction of the baseline mean.
     change = estimates["mean"]["point_estimate"] * 100.0
     name = os.path.relpath(os.path.dirname(directory), criterion_root)
-    compared += 1
-    if change > threshold:
-        regressions.append((name, change))
-    elif change < -threshold:
-        improvements.append((name, change))
+    changes.append((name, change))
+
+compared = len(changes)
+regressions = [entry for entry in changes if entry[1] > threshold]
+improvements = [entry for entry in changes if entry[1] < -threshold]
+
+if report_path:
+    with open(report_path, "w") as handle:
+        handle.write(f"## Benchmark comparison: {baseline_ref} vs working tree\n\n")
+        if compared == 0:
+            handle.write("No comparable benchmarks were found.\n")
+        else:
+            handle.write("| Benchmark | Change | |\n| --- | ---: | --- |\n")
+            for name, change in sorted(changes, key=lambda entry: -entry[1]):
+                flag = "SLOWER" if change > threshold else "faster" if change < -threshold else ""
+                handle.write(f"| `{name}` | {change:+.1f}% | {flag} |\n")
+            handle.write(
+                f"\n{compared} benchmark(s) compared, {len(regressions)} over the "
+                f"{threshold:g}% threshold.\n"
+            )
 
 if compared == 0:
     print("bench-compare: no comparisons found; did both runs execute?", file=sys.stderr)

@@ -1,0 +1,21 @@
+# Excluded from the root workspace on purpose, the same way fuzz/ is:
+# `[workspace]` below makes this its own root, so `cargo build --workspace`
+# and the Nix package/clippy/nextest checks never compile it, and it never
+# has to satisfy the analysis engine's `[lints] workspace = true` /
+# domain-never-depends-on-clap contracts that `tests/cli/architecture_contract.rs`
+# enforces on `packages/*/*` — this crate's entire purpose is a CLI.
+#
+# It still builds under plain `cargo build` from `nix develop`, and `.cargo/
+# config.toml` makes it reachable as `cargo xtask <command>` from the repo
+# root.
+[package]
+name = "xtask"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.6", features = ["derive"] }
