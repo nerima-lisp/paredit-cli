@@ -2,37 +2,27 @@ use paredit_core_cli::CommandResult;
 
 use crate::setf_arity::cli::args::SetfArityReportArgs;
 use crate::setf_arity::cli::render::print_setf_arity_report;
-use crate::setf_arity::usecase::{
-    SetfArityPolicyOptions, collect_setf_arity_violations, evaluate_setf_arity_policy,
-    summarize_setf_arity_violations,
-};
+use crate::setf_arity::usecase::{build_setf_arity_report, evaluate_fail_on_violation_policy};
 use paredit_core_cli::shared::read_input_dialect_and_tree;
 
 pub fn setf_arity_report(args: SetfArityReportArgs) -> CommandResult {
-    let mut assignment_form_count = 0;
-    let mut violations = Vec::new();
-
+    // Explicit files only: this command has never expanded a directory
+    // argument, and the envelope does not change what it accepts.
+    let mut reports = Vec::with_capacity(args.files.len());
     for file in &args.files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_assignment_form_count, file_violations) =
-            collect_setf_arity_violations(file, dialect, &tree)?;
-        assignment_form_count += file_assignment_form_count;
-        violations.extend(file_violations);
+        reports.push(build_setf_arity_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_setf_arity_violations(assignment_form_count, violations);
-    let policy = evaluate_setf_arity_policy(
-        SetfArityPolicyOptions::new(args.fail_on_violation),
-        &summary,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_setf_arity_report(&summary, &policy, args.output)?;
+    print_setf_arity_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "setf-arity-report policy failed: {policy_message}"
+            "setf-arity-report policy failed: {message}"
         )));
     }
 

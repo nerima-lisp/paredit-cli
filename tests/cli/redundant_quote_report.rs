@@ -14,9 +14,12 @@ fn cli_reports_a_quoted_number_and_keyword() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 2"))
-        .stdout(predicate::str::contains("\"number\""))
-        .stdout(predicate::str::contains("\"keyword\""));
+        .stdout(predicate::str::contains("\"finding_count\": 2"))
+        .stdout(predicate::str::contains("\"kind\": \"number\""))
+        .stdout(predicate::str::contains("\"kind\": \"keyword\""))
+        .stdout(predicate::str::contains("\"literal\": \"5\""))
+        .stdout(predicate::str::contains("\"literal\": \":foo\""))
+        .stdout(predicate::str::contains("\"line\": 2"));
 }
 
 #[test]
@@ -33,7 +36,48 @@ fn cli_does_not_flag_quoted_symbols_or_lists() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no redundant quote among five
+        // quoted forms" from "no quoted form at all".
+        .stdout(predicate::str::contains("\"quoted_form_count\": 5"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("redundant-quote-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(list '5)\n").expect("write a.clj");
+
+    paredit()
+        .args(["inspect", "redundant-quote", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_redundant_quote_emits_sarif() {
+    let dir = fresh_temp_dir("redundant-quote-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defparameter *n* '5)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "redundant-quote", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/redundant-quote/number\"",
+        ))
+        .stdout(predicate::str::contains("quoting number 5 is redundant"));
 }
 
 #[test]
@@ -69,7 +113,7 @@ fn cli_redundant_quote_passes_gate_when_clean() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
 #[test]
@@ -88,6 +132,6 @@ fn cli_redundant_quote_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"character\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"character\""));
 }

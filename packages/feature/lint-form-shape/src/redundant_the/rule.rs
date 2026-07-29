@@ -71,7 +71,7 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_the(
             view,
-            context.path(),
+            context.source(),
             &already_known,
             &mut the_form_count,
             &mut items,

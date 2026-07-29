@@ -43,7 +43,7 @@ impl LintRule for Rule {
         let context_slice = |span| context.slice(span).to_owned();
         let mut bind_form_count = 0;
         let mut items = Vec::new();
-        examine_bind(view, context.path(), &mut bind_form_count, &mut items);
+        examine_bind(view, context.source(), &mut bind_form_count, &mut items);
         for item in items {
             let span = item.span;
             let fix = {
