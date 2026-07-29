@@ -601,6 +601,8 @@ pub(super) enum RefactorCommand {
     Status(refactor::args::RefactorStatusArgs),
     /// Apply a previously generated refactor preview manifest with hash guards.
     Apply(refactor::args::RefactorApplyArgs),
+    /// Restore the pre-refactor content recorded by `refactor apply --undo-out`.
+    Undo(refactor::args::RefactorUndoArgs),
     /// Render a verified diff from a refactor preview manifest without writing files.
     Diff(refactor::args::RefactorDiffArgs),
     /// Discover Lisp sources under roots and build a gated refactor plan.

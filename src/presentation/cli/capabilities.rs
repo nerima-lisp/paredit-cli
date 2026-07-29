@@ -45,7 +45,13 @@ pub(super) struct CapabilitiesArgs {
 }
 
 pub(super) fn capabilities(args: CapabilitiesArgs) -> Result<()> {
-    let root = super::Cli::command();
+    let mut root = super::Cli::command();
+    // `Cli::command()` hands back the tree as declared, before clap has copied
+    // the root's `global` arguments into each subcommand. Without this the
+    // catalog would omit exactly the flags that apply everywhere — the budget
+    // and limit flags — from every command that accepts them.
+    root.build();
+    let root = root;
     match args.output {
         OutputFormat::Json => {
             let mut report = json!({

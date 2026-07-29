@@ -30,6 +30,17 @@ pub enum LintError {
     /// findings" would turn a bug in the rule into a silently clean report.
     #[error(transparent)]
     Selection(#[from] SexprError),
+
+    /// The run's wall-clock budget expired during the walk.
+    ///
+    /// The second variant, and the reason the doc comment above no longer
+    /// reads "one variant today": a lint pass is total with respect to its
+    /// input and *not* with respect to time. A 170-rule pass over a
+    /// pathological file is the one place this package can run unboundedly
+    /// long, and reporting that as a clean file would be the worst possible
+    /// answer.
+    #[error(transparent)]
+    TimedOut(#[from] paredit_core_safety::deadline::TimeoutError),
 }
 
 /// The result type [`LintRule::check`](crate::rule::LintRule::check) and the

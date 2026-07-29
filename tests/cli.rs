@@ -377,6 +377,8 @@ mod refactor_entrypoint_contract;
 mod refactor_manifest;
 #[path = "cli/refactor_preview.rs"]
 mod refactor_preview;
+#[path = "cli/refactor_undo.rs"]
+mod refactor_undo;
 #[path = "cli/refactor_workspace/mod.rs"]
 mod refactor_workspace;
 #[path = "cli/remove_unused_binding/mod.rs"]
@@ -393,6 +395,8 @@ mod rename_control;
 mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
+#[path = "cli/resource_budget.rs"]
+mod resource_budget;
 #[path = "cli/self_assignment_report.rs"]
 mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]

@@ -11,7 +11,6 @@ use std::io::{self, ErrorKind, IsTerminal, Read};
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
-#[cfg(any(unix, test))]
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{ArgumentError, CliError, CliResult, IoRefusal, WriteTargetError};
@@ -29,7 +28,23 @@ const UNIQUE_SIBLING_ATTEMPTS: usize = 128;
 const CLEANUP_QUARANTINE_NAME: &str = ".paredit.cleanup";
 #[cfg(unix)]
 const CLEANUP_QUARANTINE_MODE: u32 = 0o700;
-pub const MAX_SOURCE_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+/// The compiled-in ceiling on one document read.
+///
+/// Still the default and no longer the only possible value: a run may lower it
+/// with `--max-input-bytes` or `PAREDIT_MAX_INPUT_BYTES`, which is what
+/// [`max_source_input_bytes`] resolves. Kept public and unchanged because it
+/// is the documented default and several callers quote it as such.
+pub const MAX_SOURCE_INPUT_BYTES: u64 = paredit_core_safety::limits::DEFAULT_MAX_INPUT_BYTES;
+
+/// The ceiling on one document read that this invocation actually applies.
+///
+/// Every production read goes through here rather than through the constant,
+/// so lowering the bound reaches stdin, a named file, and a manifest source
+/// alike without each of them being told separately.
+#[must_use]
+pub fn max_source_input_bytes() -> u64 {
+    paredit_core_safety::limits::effective().max_input_bytes
+}
 
 #[cfg(all(test, unix))]
 type BeforeExistingFileOpenHook = (PathBuf, Box<dyn FnOnce()>);
@@ -368,7 +383,7 @@ fn describe_refused_input_link(path: &FsPath, error: io::Error) -> io::Error {
 pub fn read_input(file: Option<PathBuf>) -> CliResult<SourceInput> {
     match file {
         Some(path) => {
-            let text = read_text_file_with_limit(&path, MAX_SOURCE_INPUT_BYTES)?;
+            let text = read_text_file_with_limit(&path, max_source_input_bytes())?;
             Ok(SourceInput {
                 text,
                 file: Some(path),
@@ -379,7 +394,7 @@ pub fn read_input(file: Option<PathBuf>) -> CliResult<SourceInput> {
             if stdin.is_terminal() {
                 return Err(ArgumentError::NoInput.into());
             }
-            let text = read_text_with_limit(&mut stdin, MAX_SOURCE_INPUT_BYTES, "stdin")?;
+            let text = read_text_with_limit(&mut stdin, max_source_input_bytes(), "stdin")?;
             Ok(SourceInput { text, file: None })
         }
     }
@@ -394,14 +409,37 @@ pub fn read_input_and_dialect(
     Ok((input, dialect))
 }
 
+/// Reads, resolves the dialect for, and parses one input.
+///
+/// This is where the process deadline is checked. Every multi-file report in
+/// this tool calls it once per file, so one check here bounds all ~130 of them
+/// without each workflow having to remember a budget it was never given.
+/// Checking *before* the read means an exhausted budget stops work rather than
+/// paying for one more parse to discover it has already stopped.
 pub fn read_input_dialect_and_tree(
     file: Option<PathBuf>,
     explicit: Option<DialectArg>,
 ) -> CliResult<(SourceInput, Dialect, SyntaxTree)> {
+    let deadline = paredit_core_safety::deadline::effective();
+    if deadline.is_armed() {
+        let scope = match file.as_deref() {
+            Some(path) => format!("reading {}", path.display()),
+            None => "reading stdin".to_owned(),
+        };
+        let completed = READS_COMPLETED.fetch_add(1, Ordering::Relaxed);
+        deadline
+            .check(scope, usize::try_from(completed).unwrap_or(usize::MAX))
+            .map_err(CliError::from)?;
+    }
+
     let (input, dialect) = read_input_and_dialect(file, explicit)?;
     let tree = parse_document(&input, dialect)?;
     Ok((input, dialect, tree))
 }
+
+/// How many inputs this process has parsed, reported by a timeout so "timed
+/// out" can be read as "timed out after 412 files".
+static READS_COMPLETED: AtomicU64 = AtomicU64::new(0);
 
 /// Parses a source document with its resolved dialect, naming the input and
 /// the error's line/column in the context. The underlying [`ParseError`] keeps
@@ -453,7 +491,7 @@ pub fn read_file_or_empty(path: &FsPath) -> CliResult<(SourceInput, bool)> {
             SourceInput {
                 text: read_text_with_limit(
                     file,
-                    MAX_SOURCE_INPUT_BYTES,
+                    max_source_input_bytes(),
                     &path.display().to_string(),
                 )?,
                 file: Some(path.to_path_buf()),

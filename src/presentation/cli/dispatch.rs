@@ -673,6 +673,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::Check(args) => refactor::workflow::refactor_check(args)?,
             command::RefactorCommand::Status(args) => refactor::workflow::refactor_status(args)?,
             command::RefactorCommand::Apply(args) => refactor::workflow::refactor_apply(args)?,
+            command::RefactorCommand::Undo(args) => refactor::workflow::refactor_undo(args)?,
             command::RefactorCommand::Diff(args) => refactor::workflow::refactor_diff(args)?,
             command::RefactorCommand::WorkspacePlan(args) => {
                 refactor::workflow::workspace_refactor_plan(args)?;

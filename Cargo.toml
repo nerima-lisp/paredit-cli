@@ -42,6 +42,7 @@ paredit-feature-extract = { path = "packages/feature/extract" }
 paredit-feature-inline = { path = "packages/feature/inline" }
 paredit-feature-form-transform = { path = "packages/feature/form-transform" }
 paredit-core-workspace = { path = "packages/core/workspace" }
+paredit-core-safety = { path = "packages/core/safety" }
 
 paredit-feature-binding = { path = "packages/feature/binding" }
 paredit-feature-function-parameter = { path = "packages/feature/function-parameter" }

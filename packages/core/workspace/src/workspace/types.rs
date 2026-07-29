@@ -36,14 +36,20 @@ pub struct WorkspaceDiscovery {
 
 pub(super) type WorkspaceRootCapability = (PathBuf, PathBuf, Arc<Dir>, FilesystemIdentity);
 
-#[derive(Debug, Clone, Copy)]
-pub(super) struct WorkspaceLimits {
+/// The bounds one traversal will not exceed.
+///
+/// Public since a caller may lower them: a CI container with a 512 MB budget
+/// needs to say so, and the defaults are sized for a workstation. Raising them
+/// is possible in-process and deliberately not offered on the command line —
+/// see `paredit_core_safety::limits`, which is where the ratchet lives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorkspaceLimits {
     /// Bounds raw root inputs before filesystem resolution and canonical deduplication.
-    pub(super) max_roots: usize,
-    pub(super) max_entries: usize,
-    pub(super) max_files: usize,
-    pub(super) max_file_bytes: u64,
-    pub(super) max_total_bytes: u64,
+    pub max_roots: usize,
+    pub max_entries: usize,
+    pub max_files: usize,
+    pub max_file_bytes: u64,
+    pub max_total_bytes: u64,
 }
 
 impl Default for WorkspaceLimits {

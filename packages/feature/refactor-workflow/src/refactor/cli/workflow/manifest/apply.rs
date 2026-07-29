@@ -11,13 +11,19 @@ use super::super::super::types::apply::{
 };
 use super::super::super::types::manifest::RefactorApplyManifestHeader;
 use super::super::super::types::root::{RefactorRootGuard, RefactorRootReport};
+use super::undo::{resolve_journal_path, restore_from_journal};
 use anyhow::{Context, Result};
+use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::apply_byte_span_edits;
 use paredit_core_cli::shared::stable_text_hash;
 use paredit_core_cli::shared::{
-    write_files_with_rollback_expected, write_files_with_rollback_expected_anchored,
+    write_artifact_with_rollback, write_files_with_rollback_expected,
+    write_files_with_rollback_expected_anchored,
 };
+use paredit_core_safety::external::VerificationCommand;
+use paredit_core_safety::journal::{UndoJournal, UndoJournalFile};
 use paredit_core_syntax::sexpr::SyntaxTree;
+use std::time::Duration;
 
 #[cfg(all(test, unix))]
 thread_local! {
@@ -51,8 +57,24 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
         .map(RefactorRootGuard::new)
         .transpose()?;
 
+    let verification = args
+        .verify_command
+        .as_deref()
+        .map(|command| {
+            VerificationCommand::new(command).map(|command| {
+                command.with_budget(args.verify_timeout_ms.map(Duration::from_millis))
+            })
+        })
+        .transpose()
+        .context("--verify-command is not runnable")?;
+
     let mut files = Vec::with_capacity(manifest.files.len());
     let mut rewritten_outputs = Vec::with_capacity(manifest.files.len());
+    // The pre-image of every file, kept for as long as the write might have to
+    // be reversed. This is the whole reason an undo is possible at all: the
+    // manifest records what each edit *became* and never what it replaced, and
+    // this is the only moment both texts exist together.
+    let mut journal_entries = Vec::with_capacity(manifest.files.len());
     let mut source_bytes = 0_u64;
 
     for file in &manifest.files {
@@ -72,6 +94,11 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             .collect::<Vec<_>>();
         validate_manifest_edits(&input, &edits)
             .with_context(|| format!("manifest edits are invalid for {}", file.path.display()))?;
+        journal_entries.push(
+            UndoJournalFile::record(resolved_path.clone(), &input, &edits).with_context(|| {
+                format!("cannot record an undo journal for {}", file.path.display())
+            })?,
+        );
         let rewritten = apply_byte_span_edits(&input, edits)?;
         let output_hash = stable_text_hash(&rewritten);
         let output_parse_ok = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).is_ok();
@@ -145,10 +172,39 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
             None => write_files_with_rollback_expected(written_outputs)?,
         }
 
-        for index in written_indexes {
-            if let Some(file) = files.get_mut(index) {
+        for index in &written_indexes {
+            if let Some(file) = files.get_mut(*index) {
                 file.written = true;
             }
+        }
+
+        // Only the files that were actually rewritten belong in the journal.
+        // An entry for an unchanged file would be harmless but misleading: an
+        // undo would report it as "nothing to do" beside files that really do
+        // need putting back.
+        let journal = UndoJournal::new(
+            "refactor apply",
+            written_indexes
+                .iter()
+                .filter_map(|index| journal_entries.get(*index).cloned())
+                .collect(),
+        );
+
+        // The journal is written *before* the verification runs. If the
+        // command fails and the rollback then fails too, the operator is left
+        // with a tree that needs restoring by hand — and the file describing
+        // how is the one thing that must already be on disk by then.
+        if let Some(requested) = args.undo_out.as_deref() {
+            let path = resolve_journal_path(requested, &journal.operation);
+            write_artifact_with_rollback(
+                path.clone(),
+                format!("{}\n", serde_json::to_string_pretty(&journal.to_json())?),
+            )
+            .with_context(|| format!("failed to write undo journal {}", path.display()))?;
+        }
+
+        if let Some(verification) = &verification {
+            run_verification_or_restore(verification, &journal, root_guard.as_ref())?;
         }
     }
 
@@ -201,6 +257,82 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
 
     Ok(())
 }
+
+/// Runs the caller's check and puts every written file back if it fails.
+///
+/// The order matters and is not the obvious one: the restore happens *before*
+/// the error is raised, so the process exits with the tree in the state it
+/// started in. Reporting the failure first and restoring afterwards would be
+/// identical when everything works and would leave a half-applied refactor
+/// behind the moment the restore itself failed.
+///
+/// A restore that fails is reported as a separate, louder failure than the
+/// verification that triggered it, because the two need different responses:
+/// one means "the refactor was wrong", the other means "the working tree needs
+/// attention right now".
+fn run_verification_or_restore(
+    verification: &VerificationCommand,
+    journal: &UndoJournal,
+    root_guard: Option<&RefactorRootGuard>,
+) -> Result<()> {
+    let outcome = verification
+        .run()
+        .context("failed to run --verify-command after writing")?;
+    if outcome.passed() {
+        return Ok(());
+    }
+
+    report_verification_transcript(&outcome);
+
+    match restore_from_journal(journal, root_guard) {
+        Ok(restored) => anyhow::bail!(
+            "{}; restored {restored} file(s) to their pre-refactor content",
+            outcome.failure_reason(),
+        ),
+        Err(error) => anyhow::bail!(
+            "{}; restoring the written files ALSO failed, so the working tree is \
+             partially refactored: {error:#}",
+            outcome.failure_reason(),
+        ),
+    }
+}
+
+/// Echoes the tail of a failed command's output to stderr.
+///
+/// Printed as its own lines rather than folded into the error message. The
+/// error renderer escapes every control character in one value, which is right
+/// for a message and turns a twenty-line test failure into one unreadable
+/// string of `\u{a}`. Emitting the transcript line by line keeps the newlines
+/// real while still escaping each line — the output comes from a process this
+/// tool did not write, so ANSI and bidirectional overrides must not reach the
+/// terminal untouched.
+///
+/// Bounded: a failing test suite can produce megabytes, and a message that
+/// scrolls the failure off the top hides the line that matters.
+fn report_verification_transcript(outcome: &paredit_core_safety::external::VerificationOutcome) {
+    for (label, stream) in [("stdout", &outcome.stdout), ("stderr", &outcome.stderr)] {
+        let trimmed = stream.trim_end();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let lines = trimmed.lines().collect::<Vec<_>>();
+        let skipped = lines.len().saturating_sub(VERIFY_TRANSCRIPT_LINES);
+        if skipped > 0 {
+            eprintln!(
+                "--- verify-command {label} (last {VERIFY_TRANSCRIPT_LINES} of {} lines) ---",
+                lines.len()
+            );
+        } else {
+            eprintln!("--- verify-command {label} ---");
+        }
+        for line in lines.into_iter().skip(skipped) {
+            eprintln!("{}", safe_text!(line));
+        }
+    }
+}
+
+/// How many trailing lines of each stream a verification failure quotes.
+const VERIFY_TRANSCRIPT_LINES: usize = 20;
 
 #[cfg(all(test, unix))]
 mod tests {
@@ -271,6 +403,9 @@ mod tests {
             expect_manifest_hash: None,
             root: Some(root.clone()),
             write: true,
+            undo_out: None,
+            verify_command: None,
+            verify_timeout_ms: None,
             output: OutputFormat::Json,
         })
         .expect_err("root replacement must be rejected");

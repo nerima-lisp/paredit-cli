@@ -10,7 +10,9 @@ use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SexprResult, SymbolName, SyntaxTree,
 };
-use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{
+    WorkspaceDiscoveryOptions, WorkspaceLimits, discover_workspace_files_with_limits,
+};
 
 #[path = "diff.rs"]
 mod diff;
@@ -103,15 +105,10 @@ pub fn apply_byte_span_edits(input: &str, mut edits: Vec<(ByteSpan, String)>) ->
     Ok(output)
 }
 
-#[must_use]
-pub fn stable_text_hash(text: &str) -> String {
-    let mut hash = 0xcbf2_9ce4_8422_2325u64;
-    for byte in text.as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    format!("fnv1a64:{hash:016x}")
-}
+// Re-exported rather than defined here since the undo journal started
+// comparing against the same digest. Two spellings of one hash would agree
+// until the day one of them changed.
+pub use paredit_core_safety::hash::stable_text_hash;
 
 #[must_use]
 pub fn bounded_preview(text: &str, max_bytes: usize) -> String {
@@ -281,16 +278,20 @@ pub fn expand_input_files(
     let mut expanded = Vec::new();
     let mut seen = BTreeSet::new();
 
+    let limits = workspace_limits();
     for input in inputs {
         if input.is_dir() {
-            let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
-                roots: vec![input.clone()],
-                include_unknown: dialect.is_some(),
-                include_hidden: false,
-                include_generated: false,
-                max_depth: None,
-                exclude: Vec::new(),
-            })?;
+            let discovery = discover_workspace_files_with_limits(
+                &WorkspaceDiscoveryOptions {
+                    roots: vec![input.clone()],
+                    include_unknown: dialect.is_some(),
+                    include_hidden: false,
+                    include_generated: false,
+                    max_depth: None,
+                    exclude: Vec::new(),
+                },
+                limits,
+            )?;
             for discovered in discovery.into_files() {
                 push_unique_path(&mut expanded, &mut seen, discovered);
             }
@@ -300,6 +301,24 @@ pub fn expand_input_files(
     }
 
     Ok(expanded)
+}
+
+/// Restates this invocation's bounds in the traversal's own vocabulary.
+///
+/// The two types are separate on purpose: `ResourceLimits` is what a caller
+/// asked for and `WorkspaceLimits` is what a traversal enforces, and the
+/// traversal has no business knowing that a command line exists. This is the
+/// one place they meet.
+#[must_use]
+pub fn workspace_limits() -> WorkspaceLimits {
+    let limits = paredit_core_safety::limits::effective();
+    WorkspaceLimits {
+        max_roots: limits.max_roots,
+        max_entries: limits.max_entries,
+        max_files: limits.max_files,
+        max_file_bytes: limits.max_file_bytes,
+        max_total_bytes: limits.max_total_bytes,
+    }
 }
 
 fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: PathBuf) {

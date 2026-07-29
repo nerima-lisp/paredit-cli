@@ -11,6 +11,7 @@ pub use manifest::apply::refactor_apply;
 pub use manifest::check::refactor_check;
 pub use manifest::diff::refactor_diff;
 pub use manifest::status::refactor_status;
+pub use manifest::undo::refactor_undo;
 pub use plan::{refactor_plan, workspace_refactor_plan};
 pub use preview::{refactor_preview, workspace_refactor_preview};
 pub use verification::verify_refactor;

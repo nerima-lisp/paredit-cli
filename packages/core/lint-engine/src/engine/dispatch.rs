@@ -68,6 +68,57 @@ pub struct PassOptions<'a> {
     pub measure: bool,
 }
 
+/// The run's wall-clock budget, as the walk consults it.
+///
+/// Two decisions are baked in here rather than left to the walk:
+///
+/// - **Nothing is checked when nothing is armed.** `is_armed` is decided once
+///   per file; an unarmed run never reads the clock at all, so a lint pass
+///   stays a pure function of its input and the byte-identical-output contract
+///   holds.
+/// - **Checked per node, not per rule.** A rule's `check` is a single
+///   non-yielding call — there is no point at which a half-run rule could be
+///   abandoned safely — so the finest honest granularity is between nodes.
+///   Claiming to time out a *rule* would mean claiming a power this engine
+///   does not have.
+#[derive(Debug)]
+struct WalkBudget {
+    deadline: paredit_core_safety::deadline::Deadline,
+    armed: bool,
+    file: String,
+}
+
+impl WalkBudget {
+    fn new(path: &Path) -> Self {
+        let deadline = paredit_core_safety::deadline::effective();
+        Self {
+            armed: deadline.is_armed(),
+            deadline,
+            file: path.display().to_string(),
+        }
+    }
+
+    /// Fails once the budget has run out, naming the file and how far the walk
+    /// had got.
+    ///
+    /// Only every `CHECK_INTERVAL` nodes: `Instant::elapsed` on every node of a
+    /// large file is itself a measurable cost, and a budget overshot by a few
+    /// thousand node visits is still a budget.
+    fn check(&self, visited: usize) -> LintResult {
+        // `%` rather than `usize::is_multiple_of`, which is newer than this
+        // workspace's 1.85 MSRV.
+        if !self.armed || visited % CHECK_INTERVAL != 0 {
+            return Ok(());
+        }
+        self.deadline
+            .check(format!("linting {}", self.file), visited)?;
+        Ok(())
+    }
+}
+
+/// How many node visits pass between two clock reads during a lint walk.
+const CHECK_INTERVAL: usize = 512;
+
 /// What one pass produced.
 #[derive(Debug)]
 pub struct PassOutcome {
@@ -151,6 +202,11 @@ pub fn collect_lint_pass(
         }
     }
 
+    // Hoisted out of the walk: `effective` is a lock-free read, but the walk
+    // consults the budget once per node and the unarmed case must cost
+    // nothing measurable.
+    let budget = WalkBudget::new(path);
+
     let mut visit = VisitIndex::ROOT;
     for child in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(child))?.view();
@@ -163,6 +219,7 @@ pub fn collect_lint_pass(
             &mut visit,
             &mut sink,
             timings.as_mut(),
+            &budget,
         )?;
     }
 
@@ -185,10 +242,14 @@ fn walk(
     visit: &mut VisitIndex,
     sink: &mut FindingSink<'_>,
     mut timings: Option<&mut RuleTimings>,
+    budget: &WalkBudget,
 ) -> LintResult {
     let mut stack = vec![root];
+    let mut visited = 0_usize;
 
     while let Some(view) = stack.pop() {
+        visited += 1;
+        budget.check(visited)?;
         *visit = visit.next();
         let position = *visit;
 

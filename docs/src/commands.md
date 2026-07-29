@@ -404,7 +404,8 @@ plan/preview/verify/apply lifecycle.
 | `preview` | Preview exact refactoring rewrites without modifying files. |
 | `check` | Validate a refactor preview manifest without writing files. |
 | `status` | Summarize a preview manifest into agent-safe next actions. |
-| `apply` | Apply a previously generated preview manifest with hash guards. |
+| `apply` | Apply a previously generated preview manifest with hash guards. `--undo-out` records a reverse-edit journal; `--verify-command` runs a check afterwards and restores every written file when it fails. |
+| `undo` | Restore the pre-refactor content recorded by `apply --undo-out`. Refuses unless every file is still byte-for-byte what the write produced, so a journal cannot be applied twice or over an intervening edit. |
 | `diff` | Render a verified diff from a preview manifest without writing files. |
 | `workspace-plan` | Discover Lisp sources under roots and build a gated refactor plan. |
 | `workspace-preview` | Discover sources and preview exact refactoring rewrites. |

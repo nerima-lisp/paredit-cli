@@ -653,6 +653,7 @@ dependencies = [
  "paredit-core-cli",
  "paredit-core-edit",
  "paredit-core-lint-engine",
+ "paredit-core-safety",
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",
@@ -702,6 +703,7 @@ dependencies = [
  "libc",
  "paredit-core-edit",
  "paredit-core-lint-engine",
+ "paredit-core-safety",
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",
@@ -725,9 +727,20 @@ dependencies = [
 name = "paredit-core-lint-engine"
 version = "1.2.1"
 dependencies = [
+ "paredit-core-safety",
  "paredit-core-semantics",
  "paredit-core-syntax",
  "proptest",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-core-safety"
+version = "1.2.1"
+dependencies = [
+ "paredit-core-syntax",
+ "proptest",
+ "serde_json",
  "thiserror",
 ]
 
@@ -1077,6 +1090,7 @@ dependencies = [
  "libc",
  "paredit-core-cli",
  "paredit-core-edit",
+ "paredit-core-safety",
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",

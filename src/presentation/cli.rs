@@ -99,11 +99,46 @@ pub(crate) use shared::{read_input_dialect_and_tree, terminal_safe, terminal_saf
 struct Cli {
     #[command(subcommand)]
     command: Command,
+    #[command(flatten)]
+    budget: BudgetArgs,
+}
+
+/// The bounds that apply to whichever command runs.
+///
+/// Declared once on the root and marked `global`, so every subcommand accepts
+/// them and `inspect capabilities` lists them everywhere without 275 arg
+/// structs repeating the same four flags. They are resolved before dispatch
+/// and published process-wide; nothing downstream is handed a budget it could
+/// forget to honour.
+#[derive(Debug, Args)]
+struct BudgetArgs {
+    /// Wall-clock budget in milliseconds. Checked between files; unset means no budget.
+    #[arg(long, global = true, value_name = "MILLIS")]
+    timeout_ms: Option<u64>,
+    /// Ceiling on one document read, for example 8MiB. May lower the default, never raise it.
+    #[arg(long, global = true, value_name = "SIZE")]
+    max_input_bytes: Option<String>,
+    /// Ceiling on one file found by a directory scan. May lower the default, never raise it.
+    #[arg(long, global = true, value_name = "SIZE")]
+    max_file_bytes: Option<String>,
+    /// Ceiling on the bytes one scan reads in total. May lower the default, never raise it.
+    #[arg(long, global = true, value_name = "SIZE")]
+    max_total_bytes: Option<String>,
+    /// Ceiling on the files one scan may yield. May lower the default, never raise it.
+    #[arg(long, global = true, value_name = "COUNT")]
+    max_files: Option<usize>,
 }
 
 #[must_use]
 pub fn run() -> ExitCode {
     let cli = Cli::parse();
+    if let Err(error) = install_budget(&cli.budget) {
+        eprintln!("Error: {}", terminal_safe_error_chain(&error));
+        // A rejected limit is a usage error: the command line, not the source,
+        // is what has to change.
+        return ExitCode::from(2);
+    }
+
     match dispatch::dispatch(cli.command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -115,6 +150,36 @@ pub fn run() -> ExitCode {
             }
         }
     }
+}
+
+/// Resolves and publishes this run's bounds.
+///
+/// Flags win over the environment, and the environment exists because a CI
+/// container's budget is not something the person typing the command controls.
+/// Both are ratchets: either may lower a ceiling, neither may raise one.
+fn install_budget(args: &BudgetArgs) -> Result<()> {
+    use paredit_core_safety::deadline::{self, Deadline};
+    use paredit_core_safety::limits::{self, ResourceLimitOverrides, ResourceLimits};
+
+    let from_environment = limits::overrides_from_environment()?;
+    let from_flags = ResourceLimitOverrides::from_text(
+        args.max_input_bytes.as_deref(),
+        args.max_file_bytes.as_deref(),
+        args.max_total_bytes.as_deref(),
+        args.max_files,
+    )?;
+
+    let resolved = ResourceLimits::default()
+        .with_overrides(&from_environment)?
+        .with_overrides(&from_flags)?;
+
+    // `install` only fails when something already installed a value, which
+    // cannot happen before dispatch in a `main` that calls this once. Ignoring
+    // the result keeps a second entry point (a test harness, a future embedded
+    // caller) from aborting the run over a benign race.
+    let _ = limits::install(resolved);
+    let _ = deadline::install(Deadline::from_millis(args.timeout_ms));
+    Ok(())
 }
 
 // Facade re-exports for extracted feature packages (section 4.1).

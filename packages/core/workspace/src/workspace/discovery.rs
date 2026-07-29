@@ -271,7 +271,7 @@ pub fn discover_workspace_files(
     discover_workspace_files_with_limits(options, WorkspaceLimits::default())
 }
 
-pub(super) fn discover_workspace_files_with_limits(
+pub fn discover_workspace_files_with_limits(
     options: &WorkspaceDiscoveryOptions,
     limits: WorkspaceLimits,
 ) -> std::result::Result<WorkspaceDiscovery, WorkspaceError> {
