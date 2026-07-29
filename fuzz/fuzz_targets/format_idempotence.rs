@@ -40,8 +40,9 @@ fuzz_target!(|data: &[u8]| {
 
         // A formatted document must still parse. Anything else means the
         // formatter can turn a valid file into an invalid one.
-        let reparsed = SyntaxTree::parse_with_dialect(&once, dialect)
-            .unwrap_or_else(|error| panic!("{dialect:?}: formatted output does not reparse ({error}) for {source:?}"));
+        let reparsed = SyntaxTree::parse_with_dialect(&once, dialect).unwrap_or_else(|error| {
+            panic!("{dialect:?}: formatted output does not reparse ({error}) for {source:?}")
+        });
 
         let twice = formatter.format(&reparsed);
         assert_eq!(

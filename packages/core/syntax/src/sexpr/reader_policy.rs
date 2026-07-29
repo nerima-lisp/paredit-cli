@@ -280,6 +280,15 @@ impl DialectReaderPolicy {
         if let Some(prefix) = classify_quote_prefix(byte, next) {
             return Some(prefix);
         }
+        // `?` at end of input is a truncated character literal — the Emacs Lisp
+        // member of the family that also covers Common Lisp's and Scheme's
+        // `#\` and Clojure's `\`. Reading it as an ordinary atom made the
+        // formatter non-idempotent: it appends a trailing newline, the
+        // truncated literal claims it as its character, and the next pass
+        // appends another.
+        if byte == b'?' && next.is_none() {
+            return Some(ReaderMacro::UnsupportedDispatch { width: 1 });
+        }
         if byte != b'#' {
             return None;
         }

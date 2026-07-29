@@ -74,10 +74,21 @@ fn flake_exposes_the_documented_integration_surfaces() {
             "flake.nix must keep the documented integration surface: {needle}"
         );
     }
-    assert!(
-        flake.contains("excludes = [ \"tests/fixtures/*\" ]"),
-        "flake.nix must keep test fixtures out of the paredit treefmt formatter"
-    );
+    // The property, not one spelling of it. Both of these are byte-exact
+    // inputs whose value is destroyed by formatting: a fixture's spans are what
+    // the tests assert on, and a fuzz seed *is* its exact bytes — a crasher
+    // artifact a formatter rewrote has stopped reproducing the crash it was
+    // saved for. The list outgrew a single line when the second was added.
+    for excluded in [
+        "\"tests/fixtures/*\"",
+        "\"fuzz/corpus/*\"",
+        "\"fuzz/artifacts/*\"",
+    ] {
+        assert!(
+            flake.contains(excluded),
+            "flake.nix must keep {excluded} out of the paredit treefmt formatter"
+        );
+    }
 }
 
 /// `lispIncludes` decides which files `paredit-lint`, `paredit-format`, and the

@@ -17,12 +17,64 @@ use std::path::{Path, PathBuf};
 use paredit_cli::dialect::Dialect;
 use paredit_cli::sexpr::{Edit, ExpressionPath, Formatter, SyntaxTree};
 use proptest::prelude::*;
-use proptest::test_runner::{Config as ProptestConfig, FileFailurePersistence};
+use proptest::test_runner::{
+    Config as ProptestConfig, FileFailurePersistence, RngAlgorithm, TestCaseError, TestRng,
+    TestRunner,
+};
 
+/// A fixed seed, so this file is a gate rather than a lottery.
+///
+/// A property test with a fresh seed per run is the right tool for *finding*
+/// an invariant violation and the wrong one for a merge gate: the same commit
+/// passes on one run and fails on the next, and a red build that goes green on
+/// re-run teaches everyone to press re-run. It found the truncated
+/// character-literal family this way — a case a local run had missed turned up
+/// in CI — and each of those is now a corpus seed replayed every time.
+///
+/// Widening the search is still wanted, just not on the critical path:
+/// `PAREDIT_ROBUSTNESS_SEED=<n>` re-runs this file with a different seed, and
+/// the fuzz targets in `fuzz/` explore continuously.
 fn robustness_config(cases: u32) -> ProptestConfig {
     let mut config = ProptestConfig::with_cases(cases);
     config.failure_persistence = Some(Box::new(FileFailurePersistence::Off));
+    config.rng_algorithm = RngAlgorithm::ChaCha;
     config
+}
+
+/// The seed every run uses unless one is supplied.
+///
+/// Arbitrary, and fixed. Its only job is to be the same on your machine and on
+/// the runner.
+fn robustness_seed() -> [u8; 32] {
+    let requested = std::env::var("PAREDIT_ROBUSTNESS_SEED")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(0x5EED_1515_C0FF_EE01);
+    let mut seed = [0_u8; 32];
+    for (index, chunk) in seed.chunks_mut(8).enumerate() {
+        chunk.copy_from_slice(&(requested.wrapping_add(index as u64)).to_le_bytes());
+    }
+    seed
+}
+
+/// Runs one property over the fixed seed.
+///
+/// `proptest!` uses the thread-local default RNG, which is seeded from entropy;
+/// driving the runner directly is what makes the seed above take effect.
+fn check_property<S: Strategy>(
+    cases: u32,
+    strategy: S,
+    property: impl Fn(S::Value) -> Result<(), TestCaseError>,
+) where
+    S::Value: std::fmt::Debug,
+{
+    let mut runner = TestRunner::new_with_rng(
+        robustness_config(cases),
+        TestRng::from_seed(RngAlgorithm::ChaCha, &robustness_seed()),
+    );
+    if let Err(failure) = runner.run(&strategy, property) {
+        panic!("{failure}");
+    }
 }
 
 /// Every dialect, so a reader rule added for one cannot crash another.
@@ -146,106 +198,114 @@ fn token() -> impl Strategy<Value = String> {
     ]
 }
 
-proptest! {
-    #![proptest_config(robustness_config(400))]
+/// Reader-significant tokens, in any order, for every dialect.
+#[test]
+fn adversarial_token_soup_never_panics() {
+    check_property(
+        400,
+        (
+            prop::collection::vec(token(), 0..30),
+            0usize..DIALECTS.len(),
+        ),
+        |(tokens, dialect_index)| {
+            let source = tokens.concat();
+            let dialect = DIALECTS[dialect_index];
+            // The message, not just the boolean: a CI failure that says only
+            // "assertion failed" costs a round trip to reproduce.
+            check_invariants(&source, dialect).map_err(TestCaseError::fail)
+        },
+    );
+}
 
-    /// Reader-significant tokens, in any order, for every dialect.
-    #[test]
-    fn adversarial_token_soup_never_panics(
-        tokens in prop::collection::vec(token(), 0..30),
-        dialect_index in 0usize..DIALECTS.len(),
-    ) {
-        let source = tokens.concat();
-        let dialect = DIALECTS[dialect_index];
-        prop_assert!(check_invariants(&source, dialect).is_ok(), "{}", check_invariants(&source, dialect).unwrap_err());
-    }
+/// Arbitrary text, including bytes no Lisp reader would accept. Weaker than
+/// the token soup at reaching deep paths, stronger at reaching the boundary
+/// conditions of the byte scanner.
+#[test]
+fn arbitrary_text_never_panics() {
+    check_property(
+        400,
+        (".{0,200}", 0usize..DIALECTS.len()),
+        |(source, dialect_index)| {
+            check_invariants(&source, DIALECTS[dialect_index]).map_err(TestCaseError::fail)
+        },
+    );
+}
 
-    /// Arbitrary text, including bytes no Lisp reader would accept. Weaker
-    /// than the token soup at reaching deep paths, stronger at reaching the
-    /// boundary conditions of the byte scanner.
-    #[test]
-    fn arbitrary_text_never_panics(
-        source in ".{0,200}",
-        dialect_index in 0usize..DIALECTS.len(),
-    ) {
-        let dialect = DIALECTS[dialect_index];
-        prop_assert!(check_invariants(&source, dialect).is_ok());
-    }
-
-    /// Deep nesting must not overflow the stack. The parser documents an
-    /// iterative walk for exactly this reason, and a recursive helper added
-    /// later would only show up here.
-    #[test]
-    fn deeply_nested_input_does_not_overflow(depth in 1usize..2_000) {
+/// Deep nesting must not overflow the stack. The parser documents an iterative
+/// walk for exactly this reason, and a recursive helper added later would only
+/// show up here.
+#[test]
+fn deeply_nested_input_does_not_overflow() {
+    check_property(200, 1usize..2_000, |depth| {
         let source = format!("{}{}", "(".repeat(depth), ")".repeat(depth));
-        prop_assert!(check_invariants(&source, Dialect::CommonLisp).is_ok());
-    }
+        check_invariants(&source, Dialect::CommonLisp).map_err(TestCaseError::fail)
+    });
+}
 
-    /// Unbalanced in either direction, at any depth.
-    #[test]
-    fn unbalanced_input_is_refused_rather_than_crashing(
-        opens in 0usize..60,
-        closes in 0usize..60,
-    ) {
+/// Unbalanced in either direction, at any depth.
+#[test]
+fn unbalanced_input_is_refused_rather_than_crashing() {
+    check_property(400, (0usize..60, 0usize..60), |(opens, closes)| {
         let source = format!("{}{}", "(".repeat(opens), ")".repeat(closes));
-        prop_assert!(check_invariants(&source, Dialect::CommonLisp).is_ok());
-    }
+        check_invariants(&source, Dialect::CommonLisp).map_err(TestCaseError::fail)
+    });
+}
 
-    /// Every structural edit, at an arbitrary byte offset into an arbitrary
-    /// document.
-    ///
-    /// `--at` takes a raw offset from the caller, so the offset reaching
-    /// `select_at` is genuinely untrusted — including offsets inside a
-    /// multi-byte character, inside a string literal, and past the end. The
-    /// property asserted is that every one of these *returns*: a refusal is a
-    /// designed outcome, a panic is not.
-    ///
-    /// It is deliberately not asserted that a successful rewrite reparses.
-    /// The edit layer is span arithmetic over a tree and does not re-read its
-    /// own output; removing a delimiter that was separating two tokens can
-    /// change how the bytes after it lex. That is why the *write* path checks
-    /// the rewrite and refuses to persist one that does not reparse —
-    /// `unparseable_edit_output_is_never_written` below pins the guarantee
-    /// where it actually lives.
-    #[test]
-    fn every_edit_at_an_arbitrary_offset_returns_rather_than_panicking(
-        source in "[a-z()\\[\\] \u{3042}\"]{0,80}",
-        offset in 0usize..100,
-    ) {
-        let Ok(tree) = SyntaxTree::parse(&source) else {
-            return Ok(());
-        };
-        let Ok(selection) = tree.select_at(offset) else {
-            return Ok(());
-        };
+/// Every structural edit, at an arbitrary byte offset into an arbitrary
+/// document.
+///
+/// `--at` takes a raw offset from the caller, so the offset reaching
+/// `select_at` is genuinely untrusted — including offsets inside a multi-byte
+/// character, inside a string literal, and past the end. The property asserted
+/// is that every one of these *returns*: a refusal is a designed outcome, a
+/// panic is not.
+///
+/// It is deliberately not asserted that a successful rewrite reparses. The
+/// edit layer is span arithmetic over a tree and does not re-read its own
+/// output; removing a delimiter that was separating two tokens can change how
+/// the bytes after it lex. `a_lossy_edit_is_refused_before_it_is_emitted`
+/// below pins the guarantee where it actually lives.
+#[test]
+fn every_edit_at_an_arbitrary_offset_returns_rather_than_panicking() {
+    check_property(
+        400,
+        ("[a-z()\\[\\] \u{3042}\"]{0,80}", 0usize..100),
+        |(source, offset)| {
+            let Ok(tree) = SyntaxTree::parse(&source) else {
+                return Ok(());
+            };
+            let Ok(selection) = tree.select_at(offset) else {
+                return Ok(());
+            };
 
-        // Each of these either returns a rewrite or refuses. Reaching the end
-        // of the block is the assertion; a panic fails through the harness.
-        let outcomes = [
-            Edit::kill(&source, &tree, selection),
-            Edit::splice(&source, &tree, selection),
-            Edit::raise(&source, &tree, selection),
-            Edit::split(&source, &tree, selection),
-            Edit::join(&source, &tree, selection),
-            Edit::transpose_forward(&source, &tree, selection),
-            Edit::transpose_backward(&source, &tree, selection),
-            Edit::slurp_forward(&source, &tree, selection),
-            Edit::slurp_backward(&source, &tree, selection),
-            Edit::barf_forward(&source, &tree, selection),
-            Edit::barf_backward(&source, &tree, selection),
-            Edit::convolute(&source, &tree, selection),
-        ];
+            // Each of these either returns a rewrite or refuses. Reaching the
+            // end of the block is the assertion; a panic fails through the
+            // harness.
+            let outcomes = [
+                Edit::kill(&source, &tree, selection),
+                Edit::splice(&source, &tree, selection),
+                Edit::raise(&source, &tree, selection),
+                Edit::split(&source, &tree, selection),
+                Edit::join(&source, &tree, selection),
+                Edit::transpose_forward(&source, &tree, selection),
+                Edit::transpose_backward(&source, &tree, selection),
+                Edit::slurp_forward(&source, &tree, selection),
+                Edit::slurp_backward(&source, &tree, selection),
+                Edit::barf_forward(&source, &tree, selection),
+                Edit::barf_backward(&source, &tree, selection),
+                Edit::convolute(&source, &tree, selection),
+            ];
 
-        // A rewrite that *does* reparse must not have lost the selection's
-        // enclosing structure to a slicing error: any Ok result is a complete
-        // document, never a truncated one.
-        for outcome in outcomes.into_iter().flatten() {
-            prop_assert!(
-                outcome.len() <= source.len() * 2 + 8,
-                "an edit of {source:?} produced implausible output {outcome:?}"
-            );
-        }
-    }
+            for outcome in outcomes.into_iter().flatten() {
+                if outcome.len() > source.len() * 2 + 8 {
+                    return Err(TestCaseError::fail(format!(
+                        "an edit of {source:?} produced implausible output {outcome:?}"
+                    )));
+                }
+            }
+            Ok(())
+        },
+    );
 }
 
 /// A lossy edit is refused by the command, not merely by the write.
