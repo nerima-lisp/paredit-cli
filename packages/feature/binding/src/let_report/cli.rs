@@ -19,14 +19,20 @@ pub struct LetReportArgs {
     /// Files to scan. Omit to read a single snippet from stdin; pass two or
     /// more to get a per-file breakdown with an aggregated policy.
     files: Vec<PathBuf>,
+    /// Override extension-based dialect detection for every file.
     #[arg(long)]
     dialect: Option<DialectArg>,
+    /// Exit with failure when any binding is referenced more than once, so
+    /// inlining it would evaluate its initializer more than once.
     #[arg(long)]
     fail_on_duplicate_evaluation: bool,
+    /// Exit with failure when any local binding has no reference in its body.
     #[arg(long)]
     fail_on_unused_binding: bool,
-    #[arg(long)]
+    /// Exit with failure unless at least this many bindings are safe to inline.
+    #[arg(long, value_name = "COUNT")]
     require_inlineable_bindings: Option<usize>,
+    /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     output: OutputFormat,
 }

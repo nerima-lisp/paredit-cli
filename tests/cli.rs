@@ -11,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod accessor_arity_report;
 #[path = "cli/action_contract.rs"]
 mod action_contract;
+#[path = "cli/agent_report_budget.rs"]
+mod agent_report_budget;
 #[path = "cli/analysis_report.rs"]
 mod analysis_report;
 #[path = "cli/append_list_to_cons_report.rs"]
@@ -41,6 +43,8 @@ mod car_nthcdr_report;
 mod car_reverse_report;
 #[path = "cli/case_nil_key_report.rs"]
 mod case_nil_key_report;
+#[path = "cli/change_summary.rs"]
+mod change_summary;
 #[path = "cli/char_case_fold_report.rs"]
 mod char_case_fold_report;
 #[path = "cli/char_op_string_report.rs"]
@@ -65,6 +69,8 @@ mod complexity_report;
 mod cond_t_clause_report;
 #[path = "cli/conditional_conversion.rs"]
 mod conditional_conversion;
+#[path = "cli/config_command.rs"]
+mod config_command;
 #[path = "cli/cons_to_list_report.rs"]
 mod cons_to_list_report;
 #[path = "cli/constant_if_test_report.rs"]
@@ -103,6 +109,8 @@ mod defpackage_quoted_report;
 mod dependency_report;
 #[path = "cli/destructive_literal_report.rs"]
 mod destructive_literal_report;
+#[path = "cli/determinism_contract.rs"]
+mod determinism_contract;
 #[path = "cli/dialect_contract.rs"]
 mod dialect_contract;
 #[path = "cli/double_reverse_report.rs"]
@@ -153,6 +161,8 @@ mod eql_search_literal_report;
 mod eql_string_comparison_report;
 #[path = "cli/equality_arity_report.rs"]
 mod equality_arity_report;
+#[path = "cli/error_diagnosis.rs"]
+mod error_diagnosis;
 #[path = "cli/eval_when_situation_report.rs"]
 mod eval_when_situation_report;
 #[path = "cli/exhaustive_case_otherwise_report.rs"]
@@ -407,6 +417,8 @@ mod repair_unclosed_lists;
 mod replace_forms;
 #[path = "cli/report_interop.rs"]
 mod report_interop;
+#[path = "cli/run_controls.rs"]
+mod run_controls;
 #[path = "cli/selector.rs"]
 mod selector;
 #[path = "cli/self_assignment_report.rs"]

@@ -1,0 +1,292 @@
+//! Loading the configuration once, and the four things `config` does with it.
+
+use std::path::PathBuf;
+
+use anyhow::Result;
+
+use paredit_core_cli::gate::gate_failure;
+use paredit_core_cli::shared::write_artifact_with_rollback;
+use paredit_core_config::load::{LoadOptions, Loaded};
+use paredit_core_config::schema::{self, DefaultValue, KeySchema, ValueKind};
+use paredit_core_config::settings::Vocabulary;
+
+use crate::domain::lint::registry::catalog::{CATEGORIES, RULES};
+
+use super::args::{
+    ConfigCheckArgs, ConfigInitArgs, ConfigLocationArgs, ConfigSchemaArgs, ConfigShowArgs,
+};
+use super::render;
+
+/// The rule and category names this build registers.
+///
+/// Assembled here rather than in `paredit-core-config` because the registry is
+/// composition root: a core package that reached for it would have to depend
+/// on every lint feature to name a rule.
+#[must_use]
+pub const fn vocabulary() -> Vocabulary<'static> {
+    Vocabulary {
+        rules: &RULES,
+        categories: &CATEGORIES,
+    }
+}
+
+/// Reads the configuration the way every command should read it.
+///
+/// One function so that `config check` cannot validate a different set of
+/// files from the one the next command actually applies — a check that looks
+/// somewhere else is worse than no check.
+pub fn load(location: &ConfigLocationArgs) -> Result<Loaded> {
+    let start = match &location.from {
+        Some(directory) => directory.clone(),
+        None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+    };
+
+    // `from_process` has already read the loader variables. A flag adds to
+    // what they said rather than replacing it: assigning here would let an
+    // unset flag switch `PAREDIT_NO_CONFIG` back off, which is the opposite of
+    // what a flag defaulting to false should do.
+    let mut options = LoadOptions::from_process(start);
+    if location.config.is_some() {
+        options.explicit.clone_from(&location.config);
+    }
+    options.skip_files |= location.no_config;
+    options.skip_environment |= location.no_config_env;
+
+    Ok(paredit_core_config::load::load(
+        &options,
+        Some(vocabulary()),
+    )?)
+}
+
+pub fn check(args: ConfigCheckArgs) -> Result<()> {
+    let loaded = load(&args.location)?;
+    render::print_check(&loaded, args.output)?;
+
+    if loaded.has_errors() && !args.no_fail {
+        let count = loaded
+            .diagnostics
+            .iter()
+            .filter(|d| d.severity() == paredit_core_config::Severity::Error)
+            .count();
+        return Err(gate_failure(format!(
+            "configuration has {count} error{}",
+            if count == 1 { "" } else { "s" }
+        )));
+    }
+    Ok(())
+}
+
+pub fn show(args: ConfigShowArgs) -> Result<()> {
+    let loaded = load(&args.location)?;
+
+    if let Some(key) = &args.key {
+        if schema::lookup(key).is_none() {
+            let hint = schema::nearest_key(key)
+                .map_or_else(String::new, |near| format!(" (did you mean `{near}`?)"));
+            return Err(anyhow::anyhow!(
+                "`{key}` is not a configuration key{hint}. \
+                 Run `paredit config schema` for the full list."
+            ));
+        }
+    }
+
+    let injections = match &args.for_command {
+        None => None,
+        Some(command_path) => Some(
+            crate::presentation::cli::config_bridge::plan_for(
+                command_path,
+                &loaded.settings,
+                &<crate::presentation::cli::Cli as clap::CommandFactory>::command(),
+            )
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "`{command_path}` is not a command. Pass a full path such as \
+                     \"inspect lint\"; `paredit inspect capabilities` lists them all."
+                )
+            })?,
+        ),
+    };
+
+    render::print_show(
+        &loaded,
+        args.key.as_deref(),
+        args.changed_only,
+        injections.as_deref(),
+        args.output,
+    )
+}
+
+pub fn schema_report(args: ConfigSchemaArgs) -> Result<()> {
+    render::print_schema(args.output)
+}
+
+pub fn init(args: ConfigInitArgs) -> Result<()> {
+    let contents = template(args.all_keys);
+
+    if paredit_core_cli::runtime::current().dry_run {
+        print!("{contents}");
+        return Ok(());
+    }
+
+    let path = init_path(&args)?;
+    if path.exists() {
+        return Err(anyhow::anyhow!(
+            "refusing to overwrite {}: delete it first, or use --dry-run to print the template",
+            path.display()
+        ));
+    }
+    write_artifact_with_rollback(path.clone(), contents.clone())?;
+    render::print_init(&path, &contents, args.output)
+}
+
+fn init_path(args: &ConfigInitArgs) -> Result<PathBuf> {
+    if let Some(path) = &args.path {
+        return Ok(path.clone());
+    }
+    let working = std::env::current_dir()?;
+    if !args.repository_root {
+        return Ok(working.join("paredit.toml"));
+    }
+
+    let mut current = Some(working.as_path());
+    while let Some(directory) = current {
+        if directory.join(".git").exists() {
+            return Ok(directory.join("paredit.toml"));
+        }
+        current = directory.parent();
+    }
+    Err(anyhow::anyhow!(
+        "--repository-root found no ancestor holding a .git; pass --path instead"
+    ))
+}
+
+/// A starting `paredit.toml`, generated from the schema.
+///
+/// Generated rather than kept as a fixture for the usual reason: a template
+/// maintained by hand goes stale the first time a key is added, and a stale
+/// template teaches the wrong schema to everyone who copies it.
+fn template(all_keys: bool) -> String {
+    let mut out = String::from(
+        "# paredit configuration. Generated by `paredit config init`.\n\
+         # Every key is documented by `paredit config schema`, and every key can be\n\
+         # overridden by the environment variable shown beside it.\n\
+         #\n\
+         # Layers, lowest precedence first: built-in defaults, the user's file,\n\
+         # this repository's file, each nested directory's file, then PAREDIT_*.\n",
+    );
+
+    let mut current_table = "";
+    for entry in &schema::SCHEMA {
+        let (table, leaf) = split_key(entry.key);
+        if table != current_table {
+            out.push('\n');
+            if !table.is_empty() {
+                out.push_str(&format!("[{table}]\n"));
+            }
+            current_table = table;
+        }
+
+        out.push_str(&format!("# {}\n", entry.summary));
+        out.push_str(&format!("# {} · {}\n", kind_hint(entry), entry.env_var()));
+        match (entry.default.display(), all_keys) {
+            // A key with no default has nothing to show commented out but its
+            // own name, which is still the useful half.
+            (Some(value), true) => out.push_str(&format!("{leaf} = {value}\n")),
+            (Some(value), false) => out.push_str(&format!("# {leaf} = {value}\n")),
+            (None, _) => out.push_str(&format!("# {leaf} = {}\n", placeholder(entry))),
+        }
+    }
+    out
+}
+
+fn split_key(key: &str) -> (&str, &str) {
+    key.rsplit_once('.')
+        .map_or(("", key), |(table, leaf)| (table, leaf))
+}
+
+fn kind_hint(entry: &KeySchema) -> String {
+    match entry.kind {
+        ValueKind::Choice(choices) => format!("one of: {}", choices.join(", ")),
+        ValueKind::Integer { min, max } => format!("integer {min}..={max}"),
+        other => other.label().to_owned(),
+    }
+}
+
+/// What an unset key would plausibly be set to, so the commented line is
+/// copyable rather than a shape puzzle.
+fn placeholder(entry: &KeySchema) -> String {
+    debug_assert!(matches!(entry.default, DefaultValue::Unset));
+    match entry.kind {
+        ValueKind::Boolean => "false".to_owned(),
+        ValueKind::Integer { min, .. } => min.to_string(),
+        ValueKind::Choice(choices) => format!("\"{}\"", choices.first().copied().unwrap_or("")),
+        ValueKind::Text => "\"path/to/file\"".to_owned(),
+        _ => "[]".to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The template has to be a file the loader accepts, or `config init`
+    /// hands out something `config check` rejects.
+    #[test]
+    fn the_generated_template_parses_and_validates() {
+        for all_keys in [false, true] {
+            let text = template(all_keys);
+            let document = paredit_core_config::toml::parse(&text)
+                .unwrap_or_else(|error| panic!("template (all_keys={all_keys}) parses: {error}"));
+
+            let mut settings = paredit_core_config::Settings::with_defaults();
+            for entry in &document.entries {
+                let diagnostics = settings.apply(
+                    &entry.key,
+                    &entry.value,
+                    &paredit_core_config::Origin::file(
+                        paredit_core_config::Layer::Repository,
+                        "paredit.toml",
+                        entry.line,
+                    ),
+                    Some(vocabulary()),
+                );
+                assert!(
+                    diagnostics.is_empty(),
+                    "template key {} is rejected: {diagnostics:?}",
+                    entry.key
+                );
+            }
+        }
+    }
+
+    /// With every key commented out, the template configures nothing — which
+    /// is what "a starting point" has to mean.
+    #[test]
+    fn the_default_template_sets_no_keys() {
+        let document = paredit_core_config::toml::parse(&template(false)).expect("parses");
+        assert!(document.entries.is_empty());
+    }
+
+    #[test]
+    fn the_all_keys_template_writes_every_key_that_has_a_default() {
+        let document = paredit_core_config::toml::parse(&template(true)).expect("parses");
+        let with_defaults = schema::SCHEMA
+            .iter()
+            .filter(|entry| entry.default.display().is_some())
+            .count();
+        assert_eq!(document.entries.len(), with_defaults);
+    }
+
+    #[test]
+    fn every_key_carries_its_environment_variable_in_the_template() {
+        let text = template(false);
+        for entry in &schema::SCHEMA {
+            assert!(
+                text.contains(&entry.env_var()),
+                "{} does not document {}",
+                entry.key,
+                entry.env_var()
+            );
+        }
+    }
+}

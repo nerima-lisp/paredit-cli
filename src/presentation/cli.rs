@@ -5,9 +5,12 @@ macro_rules! safe_text {
 }
 
 mod analysis_report;
+mod argv;
 mod basic_edit;
 mod capabilities;
 mod command;
+mod config;
+mod config_bridge;
 mod contract;
 mod dependency_report;
 
@@ -15,8 +18,9 @@ mod dependency_report;
 // macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
 // it enumerates three features' capabilities, which makes it composition root
 // (section 11.5.1).
-use paredit_core_cli::{args, gate, shared};
+use paredit_core_cli::{args, diagnosis, gate, messages, shared};
 // Phase 3 facade: the composition root sees each slice's Args type and run fn.
+use paredit_feature_change_summary::change_summary::cli as change_summary;
 use paredit_feature_code_metrics::cohesion_report::cli as cohesion_report;
 use paredit_feature_code_metrics::debt_score_report::cli as debt_score_report;
 use paredit_feature_code_metrics::docstring_report::cli as docstring_report;
@@ -101,13 +105,27 @@ pub(crate) use shared::{read_input_dialect_and_tree, terminal_safe, terminal_saf
     after_help = "Canonical namespaces:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form; stdout by default, --write to update the file.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAll source-facing commands live in these three namespaces.\n`paredit completions <shell>` prints a shell completion script.\nRun `paredit inspect capabilities --output json` for a machine-readable catalog of every command and flag."
 )]
 struct Cli {
+    /// Write nothing to disk. Suppresses --write on every command, whatever
+    /// else the command line says, so a wrapper can append it unconditionally.
+    #[arg(long, global = true)]
+    dry_run: bool,
+    /// Emit JSON Lines progress on stderr, one object per line, for
+    /// operations long enough that silence looks like a hang.
+    #[arg(long, global = true)]
+    progress: bool,
     #[command(subcommand)]
     command: Command,
 }
 
+/// The environment spelling of `--dry-run`, for wrapping a whole session.
+const DRY_RUN_VAR: &str = "PAREDIT_DRY_RUN";
+
 #[must_use]
 pub fn run() -> ExitCode {
-    let cli = Cli::parse();
+    let invocation: Vec<String> = std::env::args().collect();
+    // `bootstrap` first, so a protocol server honours the repository's
+    // `paredit.toml` exactly as a one-shot command does.
+    let cli = bootstrap();
     // The protocol servers own their own exit status, and are therefore taken
     // before dispatch. A session normally ends with the client closing the
     // pipe, and routing that through the `Result` path below would report every
@@ -120,14 +138,186 @@ pub fn run() -> ExitCode {
     };
     match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("Error: {}", terminal_safe_error_chain(&error));
-            if error.downcast_ref::<gate::GateFailure>().is_some() {
-                ExitCode::from(gate::GATE_FAILURE_EXIT_CODE as u8)
-            } else {
-                ExitCode::FAILURE
+        Err(error) => report_failure(&error, &invocation),
+    }
+}
+
+/// Whether this run may not write.
+fn is_dry_run(argv: &[String]) -> bool {
+    argv.iter().any(|token| token == "--dry-run")
+        || std::env::var(DRY_RUN_VAR).is_ok_and(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+}
+
+/// Removes `--write` when the run is a dry run.
+///
+/// `--write` is the one flag every mutating command in this tool spells the
+/// same way, which is what makes a single uniform `--dry-run` possible at all:
+/// removing it is exactly "write nothing", on all ~80 mutating commands, with
+/// no argument struct having to know the flag exists.
+///
+/// Done here rather than inside each command so a harness can append
+/// `--dry-run` to a command line it did not construct and be certain. A
+/// per-command opt-in would be a guarantee with 80 places to have missed.
+fn suppress_writes_when_dry(argv: Vec<String>) -> Vec<String> {
+    if !is_dry_run(&argv) {
+        return argv;
+    }
+
+    let mut suppressed = false;
+    let mut kept = Vec::with_capacity(argv.len());
+    let mut past_separator = false;
+    for token in argv {
+        // After `--` everything is a file name, and one that happens to be
+        // called `--write` is still a file name.
+        if token == "--" {
+            past_separator = true;
+        }
+        if !past_separator && token == "--write" {
+            suppressed = true;
+            continue;
+        }
+        kept.push(token);
+    }
+
+    // Never silent: the caller asked for a write and is not getting one.
+    if suppressed {
+        eprintln!(
+            "Note: {}",
+            messages::say(messages::Message::DryRunSuppressedWrite)
+        );
+    }
+    kept
+}
+
+/// Prints a failure with its stable code and whatever would get past it, in
+/// the format this invocation was already going to be read in.
+fn report_failure(error: &anyhow::Error, invocation: &[String]) -> ExitCode {
+    use clap::CommandFactory;
+
+    let root = Cli::command();
+    let context = diagnosis::Context {
+        file: argv::long_flag_value(invocation, "file"),
+        command_path: argv::resolve_leaf(invocation, &root).map(|(_, path)| path),
+    };
+    let diagnosis = diagnosis::diagnose(error, &context);
+
+    // JSON on stderr when the report itself would have been JSON. An agent
+    // that asked for a machine-readable answer should not have to parse
+    // English to find out why it did not get one.
+    if argv::effective_output_format(invocation, &root).as_deref() == Some("json") {
+        let envelope = json!({
+            "schema_version": 1,
+            "status": "error",
+            "command": context.command_path.as_deref(),
+            "error": diagnosis.to_json(),
+        });
+        // Not wrapped in `terminal_safe`: the values inside were escaped when
+        // the envelope was built, and escaping the serialized document would
+        // turn its own newlines into `\u{a}` and stop it being JSON.
+        eprintln!(
+            "{}",
+            serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| envelope.to_string())
+        );
+    } else {
+        eprintln!(
+            "{} [{}]: {}",
+            messages::say(messages::Message::ErrorPrefix),
+            diagnosis.code,
+            terminal_safe_error_chain(error)
+        );
+        for repair in &diagnosis.repairs {
+            match &repair.command {
+                Some(command) => {
+                    eprintln!(
+                        "  {}: {} — {}",
+                        messages::say(messages::Message::RepairPrefix),
+                        repair.detail(),
+                        terminal_safe(command)
+                    );
+                }
+                None => eprintln!(
+                    "  {}: {}",
+                    messages::say(messages::Message::RepairPrefix),
+                    repair.detail()
+                ),
             }
         }
+    }
+
+    ExitCode::from(diagnosis.code.exit_code())
+}
+
+/// Reads the configuration, installs what acts below the argument layer, and
+/// parses the command line the configuration has contributed to.
+///
+/// Ordered so that failure is always survivable. A configuration that cannot
+/// be read leaves the command running unconfigured with a warning, rather than
+/// refusing to run at all: `paredit config check` is where a broken file
+/// should be diagnosed, and a tool that will not start is a bad place to learn
+/// that a file two directories up has a typo.
+fn bootstrap() -> Cli {
+    use clap::CommandFactory;
+
+    let argv = suppress_writes_when_dry(std::env::args().collect());
+    let loaded = match config::workflow::load(&config::args::ConfigLocationArgs::default()) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            eprintln!(
+                "Warning: {}: {}",
+                messages::say(messages::Message::ConfigIgnored),
+                terminal_safe_error_chain(&error)
+            );
+            return Cli::parse_from(argv);
+        }
+    };
+
+    let mut runtime = config::runtime::resolve(&loaded.settings);
+    let raw: Vec<String> = std::env::args().collect();
+    runtime.dry_run = is_dry_run(&raw);
+    runtime.progress = raw.iter().any(|token| token == "--progress");
+    paredit_core_cli::runtime::install(runtime);
+
+    // A configuration with errors contributes nothing. Injecting from a file
+    // that `config check` would reject turns a fixable diagnostic into a
+    // baffling error about flags the caller never typed.
+    if loaded.has_errors() {
+        eprintln!(
+            "Warning: {}",
+            messages::say(messages::Message::ConfigHasErrors)
+        );
+        return Cli::parse_from(argv);
+    }
+
+    let augmented = config_bridge::augment(&argv, &loaded.settings, &Cli::command());
+    if augmented.argv == argv {
+        return Cli::parse_from(argv);
+    }
+
+    match Cli::try_parse_from(&augmented.argv) {
+        Ok(cli) => cli,
+        // The rewrite must never be the reason a command fails. Re-parsing the
+        // original both drops the injection and reports against what the
+        // caller actually typed. Naming the dropped keys matters: the command
+        // is about to run with settings the caller believes are in force.
+        Err(error) if error.use_stderr() => {
+            let dropped = augmented
+                .injected
+                .iter()
+                .map(|injection| injection.key)
+                .collect::<Vec<_>>()
+                .join(", ");
+            eprintln!(
+                "Warning: {}: {dropped}",
+                messages::say(messages::Message::ConfigKeysNotApplied)
+            );
+            Cli::parse_from(argv)
+        }
+        Err(error) => error.exit(),
     }
 }
 

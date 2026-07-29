@@ -76,7 +76,12 @@ pub(super) fn capabilities(args: CapabilitiesArgs) -> Result<()> {
         return Ok(());
     }
 
-    let root = super::Cli::command();
+    // Built, not merely constructed: `clap` copies a `global = true` argument
+    // into each subcommand during `build`, and an unbuilt tree would publish a
+    // catalogue missing the flags that apply everywhere.
+    let mut root = super::Cli::command();
+    root.build();
+    let root = root;
     match args.output {
         OutputFormat::Json => {
             let mut report = json!({
@@ -115,6 +120,9 @@ fn subcommand_reports(
                 "about": about_text(subcommand),
                 "args": argument_reports(subcommand, schema_version),
             });
+            if let Some(gates) = gate_reports(subcommand) {
+                report["gates"] = gates;
+            }
             if !nested.is_empty() {
                 report["commands"] = Value::Array(nested);
             }
@@ -152,6 +160,59 @@ fn argument_reports(
             })
         })
         .collect()
+}
+
+/// How a gate flag decides to fail.
+///
+/// Derived from the flag's name rather than declared, because with ninety-odd
+/// gate flags across 275 commands a hand-kept table would be wrong within a
+/// release. The naming convention *is* the unification — a flag that follows
+/// it is discoverable, and a contract test refuses one that does not.
+/// The convention, stated once:
+///
+/// | Spelling | Kind | Fails when |
+/// | --- | --- | --- |
+/// | `--fail-on <severity>` | `severity` | a finding at or above the level |
+/// | `--fail-on-<thing>` | `presence` | any `<thing>` was found |
+/// | `--require-<thing> <N>` | `minimum` | fewer than `N` were found |
+///
+/// A `--require-*` that takes no value is deliberately *not* a gate:
+/// `--require-suppression-reason` changes what counts as an unused
+/// suppression rather than deciding the exit status, and reporting it as a
+/// gate would tell a caller it can fail on something it cannot.
+fn gate_kind(arg: &Arg) -> Option<&'static str> {
+    let long = arg.get_long()?;
+    // Order matters: the prefix test would swallow the exact match.
+    if long == "fail-on" {
+        return Some("severity");
+    }
+    if long.starts_with("fail-on-") {
+        return Some("presence");
+    }
+    if long.starts_with("require-") && takes_value(arg) {
+        return Some("minimum");
+    }
+    None
+}
+
+/// The gates one command offers, or `None` when it has none.
+///
+/// Absent rather than empty so "this command cannot fail on a policy" and
+/// "we did not look" stay distinguishable.
+fn gate_reports(command: &ClapCommand) -> Option<Value> {
+    let gates: Vec<Value> = command
+        .get_arguments()
+        .filter_map(|arg| {
+            let kind = gate_kind(arg)?;
+            Some(json!({
+                "flag": format!("--{}", arg.get_long()?),
+                "kind": kind,
+                "help": arg.get_help().map(ToString::to_string),
+                "exit_code": paredit_core_cli::gate::GATE_FAILURE_EXIT_CODE,
+            }))
+        })
+        .collect();
+    (!gates.is_empty()).then_some(Value::Array(gates))
 }
 
 fn argument_kind(arg: &Arg) -> &'static str {

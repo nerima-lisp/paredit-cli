@@ -147,13 +147,14 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 223] = [
+const INTROSPECTION_COMMANDS: [&str; 224] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
     "inspect stats",
     "inspect agent-report",
     "inspect capabilities",
+    "inspect change",
     "inspect outline",
     "inspect form",
     "inspect resolve",
@@ -486,13 +487,14 @@ const SEMANTIC_COMMANDS: [&str; 80] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 11] = [
+const SYNTAX_TIER_REPORTS: [&str; 12] = [
     "inspect diff",
     "inspect elisp-file",
     "inspect check",
     "inspect dialect",
     "inspect stats",
     "inspect capabilities",
+    "inspect change",
     "inspect outline",
     "inspect form",
     "inspect find-symbol",
