@@ -19,13 +19,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is a bare negative numeric literal (`-1`, `-5`, `-1.0`,
 /// `-1/2`): a `-` immediately followed by a digit or decimal point, with no
@@ -49,54 +51,65 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct NegatedStepDeltaItem {
-    pub path: PathBuf,
     /// The span of the whole `(incf place -N)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the place operand.
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies it into the
+    /// flipped form, and the command never prints it.
     pub place_span: ByteSpan,
     /// The span of the negative delta literal (`-N`).
+    ///
+    /// The rewrite's input, not the report's: the lint rule strips the sign off
+    /// it, and the command never prints it.
     pub delta_span: ByteSpan,
     /// The flipped operator to emit (`decf` for `incf`, `incf` for `decf`).
     pub opposite: &'static str,
 }
 
-#[derive(Debug)]
-pub struct NegatedStepDeltaSummary {
-    pub step_form_count: usize,
-    pub violations: Vec<NegatedStepDeltaItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NegatedStepDeltaPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NegatedStepDeltaPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NegatedStepDeltaItem {
+    /// The operator the form should have used, which is `incf` or `decf` and
+    /// nothing else. It is also the direction of the step: a consumer filtering
+    /// for accidental decrements wants exactly the `decf` half.
+    fn kind(&self) -> &'static str {
+        self.opposite
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NegatedStepDeltaPolicy {
-    pub fail_on_violation: bool,
-    pub step_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the leading `kind`: the old text row carried the flipped
+    /// operator and no other column, and that operator is now the kind.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("opposite", json!(self.opposite))]
+    }
+
+    /// The same sentence the `negated-step-delta` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "negative delta flips the operator; use {} with a positive delta",
+            self.opposite
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_step(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     step_form_count: &mut usize,
     violations: &mut Vec<NegatedStepDeltaItem>,
 ) {
@@ -126,75 +139,84 @@ pub fn examine_step(
     }
 
     violations.push(NegatedStepDeltaItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         place_span: place.span,
         delta_span: delta.span,
         opposite,
     });
 }
 
-/// Collects every `incf`/`decf` with a negative literal delta across a whole
-/// file, along with the total number of `incf`/`decf` forms scanned.
-pub fn collect_negated_step_deltas(
+/// Collects every `incf`/`decf` with a negative literal delta in one file, with
+/// the number of `incf`/`decf` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every step is positive" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_negated_step_delta_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NegatedStepDeltaItem>)> {
+) -> LintResult<FileFindings<NegatedStepDeltaItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("step_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut step_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_step(subview, path, &mut step_form_count, &mut violations);
+            examine_step(subview, source, &mut step_form_count, &mut violations);
         });
     }
-    Ok((step_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("step_form_count", json!(step_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_negated_step_deltas(
-    step_form_count: usize,
-    violations: Vec<NegatedStepDeltaItem>,
-) -> NegatedStepDeltaSummary {
-    NegatedStepDeltaSummary {
-        step_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_negated_step_delta_policy(
-    options: NegatedStepDeltaPolicyOptions,
-    summary: &NegatedStepDeltaSummary,
-) -> NegatedStepDeltaPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NegatedStepDeltaPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        step_form_count: summary.step_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn steps(input: &str) -> (usize, Vec<NegatedStepDeltaItem>) {
+    fn report(input: &str) -> FileFindings<NegatedStepDeltaItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_negated_step_deltas(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect negated step deltas")
+        build_negated_step_delta_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build negated step delta report")
+    }
+
+    /// The `(step_form_count, violations)` pair the report is built from.
+    fn steps(input: &str) -> (u64, Vec<NegatedStepDeltaItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "step_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("step_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -273,28 +295,37 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(incf x -1)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_negated_step_deltas(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect negated step deltas");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_negated_step_delta_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build negated step delta report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("step_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = steps("(incf x -1)");
-        let summary = summarize_negated_step_deltas(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(incf x)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_negated_step_delta_policy(NegatedStepDeltaPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_the_operator_it_should_have_used() {
+        let report = report("(dolist (x xs)\n  (incf total -1))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "decf");
+        assert_eq!(finding.json_fields(), vec![("opposite", json!("decf"))]);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_negated_step_delta_policy(NegatedStepDeltaPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_step_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(incf x -1)\n(incf x 1)\n(decf y -2)\n");
+        assert_eq!(report.summary, vec![("step_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

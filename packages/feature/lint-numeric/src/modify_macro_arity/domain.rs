@@ -20,23 +20,29 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
-/// The inclusive `(min, max)` argument arity of a place-modifying macro, or
-/// `None` if `head` is not one this rule checks.
-fn expected_arity(head: &str) -> Option<(usize, usize)> {
+/// The canonical name and the inclusive `(min, max)` argument arity of a
+/// place-modifying macro, or `None` if `head` is not one this rule checks.
+///
+/// The name is returned alongside the arity rather than recomputed, so the
+/// canonical spelling and the arity it belongs to cannot drift apart.
+fn expected_arity(head: &str) -> Option<(&'static str, usize, usize)> {
     match head.to_ascii_lowercase().as_str() {
-        "incf" | "decf" => Some((1, 2)),
-        "push" => Some((2, 2)),
-        "pop" => Some((1, 1)),
+        "incf" => Some(("incf", 1, 2)),
+        "decf" => Some(("decf", 1, 2)),
+        "push" => Some(("push", 2, 2)),
+        "pop" => Some(("pop", 1, 1)),
         _ => None,
     }
 }
@@ -66,58 +72,76 @@ fn arity_phrase(min: usize, max: usize) -> String {
 
 #[derive(Debug, Clone)]
 pub struct ModifyMacroArityItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The 1-based line the call starts on.
+    pub line: usize,
+    /// The macro's canonical lowercase name, which is a closed set of four.
+    pub canonical_operator: &'static str,
+    /// The macro as it is spelled in the source, whose case is not folded.
     pub operator: String,
     pub argument_count: usize,
     pub min_arity: usize,
     pub max_arity: usize,
 }
 
-#[derive(Debug)]
-pub struct ModifyMacroAritySummary {
-    pub call_count: usize,
-    pub violations: Vec<ModifyMacroArityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ModifyMacroArityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ModifyMacroArityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ModifyMacroArityItem {
+    /// The macro's canonical name rather than its source spelling: `kind` is a
+    /// selector, and `(INCF …)` and `(incf …)` are the same mistake. The
+    /// spelling as written stays in the `operator` field.
+    fn kind(&self) -> &'static str {
+        self.canonical_operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ModifyMacroArityPolicy {
-    pub fail_on_violation: bool,
-    pub call_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("op={}", self.operator),
+            format!("expected={}", expected_arity_phrase(self)),
+            format!("arguments={}", self.argument_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("argument_count", json!(self.argument_count)),
+            ("min_arity", json!(self.min_arity)),
+            ("max_arity", json!(self.max_arity)),
+            ("expected", json!(expected_arity_phrase(self))),
+        ]
+    }
+
+    /// The same sentence the `modify-macro-arity` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} takes {} argument(s) but has {}",
+            self.operator,
+            expected_arity_phrase(self),
+            self.argument_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     call_count: &mut usize,
     violations: &mut Vec<ModifyMacroArityItem>,
 ) {
     let Some(head) = list_head(view) else {
         return;
     };
-    let Some((min_arity, max_arity)) = expected_arity(head) else {
+    let Some((canonical_operator, min_arity, max_arity)) = expected_arity(head) else {
         return;
     };
     // A quoted/quasiquoted/unquoted call is data or a template, not a call.
@@ -133,8 +157,9 @@ pub fn examine_call(
     let argument_count = view.children.len() - 1;
     if !(min_arity..=max_arity).contains(&argument_count) {
         violations.push(ModifyMacroArityItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
+            canonical_operator,
             operator: head.to_owned(),
             argument_count,
             min_arity,
@@ -143,57 +168,54 @@ pub fn examine_call(
     }
 }
 
-/// Collects every misarity modify-macro call across a whole file, along with
-/// the total number of such calls scanned.
-pub fn collect_modify_macro_arity_violations(
+/// Collects every misarity modify-macro call in one file, with the number of
+/// such calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every call has the right arity" for
+/// Common Lisp and "nothing was looked for" for Fennel, and the two read
+/// identically without the flag.
+pub fn build_modify_macro_arity_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ModifyMacroArityItem>)> {
+) -> LintResult<FileFindings<ModifyMacroArityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("call_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut call_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &mut call_count, &mut violations);
+            examine_call(subview, source, &mut call_count, &mut violations);
         });
     }
-    Ok((call_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("call_count", json!(call_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_modify_macro_arity(
-    call_count: usize,
-    violations: Vec<ModifyMacroArityItem>,
-) -> ModifyMacroAritySummary {
-    ModifyMacroAritySummary {
-        call_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_modify_macro_arity_policy(
-    options: ModifyMacroArityPolicyOptions,
-    summary: &ModifyMacroAritySummary,
-) -> ModifyMacroArityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ModifyMacroArityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        call_count: summary.call_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 /// A human phrase for the expected arity of one violation, e.g. `exactly 2`.
@@ -206,14 +228,22 @@ pub fn expected_arity_phrase(item: &ModifyMacroArityItem) -> String {
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<ModifyMacroArityItem>) {
+    fn report(input: &str) -> FileFindings<ModifyMacroArityItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_modify_macro_arity_violations(
-            &PathBuf::from("test.lisp"),
-            Dialect::CommonLisp,
-            &tree,
-        )
-        .expect("collect modify macro arity violations")
+        build_modify_macro_arity_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build modify macro arity report")
+    }
+
+    /// The `(call_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<ModifyMacroArityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "call_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("call_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -303,32 +333,64 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(incf x 1 2)", Dialect::Clojure).expect("parse input");
-        let (call_count, items) = collect_modify_macro_arity_violations(
-            &PathBuf::from("app.clj"),
-            Dialect::Clojure,
-            &tree,
-        )
-        .expect("collect modify macro arity violations");
-        assert_eq!(call_count, 0);
-        assert!(items.is_empty());
+        let report = build_modify_macro_arity_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build modify macro arity report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("call_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (call_count, items) = violations("(incf x 1 2)");
-        let summary = summarize_modify_macro_arity(call_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(incf x)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_modify_macro_arity_policy(ModifyMacroArityPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_every_field_the_report_publishes() {
+        let report = report("(defun f (x)\n  (incf x 1 2))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "incf");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("operator", json!("incf")),
+                ("argument_count", json!(3)),
+                ("min_arity", json!(1)),
+                ("max_arity", json!(2)),
+                ("expected", json!("1 or 2")),
+            ]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "op=incf".to_owned(),
+                "expected=1 or 2".to_owned(),
+                "arguments=3".to_owned(),
+            ]
+        );
+    }
 
-        let strict =
-            evaluate_modify_macro_arity_policy(ModifyMacroArityPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    /// `kind` folds case so a consumer can select on it; `operator` does not,
+    /// so the source spelling survives.
+    #[test]
+    fn the_kind_is_canonical_while_the_operator_keeps_its_source_casing() {
+        let report = report("(INCF x 1 2)");
+        let finding = &report.findings[0];
+        assert_eq!(finding.kind(), "incf");
+        assert_eq!(finding.operator, "INCF");
+    }
+
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(incf x 1 2)\n(incf y)\n(pop stack)\n");
+        assert_eq!(report.summary, vec![("call_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

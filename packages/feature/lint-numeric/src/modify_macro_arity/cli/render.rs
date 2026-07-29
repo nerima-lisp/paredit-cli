@@ -1,66 +1,15 @@
 use paredit_core_cli::CliResult;
-use paredit_core_cli::safe_text;
-use serde_json::json;
 
-use crate::modify_macro_arity::usecase::{
-    ModifyMacroArityPolicy, ModifyMacroAritySummary, expected_arity_phrase,
-};
-use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::args::ReportFormat;
+
+use crate::modify_macro_arity::usecase::ModifyMacroArityItem;
+use paredit_core_cli::report::render::print_report;
+use paredit_core_cli::report::{FileFindings, ReportPolicy};
 
 pub fn print_modify_macro_arity_report(
-    summary: &ModifyMacroAritySummary,
-    policy: &ModifyMacroArityPolicy,
-    output: OutputFormat,
+    reports: &[FileFindings<ModifyMacroArityItem>],
+    policy: &ReportPolicy,
+    output: ReportFormat,
 ) -> CliResult<()> {
-    match output {
-        OutputFormat::Text => {
-            println!("call_count\t{}", summary.call_count);
-            println!("violation_count\t{}", summary.violations.len());
-            if policy.fail_on_violation {
-                println!("policy\tfail_on_violation=true\tpassed={}", policy.passed);
-            }
-            for item in &summary.violations {
-                println!(
-                    "violation\t{}\t{}\top={}\texpected={}\targuments={}",
-                    safe_text!(item.path.display()),
-                    item.span.start().get(),
-                    safe_text!(item.operator),
-                    expected_arity_phrase(item),
-                    item.argument_count,
-                );
-            }
-        }
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&json!({
-                    "schema_version": 1,
-                    "call_count": summary.call_count,
-                    "violation_count": summary.violations.len(),
-                    "policy": {
-                        "fail_on_violation": policy.fail_on_violation,
-                        "passed": policy.passed,
-                        "violations": &policy.violations,
-                    },
-                    "violations": summary.violations
-                        .iter()
-                        .map(|item| json!({
-                            "path": item.path.display().to_string(),
-                            "span": {
-                                "start": item.span.start().get(),
-                                "end": item.span.end().get(),
-                            },
-                            "operator": &item.operator,
-                            "argument_count": item.argument_count,
-                            "min_arity": item.min_arity,
-                            "max_arity": item.max_arity,
-                            "expected": expected_arity_phrase(item),
-                        }))
-                        .collect::<Vec<_>>(),
-                }))?
-            );
-        }
-    }
-
-    Ok(())
+    print_report("inspect modify-macro-arity", reports, policy, output)
 }

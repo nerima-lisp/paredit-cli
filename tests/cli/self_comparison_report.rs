@@ -14,8 +14,14 @@ fn cli_reports_eq_of_a_variable_with_itself() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"operator\": \"eq\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"comparison_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // Half of this rule's heads are punctuation, so the kind is the rule's
+        // own name and the operator stays a field.
+        .stdout(predicate::str::contains("\"kind\": \"self-comparison\""))
+        .stdout(predicate::str::contains("\"operator\": \"eq\""))
+        .stdout(predicate::str::contains("\"operand\": \"status\""));
 }
 
 #[test]
@@ -32,7 +38,7 @@ fn cli_reports_an_ordering_predicate_of_identical_operands() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("(rank a)"));
 }
 
@@ -50,7 +56,50 @@ fn cli_does_not_flag_distinct_operands() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "one comparison, of two distinct
+        // operands" from "no comparison at all".
+        .stdout(predicate::str::contains("\"comparison_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_self_comparison_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("self-comparison-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn same? [x] (eq x x))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "self-comparison", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_self_comparison_emits_sarif() {
+    let dir = fresh_temp_dir("self-comparison-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(eql x x)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "self-comparison", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/self-comparison/self-comparison\"",
+        ))
+        .stdout(predicate::str::contains(
+            "eql compares operand x with itself",
+        ));
 }
 
 #[test]
@@ -67,7 +116,7 @@ fn cli_does_not_flag_the_nan_check_idiom() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
 #[test]

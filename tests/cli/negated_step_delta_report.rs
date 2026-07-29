@@ -14,7 +14,10 @@ fn cli_flags_incf_negative() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"step_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"decf\""))
         .stdout(predicate::str::contains("\"opposite\": \"decf\""));
 }
 
@@ -33,7 +36,50 @@ fn cli_does_not_flag_positive_or_variable_delta() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "three steps, none negative" from
+        // "no incf/decf at all".
+        .stdout(predicate::str::contains("\"step_form_count\": 3"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_negated_step_delta_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("negated-step-delta-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn step [] (incf counter -1))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "negated-step-delta", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_negated_step_delta_emits_sarif() {
+    let dir = fresh_temp_dir("negated-step-delta-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(incf counter -1)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "negated-step-delta", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/negated-step-delta/decf\"",
+        ))
+        .stdout(predicate::str::contains(
+            "negative delta flips the operator; use decf with a positive delta",
+        ));
 }
 
 #[test]
