@@ -2,35 +2,27 @@ use paredit_core_cli::CommandResult;
 
 use crate::step_zero::cli::args::StepZeroReportArgs;
 use crate::step_zero::cli::render::print_step_zero_report;
-use crate::step_zero::usecase::{
-    StepZeroPolicyOptions, collect_step_zeros, evaluate_step_zero_policy, summarize_step_zeros,
-};
+use crate::step_zero::usecase::{build_step_zero_report, evaluate_fail_on_violation_policy};
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 pub fn step_zero_report(args: StepZeroReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let mut step_form_count = 0;
-    let mut violations = Vec::new();
-
+    let mut reports = Vec::with_capacity(files.len());
     for file in &files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_form_count, file_violations) = collect_step_zeros(file, dialect, &tree)?;
-        step_form_count += file_form_count;
-        violations.extend(file_violations);
+        reports.push(build_step_zero_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_step_zeros(step_form_count, violations);
-    let policy =
-        evaluate_step_zero_policy(StepZeroPolicyOptions::new(args.fail_on_violation), &summary);
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_step_zero_report(&summary, &policy, args.output)?;
+    print_step_zero_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "step-zero-report policy failed: {policy_message}"
+            "step-zero-report policy failed: {message}"
         )));
     }
 

@@ -14,7 +14,9 @@ fn cli_flags_eq_against_t() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"comparison_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"operator\": \"eq\""));
 }
 
@@ -32,7 +34,7 @@ fn cli_flags_equalp_with_t_first() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"operator\": \"equalp\""));
 }
 
@@ -51,7 +53,51 @@ fn cli_does_not_flag_numeric_equal_both_t_or_quoted_t() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no comparison against t in three
+        // scanned forms" from "no equality form at all": `=` is not one of this
+        // rule's operators, so only the three `eq` forms count.
+        .stdout(predicate::str::contains("\"comparison_form_count\": 3"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("t-comparison-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn ready? [x] (= x true))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "t-comparison", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_t_comparison_emits_sarif() {
+    let dir = fresh_temp_dir("t-comparison-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(eql result t)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "t-comparison", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/t-comparison/eql\"",
+        ))
+        .stdout(predicate::str::contains(
+            "eql against t matches only the symbol T, not any true value",
+        ));
 }
 
 #[test]

@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Operators whose second argument is the (optional) divisor.
 const QUOTIENT_OPS: [&str; 10] = [
@@ -70,45 +72,66 @@ fn divisor_indices(head: &str, child_count: usize) -> Vec<usize> {
 
 #[derive(Debug, Clone)]
 pub struct ZeroDivisorItem {
-    pub path: PathBuf,
     /// The span of the whole division form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The operator, lowercased.
     pub operator: String,
     /// The span of the literal `0` divisor.
     pub divisor_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct ZeroDivisorSummary {
-    pub division_form_count: usize,
-    pub violations: Vec<ZeroDivisorItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ZeroDivisorPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ZeroDivisorPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ZeroDivisorItem {
+    /// The rule's own name.
+    ///
+    /// The operator would not do. `/` is punctuation, which makes a poor `grep`
+    /// selector and a worse SARIF rule id, and the eleven heads are one bug
+    /// either way — every one of them signals `division-by-zero`. The operator
+    /// stays a reported field instead, which is also the only place it could
+    /// live: it is an owned `String` and `kind` is `&'static str`.
+    fn kind(&self) -> &'static str {
+        "zero-divisor"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ZeroDivisorPolicy {
-    pub fail_on_violation: bool,
-    pub division_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Bare rather than `operator=…`, which is the column this report's text
+    /// row has always printed.
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.operator.clone()]
+    }
+
+    /// `divisor_span` is kept: this rule is report-only, so the span of the
+    /// literal `0` is not a fix's input but the one thing pointing at the
+    /// offending operand inside a form the outer span only bounds.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            (
+                "divisor_span",
+                json!({
+                    "start": self.divisor_span.start().get(),
+                    "end": self.divisor_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `zero-divisor` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} by a literal 0 always signals division-by-zero",
+            self.operator
+        )
+    }
 }
 
 /// Whether a divisor is provably zero.
@@ -124,7 +147,7 @@ pub type IsZeroDivisor<'a> = &'a dyn Fn(&ExpressionView) -> bool;
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     is_zero: IsZeroDivisor<'_>,
     division_form_count: &mut usize,
     violations: &mut Vec<ZeroDivisorItem>,
@@ -142,8 +165,8 @@ pub fn examine(
         let divisor = &view.children[index];
         if is_zero(divisor) {
             violations.push(ZeroDivisorItem {
-                path: path.to_path_buf(),
                 span: view.span,
+                line: line_of(source, view.span.start().get()),
                 operator: lower.clone(),
                 divisor_span: divisor.span,
             });
@@ -152,17 +175,29 @@ pub fn examine(
     }
 }
 
-/// Collects every division-family form with a literal `0` divisor across a whole
-/// file, along with the total number of division forms scanned.
-pub fn collect_zero_divisors(
+/// Collects every division-family form with a literal `0` divisor in one file,
+/// with the number of division forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no division by a literal 0 here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_zero_divisor_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ZeroDivisorItem>)> {
+) -> LintResult<FileFindings<ZeroDivisorItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("division_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut division_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
@@ -170,55 +205,52 @@ pub fn collect_zero_divisors(
         for_each_subview(&view, |subview| {
             examine(
                 subview,
-                path,
+                source,
                 &is_zero_literal,
                 &mut division_form_count,
                 &mut violations,
             );
         });
     }
-    Ok((division_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("division_form_count", json!(division_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_zero_divisors(
-    division_form_count: usize,
-    violations: Vec<ZeroDivisorItem>,
-) -> ZeroDivisorSummary {
-    ZeroDivisorSummary {
-        division_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_zero_divisor_policy(
-    options: ZeroDivisorPolicyOptions,
-    summary: &ZeroDivisorSummary,
-) -> ZeroDivisorPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ZeroDivisorPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        division_form_count: summary.division_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn divs(input: &str) -> (usize, Vec<ZeroDivisorItem>) {
+    fn report(input: &str) -> FileFindings<ZeroDivisorItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_zero_divisors(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect zero divisors")
+        build_zero_divisor_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build zero divisor report")
+    }
+
+    /// The `(division_form_count, violations)` pair the report is built from.
+    fn divs(input: &str) -> (u64, Vec<ZeroDivisorItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "division_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("division_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -278,26 +310,51 @@ mod tests {
         assert_eq!(divs("(MOD x 0)").1.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(/ x 0)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_zero_divisors(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect zero divisors");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_zero_divisor_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build zero divisor report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("division_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = divs("(/ x 0)");
-        let summary = summarize_zero_divisors(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(/ x 2)").dialect_modelled);
+    }
 
-        let quiet = evaluate_zero_divisor_policy(ZeroDivisorPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// `divisor_span` points at the `0` itself, which the outer span only
+    /// bounds; it stayed a reported field when this report moved onto the
+    /// envelope.
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_divisor_span() {
+        let source = "(defun f (x)\n  (mod x 0))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "zero-divisor");
+        assert_eq!(finding.text_columns(), vec!["mod".to_owned()]);
 
-        let strict = evaluate_zero_divisor_policy(ZeroDivisorPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+        let start = finding.divisor_span.start().get();
+        let end = finding.divisor_span.end().get();
+        assert_eq!(&source[start..end], "0");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("operator", json!("mod")),
+                ("divisor_span", json!({ "start": start, "end": end })),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_summary_counts_every_division_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(/ x 0)\n(/ x 2)\n(mod a b)\n");
+        assert_eq!(report.summary, vec![("division_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

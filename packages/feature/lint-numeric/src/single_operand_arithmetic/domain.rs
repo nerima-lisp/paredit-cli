@@ -25,13 +25,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The canonical operator name for a `+`/`*` head, or `None` otherwise. Unlike
 /// the boolean operators these are punctuation, so an exact match is used (no
@@ -53,52 +55,60 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct SingleOperandArithmeticItem {
-    pub path: PathBuf,
     /// The span of the whole `(+ X)`/`(* X)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The operator (`+` or `*`).
     pub operator: &'static str,
-    /// The span of the sole operand `X` (lets a fix substitute its source).
+    /// The span of the sole operand `X`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies `X`'s source
+    /// to replace the wrapper with it, and the command has never printed it.
     pub inner_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct SingleOperandArithmeticSummary {
-    pub arithmetic_form_count: usize,
-    pub violations: Vec<SingleOperandArithmeticItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SingleOperandArithmeticPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SingleOperandArithmeticPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SingleOperandArithmeticItem {
+    /// The rule's own name.
+    ///
+    /// Both operators are punctuation (`+`, `*`), which makes a poor `grep`
+    /// selector and a worse SARIF rule id, and the two are the same redundant
+    /// wrapper either way. The operator stays a reported field instead.
+    fn kind(&self) -> &'static str {
+        "single-operand-arithmetic"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SingleOperandArithmeticPolicy {
-    pub fail_on_violation: bool,
-    pub arithmetic_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("operator={}", self.operator)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("operator", json!(self.operator))]
+    }
+
+    /// The same sentence the `single-operand-arithmetic` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} has a single operand; ({} X) is just X",
+            self.operator, self.operator
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_arithmetic(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     arithmetic_form_count: &mut usize,
     violations: &mut Vec<SingleOperandArithmeticItem>,
 ) {
@@ -119,74 +129,83 @@ pub fn examine_arithmetic(
         return;
     }
     violations.push(SingleOperandArithmeticItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         operator,
         inner_span: operand.span,
     });
 }
 
-/// Collects every single-operand `+`/`*` across a whole file, along with the
-/// total number of `+`/`*` forms scanned.
-pub fn collect_single_operand_arithmetic(
+/// Collects every single-operand `+`/`*` in one file, with the number of
+/// `+`/`*` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every `+`/`*` here does real arithmetic"
+/// for Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_single_operand_arithmetic_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SingleOperandArithmeticItem>)> {
+) -> LintResult<FileFindings<SingleOperandArithmeticItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("arithmetic_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut arithmetic_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_arithmetic(subview, path, &mut arithmetic_form_count, &mut violations);
+            examine_arithmetic(subview, source, &mut arithmetic_form_count, &mut violations);
         });
     }
-    Ok((arithmetic_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("arithmetic_form_count", json!(arithmetic_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_single_operand_arithmetic(
-    arithmetic_form_count: usize,
-    violations: Vec<SingleOperandArithmeticItem>,
-) -> SingleOperandArithmeticSummary {
-    SingleOperandArithmeticSummary {
-        arithmetic_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_single_operand_arithmetic_policy(
-    options: SingleOperandArithmeticPolicyOptions,
-    summary: &SingleOperandArithmeticSummary,
-) -> SingleOperandArithmeticPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SingleOperandArithmeticPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        arithmetic_form_count: summary.arithmetic_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn arithmetic(input: &str) -> (usize, Vec<SingleOperandArithmeticItem>) {
+    fn report(input: &str) -> FileFindings<SingleOperandArithmeticItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_single_operand_arithmetic(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect single-operand arithmetic")
+        build_single_operand_arithmetic_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build single-operand arithmetic report")
+    }
+
+    /// The `(arithmetic_form_count, violations)` pair the report is built from.
+    fn arithmetic(input: &str) -> (u64, Vec<SingleOperandArithmeticItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "arithmetic_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("arithmetic_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -259,32 +278,40 @@ mod tests {
         assert_eq!(violations[0].operator, "*");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(+ x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_single_operand_arithmetic(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect single-operand arithmetic");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_single_operand_arithmetic_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build single-operand arithmetic report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("arithmetic_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = arithmetic("(+ x)");
-        let summary = summarize_single_operand_arithmetic(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(+ x y)").dialect_modelled);
+    }
 
-        let quiet = evaluate_single_operand_arithmetic_policy(
-            SingleOperandArithmeticPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The operator is punctuation, so it stays a column and a JSON field
+    /// rather than becoming the `kind`.
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(defun f (x)\n  (* x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "single-operand-arithmetic");
+        assert_eq!(finding.json_fields(), vec![("operator", json!("*"))]);
+        assert_eq!(finding.text_columns(), vec!["operator=*".to_owned()]);
+    }
 
-        let strict = evaluate_single_operand_arithmetic_policy(
-            SingleOperandArithmeticPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_arithmetic_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(+ x)\n(+ x y)\n(*)\n");
+        assert_eq!(report.summary, vec![("arithmetic_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

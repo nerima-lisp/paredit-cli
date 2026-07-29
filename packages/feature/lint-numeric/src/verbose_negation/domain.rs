@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare integer literal `literal` (no reader prefixes).
 fn is_int_literal(view: &ExpressionView, literal: &str) -> bool {
@@ -42,50 +44,60 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct VerboseNegationItem {
-    pub path: PathBuf,
     /// The span of the whole `(- 0 x)`/`(* x -1)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the operand `X` that is being negated.
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies `X`'s source
+    /// to build `(- X)`, and the command has never printed it.
     pub operand_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct VerboseNegationSummary {
-    pub arithmetic_form_count: usize,
-    pub violations: Vec<VerboseNegationItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct VerboseNegationPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl VerboseNegationPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for VerboseNegationItem {
+    /// The rule's own name.
+    ///
+    /// This report has nothing else to offer: the three shapes it matches
+    /// (`(- 0 X)`, `(* X -1)`, `(* -1 X)`) are one smell with one rewrite, and
+    /// the head that produced a finding is punctuation the item never retained.
+    fn kind(&self) -> &'static str {
+        "verbose-negation"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct VerboseNegationPolicy {
-    pub fail_on_violation: bool,
-    pub arithmetic_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the leading `kind`: the old text row carried only the
+    /// path and the offset, both of which the envelope prints itself.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Nothing beyond the envelope's own `kind`/`line`/`span`, which is exactly
+    /// what the old JSON published.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `verbose-negation` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way. Load
+    /// bearing here, since this finding has no columns of its own.
+    fn message(&self) -> String {
+        "negation written the long way; use (- x)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     arithmetic_form_count: &mut usize,
     violations: &mut Vec<VerboseNegationItem>,
 ) {
@@ -124,73 +136,82 @@ pub fn examine_form(
     };
 
     violations.push(VerboseNegationItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         operand_span: operand.span,
     });
 }
 
-/// Collects every verbose negation across a whole file, along with the total
-/// number of `-`/`*` forms scanned.
-pub fn collect_verbose_negations(
+/// Collects every verbose negation in one file, with the number of `-`/`*`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no long-hand negation here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_verbose_negation_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<VerboseNegationItem>)> {
+) -> LintResult<FileFindings<VerboseNegationItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("arithmetic_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut arithmetic_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(subview, path, &mut arithmetic_form_count, &mut violations);
+            examine_form(subview, source, &mut arithmetic_form_count, &mut violations);
         });
     }
-    Ok((arithmetic_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("arithmetic_form_count", json!(arithmetic_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_verbose_negations(
-    arithmetic_form_count: usize,
-    violations: Vec<VerboseNegationItem>,
-) -> VerboseNegationSummary {
-    VerboseNegationSummary {
-        arithmetic_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_verbose_negation_policy(
-    options: VerboseNegationPolicyOptions,
-    summary: &VerboseNegationSummary,
-) -> VerboseNegationPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    VerboseNegationPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        arithmetic_form_count: summary.arithmetic_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn negations(input: &str) -> (usize, Vec<VerboseNegationItem>) {
+    fn report(input: &str) -> FileFindings<VerboseNegationItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_verbose_negations(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect verbose negations")
+        build_verbose_negation_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build verbose negation report")
+    }
+
+    /// The `(arithmetic_form_count, violations)` pair the report is built from.
+    fn negations(input: &str) -> (u64, Vec<VerboseNegationItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "arithmetic_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("arithmetic_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -259,28 +280,43 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(- 0 x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_verbose_negations(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect verbose negations");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_verbose_negation_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build verbose negation report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("arithmetic_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = negations("(- 0 x)");
-        let summary = summarize_verbose_negations(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(- x 1)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_verbose_negation_policy(VerboseNegationPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// This finding has no fields of its own, so `message` is the only prose an
+    /// interop consumer gets.
+    #[test]
+    fn a_finding_carries_its_line_and_leans_on_its_message() {
+        let report = report("(defun negate (x)\n  (- 0 x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "verbose-negation");
+        assert!(finding.json_fields().is_empty());
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.message(),
+            "negation written the long way; use (- x)"
+        );
+    }
 
-        let strict =
-            evaluate_verbose_negation_policy(VerboseNegationPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_arithmetic_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(- 0 x)\n(- x 0)\n(* a b)\n");
+        assert_eq!(report.summary, vec![("arithmetic_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

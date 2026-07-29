@@ -44,7 +44,12 @@ impl LintRule for Rule {
         let context_slice = |span| context.slice(span).to_owned();
         let mut arithmetic_form_count = 0;
         let mut items = Vec::new();
-        examine_arithmetic(view, context.path(), &mut arithmetic_form_count, &mut items);
+        examine_arithmetic(
+            view,
+            context.source(),
+            &mut arithmetic_form_count,
+            &mut items,
+        );
         for item in items {
             let span = item.span;
             let fix = {
