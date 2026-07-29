@@ -20,16 +20,18 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const ITERATION_HEADS: [&str; 2] = ["dolist", "dotimes"];
 
@@ -52,50 +54,64 @@ fn is_arity_ambiguous(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct MalformedIterationSpecItem {
-    pub path: PathBuf,
+    /// The span of the offending spec.
     pub span: ByteSpan,
+    /// The 1-based line the spec starts on.
+    pub line: usize,
+    /// The iteration operator (`dolist`, `dotimes`) as written.
     pub head: String,
+    /// The spec, re-rendered from the tree.
     pub spec: String,
+    /// How many elements the spec has, against the two or three it needs.
     pub element_count: usize,
 }
 
-#[derive(Debug)]
-pub struct MalformedIterationSpecSummary {
-    pub iteration_form_count: usize,
-    pub violations: Vec<MalformedIterationSpecItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MalformedIterationSpecPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl MalformedIterationSpecPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for MalformedIterationSpecItem {
+    /// The rule's own name. The iteration operator is a per-finding string
+    /// rather than a fixed vocabulary, so it is a field instead of a variant.
+    fn kind(&self) -> &'static str {
+        "malformed-iteration-spec"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct MalformedIterationSpecPolicy {
-    pub fail_on_violation: bool,
-    pub iteration_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("head={}", self.head),
+            format!("elements={}", self.element_count),
+            format!("spec={}", self.spec),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("element_count", json!(self.element_count)),
+            ("spec", json!(self.spec)),
+        ]
+    }
+
+    /// The same sentence the `malformed-iteration-spec` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} spec {} must be (var form [result])",
+            self.head, self.spec
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_iteration(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     iteration_form_count: &mut usize,
     violations: &mut Vec<MalformedIterationSpecItem>,
 ) {
@@ -126,8 +142,8 @@ pub fn examine_iteration(
     if !is_paren_list(spec) {
         // A bare atom (or bracket/brace form) is never a valid spec.
         violations.push(MalformedIterationSpecItem {
-            path: path.to_path_buf(),
             span: spec.span,
+            line: line_of(source, spec.span.start().get()),
             head: head.to_owned(),
             spec: render_expression(spec),
             element_count: spec.children.len(),
@@ -143,8 +159,8 @@ pub fn examine_iteration(
     let element_count = spec.children.len();
     if !(2..=3).contains(&element_count) {
         violations.push(MalformedIterationSpecItem {
-            path: path.to_path_buf(),
             span: spec.span,
+            line: line_of(source, spec.span.start().get()),
             head: head.to_owned(),
             spec: render_expression(spec),
             element_count,
@@ -152,67 +168,76 @@ pub fn examine_iteration(
     }
 }
 
-/// Collects every malformed `dolist`/`dotimes` spec across a whole file, along
-/// with the total number of `dolist`/`dotimes` forms scanned.
-pub fn collect_malformed_iteration_specs(
+/// Collects every malformed `dolist`/`dotimes` spec in one file, with the
+/// number of `dolist`/`dotimes` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every spec is well-formed here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_malformed_iteration_spec_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<MalformedIterationSpecItem>)> {
+) -> LintResult<FileFindings<MalformedIterationSpecItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("iteration_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut iteration_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_iteration(subview, path, &mut iteration_form_count, &mut violations);
+            examine_iteration(subview, source, &mut iteration_form_count, &mut violations);
         });
     }
-    Ok((iteration_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("iteration_form_count", json!(iteration_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_malformed_iteration_specs(
-    iteration_form_count: usize,
-    violations: Vec<MalformedIterationSpecItem>,
-) -> MalformedIterationSpecSummary {
-    MalformedIterationSpecSummary {
-        iteration_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_malformed_iteration_spec_policy(
-    options: MalformedIterationSpecPolicyOptions,
-    summary: &MalformedIterationSpecSummary,
-) -> MalformedIterationSpecPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    MalformedIterationSpecPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        iteration_form_count: summary.iteration_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn specs(input: &str) -> (usize, Vec<MalformedIterationSpecItem>) {
+    fn report(input: &str) -> FileFindings<MalformedIterationSpecItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_malformed_iteration_specs(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect malformed iteration specs")
+        build_malformed_iteration_spec_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build malformed iteration spec report")
+    }
+
+    /// The `(iteration_form_count, violations)` pair the report is built from.
+    fn specs(input: &str) -> (u64, Vec<MalformedIterationSpecItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "iteration_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("iteration_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -282,33 +307,57 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(dolist (x) (print x))", Dialect::Clojure)
             .expect("parse input");
-        let (iteration_form_count, violations) =
-            collect_malformed_iteration_specs(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect malformed iteration specs");
-        assert_eq!(iteration_form_count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_malformed_iteration_spec_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build malformed iteration spec report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("iteration_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (iteration_form_count, items) = specs("(dolist (x) (print x))");
-        let summary = summarize_malformed_iteration_specs(iteration_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(dolist (x items) (print x))").dialect_modelled);
+    }
 
-        let quiet = evaluate_malformed_iteration_spec_policy(
-            MalformedIterationSpecPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_head_its_arity_and_its_spec() {
+        let report = report("(defun f (xs)\n  (dolist (x) (print x)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "malformed-iteration-spec");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("head", json!("dolist")),
+                ("element_count", json!(1)),
+                ("spec", json!("(x)")),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "head=dolist".to_owned(),
+                "elements=1".to_owned(),
+                "spec=(x)".to_owned(),
+            ]
+        );
+        assert_eq!(
+            finding.message(),
+            "dolist spec (x) must be (var form [result])"
+        );
+    }
 
-        let strict = evaluate_malformed_iteration_spec_policy(
-            MalformedIterationSpecPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_iteration_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(dolist (x) (print x))\n(dolist (y items) (print y))\n");
+        assert_eq!(report.summary, vec![("iteration_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

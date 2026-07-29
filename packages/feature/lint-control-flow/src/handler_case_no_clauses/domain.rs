@@ -15,13 +15,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent.
 fn is_reader_conditional(view: &ExpressionView) -> bool {
@@ -30,50 +32,60 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct HandlerCaseNoClausesItem {
-    pub path: PathBuf,
     /// The span of the whole `(handler-case expr)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the protected form `expr` (for reconstructing the fix).
     pub form_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct HandlerCaseNoClausesSummary {
-    pub handler_case_form_count: usize,
-    pub violations: Vec<HandlerCaseNoClausesItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct HandlerCaseNoClausesPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl HandlerCaseNoClausesPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for HandlerCaseNoClausesItem {
+    /// The rule's own name. There is exactly one shape this rule flags — the
+    /// clauseless `(handler-case expr)` — so there is no variant to separate.
+    fn kind(&self) -> &'static str {
+        "handler-case-no-clauses"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct HandlerCaseNoClausesPolicy {
-    pub fail_on_violation: bool,
-    pub handler_case_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Empty: the old text row carried nothing beyond the path and offset, both
+    /// of which the envelope supplies.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// `form_span` is the protected form the fix splices in. It is on the
+    /// report because the hand-written renderer published it, and a consumer
+    /// applying the same edit itself needs it.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "form_span",
+            json!({
+                "start": self.form_span.start().get(),
+                "end": self.form_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `handler-case-no-clauses` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "a handler-case with no clauses is just its body; (handler-case x) is x".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     handler_case_form_count: &mut usize,
     violations: &mut Vec<HandlerCaseNoClausesItem>,
 ) {
@@ -95,73 +107,88 @@ pub fn examine(
     }
 
     violations.push(HandlerCaseNoClausesItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         form_span: form.span,
     });
 }
 
-/// Collects every clauseless `(handler-case expr)` across a whole file, along
-/// with the total number of `handler-case` forms scanned.
-pub fn collect_handler_case_no_clauses(
+/// Collects every clauseless `(handler-case expr)` in one file, with the number
+/// of `handler-case` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every handler-case has clauses here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_handler_case_no_clauses_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<HandlerCaseNoClausesItem>)> {
+) -> LintResult<FileFindings<HandlerCaseNoClausesItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("handler_case_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut handler_case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut handler_case_form_count, &mut violations);
+            examine(
+                subview,
+                source,
+                &mut handler_case_form_count,
+                &mut violations,
+            );
         });
     }
-    Ok((handler_case_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("handler_case_form_count", json!(handler_case_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_handler_case_no_clauses(
-    handler_case_form_count: usize,
-    violations: Vec<HandlerCaseNoClausesItem>,
-) -> HandlerCaseNoClausesSummary {
-    HandlerCaseNoClausesSummary {
-        handler_case_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_handler_case_no_clauses_policy(
-    options: HandlerCaseNoClausesPolicyOptions,
-    summary: &HandlerCaseNoClausesSummary,
-) -> HandlerCaseNoClausesPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    HandlerCaseNoClausesPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        handler_case_form_count: summary.handler_case_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn cases(input: &str) -> (usize, Vec<HandlerCaseNoClausesItem>) {
+    fn report(input: &str) -> FileFindings<HandlerCaseNoClausesItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_handler_case_no_clauses(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect handler-case no clauses")
+        build_handler_case_no_clauses_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build handler-case no clauses report")
+    }
+
+    /// The `(handler_case_form_count, violations)` pair the report is built
+    /// from.
+    fn cases(input: &str) -> (u64, Vec<HandlerCaseNoClausesItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "handler_case_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("handler_case_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -198,33 +225,50 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(handler-case x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_handler_case_no_clauses(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect handler-case no clauses");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_handler_case_no_clauses_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build handler-case no clauses report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("handler_case_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = cases("(handler-case x)");
-        let summary = summarize_handler_case_no_clauses(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(handler-case (compute) (error (e) nil))").dialect_modelled);
+    }
 
-        let quiet = evaluate_handler_case_no_clauses_policy(
-            HandlerCaseNoClausesPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_protected_form_span() {
+        let source = "(defun f ()\n  (handler-case (compute)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "handler-case-no-clauses");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "form_span",
+                json!({
+                    "start": finding.form_span.start().get(),
+                    "end": finding.form_span.end().get(),
+                })
+            )]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(slice(source, finding.form_span), "(compute)");
+    }
 
-        let strict = evaluate_handler_case_no_clauses_policy(
-            HandlerCaseNoClausesPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_handler_case_scanned_not_only_the_flagged_ones() {
+        let report = report("(handler-case x)\n(handler-case y (error (e) nil))\n");
+        assert_eq!(report.summary, vec![("handler_case_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

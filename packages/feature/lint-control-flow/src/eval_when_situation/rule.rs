@@ -42,7 +42,12 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut eval_when_form_count = 0;
         let mut items = Vec::new();
-        examine_eval_when(view, context.path(), &mut eval_when_form_count, &mut items);
+        examine_eval_when(
+            view,
+            context.source(),
+            &mut eval_when_form_count,
+            &mut items,
+        );
         for item in items {
             let span = item.span;
 

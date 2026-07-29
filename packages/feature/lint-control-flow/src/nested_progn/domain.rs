@@ -20,13 +20,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is a `(progn …)` form.
 fn is_progn(view: &ExpressionView) -> bool {
@@ -35,54 +37,60 @@ fn is_progn(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct NestedPrognItem {
-    pub path: PathBuf,
     /// The span of the inner (nested) progn.
     pub span: ByteSpan,
+    /// The 1-based line the inner progn starts on.
+    pub line: usize,
     /// The span covering just the inner progn's body forms (first form start to
     /// last form end), so a fix can splice that source in place of the wrapper.
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies the body
+    /// from it, and the command never prints it.
     pub body_span: ByteSpan,
     /// The inner progn's body form count (always >= 2 here; the 0/1 cases
     /// belong to the redundant-progn rule).
     pub body_form_count: usize,
 }
 
-#[derive(Debug)]
-pub struct NestedPrognSummary {
-    pub progn_form_count: usize,
-    pub violations: Vec<NestedPrognItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NestedPrognPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NestedPrognPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NestedPrognItem {
+    /// The rule's own name. There is exactly one shape this rule flags — a
+    /// multi-form progn directly inside another — so there is no variant to
+    /// separate.
+    fn kind(&self) -> &'static str {
+        "nested-progn"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NestedPrognPolicy {
-    pub fail_on_violation: bool,
-    pub progn_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("body_form_count={}", self.body_form_count)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("body_form_count", json!(self.body_form_count))]
+    }
+
+    /// The same sentence the `nested-progn` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "progn with {} forms is nested directly in another progn; splice its forms in",
+            self.body_form_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_progn(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     progn_form_count: &mut usize,
     violations: &mut Vec<NestedPrognItem>,
 ) {
@@ -106,8 +114,8 @@ pub fn examine_progn(
                 body[inner_body_form_count - 1].span.end(),
             );
             violations.push(NestedPrognItem {
-                path: path.to_path_buf(),
                 span: child.span,
+                line: line_of(source, child.span.start().get()),
                 body_span,
                 body_form_count: inner_body_form_count,
             });
@@ -115,67 +123,76 @@ pub fn examine_progn(
     }
 }
 
-/// Collects every progn nested directly inside another progn across a whole
-/// file, along with the total number of progn forms scanned.
-pub fn collect_nested_progns(
+/// Collects every progn nested directly inside another progn in one file, with
+/// the number of progn forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no progn nests here" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_nested_progn_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NestedPrognItem>)> {
+) -> LintResult<FileFindings<NestedPrognItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("progn_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut progn_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_progn(subview, path, &mut progn_form_count, &mut violations);
+            examine_progn(subview, source, &mut progn_form_count, &mut violations);
         });
     }
-    Ok((progn_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("progn_form_count", json!(progn_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_nested_progns(
-    progn_form_count: usize,
-    violations: Vec<NestedPrognItem>,
-) -> NestedPrognSummary {
-    NestedPrognSummary {
-        progn_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_nested_progn_policy(
-    options: NestedPrognPolicyOptions,
-    summary: &NestedPrognSummary,
-) -> NestedPrognPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NestedPrognPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        progn_form_count: summary.progn_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn nested(input: &str) -> (usize, Vec<NestedPrognItem>) {
+    fn report(input: &str) -> FileFindings<NestedPrognItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_nested_progns(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect nested progns")
+        build_nested_progn_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build nested progn report")
+    }
+
+    /// The `(progn_form_count, violations)` pair the report is built from.
+    fn nested(input: &str) -> (u64, Vec<NestedPrognItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "progn_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("progn_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -250,27 +267,43 @@ mod tests {
         assert_eq!(violations.len(), 2);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(progn a (progn b c))", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_nested_progns(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect nested progns");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_nested_progn_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build nested progn report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("progn_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = nested("(progn a (progn b c))");
-        let summary = summarize_nested_progns(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(progn (foo) (bar))").dialect_modelled);
+    }
 
-        let quiet = evaluate_nested_progn_policy(NestedPrognPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_body_form_count() {
+        let report = report("(progn\n  a\n  (progn b c))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 3);
+        assert_eq!(finding.kind(), "nested-progn");
+        assert_eq!(finding.json_fields(), vec![("body_form_count", json!(2))]);
+        assert_eq!(finding.text_columns(), vec!["body_form_count=2".to_owned()]);
+        assert_eq!(
+            finding.message(),
+            "progn with 2 forms is nested directly in another progn; splice its forms in"
+        );
+    }
 
-        let strict = evaluate_nested_progn_policy(NestedPrognPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_progn_scanned_not_only_the_flagged_ones() {
+        // Outer plus inner, of which only the inner is a finding.
+        let report = report("(progn a (progn b c) d)\n");
+        assert_eq!(report.summary, vec![("progn_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

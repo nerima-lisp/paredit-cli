@@ -3,38 +3,28 @@ use paredit_core_cli::CommandResult;
 use crate::binds_constant::cli::args::BindsConstantReportArgs;
 use crate::binds_constant::cli::render::print_binds_constant_report;
 use crate::binds_constant::usecase::{
-    BindsConstantPolicyOptions, collect_binds_constant, evaluate_binds_constant_policy,
-    summarize_binds_constant,
+    build_binds_constant_report, evaluate_fail_on_violation_policy,
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 pub fn binds_constant_report(args: BindsConstantReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let mut binding_form_count = 0;
-    let mut violations = Vec::new();
-
+    let mut reports = Vec::with_capacity(files.len());
     for file in &files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_binding_form_count, file_violations) =
-            collect_binds_constant(file, dialect, &tree)?;
-        binding_form_count += file_binding_form_count;
-        violations.extend(file_violations);
+        reports.push(build_binds_constant_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_binds_constant(binding_form_count, violations);
-    let policy = evaluate_binds_constant_policy(
-        BindsConstantPolicyOptions::new(args.fail_on_violation),
-        &summary,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_binds_constant_report(&summary, &policy, args.output)?;
+    print_binds_constant_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "binds-constant-report policy failed: {policy_message}"
+            "binds-constant-report policy failed: {message}"
         )));
     }
 

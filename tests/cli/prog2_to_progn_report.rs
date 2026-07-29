@@ -14,7 +14,12 @@ fn cli_flags_two_form_prog2() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"prog2_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // The operator token the fix rewrites, which the hand-written renderer
+        // published and the envelope keeps.
+        .stdout(predicate::str::contains("\"head_span\""));
 }
 
 #[test]
@@ -31,7 +36,50 @@ fn cli_does_not_flag_three_form() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "the one prog2 here has three
+        // forms" from "no prog2 at all".
+        .stdout(predicate::str::contains("\"prog2_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_prog2_to_progn_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("prog2-to-progn-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(prog2 a b)\n").expect("write a.clj");
+
+    paredit()
+        .args(["inspect", "prog2-to-progn", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_prog2_to_progn_emits_sarif() {
+    let dir = fresh_temp_dir("prog2-to-progn-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(prog2 (setup) (run))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "prog2-to-progn", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/prog2-to-progn/prog2-to-progn\"",
+        ))
+        .stdout(predicate::str::contains(
+            "a two-form prog2 is just progn; (prog2 a b) is (progn a b)",
+        ));
 }
 
 #[test]
