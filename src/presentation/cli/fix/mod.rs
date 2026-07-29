@@ -37,5 +37,18 @@ pub(super) fn fix(command: FixCommand) -> Result<()> {
         FixCommand::Plan(selection) => (selection, FixMode::Plan),
         FixCommand::List(selection) => (selection, FixMode::List),
     };
+
+    // `inspect lint` gets this from clap's `required_unless_present_any`, which
+    // these leaves cannot reuse: the argument list they present is a subset,
+    // and `fix list` takes no files at all. Without the check, `paredit fix
+    // apply` with no arguments scans nothing, reports zero fixes, and exits
+    // zero — which reads exactly like a clean codebase.
+    if mode != FixMode::List && selection.files.is_empty() {
+        anyhow::bail!(
+            "no files to fix: pass one or more files or directories \
+             (`paredit fix list` is the leaf that takes none)"
+        );
+    }
+
     lint_report(LintReportArgs::for_fix(selection, mode))
 }

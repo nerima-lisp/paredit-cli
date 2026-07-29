@@ -143,3 +143,17 @@ fn rule_selection_narrows_a_fix_run_the_way_it_narrows_a_lint_run() {
         "a rule that was not named must have been left alone: {fixed}"
     );
 }
+
+/// `paredit fix apply` with no arguments used to scan nothing, report zero
+/// fixes, and exit zero — which reads exactly like a clean codebase.
+#[test]
+fn a_fix_run_with_no_files_is_refused_rather_than_reported_as_clean() {
+    for leaf in ["apply", "check", "plan"] {
+        paredit()
+            .args(["fix", leaf])
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("no files to fix"));
+    }
+    paredit().args(["fix", "list"]).assert().success();
+}
