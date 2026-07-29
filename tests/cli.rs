@@ -199,6 +199,8 @@ mod format_to_string_report;
 mod funcall_lambda_report;
 #[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
+#[path = "cli/generate.rs"]
+mod generate;
 #[path = "cli/getf_default_nil_report.rs"]
 mod getf_default_nil_report;
 #[path = "cli/gethash_default_report.rs"]
