@@ -24,16 +24,18 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The argument indices at which a destructive function may modify its
 /// argument (so a quoted literal there is undefined behavior), or `None` if the
@@ -98,51 +100,60 @@ fn is_quoted_list_literal(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct DestructiveLiteralItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The 1-based line the call starts on.
+    pub line: usize,
     /// The destructive operator (`nreverse`, `sort`, …).
     pub operator: String,
     /// A rendered form of the quoted literal being modified.
     pub literal: String,
 }
 
-#[derive(Debug)]
-pub struct DestructiveLiteralSummary {
-    pub destructive_call_count: usize,
-    pub violations: Vec<DestructiveLiteralItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DestructiveLiteralPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl DestructiveLiteralPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for DestructiveLiteralItem {
+    /// The rule's name, not the operator.
+    ///
+    /// There are 23 covered destructive functions and `operator` is a
+    /// per-finding `String` (lowercased from source), so it cannot be a
+    /// `&'static str` kind. It stays a JSON field and a text column, where a
+    /// consumer can still filter on it.
+    fn kind(&self) -> &'static str {
+        "destructive-literal"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DestructiveLiteralPolicy {
-    pub fail_on_violation: bool,
-    pub destructive_call_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.operator.clone(), format!("literal={}", self.literal)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("literal", json!(self.literal)),
+        ]
+    }
+
+    /// The same sentence the `destructive-literal` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} destructively modifies quoted literal {} (undefined behavior)",
+            self.operator, self.literal
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     destructive_call_count: &mut usize,
     violations: &mut Vec<DestructiveLiteralItem>,
 ) {
@@ -160,8 +171,8 @@ pub fn examine_call(
         if let Some(sequence) = view.children.get(index) {
             if is_quoted_list_literal(sequence) {
                 violations.push(DestructiveLiteralItem {
-                    path: path.to_path_buf(),
                     span: view.span,
+                    line: line_of(source, view.span.start().get()),
                     operator: head.to_ascii_lowercase(),
                     literal: render_expression(sequence),
                 });
@@ -171,67 +182,81 @@ pub fn examine_call(
     }
 }
 
-/// Collects every destructive call on a quoted list literal across a whole
-/// file, along with the total number of destructive calls scanned.
+/// Collects every destructive call on a quoted list literal in one file, with
+/// the number of destructive calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every destructive call here is on a
+/// fresh list" for Common Lisp and "nothing was looked for" for Clojure, and
+/// the two read identically without the flag.
 pub fn collect_destructive_literals(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DestructiveLiteralItem>)> {
+) -> LintResult<FileFindings<DestructiveLiteralItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("destructive_call_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut destructive_call_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &mut destructive_call_count, &mut violations);
+            examine_call(
+                subview,
+                source,
+                &mut destructive_call_count,
+                &mut violations,
+            );
         });
     }
-    Ok((destructive_call_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("destructive_call_count", json!(destructive_call_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_destructive_literals(
-    destructive_call_count: usize,
-    violations: Vec<DestructiveLiteralItem>,
-) -> DestructiveLiteralSummary {
-    DestructiveLiteralSummary {
-        destructive_call_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_destructive_literal_policy(
-    options: DestructiveLiteralPolicyOptions,
-    summary: &DestructiveLiteralSummary,
-) -> DestructiveLiteralPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    DestructiveLiteralPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        destructive_call_count: summary.destructive_call_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<DestructiveLiteralItem>) {
+    fn report(input: &str) -> FileFindings<DestructiveLiteralItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_destructive_literals(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
+        collect_destructive_literals(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
             .expect("collect destructive literals")
+    }
+
+    /// The `(destructive_call_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<DestructiveLiteralItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "destructive_call_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("destructive_call_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -346,33 +371,57 @@ mod tests {
         assert_eq!(violations[0].operator, "nbutlast");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(nreverse '(1 2))", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_destructive_literals(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect destructive literals");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = collect_destructive_literals(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("collect destructive literals");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("destructive_call_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(nreverse '(1 2))");
-        let summary = summarize_destructive_literals(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(nreverse xs)").dialect_modelled);
+    }
 
-        let quiet = evaluate_destructive_literal_policy(
-            DestructiveLiteralPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_literal() {
+        let report = report("(defun f ()\n  (nbutlast '(1 2 3)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "destructive-literal");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("operator", json!("nbutlast")),
+                ("literal", json!(finding.literal)),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "nbutlast".to_owned(),
+                format!("literal={}", finding.literal),
+            ]
+        );
+        assert_eq!(
+            finding.message(),
+            format!(
+                "nbutlast destructively modifies quoted literal {} (undefined behavior)",
+                finding.literal
+            )
+        );
+    }
 
-        let strict = evaluate_destructive_literal_policy(
-            DestructiveLiteralPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_destructive_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(nreverse '(1 2))\n(nreverse xs)\n");
+        assert_eq!(report.summary, vec![("destructive_call_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

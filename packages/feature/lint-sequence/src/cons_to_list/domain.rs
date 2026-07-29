@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the empty-list tail: the bare `nil` symbol (no reader
 /// prefixes) or a literal `()`.
@@ -47,53 +49,62 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct ConsToListItem {
-    pub path: PathBuf,
     /// The span of the whole `(cons X TAIL)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the prepended element `X`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to build
+    /// the `list` call, and the command has never printed it.
     pub element_span: ByteSpan,
     /// The span of the tail list's elements (`b c` in `(list b c)`), or `None`
     /// for a `nil`/empty-list tail.
+    ///
+    /// The rewrite's input, like `element_span`, and likewise unpublished.
     pub tail_elements_span: Option<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct ConsToListSummary {
-    pub cons_form_count: usize,
-    pub violations: Vec<ConsToListItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ConsToListPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ConsToListPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ConsToListItem {
+    fn kind(&self) -> &'static str {
+        "cons-to-list"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ConsToListPolicy {
-    pub fail_on_violation: bool,
-    pub cons_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing: the old text row carried only the path and the offset, both of
+    /// which the envelope prints itself. The `message` override is what a
+    /// reader of a text row has to go on.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Nothing beyond the span the envelope already prints. The two operand
+    /// spans this item carries feed the autofix and were never in the report's
+    /// JSON; moving onto the envelope is not the occasion to start publishing
+    /// them.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `cons-to-list` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "cons onto nil/a list is a list constructor; use list".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cons(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     cons_form_count: &mut usize,
     violations: &mut Vec<ConsToListItem>,
 ) {
@@ -134,74 +145,83 @@ pub fn examine_cons(
     };
 
     violations.push(ConsToListItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         element_span: element.span,
         tail_elements_span,
     });
 }
 
-/// Collects every collapsible `cons` across a whole file, along with the total
-/// number of `cons` forms scanned.
+/// Collects every collapsible `cons` in one file, with the number of `cons`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every cons here is a genuine cons" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
 pub fn collect_cons_to_lists(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ConsToListItem>)> {
+) -> LintResult<FileFindings<ConsToListItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("cons_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut cons_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_cons(subview, path, &mut cons_form_count, &mut violations);
+            examine_cons(subview, source, &mut cons_form_count, &mut violations);
         });
     }
-    Ok((cons_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("cons_form_count", json!(cons_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_cons_to_lists(
-    cons_form_count: usize,
-    violations: Vec<ConsToListItem>,
-) -> ConsToListSummary {
-    ConsToListSummary {
-        cons_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_cons_to_list_policy(
-    options: ConsToListPolicyOptions,
-    summary: &ConsToListSummary,
-) -> ConsToListPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ConsToListPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        cons_form_count: summary.cons_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn conses(input: &str) -> (usize, Vec<ConsToListItem>) {
+    fn report(input: &str) -> FileFindings<ConsToListItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_cons_to_lists(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
+        collect_cons_to_lists(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
             .expect("collect cons to lists")
+    }
+
+    /// The `(cons_form_count, violations)` pair the report is built from.
+    fn conses(input: &str) -> (u64, Vec<ConsToListItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "cons_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("cons_form_count in the summary");
+        (count, report.findings)
     }
 
     fn parts<'a>(source: &'a str, item: &ConsToListItem) -> (&'a str, Option<&'a str>) {
@@ -271,26 +291,43 @@ mod tests {
         assert_eq!(parts("(cons a (cons b nil))", &violations[0]), ("b", None));
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(cons a nil)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_cons_to_lists(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect cons to lists");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = collect_cons_to_lists(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("collect cons to lists");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("cons_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = conses("(cons a nil)");
-        let summary = summarize_cons_to_lists(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(cons a xs)").dialect_modelled);
+    }
 
-        let quiet = evaluate_cons_to_list_policy(ConsToListPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The old JSON published the path and the whole form's span and nothing
+    /// else, so the envelope's own fields carry the entire finding.
+    #[test]
+    fn a_finding_carries_its_line_and_no_extra_json() {
+        let report = report("(defun f (a)\n  (cons a nil))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "cons-to-list");
+        assert!(finding.text_columns().is_empty());
+        assert!(finding.json_fields().is_empty());
+        assert_eq!(
+            finding.message(),
+            "cons onto nil/a list is a list constructor; use list"
+        );
+    }
 
-        let strict = evaluate_cons_to_list_policy(ConsToListPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_cons_scanned_not_only_the_flagged_ones() {
+        let report = report("(cons a nil)\n(cons a xs)\n");
+        assert_eq!(report.summary, vec![("cons_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
