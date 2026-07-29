@@ -613,6 +613,10 @@ lint の `REGISTRY`（`const` 配列）も同じ扱いで、**ルート側に移
 >
 > なお `benches/` だけでなく **`examples/semantic_coverage.rs` も façade 経由の
 > 利用者**である（§11.3 の「参照ゼロ」も参照）。
+> **さらに再訂正**: この example は R 群の実装で `paredit inspect
+> semantic-coverage` という CLI サブコマンドに昇格し、削除された。現在の
+> 唯一の利用者は `src/presentation/cli/semantic_coverage_report/` である
+> （詳細は §11.3 の追記）。
 
 ### 5.2 feature パッケージ（約 153,900 行）
 
@@ -1215,8 +1219,11 @@ Phase 開始前に判断が必要なもの。
    26 パッケージ分の rustdoc は無視できない時間になる可能性がある。Phase 2.5 で実測して判断。
    **§11.2 の intra-doc link 372 本を自動検出できるようになる**ため、判断材料としては加点。
 
-8. **`semantic_coverage`（766 行・参照ゼロ）をどこへ置くか**（§11.3）。
-   `core/semantics` 同梱 / `benches/` へ移動 / 削除の 3 択。
+8. **`semantic_coverage` の帰属をどうするか**（§11.3）。
+   もはや「参照ゼロの計測ハーネス」ではなく、`paredit inspect semantic-coverage`
+   の usecase 層として出荷済み（R 群で `examples/` から CLI へ昇格し、
+   example 自体は削除した）。`benches/` 案・削除の 2 択は消え、他の
+   `usecase/*` と同じ移行ルールに従わせるだけでよいかが残る論点。
    **Phase 2 の `core/semantics` 切り出し前に決めること。**
 
 9. **`#[non_exhaustive]` を使わない方針で合意できるか**（§9.4）。
@@ -1953,6 +1960,31 @@ doc コメントによれば、`domain::semantics` が実コードのどれだ�
 | 削除する | 参照ゼロだが、766 行の設計意図がある。**独断で消さない** |
 
 **Phase 2（`core/semantics` 切り出し）の前に判断が必要。** 未決事項として §8 に追加する。
+
+> **【実装時の再訂正 — `examples/` 依存も解消済み】**
+>
+> FEATURE-CANDIDATES.md の R 群（意味解析カバレッジと方言パリティ）の実装で、
+> `examples/semantic_coverage.rs` は `paredit inspect semantic-coverage` という
+> 正式 CLI サブコマンドに昇格し、**example 自体は削除した**
+> (`src/presentation/cli/semantic_coverage_report/`)。
+>
+> つまり上の表の前提だった「唯一の利用者は `examples/`」はもう成り立たない。
+> 現在の唯一の利用者は `src/presentation/cli/semantic_coverage_report/workflow.rs`
+> で、これは一時的な開発ハーネスではなく**出荷済みコマンドの本体**である。
+>
+> これは選択肢の評価を変える:
+>
+> - 「計測ツール」ではなく「本番コマンドの usecase 層」という性格になったので、
+>   `packages/core/semantics` への同梱よりも、他の `usecase/*` と同じ扱い
+>   （移行の一般ルールに従う）が自然になった。`benches/` 案は該当しなくなった
+>   （もう計測専用ハーネスではない）。
+> - 「削除する」は完全に選択肢から外れる — CLI 契約
+>   (`src/presentation/cli/contract.rs` の `INTROSPECTION_COMMANDS`、
+>   `tests/cli/dialect_contract.rs` の pinned counts) がこのコマンドの
+>   存在を前提にしている。
+>
+> Phase 2 の判断は「計測ハーネスをどこに置くか」ではなく「他の `usecase/*`
+> モジュールと同じ移行ルールに従わせるだけでよいか」に縮小された。
 
 ### 11.4 移行スクリプトを用意する
 

@@ -206,6 +206,15 @@ model, a binding table, nine lint rules, and a per-file report.
   `elisp-quoted-lambda`, `elisp-interactive-in-macro`, and
   `elisp-condition-case-without-handler`. Each declares `Dialect::EmacsLisp`
   only, so a Common Lisp run skips them before walking anything.
+- `inspect semantic-coverage`, promoted from a development-only example into
+  a real command. It measures how much of `types`/`narrowing`/`constants`/
+  `value-propagation` actually resolves on real source — variable-binding and
+  constant-folding rates, broken down per dialect — and ranks unresolved
+  bindings by cause, so the highest-count unknown head is the next operator
+  worth registering in the transparency table. `--fail-under` gates CI on a
+  resolution-rate floor; a new bundled corpus and baseline test
+  (`tests/semantic_coverage_baseline.rs`) pin today's rate so a future change
+  cannot quietly narrow it.
 - Every reported failure names the byte position it is about, when it has
   one: `--output json`'s error envelope carries an `offset` field, and the
   text rendering shows a `rustc`-style caret under the source line. A parse
@@ -236,6 +245,22 @@ model, a binding table, nine lint rules, and a per-file report.
   report findings from every file that *did* analyze cleanly, name the ones
   that did not in a new `partial_failures` field (and on stderr), and only
   fail outright when nothing in the request could be analyzed at all.
+- **Three extensions to lint suppression.** Any `paredit:ignore` directive may
+  now carry `-until YYYY-MM-DD` right after the token
+  (`paredit:ignore-until`, `paredit:ignore-next-form-until`,
+  `paredit:ignore-file-until`), and `--report-expired-suppressions` reports
+  any past its date — used or not — exiting 3 so CI can catch a suppression
+  that outlived the reason it was written for; a missing or malformed date
+  makes the whole comment not a directive, so a typo shows up as the finding
+  reappearing rather than as a suppression that silently never expires.
+  `--report-suppressions` lists every directive, used or not, with its scope,
+  rules, reason, and expiry — the full inventory, one step past
+  `--report-unused-suppressions`'s stale-only view. `--suppress-path <path>`
+  (repeatable, also settable as `lint.suppress-paths` in `paredit.toml`)
+  silences every finding under a path as if the whole file carried
+  `paredit:ignore-file`, for generated code and vendored dependencies that get
+  overwritten and so cannot hold an inline directive; scoped to `inspect
+  lint` alone, unlike `paths.exclude` which hides a path from every command.
 
 ### Fixed
 

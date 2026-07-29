@@ -696,6 +696,123 @@ pub(super) fn print_lint_unused_suppressions(
     Ok(())
 }
 
+/// Reports inline suppression directives whose `-until` date has passed, for
+/// `--report-expired-suppressions`. Shaped like
+/// [`print_lint_unused_suppressions`] — same carrier struct, a different
+/// problem — but kept as its own function rather than a shared one so
+/// neither's field names depend on the other's.
+pub(super) fn print_lint_expired_suppressions(
+    entries: &[(
+        String,
+        crate::application::usecase::lint_report::UnusedSuppression,
+    )],
+    output: OutputFormat,
+) -> CliResult<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("expired_suppression_count\t{}", entries.len());
+            for (path, entry) in entries {
+                let rules = match &entry.unused_rules {
+                    None => "*".to_owned(),
+                    Some(rules) => rules.join(","),
+                };
+                println!(
+                    "expired\t{}\t{}\t{}\t{}\t{}",
+                    safe_text!(path),
+                    entry.comment_line,
+                    entry.target_line,
+                    safe_text!(rules),
+                    entry.scope.as_str(),
+                );
+            }
+        }
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "schema_version": 1,
+                    "expired_suppression_count": entries.len(),
+                    "expired_suppressions": entries
+                        .iter()
+                        .map(|(path, entry)| json!({
+                            "path": path,
+                            "comment_line": entry.comment_line,
+                            "target_line": entry.target_line,
+                            // null => a bare directive; otherwise the named rules.
+                            "rules": entry.unused_rules,
+                            "scope": entry.scope.as_str(),
+                        }))
+                        .collect::<Vec<_>>(),
+                }))?
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Lists every inline suppression directive, used or not, for
+/// `--report-suppressions` — the full survey, one step past
+/// `--report-unused-suppressions`'s stale-only view.
+pub(super) fn print_lint_suppression_inventory(
+    entries: &[(
+        String,
+        crate::application::usecase::lint_report::SuppressionInventoryEntry,
+    )],
+    output: OutputFormat,
+) -> CliResult<()> {
+    let unused_count = entries.iter().filter(|(_, entry)| !entry.used).count();
+    match output {
+        OutputFormat::Text => {
+            println!("suppression_count\t{}", entries.len());
+            println!("unused_count\t{unused_count}");
+            for (path, entry) in entries {
+                let rules = match &entry.rules {
+                    None => "*".to_owned(),
+                    Some(rules) => rules.join(","),
+                };
+                println!(
+                    "suppression\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    safe_text!(path),
+                    entry.comment_line,
+                    entry.target_line,
+                    safe_text!(rules),
+                    entry.scope.as_str(),
+                    entry.used,
+                    safe_text!(entry.reason.as_deref().unwrap_or("")),
+                    safe_text!(entry.expires.as_deref().unwrap_or("")),
+                );
+            }
+        }
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "schema_version": 1,
+                    "suppression_count": entries.len(),
+                    "unused_count": unused_count,
+                    "suppressions": entries
+                        .iter()
+                        .map(|(path, entry)| json!({
+                            "path": path,
+                            "comment_line": entry.comment_line,
+                            "target_line": entry.target_line,
+                            "target_end_line": entry.target_end_line,
+                            "rules": entry.rules,
+                            "scope": entry.scope.as_str(),
+                            "used": entry.used,
+                            "reason": entry.reason,
+                            "expires": entry.expires,
+                        }))
+                        .collect::<Vec<_>>(),
+                }))?
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// One byte-region edit within a fix: replace `[byte_offset, byte_offset +
 /// byte_length)` with `text`.
 #[derive(Clone)]

@@ -33,9 +33,15 @@ use crate::domain::view_query::for_each_subview;
 /// The files to measure. Discovery (walking directories, filtering
 /// extensions) happens behind [`SemanticCoverageSourcePort`]; this only names
 /// the roots the caller asked about.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SemanticCoverageRequest {
     pub paths: Vec<PathBuf>,
+    /// Forces every file to the same dialect, the way a CLI `--dialect` flag
+    /// would. `None` detects each file from its own extension (and, for a
+    /// `.scm`/extensionless file, its `#lang` line), so a corpus of mixed
+    /// dialects measures each file under its own grammar rather than all
+    /// under one guessed dialect.
+    pub dialect: Option<Dialect>,
 }
 
 /// One file the source discovered, ready to be loaded.
@@ -51,9 +57,11 @@ pub struct SemanticCoverageInventory {
 
 /// Turns a request into loadable files, and files into bytes.
 ///
-/// Only Common Lisp is worth measuring here: `build_binding_table` and
-/// `build_value_table` return an empty table for every other dialect, so a
-/// source that discovered other dialects would only measure zeroes.
+/// A source may discover files of any dialect: the workflow measures each
+/// file under its own detected (or overridden) dialect, and
+/// [`SemanticCoverageReport::by_dialect`] is exactly what makes the resulting
+/// zeroes for a dialect the semantic layer does not model yet legible, rather
+/// than a reason to filter that dialect out before measuring.
 pub trait SemanticCoverageSourcePort {
     /// What this adapter's own failures look like.
     ///
@@ -326,9 +334,10 @@ fn rank<K: Ord>(counts: &BTreeMap<K, usize>) -> Vec<(&K, usize)> {
 }
 
 /// What the semantic layer resolved in one file.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticCoverageFileReport {
     path: PathBuf,
+    dialect: Dialect,
     variable_binding_count: usize,
     resolved_binding_count: usize,
     list_expression_count: usize,
@@ -336,10 +345,31 @@ pub struct SemanticCoverageFileReport {
     non_resolution: BindingNonResolutionBreakdown,
 }
 
+impl Default for SemanticCoverageFileReport {
+    fn default() -> Self {
+        Self {
+            path: PathBuf::new(),
+            dialect: Dialect::Unknown,
+            variable_binding_count: 0,
+            resolved_binding_count: 0,
+            list_expression_count: 0,
+            known_list_expression_count: 0,
+            non_resolution: BindingNonResolutionBreakdown::default(),
+        }
+    }
+}
+
 impl SemanticCoverageFileReport {
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// The dialect this file was measured under — detected from its
+    /// extension (or `#lang` line), or the request's override.
+    #[must_use]
+    pub const fn dialect(&self) -> Dialect {
+        self.dialect
     }
 
     /// Every `Variable`-kind binding the binding table recorded. Function,
@@ -431,6 +461,109 @@ impl SemanticCoverageReport {
         }
         total
     }
+
+    /// Coverage totals scoped to each dialect the corpus actually contained,
+    /// in [`Dialect::ALL`] order.
+    ///
+    /// This is `R2`'s whole point: `domain::semantics` resolves only Common
+    /// Lisp today, and a per-dialect breakdown makes that a number next to
+    /// every other dialect's zero rather than a claim buried in a doc
+    /// comment. A dialect with no discovered files is omitted rather than
+    /// printed as an all-zero row, since "0/0" is not evidence of anything.
+    #[must_use]
+    pub fn by_dialect(&self) -> Vec<(Dialect, DialectCoverageTotals)> {
+        Dialect::ALL
+            .into_iter()
+            .filter_map(|dialect| {
+                let mut totals = DialectCoverageTotals::default();
+                for file in self.files.iter().filter(|file| file.dialect == dialect) {
+                    totals.file_count += 1;
+                    totals.variable_bindings += file.variable_binding_count;
+                    totals.resolved_bindings += file.resolved_binding_count;
+                    totals.list_expressions += file.list_expression_count;
+                    totals.known_list_expressions += file.known_list_expression_count;
+                }
+                (totals.file_count > 0).then_some((dialect, totals))
+            })
+            .collect()
+    }
+}
+
+/// One dialect's slice of [`SemanticCoverageReport::by_dialect`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DialectCoverageTotals {
+    pub file_count: usize,
+    pub variable_bindings: usize,
+    pub resolved_bindings: usize,
+    pub list_expressions: usize,
+    pub known_list_expressions: usize,
+}
+
+/// The outcome of a `--fail-under`-style gate on corpus-wide resolution.
+///
+/// Scoped to the total variable-binding resolution rate rather than the list-
+/// expression rate: a binding either resolves or it does not, so its rate is
+/// a stable target to pin a threshold to, while the list rate moves with how
+/// much of a corpus is fold-eligible code versus data literals and is not a
+/// meaningful regression signal on its own.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SemanticCoveragePolicy {
+    pub threshold: Option<f64>,
+    pub resolved_percent: f64,
+    pub passed: bool,
+    pub message: Option<String>,
+}
+
+impl SemanticCoveragePolicy {
+    #[must_use]
+    pub fn evaluate(threshold: Option<f64>, report: &SemanticCoverageReport) -> Self {
+        let total = report.total_variable_bindings();
+        let resolved = report.total_resolved_bindings();
+        let resolved_percent = if total == 0 {
+            100.0
+        } else {
+            (resolved as f64 / total as f64) * 100.0
+        };
+        let Some(threshold) = threshold else {
+            return Self {
+                threshold: None,
+                resolved_percent,
+                passed: true,
+                message: None,
+            };
+        };
+        // An armed threshold over zero measured bindings is almost always a
+        // misconfiguration — an empty corpus, a typo'd path, an accidental
+        // glob that matched nothing — not evidence the corpus is fully
+        // resolved. Reporting `100%` and passing silently would hide exactly
+        // that mistake from CI, so this is the one case where the gate fires
+        // regardless of the threshold.
+        let (passed, message) = if total == 0 {
+            (
+                false,
+                Some(
+                    "no variable bindings were measured; --fail-under cannot evaluate \
+                     an empty corpus"
+                        .to_owned(),
+                ),
+            )
+        } else {
+            let passed = resolved_percent >= threshold;
+            let message = (!passed).then(|| {
+                format!(
+                    "resolved {resolved}/{total} variable bindings ({resolved_percent:.1}%), \
+                     below the --fail-under threshold of {threshold:.1}%"
+                )
+            });
+            (passed, message)
+        };
+        Self {
+            threshold: Some(threshold),
+            resolved_percent,
+            passed,
+            message,
+        }
+    }
 }
 
 pub fn build_semantic_coverage_report(
@@ -444,27 +577,48 @@ pub fn build_semantic_coverage_report(
     let mut loaded = Vec::with_capacity(inventory.files.len());
     let mut errors = Vec::new();
     for file in &inventory.files {
-        match load_file(source, file) {
+        match load_file(source, file, request.dialect) {
             Ok(file) => loaded.push(file),
             Err(error) => errors.push(error),
         }
     }
 
-    // The project table is what makes a `defconstant` visible to a file that
-    // does not define it, and building it needs every file analysed first —
-    // which is the whole reason discovery and measurement are separate passes
-    // here. Analysis *order* does not matter: the table carries a value only
-    // for a constant defined exactly once project-wide, and "exactly once" is
-    // the same however the files are visited.
-    let project_files: Vec<ProjectFile<'_>> = loaded
-        .iter()
-        .map(|file| ProjectFile::new(&file.tree, &file.packages, &file.values))
+    // One project table per dialect present, not one for the whole corpus:
+    // `build_global_table` reads every file's top level with a single
+    // dialect's definition forms, so handing it a `defun` from one dialect
+    // and a `cl-defun` from another under the same call would misclassify
+    // whichever dialect it was not called with. A dialect table stays empty
+    // when the layer does not model that dialect's definitions yet — the
+    // same conservatism `build_global_table` already applies for Common Lisp
+    // alone, just run once per dialect instead of assumed for all of them.
+    //
+    // Building it needs every file of that dialect analysed first, which is
+    // the whole reason discovery and measurement are separate passes here.
+    // Analysis *order* does not matter within a dialect: the table carries a
+    // value only for a constant defined exactly once project-wide, and
+    // "exactly once" is the same however the files are visited.
+    let globals: Vec<(Dialect, GlobalTable)> = Dialect::ALL
+        .into_iter()
+        .filter_map(|dialect| {
+            let group: Vec<ProjectFile<'_>> = loaded
+                .iter()
+                .filter(|file| file.dialect == dialect)
+                .map(|file| ProjectFile::new(&file.tree, &file.packages, &file.values))
+                .collect();
+            (!group.is_empty()).then(|| (dialect, build_global_table(dialect, &group)))
+        })
         .collect();
-    let globals = build_global_table(Dialect::CommonLisp, &project_files);
 
     let files = loaded
         .iter()
-        .map(|file| measure_file(file, &globals))
+        .map(|file| {
+            let table = globals
+                .iter()
+                .find(|(dialect, _)| *dialect == file.dialect)
+                .map(|(_, table)| table)
+                .expect("every loaded file's dialect built a (possibly empty) global table above");
+            measure_file(file, table)
+        })
         .collect();
 
     Ok(SemanticCoverageReport { files, errors })
@@ -474,6 +628,7 @@ pub fn build_semantic_coverage_report(
 /// exists to widen it.
 struct LoadedFile {
     path: PathBuf,
+    dialect: Dialect,
     text: String,
     tree: SyntaxTree,
     bindings: BindingTable,
@@ -484,6 +639,7 @@ struct LoadedFile {
 fn load_file(
     source: &impl SemanticCoverageSourcePort,
     file: &DiscoveredSemanticCoverageFile,
+    explicit_dialect: Option<Dialect>,
 ) -> Result<LoadedFile, SemanticCoverageFileError> {
     let bytes = source.load(file).map_err(|message| {
         file_error(&file.path, SemanticCoverageProcessingStage::Read, message)
@@ -495,7 +651,8 @@ fn load_file(
             error.to_string(),
         )
     })?;
-    let tree = SyntaxTree::parse_with_dialect(&text, Dialect::CommonLisp).map_err(|error| {
+    let dialect = Dialect::detect_in_source(Some(&file.path), explicit_dialect, &text);
+    let tree = SyntaxTree::parse_with_dialect(&text, dialect).map_err(|error| {
         file_error(
             &file.path,
             SemanticCoverageProcessingStage::Parse,
@@ -503,12 +660,13 @@ fn load_file(
         )
     })?;
 
-    let bindings = build_binding_table(Dialect::CommonLisp, &tree, &text);
-    let values = build_value_table(Dialect::CommonLisp, &tree, &bindings);
-    let packages = resolve_file_packages(Dialect::CommonLisp, &tree);
+    let bindings = build_binding_table(dialect, &tree, &text);
+    let values = build_value_table(dialect, &tree, &bindings);
+    let packages = resolve_file_packages(dialect, &tree);
 
     Ok(LoadedFile {
         path: file.path.clone(),
+        dialect,
         text,
         tree,
         bindings,
@@ -530,13 +688,16 @@ fn measure_file(file: &LoadedFile, globals: &GlobalTable) -> SemanticCoverageFil
         tree,
         bindings,
         packages,
+        dialect,
         ..
     } = file;
+    let dialect = *dialect;
     let project = ProjectConstants::new(globals, packages);
-    let values = build_value_table_in_project(Dialect::CommonLisp, tree, bindings, Some(&project));
+    let values = build_value_table_in_project(dialect, tree, bindings, Some(&project));
 
     let mut report = SemanticCoverageFileReport {
         path: file.path.clone(),
+        dialect,
         ..SemanticCoverageFileReport::default()
     };
 
@@ -588,7 +749,7 @@ fn measure_file(file: &LoadedFile, globals: &GlobalTable) -> SemanticCoverageFil
     let mut folded_initial_forms: HashSet<ByteSpan> = HashSet::new();
     for_each_subview(&document, |view| {
         if pending_initial_forms.contains_key(&view.span)
-            && evaluate_constant(Dialect::CommonLisp, view, bindings, &values).is_known()
+            && evaluate_constant(dialect, view, bindings, &values).is_known()
         {
             folded_initial_forms.insert(view.span);
         }
@@ -597,7 +758,7 @@ fn measure_file(file: &LoadedFile, globals: &GlobalTable) -> SemanticCoverageFil
             return;
         }
         report.list_expression_count += 1;
-        if evaluate_constant(Dialect::CommonLisp, view, bindings, &values).is_known() {
+        if evaluate_constant(dialect, view, bindings, &values).is_known() {
             report.known_list_expression_count += 1;
         }
     });
@@ -727,6 +888,7 @@ mod tests {
             &mut source,
             SemanticCoverageRequest {
                 paths: vec![PathBuf::from("a.lisp")],
+                ..Default::default()
             },
         )
         .expect("workflow succeeds");
@@ -790,6 +952,7 @@ mod tests {
             &mut source,
             SemanticCoverageRequest {
                 paths: vec![PathBuf::from("good.lisp"), PathBuf::from("bad.lisp")],
+                ..Default::default()
             },
         )
         .expect("workflow succeeds despite a per-file error");
@@ -799,5 +962,153 @@ mod tests {
             report.errors()[0].stage,
             SemanticCoverageProcessingStage::Read
         );
+    }
+
+    fn report_for(path: &str, text: &str) -> SemanticCoverageFileReport {
+        let mut source = FakeSource::default().with_file(path, text);
+        let report = build_semantic_coverage_report(
+            &mut source,
+            SemanticCoverageRequest {
+                paths: vec![PathBuf::from(path)],
+                ..Default::default()
+            },
+        )
+        .expect("workflow succeeds");
+        assert!(report.errors().is_empty());
+        report.files().first().cloned().expect("one file measured")
+    }
+
+    #[test]
+    fn a_file_is_measured_under_its_detected_dialect() {
+        assert_eq!(
+            report_for("a.lisp", "(let ((x 1)) x)").dialect(),
+            Dialect::CommonLisp
+        );
+        assert_eq!(
+            report_for("a.el", "(let ((x 1)) x)").dialect(),
+            Dialect::EmacsLisp
+        );
+    }
+
+    #[test]
+    fn an_explicit_dialect_override_wins_over_the_extension() {
+        let mut source = FakeSource::default().with_file("a.txt", "(let ((x 1)) x)");
+        let report = build_semantic_coverage_report(
+            &mut source,
+            SemanticCoverageRequest {
+                paths: vec![PathBuf::from("a.txt")],
+                dialect: Some(Dialect::CommonLisp),
+            },
+        )
+        .expect("workflow succeeds");
+        assert_eq!(
+            report.files().first().expect("one file").dialect(),
+            Dialect::CommonLisp
+        );
+    }
+
+    /// The layer's own asymmetry, made visible per dialect: Emacs Lisp has a
+    /// binding table (dialect-depth work in progress elsewhere registers its
+    /// `let`) but no value table yet, so it resolves nothing, while Common
+    /// Lisp resolves the same shape of binding. This is `R2` end to end.
+    #[test]
+    fn by_dialect_shows_common_lisp_resolving_while_emacs_lisp_does_not() {
+        let mut source = FakeSource::default()
+            .with_file("a.lisp", "(let ((x 1)) x)")
+            .with_file("a.el", "(let ((x 1)) x)");
+        let report = build_semantic_coverage_report(
+            &mut source,
+            SemanticCoverageRequest {
+                paths: vec![PathBuf::from("a.lisp"), PathBuf::from("a.el")],
+                ..Default::default()
+            },
+        )
+        .expect("workflow succeeds");
+
+        let by_dialect: std::collections::BTreeMap<&str, DialectCoverageTotals> = report
+            .by_dialect()
+            .into_iter()
+            .map(|(dialect, totals)| (dialect.label(), totals))
+            .collect();
+
+        let common_lisp = by_dialect["common-lisp"];
+        assert_eq!(common_lisp.variable_bindings, 1);
+        assert_eq!(common_lisp.resolved_bindings, 1);
+
+        let emacs_lisp = by_dialect["emacs-lisp"];
+        assert_eq!(emacs_lisp.variable_bindings, 1);
+        assert_eq!(
+            emacs_lisp.resolved_bindings, 0,
+            "the value table is Common-Lisp-only today; a dialect whose \
+             binding table exists but whose value table does not must show \
+             up as bindings found, none resolved — not folded into a single \
+             number that hides which half of the layer is missing"
+        );
+
+        // A dialect the corpus never contained does not appear at all: an
+        // absent row, not an all-zero one that would misreport "measured and
+        // found nothing" for "never looked".
+        assert!(!by_dialect.contains_key("clojure"));
+    }
+
+    #[test]
+    fn an_unarmed_threshold_always_passes() {
+        let report = build_semantic_coverage_report(
+            &mut FakeSource::default().with_file("a.lisp", "(let ((x (read))) x)"),
+            SemanticCoverageRequest {
+                paths: vec![PathBuf::from("a.lisp")],
+                ..Default::default()
+            },
+        )
+        .expect("workflow succeeds");
+        let policy = SemanticCoveragePolicy::evaluate(None, &report);
+        assert!(policy.passed);
+        assert!(policy.message.is_none());
+    }
+
+    #[test]
+    fn a_threshold_above_the_resolved_rate_fails_with_a_message() {
+        let report = report("(let ((x (read))) x)");
+        let report = SemanticCoverageReport {
+            files: vec![report],
+            errors: Vec::new(),
+        };
+        let policy = SemanticCoveragePolicy::evaluate(Some(50.0), &report);
+        assert!(!policy.passed);
+        assert!(policy.message.is_some());
+    }
+
+    #[test]
+    fn a_threshold_at_or_below_the_resolved_rate_passes() {
+        let report = report("(let ((x 1)) x)");
+        let report = SemanticCoverageReport {
+            files: vec![report],
+            errors: Vec::new(),
+        };
+        let policy = SemanticCoveragePolicy::evaluate(Some(100.0), &report);
+        assert!(policy.passed);
+    }
+
+    /// An armed threshold over zero measured bindings fails rather than
+    /// trivially passing at a fabricated 100% — an empty corpus almost always
+    /// means a misconfiguration (a typo'd path, a glob matching nothing), and
+    /// CI silently passing on that mistake would be worse than a loud failure.
+    #[test]
+    fn an_armed_threshold_over_zero_bindings_fails_rather_than_passing_trivially() {
+        let report = SemanticCoverageReport::default();
+        let policy = SemanticCoveragePolicy::evaluate(Some(50.0), &report);
+        assert!(!policy.passed);
+        assert!(policy.message.is_some());
+    }
+
+    /// An *unarmed* threshold is a different question: `None` means the
+    /// caller never asked for a gate at all, so an empty corpus is not this
+    /// policy's problem to flag.
+    #[test]
+    fn an_unarmed_threshold_still_passes_over_zero_bindings() {
+        let report = SemanticCoverageReport::default();
+        let policy = SemanticCoveragePolicy::evaluate(None, &report);
+        assert!(policy.passed);
+        assert!(policy.message.is_none());
     }
 }
