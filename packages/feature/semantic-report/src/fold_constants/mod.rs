@@ -6,5 +6,6 @@
 //! anything itself, so the two can never disagree about what is foldable.
 
 pub mod cli;
+pub mod domain;
 
 pub use cli::{FoldConstantsArgs, fold_constants};

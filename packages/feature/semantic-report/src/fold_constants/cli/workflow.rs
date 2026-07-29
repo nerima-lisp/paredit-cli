@@ -10,6 +10,7 @@ use paredit_core_syntax::sexpr::ByteSpan;
 
 use crate::constant_report::domain::build_constant_report;
 use crate::fold_constants::cli::args::FoldConstantsArgs;
+use crate::fold_constants::domain::should_fold;
 use crate::shared::SemanticFile;
 
 /// One file's planned folds and the text they produce.
@@ -25,12 +26,23 @@ struct FoldPlan {
 /// Replaces every provably-constant expression with the literal it evaluates
 /// to.
 ///
-/// Quoted forms are safe by construction rather than by a guard here: the
-/// value layer refuses to evaluate through `'` and `` ` ``, so `'(+ 1 2)`
-/// never reaches this as a foldable span. Nested folds are likewise already
-/// excluded by the report, which yields only the outermost form of each
-/// folded region — so the spans are non-overlapping and can be applied in one
-/// pass.
+/// What is folded: compound forms outside every quote context whose value is
+/// an integer, character, keyword, boolean, `nil`, or string. Nested folds are
+/// excluded by the report, which yields only the outermost form of each folded
+/// region, so the spans are non-overlapping and apply in one pass.
+///
+/// What is not folded, and why the exclusions are not "by construction":
+///
+/// * Anything under `'`, `` ` ``, `#.`, a reader conditional, or a reader
+///   label, at any depth. The value layer declining to evaluate a quoted form
+///   is not enough on its own — that check sees one form's own prefixes, so a
+///   walk into the *children* of `'(a (+ 1 2))` would lose the quote. The
+///   report prunes those subtrees instead; see
+///   `constant_report::domain::opens_unevaluated_context`, which also explains
+///   why `,` does not re-open evaluated context here.
+/// * Floats, refused by [`should_fold`]: the value layer keeps an `f64` and
+///   drops the exponent marker, so no spelling this could emit preserves a
+///   `double-float`'s type.
 pub fn fold_constants(args: FoldConstantsArgs) -> Result<()> {
     let files = expand_input_files(&args.files, args.dialect)?;
     let mut plans = Vec::with_capacity(files.len());
@@ -42,7 +54,7 @@ pub fn fold_constants(args: FoldConstantsArgs) -> Result<()> {
         let mut edits: Vec<(ByteSpan, String)> = Vec::new();
         let mut folds = Vec::new();
         for foldable in &report.foldable {
-            if foldable.saved_bytes < args.min_saved_bytes {
+            if !should_fold(foldable, args.min_saved_bytes) {
                 continue;
             }
             edits.push((foldable.span, foldable.value.clone()));

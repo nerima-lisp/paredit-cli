@@ -1,9 +1,12 @@
 //! `refactor fold-constants`: the write side of `inspect constants`.
 //!
-//! The safety property worth testing at this level is the one the command
-//! does not implement itself — quoted forms are never folded, because the
-//! value layer refuses to evaluate through `'` and `` ` ``. A regression
-//! there would turn `'(+ 1 2)` from a list into the number 3.
+//! Every test here is about a rewrite that still parses and is still wrong.
+//! The write path's balance check catches an unbalanced result and nothing
+//! else, so a fold that changes what a form *means* — quoted data rewritten
+//! as if it were code, a string escape a Lisp reader spells differently than
+//! Rust does, a float that prints as an integer — passes every structural
+//! check on the way out. Only comparing the folded text against what the
+//! reader will make of it catches those.
 
 use super::*;
 
@@ -15,10 +18,25 @@ const FIXTURE: &str = concat!(
 );
 
 fn fixture(name: &str) -> std::path::PathBuf {
+    written_fixture(name, FIXTURE)
+}
+
+fn written_fixture(name: &str, source: &str) -> std::path::PathBuf {
     let dir = fresh_temp_dir(name);
     let file = dir.join("source.lisp");
-    fs::write(&file, FIXTURE).expect("write fixture");
+    fs::write(&file, source).expect("write fixture");
     file
+}
+
+/// Folds `source` in place and returns what the file holds afterwards.
+fn fold_in_place(name: &str, source: &str) -> String {
+    let file = written_fixture(name, source);
+    paredit()
+        .args(["refactor", "fold-constants", "--write"])
+        .arg(&file)
+        .assert()
+        .success();
+    fs::read_to_string(&file).expect("read rewritten fixture")
 }
 
 #[test]
@@ -98,4 +116,59 @@ fn cli_folded_output_still_parses() {
         .arg(&file)
         .assert()
         .success();
+}
+
+#[test]
+fn cli_leaves_arithmetic_nested_inside_quoted_data_alone() {
+    // `'(a (+ 1 2))` is a two-element list whose second element is the list
+    // `(+ 1 2)`. Folding it to `'(a 3)` deletes two elements of a data
+    // literal. The rewrite still parses, so nothing downstream catches it.
+    let source = concat!(
+        "(defun f () '(a (+ 1 2)))\n",
+        "(defmacro g () `(list (+ 5 6)))\n",
+        "(defun h () '(a (b (c (+ 7 8)))))\n",
+    );
+    assert_eq!(fold_in_place("fold-constants-nested-quote", source), source);
+}
+
+#[test]
+fn cli_folds_a_string_in_lisp_escaping_not_rust_escaping() {
+    // A Lisp reader knows two escapes inside `"…"`: `\\` and `\"`. Rust's
+    // `{:?}` writes a newline as `\n`, which the reader takes as the letter
+    // `n` — the string reparses, one character shorter and different.
+    let source = "(defun s () (if t \"line1\nline2 \\\\ q\\\" end\" 2))\n";
+    let folded = fold_in_place("fold-constants-string-escapes", source);
+    assert_eq!(folded, "(defun s () \"line1\nline2 \\\\ q\\\" end\")\n");
+    assert!(
+        !folded.contains("\\n"),
+        "a real newline must stay a real newline, not become `\\n`: {folded:?}"
+    );
+}
+
+#[test]
+fn cli_refuses_to_fold_a_float() {
+    // `1.0d0` is a `double-float`. The value layer keeps only its `f64`, so
+    // the marker that says which float type it is cannot be reproduced —
+    // before this was refused, the fold wrote the integer `1`.
+    let source = "(defun h () (if t 1.0d0 2))\n";
+    assert_eq!(fold_in_place("fold-constants-float", source), source);
+}
+
+#[test]
+fn cli_reports_no_fold_for_a_float_or_a_quoted_form() {
+    let file = written_fixture(
+        "fold-constants-float-plan",
+        "(defun h () (if t 1.0d0 2))\n(defun f () '(a (+ 1 2)))\n",
+    );
+    let output = paredit()
+        .args(["refactor", "fold-constants"])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(report["fold_count"], 0, "{report}");
+    assert_eq!(report["files"][0]["changed"], false);
 }
