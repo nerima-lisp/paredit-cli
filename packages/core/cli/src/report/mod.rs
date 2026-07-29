@@ -11,6 +11,7 @@
 //! now produce reports of this shape, and a copy per package is three places
 //! for the output contract to drift.
 
+pub mod interop;
 pub mod render;
 
 use std::path::PathBuf;
@@ -32,6 +33,68 @@ pub trait Finding {
     fn text_columns(&self) -> Vec<String>;
     /// The finding's own JSON fields. `line` and `span` are added around them.
     fn json_fields(&self) -> Vec<(&'static str, Value)>;
+
+    /// How serious this finding is, for the interop formats that carry a level.
+    ///
+    /// Defaulted rather than required. Most of these reports describe one thing
+    /// worth looking at, with no internal gradation, and forcing every one to
+    /// restate `Warning` would be ceremony. A report whose findings *are*
+    /// graded — a defect versus an observation — overrides it.
+    fn severity(&self) -> FindingSeverity {
+        FindingSeverity::Warning
+    }
+
+    /// One line of prose for a consumer that has no column layout: a SARIF
+    /// result message, a JUnit failure message, a Code Climate description.
+    ///
+    /// Defaults to the text columns joined, which is what those columns already
+    /// are — a human-readable description split for `cut`. A report with a
+    /// better sentence to offer overrides it.
+    fn message(&self) -> String {
+        let columns = self.text_columns();
+        if columns.is_empty() {
+            self.kind().to_owned()
+        } else {
+            columns.join(" ")
+        }
+    }
+}
+
+/// The level an interop consumer files a finding under.
+///
+/// Three rungs because that is the intersection of what the target formats can
+/// express: SARIF has `note`/`warning`/`error`, Code Climate has
+/// `info`/`minor`/`major`, and both map onto these without inventing a rung
+/// this tool cannot justify.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FindingSeverity {
+    Note,
+    Warning,
+    Error,
+}
+
+impl FindingSeverity {
+    /// The SARIF `level` vocabulary, which is also what the text and CSV
+    /// outputs print.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Note => "note",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+
+    /// The Code Climate `severity` vocabulary, which is a different set of
+    /// words for the same three rungs.
+    #[must_use]
+    pub const fn code_climate(self) -> &'static str {
+        match self {
+            Self::Note => "info",
+            Self::Warning => "minor",
+            Self::Error => "major",
+        }
+    }
 }
 
 /// One analyzed file.

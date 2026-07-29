@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use paredit_core_cli::args::{DialectArg, OutputFormat};
+use paredit_core_cli::args::{DialectArg, ReportFormat};
 
 use crate::line_metrics_report::usecase::LineThresholds;
 
@@ -27,8 +27,8 @@ pub struct LineMetricsReportArgs {
     #[arg(long)]
     pub fail_on_overflow: bool,
     /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    pub output: OutputFormat,
+    #[arg(long, value_enum, default_value_t = ReportFormat::Json)]
+    pub output: ReportFormat,
 }
 
 impl LineMetricsReportArgs {
