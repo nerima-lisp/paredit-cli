@@ -1,10 +1,8 @@
 use paredit_core_cli::CliResult;
 use serde_json::json;
 
-use crate::application::usecase::emacs_lisp_file_report::{
-    EmacsLispFileFacts, EmacsLispFilePolicy,
-};
 use crate::presentation::cli::OutputFormat;
+use paredit_feature_emacs_lisp::file_report::usecase::{EmacsLispFileFacts, EmacsLispFilePolicy};
 
 pub(super) fn print_emacs_lisp_file_report(
     files: &[EmacsLispFileFacts],

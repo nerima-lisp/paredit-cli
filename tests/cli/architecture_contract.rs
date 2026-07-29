@@ -185,102 +185,98 @@ const COMPOSITION_ROOT: &[&str] = &[
     "lint",
     // Runs the registry, so it cannot be core or a feature.
     "lint_report",
-    "lint_suppression",
-    // Re-exports policy types owned by three separate features.
-    "report_policy",
     // A development harness measured against the semantics layer, reached
     // by examples/semantic_coverage.rs through the public API.
     "semantic_coverage",
 ];
 
-/// Modules in the root that do **not** meet the criterion above.
+/// Modules parked in the root that do **not** meet the criterion above.
 ///
-/// Kept separate from [`COMPOSITION_ROOT`] because they are there for a
-/// different reason — nobody has moved them yet — and merging the two lists is
-/// how "temporarily in the root" becomes permanent. Measured: not one of these
-/// aggregates several features. Their imports resolve, through the `crate::domain`
-/// re-export facade, to `packages/core/*` only, except `duplicate_export_report`,
-/// which additionally reaches one feature (`paredit-feature-package`) — and a
-/// feature depending on one other feature is already an allowed shape.
+/// **Empty, and that is the point.** It held seven entries described as
+/// "reports that still await a home". None of them was ever composition root:
+/// each turned out to already *import* the package it belonged in, so the
+/// homes were decided by existing coupling rather than by taste.
 ///
-/// So each is a self-contained slice that belongs in a feature package. Moving
-/// them is a package extraction per module — new manifest, README, `cli/`
-/// wiring, and a `Cargo.toml` edge — which is why it is not folded into an
-/// unrelated change.
+/// | module | home | what it already depended on |
+/// | --- | --- | --- |
+/// | `duplicate_export_report` | `feature/package` | sat beside `unused_export_report`, same `defpackage :export` |
+/// | `duplicate_method_report` | `feature/lisp-analysis` | beside `method_combination_report`, `generic_dispatch_report` |
+/// | `duplicate_slot_report` | `feature/lisp-analysis` | beside `class_hierarchy_report` |
+/// | `shadowed_binding_report` | `feature/binding` | imported that package's `let_report` |
+/// | `unused_parameter_report` | `feature/function-parameter` | imported its lambda-list parser |
+/// | `symbol_report` | `feature/project-inventory` | beside `symbol_index_report` |
+/// | `mutation_safety` | deleted | the file was empty |
 ///
-/// **This list may shrink. It may never grow**, which the test below enforces
-/// rather than merely asking for in a comment.
-const AWAITING_EXTRACTION: &[&str] = &[
-    "duplicate_export_report",
-    "duplicate_method_report",
-    "duplicate_slot_report",
-    "shadowed_binding_report",
-    "unused_parameter_report",
-    "mutation_safety",
-    "symbol_report",
-];
+/// No new package was needed for any of them.
+///
+/// Keep this list empty. An entry means a module was parked in the root rather
+/// than given a home, and the fastest way to find that home is to read its
+/// imports — the answer has been there each time.
+const AWAITING_EXTRACTION: &[&str] = &[];
 
-/// Section 3.1.1: the root's layer modules must not accumulate code again.
+/// Section 3.1.1: the root crate holds the composition root and nothing else.
 ///
-/// They are kept as the public API's namespace, and the cost of keeping them is
-/// this test. Without it, "just put it in domain for now" comes back.
+/// This used to walk `src/domain` and `src/application/usecase` and allow
+/// anything on a list. Both directories are gone — they held 415 lines of
+/// `pub use` re-exporting other packages, 26 of which anything referenced —
+/// so walking them would now pass by finding nothing, which is the worst kind
+/// of green.
+///
+/// It walks `src/` instead, which cannot disappear, and names what may be
+/// there. A new top-level module is a deliberate decision about the
+/// composition root rather than a directory somebody dropped a file into.
 #[test]
-fn root_layer_modules_hold_only_facades_and_the_composition_root() {
-    for (layer, dir) in [
-        ("domain", "src/domain"),
-        ("application", "src/application/usecase"),
-        ("infrastructure", "src/infrastructure"),
-    ] {
-        let Ok(entries) = fs::read_dir(dir) else {
+fn the_root_crate_holds_only_the_composition_root() {
+    const ALSO_ALLOWED: &[&str] = &[
+        // The crate's own entry points.
+        "lib",
+        "main", // The delivery layer: clap tree, dispatch, protocol servers.
+        "presentation",
+    ];
+
+    let entries = fs::read_dir("src").expect("read src/");
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let stem = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if ALSO_ALLOWED.contains(&stem.as_str())
+            || COMPOSITION_ROOT.contains(&stem.as_str())
+            || AWAITING_EXTRACTION.contains(&stem.as_str())
+        {
             continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let stem = path
-                .file_stem()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if stem == "mod"
-                || COMPOSITION_ROOT.contains(&stem.as_str())
-                || AWAITING_EXTRACTION.contains(&stem.as_str())
-            {
-                continue;
-            }
-            panic!(
-                "{} holds `{stem}`, which is neither a facade nor listed as composition \
-                 root. Extract it into a package, or add it to COMPOSITION_ROOT with a \
-                 reason. The {layer} layer exists to name the public API, not to hold code.",
-                path.display()
-            );
         }
+        panic!(
+            "src/ holds `{stem}`, which is not the composition root. Put it in the \
+             package that owns the concept — read its imports, the answer has been \
+             there every time — or add it to COMPOSITION_ROOT with a reason that \
+             survives the criterion: does it aggregate several features?"
+        );
     }
-}
-
-/// The backlog may shrink and may not grow.
-///
-/// Pinned to a count rather than left as a comment saying "this list must
-/// shrink", because a comment does not fail. Lowering the number when a module
-/// is extracted is the point; raising it means a new module was parked in the
-/// root instead of being given a package, which is the thing section 3.1.1
-/// exists to prevent.
-#[test]
-fn the_extraction_backlog_never_grows() {
-    const REMAINING: usize = 7;
 
     assert!(
-        AWAITING_EXTRACTION.len() <= REMAINING,
-        "AWAITING_EXTRACTION grew to {}: a module was parked in the root rather than \
-         given a feature package. Extract it instead, or justify it in COMPOSITION_ROOT \
-         by the stated criterion (does it aggregate several features?).",
-        AWAITING_EXTRACTION.len()
+        !Path::new("src/domain").exists() && !Path::new("src/application").exists(),
+        "src/domain and src/application are gone deliberately. They were re-export \
+         facades, and a directory named `domain` is where \"just put it here for now\" \
+         goes — seven report modules had accumulated in one."
     );
+}
 
-    assert_eq!(
-        AWAITING_EXTRACTION.len(),
-        REMAINING,
-        "AWAITING_EXTRACTION shrank to {} — extraction happened, which is the goal. \
-         Lower REMAINING to match.",
-        AWAITING_EXTRACTION.len()
+/// The backlog is empty and stays empty.
+///
+/// Pinned as a test rather than a comment, because a comment does not fail.
+/// The seven modules this list used to hold are gone, and each was placed by
+/// reading its imports — so a new entry here is not "we will get to it", it is
+/// "nobody checked which package this already depends on".
+#[test]
+fn nothing_is_parked_in_the_root() {
+    assert!(
+        AWAITING_EXTRACTION.is_empty(),
+        "AWAITING_EXTRACTION holds {AWAITING_EXTRACTION:?}. Read the module's imports: every one of the \
+         seven that used to be here already depended on the package it belonged in. \
+         Move it there, or justify it in COMPOSITION_ROOT by the stated criterion \
+         (does it aggregate several features?)."
     );
 }
 

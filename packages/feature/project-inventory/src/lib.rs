@@ -8,6 +8,7 @@ pub mod keyword_arity_report;
 pub mod license_report;
 pub mod serial_consistency_report;
 pub mod symbol_index_report;
+pub mod symbol_report;
 pub mod test_map_report;
 pub mod unreachable_expression_report;
 
@@ -20,6 +21,7 @@ pub use keyword_arity_report::cli::{KeywordArityReportArgs, keyword_arity_report
 pub use license_report::cli::{LicenseReportArgs, license_report};
 pub use serial_consistency_report::cli::{SerialConsistencyReportArgs, serial_consistency_report};
 pub use symbol_index_report::cli::{SymbolIndexReportArgs, symbol_index_report};
+pub use symbol_report::cli::{SymbolQueryArgs, SymbolReportArgs, find_symbol, symbol_report};
 pub use test_map_report::cli::{TestMapReportArgs, test_map_report};
 pub use unreachable_expression_report::cli::{
     UnreachableExpressionReportArgs, unreachable_expression_report,

@@ -92,6 +92,16 @@ fn every_workspace_member_inherits_the_shared_lints() {
     println!("checked {checked} workspace member manifests");
 }
 
+/// The library entrypoint keeps resolving `paredit_cli::{dialect, sexpr}`.
+///
+/// This used to pin the literal text `pub use domain::dialect;`, which froze
+/// *where* the re-export came from as well as *that* it existed. It came from
+/// `src/domain/mod.rs`, a module that re-exported 200 names it did not own;
+/// when that facade was deleted the two names moved to their real source and
+/// this test failed even though nothing a caller can observe had changed.
+///
+/// So it asserts the property instead: the names are re-exported, from
+/// wherever they are actually defined.
 #[test]
 fn rustdoc_entrypoint_stays_aligned_with_readme_and_public_library_surface() {
     let lib_rs = fs::read_to_string("src/lib.rs").expect("read src/lib.rs");
@@ -105,10 +115,16 @@ fn rustdoc_entrypoint_stays_aligned_with_readme_and_public_library_surface() {
         lib_rs.contains("#![doc = include_str!(\"../README.md\")]"),
         "src/lib.rs must use README.md as the crate-level rustdoc entrypoint"
     );
-    for required in ["pub use domain::dialect;", "pub use domain::sexpr;"] {
+
+    let reexports: Vec<&str> = lib_rs
+        .lines()
+        .filter(|line| line.trim_start().starts_with("pub use "))
+        .collect();
+    for name in ["dialect", "sexpr"] {
         assert!(
-            lib_rs.contains(required),
-            "src/lib.rs must keep the public library entrypoint explicit: {required}"
+            reexports.iter().any(|line| line.contains(name)),
+            "src/lib.rs must re-export `{name}` so `paredit_cli::{name}` resolves; \
+             found only {reexports:?}"
         );
     }
 }

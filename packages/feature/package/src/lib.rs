@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod dependency_report;
+pub mod duplicate_export_report;
 pub mod error;
 pub mod package;
 pub mod package_boundary_report;
@@ -14,6 +15,7 @@ pub mod unused_package_report;
 // The contract with the composition root (section 4.2): each slice that
 // owns a subcommand publishes its `clap` argument type and the function
 // that runs it. command.rs and dispatch.rs need these two names and no more.
+pub use duplicate_export_report::cli::{DuplicateExportReportArgs, duplicate_export_report};
 pub use package::cli::{AddExportArgs, add_export};
 pub use package::cli::{MergePackageOptionsArgs, merge_package_options};
 pub use package::cli::{PackageReportArgs, package_report};

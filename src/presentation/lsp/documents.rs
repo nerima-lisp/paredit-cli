@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 /// How a client counts the `character` field of a position.
 ///

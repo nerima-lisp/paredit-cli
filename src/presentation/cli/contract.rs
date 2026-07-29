@@ -1,10 +1,10 @@
 use serde_json::{Map, Value, json};
 
-use crate::application::usecase::emacs_lisp_file_report::supports_emacs_lisp_file_report_dialect;
-use crate::domain::dialect::{Dialect, SemanticOperation};
-use crate::domain::inline_function::supports_inline_function_dialect;
-use crate::domain::inline_let::supports_inline_let_dialect;
-use crate::domain::rename::supports_rename_at_dialect;
+use paredit_core_syntax::dialect::{Dialect, SemanticOperation};
+use paredit_feature_emacs_lisp::file_report::usecase::supports_emacs_lisp_file_report_dialect;
+use paredit_feature_inline::inline_function::domain::supports_inline_function_dialect;
+use paredit_feature_inline::inline_let::domain::supports_inline_let_dialect;
+use paredit_feature_rename::rename::domain::supports_rename_at_dialect;
 
 pub(super) const DIALECTS: [&str; 10] = [
     "common-lisp",

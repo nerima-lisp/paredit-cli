@@ -1,9 +1,7 @@
 use paredit_core_cli::CliResult;
 use serde_json::json;
 
-use crate::application::usecase::semantic_coverage::{
-    SemanticCoveragePolicy, SemanticCoverageReport,
-};
+use crate::semantic_coverage::{SemanticCoveragePolicy, SemanticCoverageReport};
 
 use super::percentage;
 

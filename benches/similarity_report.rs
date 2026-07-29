@@ -5,13 +5,13 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use paredit_cli::application::usecase::similarity_report::{
+use paredit_core_syntax::dialect::Dialect;
+use paredit_feature_similarity::similarity_report::usecase::{
     DiscoveredSimilarityFile, SimilarityComparisonScope, SimilarityDuplicatePolicy,
     SimilarityErrorPolicy, SimilarityFormScope, SimilarityInventory, SimilarityOverlapPolicy,
     SimilarityReportOptions, SimilarityReportPlan, SimilarityReportRequest,
     SimilarityReportSourcePort, build_similarity_report,
 };
-use paredit_cli::domain::dialect::Dialect;
 
 /// The two ends of the range, and deliberately nothing between them — see the
 /// same constant in `benches/lint_report.rs`. It matters more here, where the

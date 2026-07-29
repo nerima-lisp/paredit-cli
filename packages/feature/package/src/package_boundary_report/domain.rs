@@ -13,7 +13,7 @@
 //! this report is built on is specific to the CL package system. The active
 //! package for each qualified reference is tracked purely from preceding
 //! top-level `in-package` forms in the same file (mirroring how
-//! `crate::domain::definition_report::collect_definition_forms` already
+//! `paredit_feature_remove_unused::definition_report::domain::collect_definition_forms` already
 //! tracks "current package" for its own inventory), so a reference is only
 //! flagged when the file's *own* declared package differs from the
 //! reference's target — a same-package self-reference through the

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use crate::application::usecase::dependency_report::DependencyReportItem;
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_feature_package::dependency_report::usecase::DependencyReportItem;
 
 #[derive(Debug)]
 pub struct DependencyReportFile {

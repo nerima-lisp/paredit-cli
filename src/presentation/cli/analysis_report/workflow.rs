@@ -5,11 +5,11 @@ use serde_json::json;
 
 use paredit_core_cli::report::budget::Budget;
 
-use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::args::{AnalyzeArgs, OutputFormat};
 use crate::presentation::cli::shared::{
     check_deadline_for_read, read_input_and_dialect, read_input_dialect_and_tree,
 };
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 use super::args::AgentReportArgs;
 use super::render::{

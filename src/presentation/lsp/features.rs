@@ -17,7 +17,7 @@ use paredit_core_syntax::sexpr::{
 };
 
 use super::documents::{Document, PositionEncoding};
-use crate::application::usecase::lint_report::{
+use crate::lint::report::{
     LintPassRequest, RuleFilter, Severity, resolve_active_rules, rule_category, rule_description,
     rule_severity, run_lint_pass,
 };
@@ -349,7 +349,7 @@ pub(crate) fn formatting_edits(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::dialect::Dialect;
+    use paredit_core_syntax::dialect::Dialect;
 
     fn document(text: &str) -> Document {
         Document::new(text.to_owned(), Dialect::CommonLisp, 1)

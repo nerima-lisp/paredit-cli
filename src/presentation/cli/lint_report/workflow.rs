@@ -1,13 +1,13 @@
 use paredit_core_cli::{CliError, CliResult, CommandResult};
+use paredit_core_lint_engine::suppression::{Date, LintSuppressions};
 
-use crate::application::usecase::lint_report::{
-    CATEGORIES, Date, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, LintSuppressions,
-    RULES, RuleFilter, RuleFixFor, RulePreset, RuleSettings, RuleTag, RuleTimings, Severity,
-    SeverityOverrides, apply_severity_override, collect_lint_findings, evaluate_lint_policy,
-    lint_gate_violations, resolve_active_rules, rule_setting, rule_tags, rule_timing_report,
-    run_lint_pass, summarize_lint_findings,
+use crate::lint::report::{
+    CATEGORIES, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, RULES, RuleFilter,
+    RuleFixFor, RulePreset, RuleSettings, RuleTag, RuleTimings, Severity, SeverityOverrides,
+    apply_severity_override, collect_lint_findings, evaluate_lint_policy, lint_gate_violations,
+    resolve_active_rules, rule_setting, rule_tags, rule_timing_report, run_lint_pass,
+    summarize_lint_findings,
 };
-use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 use crate::presentation::cli::lint_report::args::{EmitFormat, LintReportArgs};
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
@@ -22,6 +22,7 @@ use crate::presentation::cli::lint_report::render::{
 };
 use paredit_core_cli::report::FindingSeverity;
 use paredit_core_cli::report::interop::{self, Flattened, Row};
+use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 
 use crate::presentation::cli::shared::{
     FileFailure, analyze_files, apply_byte_span_edits, expand_input_files,
@@ -222,14 +223,14 @@ fn retain_unbaselined(
 /// end)` so the fix engine can pair a finding with its rewrite.
 ///
 /// The rules themselves now own their repairs (see
-/// [`crate::domain::lint_report::collect_lint_fixes`]); this only reshapes the
+/// [`crate::lint::report::collect_lint_fixes`]); this only reshapes the
 /// domain's list into the map the fixpoint loop, SARIF writer, and fix plan
 /// all index by. Later entries overwrite earlier ones on an identical key,
 /// which is what a rule reporting twice on one span has always resolved to.
 fn collect_lint_fixes(
     file: &std::path::Path,
-    dialect: crate::domain::dialect::Dialect,
-    tree: &crate::domain::sexpr::SyntaxTree,
+    dialect: paredit_core_syntax::dialect::Dialect,
+    tree: &paredit_core_syntax::sexpr::SyntaxTree,
     text: &str,
     active: &[&str],
     settings: &RuleSettings,
@@ -326,7 +327,7 @@ fn resolve_rule_settings(args: &LintReportArgs) -> CliResult<RuleSettings> {
             .into());
         }
         let Some(declared) = rule_setting(rule, key) else {
-            let valid: Vec<&str> = crate::application::usecase::lint_report::rule_settings(rule)
+            let valid: Vec<&str> = crate::lint::report::rule_settings(rule)
                 .iter()
                 .map(|setting| setting.key())
                 .collect();
@@ -740,7 +741,7 @@ fn lint_report_remove_unused_suppressions(
 /// Line -> the rules that reported a finding there, across every rule.
 fn findings_by_line(
     file: &std::path::Path,
-    dialect: crate::domain::dialect::Dialect,
+    dialect: paredit_core_syntax::dialect::Dialect,
     tree: &SyntaxTree,
     text: &str,
 ) -> CliResult<std::collections::HashMap<usize, std::collections::HashSet<&'static str>>> {
@@ -1734,8 +1735,8 @@ fn lint_report_test_rules(custom: &CustomRules) -> CommandResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::usecase::lint_report::{FIXABLE_RULES, RULES};
-    use crate::domain::dialect::Dialect;
+    use crate::lint::report::{FIXABLE_RULES, RULES};
+    use paredit_core_syntax::dialect::Dialect;
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
@@ -1855,7 +1856,7 @@ mod tests {
             (source, Dialect::CommonLisp, "fixture.lisp"),
             (elisp_source, Dialect::EmacsLisp, "fixture.el"),
         ] {
-            let tree = crate::domain::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
+            let tree = paredit_core_syntax::sexpr::SyntaxTree::parse_with_dialect(text, dialect)
                 .expect("parse fixture");
             let fixes = collect_lint_fixes(
                 &PathBuf::from(name),

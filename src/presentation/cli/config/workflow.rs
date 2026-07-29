@@ -10,7 +10,7 @@ use paredit_core_config::load::{LoadOptions, Loaded};
 use paredit_core_config::schema::{self, DefaultValue, KeySchema, ValueKind};
 use paredit_core_config::settings::Vocabulary;
 
-use crate::domain::lint::registry::catalog::{CATEGORIES, RULES};
+use crate::lint::registry::catalog::{CATEGORIES, RULES};
 
 use super::args::{
     ConfigCheckArgs, ConfigInitArgs, ConfigLocationArgs, ConfigSchemaArgs, ConfigShowArgs,

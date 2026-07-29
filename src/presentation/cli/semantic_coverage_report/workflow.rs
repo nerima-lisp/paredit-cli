@@ -1,14 +1,14 @@
 use paredit_core_cli::CommandResult;
 
-use crate::application::usecase::semantic_coverage::{
-    DiscoveredSemanticCoverageFile, SemanticCoverageInventory, SemanticCoveragePolicy,
-    SemanticCoverageRequest, SemanticCoverageSourcePort, SemanticCoverageWorkflowError,
-    build_semantic_coverage_report,
-};
 use crate::presentation::cli::gate;
 use crate::presentation::cli::semantic_coverage_report::args::SemanticCoverageReportArgs;
 use crate::presentation::cli::semantic_coverage_report::render::print_semantic_coverage_report;
 use crate::presentation::cli::shared::expand_input_files;
+use crate::semantic_coverage::{
+    DiscoveredSemanticCoverageFile, SemanticCoverageInventory, SemanticCoveragePolicy,
+    SemanticCoverageRequest, SemanticCoverageSourcePort, SemanticCoverageWorkflowError,
+    build_semantic_coverage_report,
+};
 
 /// Reads files this command already expanded from directories, so discovery
 /// stays the CLI shell's responsibility and the usecase only turns bytes into

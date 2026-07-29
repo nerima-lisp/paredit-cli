@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 
 use paredit_core_cli::CliResult;
 
-use crate::application::usecase::lint_report::{
+use crate::lint::report::{
     RULES, Severity, SeverityOverrides, overridden_rule_severity, rule_category, rule_is_fixable,
 };
 use paredit_feature_lint_custom::{CustomFinding, Ruleset, parse_ruleset, run, run_tests};
@@ -95,7 +95,7 @@ impl CustomRules {
     /// fix)`, with the rule name interned so it can join a `LintFinding`.
     pub(super) fn findings(
         &self,
-        tree: &crate::domain::sexpr::SyntaxTree,
+        tree: &paredit_core_syntax::sexpr::SyntaxTree,
         source: &str,
     ) -> Vec<(&'static str, CustomFinding)> {
         run(&self.ruleset, tree, source)
@@ -309,7 +309,7 @@ mod tests {
     fn a_deny_still_re_ranks_a_shipped_rule_through_the_resolver() {
         let custom = CustomRules::default();
         let mut overrides = SeverityOverrides::new();
-        crate::application::usecase::lint_report::apply_severity_override(
+        crate::lint::report::apply_severity_override(
             &mut overrides,
             "redundant-quote",
             Severity::Error,
@@ -323,7 +323,7 @@ mod tests {
     fn findings_carry_the_interned_name() {
         let custom = loaded(r#"(defrule no-print :pattern (print ?x) :message "m")"#);
         let source = "(print 1)";
-        let tree = crate::domain::sexpr::SyntaxTree::parse(source).expect("parse");
+        let tree = paredit_core_syntax::sexpr::SyntaxTree::parse(source).expect("parse");
         let found = custom.findings(&tree, source);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].0, "no-print");

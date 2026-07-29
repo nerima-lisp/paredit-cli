@@ -1,9 +1,7 @@
 use paredit_core_cli::CliResult;
 
-use crate::application::usecase::semantic_coverage::{
-    SemanticCoveragePolicy, SemanticCoverageReport,
-};
 use crate::presentation::cli::OutputFormat;
+use crate::semantic_coverage::{SemanticCoveragePolicy, SemanticCoverageReport};
 
 mod json;
 mod text;

@@ -2,24 +2,16 @@
 fn top_level_public_modules_keep_docs_rs_responsibility_docs() {
     for (path, required) in [
         (
-            "src/application/mod.rs",
-            "//! Application services that orchestrate typed domain operations into",
+            "src/lint/mod.rs",
+            "//! The lint context: what a rule is, how rules are registered, and the single",
         ),
         (
-            "src/application/usecase/mod.rs",
-            "//! Application use cases for Lisp-aware analysis, reporting, and refactor planning.",
+            "src/semantic_coverage.rs",
+            "//! Measuring how much of the semantic layer resolves on real source.",
         ),
         (
             "packages/feature/refactor-workflow/src/refactor/usecase/mod.rs",
             "//! Refactor planning, preview, and guarded apply services.",
-        ),
-        (
-            "src/domain/mod.rs",
-            "//! Core Lisp parsing, dialect, and semantic refactoring rules that stay",
-        ),
-        (
-            "src/infrastructure/mod.rs",
-            "//! Infrastructure adapters that turn filesystems and workspace discovery into",
         ),
         (
             "src/presentation/mod.rs",

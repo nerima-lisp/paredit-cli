@@ -21,10 +21,10 @@ use serde_json::{Value, json};
 use paredit_core_jsonrpc::{Outcome, ResponseError, error_codes};
 use paredit_core_syntax::sexpr::SyntaxTree;
 
-use crate::application::usecase::lint_report::{
+use crate::lint::report::{
     LintPassRequest, RuleFilter, resolve_active_rules, rule_severity, run_lint_pass,
 };
-use crate::domain::dialect::Dialect;
+use paredit_core_syntax::dialect::Dialect;
 
 /// What a file looked like when it was last analyzed.
 #[derive(Debug, Clone, PartialEq, Eq)]

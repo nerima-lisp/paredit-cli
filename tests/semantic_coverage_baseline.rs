@@ -20,11 +20,11 @@
 
 use std::path::{Path, PathBuf};
 
-use paredit_cli::application::usecase::semantic_coverage::{
+use paredit_cli::dialect::Dialect;
+use paredit_cli::semantic_coverage::{
     DiscoveredSemanticCoverageFile, SemanticCoverageInventory, SemanticCoverageRequest,
     SemanticCoverageSourcePort, build_semantic_coverage_report,
 };
-use paredit_cli::dialect::Dialect;
 
 const EXTENSIONS: [&str; 3] = ["lisp", "lsp", "cl"];
 

@@ -1,7 +1,5 @@
-use crate::application::usecase::semantic_coverage::{
-    SemanticCoveragePolicy, SemanticCoverageReport,
-};
 use crate::presentation::cli::terminal_safe;
+use crate::semantic_coverage::{SemanticCoveragePolicy, SemanticCoverageReport};
 
 use super::percentage;
 

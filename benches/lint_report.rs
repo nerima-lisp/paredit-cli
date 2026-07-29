@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use paredit_cli::domain::dialect::Dialect;
-use paredit_cli::domain::lint_report::collect_lint_findings;
-use paredit_cli::domain::sexpr::SyntaxTree;
+use paredit_cli::lint::report::collect_lint_findings;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::SyntaxTree;
 
 /// The two ends of the range, and deliberately nothing between them.
 ///

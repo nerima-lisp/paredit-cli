@@ -1,11 +1,11 @@
 use paredit_core_cli::CommandResult;
 
-use crate::application::usecase::emacs_lisp_file_report::{
-    EmacsLispFilePolicyOptions, collect_emacs_lisp_file_facts, evaluate_emacs_lisp_file_policy,
-};
 use crate::presentation::cli::emacs_lisp_file_report::args::EmacsLispFileReportArgs;
 use crate::presentation::cli::emacs_lisp_file_report::render::print_emacs_lisp_file_report;
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
+use paredit_feature_emacs_lisp::file_report::usecase::{
+    EmacsLispFilePolicyOptions, collect_emacs_lisp_file_facts, evaluate_emacs_lisp_file_policy,
+};
 
 pub(in crate::presentation::cli) fn emacs_lisp_file_report(
     args: EmacsLispFileReportArgs,

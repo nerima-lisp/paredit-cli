@@ -1,14 +1,20 @@
 # paredit-feature-binding
 
-Reshaping `let`, `let*`, `flet`, `labels` and `progn` binding forms.
+Reshaping `let`, `let*`, `flet`, `labels` and `progn` binding forms, and
+reporting on what they bind.
 
 ## Responsibilities
 
-Every transformation that changes the *shape* of a binding form without
-changing what it binds:
+Everything that reasons about a *binding form's shape* rather than about the
+values flowing through it — both the transformations and the reports, because
+they share the same reading of a binding list:
 
 - **Introducing and reporting.** `introduce_let` lifts a repeated expression
-  into a new binding; `let_report` describes the binding forms in a file.
+  into a new binding; `let_report` describes the binding forms in a file;
+  `shadowed_binding_report` finds a binding that reuses an enclosing
+  parameter's or binding's name. The last of these is why this package reaches
+  `paredit-feature-function-parameter`: deciding whether a `let` shadows a
+  parameter needs the validated lambda-list parser that names parameters.
 - **Splitting and merging.** `split_let`, `split_let_star`,
   `merge_nested_let`, `merge_nested_let_star`, `merge_nested_flet`.
 - **Converting between forms.** `convert_let_to_let_star` and its inverse,
