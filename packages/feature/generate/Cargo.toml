@@ -1,0 +1,23 @@
+[package]
+name = "paredit-feature-generate"
+description = "Generators that produce new Common Lisp source from what the analyzer already knows: a defpackage from a file's definitions, an ASDF defsystem from a directory, test skeletons for untested definitions, CLOS accessors for bare slots, a defgeneric for an undeclared method group, and a docstring template for a definition"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-cli = { path = "../../core/cli" }
+paredit-feature-project-inventory = { path = "../project-inventory" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`.
+[lints]
+workspace = true

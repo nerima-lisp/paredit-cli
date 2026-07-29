@@ -668,6 +668,7 @@ dependencies = [
  "paredit-feature-extract",
  "paredit-feature-form-transform",
  "paredit-feature-function-parameter",
+ "paredit-feature-generate",
  "paredit-feature-inline",
  "paredit-feature-lint-conditional",
  "paredit-feature-lint-control-flow",
@@ -916,6 +917,18 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-generate"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "paredit-feature-project-inventory",
+ "serde_json",
 ]
 
 [[package]]

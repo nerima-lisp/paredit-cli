@@ -31,6 +31,40 @@ Lisp sources via `paredit edit format`) is one command:
 nix fmt
 ```
 
+## Scaffolding a new rule or command
+
+`cargo xtask` (see `xtask/`, aliased in `.cargo/config.toml`) generates the
+boilerplate-shaped files a new lint rule or a new `inspect`/`edit`/`refactor`
+command needs:
+
+```sh
+cargo xtask new-lint-rule <theme> <rule-name> --description "..."
+cargo xtask new-command <inspect|edit|refactor> <package> <command-name> --description "..."
+```
+
+`new-lint-rule` scaffolds the rule's `domain`/`usecase`/`rule`/`cli` files
+inside an existing `lint-<theme>` package and also registers it — bumping
+`RULE_COUNT` and appending its entry in
+`src/domain/lint/registry/mod.rs`, and the matching pinned-count assertions
+in `src/domain/lint/registry/catalog.rs` — because that step is pure
+arithmetic over one well-known pattern. `new-command` scaffolds the same
+shape without the rule registration, for a command outside the lint suite.
+
+Neither generator touches the composition root
+(`src/presentation/cli/{cli,command,dispatch,contract}.rs`,
+`tests/cli/dialect_contract.rs`, `docs/src/commands.md`). Wiring a command in
+by hand there is unavoidable — clap needs a real enum variant and match arm to
+add — and a script that edits those files blind has, in this project's own
+history, silently double-commaed `command.rs` or duplicated a
+`contract.rs` entry. Instead both generators print the exact remaining
+steps, with the current pinned counts read fresh from the repository, so
+finishing the wiring is a short, reviewable diff rather than a search.
+
+The `scripts/*-package.py` scripts are a separate, larger surface — moving
+code between whole packages, rewriting `crate::` paths across a package
+boundary — exercised only a few times a year. They stay Python; porting them
+carries more risk than leaving them alone.
+
 ## The verification gate
 
 Locally the gate is one command:
@@ -168,9 +202,10 @@ The stable replay test picks it up without anyone needing nightly again.
 ### Benchmark comparison
 
 ```sh
-./scripts/bench-compare.sh                 # against origin/main
-./scripts/bench-compare.sh v1.2.0          # against a tag
-THRESHOLD=15 ./scripts/bench-compare.sh    # allow 15% instead of 10%
+./scripts/bench-compare.sh                          # against origin/main
+./scripts/bench-compare.sh v1.2.0                   # against a tag
+THRESHOLD=15 ./scripts/bench-compare.sh             # allow 15% instead of 10%
+REPORT=bench-report.md ./scripts/bench-compare.sh   # also write a Markdown table
 ```
 
 The script checks the baseline out into a temporary git worktree, benchmarks
@@ -185,7 +220,10 @@ Two revisions measured back to back on one machine is the only comparison that
 survives it, and it is what the `benchmark` CI job runs on every pull request.
 
 That job reports rather than blocks: a performance regression is information
-for the reviewer, not grounds for stopping a correctness fix.
+for the reviewer, not grounds for stopping a correctness fix. It also writes
+the `REPORT` table to the job's step summary, unconditionally — every
+benchmark's change, not only the ones over threshold, so the reviewer sees
+the whole picture in the PR's Checks tab instead of having to open the log.
 
 ### Mutation testing
 

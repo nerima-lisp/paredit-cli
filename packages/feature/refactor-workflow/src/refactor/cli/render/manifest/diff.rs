@@ -9,6 +9,7 @@ use crate::refactor::cli::manifest::status::{
 };
 use anyhow::Result;
 use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
@@ -26,6 +27,7 @@ pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFor
 
     match output {
         OutputFormat::Text => {
+            let painter = Painter::stdout();
             println!(
                 "manifest_path\t{}",
                 safe_text!(result.manifest.path.display())
@@ -86,7 +88,7 @@ pub fn print_refactor_diff_result(result: &RefactorDiffResult, output: OutputFor
                     file.stale()
                 );
                 if !file.diff.is_empty() {
-                    print!("{}", file.diff);
+                    print!("{}", colorize_diff(painter, &file.diff));
                 }
             }
         }

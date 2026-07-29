@@ -23,8 +23,8 @@ use paredit_core_cli::report::FindingSeverity;
 use paredit_core_cli::report::interop::{self, Flattened, Row};
 
 use crate::presentation::cli::shared::{
-    analyze_files, apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree,
-    stable_text_hash, unified_diff, write_file_with_rollback,
+    FileFailure, analyze_files, apply_byte_span_edits, expand_input_files,
+    read_input_dialect_and_tree, stable_text_hash, unified_diff, write_file_with_rollback,
 };
 
 /// The 1-based line and byte-based column of a byte offset in `text`.
@@ -44,6 +44,40 @@ fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
         None => clamped + 1,
     };
     (line, column)
+}
+
+/// Every file `analyze_files` could not analyze failed the same way: none of
+/// them did. There is no partial report to produce, so this is the one case
+/// where a lint run still fails outright — naming the first failure by input
+/// order, the same file a fully serial run would have stopped on first.
+fn total_failure(failures: Vec<FileFailure>) -> anyhow::Error {
+    let first = failures
+        .into_iter()
+        .next()
+        .expect("total failure has at least one failure");
+    anyhow::anyhow!(
+        "failed to analyze {}: {}",
+        first.file.display(),
+        first.message
+    )
+}
+
+/// Notes, on stderr, any files `analyze_files` could not produce a result
+/// for — without failing the command over them. The files that did succeed
+/// still have a report worth producing; mirrors the cache-statistics note
+/// already printed for the same reason (an aside about the run, not part of
+/// the report body).
+fn note_partial_failures(failures: &[FileFailure]) {
+    if failures.is_empty() {
+        return;
+    }
+    eprintln!(
+        "warning: {} of the requested files could not be analyzed and are excluded from this report:",
+        failures.len()
+    );
+    for failure in failures {
+        eprintln!("  {}: {}", failure.file.display(), failure.message);
+    }
 }
 
 /// A SARIF `primaryLocationLineHash` for a finding: a hash of the rule and the
@@ -271,15 +305,19 @@ fn resolve_rule_settings(args: &LintReportArgs) -> Result<RuleSettings> {
             anyhow::anyhow!("malformed --rule-arg {argument:?}; expected <rule>.<key>=<value>")
         })?;
         if !RULES.contains(&rule) {
-            anyhow::bail!("unknown lint rule {rule:?} in --rule-arg {argument:?}");
+            let suggestion =
+                paredit_core_lint_engine::error::did_you_mean(RULES.iter().copied(), rule);
+            anyhow::bail!("unknown lint rule {rule:?} in --rule-arg {argument:?}{suggestion}");
         }
         let Some(declared) = rule_setting(rule, key) else {
             let valid: Vec<&str> = crate::application::usecase::lint_report::rule_settings(rule)
                 .iter()
                 .map(|setting| setting.key())
                 .collect();
+            let suggestion =
+                paredit_core_lint_engine::error::did_you_mean(valid.iter().copied(), key);
             anyhow::bail!(
-                "lint rule {rule:?} has no setting {key:?}; valid settings: {}",
+                "lint rule {rule:?} has no setting {key:?}; valid settings: {}{suggestion}",
                 if valid.is_empty() {
                     "(none)".to_owned()
                 } else {
@@ -324,8 +362,10 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
 
     if let Some(rule) = &args.explain {
         if !RULES.contains(&rule.as_str()) {
+            let suggestion =
+                paredit_core_lint_engine::error::did_you_mean(RULES.iter().copied(), rule);
             anyhow::bail!(
-                "unknown lint rule {rule:?}; run `inspect lint --list-rules` for the catalogue"
+                "unknown lint rule {rule:?}; run `inspect lint --list-rules` for the catalogue{suggestion}"
             );
         }
         return print_lint_explanation(rule, args.output);
@@ -416,7 +456,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     // tool and has no dependency between files, so it runs on every core.
     // `analyze_files` returns results in input order, which is what keeps the
     // report byte-identical however the workers were scheduled.
-    let per_file = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
         // The cached value is the *pre-baseline* finding set: a baseline is a
         // filter over the answer, not part of the question, so changing one
         // must not throw the analysis away.
@@ -477,9 +517,14 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
             .collect();
         let file_ids = assign_finding_ids(&kept, &input.text);
         Ok((kept, file_ids))
-    })?;
+    });
+    if analysis.is_total_failure() {
+        return Err(total_failure(analysis.failed));
+    }
+    note_partial_failures(&analysis.failed);
+    let file_failures = analysis.failed;
 
-    for (kept, file_ids) in per_file {
+    for (kept, file_ids) in analysis.succeeded {
         ids.extend(file_ids);
         findings.extend(kept);
     }
@@ -511,7 +556,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Result<
     let policy_passed = policy.passed;
     let policy_message = policy.violations.join("; ");
 
-    print_lint_report(&summary, &policy, &ids, &meta, args.output)?;
+    print_lint_report(&summary, &policy, &ids, &file_failures, &meta, args.output)?;
 
     if !policy_passed {
         return Err(crate::presentation::cli::gate::gate_failure(format!(
@@ -686,7 +731,7 @@ fn lint_report_sarif(
     // finding's suffix depends on how many identical-looking lines preceded it
     // — which is only well defined in file order. Computing per file in
     // parallel and numbering afterwards keeps both properties.
-    let per_file = analyze_files(files, args.dialect, |file, dialect, tree, input| {
+    let analysis = analyze_files(files, args.dialect, |file, dialect, tree, input| {
         let pass = run_lint_pass(
             file,
             dialect,
@@ -709,9 +754,13 @@ fn lint_report_sarif(
             .collect();
         let ids = assign_finding_ids(&findings, &input.text);
         Ok((findings, ids, fixes, input.text.clone()))
-    })?;
+    });
+    if analysis.is_total_failure() {
+        return Err(total_failure(analysis.failed));
+    }
+    note_partial_failures(&analysis.failed);
 
-    for (findings, ids, fixes, text) in per_file {
+    for (findings, ids, fixes, text) in analysis.succeeded {
         for (index, finding) in findings.into_iter().enumerate() {
             let start = finding.span.start().get();
             let end = finding.span.end().get();
@@ -936,7 +985,13 @@ fn lint_report_fix(
             if args.diff {
                 // Preview only: the unified diff is the payload (stdout, so it
                 // pipes to a file/pager), and nothing is written.
-                print!("{}", unified_diff(file, &input.text, &text));
+                print!(
+                    "{}",
+                    paredit_core_cli::color::colorize_diff(
+                        paredit_core_cli::color::Painter::stdout(),
+                        &unified_diff(file, &input.text, &text)
+                    )
+                );
             } else if !args.check {
                 write_file_with_rollback(file.clone(), text)?;
             }
@@ -1268,7 +1323,7 @@ fn lint_report_github(
     // interleaved by thread would be unreadable and, worse, unstable between
     // runs. The split is the general shape for adopting `analyze_files` in a
     // command that emits as it goes — compute per file, emit in file order.
-    let annotated = analyze_files(files, args.dialect, |file, dialect, tree, input| {
+    let analysis = analyze_files(files, args.dialect, |file, dialect, tree, input| {
         let findings = merge_custom(
             collect_lint_findings(file, dialect, tree)?,
             custom,
@@ -1286,9 +1341,13 @@ fn lint_report_github(
                 (finding, line, column)
             })
             .collect::<Vec<_>>())
-    })?;
+    });
+    if analysis.is_total_failure() {
+        return Err(total_failure(analysis.failed));
+    }
+    note_partial_failures(&analysis.failed);
 
-    for (finding, line, column) in annotated.into_iter().flatten() {
+    for (finding, line, column) in analysis.succeeded.into_iter().flatten() {
         finding_rules.push(finding.rule);
         print_lint_github_annotation(
             &finding.path.display().to_string(),

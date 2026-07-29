@@ -413,29 +413,41 @@ pub fn read_input_and_dialect(
     Ok((input, dialect))
 }
 
-/// Reads, resolves the dialect for, and parses one input.
+/// Checks the process deadline before reading `file` (or stdin, when
+/// `None`), and counts the read toward "how many inputs have been read" so a
+/// timeout's message can say how far the run got.
 ///
-/// This is where the process deadline is checked. Every multi-file report in
-/// this tool calls it once per file, so one check here bounds all ~130 of them
-/// without each workflow having to remember a budget it was never given.
-/// Checking *before* the read means an exhausted budget stops work rather than
-/// paying for one more parse to discover it has already stopped.
+/// Every multi-file report in this tool calls it once per file, so one check
+/// here bounds all of them without each workflow having to remember a budget
+/// it was never given. Checking *before* the read means an exhausted budget
+/// stops work rather than paying for one more read to discover it has
+/// already stopped.
+///
+/// Factored out of [`read_input_dialect_and_tree`] so a caller that needs the
+/// raw text without a tree — a multi-error parse scan, for one — still
+/// participates in the same budget every other read does, rather than
+/// silently opting out of it by not calling that function.
+pub fn check_deadline_for_read(file: Option<&FsPath>) -> CliResult<()> {
+    let deadline = paredit_core_safety::deadline::effective();
+    if !deadline.is_armed() {
+        return Ok(());
+    }
+    let scope = match file {
+        Some(path) => format!("reading {}", path.display()),
+        None => "reading stdin".to_owned(),
+    };
+    let completed = READS_COMPLETED.fetch_add(1, Ordering::Relaxed);
+    deadline
+        .check(scope, usize::try_from(completed).unwrap_or(usize::MAX))
+        .map_err(CliError::from)
+}
+
+/// Reads, resolves the dialect for, and parses one input.
 pub fn read_input_dialect_and_tree(
     file: Option<PathBuf>,
     explicit: Option<DialectArg>,
 ) -> CliResult<(SourceInput, Dialect, SyntaxTree)> {
-    let deadline = paredit_core_safety::deadline::effective();
-    if deadline.is_armed() {
-        let scope = match file.as_deref() {
-            Some(path) => format!("reading {}", path.display()),
-            None => "reading stdin".to_owned(),
-        };
-        let completed = READS_COMPLETED.fetch_add(1, Ordering::Relaxed);
-        deadline
-            .check(scope, usize::try_from(completed).unwrap_or(usize::MAX))
-            .map_err(CliError::from)?;
-    }
-
+    check_deadline_for_read(file.as_deref())?;
     let (input, dialect) = read_input_and_dialect(file, explicit)?;
     let tree = parse_document(&input, dialect)?;
     Ok((input, dialect, tree))
