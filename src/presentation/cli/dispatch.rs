@@ -758,6 +758,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::AddIgnoreDeclaration(args) => {
                 add_ignore_declaration::workflow::add_ignore_declaration(args)?;
             }
+            command::RefactorCommand::FoldConstants(args) => {
+                fold_constants::workflow::fold_constants(args)?;
+            }
             command::RefactorCommand::MoveDefinition(args) => {
                 definition_movement::move_definition::move_definition(args)?;
             }

@@ -183,6 +183,8 @@ mod extract_function;
 mod extract_local_function;
 #[path = "cli/flatten_progn.rs"]
 mod flatten_progn;
+#[path = "cli/fold_constants.rs"]
+mod fold_constants;
 #[path = "cli/form_report.rs"]
 mod form_report;
 #[path = "cli/format/mod.rs"]

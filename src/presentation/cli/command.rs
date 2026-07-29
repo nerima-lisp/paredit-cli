@@ -28,7 +28,7 @@ use super::{
     eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
     exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
     external_diagnostics_report, external_system_report, extract_constant, extract_function,
-    extract_local_function, flatten_progn, form_report, format_directive_report,
+    extract_local_function, flatten_progn, fold_constants, form_report, format_directive_report,
     format_missing_destination_report, format_newline_report, format_to_string_report,
     funcall_lambda_report, function_parameter, generic_dispatch_report, getf_default_nil_report,
     gethash_default_report, handler_case_no_clauses_report, hotspot_report,
@@ -676,6 +676,8 @@ pub(super) enum RefactorCommand {
     RemoveDefinition(definition_removal::args::RemoveDefinitionArgs),
     /// Plan or remove unused top-level definitions across explicit files.
     RemoveUnusedDefinitions(definition_removal::args::RemoveUnusedDefinitionsArgs),
+    /// Replace every expression `inspect constants` proves constant with the literal it evaluates to.
+    FoldConstants(fold_constants::args::FoldConstantsArgs),
     /// Insert (declare (ignore ...)) for every parameter `inspect unused-parameters` reports as unused.
     AddIgnoreDeclaration(add_ignore_declaration::args::AddIgnoreDeclarationArgs),
     /// Plan or move a top-level definition between files.
