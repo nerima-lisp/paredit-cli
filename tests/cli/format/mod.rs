@@ -129,3 +129,76 @@ fn cli_format_max_width_widens_the_inline_fit_threshold() {
         .success()
         .stdout(predicate::eq(input));
 }
+
+#[test]
+fn cli_format_diff_stat_reports_hunks_and_changed_lines() {
+    let dir = fresh_temp_dir("format-diff-stat");
+    let file = dir.join(Path::new("source.lisp"));
+    fs::write(&file, "(defun foo   ()   1)\n").expect("write unformatted fixture");
+
+    let output = paredit()
+        .arg("edit")
+        .arg("format")
+        .arg("--file")
+        .arg(&file)
+        .arg("--diff-stat")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value =
+        serde_json::from_slice(&output).expect("--diff-stat emits valid JSON");
+    assert_eq!(report["changed"], true);
+    assert_eq!(report["hunks"], 1);
+    assert!(report["added_lines"].as_u64().expect("added_lines") > 0);
+    assert!(report["removed_lines"].as_u64().expect("removed_lines") > 0);
+    // --diff-stat never writes.
+    assert_eq!(
+        fs::read_to_string(&file).expect("read fixture"),
+        "(defun foo   ()   1)\n"
+    );
+}
+
+#[test]
+fn cli_format_diff_stat_reports_no_changes_for_a_canonical_file() {
+    let dir = fresh_temp_dir("format-diff-stat-clean");
+    let file = dir.join(Path::new("source.lisp"));
+    fs::write(&file, "(defun foo ()\n  1)\n").expect("write canonical fixture");
+
+    let output = paredit()
+        .arg("edit")
+        .arg("format")
+        .arg("--file")
+        .arg(&file)
+        .arg("--diff-stat")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value =
+        serde_json::from_slice(&output).expect("--diff-stat emits valid JSON");
+    assert_eq!(report["changed"], false);
+    assert_eq!(report["hunks"], 0);
+    assert_eq!(report["added_lines"], 0);
+    assert_eq!(report["removed_lines"], 0);
+}
+
+#[test]
+fn cli_format_diff_stat_rejects_write_and_diff_together() {
+    let dir = fresh_temp_dir("format-diff-stat-conflicts");
+    let file = dir.join(Path::new("source.lisp"));
+    fs::write(&file, "(foo)\n").expect("write fixture");
+
+    paredit()
+        .arg("edit")
+        .arg("format")
+        .arg("--file")
+        .arg(&file)
+        .arg("--diff-stat")
+        .arg("--diff")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}

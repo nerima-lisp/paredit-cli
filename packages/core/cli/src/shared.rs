@@ -23,7 +23,7 @@ mod io;
 #[path = "macos_acl.rs"]
 mod macos_acl;
 
-pub use diff::unified_diff;
+pub use diff::{DiffStat, diff_stat, unified_diff};
 pub use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored};
 pub use io::{
     ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, parse_document, read_file_or_empty,

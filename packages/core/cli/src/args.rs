@@ -46,8 +46,12 @@ pub struct FormatArgs {
     /// Exit non-zero if --file is not already canonically formatted. Writes
     /// and prints nothing either way; for a CI gate that only wants an exit
     /// code, not `--diff`'s output on every clean file too.
-    #[arg(long, conflicts_with_all = ["write", "diff"])]
+    #[arg(long, conflicts_with_all = ["write", "diff", "diff_stat"])]
     pub check: bool,
+    /// Print a JSON count of changed hunks and lines instead of the rewritten
+    /// document or a human-readable diff. Writes nothing.
+    #[arg(long, conflicts_with_all = ["write", "diff", "check"])]
+    pub diff_stat: bool,
 }
 
 #[derive(Debug, Args)]

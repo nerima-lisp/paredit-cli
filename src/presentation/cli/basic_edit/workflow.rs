@@ -11,8 +11,8 @@ use crate::presentation::cli::args::{
 use std::path::Path;
 
 use crate::presentation::cli::shared::{
-    edit_target, edit_target_with, emit_document, read_input_and_dialect,
-    read_input_dialect_and_tree, resolve_compact, resolve_one, resolve_targets,
+    diff_stat, edit_target, edit_target_with, emit_document, read_input_and_dialect,
+    read_input_dialect_and_tree, resolve_compact, resolve_one, resolve_targets, unified_diff,
 };
 use paredit_core_cli::error::ArgumentError;
 use paredit_core_cli::kill_ring::{KillRingEntry, read_ring, ring_path, write_ring};
@@ -20,6 +20,7 @@ use paredit_core_syntax::selector::target_text;
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
     let check = args.check;
+    let diff_stat_only = args.diff_stat;
     let max_width = args.max_width;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let mut formatter = Formatter::with_dialect(args.indent, dialect);
@@ -41,6 +42,26 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
             .as_deref()
             .map_or_else(|| "stdin".to_owned(), |path| path.display().to_string());
         bail!("{where_} is not formatted; drop --check to see the diff or write it");
+    }
+
+    if diff_stat_only {
+        let path = input
+            .file
+            .clone()
+            .unwrap_or_else(|| std::path::PathBuf::from("stdin"));
+        let diff = unified_diff(&path, &input.text, &rendered);
+        let stat = diff_stat(&diff);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
+                "changed": !diff.is_empty(),
+                "hunks": stat.hunks,
+                "added_lines": stat.added_lines,
+                "removed_lines": stat.removed_lines,
+            }))?
+        );
+        return Ok(());
     }
 
     Ok(emit_document(
