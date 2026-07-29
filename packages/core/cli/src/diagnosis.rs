@@ -528,13 +528,16 @@ const fn classify_refusal(error: &IoRefusal) -> ErrorCode {
         IoRefusal::RewriteDoesNotReparse | IoRefusal::NamedRewriteDoesNotReparse { .. } => {
             ErrorCode::RefusalRewriteDoesNotReparse
         }
-        // The six time-of-check-to-time-of-use guards. One code because the
-        // response to all of them is the same: the file moved under us.
+        // The six time-of-check-to-time-of-use guards, plus a lock held by
+        // another process. One code because the response is the same for
+        // all seven: the situation may already have resolved itself, so
+        // re-read and retry rather than treat it as a shape problem.
         IoRefusal::ReplacedTarget { .. }
         | IoRefusal::HardLinkedTarget { .. }
         | IoRefusal::TargetReplacedSinceParsing { .. }
         | IoRefusal::TargetChangedSinceParsing { .. }
-        | IoRefusal::TargetRemovedSinceParsing { .. } => ErrorCode::RefusalTargetChanged,
+        | IoRefusal::TargetRemovedSinceParsing { .. }
+        | IoRefusal::WriteTargetLocked { .. } => ErrorCode::RefusalTargetChanged,
     }
 }
 

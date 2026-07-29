@@ -660,6 +660,9 @@ struct PortableStagedWrite {
     path: PathBuf,
     staged_path: PathBuf,
     backup_path: Option<PathBuf>,
+    // Held for its `Drop` side effect only; never read.
+    #[allow(dead_code)]
+    lock: WriteLock,
 }
 
 #[cfg(any(not(unix), test))]
@@ -700,6 +703,7 @@ fn stage_write_target_portable(
     content: String,
     expected_original: Option<ExpectedWriteTarget>,
 ) -> CliResult<PortableStagedWrite> {
+    let lock = acquire_write_lock(&path)?;
     let metadata = match fs::symlink_metadata(&path) {
         Ok(metadata) if metadata.file_type().is_symlink() => {
             return Err(IoRefusal::WriteSymlink {
@@ -844,6 +848,7 @@ fn stage_write_target_portable(
         path,
         staged_path,
         backup_path,
+        lock,
     })
 }
 
@@ -1034,6 +1039,11 @@ struct StagedWriteTarget {
     backup_digest: Option<[u8; 32]>,
     #[cfg(unix)]
     publication_state_uncertain: Cell<bool>,
+    /// Held until this value drops, whichever way staging, applying, or
+    /// rolling back this target ends. Never read; the `Drop` side effect is
+    /// the whole point.
+    #[allow(dead_code)]
+    lock: WriteLock,
 }
 
 #[cfg(unix)]
@@ -1132,6 +1142,7 @@ fn stage_write_target_expected_inner(
     #[cfg(unix)] parent: AnchoredDirectory,
     #[cfg(unix)] target_name: OsString,
 ) -> CliResult<StagedWriteTarget> {
+    let lock = acquire_write_lock(&path)?;
     let staged_digest = *blake3::hash(content.as_bytes()).as_bytes();
     let metadata = match target_symlink_metadata(
         #[cfg(unix)]
@@ -1437,6 +1448,7 @@ fn stage_write_target_expected_inner(
         backup_digest,
         #[cfg(unix)]
         publication_state_uncertain: Cell::new(false),
+        lock,
     };
     if let Err(error) = sync_parent_directory(
         #[cfg(unix)]
@@ -3422,6 +3434,117 @@ fn unique_sibling_path(path: &FsPath, suffix: &str) -> PathBuf {
     path.with_file_name(format!(".{file_name}.paredit-{suffix}-{pid}-{counter}"))
 }
 
+/// Unlike [`unique_sibling_path`], this name is deterministic rather than
+/// counter-suffixed: a second process racing for the same target has to be
+/// able to find the exact same path a first process created.
+fn write_lock_path(path: &FsPath) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("paredit");
+    path.with_file_name(format!(".{file_name}.paredit-lock"))
+}
+
+const WRITE_LOCK_ATTEMPTS: usize = 8;
+
+/// Holds a target's write lock for the lifetime of the staged write it
+/// belongs to; released by removing the lock file on drop, whichever way the
+/// staging/apply/rollback that owns it ends.
+#[derive(Debug)]
+struct WriteLock {
+    path: PathBuf,
+}
+
+impl Drop for WriteLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+/// Acquires `path`'s write lock, refusing fast if another live process
+/// already holds it.
+///
+/// This is mutual exclusion between separate *processes* racing for the same
+/// target, layered on top of — not a replacement for — the digest/identity
+/// re-validation the rest of this module already does: that guard is what
+/// makes two concurrent writes to the same file safe rather than corrupting,
+/// and stays in force even if this lock is ever bypassed by hand (a lock
+/// file left over from `kill -9`, for instance). What this adds is failing
+/// one of the two processes immediately, with a reason that names the
+/// conflict, instead of doing the staging work only to lose that guard's
+/// race at the very end.
+fn acquire_write_lock(path: &FsPath) -> CliResult<WriteLock> {
+    let lock_path = write_lock_path(path);
+    for _ in 0..WRITE_LOCK_ATTEMPTS {
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(libc::O_NOFOLLOW);
+        }
+        match options.open(&lock_path) {
+            Ok(mut file) => {
+                // Best effort: a lock file with no readable holder PID is
+                // simply never treated as stale, which is the safe default.
+                let _ = writeln!(file, "{}", std::process::id());
+                return Ok(WriteLock { path: lock_path });
+            }
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                if !lock_holder_is_stale(&lock_path) {
+                    return Err(IoRefusal::WriteTargetLocked {
+                        path: path.display().to_string(),
+                    }
+                    .into());
+                }
+                // The holder is gone; the lock it left behind is not doing
+                // anyone any good. Removing it and retrying is a race with
+                // any other process doing the same thing, which is why this
+                // loops rather than assuming the retry succeeds.
+                let _ = fs::remove_file(&lock_path);
+            }
+            Err(error) => {
+                return Err(error).map_err(CliError::io(format!(
+                    "failed to acquire write lock for {}",
+                    path.display()
+                )));
+            }
+        }
+    }
+    Err(IoRefusal::WriteTargetLocked {
+        path: path.display().to_string(),
+    }
+    .into())
+}
+
+/// Whether the process that created `lock_path` is provably gone.
+///
+/// Unreadable content, content that is not a PID, or (on a platform with no
+/// liveness check) any content at all: none of these count as stale. A false
+/// "still held" costs the caller a clear, resolvable error; a false "stale"
+/// would let two processes stage the same target at once.
+#[cfg(unix)]
+#[allow(unsafe_code)]
+fn lock_holder_is_stale(lock_path: &FsPath) -> bool {
+    let Ok(contents) = fs::read_to_string(lock_path) else {
+        return false;
+    };
+    let Ok(pid) = contents.trim().parse::<i32>() else {
+        return false;
+    };
+    // Signal 0 sends nothing; it only checks whether `pid` could be signalled
+    // at all. ESRCH is the one answer that means the process is gone —
+    // EPERM means it exists but is owned by someone else, which is still
+    // "held".
+    let sent = unsafe { libc::kill(pid, 0) };
+    sent != 0 && io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+}
+
+#[cfg(not(unix))]
+fn lock_holder_is_stale(_lock_path: &FsPath) -> bool {
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3680,6 +3803,69 @@ mod tests {
 
         refuse_symlinked_ancestors(&nested).expect("a chain with no symlinks must be allowed");
 
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn a_second_write_lock_on_the_same_target_is_refused() {
+        let directory = test_directory("write-lock-conflict");
+        let target = directory.join("target.lisp");
+
+        let first = acquire_write_lock(&target).expect("acquire the first lock");
+        let error =
+            acquire_write_lock(&target).expect_err("a second concurrent lock must be refused");
+        assert!(error.chain().contains("holds its write lock"));
+
+        drop(first);
+        acquire_write_lock(&target).expect("the lock is free once the holder drops it");
+
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn a_write_lock_is_released_once_dropped() {
+        let directory = test_directory("write-lock-release");
+        let target = directory.join("target.lisp");
+        let lock_path = write_lock_path(&target);
+
+        let lock = acquire_write_lock(&target).expect("acquire lock");
+        assert!(lock_path.exists());
+        drop(lock);
+        assert!(!lock_path.exists());
+
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_lock_left_by_a_dead_process_is_treated_as_stale() {
+        let directory = test_directory("write-lock-stale");
+        let target = directory.join("target.lisp");
+        let lock_path = write_lock_path(&target);
+        // A PID essentially guaranteed not to be a live process in this test
+        // run: `1` is already taken by init/launchd, so this uses a value
+        // outside any realistic PID range instead of trying to guess one.
+        fs::write(&lock_path, "2147483647\n").expect("write a stale lock file");
+
+        acquire_write_lock(&target).expect("a lock left by a dead process must not block");
+
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_lock_held_by_this_live_process_is_not_stale() {
+        let directory = test_directory("write-lock-live");
+        let target = directory.join("target.lisp");
+
+        // acquire_write_lock writes this process's own PID, which is
+        // guaranteed alive for the duration of the test.
+        let lock = acquire_write_lock(&target).expect("acquire lock");
+        let error =
+            acquire_write_lock(&target).expect_err("a lock held by a live process must persist");
+        assert!(error.chain().contains("holds its write lock"));
+
+        drop(lock);
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 

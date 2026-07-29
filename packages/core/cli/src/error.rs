@@ -92,6 +92,16 @@ pub enum IoRefusal {
     #[error("refusing to write through symlinked ancestor directory of {path}")]
     SymlinkedAncestorDirectory { path: String },
 
+    /// Another paredit process already holds this target's write lock.
+    ///
+    /// The existing digest/identity re-validation already refuses a write
+    /// whose target changed underneath it, so two concurrent invocations of
+    /// the same target never corrupt anything; this exists to fail one of
+    /// them fast, with a clear reason, instead of doing the (possibly slow)
+    /// staging work only to lose that race at the very end.
+    #[error("refusing to write {path}: another process holds its write lock")]
+    WriteTargetLocked { path: String },
+
     /// `--dry-run` reached a write the argument layer could not turn into a
     /// preview, because the command does not spell writing as `--write`.
     #[error(
