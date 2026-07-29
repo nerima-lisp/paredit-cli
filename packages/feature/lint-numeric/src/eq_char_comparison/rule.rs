@@ -59,7 +59,7 @@ impl LintRule for Rule {
         let mut items = Vec::new();
         examine_comparison(
             view,
-            context.path(),
+            context.source(),
             &is_character,
             &mut comparison_form_count,
             &mut items,

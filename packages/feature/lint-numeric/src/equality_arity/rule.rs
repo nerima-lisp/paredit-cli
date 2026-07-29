@@ -47,7 +47,7 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut call_count = 0;
         let mut items = Vec::new();
-        examine_call(view, context.path(), &mut call_count, &mut items);
+        examine_call(view, context.source(), &mut call_count, &mut items);
         for item in items {
             let span = item.span;
 
