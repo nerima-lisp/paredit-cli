@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 215] = [
+const INTROSPECTION_COMMANDS: [&str; 216] = [
     "inspect check",
     "inspect dialect",
     "inspect stats",
@@ -191,6 +191,7 @@ const INTROSPECTION_COMMANDS: [&str; 215] = [
     "inspect symbol-index",
     "inspect keyword-arity",
     "inspect unreachable-expressions",
+    "inspect external-diagnostics",
     "inspect external-systems",
     "inspect licenses",
     "inspect serial-consistency",

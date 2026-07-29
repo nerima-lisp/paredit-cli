@@ -619,6 +619,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Restarts(args) => {
                 restart_report::workflow::restart_report(args)?;
             }
+            command::InspectCommand::ExternalDiagnostics(args) => {
+                external_diagnostics_report::workflow::external_diagnostics_report(args)?;
+            }
             command::InspectCommand::Types(args) => type_report::workflow::type_report(args)?,
             command::InspectCommand::Narrowing(args) => {
                 narrowing_report::workflow::narrowing_report(args)?;

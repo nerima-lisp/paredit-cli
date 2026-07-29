@@ -661,6 +661,7 @@ dependencies = [
  "paredit-feature-code-metrics",
  "paredit-feature-conditional-conversion",
  "paredit-feature-emacs-lisp",
+ "paredit-feature-external-check",
  "paredit-feature-extract",
  "paredit-feature-form-transform",
  "paredit-feature-function-parameter",
@@ -821,6 +822,18 @@ version = "1.2.1"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-external-check"
+version = "1.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-safety",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

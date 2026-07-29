@@ -157,6 +157,8 @@ mod exhaustive_case_otherwise_report;
 mod explicit_nil_return_report;
 #[path = "cli/explicit_step_delta_report.rs"]
 mod explicit_step_delta_report;
+#[path = "cli/external_diagnostics.rs"]
+mod external_diagnostics;
 #[path = "cli/extract_constant/mod.rs"]
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]

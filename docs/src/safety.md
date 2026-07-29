@@ -75,9 +75,43 @@ A command that exceeds `--verify-timeout-ms` is killed and treated as a
 failure: a check that did not finish is not a check that passed.
 
 This is also the supported route to stronger, implementation-specific
-verification — compiling with SBCL, running a property suite, comparing
-behaviour before and after — without tying the tool itself to one Lisp
-implementation.
+verification — running a property suite, comparing behaviour before and after —
+without tying the tool itself to one Lisp implementation. A check that loads
+the system and compares results before and after a refactor is a
+`--verify-command`; it is deliberately not a built-in, because a built-in one
+would make every CI run depend on a particular implementation being installed
+and on the code being safe to evaluate.
+
+## Asking the implementation
+
+`inspect external-diagnostics` compiles each file with a real Common Lisp and
+reports its own diagnostics, placed at the definition it named:
+
+```sh
+paredit inspect external-diagnostics --implementation sbcl --save-baseline before.json src/
+# ... apply the refactor ...
+paredit inspect external-diagnostics --implementation sbcl \
+  --baseline before.json --fail-on-introduced src/
+```
+
+SBCL's compiler covers exactly the class of mistake a syntactic refactor can
+introduce — an undefined variable a rename missed, an arity a signature change
+broke, a `defmethod` with no matching generic — and comparing the diagnostic
+sets before and after is a stronger safety argument than any analysis in this
+tool can make alone. A diagnostic that was already there is not evidence
+against the refactor, which is why the baseline is a first-class input rather
+than something the caller diffs.
+
+**Compiling is executing.** `compile-file` runs the file's macros, its
+`eval-when (:compile-toplevel)` forms, and its `#.` read-time evaluation.
+Pointing this command at code is the same act as running it, which is why
+`--implementation` has no default. The compilation output goes to a temporary
+directory, so the source tree is untouched.
+
+An implementation that fails in a way this tool cannot read as diagnostics — a
+missing binary, an exhausted heap — is an error, never an empty report. A
+caller gating on this command must not read a check that did not run as a check
+that passed.
 
 ## Knowing the blast radius first
 
