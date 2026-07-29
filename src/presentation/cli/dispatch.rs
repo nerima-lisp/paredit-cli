@@ -680,6 +680,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::Patch(args) => {
                 structural_patch::workflow::structural_patch(args)?;
             }
+            command::RefactorCommand::Step(args) => {
+                refactor_step::workflow::refactor_step(args)?;
+            }
             command::RefactorCommand::WorkspacePlan(args) => {
                 refactor::workflow::workspace_refactor_plan(args)?;
             }

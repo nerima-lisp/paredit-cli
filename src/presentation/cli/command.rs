@@ -55,9 +55,9 @@ use super::{
     redundant_funcall_report, redundant_identity_key_report, redundant_identity_report,
     redundant_if_nil_report, redundant_let_star_report, redundant_prog1_report,
     redundant_progn_report, redundant_quote_report, redundant_start_zero_report,
-    redundant_the_report, refactor, remove_unused_binding, remove_unused_control, rename,
-    rename_control, replace_forms, restart_report, self_assignment_report, self_comparison_report,
-    serial_consistency_report, setf_arity_report, setq_non_variable_report,
+    redundant_the_report, refactor, refactor_step, remove_unused_binding, remove_unused_control,
+    rename, rename_control, replace_forms, restart_report, self_assignment_report,
+    self_comparison_report, serial_consistency_report, setf_arity_report, setq_non_variable_report,
     shadowed_binding_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
     similarity_report, single_arg_comparison_report, single_clause_cond_report,
     single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
@@ -609,6 +609,9 @@ pub(super) enum RefactorCommand {
     /// Carry the difference between two versions of one file onto a third,
     /// matching each change by structure rather than by position.
     Patch(structural_patch::args::StructuralPatchArgs),
+    /// Walk a preview manifest one edit at a time, taking only the steps you
+    /// accept.
+    Step(refactor_step::args::RefactorStepArgs),
     /// Discover Lisp sources under roots and build a gated refactor plan.
     WorkspacePlan(refactor::args::WorkspaceRefactorPlanArgs),
     /// Discover Lisp sources under roots and preview exact refactoring rewrites.

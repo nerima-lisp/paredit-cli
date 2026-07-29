@@ -385,6 +385,8 @@ mod refactor_entrypoint_contract;
 mod refactor_manifest;
 #[path = "cli/refactor_preview.rs"]
 mod refactor_preview;
+#[path = "cli/refactor_step.rs"]
+mod refactor_step;
 #[path = "cli/refactor_workspace/mod.rs"]
 mod refactor_workspace;
 #[path = "cli/remove_unused_binding/mod.rs"]

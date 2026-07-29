@@ -388,7 +388,8 @@ const STRUCTURAL_COMMANDS: [&str; 17] = [
     "edit barf-backward",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 79] = [
+const SEMANTIC_COMMANDS: [&str; 80] = [
+    "refactor step",
     "refactor patch",
     "refactor plan",
     "refactor verify",
@@ -525,7 +526,8 @@ const SCOPE_TIER_REPORTS: [&str; 27] = [
 
 /// Refactor plumbing that moves whole forms or drives the manifest workflow.
 /// None of it reads an operator name, so it is complete for every dialect.
-const SYNTAX_TIER_REFACTORS: [&str; 15] = [
+const SYNTAX_TIER_REFACTORS: [&str; 16] = [
+    "refactor step",
     "refactor patch",
     "refactor plan",
     "refactor verify",
