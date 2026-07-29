@@ -26,10 +26,11 @@ mod macos_acl;
 pub use diff::unified_diff;
 pub use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored};
 pub use io::{
-    ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, parse_document, read_file_or_empty,
-    read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_expected_target,
-    read_text_file_with_limit, read_text_with_limit, write_artifact_with_rollback,
-    write_file_with_rollback, write_files_with_rollback, write_files_with_rollback_expected,
+    ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, check_deadline_for_read, parse_document,
+    read_file_or_empty, read_input_and_dialect, read_input_dialect_and_tree,
+    read_text_file_with_expected_target, read_text_file_with_limit, read_text_with_limit,
+    write_artifact_with_rollback, write_file_with_rollback, write_files_with_rollback,
+    write_files_with_rollback_expected,
 };
 
 pub const fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {
@@ -490,6 +491,41 @@ pub fn expand_input_files(
     Ok(expanded)
 }
 
+/// One file `analyze_files` could not produce a result for, and why.
+#[derive(Debug, Clone)]
+pub struct FileFailure {
+    pub file: PathBuf,
+    /// The failure's message chain, flattened the way `anyhow`'s `{:#}`
+    /// flattens it — the same rendering a top-level command failure gets.
+    pub message: String,
+}
+
+/// The result of analyzing a list of files: what succeeded, and what did not.
+///
+/// Never itself an error. A file that fails to read or parse is data a
+/// report can act on — "N of M files analyzed cleanly" — not a reason to
+/// discard every other file's result, which is what returning
+/// `anyhow::Result<Vec<T>>` used to do: one bad file among a thousand good
+/// ones threw the whole run away and told the caller nothing about the other
+/// 999. Both fields preserve the input order of the files they came from.
+#[derive(Debug)]
+pub struct FileAnalysis<T> {
+    pub succeeded: Vec<T>,
+    pub failed: Vec<FileFailure>,
+}
+
+impl<T> FileAnalysis<T> {
+    /// Whether nothing could be analyzed at all.
+    ///
+    /// The one case a caller cannot report around: if every file failed,
+    /// there is no partial result to show, and the run should fail loudly
+    /// rather than print an empty report that looks like a clean one.
+    #[must_use]
+    pub fn is_total_failure(&self) -> bool {
+        self.succeeded.is_empty() && !self.failed.is_empty()
+    }
+}
+
 /// Reads, parses, and analyzes a list of files, using every available core.
 ///
 /// The shape every multi-file report in this tool has is
@@ -503,10 +539,11 @@ pub fn expand_input_files(
 ///   which thread finished first, so the report's bytes do not depend on
 ///   scheduling. That is the same-input-same-output contract, and it is the
 ///   reason the results are collected into pre-indexed slots rather than
-///   pushed as they arrive.
-/// - **The first failure by input order wins.** A run over ten files where
-///   files 2 and 7 both fail must report file 2, every time — not whichever
-///   thread lost the race.
+///   pushed as they arrive. [`FileAnalysis::succeeded`] and
+///   [`FileAnalysis::failed`] each keep that ordering independently.
+/// - **Every failure is kept, not only the first.** A run over ten files
+///   where files 2 and 7 both fail reports both, every time — not whichever
+///   thread lost the race, and not only the earliest by input order.
 /// - **One worker is the serial path.** With `--jobs 1`, or a list short
 ///   enough not to be worth a thread, no thread is spawned at all. A caller
 ///   debugging a panic gets the original stack.
@@ -521,54 +558,67 @@ pub fn analyze_files<T, F>(
     files: &[PathBuf],
     dialect: Option<DialectArg>,
     analyze: F,
-) -> anyhow::Result<Vec<T>>
+) -> FileAnalysis<T>
 where
     T: Send,
     F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> anyhow::Result<T> + Sync,
 {
     let workers = worker_count(files.len());
-    if workers <= 1 {
-        return files
+    let results: Vec<anyhow::Result<T>> = if workers <= 1 {
+        files
             .iter()
             .map(|file| analyze_one(file, dialect, &analyze))
-            .collect();
-    }
+            .collect()
+    } else {
+        // Static partition into contiguous chunks. A work-stealing queue would
+        // balance an uneven file-size distribution better; it would also need a
+        // dependency, a mutex on the hot path, and a reason to believe the
+        // imbalance costs more than the contention. Contiguous chunks of a
+        // sorted file list are close to even in practice, and each worker
+        // writes only its own slice — which is what makes the whole thing
+        // sound without a lock.
+        let mut results = files
+            .iter()
+            .map(|_| None::<anyhow::Result<T>>)
+            .collect::<Vec<_>>();
+        let per_worker = files.len().div_ceil(workers);
+        let analyze = &analyze;
 
-    // Static partition into contiguous chunks. A work-stealing queue would
-    // balance an uneven file-size distribution better; it would also need a
-    // dependency, a mutex on the hot path, and a reason to believe the
-    // imbalance costs more than the contention. Contiguous chunks of a sorted
-    // file list are close to even in practice, and each worker writes only its
-    // own slice — which is what makes the whole thing sound without a lock.
-    let mut results = files
-        .iter()
-        .map(|_| None::<anyhow::Result<T>>)
-        .collect::<Vec<_>>();
-    let per_worker = files.len().div_ceil(workers);
-    let analyze = &analyze;
-
-    std::thread::scope(|scope| {
-        for (chunk_index, slots) in results.chunks_mut(per_worker).enumerate() {
-            let start = chunk_index * per_worker;
-            scope.spawn(move || {
-                for (offset, slot) in slots.iter_mut().enumerate() {
-                    // `files` is borrowed immutably by every worker; the
-                    // mutable half is the disjoint slice each one owns.
-                    if let Some(file) = files.get(start + offset) {
-                        *slot = Some(analyze_one(file, dialect, analyze));
+        std::thread::scope(|scope| {
+            for (chunk_index, slots) in results.chunks_mut(per_worker).enumerate() {
+                let start = chunk_index * per_worker;
+                scope.spawn(move || {
+                    for (offset, slot) in slots.iter_mut().enumerate() {
+                        // `files` is borrowed immutably by every worker; the
+                        // mutable half is the disjoint slice each one owns.
+                        if let Some(file) = files.get(start + offset) {
+                            *slot = Some(analyze_one(file, dialect, analyze));
+                        }
                     }
-                }
-            });
-        }
-    });
+                });
+            }
+        });
 
-    // Collected in input order, so the report's bytes do not depend on which
-    // worker finished first, and the first failure by input order is the one
-    // reported.
-    results
-        .into_iter()
-        .map(|slot| slot.expect("every slot is filled before the scope ends"))
-        .collect()
+        results
+            .into_iter()
+            .map(|slot| slot.expect("every slot is filled before the scope ends"))
+            .collect()
+    };
+
+    let mut analysis = FileAnalysis {
+        succeeded: Vec::with_capacity(results.len()),
+        failed: Vec::new(),
+    };
+    for (file, result) in files.iter().zip(results) {
+        match result {
+            Ok(value) => analysis.succeeded.push(value),
+            Err(error) => analysis.failed.push(FileFailure {
+                file: file.clone(),
+                message: format!("{error:#}"),
+            }),
+        }
+    }
+    analysis
 }
 
 fn analyze_one<T, F>(file: &PathBuf, dialect: Option<DialectArg>, analyze: &F) -> anyhow::Result<T>
@@ -626,7 +676,106 @@ fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, p
 
 #[cfg(test)]
 mod tests {
-    use super::{require_output_file, terminal_safe, terminal_safe_error_chain};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::{
+        PathBuf, analyze_files, require_output_file, terminal_safe, terminal_safe_error_chain,
+    };
+
+    static TEST_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// A file under a fresh temp directory, so parallel test binaries never
+    /// collide.
+    fn test_file(name: &str, content: &str) -> PathBuf {
+        let directory = std::env::temp_dir().join(format!(
+            "paredit-cli-shared-{name}-{}-{}",
+            std::process::id(),
+            TEST_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&directory).expect("create test directory");
+        let path = directory.join(format!("{name}.lisp"));
+        std::fs::write(&path, content).expect("write test file");
+        path
+    }
+
+    #[test]
+    fn analyze_files_partitions_successes_and_failures_by_input_order() {
+        let files = vec![
+            test_file("a", "(defun a () 1)"),
+            test_file("b", "(defun b (\n"), // unclosed: fails
+            test_file("c", "(defun c () 3)"),
+        ];
+
+        let analysis = analyze_files(&files, None, |file, _dialect, _tree, _input| {
+            Ok(file.file_stem().unwrap().to_string_lossy().into_owned())
+        });
+
+        assert!(!analysis.is_total_failure());
+        assert_eq!(analysis.succeeded, vec!["a".to_owned(), "c".to_owned()]);
+        assert_eq!(analysis.failed.len(), 1);
+        assert_eq!(analysis.failed[0].file, files[1]);
+        assert!(
+            analysis.failed[0].message.contains("unclosed list"),
+            "{}",
+            analysis.failed[0].message
+        );
+    }
+
+    #[test]
+    fn analyze_files_reports_every_failure_not_only_the_first() {
+        let files = vec![
+            test_file("first-broken", "(defun a (\n"),
+            test_file("clean", "(defun b () 2)"),
+            test_file("second-broken", "(defun c (\n"),
+        ];
+
+        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| Ok(()));
+
+        assert_eq!(analysis.succeeded, vec![()]);
+        assert_eq!(analysis.failed.len(), 2);
+        assert_eq!(analysis.failed[0].file, files[0]);
+        assert_eq!(analysis.failed[1].file, files[2]);
+    }
+
+    #[test]
+    fn analyze_files_is_a_total_failure_only_when_nothing_succeeded() {
+        let all_broken = vec![
+            test_file("total-a", "(defun a (\n"),
+            test_file("total-b", "(defun b (\n"),
+        ];
+        let analysis = analyze_files(&all_broken, None, |_file, _dialect, _tree, _input| Ok(()));
+        assert!(analysis.is_total_failure());
+
+        let all_clean = vec![test_file("clean-only", "(defun a () 1)")];
+        let analysis = analyze_files(&all_clean, None, |_file, _dialect, _tree, _input| Ok(()));
+        assert!(!analysis.is_total_failure());
+
+        let empty: Vec<PathBuf> = Vec::new();
+        let analysis = analyze_files(&empty, None, |_file, _dialect, _tree, _input| Ok(()));
+        assert!(!analysis.is_total_failure());
+    }
+
+    /// The same partitioning holds on the parallel path — the worker
+    /// threshold is small enough to exercise from a unit test without a
+    /// slow fixture.
+    #[test]
+    fn analyze_files_partitions_correctly_on_the_parallel_path() {
+        let files: Vec<PathBuf> = (0..10)
+            .map(|index| {
+                if index == 4 {
+                    test_file(&format!("parallel-broken-{index}"), "(defun f (\n")
+                } else {
+                    test_file(&format!("parallel-ok-{index}"), "(defun f () 1)")
+                }
+            })
+            .collect();
+
+        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| Ok(()));
+
+        assert_eq!(analysis.succeeded.len(), 9);
+        assert_eq!(analysis.failed.len(), 1);
+        assert_eq!(analysis.failed[0].file, files[4]);
+    }
 
     #[test]
     fn require_output_file_rejects_missing_file() {

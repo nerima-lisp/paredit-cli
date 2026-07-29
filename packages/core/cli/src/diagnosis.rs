@@ -476,7 +476,7 @@ fn extract_offset(error: &anyhow::Error) -> Option<usize> {
         return offset_of_sexpr(sexpr);
     }
     if let Some(parse) = error.downcast_ref::<ParseError>() {
-        return Some(offset_of_parse(parse));
+        return Some(parse.position());
     }
     error.downcast_ref::<CliError>().and_then(offset_of_cli)
 }
@@ -484,7 +484,7 @@ fn extract_offset(error: &anyhow::Error) -> Option<usize> {
 const fn offset_of_cli(error: &CliError) -> Option<usize> {
     match error {
         CliError::Sexpr(sexpr) => offset_of_sexpr(sexpr),
-        CliError::Parse { source, .. } => Some(offset_of_parse(source)),
+        CliError::Parse { source, .. } => Some(source.position()),
         _ => None,
     }
 }
@@ -495,7 +495,7 @@ const fn offset_of_sexpr(error: &SexprError) -> Option<usize> {
         SexprError::Selection(selection) | SexprError::EditSelection { source: selection } => {
             offset_of_selection(selection)
         }
-        SexprError::Parse(parse) => Some(offset_of_parse(parse)),
+        SexprError::Parse(parse) => Some(parse.position()),
         SexprError::Path(PathError::InvalidSegment { .. }) | SexprError::Symbol(_) => None,
     }
 }
@@ -528,21 +528,6 @@ const fn offset_of_selection(error: &SelectionError) -> Option<usize> {
         | SelectionError::TreeMismatch
         | SelectionError::PathNotReachable { .. }
         | SelectionError::PathSegmentOutOfRange { .. } => None,
-    }
-}
-
-const fn offset_of_parse(error: &ParseError) -> usize {
-    match error {
-        ParseError::UnexpectedClose { position, .. }
-        | ParseError::UnsupportedReaderDispatch { position, .. }
-        | ParseError::MismatchedClose { position, .. }
-        | ParseError::ResourceLimitExceeded { position, .. }
-        | ParseError::UnclosedList(position)
-        | ParseError::UnterminatedString(position)
-        | ParseError::UnterminatedBlockComment(position)
-        | ParseError::UnterminatedSymbol(position)
-        | ParseError::DanglingSingleEscape(position)
-        | ParseError::MissingReaderForm(position) => *position,
     }
 }
 

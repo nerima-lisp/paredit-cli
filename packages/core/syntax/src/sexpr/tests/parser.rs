@@ -992,3 +992,55 @@ fn a_lang_directive_is_kept_as_trivia_rather_than_dropped() {
 
     assert_eq!(&source[..first.span.start().get()], "#lang racket/base\n");
 }
+
+// --- find_parse_errors: recovery and multiple reporting (Q6) ---
+
+#[test]
+fn find_parse_errors_is_empty_for_a_clean_document() {
+    let errors = SyntaxTree::find_parse_errors("(defun add (x y) (+ x y))\n", Dialect::CommonLisp);
+    assert!(errors.is_empty());
+}
+
+/// Two independent, self-contained errors — a stray closing delimiter right
+/// after an otherwise-complete top-level form, so neither swallows anything
+/// past itself — are both found, at their own absolute byte positions.
+#[test]
+fn find_parse_errors_reports_two_independent_errors_at_their_own_positions() {
+    let source = "(foo))\n(bar))\n";
+    let errors = SyntaxTree::find_parse_errors(source, Dialect::CommonLisp);
+
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(errors[0].position(), 5, "{errors:?}"); // the stray ')' after "(foo)"
+    assert_eq!(errors[1].position(), 12, "{errors:?}"); // the stray ')' after "(bar)"
+    assert!(matches!(errors[0], ParseError::UnexpectedClose { .. }));
+    assert!(matches!(errors[1], ParseError::UnexpectedClose { .. }));
+}
+
+/// A valid top-level form recovery skips over on its way to the next error
+/// is not itself reported as a problem.
+#[test]
+fn find_parse_errors_does_not_report_the_valid_form_it_recovers_through() {
+    let source = "(a))\n(ok 1)\n(b))\n";
+    let errors = SyntaxTree::find_parse_errors(source, Dialect::CommonLisp);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+}
+
+/// No column-zero `(` follows the failure, so there is nothing to resync on
+/// and this falls back to exactly what `parse_with_dialect` already
+/// reports: one error.
+#[test]
+fn find_parse_errors_falls_back_to_one_error_with_no_resync_point() {
+    let source = "(defun broken (x y";
+    let errors = SyntaxTree::find_parse_errors(source, Dialect::CommonLisp);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!(errors[0].position(), 14); // the unclosed inner "(x y" list
+}
+
+/// A syntax error on every line of a large file is bounded work and a
+/// bounded report, not one entry per line.
+#[test]
+fn find_parse_errors_is_capped_on_pathological_input() {
+    let source = "(f))\n".repeat(60);
+    let errors = SyntaxTree::find_parse_errors(&source, Dialect::CommonLisp);
+    assert_eq!(errors.len(), 50, "{errors:?}");
+}

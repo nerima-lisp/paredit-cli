@@ -176,6 +176,70 @@ fn cli_check_reports_parse_error_as_json_and_exits_nonzero() {
         .stdout(predicate::str::contains("unclosed list"));
 }
 
+/// `errors` reports every syntax problem in the file, not only the one the
+/// singular `error` field already reported — the round trip Q6 exists to cut.
+#[test]
+fn cli_check_json_reports_every_syntax_error_not_only_the_first() {
+    let mut cmd = paredit();
+    let stdout = cmd
+        .args(["inspect", "check", "--output", "json"])
+        .write_stdin("(foo))\n(bar))\n")
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+
+    assert_eq!(report["status"], "error");
+    // The singular field is unchanged: the first problem, as text.
+    assert!(
+        report["error"]
+            .as_str()
+            .expect("error")
+            .contains("unexpected closing delimiter")
+    );
+    let errors = report["errors"].as_array().expect("errors array");
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(errors[0]["offset"], 5);
+    assert_eq!(errors[1]["offset"], 12);
+}
+
+/// A clean file's `errors` array is empty, not merely absent.
+#[test]
+fn cli_check_json_errors_array_is_empty_for_a_clean_file() {
+    let mut cmd = paredit();
+    let stdout = cmd
+        .args(["inspect", "check", "--output", "json"])
+        .write_stdin("(defun add (x y) (+ x y))")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+    assert_eq!(report["errors"].as_array(), Some(&Vec::new()));
+}
+
+/// Text mode reports every problem too, one line each, before failing on the
+/// first — the same "fix one, see the next without re-running" the JSON
+/// shape offers.
+#[test]
+fn cli_check_text_reports_every_syntax_error_one_per_line() {
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("check")
+        .write_stdin("(foo))\n(bar))\n")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "error: unexpected closing delimiter ')' at byte 5",
+        ))
+        .stdout(predicate::str::contains(
+            "error: unexpected closing delimiter ')' at byte 12",
+        ));
+}
+
 #[test]
 fn cli_stats_reports_structural_metrics_as_json() {
     let mut cmd = paredit();
