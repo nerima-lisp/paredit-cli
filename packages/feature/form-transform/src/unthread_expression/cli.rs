@@ -4,14 +4,14 @@ use crate::unthread_expression::usecase::{
 };
 use anyhow::{Context, Result};
 use clap::Args;
+use paredit_core_cli::args::CompactSelectorArgs;
 use paredit_core_cli::args::DialectArg;
 use paredit_core_cli::args::OutputFormat;
 use paredit_core_cli::args::ThreadStyleArg;
 use paredit_core_cli::safe_text;
 use paredit_core_cli::shared::read_input_dialect_and_tree;
-use paredit_core_cli::shared::resolve_target;
+use paredit_core_cli::shared::resolve_compact_target;
 use paredit_core_cli::shared::write_file_with_rollback;
-use paredit_core_syntax::sexpr::Path;
 use paredit_core_syntax::sexpr::SymbolName;
 use serde_json::json;
 use std::path::PathBuf;
@@ -24,12 +24,8 @@ pub struct UnthreadExpressionArgs {
     /// Override extension-based dialect detection.
     #[arg(long)]
     dialect: Option<DialectArg>,
-    /// Select by child index path, for example 0.2.1.
-    #[arg(long, conflicts_with = "at")]
-    path: Option<Path>,
-    /// Select the smallest expression containing byte offset.
-    #[arg(long, conflicts_with = "path")]
-    at: Option<usize>,
+    #[command(flatten)]
+    selector: CompactSelectorArgs,
     /// Threading style. Required for custom operators other than -> and ->>.
     #[arg(long, value_enum)]
     style: Option<ThreadStyleArg>,
@@ -58,9 +54,15 @@ const fn application_unthread_style(style: ThreadStyleArg) -> ApplicationUnthrea
 
 pub fn unthread_expression(args: UnthreadExpressionArgs) -> Result<()> {
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let target = resolve_compact_target(
+        &tree,
+        dialect,
+        &args.selector,
+        "refactor unthread-expression",
+    )?;
+    let selection = tree.select_path(&target.path)?;
     let selected = selection.view();
-    let path = args.path.clone();
+    let path = Some(target.path.clone());
     let style = args.style.map(application_unthread_style);
     let plan = plan_unthread_expression(UnthreadExpressionRequest {
         input: &input.text,

@@ -405,6 +405,8 @@ mod repair_unclosed_lists;
 mod replace_forms;
 #[path = "cli/report_interop.rs"]
 mod report_interop;
+#[path = "cli/selector.rs"]
+mod selector;
 #[path = "cli/self_assignment_report.rs"]
 mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]
