@@ -16,13 +16,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent.
 fn is_reader_conditional(view: &ExpressionView) -> bool {
@@ -31,50 +33,58 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct UnwindProtectNoCleanupItem {
-    pub path: PathBuf,
     /// The span of the whole `(unwind-protect x)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the protected form `x` (for reconstructing the fix).
     pub form_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct UnwindProtectNoCleanupSummary {
-    pub unwind_protect_form_count: usize,
-    pub violations: Vec<UnwindProtectNoCleanupItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct UnwindProtectNoCleanupPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl UnwindProtectNoCleanupPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for UnwindProtectNoCleanupItem {
+    fn kind(&self) -> &'static str {
+        "unwind-protect-no-cleanup"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct UnwindProtectNoCleanupPolicy {
-    pub fail_on_violation: bool,
-    pub unwind_protect_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Nothing beyond the leading `kind`, path and line: this report's text
+    /// rows have never carried a column of their own.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// `form_span` is the fix's input, but the JSON has always published it —
+    /// it is how a consumer locates the protected form the wrapper collapses
+    /// to — so it stays on the report.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "form_span",
+            json!({
+                "start": self.form_span.start().get(),
+                "end": self.form_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `unwind-protect-no-cleanup` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "an unwind-protect with no cleanup is just its body; (unwind-protect x) is x".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     unwind_protect_form_count: &mut usize,
     violations: &mut Vec<UnwindProtectNoCleanupItem>,
 ) {
@@ -96,23 +106,35 @@ pub fn examine(
     }
 
     violations.push(UnwindProtectNoCleanupItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         form_span: form.span,
     });
 }
 
-/// Collects every cleanupless `(unwind-protect x)` across a whole file, along
-/// with the total number of `unwind-protect` forms scanned.
-pub fn collect_unwind_protect_no_cleanup(
+/// Collects every cleanupless `(unwind-protect x)` in one file, with the number
+/// of `unwind-protect` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no cleanupless unwind-protect here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_unwind_protect_no_cleanup_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<UnwindProtectNoCleanupItem>)> {
+) -> LintResult<FileFindings<UnwindProtectNoCleanupItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("unwind_protect_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut unwind_protect_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
@@ -120,54 +142,55 @@ pub fn collect_unwind_protect_no_cleanup(
         for_each_subview(&view, |subview| {
             examine(
                 subview,
-                path,
+                source,
                 &mut unwind_protect_form_count,
                 &mut violations,
             );
         });
     }
-    Ok((unwind_protect_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![(
+            "unwind_protect_form_count",
+            json!(unwind_protect_form_count),
+        )],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_unwind_protect_no_cleanup(
-    unwind_protect_form_count: usize,
-    violations: Vec<UnwindProtectNoCleanupItem>,
-) -> UnwindProtectNoCleanupSummary {
-    UnwindProtectNoCleanupSummary {
-        unwind_protect_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_unwind_protect_no_cleanup_policy(
-    options: UnwindProtectNoCleanupPolicyOptions,
-    summary: &UnwindProtectNoCleanupSummary,
-) -> UnwindProtectNoCleanupPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    UnwindProtectNoCleanupPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        unwind_protect_form_count: summary.unwind_protect_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn ups(input: &str) -> (usize, Vec<UnwindProtectNoCleanupItem>) {
+    fn report(input: &str) -> FileFindings<UnwindProtectNoCleanupItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_unwind_protect_no_cleanup(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect unwind-protect no cleanup")
+        build_unwind_protect_no_cleanup_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build unwind-protect no cleanup report")
+    }
+
+    /// The `(unwind_protect_form_count, violations)` pair the report is built
+    /// from.
+    fn ups(input: &str) -> (u64, Vec<UnwindProtectNoCleanupItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "unwind_protect_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("unwind_protect_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -200,33 +223,54 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(unwind-protect x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_unwind_protect_no_cleanup(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect unwind-protect no cleanup");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_unwind_protect_no_cleanup_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build unwind-protect no cleanup report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(
+            report.summary,
+            vec![("unwind_protect_form_count", json!(0))]
+        );
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = ups("(unwind-protect x)");
-        let summary = summarize_unwind_protect_no_cleanup(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(unwind-protect x (cleanup))").dialect_modelled);
+    }
 
-        let quiet = evaluate_unwind_protect_no_cleanup_policy(
-            UnwindProtectNoCleanupPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_form_span() {
+        let report = report("(defun f (x)\n  (unwind-protect x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "unwind-protect-no-cleanup");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "form_span",
+                json!({
+                    "start": finding.form_span.start().get(),
+                    "end": finding.form_span.end().get(),
+                })
+            )]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_unwind_protect_no_cleanup_policy(
-            UnwindProtectNoCleanupPolicyOptions::new(true),
-            &summary,
+    #[test]
+    fn the_summary_counts_every_unwind_protect_scanned_not_only_the_flagged_ones() {
+        let report = report("(unwind-protect x)\n(unwind-protect y (cleanup))\n");
+        assert_eq!(
+            report.summary,
+            vec![("unwind_protect_form_count", json!(2))]
         );
-        assert!(!strict.passed);
+        assert_eq!(report.findings.len(), 1);
     }
 }

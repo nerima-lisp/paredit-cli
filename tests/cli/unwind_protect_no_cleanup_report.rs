@@ -14,7 +14,11 @@ fn cli_flags_cleanupless() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"unwind_protect_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // The protected form's span survived the move onto the envelope.
+        .stdout(predicate::str::contains("\"form_span\""));
 }
 
 #[test]
@@ -31,7 +35,50 @@ fn cli_does_not_flag_with_cleanup() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "this unwind-protect protects
+        // something" from "no unwind-protect form at all".
+        .stdout(predicate::str::contains("\"unwind_protect_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("unwind-protect-no-cleanup-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(unwind-protect x)\n").expect("write a.clj");
+
+    paredit()
+        .args(["inspect", "unwind-protect-no-cleanup", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_unwind_protect_no_cleanup_emits_sarif() {
+    let dir = fresh_temp_dir("unwind-protect-no-cleanup-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(unwind-protect x)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "unwind-protect-no-cleanup", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/unwind-protect-no-cleanup/unwind-protect-no-cleanup\"",
+        ))
+        .stdout(predicate::str::contains(
+            "an unwind-protect with no cleanup is just its body; (unwind-protect x) is x",
+        ));
 }
 
 #[test]
