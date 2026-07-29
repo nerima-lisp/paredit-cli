@@ -15,15 +15,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is a `(lambda …)` list form (ignoring any reader prefix).
 fn is_lambda_form(view: &ExpressionView) -> bool {
@@ -32,48 +34,51 @@ fn is_lambda_form(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct SharpQuotedLambdaItem {
-    pub path: PathBuf,
     /// The span of the whole `#'(lambda …)` form (prefix included).
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
 }
 
-#[derive(Debug)]
-pub struct SharpQuotedLambdaSummary {
-    pub lambda_form_count: usize,
-    pub violations: Vec<SharpQuotedLambdaItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SharpQuotedLambdaPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SharpQuotedLambdaPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SharpQuotedLambdaItem {
+    /// Fixed: this rule has exactly one shape to report, and no sub-kind to
+    /// separate.
+    fn kind(&self) -> &'static str {
+        "sharp-quoted-lambda"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SharpQuotedLambdaPolicy {
-    pub fail_on_violation: bool,
-    pub lambda_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Empty, because the old text row carried nothing past the path and
+    /// offset: the span alone locates the redundant `#'`.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Empty, because the old JSON carried only the path and span, which the
+    /// envelope already emits.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `sharp-quoted-lambda` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "#' on a lambda is redundant; #'(lambda …) is (lambda …)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_lambda(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     lambda_form_count: &mut usize,
     violations: &mut Vec<SharpQuotedLambdaItem>,
 ) {
@@ -85,73 +90,82 @@ pub fn examine_lambda(
     // Flag only a lambda form whose sole reader prefix is the function `#'`.
     if view.reader_prefixes.len() == 1 && view.reader_prefixes[0] == ReaderPrefix::Function {
         violations.push(SharpQuotedLambdaItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
         });
     }
 }
 
-/// Collects every `#'(lambda …)` across a whole file, along with the total
-/// number of `lambda` forms scanned.
-pub fn collect_sharp_quoted_lambdas(
+/// Collects every `#'(lambda …)` in one file, with the number of `lambda` forms
+/// scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant `#'` here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_sharp_quoted_lambda_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SharpQuotedLambdaItem>)> {
+) -> LintResult<FileFindings<SharpQuotedLambdaItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("lambda_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut lambda_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_lambda(subview, path, &mut lambda_form_count, &mut violations);
+            examine_lambda(subview, source, &mut lambda_form_count, &mut violations);
         });
     }
-    Ok((lambda_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("lambda_form_count", json!(lambda_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_sharp_quoted_lambdas(
-    lambda_form_count: usize,
-    violations: Vec<SharpQuotedLambdaItem>,
-) -> SharpQuotedLambdaSummary {
-    SharpQuotedLambdaSummary {
-        lambda_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_sharp_quoted_lambda_policy(
-    options: SharpQuotedLambdaPolicyOptions,
-    summary: &SharpQuotedLambdaSummary,
-) -> SharpQuotedLambdaPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SharpQuotedLambdaPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        lambda_form_count: summary.lambda_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn lambdas(input: &str) -> (usize, Vec<SharpQuotedLambdaItem>) {
+    fn report(input: &str) -> FileFindings<SharpQuotedLambdaItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_sharp_quoted_lambdas(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect sharp-quoted lambdas")
+        build_sharp_quoted_lambda_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build sharp-quoted lambda report")
+    }
+
+    /// The `(lambda_form_count, violations)` pair the report is built from.
+    fn lambdas(input: &str) -> (u64, Vec<SharpQuotedLambdaItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "lambda_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("lambda_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -200,33 +214,41 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(mapcar #'(lambda (x) x) xs)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_sharp_quoted_lambdas(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect sharp-quoted lambdas");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_sharp_quoted_lambda_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build sharp-quoted lambda report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("lambda_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = lambdas("#'(lambda (x) x)");
-        let summary = summarize_sharp_quoted_lambdas(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(mapcar (lambda (x) x) xs)").dialect_modelled);
+    }
 
-        let quiet = evaluate_sharp_quoted_lambda_policy(
-            SharpQuotedLambdaPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The old report published only the path and span, so the envelope's own
+    /// columns are the whole finding.
+    #[test]
+    fn a_finding_carries_its_line_and_nothing_the_envelope_does_not_already_print() {
+        let report = report("(defun g ()\n  (sort xs #'(lambda (a b) (< a b))))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "sharp-quoted-lambda");
+        assert!(finding.text_columns().is_empty());
+        assert!(finding.json_fields().is_empty());
+    }
 
-        let strict = evaluate_sharp_quoted_lambda_policy(
-            SharpQuotedLambdaPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_lambda_scanned_not_only_the_flagged_ones() {
+        let report = report("#'(lambda (x) x)\n(lambda (y) y)\n#'(lambda (z) z)\n");
+        assert_eq!(report.summary, vec![("lambda_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

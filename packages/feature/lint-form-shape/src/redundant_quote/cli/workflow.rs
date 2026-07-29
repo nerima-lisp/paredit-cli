@@ -3,38 +3,28 @@ use paredit_core_cli::CommandResult;
 use crate::redundant_quote::cli::args::RedundantQuoteReportArgs;
 use crate::redundant_quote::cli::render::print_redundant_quote_report;
 use crate::redundant_quote::usecase::{
-    RedundantQuotePolicyOptions, collect_redundant_quotes, evaluate_redundant_quote_policy,
-    summarize_redundant_quotes,
+    build_redundant_quote_report, evaluate_fail_on_violation_policy,
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 pub fn redundant_quote_report(args: RedundantQuoteReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let mut quoted_form_count = 0;
-    let mut violations = Vec::new();
-
+    let mut reports = Vec::with_capacity(files.len());
     for file in &files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_quoted_form_count, file_violations) =
-            collect_redundant_quotes(file, dialect, &tree)?;
-        quoted_form_count += file_quoted_form_count;
-        violations.extend(file_violations);
+        reports.push(build_redundant_quote_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_redundant_quotes(quoted_form_count, violations);
-    let policy = evaluate_redundant_quote_policy(
-        RedundantQuotePolicyOptions::new(args.fail_on_violation),
-        &summary,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_redundant_quote_report(&summary, &policy, args.output)?;
+    print_redundant_quote_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "redundant-quote-report policy failed: {policy_message}"
+            "redundant-quote-report policy failed: {message}"
         )));
     }
 

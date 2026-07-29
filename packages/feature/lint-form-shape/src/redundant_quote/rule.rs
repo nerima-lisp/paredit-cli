@@ -42,7 +42,7 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut quoted_form_count = 0;
         let mut items = Vec::new();
-        examine_quote(view, context.path(), &mut quoted_form_count, &mut items);
+        examine_quote(view, context.source(), &mut quoted_form_count, &mut items);
         for item in items {
             let span = item.span;
             // The replacement is the quoted datum's own source, which the

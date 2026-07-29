@@ -21,15 +21,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled shape.
@@ -46,54 +48,65 @@ fn is_plain_variable(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct SingleValueBindItem {
-    pub path: PathBuf,
     /// The span of the whole `(multiple-value-bind (x) form body…)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the single bound variable `x`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to build
+    /// the `let` binding, and the command never printed it.
     pub var_span: ByteSpan,
     /// The span of the value form.
+    ///
+    /// The rewrite's input, not the report's — see [`Self::var_span`].
     pub form_span: ByteSpan,
     /// The span covering the body forms (`None` when there is no body).
+    ///
+    /// The rewrite's input, not the report's — see [`Self::var_span`].
     pub body_span: Option<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct SingleValueBindSummary {
-    pub bind_form_count: usize,
-    pub violations: Vec<SingleValueBindItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SingleValueBindPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SingleValueBindPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SingleValueBindItem {
+    /// Fixed: this rule has exactly one shape to report, and no sub-kind to
+    /// separate.
+    fn kind(&self) -> &'static str {
+        "single-value-bind"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SingleValueBindPolicy {
-    pub fail_on_violation: bool,
-    pub bind_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Empty, because the old text row carried nothing past the path and
+    /// offset: the span alone locates the bind.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Empty, because the old JSON carried only the path and span, which the
+    /// envelope already emits. The three rewrite spans stay off the report for
+    /// the same reason they were off it before.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `single-value-bind` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "multiple-value-bind of one variable is just let; (multiple-value-bind (x) f body) is (let ((x f)) body)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_bind(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     bind_form_count: &mut usize,
     violations: &mut Vec<SingleValueBindItem>,
 ) {
@@ -141,75 +154,85 @@ pub fn examine_bind(
     };
 
     violations.push(SingleValueBindItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         var_span: var.span,
         form_span: form.span,
         body_span,
     });
 }
 
-/// Collects every single-value `multiple-value-bind` across a whole file, along
-/// with the total number of `multiple-value-bind` forms scanned.
-pub fn collect_single_value_binds(
+/// Collects every single-value `multiple-value-bind` in one file, with the
+/// number of `multiple-value-bind` forms scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every bind here captures more than one
+/// value" for Common Lisp and "nothing was looked for" for Clojure, and the two
+/// read identically without the flag.
+pub fn build_single_value_bind_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SingleValueBindItem>)> {
+) -> LintResult<FileFindings<SingleValueBindItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("bind_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut bind_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_bind(subview, path, &mut bind_form_count, &mut violations);
+            examine_bind(subview, source, &mut bind_form_count, &mut violations);
         });
     }
-    Ok((bind_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("bind_form_count", json!(bind_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_single_value_binds(
-    bind_form_count: usize,
-    violations: Vec<SingleValueBindItem>,
-) -> SingleValueBindSummary {
-    SingleValueBindSummary {
-        bind_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_single_value_bind_policy(
-    options: SingleValueBindPolicyOptions,
-    summary: &SingleValueBindSummary,
-) -> SingleValueBindPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SingleValueBindPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        bind_form_count: summary.bind_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn binds(input: &str) -> (usize, Vec<SingleValueBindItem>) {
+    fn report(input: &str) -> FileFindings<SingleValueBindItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_single_value_binds(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect single-value binds")
+        build_single_value_bind_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build single-value bind report")
+    }
+
+    /// The `(bind_form_count, violations)` pair the report is built from.
+    fn binds(input: &str) -> (u64, Vec<SingleValueBindItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "bind_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("bind_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -275,30 +298,43 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(multiple-value-bind (x) (f) x)", Dialect::Clojure)
                 .expect("parse");
-        let (count, violations) =
-            collect_single_value_binds(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect single-value binds");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_single_value_bind_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build single-value bind report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("bind_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = binds("(multiple-value-bind (x) (f) x)");
-        let summary = summarize_single_value_binds(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(multiple-value-bind (q r) (f) q)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_single_value_bind_policy(SingleValueBindPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The old report published only the path and span, so the envelope's own
+    /// columns are the whole finding — the three rewrite spans stay internal.
+    #[test]
+    fn a_finding_carries_its_line_and_nothing_the_envelope_does_not_already_print() {
+        let report = report("(defun g ()\n  (multiple-value-bind (v) (compute) (list v)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "single-value-bind");
+        assert!(finding.text_columns().is_empty());
+        assert!(finding.json_fields().is_empty());
+    }
 
-        let strict =
-            evaluate_single_value_bind_policy(SingleValueBindPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_bind_scanned_not_only_the_flagged_ones() {
+        let report = report(
+            "(multiple-value-bind (x) (f) x)\n(multiple-value-bind (q r) (g) q)\n(multiple-value-bind (y) (h) y)\n",
+        );
+        assert_eq!(report.summary, vec![("bind_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

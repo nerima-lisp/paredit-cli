@@ -15,61 +15,74 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
+use serde_json::{Value, json};
 
 const ASSIGNMENT_HEADS: [&str; 4] = ["setq", "psetq", "setf", "psetf"];
 
 #[derive(Debug, Clone)]
 pub struct SetfArityItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The 1-based line the assignment form starts on.
+    pub line: usize,
+    /// The operator as it is spelled in the source, so its case survives.
+    /// Data rather than a tag: `SETF` and `setf` are the same operator but not
+    /// the same string, which is why this is not the finding's `kind`.
     pub operator: String,
     pub argument_count: usize,
 }
 
-#[derive(Debug)]
-pub struct SetfAritySummary {
-    pub assignment_form_count: usize,
-    pub violations: Vec<SetfArityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SetfArityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SetfArityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SetfArityItem {
+    /// Fixed: the operator is source-cased data rather than a closed set of
+    /// tags, and there is only one class of finding here.
+    fn kind(&self) -> &'static str {
+        "setf-arity"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SetfArityPolicy {
-    pub fail_on_violation: bool,
-    pub assignment_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("op={}", self.operator),
+            format!("args={}", self.argument_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("argument_count", json!(self.argument_count)),
+        ]
+    }
+
+    /// The same sentence the `setf-arity` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} has {} arguments; place/value pairs require an even count",
+            self.operator, self.argument_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     assignment_form_count: &mut usize,
     violations: &mut Vec<SetfArityItem>,
 ) {
@@ -87,75 +100,84 @@ pub fn examine_assignment(
     let argument_count = view.children.len() - 1;
     if argument_count > 0 && argument_count % 2 == 1 {
         violations.push(SetfArityItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             operator: head.to_owned(),
             argument_count,
         });
     }
 }
 
-/// Collects every odd-arity `setq`/`setf`/`psetq`/`psetf` across a whole
-/// file, along with the total number of assignment forms scanned.
-pub fn collect_setf_arity_violations(
+/// Collects every odd-arity `setq`/`setf`/`psetq`/`psetf` in one file, with the
+/// number of assignment forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every assignment here is even-arity" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_setf_arity_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SetfArityItem>)> {
+) -> LintResult<FileFindings<SetfArityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("assignment_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut assignment_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_assignment(subview, path, &mut assignment_form_count, &mut violations);
+            examine_assignment(subview, source, &mut assignment_form_count, &mut violations);
         });
     }
-    Ok((assignment_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("assignment_form_count", json!(assignment_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_setf_arity_violations(
-    assignment_form_count: usize,
-    violations: Vec<SetfArityItem>,
-) -> SetfAritySummary {
-    SetfAritySummary {
-        assignment_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_setf_arity_policy(
-    options: SetfArityPolicyOptions,
-    summary: &SetfAritySummary,
-) -> SetfArityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SetfArityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        assignment_form_count: summary.assignment_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<SetfArityItem>) {
+    fn report(input: &str) -> FileFindings<SetfArityItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_setf_arity_violations(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect setf arity violations")
+        build_setf_arity_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build setf arity report")
+    }
+
+    /// The `(assignment_form_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<SetfArityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "assignment_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("assignment_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -201,26 +223,43 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(setf a 1 b)").expect("parse input");
-        let (assignment_form_count, violations) =
-            collect_setf_arity_violations(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect setf arity violations");
-        assert_eq!(assignment_form_count, 0);
-        assert!(violations.is_empty());
+        let report = build_setf_arity_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build setf arity report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("assignment_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (assignment_form_count, items) = violations("(setf a 1 b)");
-        let summary = summarize_setf_arity_violations(assignment_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(setf a 1 b 2)").dialect_modelled);
+    }
 
-        let quiet = evaluate_setf_arity_policy(SetfArityPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_argument_count() {
+        let report = report("(defun f ()\n  (psetq a 1 b))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "setf-arity");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("psetq")), ("argument_count", json!(3))]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["op=psetq".to_owned(), "args=3".to_owned()]
+        );
+    }
 
-        let strict = evaluate_setf_arity_policy(SetfArityPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_assignment_scanned_not_only_the_flagged_ones() {
+        let report = report("(setf a 1 b)\n(setf c 2)\n(setq d 3 e)\n");
+        assert_eq!(report.summary, vec![("assignment_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }
