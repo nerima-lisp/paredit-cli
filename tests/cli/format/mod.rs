@@ -131,6 +131,65 @@ fn cli_format_max_width_widens_the_inline_fit_threshold() {
 }
 
 #[test]
+fn cli_format_max_width_moves_the_definition_header_threshold() {
+    // The whole-form fit test behind a `defsystem` header was still reading
+    // the compiled-in 80-column constant, so `--max-width` moved every other
+    // width decision in the formatter but not this one.
+    let inline =
+        "(defsystem \"foo\" :description \"short\" :version \"0.1.0\" :depends-on (:asdf))\n";
+    let broken = "(defsystem \"foo\"\n  :description \"short\"\n  :version \"0.1.0\"\n  :depends-on (:asdf))\n";
+
+    let dir = fresh_temp_dir("format-max-width-defsystem");
+    let file = dir.join(Path::new("system.asd"));
+    fs::write(&file, inline).expect("write fixture");
+
+    paredit()
+        .arg("edit")
+        .arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::eq(inline));
+
+    paredit()
+        .arg("edit")
+        .arg("format")
+        .arg("--file")
+        .arg(&file)
+        .arg("--max-width")
+        .arg("40")
+        .assert()
+        .success()
+        .stdout(predicate::eq(broken));
+
+    // And the other direction: a header past the default fits once widened.
+    let long = "(defsystem \"foo\" :description \"a description that pushes this past eighty columns\" :version \"0.1.0\")\n";
+    let long_file = dir.join(Path::new("long.asd"));
+    fs::write(&long_file, long).expect("write fixture");
+
+    paredit()
+        .arg("edit")
+        .arg("format")
+        .arg("--file")
+        .arg(&long_file)
+        .assert()
+        .success()
+        .stdout(predicate::eq(long).not());
+
+    paredit()
+        .arg("edit")
+        .arg("format")
+        .arg("--file")
+        .arg(&long_file)
+        .arg("--max-width")
+        .arg("120")
+        .assert()
+        .success()
+        .stdout(predicate::eq(long));
+}
+
+#[test]
 fn cli_format_diff_stat_reports_hunks_and_changed_lines() {
     let dir = fresh_temp_dir("format-diff-stat");
     let file = dir.join(Path::new("source.lisp"));
