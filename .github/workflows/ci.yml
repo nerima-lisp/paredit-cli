@@ -121,10 +121,19 @@ jobs:
   # `continue-on-error` on purpose: a performance regression is information for
   # the reviewer, not grounds for blocking a correctness fix. The job's failure
   # is visible in the checks list without gating the merge.
+  #
+  # The timeout was 45 minutes when the job took 18, because two full workspace
+  # builds under fat LTO and one codegen unit accounted for roughly 800 of its
+  # 1082 seconds. `[profile.bench]` in Cargo.toml stopped that: the same two
+  # builds are now parallel rather than serial, which on a four-core runner is
+  # a 4x difference. A job that used to be the longest in this workflow — it
+  # set the wall clock of every pull request single-handed — should not still
+  # be allowed to run for three quarters of an hour before anyone notices it
+  # hung. 20 leaves better than 3x headroom over the measured cost.
   benchmark:
     name: Benchmark against the merge base
     if: github.event_name == 'pull_request'
-    timeout-minutes: 45
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

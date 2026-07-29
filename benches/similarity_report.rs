@@ -13,7 +13,11 @@ use paredit_cli::application::usecase::similarity_report::{
 };
 use paredit_cli::domain::dialect::Dialect;
 
-const INPUT_SIZES: [usize; 3] = [32, 64, 128];
+/// The two ends of the range, and deliberately nothing between them — see the
+/// same constant in `benches/lint_report.rs`. It matters more here, where the
+/// scenarios are about pruning behaviour that is quadratic in the candidate
+/// count: 32 and 128 bracket that curve, and 64 sat on the line between them.
+const INPUT_SIZES: [usize; 2] = [32, 128];
 const RETENTION_MODES: [(Option<usize>, &str); 2] =
     [(Some(1), "top1-retention"), (None, "full-retention")];
 
