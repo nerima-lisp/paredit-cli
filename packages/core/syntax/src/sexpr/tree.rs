@@ -893,6 +893,51 @@ impl<'a> Selection<'a> {
         self.tree.expression_view(self.node_id)
     }
 
+    /// Returns the zero-based path from the virtual root to this selection.
+    ///
+    /// The inverse of [`SyntaxTree::select_path`]. Every command in this tool
+    /// addresses a form by path, so an operation that *finds* a form — `select
+    /// --at`, `edit navigate` — has to be able to say which path it landed on,
+    /// or its answer cannot be fed back in.
+    #[must_use]
+    pub fn path(self) -> ExpressionPath {
+        let mut indexes = Vec::new();
+        let mut current = self.node_id;
+        while let Some(parent_id) = self.tree.node(current).parent {
+            let position = self
+                .tree
+                .node(parent_id)
+                .children
+                .iter()
+                .position(|id| *id == current)
+                .expect("a node is listed among its own parent's children");
+            indexes.push(position);
+            current = parent_id;
+        }
+        indexes.reverse();
+        ExpressionPath::from_indexes(indexes)
+    }
+
+    /// Returns whether this selection is a list or an atom.
+    #[must_use]
+    pub fn kind(self) -> ExpressionKind {
+        match self.node().kind {
+            NodeKind::Root => ExpressionKind::Root,
+            NodeKind::List => ExpressionKind::List,
+            NodeKind::Atom => ExpressionKind::Atom,
+        }
+    }
+
+    /// Returns the head symbol of a selected list, ignoring reader prefixes.
+    #[must_use]
+    pub fn head(self) -> Option<&'a str> {
+        let node = self.node();
+        if node.kind != NodeKind::List {
+            return None;
+        }
+        self.tree.atom_text(*node.children.first()?)
+    }
+
     /// Returns the enclosing list span when the parent node is a list.
     pub fn enclosing_list_span(self) -> SexprResult<ByteSpan> {
         let parent_id = self.node().parent.ok_or(StructureError::NoEnclosingList)?;

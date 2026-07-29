@@ -115,9 +115,56 @@ model, a binding table, nine lint rules, and a per-file report.
   `inspect form --name parse-header` turns a name into a path in one call. Its
   JSON now reports the *resolved* path for `--at` and the other coordinate
   selectors, where it previously reported `null`.
+- Thirteen `edit` commands and one `inspect` report close the remaining gaps
+  against Emacs `paredit.el`, whose keystroke-level operations had no CLI
+  equivalent:
+  - `edit wrap --delimiter doublequote` wraps a form in a string literal,
+    escaping the quotes and backslashes it contains (`paredit-meta-doublequote`).
+    `--prefix quote|quasiquote|unquote|unquote-splicing|sharp-quote` attaches
+    reader sugar instead of a delimiter pair, and `edit unwrap-prefix` removes
+    it — outermost first, or all of it with `--all`.
+  - `edit navigate --direction forward|backward|up|down` prints the `--path`
+    the move lands on, so an agent composes addresses instead of computing
+    them. Text output is the bare path. It refuses at a list's boundary rather
+    than silently changing depth, which is right for an address even though
+    Emacs moves point out of the list.
+  - `edit delete-forward` / `edit delete-backward` delete one character at a
+    byte offset and refuse anything structural: a delimiter with something
+    inside it, the whitespace holding two symbols apart, a comment's opening
+    token. `()` and `""` are deleted as a pair, and a backslash inside a string
+    travels with the character it escapes.
+  - `edit newline` inserts a break and reindents the definition it landed in,
+    refusing an offset inside a string, a comment, a symbol, or reader sugar.
+  - `edit reindent-defun` reindents one definition to the Emacs
+    `lisp-indent-function` convention *without* rewrapping its lines, which
+    `edit format` cannot do — a one-character insertion should not arrive in
+    review as a twenty-line diff. `inspect indentation` now measures deviation
+    from the same table this produces, rather than a second copy of it.
+  - `edit copy` prints a form together with the own-line comment block above
+    it, which `edit select` leaves behind. With `--to-ring` it, `edit kill
+    --to-ring`, and `edit yank` share a kill ring: a named file, from `--ring`,
+    then `$PAREDIT_KILL_RING`, then `.paredit/kill-ring.json`. Repository-
+    relative by default, so two checkouts do not share a clipboard by accident.
+  - `edit raise --levels N` climbs N enclosing lists in one call, and names how
+    deep the selection actually sat when it cannot.
+  - `edit transpose --with-path` / `--with-at` / `--with-select` swaps any two
+    expressions in the same list, not only adjacent ones. The partner keeps its
+    own flag names because the primary selector already claims `--path`,
+    `--at` and `--select`.
+  - `edit split-string` splits a string literal in two, the inverse of `edit
+    join` on two strings. `edit escape-string` / `edit unescape-string` add and
+    remove one level of escaping; unescaping collapses `\\` and `\"` only and
+    refuses any other sequence, because `"a\nb"` is a newline in Emacs Lisp and
+    the letter `n` in Common Lisp.
+  - `inspect context-at` reports whether a byte offset is code, a string, a
+    comment, a delimiter, reader sugar, or the whitespace between forms, with
+    the enclosing list, the nesting depth, and the stack of open delimiters.
+    `--fail-on-structural` turns "a character edit here is not safe" into exit
+    code 3 — the question to ask before a cursor edit rather than after a
+    refused one.
 - `inspect capabilities --schema-version 3` reports a `dialect_contract` in
-  which every one of the 2760 command/dialect cells is answered. Previously
-  2720 of them said `unknown`. Cells gain a fourth status, `silent`: the
+  which every one of the 3250 command/dialect cells is answered. Previously
+  2720 of the 2760 cells the matrix then held said `unknown`. Cells gain a fourth status, `silent`: the
   command succeeds and reports nothing because it has no rules for that
   dialect, which is not the same as finding nothing. Roughly 155 of the 276
   commands are silent outside Common Lisp. Each command also reports the

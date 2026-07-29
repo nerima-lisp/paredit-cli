@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 224] = [
+const INTROSPECTION_COMMANDS: [&str; 225] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -372,15 +372,19 @@ const INTROSPECTION_COMMANDS: [&str; 224] = [
     "inspect empty-let",
     "inspect identity-arithmetic",
     "inspect redundant-divisor",
+    "inspect context-at",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
 
-const STRUCTURAL_COMMANDS: [&str; 17] = [
+const STRUCTURAL_COMMANDS: [&str; 29] = [
     "edit select",
     "edit replace",
     "edit kill",
+    "edit copy",
+    "edit yank",
     "edit wrap",
+    "edit unwrap-prefix",
     "edit splice",
     "edit split",
     "edit join",
@@ -394,6 +398,15 @@ const STRUCTURAL_COMMANDS: [&str; 17] = [
     "edit slurp-backward",
     "edit barf-forward",
     "edit barf-backward",
+    "edit transpose",
+    "edit navigate",
+    "edit delete-forward",
+    "edit delete-backward",
+    "edit newline",
+    "edit reindent-defun",
+    "edit split-string",
+    "edit escape-string",
+    "edit unescape-string",
 ];
 
 const SEMANTIC_COMMANDS: [&str; 80] = [
@@ -487,7 +500,8 @@ const SEMANTIC_COMMANDS: [&str; 80] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 12] = [
+const SYNTAX_TIER_REPORTS: [&str; 13] = [
+    "inspect context-at",
     "inspect diff",
     "inspect elisp-file",
     "inspect check",

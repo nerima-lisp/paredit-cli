@@ -291,6 +291,44 @@ paredit inspect agent-report --file source.lisp
 `inspect form --name parse-header` turns a name into a path in one call —
 previously that took an `outline` pass first.
 
+## Walking from a path you already have
+
+`edit navigate` answers "which path is one step that way" without another
+report. In text mode it prints the bare path, so it substitutes directly into
+the next command:
+
+```sh
+# The sibling after --path 0.2.
+paredit edit navigate --file source.lisp --path 0.2 --direction forward
+
+# Compose it.
+paredit edit select --file source.lisp \
+  --path "$(paredit edit navigate --file source.lisp --path 0.2 --direction forward)"
+```
+
+`--direction forward|backward` move between siblings, `up` goes to the
+enclosing expression, and `down` goes to the first child. Each is exactly one
+step: at the end of a list, `forward` fails rather than moving out of it, so a
+composed sequence never silently changes depth. `--output json` reports the
+span, kind, and head of both ends of the move.
+
+## Asking what is at an offset
+
+`--at` selects the smallest *expression* containing an offset, which says
+nothing about whether the offset is inside a string, a comment, or a
+delimiter. `inspect context-at` answers that, and is what the character edits
+(`edit delete-forward`, `edit delete-backward`, `edit newline`) check before
+refusing:
+
+```sh
+paredit inspect context-at --file source.lisp --at 42 --output json
+```
+
+It reports the kind of text at the offset, whether a character edit there is
+structurally inert, the innermost expression and enclosing list, the nesting
+depth, and the stack of open delimiters. `--fail-on-structural` turns "not
+inert" into exit code 3 for use as a gate.
+
 ## Files and stdin
 
 Single-document commands read `--file` when given and stdin otherwise.

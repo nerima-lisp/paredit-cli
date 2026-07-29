@@ -178,7 +178,45 @@ version: 1.4.0
     <command>paredit edit barf-backward --file f.lisp --path 0.3 --write</command>
     <command>paredit edit transpose-forward --file f.lisp --path 0.3 --write</command>
     <command>paredit edit transpose-backward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit transpose --file f.lisp --path 0.1 --with-path 0.3 --write</command>
+    <command>paredit edit transpose --file f.lisp --name foo --with-select name:bar --write</command>
+    <command>paredit edit raise --file f.lisp --path 0.3.1 --levels 2 --write</command>
+    <command>paredit edit wrap --file f.lisp --path 0.3 --delimiter doublequote --write</command>
+    <command>paredit edit wrap --file f.lisp --path 0.3 --prefix quote --write</command>
+    <command>paredit edit unwrap-prefix --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit split-string --file f.lisp --at 120 --write</command>
+    <command>paredit edit escape-string --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit unescape-string --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit reindent-defun --file f.lisp --path 0 --write</command>
     <command>paredit edit select --file f.lisp --path 0.3</command>
+    <command>paredit edit copy --file f.lisp --path 0.3</command>
+  </group>
+  <group name="navigation_and_cursor">
+    <description>
+      Answer "which path" and "is this offset safe" before editing, instead of computing a
+      path by hand and discovering it was wrong from a refusal. `navigate` prints a bare
+      path in text mode, so it substitutes straight into the next command's --path.
+      `context-at` says whether a byte offset is code, a string, a comment, a delimiter or
+      reader sugar; the character edits refuse every offset it reports as carrying
+      structure.
+    </description>
+    <command>paredit edit navigate --file f.lisp --path 0.3 --direction forward</command>
+    <command>paredit edit navigate --file f.lisp --path 0.3 --direction down --output json</command>
+    <command>paredit inspect context-at --file f.lisp --at 120 --output json</command>
+    <command>paredit edit delete-forward --file f.lisp --at 120 --write</command>
+    <command>paredit edit delete-backward --file f.lisp --at 120 --write</command>
+    <command>paredit edit newline --file f.lisp --at 120 --write</command>
+  </group>
+  <group name="kill_ring">
+    <description>
+      Move a form between files without reconstructing its text. The ring is a file:
+      --ring, else $PAREDIT_KILL_RING, else .paredit/kill-ring.json. `copy --to-ring`
+      stores the form with the comment block above it; `kill --to-ring` stores exactly
+      what it removed. `yank --index 0` is the most recent entry.
+    </description>
+    <command>paredit edit copy --file src.lisp --path 0.3 --to-ring</command>
+    <command>paredit edit kill --file src.lisp --path 0.3 --to-ring --write</command>
+    <command>paredit edit yank --file dst.lisp --path 0.1 --placement before --write</command>
   </group>
 
   <group name="structural_diff_and_patch">
@@ -279,6 +317,7 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   <branch condition="Relocating top-level forms">Use move-definition, move-form, or split-file</branch>
   <branch condition="You know what the form looks like but not where it is">Use --query (S-expression pattern), --name (definition name), or --line-column; run `inspect resolve` first to see what it matches</branch>
   <branch condition="One-off structural edit at a specific path">Use a structural primitive (replace, wrap, splice, raise, slurp/barf)</branch>
+  <branch condition="The path to edit is not known yet">Use `edit navigate` from a path you already have, or `inspect context-at` from a byte offset</branch>
   <branch condition="Consolidating duplicated or near-duplicated code">Use `inspect duplicates` for exact shapes and `inspect similarity` for near-duplicates, then replacement-plan/replace-forms or extract-function/extract-constant</branch>
   <branch condition="Deleting dead code">Use `inspect unused-definitions` first, only then remove-unused-definitions --write</branch>
 </decision_tree>

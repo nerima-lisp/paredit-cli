@@ -1,12 +1,18 @@
 //! Typed S-expression parsing, tree navigation, spans, and balanced edit
 //! primitives that back both the CLI and downstream Rust automation.
 
+mod cursor_edit;
 mod edit;
 pub mod error;
 mod formatter;
+mod navigation;
 mod parser;
 pub mod reader;
 mod reader_policy;
+mod reader_prefix_edit;
+mod reindent;
+mod string_edit;
+mod structural_edit;
 
 pub(crate) use reader_policy::lang_directive_language as reader_policy_lang_directive;
 #[cfg(test)]
@@ -20,7 +26,10 @@ pub use error::{
     PathError, SelectionError, SexprError, SexprResult, SpanError, StructureError, SymbolError,
 };
 pub use formatter::Formatter;
+pub use navigation::{ContextKind, Direction, SourceContext};
 pub use parser::ParseError;
+pub use reindent::body_form_distinguished;
+pub use structural_edit::Placement;
 pub use tree::AtomOccurrenceIndex;
 pub use tree::{
     AtomOccurrence, ExpressionKind, ExpressionView, OutlineEntry, ReaderPrefix, Selection,

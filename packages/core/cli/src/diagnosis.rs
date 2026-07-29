@@ -114,6 +114,7 @@ pub enum ErrorCode {
     ArgumentNeedsRepository,
     ArgumentNoInputsProduced,
     ArgumentArchiveDestination,
+    ArgumentKillRingIndex,
 
     SelectionPathNotReachable,
     SelectionPathInvalid,
@@ -164,6 +165,7 @@ impl ErrorCode {
             Self::ArgumentNeedsRepository => "argument.needs-repository",
             Self::ArgumentNoInputsProduced => "argument.no-inputs-produced",
             Self::ArgumentArchiveDestination => "argument.archive-destination",
+            Self::ArgumentKillRingIndex => "argument.kill-ring-index",
 
             Self::SelectionPathNotReachable => "selection.path-not-reachable",
             Self::SelectionPathInvalid => "selection.path-invalid",
@@ -212,7 +214,8 @@ impl ErrorCode {
             | Self::ArgumentInvalidGlob
             | Self::ArgumentNeedsRepository
             | Self::ArgumentNoInputsProduced
-            | Self::ArgumentArchiveDestination => Category::Argument,
+            | Self::ArgumentArchiveDestination
+            | Self::ArgumentKillRingIndex => Category::Argument,
 
             Self::SelectionPathNotReachable
             | Self::SelectionPathInvalid
@@ -265,7 +268,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 39] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -275,6 +278,7 @@ impl ErrorCode {
         Self::ArgumentNeedsRepository,
         Self::ArgumentNoInputsProduced,
         Self::ArgumentArchiveDestination,
+        Self::ArgumentKillRingIndex,
         Self::SelectionPathNotReachable,
         Self::SelectionPathInvalid,
         Self::SelectionOffsetNotFound,
@@ -463,6 +467,10 @@ const fn classify_cli(error: &CliError) -> ErrorCode {
         CliError::Selector(selector) => classify_selector(selector),
         CliError::NotUtf8 { .. } => ErrorCode::InputNotUtf8,
         CliError::Parse { .. } => ErrorCode::InputUnparsable,
+        // A sidecar this tool owns did not parse. Same code as a source file
+        // that did not: to a caller both mean "something read is malformed",
+        // and the message already names which file.
+        CliError::Json { .. } => ErrorCode::InputUnparsable,
         CliError::CleanupAlsoFailed(CleanupFailure { .. }) => ErrorCode::EnvironmentRollbackFailed,
         CliError::WriteTarget(WriteTargetError::ParentNotADirectory { .. }) => {
             ErrorCode::EnvironmentIo
@@ -491,6 +499,10 @@ const fn classify_argument(error: &ArgumentError) -> ErrorCode {
         | ArgumentError::EmptyArchive => ErrorCode::ArgumentNoInputsProduced,
         ArgumentError::ArchiveRequiresDestination => ErrorCode::ArgumentArchiveDestination,
         ArgumentError::AllMatchShifted { .. } => ErrorCode::RefusalMatchShifted,
+        // A second address was asked for and not given: the same thing
+        // `--path`'s absence means, so the same code.
+        ArgumentError::SecondTargetRequired => ErrorCode::ArgumentTargetRequired,
+        ArgumentError::KillRingIndexOutOfRange { .. } => ErrorCode::ArgumentKillRingIndex,
     }
 }
 
@@ -721,6 +733,9 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
         }
         ErrorCode::ArgumentArchiveDestination => {
             vec![Repair::new("pass-flag", Message::RepairArchiveDestination)]
+        }
+        ErrorCode::ArgumentKillRingIndex => {
+            vec![Repair::new("pass-flag", Message::RepairKillRingIndex)]
         }
 
         ErrorCode::SelectionMalformed => vec![
