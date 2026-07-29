@@ -14,7 +14,10 @@ fn cli_flags_aesthetic() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"format_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"argument_span\""))
         .stdout(predicate::str::contains(
             "\"replacement\": \"princ-to-string\"",
         ));
@@ -34,7 +37,50 @@ fn cli_does_not_flag_surrounding_text() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "one format call whose control
+        // string carries more than the directive" from "no format call".
+        .stdout(predicate::str::contains("\"format_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("format-to-string-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn f [x] (tostring x))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "format-to-string", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_format_to_string_emits_sarif() {
+    let dir = fresh_temp_dir("format-to-string-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(format nil \"~S\" x)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "format-to-string", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/format-to-string/prin1-to-string\"",
+        ))
+        .stdout(predicate::str::contains(
+            "format to a string is just prin1-to-string; use (prin1-to-string x)",
+        ));
 }
 
 #[test]
