@@ -11,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod accessor_arity_report;
 #[path = "cli/action_contract.rs"]
 mod action_contract;
+#[path = "cli/add_ignore_declaration.rs"]
+mod add_ignore_declaration;
 #[path = "cli/agent_report_budget.rs"]
 mod agent_report_budget;
 #[path = "cli/analysis_report.rs"]
@@ -151,6 +153,8 @@ mod emacs_lisp_file_report;
 mod empty_body_report;
 #[path = "cli/empty_let_report.rs"]
 mod empty_let_report;
+#[path = "cli/encoding_write.rs"]
+mod encoding_write;
 #[path = "cli/eq_char_comparison_report.rs"]
 mod eq_char_comparison_report;
 #[path = "cli/eq_number_comparison_report.rs"]
@@ -185,6 +189,8 @@ mod extract_local_function;
 mod feature_dependency_contract;
 #[path = "cli/flatten_progn.rs"]
 mod flatten_progn;
+#[path = "cli/fold_constants.rs"]
+mod fold_constants;
 #[path = "cli/form_report.rs"]
 mod form_report;
 #[path = "cli/format/mod.rs"]
@@ -545,6 +551,8 @@ mod verbose_negation_report;
 mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]
 mod workspace_report;
+#[path = "cli/writability_report.rs"]
+mod writability_report;
 #[path = "cli/write_scope.rs"]
 mod write_scope;
 #[path = "cli/zero_divisor_report.rs"]

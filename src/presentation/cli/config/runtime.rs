@@ -55,13 +55,20 @@ pub fn resolve(settings: &Settings) -> RuntimeSettings {
             .text("output.color")
             .and_then(ColorMode::from_label)
             .unwrap_or_default(),
-        // None of these three is a configuration key. A `paredit.toml` that
+        // None of the rest is a configuration key. A `paredit.toml` that
         // quietly made every write a no-op would be a trap; progress on
         // stderr and delegating to a pager are both properties of one
-        // invocation rather than of a repository.
+        // invocation rather than of a repository; and the write-policy
+        // settings below are specific enough — unix permission bits, an
+        // opt-in symlink refusal, a source encoding — that a flag resolved
+        // in `bootstrap` fits better than a schema key every other dialect
+        // and platform would have to ignore.
         progress: false,
         paginate: false,
         dry_run: false,
+        new_file_mode: None,
+        refuse_symlinked_ancestors: false,
+        source_encoding: None,
     }
 }
 

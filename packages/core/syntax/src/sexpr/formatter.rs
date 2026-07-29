@@ -4,7 +4,11 @@ mod styles;
 
 use crate::dialect::Dialect;
 
-const MAX_INLINE_WIDTH: usize = 80;
+/// The compiled-in default for one inline (non-wrapped) line's width.
+///
+/// Still the default and no longer the only possible value: a caller may
+/// lower or raise it with [`Formatter::with_max_width`].
+pub const MAX_INLINE_WIDTH: usize = 80;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Formatter {
@@ -15,4 +19,8 @@ pub struct Formatter {
     /// table, which is what [`Formatter::new`] preserves for callers that do
     /// not know the dialect.
     dialect: Dialect,
+    /// The width one inline (non-wrapped) line may reach before this falls
+    /// back to a multi-line layout. [`MAX_INLINE_WIDTH`] unless overridden
+    /// with [`Formatter::with_max_width`].
+    max_width: usize,
 }

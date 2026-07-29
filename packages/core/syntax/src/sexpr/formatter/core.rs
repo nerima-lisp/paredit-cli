@@ -43,7 +43,22 @@ impl Formatter {
         Self {
             indent: indent.min(MAX_INLINE_WIDTH),
             dialect,
+            max_width: MAX_INLINE_WIDTH,
         }
+    }
+
+    /// Overrides the inline-width budget [`Formatter::with_dialect`] set to
+    /// [`MAX_INLINE_WIDTH`].
+    ///
+    /// Re-clamps `indent` to the new width: an indent wider than the line
+    /// budget could never fit an inline form regardless, and every existing
+    /// caller of `with_dialect` already accepts silent clamping to the
+    /// compiled-in default for the same reason.
+    #[must_use]
+    pub fn with_max_width(mut self, max_width: usize) -> Self {
+        self.max_width = max_width;
+        self.indent = self.indent.min(max_width);
+        self
     }
 
     #[must_use]
@@ -325,18 +340,18 @@ impl Formatter {
     }
 
     pub(super) fn compact_node(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
-        fn push_bounded(output: &mut String, value: &str) -> Option<()> {
+        fn push_bounded(output: &mut String, value: &str, max_width: usize) -> Option<()> {
             let new_len = output.len().checked_add(value.len())?;
-            if new_len > MAX_INLINE_WIDTH {
+            if new_len > max_width {
                 return None;
             }
             output.push_str(value);
             Some(())
         }
 
-        fn push_char_bounded(output: &mut String, value: char) -> Option<()> {
+        fn push_char_bounded(output: &mut String, value: char, max_width: usize) -> Option<()> {
             let new_len = output.len().checked_add(value.len_utf8())?;
-            if new_len > MAX_INLINE_WIDTH {
+            if new_len > max_width {
                 return None;
             }
             output.push(value);
@@ -349,22 +364,23 @@ impl Formatter {
             Close(char),
         }
 
+        let max_width = self.max_width;
         let mut output = String::new();
         let mut actions = vec![Action::Node(node_id)];
 
         while let Some(action) = actions.pop() {
             match action {
-                Action::Separator => push_char_bounded(&mut output, ' ')?,
-                Action::Close(delimiter) => push_char_bounded(&mut output, delimiter)?,
+                Action::Separator => push_char_bounded(&mut output, ' ', max_width)?,
+                Action::Close(delimiter) => push_char_bounded(&mut output, delimiter, max_width)?,
                 Action::Node(current_id) => {
                     let node = tree.node(current_id);
                     match node.kind {
                         NodeKind::Root => return None,
                         NodeKind::Atom => {
-                            push_bounded(&mut output, node.span.slice(&tree.source))?;
+                            push_bounded(&mut output, node.span.slice(&tree.source), max_width)?;
                         }
                         NodeKind::List if self.is_opaque_reader_form(node) => {
-                            push_bounded(&mut output, node.span.slice(&tree.source))?;
+                            push_bounded(&mut output, node.span.slice(&tree.source), max_width)?;
                         }
                         NodeKind::List => {
                             if self
@@ -375,10 +391,10 @@ impl Formatter {
                             }
 
                             for span in &node.reader_prefix_spans {
-                                push_bounded(&mut output, span.slice(&tree.source))?;
+                                push_bounded(&mut output, span.slice(&tree.source), max_width)?;
                             }
                             let delimiter = self.list_delimiter(node);
-                            push_char_bounded(&mut output, delimiter.open())?;
+                            push_char_bounded(&mut output, delimiter.open(), max_width)?;
                             actions.push(Action::Close(delimiter.close()));
                             for (position, child) in node.children.iter().enumerate().rev() {
                                 actions.push(Action::Node(*child));

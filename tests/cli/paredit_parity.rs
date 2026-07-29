@@ -426,6 +426,229 @@ fn yank_reports_an_index_the_ring_does_not_have() {
         .stderr(predicate::str::contains("--index 3 is out of range"));
 }
 
+// --- D42: duplicate, the kill-ring-free half of copy + yank ---
+
+#[test]
+fn duplicate_writes_a_second_copy_after_the_form() {
+    assert_eq!(
+        edit(
+            &["edit", "duplicate", "--path", "0.1"],
+            "(progn\n  (f y)\n  (g z))\n"
+        ),
+        "(progn\n  (f y)\n  (f y)\n  (g z))\n"
+    );
+}
+
+#[test]
+fn duplicate_carries_the_comment_block_copy_would_have_taken() {
+    assert_eq!(
+        edit(
+            &["edit", "duplicate", "--path", "0.1"],
+            "(progn\n  ;; explain\n  (f y)\n  (g z))\n"
+        ),
+        "(progn\n  ;; explain\n  (f y)\n  ;; explain\n  (f y)\n  (g z))\n"
+    );
+}
+
+#[test]
+fn duplicate_of_an_inline_form_stays_on_the_line() {
+    assert_eq!(
+        edit(&["edit", "duplicate", "--path", "0.1"], "(list a b)\n"),
+        "(list a a b)\n"
+    );
+}
+
+#[test]
+fn duplicate_leaves_the_kill_ring_alone() {
+    let dir = fresh_temp_dir("duplicate-ring");
+    let ring = dir.join("ring.json");
+    let source = dir.join("source.lisp");
+    fs::write(&source, "(progn\n  (f y)\n  (g z))\n").expect("write source");
+
+    // Put something on the ring, then duplicate: the ring entry must survive.
+    paredit()
+        .args(["edit", "kill", "--path", "0.2", "--to-ring", "--ring"])
+        .arg(&ring)
+        .arg("--file")
+        .arg(&source)
+        .arg("--write")
+        .assert()
+        .success();
+    let after_kill = fs::read_to_string(&ring).expect("read ring after kill");
+
+    paredit()
+        .args(["edit", "duplicate", "--path", "0.1", "--write", "--file"])
+        .arg(&source)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&ring).expect("read ring after duplicate"),
+        after_kill,
+        "duplicate must not push, pop, or reorder the kill ring"
+    );
+    assert_eq!(
+        fs::read_to_string(&source).expect("read source"),
+        "(progn\n  (f y)\n  (f y))\n"
+    );
+}
+
+// --- D39: normalize-quotes, the two spellings of one quote ---
+
+#[test]
+fn normalize_quotes_shortens_a_quote_list_to_its_prefix() {
+    assert_eq!(
+        edit(
+            &["edit", "normalize-quotes", "--path", "0.1"],
+            "(list (quote x) y)\n"
+        ),
+        "(list 'x y)\n"
+    );
+    // `--dialect` is required for the `function` half: stdin with no file name
+    // resolves to `Dialect::Unknown`, and `(function f)` is a form only the
+    // Common Lisp family has.
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--dialect",
+                "common-lisp"
+            ],
+            "(mapcar (function car) xs)\n"
+        ),
+        "(mapcar #'car xs)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_expands_a_prefix_into_its_list() {
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--style",
+                "longhand"
+            ],
+            "(list 'x y)\n"
+        ),
+        "(list (quote x) y)\n"
+    );
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--style",
+                "longhand",
+                "--dialect",
+                "common-lisp"
+            ],
+            "(mapcar #'car xs)\n"
+        ),
+        "(mapcar (function car) xs)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_keeps_a_non_quote_reader_prefix() {
+    // The selection's span covers its reader prefix, so shortening the list
+    // inside `,(quote x)` used to take the unquote with it and print
+    // `(list 'x y)` — an inversion of when the form is evaluated, in output
+    // that still reparses and so never tripped the `--write` reparse guard.
+    for input in [
+        "(list `(quote x) y)",
+        "(list ,(quote x) y)",
+        "(list ,@(quote x) y)",
+        "(list #(quote x) y)",
+    ] {
+        paredit()
+            .args([
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--dialect",
+                "common-lisp",
+            ])
+            .write_stdin(input.to_owned())
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("not a quote form"));
+    }
+}
+
+#[test]
+fn normalize_quotes_does_not_write_a_function_form_into_a_clojure_file() {
+    // `#'inc` in Clojure is a var quote, and `@x` is a deref; the parser files
+    // both under the same catch-all reader-prefix slot as Common Lisp's `#'`.
+    // Expanding either into `(function ...)` writes a form Clojure does not
+    // have.
+    for input in ["(map #'inc xs)", "(map @xs ys)"] {
+        paredit()
+            .args([
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--style",
+                "longhand",
+                "--dialect",
+                "clojure",
+            ])
+            .write_stdin(input.to_owned())
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("not a quote form"));
+    }
+
+    // The universal half still works there.
+    assert_eq!(
+        edit(
+            &[
+                "edit",
+                "normalize-quotes",
+                "--path",
+                "0.1",
+                "--dialect",
+                "clojure"
+            ],
+            "(map (quote x) xs)\n"
+        ),
+        "(map 'x xs)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_leaves_a_form_already_in_that_style_alone() {
+    // Running this over a whole file must not depend on knowing which forms
+    // already comply.
+    assert_eq!(
+        edit(
+            &["edit", "normalize-quotes", "--path", "0.1"],
+            "(list 'x)\n"
+        ),
+        "(list 'x)\n"
+    );
+}
+
+#[test]
+fn normalize_quotes_refuses_a_form_that_is_not_a_quote() {
+    paredit()
+        .args(["edit", "normalize-quotes", "--path", "0.1"])
+        .write_stdin("(list (f x))")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not a quote form"));
+}
+
 // --- K9: reindent ---
 
 #[test]

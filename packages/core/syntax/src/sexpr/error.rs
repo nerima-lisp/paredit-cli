@@ -155,6 +155,13 @@ pub enum StructureError {
     #[error("selected expression carries no reader prefix to unwrap")]
     NoReaderPrefixToUnwrap,
 
+    // --- quote normalization ---
+    /// Covers both "not a quote at all" and a malformed `(quote a b)` /
+    /// `(quote)`: in every case the selection is not something with two
+    /// interchangeable spellings, which is the only question this edit asks.
+    #[error("selected expression is not a quote form ('x, #'f, (quote x), or (function f))")]
+    NotAQuoteForm,
+
     // --- raise --levels ---
     #[error("cannot raise {requested} levels: the selection is only {available} levels deep")]
     RaiseLevelsExceedDepth { requested: usize, available: usize },

@@ -1,4 +1,4 @@
-use crate::sexpr::formatter::{Formatter, MAX_INLINE_WIDTH};
+use crate::sexpr::formatter::Formatter;
 use crate::sexpr::tree::{NodeKind, SyntaxTree};
 use crate::sexpr::types::NodeId;
 
@@ -78,7 +78,11 @@ impl Formatter {
             output.push_str(&self.compact_node(tree, *child)?);
         }
         output.push(delimiter.close());
-        (output.len().saturating_add(reader_prefix_len) <= MAX_INLINE_WIDTH).then_some(output)
+        // `self.max_width`, not the compiled-in constant: this was the last
+        // width decision `--max-width` did not reach, which left a `defsystem`
+        // header inlined up to 80 columns under `--max-width 40` and broken at
+        // 80 under `--max-width 120`.
+        (output.len().saturating_add(reader_prefix_len) <= self.max_width).then_some(output)
     }
 
     pub(in crate::sexpr::formatter) fn format_definition(

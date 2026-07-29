@@ -27,6 +27,20 @@
 # benchmark's mean regressed by more than THRESHOLD percent. An improvement is
 # reported and never fails.
 #
+# ## Why the confidence interval and not just the point estimate
+#
+# Criterion reports a mean change *and* a confidence interval for it. The point
+# estimate alone does not say whether the number means anything: +10.3% with an
+# interval spanning -5%..+25% is a measurement that could not tell the two
+# revisions apart, and failing on it reports a regression that was never
+# observed. On a shared CI runner that is the common case, not the rare one.
+#
+# So the gate fails only when the interval's *lower* bound clears the
+# threshold — when the measurement is confident the regression is at least that
+# large. A point estimate over the threshold whose interval is not is still
+# printed, marked `noisy`, because it is worth a reviewer's glance; it just is
+# not evidence.
+#
 # ## The Markdown report
 #
 # `REPORT=<path>` additionally writes every benchmark's change as a Markdown
@@ -143,13 +157,22 @@ for directory, _, files in os.walk(criterion_root):
         continue
     with open(os.path.join(directory, "estimates.json")) as handle:
         estimates = json.load(handle)
+    mean = estimates["mean"]
     # Criterion reports the change as a fraction of the baseline mean.
-    change = estimates["mean"]["point_estimate"] * 100.0
+    change = mean["point_estimate"] * 100.0
+    # The interval is what makes the point estimate evidence. Fall back to the
+    # point estimate itself if a Criterion version ever stops writing one, so
+    # the gate degrades to its old behaviour rather than silently passing
+    # everything.
+    interval = mean.get("confidence_interval") or {}
+    lower = interval.get("lower_bound", mean["point_estimate"]) * 100.0
     name = os.path.relpath(os.path.dirname(directory), criterion_root)
-    changes.append((name, change))
+    changes.append((name, change, lower))
 
 compared = len(changes)
-regressions = [entry for entry in changes if entry[1] > threshold]
+# Over the threshold *and* measured confidently enough to say so.
+regressions = [entry for entry in changes if entry[1] > threshold and entry[2] > threshold]
+noisy = [entry for entry in changes if entry[1] > threshold and entry[2] <= threshold]
 improvements = [entry for entry in changes if entry[1] < -threshold]
 
 if report_path:
@@ -158,24 +181,39 @@ if report_path:
         if compared == 0:
             handle.write("No comparable benchmarks were found.\n")
         else:
-            handle.write("| Benchmark | Change | |\n| --- | ---: | --- |\n")
-            for name, change in sorted(changes, key=lambda entry: -entry[1]):
-                flag = "SLOWER" if change > threshold else "faster" if change < -threshold else ""
-                handle.write(f"| `{name}` | {change:+.1f}% | {flag} |\n")
+            handle.write("| Benchmark | Change | At least | |\n| --- | ---: | ---: | --- |\n")
+            for name, change, lower in sorted(changes, key=lambda entry: -entry[1]):
+                if change > threshold:
+                    flag = "SLOWER" if lower > threshold else "noisy"
+                elif change < -threshold:
+                    flag = "faster"
+                else:
+                    flag = ""
+                handle.write(f"| `{name}` | {change:+.1f}% | {lower:+.1f}% | {flag} |\n")
             handle.write(
                 f"\n{compared} benchmark(s) compared, {len(regressions)} over the "
-                f"{threshold:g}% threshold.\n"
+                f"{threshold:g}% threshold, {len(noisy)} over it but within the "
+                "measurement's own noise.\n\n"
+                "\"At least\" is the lower bound of Criterion's confidence interval for "
+                "the change. A benchmark is only counted as a regression when that bound "
+                "clears the threshold too — a point estimate whose interval reaches back "
+                "below it is a measurement that could not tell the two revisions apart.\n"
             )
 
 if compared == 0:
     print("bench-compare: no comparisons found; did both runs execute?", file=sys.stderr)
     sys.exit(2)
 
-for name, change in sorted(improvements, key=lambda entry: entry[1]):
+for name, change, _ in sorted(improvements, key=lambda entry: entry[1]):
     print(f"  faster  {change:+7.1f}%  {name}")
-for name, change in sorted(regressions, key=lambda entry: -entry[1]):
-    print(f"  SLOWER  {change:+7.1f}%  {name}")
+for name, change, lower in sorted(noisy, key=lambda entry: -entry[1]):
+    print(f"  noisy   {change:+7.1f}%  {name}  (interval reaches {lower:+.1f}%)")
+for name, change, lower in sorted(regressions, key=lambda entry: -entry[1]):
+    print(f"  SLOWER  {change:+7.1f}%  {name}  (at least {lower:+.1f}%)")
 
-print(f"bench-compare: {compared} benchmark(s) compared, {len(regressions)} over threshold")
+print(
+    f"bench-compare: {compared} benchmark(s) compared, {len(regressions)} over threshold, "
+    f"{len(noisy)} over threshold but within noise"
+)
 sys.exit(1 if regressions else 0)
 PYTHON

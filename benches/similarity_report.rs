@@ -219,11 +219,23 @@ fn benchmark_similarity_report(c: &mut Criterion) {
     }
 }
 
+/// Enough samples for the confidence interval to be narrower than the gate's
+/// threshold.
+///
+/// This used to be Criterion's minimum — `sample_size(10)` over a one-second
+/// window — which measured fast but produced an interval tens of percent wide.
+/// `scripts/bench-compare.sh` fails a branch at a 10% regression, so an
+/// interval that wide meant the gate could not distinguish a real regression
+/// from a noisy neighbour on the runner, and it reported both.
+///
+/// The cost is roughly three seconds per benchmark instead of one and a half,
+/// paid twice (baseline and working tree). That is minutes against a 45-minute
+/// job budget, and it buys a verdict that means something.
 fn criterion_config() -> Criterion {
     Criterion::default()
-        .sample_size(10)
-        .warm_up_time(Duration::from_millis(500))
-        .measurement_time(Duration::from_secs(1))
+        .sample_size(50)
+        .warm_up_time(Duration::from_secs(1))
+        .measurement_time(Duration::from_secs(3))
         .without_plots()
 }
 
