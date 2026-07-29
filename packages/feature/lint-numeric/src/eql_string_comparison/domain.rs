@@ -15,13 +15,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 const EQ_HEADS: [&str; 2] = ["eq", "eql"];
 
@@ -31,47 +33,66 @@ fn is_string_literal(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct EqlStringComparisonItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The 1-based line the comparison starts on.
+    pub line: usize,
+    /// The operator exactly as it was written, so its source casing survives.
     pub operator: String,
     pub literal: String,
 }
 
-#[derive(Debug)]
-pub struct EqlStringComparisonSummary {
-    pub comparison_form_count: usize,
-    pub violations: Vec<EqlStringComparisonItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EqlStringComparisonPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EqlStringComparisonPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EqlStringComparisonItem {
+    /// Which of the two identity predicates was used, normalized to the
+    /// spelling this rule matched on.
+    ///
+    /// They are two different mistakes to make — `eq` on a string is wrong for
+    /// the same reason `eql` is, but a codebase mid-way through replacing one
+    /// with the other cares which it is looking at — and a consumer filtering
+    /// on one of them is asking a real question. `operator` keeps the source
+    /// casing that this discards.
+    fn kind(&self) -> &'static str {
+        EQ_HEADS
+            .iter()
+            .find(|name| self.operator.eq_ignore_ascii_case(name))
+            .copied()
+            .unwrap_or("eql-string-comparison")
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EqlStringComparisonPolicy {
-    pub fail_on_violation: bool,
-    pub comparison_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("op={}", self.operator),
+            format!("literal={}", self.literal),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("literal", json!(self.literal)),
+        ]
+    }
+
+    /// The same sentence the `eql-string-comparison` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} compares against string literal {}",
+            self.operator, self.literal
+        )
+    }
 }
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     comparison_form_count: &mut usize,
     violations: &mut Vec<EqlStringComparisonItem>,
 ) {
@@ -95,75 +116,84 @@ pub fn examine_comparison(
         .find(|argument| is_string_literal(argument))
     {
         violations.push(EqlStringComparisonItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             operator: head.to_owned(),
             literal: atom_text(literal).unwrap_or_default().to_owned(),
         });
     }
 }
 
-/// Collects every `eq`/`eql` call with a string-literal argument across a
-/// whole file, along with the total number of `eq`/`eql` calls scanned.
-pub fn collect_eql_string_comparisons(
+/// Collects every `eq`/`eql` call with a string-literal argument in one file,
+/// with the number of `eq`/`eql` calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no such comparison here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_eql_string_comparison_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EqlStringComparisonItem>)> {
+) -> LintResult<FileFindings<EqlStringComparisonItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("comparison_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(subview, path, &mut comparison_form_count, &mut violations);
+            examine_comparison(subview, source, &mut comparison_form_count, &mut violations);
         });
     }
-    Ok((comparison_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("comparison_form_count", json!(comparison_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_eql_string_comparisons(
-    comparison_form_count: usize,
-    violations: Vec<EqlStringComparisonItem>,
-) -> EqlStringComparisonSummary {
-    EqlStringComparisonSummary {
-        comparison_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_eql_string_comparison_policy(
-    options: EqlStringComparisonPolicyOptions,
-    summary: &EqlStringComparisonSummary,
-) -> EqlStringComparisonPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EqlStringComparisonPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        comparison_form_count: summary.comparison_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn comparisons(input: &str) -> (usize, Vec<EqlStringComparisonItem>) {
+    fn report(input: &str) -> FileFindings<EqlStringComparisonItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_eql_string_comparisons(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect eql string comparisons")
+        build_eql_string_comparison_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build eql string comparison report")
+    }
+
+    /// The `(comparison_form_count, violations)` pair the report is built from.
+    fn comparisons(input: &str) -> (u64, Vec<EqlStringComparisonItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "comparison_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("comparison_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -211,32 +241,53 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(eq x \"root\")").expect("parse input");
-        let (comparison_form_count, violations) =
-            collect_eql_string_comparisons(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect eql string comparisons");
-        assert_eq!(comparison_form_count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_eql_string_comparison_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build eql string comparison report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (comparison_form_count, items) = comparisons("(eql x \"root\")");
-        let summary = summarize_eql_string_comparisons(comparison_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(eql x y)").dialect_modelled);
+    }
 
-        let quiet = evaluate_eql_string_comparison_policy(
-            EqlStringComparisonPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_literal() {
+        let report = report("(defun f (name)\n  (eql name \"root\"))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "eql");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("eql")), ("literal", json!("\"root\""))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["op=eql".to_owned(), "literal=\"root\"".to_owned()]
+        );
+    }
 
-        let strict = evaluate_eql_string_comparison_policy(
-            EqlStringComparisonPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    /// The `kind` normalizes; the `operator` field does not, so the source
+    /// spelling is still recoverable from the report.
+    #[test]
+    fn a_shouted_operator_normalizes_only_in_the_kind() {
+        let (_, violations) = comparisons("(EQ x \"root\")");
+        assert_eq!(violations[0].kind(), "eq");
+        assert_eq!(violations[0].operator, "EQ");
+    }
+
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(eql x \"root\")\n(eq y z)\n");
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
