@@ -504,17 +504,20 @@ pub(super) fn print_lint_suppression_removal(
 pub(super) fn print_lint_rule_catalog(
     active: &[&str],
     custom: &CustomRules,
+    fixable_only: bool,
     output: OutputFormat,
 ) -> CliResult<()> {
     let listed: Vec<&(&str, &str, &str)> = RULE_DOCS
         .iter()
         .filter(|(rule, _, _)| active.contains(rule))
+        .filter(|(rule, _, _)| !fixable_only || rule_is_fixable(rule))
         .collect();
     // A project's own rules are listed beside the shipped ones, tagged so the
     // two are distinguishable: a caller asking "what will run?" is asking about
     // both, and a caller asking "what shipped?" needs to be able to tell.
     let project: Vec<(&'static str, &'static str, String, Severity, bool)> = custom
         .catalog()
+        .filter(|(_, _, _, _, fixable)| !fixable_only || *fixable)
         .map(|(name, category, description, severity, fixable)| {
             (name, category, description.to_owned(), severity, fixable)
         })

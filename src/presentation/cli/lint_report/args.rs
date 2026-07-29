@@ -95,6 +95,14 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// List every available lint rule with its description, then exit without scanning.
     #[arg(long)]
     pub(in crate::presentation::cli::lint_report) list_rules: bool,
+    /// With --list-rules, list only the rules that carry an auto-fix.
+    ///
+    /// The full catalogue reports fixability as a column, which answers
+    /// "is this rule fixable" and not "what would a fix run do". A caller
+    /// about to run the fixer is asking the second one; `paredit fix list` is
+    /// this flag under a name that says so.
+    #[arg(long, requires = "list_rules")]
+    pub(in crate::presentation::cli::lint_report) fixable: bool,
     /// Print the long-form explanation of one rule — why it fires, a
     /// before/after example, what it deliberately leaves alone — then exit.
     #[arg(long, value_name = "RULE")]
@@ -267,4 +275,130 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(in crate::presentation::cli::lint_report) output: OutputFormat,
+}
+
+/// Which of `inspect lint`'s write-side modes the `fix` namespace is asking
+/// for.
+///
+/// `fix` exists because the auto-fixer was reachable only as
+/// `inspect lint --fix`, which is three wrong words for it: it is not an
+/// inspection, its subject is not the lint report, and the capability is a
+/// flag on a command with forty other flags. The mode is what the flag used to
+/// be, moved into the command name where a reader can find it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::presentation::cli) enum FixMode {
+    /// Apply the fixes.
+    Apply,
+    /// Apply nothing; exit 3 if any fix is still pending.
+    Check,
+    /// Emit the machine-readable fix plan without writing.
+    Plan,
+    /// List the fixable rules and exit.
+    List,
+}
+
+/// The subset of lint's flags the `fix` namespace exposes.
+///
+/// A subset rather than a re-declaration of all forty. Everything omitted is
+/// omitted for a reason a caller can state: `--baseline` and `--emit` shape a
+/// *report*, and a fix run does not produce one; `--fail-on` gates on
+/// findings, and `fix check` already gates on pending fixes; `--stats` and
+/// `--timings` measure a scan.
+#[derive(Debug, Args)]
+pub(in crate::presentation::cli) struct FixSelectionArgs {
+    /// Files to fix. Not required by `fix list`.
+    pub(in crate::presentation::cli) files: Vec<PathBuf>,
+    /// Override extension-based dialect detection for every file.
+    #[arg(long)]
+    pub(in crate::presentation::cli) dialect: Option<DialectArg>,
+    /// Fix only these rules (repeatable). Mutually exclusive with --exclude.
+    #[arg(long = "rule", value_name = "RULE")]
+    pub(in crate::presentation::cli) rules: Vec<String>,
+    /// Fix only rules in these categories (repeatable).
+    #[arg(long = "category", value_name = "CATEGORY", conflicts_with = "rules")]
+    pub(in crate::presentation::cli) categories: Vec<String>,
+    /// Skip these rules (repeatable). Mutually exclusive with --rule.
+    #[arg(long = "exclude", value_name = "RULE", conflicts_with = "rules")]
+    pub(in crate::presentation::cli) exclude: Vec<String>,
+    /// Fix only rules carrying every one of these tags (repeatable).
+    #[arg(long = "tag", value_name = "TAG")]
+    pub(in crate::presentation::cli) tags: Vec<String>,
+    /// How wide a net to cast. See `paredit inspect lint --list-presets`.
+    #[arg(long, value_enum, value_name = "PRESET", default_value_t = PresetArg::Recommended)]
+    pub(in crate::presentation::cli) preset: PresetArg,
+    /// Also apply the experimental rules' fixes, whichever preset is in force.
+    #[arg(long)]
+    pub(in crate::presentation::cli) experimental: bool,
+    /// Skip the fixes tagged `destructive` — the few whose rewrite can change
+    /// runtime behaviour rather than only spelling.
+    #[arg(long)]
+    pub(in crate::presentation::cli) no_destructive_fixes: bool,
+    /// Load the project's own pattern rules from this directory instead of
+    /// the default `.paredit/rules`.
+    #[arg(long, value_name = "DIR")]
+    pub(in crate::presentation::cli) custom_rules: Option<PathBuf>,
+    /// Print a unified diff of what would change and write nothing.
+    #[arg(long)]
+    pub(in crate::presentation::cli) diff: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    pub(in crate::presentation::cli) output: OutputFormat,
+}
+
+impl LintReportArgs {
+    /// Builds the lint arguments a `fix` invocation means.
+    ///
+    /// Written as an explicit field-by-field literal rather than a `Default`
+    /// plus overrides, and deliberately: a flag added to `LintReportArgs`
+    /// stops this compiling until somebody decides whether `fix` should
+    /// expose it. A `..Default::default()` would silently answer "no" to that
+    /// question forever.
+    pub(in crate::presentation::cli) fn for_fix(
+        selection: FixSelectionArgs,
+        mode: FixMode,
+    ) -> Self {
+        Self {
+            files: selection.files,
+            list_rules: mode == FixMode::List,
+            fixable: mode == FixMode::List,
+            explain: None,
+            list_presets: false,
+            list_tags: false,
+            docs: false,
+            emit: None,
+            sarif: false,
+            github: false,
+            fix: matches!(mode, FixMode::Apply | FixMode::Check),
+            diff: selection.diff && matches!(mode, FixMode::Apply | FixMode::Check),
+            check: mode == FixMode::Check,
+            fix_plan: mode == FixMode::Plan,
+            stats: false,
+            report_unused_suppressions: false,
+            report_expired_suppressions: false,
+            report_suppressions: false,
+            suppress_paths: Vec::new(),
+            baseline: None,
+            write_baseline: None,
+            cache_dir: None,
+            dialect: selection.dialect,
+            rules: selection.rules,
+            categories: selection.categories,
+            exclude: selection.exclude,
+            tags: selection.tags,
+            preset: selection.preset,
+            experimental: selection.experimental,
+            deny: Vec::new(),
+            warn: Vec::new(),
+            rule_args: Vec::new(),
+            timings: false,
+            no_destructive_fixes: selection.no_destructive_fixes,
+            custom_rules: selection.custom_rules,
+            test_rules: false,
+            require_suppression_reason: false,
+            remove_unused_suppressions: false,
+            fail_on_finding: false,
+            fail_on: None,
+            output: selection.output,
+        }
+    }
 }

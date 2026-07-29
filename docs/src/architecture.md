@@ -338,13 +338,29 @@ The `source()` chain flattens into the message there — the last point at which
 anything reads it — while the classification stays a type.
 
 ## How the layers map to the three namespaces
+## How the layers map to the namespaces
 
-The [command model](commands.md) — `inspect`, `edit`, `refactor` — is a
-presentation-level grouping. Underneath, an `inspect` report and a `refactor`
-plan are both application use cases over the same domain `SyntaxTree`; the
-namespace only reflects whether the command writes. This is why a report and
-the refactor that consumes it always agree on paths, spans, and symbol
-identity: they share the domain, not just a serialization format.
+The [command model](commands.md) — `inspect`, `edit`, `refactor`, `query`,
+`fix`, `migrate` — is a presentation-level grouping. Underneath, an `inspect`
+report and a `refactor` plan are both application use cases over the same
+domain `SyntaxTree`; the namespace only reflects whether the command writes
+and what the caller was trying to do. This is why a report and the refactor
+that consumes it always agree on paths, spans, and symbol identity: they share
+the domain, not just a serialization format.
+
+The three added namespaces make the point sharply, because each is a *new
+address* onto machinery that already existed rather than new machinery:
+
+| Namespace | What it exposes | Where the logic lives |
+| --- | --- | --- |
+| `query` | the pattern language, at workspace scope | `paredit_core_syntax::selector::{pattern, matcher, rewrite}` |
+| `fix` | the lint auto-fixer | the same engine `inspect lint --fix` runs, called with the arguments that spelling would have produced |
+| `migrate` | ordered, dialect-scoped recipes | `selector::rewrite` again, sequenced by `paredit-feature-migrate` |
+
+`selector::rewrite` sits in **core**, not in `paredit-feature-query`, for one
+concrete reason: `paredit-feature-migrate` needs it too, and a feature package
+depending on a feature package is the dependency direction this split exists
+to prevent.
 
 ## Where a change belongs
 

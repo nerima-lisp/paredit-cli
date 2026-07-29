@@ -173,9 +173,22 @@ pub(super) const TOOLS: &[Tool] = &[
 ///
 /// Checked by name rather than by asking the command, because the check has to
 /// happen *before* the command runs and there is no dry-run that reports "I
-/// would have written". Every writing flag in this tool is one of these; a
-/// contract test asserts the list still covers the catalog.
+/// would have written".
 pub(super) const WRITING_FLAGS: &[&str] = &["--write", "--fix", "--apply", "--in-place"];
+
+/// The command paths that write without any flag saying so.
+///
+/// A flag list was the whole gate until the `fix` namespace existed, and it
+/// was sound while every writing command spelled the write as a flag.
+/// `paredit fix apply` spells it in the command *name* — which was the point
+/// of moving the auto-fixer out from under `inspect lint --fix` — and so
+/// carries none of the four flags above. Under `--read-only` it therefore ran,
+/// and wrote.
+///
+/// Matched as a subcommand *sequence* at the front of the argument vector
+/// rather than by asking "is this word anywhere in argv": `--rule apply` must
+/// not be mistaken for `fix apply`, and neither must a file named `fix`.
+const WRITING_COMMANDS: &[&[&str]] = &[&["fix", "apply"]];
 
 pub(super) fn find(name: &str) -> Option<&'static Tool> {
     TOOLS.iter().find(|tool| tool.name == name)
@@ -236,8 +249,26 @@ pub(super) fn argv_for(tool: &Tool, arguments: &Value) -> Result<Vec<String>, St
 }
 
 /// Whether an argument vector asks for a write.
+///
+/// Two questions, because a write is spelled two ways: as a flag on a command
+/// that can also not write (`edit wrap --write`), and as the command itself
+/// (`fix apply`). Missing the second is how `--read-only` stopped being a
+/// promise.
 pub(super) fn writes(argv: &[String]) -> bool {
-    argv.iter().any(|arg| WRITING_FLAGS.contains(&arg.as_str()))
+    if argv.iter().any(|arg| WRITING_FLAGS.contains(&arg.as_str())) {
+        return true;
+    }
+    WRITING_COMMANDS.iter().any(|path| leads_with(argv, path))
+}
+
+/// Whether `argv`'s leading non-flag words are exactly `path`.
+///
+/// The leading words, not any words: `paredit inspect lint --explain fix` has
+/// `fix` in it and writes nothing.
+fn leads_with(argv: &[String], path: &[&str]) -> bool {
+    let mut words = argv.iter().filter(|arg| !arg.starts_with('-'));
+    path.iter()
+        .all(|expected| words.next().is_some_and(|actual| actual == expected))
 }
 
 /// What running a command produced.

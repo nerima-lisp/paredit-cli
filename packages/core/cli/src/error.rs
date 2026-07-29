@@ -235,6 +235,20 @@ pub enum ArgumentError {
         index: usize,
         available: usize,
     },
+
+    /// A flag or positional argument named something this build does not have.
+    ///
+    /// Deliberately general — `what` names the kind of thing ("migration
+    /// recipe") and `available` lists what exists. A caller who typoed a name
+    /// gets an argument error naming the alternatives, rather than
+    /// `internal.unclassified`, whose documented meaning is "a defect in this
+    /// tool, please report it".
+    #[error("no {what} named {name:?}; available: {available}")]
+    UnknownName {
+        what: &'static str,
+        name: String,
+        available: String,
+    },
 }
 
 /// A write failed, and then undoing it failed too.
@@ -307,6 +321,18 @@ pub enum CliError {
     /// what an agent needs in order to widen or narrow and try again.
     #[error(transparent)]
     Selector(#[from] SelectorError),
+
+    /// A `--query` pattern does not parse.
+    #[error(transparent)]
+    Pattern(#[from] paredit_core_syntax::selector::error::PatternError),
+
+    /// A `--rewrite` template did not read as one replacement form.
+    ///
+    /// Kept apart from [`Self::Selector`]: a selector says *which* forms to
+    /// act on and a rewrite template says *what to put there*, and a caller
+    /// fixing one is editing a different flag from a caller fixing the other.
+    #[error(transparent)]
+    Rewrite(#[from] paredit_core_syntax::selector::error::RewriteError),
 
     #[error("{description} is not valid UTF-8")]
     NotUtf8 {
@@ -740,6 +766,8 @@ command_failure_from!(
     WorkspaceError,
     ArgumentError,
     SelectorError,
+    paredit_core_syntax::selector::error::PatternError,
+    paredit_core_syntax::selector::error::RewriteError,
     CleanupFailure,
     WriteTargetError,
     paredit_core_lint_engine::error::LintError,

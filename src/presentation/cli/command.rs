@@ -1,3 +1,5 @@
+use super::fix::FixCommand;
+use super::{MigrateCommand, query_count, query_find, query_replace};
 use super::{
     accessor_arity_report, add_ignore_declaration, analysis_report, api_diff_report,
     api_surface_report, append_list_to_cons_report, append_nil_report,
@@ -862,6 +864,18 @@ pub(super) enum ConfigCommand {
     Init(config::args::ConfigInitArgs),
 }
 
+/// The `query` namespace: the pattern language as a first-class capability
+/// rather than as one of eight ways to select a form.
+#[derive(Debug, Subcommand)]
+pub(super) enum QueryCommand {
+    /// Report every form in the workspace whose shape matches --query.
+    Find(query_find::QueryFindArgs),
+    /// Count matches per pattern and per file, for several patterns at once.
+    Count(query_count::QueryCountArgs),
+    /// Rewrite every match with a --rewrite template. Writes only with --write.
+    Replace(query_replace::QueryReplaceArgs),
+}
+
 #[derive(Debug, Subcommand)]
 pub(super) enum Command {
     /// Read-only inventory, validation, and analysis.
@@ -878,6 +892,23 @@ pub(super) enum Command {
     Refactor {
         #[command(subcommand)]
         command: RefactorCommand,
+    },
+    /// Search the workspace by S-expression pattern, count matches, and
+    /// rewrite them with a template.
+    Query {
+        #[command(subcommand)]
+        command: QueryCommand,
+    },
+    /// Apply the lint auto-fixes. The write side of `inspect lint`, under a
+    /// name that says it writes.
+    Fix {
+        #[command(subcommand)]
+        command: FixCommand,
+    },
+    /// Run a named, ordered, dialect-scoped codemod recipe.
+    Migrate {
+        #[command(subcommand)]
+        command: MigrateCommand,
     },
     /// Inspect, validate, and scaffold the layered paredit.toml configuration.
     Config {

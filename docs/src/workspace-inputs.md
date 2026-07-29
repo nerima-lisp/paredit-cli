@@ -2,8 +2,8 @@
 
 Every command that takes roots — `inspect workspace`, `inspect sources`,
 `inspect similarity`, `refactor workspace-plan`, `refactor workspace-preview`,
-`refactor workspace-execute` — shares one flag set for deciding which files it
-looks at. This page is the reference for that set.
+`refactor workspace-execute`, all three `query` leaves, and `migrate run` —
+shares one flag set for deciding which files it looks at. This page is the reference for that set.
 
 The flags divide cleanly in two, and the division is worth keeping in mind
 because it explains how they combine:

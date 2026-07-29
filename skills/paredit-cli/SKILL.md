@@ -1,7 +1,7 @@
 ---
 name: paredit-cli
 description: This skill should be used when refactoring Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming scoped symbols, functions, control targets, or packages; moving definitions; extracting or inlining local code; reshaping bindings, conditionals, calls, or parameters; or removing unused code. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
-version: 1.4.0
+version: 1.5.0
 ---
 
 <purpose>
@@ -13,7 +13,8 @@ version: 1.4.0
 <overview>
   paredit detects the Lisp dialect (Common Lisp, Emacs Lisp, LFE, Scheme, Racket, Clojure, Hy, Carp, Janet, Fennel)
   from file extension or an explicit --dialect flag, and exposes every read and write
-  operation under `paredit inspect ...`, `paredit edit ...`, or `paredit refactor ...`.
+  operation under `paredit inspect ...`, `paredit edit ...`, `paredit refactor ...`,
+  `paredit query ...`, `paredit fix ...`, or `paredit migrate ...`.
 
   The core rule: never hand-edit balanced delimiters during a refactor. Validate the file,
   locate the exact form or symbol with a report command, apply one structural edit, then
@@ -24,6 +25,9 @@ version: 1.4.0
   - `paredit edit ...` — low-level structural edits on one file.
   - `paredit refactor ...` — plan, preview, verify, apply/diff flows for a rename or move.
   - `paredit inspect workspace ...` — directory-root discovery and inventory across many files.
+  - `paredit query ...` — search, count, and rewrite by S-expression pattern across a workspace.
+  - `paredit fix ...` — apply the lint auto-fixes (the write side of `inspect lint`).
+  - `paredit migrate ...` — run a named, ordered, dialect-scoped codemod recipe.
 
   Discovery: `paredit inspect capabilities --output json` prints a machine-readable catalog of
   every command, flag, default, and enum value in one call — use it instead of crawling --help.
@@ -57,6 +61,38 @@ version: 1.4.0
     <command>paredit inspect packages --output json system.asd src/*.lisp</command>
     <command>paredit inspect duplicates --output json src/*.lisp</command>
     <command>paredit inspect similarity --threshold 0.87 --output json src</command>
+  </group>
+
+  <group name="pattern_search_and_rewrite">
+    <description>Search a whole workspace by S-expression shape, and rewrite what it finds. `?name` binds a
+      form; `...` swallows a run of them; `?name...` binds that run. The same language `--query` selects with,
+      as a command in its own right. Nothing is written without --write.</description>
+    <command>paredit query find --query '(defun ?name ...)' --output json src</command>
+    <command>paredit query find --query '(eq ?x ?x)' --fail-on-match --since origin/main --output json .</command>
+    <command>paredit query count --query '(if ?t ?a nil)' --query '(when ?t ?a)' --output json src</command>
+    <command>paredit query replace --query '(if ?t ?a nil)' --rewrite '(when ?t ?a)' --diff src</command>
+    <command>paredit query replace --query '(old-name ?args...)' --rewrite '(new-name ?args...)' --write src</command>
+    <command>paredit query replace --query '(deprecated ...)' --rewrite '(current)' --check .</command>
+  </group>
+
+  <group name="lint_autofix">
+    <description>The write side of `inspect lint`. `fix apply` writes in place with no --write, inheriting
+      `inspect lint --fix` exactly; preview with --diff and gate with `fix check`.</description>
+    <command>paredit fix list --output json</command>
+    <command>paredit fix apply --diff src</command>
+    <command>paredit fix apply --rule redundant-progn --no-destructive-fixes src</command>
+    <command>paredit fix check --output json src</command>
+    <command>paredit fix plan --output json src</command>
+  </group>
+
+  <group name="codemod_recipes">
+    <description>Named, ordered, dialect-scoped rewrites. A recipe skips every file outside its :dialects and
+      reports how many, so a run that changed nothing says why. Read `migrate explain` before `migrate run`.</description>
+    <command>paredit migrate list --output json</command>
+    <command>paredit migrate explain elisp-cl-lib --output json</command>
+    <command>paredit migrate run nil-conditionals --diff src</command>
+    <command>paredit migrate run elisp-cl-lib --write lisp</command>
+    <command>paredit migrate run nil-conditionals --check --output json .</command>
   </group>
 
   <group name="rename">

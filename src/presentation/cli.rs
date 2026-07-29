@@ -64,6 +64,7 @@ use paredit_feature_lisp_analysis::read_conditional_report::cli as read_conditio
 use paredit_feature_lisp_analysis::read_time_eval_report::cli as read_time_eval_report;
 use paredit_feature_lisp_analysis::readtable_case_report::cli as readtable_case_report;
 use paredit_feature_lisp_analysis::restart_report::cli as restart_report;
+use paredit_feature_migrate::{MigrateCommand, migrate};
 use paredit_feature_project_inventory::api_diff_report::cli as api_diff_report;
 use paredit_feature_project_inventory::api_surface_report::cli as api_surface_report;
 use paredit_feature_project_inventory::blame_report::cli as blame_report;
@@ -74,6 +75,9 @@ use paredit_feature_project_inventory::serial_consistency_report::cli as serial_
 use paredit_feature_project_inventory::symbol_index_report::cli as symbol_index_report;
 use paredit_feature_project_inventory::test_map_report::cli as test_map_report;
 use paredit_feature_project_inventory::unreachable_expression_report::cli as unreachable_expression_report;
+use paredit_feature_query::count_report::cli as query_count;
+use paredit_feature_query::find_report::cli as query_find;
+use paredit_feature_query::replace::cli as query_replace;
 use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
@@ -88,6 +92,7 @@ use paredit_feature_structural_diff::structural_diff::cli as structural_diff;
 use paredit_feature_structural_diff::structural_patch::cli as structural_patch;
 mod dispatch;
 mod emacs_lisp_file_report;
+mod fix;
 mod lint_report;
 mod semantic_coverage_report;
 mod writability_report;
@@ -107,7 +112,7 @@ pub(crate) use shared::{read_input_dialect_and_tree, terminal_safe, terminal_saf
     version,
     about,
     long_about = None,
-    after_help = "Canonical namespaces:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form; stdout by default, --write to update the file.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAll source-facing commands live in these three namespaces.\n`paredit completions <shell>` prints a shell completion script.\nRun `paredit inspect capabilities --output json` for a machine-readable catalog of every command and flag."
+    after_help = "Canonical namespaces, by what a change costs to undo:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form; stdout by default, --write to update the file.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAnd by what you are trying to do, over a file set rather than one form:\n  `paredit query ...` searches, counts, and rewrites by S-expression pattern.\n  `paredit fix ...` applies the lint auto-fixes (the write side of `inspect lint`).\n  `paredit migrate ...` runs a named, dialect-scoped codemod recipe.\n\nAll source-facing commands live in these six namespaces.\n`paredit completions <shell>` prints a shell completion script.\nRun `paredit inspect capabilities --output json` for a machine-readable catalog of every command and flag."
 )]
 struct Cli {
     /// Write nothing to disk. Suppresses --write on every command, whatever

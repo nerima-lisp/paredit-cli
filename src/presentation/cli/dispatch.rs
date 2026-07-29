@@ -949,6 +949,15 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                 remove_unused_binding::remove_unused_binding(args)?;
             }
         },
+        Command::Query { command } => match command {
+            command::QueryCommand::Find(args) => query_find::workflow::query_find(args)?,
+            command::QueryCommand::Count(args) => query_count::workflow::query_count(args)?,
+            command::QueryCommand::Replace(args) => {
+                query_replace::workflow::query_replace(args)?;
+            }
+        },
+        Command::Fix { command } => fix::fix(command)?,
+        Command::Migrate { command } => migrate(command)?,
         Command::Config { command } => match command {
             command::ConfigCommand::Check(args) => config::workflow::check(args)?,
             command::ConfigCommand::Show(args) => config::workflow::show(args)?,

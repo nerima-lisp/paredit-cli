@@ -282,7 +282,7 @@ fn atom_symbol(view: &ExpressionView) -> &str {
 /// Lisp, Scheme, Racket and Clojure are case-sensitive, and folding case for
 /// them would make `--query '(Foo)'` match `(foo)` in a language where those
 /// are two different symbols.
-fn symbol_matches(candidate: &str, expected: &str, dialect: Dialect) -> bool {
+pub(super) fn symbol_matches(candidate: &str, expected: &str, dialect: Dialect) -> bool {
     if dialect == Dialect::CommonLisp {
         crate::common_lisp::common_lisp_symbol_reference_eq(candidate, expected)
     } else {

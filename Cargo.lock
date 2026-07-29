@@ -684,9 +684,11 @@ dependencies = [
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
  "paredit-feature-lisp-analysis",
+ "paredit-feature-migrate",
  "paredit-feature-package",
  "paredit-feature-project-analysis",
  "paredit-feature-project-inventory",
+ "paredit-feature-query",
  "paredit-feature-refactor-workflow",
  "paredit-feature-remove-unused",
  "paredit-feature-rename",
@@ -1086,6 +1088,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-migrate"
+version = "1.2.1"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "paredit-feature-package"
 version = "1.2.1"
 dependencies = [
@@ -1119,6 +1132,16 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-project-inventory"
+version = "1.2.1"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-query"
 version = "1.2.1"
 dependencies = [
  "clap",

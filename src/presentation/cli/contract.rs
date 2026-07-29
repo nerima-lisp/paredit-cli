@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 228] = [
+const INTROSPECTION_COMMANDS: [&str; 236] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -376,11 +376,29 @@ const INTROSPECTION_COMMANDS: [&str; 228] = [
     "inspect redundant-divisor",
     "inspect context-at",
     "inspect writability",
+    // The `query` namespace's read-only leaves. Pattern matching needs the
+    // balanced-parens tree and the dialect's reader, and nothing above them,
+    // so both sit at the syntax tier below.
+    "query find",
+    "query count",
+    // The `fix` namespace. `apply`, `check` and `plan` write, and are still
+    // introspection *here*, because this table is about how an unmet dialect
+    // tier presents itself: they exit zero having fixed nothing for a dialect
+    // the lint rules do not model, exactly as `inspect lint --fix` does. A
+    // semantic classification would claim they refuse, which they do not.
+    "fix apply",
+    "fix check",
+    "fix plan",
+    "fix list",
+    // The `migrate` namespace's read-only leaves. Both read the recipe
+    // catalogue and no source file.
+    "migrate list",
+    "migrate explain",
 ];
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
 
-const STRUCTURAL_COMMANDS: [&str; 31] = [
+const STRUCTURAL_COMMANDS: [&str; 33] = [
     "edit select",
     "edit replace",
     "edit kill",
@@ -412,6 +430,16 @@ const STRUCTURAL_COMMANDS: [&str; 31] = [
     "edit split-string",
     "edit escape-string",
     "edit unescape-string",
+    // Template rewriting is paren surgery: the pattern and the template are
+    // read with the dialect's own reader and spliced by byte span, with no
+    // operator vocabulary consulted anywhere. That is the syntax tier, which
+    // is what this category resolves to unconditionally.
+    //
+    // `migrate run`'s *recipes* are dialect-scoped, but the scope is data in
+    // the recipe rather than a limit on the command, and a recipe out of scope
+    // is reported rather than refused.
+    "query replace",
+    "migrate run",
 ];
 
 const SEMANTIC_COMMANDS: [&str; 83] = [
@@ -508,7 +536,7 @@ const SEMANTIC_COMMANDS: [&str; 83] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 14] = [
+const SYNTAX_TIER_REPORTS: [&str; 19] = [
     "inspect context-at",
     "inspect diff",
     "inspect elisp-file",
@@ -523,6 +551,15 @@ const SYNTAX_TIER_REPORTS: [&str; 14] = [
     "inspect workspace",
     "inspect sources",
     "inspect writability",
+    "query find",
+    "query count",
+    // The three catalogue commands read no source at all: `fix list` prints
+    // the rule table, and the two `migrate` leaves print the recipe table.
+    // Their output is identical for every dialect, so reporting them as
+    // "carries no analysis for this dialect" would be a warning about nothing.
+    "fix list",
+    "migrate list",
+    "migrate explain",
 ];
 
 /// Reports built on the dialect-neutral definition and scope shapes, which

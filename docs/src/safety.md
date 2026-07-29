@@ -17,6 +17,38 @@ paredit edit format --file source.lisp --write
 
 `--write` refuses to persist a result that no longer parses, and writes are staged with automatic rollback, so a failed write cannot leave a truncated or unbalanced file behind.
 
+## A rewrite that parses can still be wrong
+
+Everything above rests on one guard: the result has to reparse. That guard is
+complete for a transform whose shape was decided when it was written —
+`convert-if-to-when` converts `if` to `when` and nothing else.
+
+`paredit query replace` and `paredit migrate run` take the shape from the
+caller, and three of their failure modes produce source that **parses
+cleanly and is still wrong**. The reparse guard cannot see any of them, so
+they are refused up front instead:
+
+| skipped as | why | override |
+| --- | --- | --- |
+| `quoted` | The match is inside quoted data. `'(a (if x y nil) b)` is a *list literal* — it has the shape the pattern matches, and rewriting it changes the program's data rather than its code. | `--include-quoted` |
+| `comment-loss` | A comment inside the match is carried by no capture the template uses, so the splice deletes it. Comments live outside the node tree, so the loss is invisible to everything downstream. | `--allow-comment-loss` |
+| `overlapping` | An enclosing match was already rewritten; splicing into text it discarded would corrupt both. Run the command again to reach the nested one. | — |
+
+All three are counted in every output format, **including when the count is
+zero**. Read the `skipped` counts before the diff: a skip count that only
+appears when it is non-zero reads as "this cannot happen" until the day it
+does.
+
+Neither command writes without `--write`. What is *not* guaranteed is that a
+rewrite preserves meaning: `--query '(car ?x)' --rewrite '(cdr ?x)'` is a
+valid instruction and both commands carry it out. The reviewable artifact is
+the plan, which is why it prints by default.
+
+`paredit fix apply` is the one writing command with no `--write` — it inherits
+`inspect lint --fix`'s behaviour exactly, which is what makes the two
+spellings produce the same bytes. Preview it with `--diff`, gate it with
+`paredit fix check`, and refuse it with the global `--dry-run`.
+
 ## Refactor is explicit
 
 Use `paredit refactor plan`, `paredit refactor preview`, and `paredit refactor verify` before `paredit refactor apply` when the workflow is available. These commands make planned changes and verification results visible before a write is requested.

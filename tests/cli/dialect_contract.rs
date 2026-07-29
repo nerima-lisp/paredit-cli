@@ -46,7 +46,14 @@ fn clap_contract_leaf_paths(report: &serde_json::Value) -> BTreeSet<String> {
     let mut leaves = BTreeSet::new();
     for namespace in report["commands"].as_array().expect("root commands") {
         let name = namespace["name"].as_str().expect("namespace name");
-        if !matches!(name, "inspect" | "edit" | "refactor") {
+        // The namespaces the dialect contract covers. `config`, `generate`,
+        // `completions` and the protocol servers are outside it: none of them
+        // analyses a source file, so "which dialects does this answer for" is
+        // not a question they have.
+        if !matches!(
+            name,
+            "inspect" | "edit" | "refactor" | "query" | "fix" | "migrate"
+        ) {
             continue;
         }
 
@@ -76,7 +83,7 @@ fn schema_v2_registry_is_an_exact_bijection_with_clap_leaves() {
     let unique_registry_paths = registry_paths.iter().copied().collect::<BTreeSet<_>>();
 
     assert_eq!(registry_paths.len(), unique_registry_paths.len());
-    assert_eq!(registry_paths.len(), 344);
+    assert_eq!(registry_paths.len(), 354);
     assert_eq!(
         clap_contract_leaf_paths(&v1),
         unique_registry_paths
@@ -130,9 +137,9 @@ fn schema_v2_keeps_its_three_value_vocabulary() {
     assert_eq!(report["schema_version"], 2);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["command_count"], 344);
+    assert_eq!(contract["command_count"], 354);
     assert_eq!(contract["dialect_count"], 10);
-    assert_eq!(contract["cell_count"], 3440);
+    assert_eq!(contract["cell_count"], 3540);
     assert_eq!(contract["dialects"], serde_json::json!(DIALECTS));
     assert_eq!(
         contract["statuses"],
@@ -153,14 +160,14 @@ fn schema_v2_keeps_its_three_value_vocabulary() {
         category_counts,
         BTreeMap::from([
             ("format", 2),
-            ("introspection", 228),
+            ("introspection", 236),
             ("semantic", 83),
-            ("structural", 31),
+            ("structural", 33),
         ])
     );
 
     let cells = support_cells(contract);
-    assert_eq!(cells.len(), 3440);
+    assert_eq!(cells.len(), 3540);
     let vocabulary = cells.values().map(String::as_str).collect::<BTreeSet<_>>();
     assert!(
         vocabulary.is_subset(&BTreeSet::from(["supported", "unsupported"])),
@@ -174,7 +181,7 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
     assert_eq!(report["schema_version"], 3);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["cell_count"], 3440);
+    assert_eq!(contract["cell_count"], 3540);
     assert_eq!(
         contract["statuses"],
         serde_json::json!(["supported", "silent", "unsupported", "unknown"])
@@ -203,7 +210,7 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
 
     // The whole point of the matrix: no cell may answer "unknown".
     let cells = support_cells(contract);
-    assert_eq!(cells.len(), 3440);
+    assert_eq!(cells.len(), 3540);
     let unanswered = cells
         .iter()
         .filter(|(_, status)| *status == "unknown")
@@ -253,7 +260,7 @@ fn schema_v3_summarises_how_deep_each_dialect_goes() {
             .values()
             .map(|count| count.as_u64().expect("count"))
             .sum();
-        assert_eq!(total, 344, "{dialect} counts do not cover every command");
+        assert_eq!(total, 354, "{dialect} counts do not cover every command");
 
         // The summary has to agree with the matrix it summarises.
         for (status, count) in by_status {
@@ -314,7 +321,7 @@ fn fixture_source(dialect: &str) -> (&'static str, String) {
 /// Each entry is the command and the arguments that select something in the
 /// fixture, so a claim of `supported` is checked by running the command rather
 /// than by trusting the table that produced it.
-const SAMPLED_COMMANDS: [(&str, &[&str]); 8] = [
+const SAMPLED_COMMANDS: [(&str, &[&str]); 11] = [
     ("inspect outline", &[]),
     ("inspect definitions", &[]),
     ("inspect lint", &[]),
@@ -323,6 +330,13 @@ const SAMPLED_COMMANDS: [(&str, &[&str]); 8] = [
     ("edit select", &["--path", "0"]),
     ("refactor convert-let-to-let-star", &["--path", "0.3"]),
     ("refactor convert-labels-to-flet", &["--path", "0"]),
+    // The three namespaces added by section O. All three claim `supported`
+    // for every dialect — pattern matching and template splicing read the
+    // tree and the dialect's own reader and nothing above them — and a claim
+    // of support on ten dialects is worth one real invocation each.
+    ("query find", &["--query", "(defun ?name ...)"]),
+    ("query count", &["--query", "(defun ?name ...)"]),
+    ("migrate run", &[]),
 ];
 
 #[test]
@@ -344,7 +358,15 @@ fn sampled_cells_behave_the_way_the_matrix_says_they_do() {
 
             let mut invocation = paredit();
             invocation.args(command.split(' '));
-            if command.starts_with("inspect ") {
+            // `migrate run` takes its recipe name before its roots, so it goes
+            // in ahead of the file rather than in the flag list.
+            if command == "migrate run" {
+                invocation.arg("nil-conditionals");
+            }
+            if ["inspect ", "query ", "migrate "]
+                .iter()
+                .any(|prefix| command.starts_with(prefix))
+            {
                 invocation.arg(&file);
             } else {
                 invocation.args(["--file", file.to_str().expect("utf-8 path")]);
