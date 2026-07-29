@@ -11,6 +11,9 @@ repository.workspace = true
 
 [dependencies]
 paredit-core-syntax = { path = "../syntax" }
+# Content addressing for the incremental analysis cache. The digest has to be
+# collision-resistant: a cache key is a claim that two questions are the same.
+blake3.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 

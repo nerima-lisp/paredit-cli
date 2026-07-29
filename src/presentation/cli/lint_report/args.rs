@@ -117,6 +117,14 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// baseline of known findings (for later use with --baseline); exit 0.
     #[arg(long, value_name = "FILE", conflicts_with_all = ["list_rules", "sarif", "github", "fix", "baseline", "report_unused_suppressions"])]
     pub(in crate::presentation::cli::lint_report) write_baseline: Option<PathBuf>,
+    /// Reuse results for files whose content has not changed, cached here.
+    ///
+    /// Content-addressed: a hit means this exact question — same rules, same
+    /// settings, same bytes, same build — was answered before. Safe to share
+    /// between branches and to keep across upgrades; a new build simply cannot
+    /// read the old entries.
+    #[arg(long, value_name = "DIR", conflicts_with_all = ["list_rules", "fix"])]
+    pub(in crate::presentation::cli::lint_report) cache_dir: Option<PathBuf>,
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
     pub(in crate::presentation::cli::lint_report) dialect: Option<DialectArg>,

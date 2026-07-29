@@ -348,6 +348,11 @@ impl DialectReaderPolicy {
         let third = bytes.get(pos + 2).copied();
         let fourth = bytes.get(pos + 3).copied();
         match byte {
+            // A bare `\` at end of input is a truncated character literal, not
+            // a symbol. Same reasoning as `#\` in Scheme: the formatter's
+            // trailing newline would become its character, and
+            // `format(format(x))` would differ from `format(x)`.
+            b'\\' if next.is_none() => Some(ReaderMacro::UnsupportedDispatch { width: 1 }),
             b'\'' => prefix(ReaderPrefix::Quote, 1),
             b'`' => prefix(ReaderPrefix::Quasiquote, 1),
             b'~' if next == Some(b'@') => prefix(ReaderPrefix::UnquoteSplicing, 2),

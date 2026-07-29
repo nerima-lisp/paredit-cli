@@ -169,6 +169,34 @@ Two paths stay serial on purpose. `--fix` writes files, and `--timings`
 measures per-rule cost, which sixteen workers contending for memory bandwidth
 would turn into a measurement of the machine.
 
+## Not analysing a file twice
+
+`inspect lint --cache-dir <dir>` reuses the findings for any file whose bytes
+have not changed. On the same 1065-file corpus, a warm run is about 4× faster
+than a cold one and reports byte-identical output.
+
+The cache is **content-addressed**. The key is a hash of everything that can
+change the answer — the tool version, the analysis, the active rule set, the
+rule settings, and the file's own bytes — so a hit means "this exact question
+was asked and answered", never "a file with this name was seen before". Three
+consequences follow:
+
+- There is no invalidation logic, because there is nothing to invalidate. A
+  stale entry is unreachable rather than wrong.
+- No mtime, size, or inode is consulted. All three are proxies for content and
+  all three lie: a fresh checkout, a `touch`, a filesystem without sub-second
+  timestamps.
+- Upgrading `paredit` cannot serve an answer computed by the old build, and a
+  narrowed `--rule` selection cannot serve the full suite's answer.
+
+A `--baseline` is a filter over the answer rather than part of the question, so
+the *pre-baseline* findings are what get cached: changing a baseline does not
+throw the analysis away.
+
+A cache directory that cannot be opened is an error, not a silent fallback. A
+run that quietly did not use the cache it was asked to use looks identical to
+one that did, only slower.
+
 ## Workspace scope
 
 For workspace operations, start with `paredit inspect workspace` to identify the affected files. Use the workspace planning and preview commands before `paredit refactor workspace-execute`.

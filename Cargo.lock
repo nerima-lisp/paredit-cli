@@ -739,6 +739,7 @@ dependencies = [
 name = "paredit-core-safety"
 version = "1.2.1"
 dependencies = [
+ "blake3",
  "paredit-core-syntax",
  "proptest",
  "serde_json",

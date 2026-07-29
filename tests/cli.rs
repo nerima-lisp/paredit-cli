@@ -219,6 +219,8 @@ mod lambda_list_keyword_order_report;
 mod last_default_count_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/lint_cache.rs"]
+mod lint_cache;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
 #[path = "cli/lint_report_golden.rs"]
