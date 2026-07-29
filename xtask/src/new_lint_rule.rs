@@ -42,7 +42,8 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
 
     if rule_dir.exists() {
         return Err(crate::error::XtaskError::refused(format!(
-            "{} already exists", rule_dir.display()
+            "{} already exists",
+            rule_dir.display()
         )));
     }
 
@@ -403,21 +404,31 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
 
 fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u32, u32)> {
     let path = repo.path("src/domain/lint/registry/mod.rs");
-    let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!("read {}", path.display())))?;
+    let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!(
+        "read {}",
+        path.display()
+    )))?;
 
     let marker = "pub const RULE_COUNT: usize = ";
     let start = text
         .find(marker)
-        .map_err(crate::error::XtaskError::io(format!("`{marker}` not found in {}", path.display())))?
+        .map_err(crate::error::XtaskError::io(format!(
+            "`{marker}` not found in {}",
+            path.display()
+        )))?
         + marker.len();
     let end = start
         + text[start..]
             .find(';')
-            .map_err(crate::error::XtaskError::io("no `;` after RULE_COUNT value"))?;
+            .map_err(crate::error::XtaskError::io(
+                "no `;` after RULE_COUNT value",
+            ))?;
     let old_count: u32 = text[start..end]
         .trim()
         .parse()
-        .map_err(crate::error::XtaskError::io("RULE_COUNT value is not a number"))?;
+        .map_err(crate::error::XtaskError::io(
+            "RULE_COUNT value is not a number",
+        ))?;
     let new_count = old_count + 1;
     text.replace_range(start..end, &new_count.to_string());
 
@@ -425,19 +436,25 @@ fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u
         "    RuleEntry::new(\n        &{crate_name}::{snake}::rule::META,\n        \
          &{crate_name}::{snake}::rule::RULE,\n    ),\n"
     );
-    let closing = text
-        .rfind("\n];")
-        .map_err(crate::error::XtaskError::io("closing `];` of REGISTRY not found"))?;
+    let closing = text.rfind("\n];").map_err(crate::error::XtaskError::io(
+        "closing `];` of REGISTRY not found",
+    ))?;
     text.insert_str(closing + 1, &insertion);
 
-    fs::write(&path, &text).map_err(crate::error::XtaskError::io(format!("write {}", path.display())))?;
+    fs::write(&path, &text).map_err(crate::error::XtaskError::io(format!(
+        "write {}",
+        path.display()
+    )))?;
     println!("  updated {} (RULE_COUNT, REGISTRY entry)", path.display());
     Ok((old_count, new_count))
 }
 
 fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Result<()> {
     let path = repo.path("src/domain/lint/registry/catalog.rs");
-    let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!("read {}", path.display())))?;
+    let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!(
+        "read {}",
+        path.display()
+    )))?;
 
     text = bump_assert(&text, "assert!(RULE_COUNT == ")?;
     if is_fixable {
@@ -447,7 +464,10 @@ fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Resul
         text = bump_assert(&text, "assert!(warning_count() == ")?;
     }
 
-    fs::write(&path, text).map_err(crate::error::XtaskError::io(format!("write {}", path.display())))?;
+    fs::write(&path, text).map_err(crate::error::XtaskError::io(format!(
+        "write {}",
+        path.display()
+    )))?;
     println!("  updated {} (pinned-count assertions)", path.display());
     Ok(())
 }
@@ -455,16 +475,20 @@ fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Resul
 fn bump_assert(text: &str, marker: &str) -> Result<String> {
     let start = text
         .find(marker)
-        .map_err(crate::error::XtaskError::io(format!("`{marker}` not found")))?
+        .map_err(crate::error::XtaskError::io(format!(
+            "`{marker}` not found"
+        )))?
         + marker.len();
     let rest = &text[start..];
-    let end_offset = rest
-        .find(')')
-        .map_err(crate::error::XtaskError::io("no closing `)` after assertion value"))?;
+    let end_offset = rest.find(')').map_err(crate::error::XtaskError::io(
+        "no closing `)` after assertion value",
+    ))?;
     let old: i64 = rest[..end_offset]
         .trim()
         .parse()
-        .map_err(crate::error::XtaskError::io(format!("`{marker}` value is not a number")))?;
+        .map_err(crate::error::XtaskError::io(format!(
+            "`{marker}` value is not a number"
+        )))?;
     let mut result = text.to_owned();
     result.replace_range(start..start + end_offset, &(old + 1).to_string());
     Ok(result)

@@ -14,8 +14,8 @@
 //! exercised only a few times a year and already works.
 
 mod case;
-mod error;
 mod checklist;
+mod error;
 mod fs_util;
 mod new_command;
 mod new_lint_rule;

@@ -32,7 +32,8 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
 
     if module_dir.exists() {
         return Err(crate::error::XtaskError::refused(format!(
-            "{} already exists", module_dir.display()
+            "{} already exists",
+            module_dir.display()
         )));
     }
 
