@@ -18,13 +18,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled operand list.
@@ -34,51 +36,64 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct ValuesListOfListItem {
-    pub path: PathBuf,
     /// The span of the whole `(values-list (list …))` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span of the element list (`a b …`, the `list` head and parens
     /// excluded), or `None` for an empty `(list)` (rewrite to `(values)`).
     pub elements_span: Option<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct ValuesListOfListSummary {
-    pub values_list_form_count: usize,
-    pub violations: Vec<ValuesListOfListItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ValuesListOfListPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ValuesListOfListPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ValuesListOfListItem {
+    /// One tag for every finding: this report has a single shape to describe,
+    /// a list built only to be spread by the `values-list` around it.
+    fn kind(&self) -> &'static str {
+        "throwaway-list"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ValuesListOfListPolicy {
-    pub fail_on_violation: bool,
-    pub values_list_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// None: the old text row carried the path and the offset, both of which
+    /// the envelope prints itself.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// `elements_span` stays a key even when it is `null`, which is how the old
+    /// renderer wrote an empty `(list)`. A consumer testing the key's presence
+    /// rather than its value would otherwise read that case as a missing field.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "elements_span",
+            self.elements_span.map_or(Value::Null, |span| {
+                json!({
+                    "start": span.start().get(),
+                    "end": span.end().get(),
+                })
+            }),
+        )]
+    }
+
+    /// The same sentence the `values-list-of-list` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "values-list of a fresh list is just values; (values-list (list a b)) is (values a b)"
+            .to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     values_list_form_count: &mut usize,
     violations: &mut Vec<ValuesListOfListItem>,
 ) {
@@ -119,73 +134,87 @@ pub fn examine(
     };
 
     violations.push(ValuesListOfListItem {
-        path: path.to_path_buf(),
         span: view.span,
+        line: line_of(source, view.span.start().get()),
         elements_span,
     });
 }
 
-/// Collects every `(values-list (list …))` across a whole file, along with the
-/// total number of `values-list` forms scanned.
-pub fn collect_values_list_of_lists(
+/// Collects every `(values-list (list …))` in one file, with the number of
+/// `values-list` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no throwaway list here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_values_list_of_list_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ValuesListOfListItem>)> {
+) -> LintResult<FileFindings<ValuesListOfListItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("values_list_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut values_list_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut values_list_form_count, &mut violations);
+            examine(
+                subview,
+                source,
+                &mut values_list_form_count,
+                &mut violations,
+            );
         });
     }
-    Ok((values_list_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("values_list_form_count", json!(values_list_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_values_list_of_lists(
-    values_list_form_count: usize,
-    violations: Vec<ValuesListOfListItem>,
-) -> ValuesListOfListSummary {
-    ValuesListOfListSummary {
-        values_list_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_values_list_of_list_policy(
-    options: ValuesListOfListPolicyOptions,
-    summary: &ValuesListOfListSummary,
-) -> ValuesListOfListPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ValuesListOfListPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        values_list_form_count: summary.values_list_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<ValuesListOfListItem>) {
+    fn report(input: &str) -> FileFindings<ValuesListOfListItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_values_list_of_lists(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect values-list of lists")
+        build_values_list_of_list_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build values-list of list report")
+    }
+
+    /// The `(values_list_form_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<ValuesListOfListItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "values_list_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("values_list_form_count in the summary");
+        (count, report.findings)
     }
 
     fn elements<'a>(source: &'a str, item: &ValuesListOfListItem) -> &'a str {
@@ -246,31 +275,56 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(values-list (list a b))", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_values_list_of_lists(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect values-list of lists");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_values_list_of_list_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build values-list of list report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("values_list_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(values-list (list a b))");
-        let summary = summarize_values_list_of_lists(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(values-list xs)").dialect_modelled);
+    }
 
-        let quiet = evaluate_values_list_of_list_policy(
-            ValuesListOfListPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_element_span() {
+        let report = report("(defun f (a b)\n  (values-list (list a b)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "throwaway-list");
+        let span = finding.elements_span.expect("two elements");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "elements_span",
+                json!({ "start": span.start().get(), "end": span.end().get() })
+            )]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_values_list_of_list_policy(ValuesListOfListPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    /// An empty `(list)` published `"elements_span": null`; the key stays.
+    #[test]
+    fn an_empty_list_still_carries_the_element_span_key() {
+        let report = report("(values-list (list))");
+        assert_eq!(
+            report.findings[0].json_fields(),
+            vec![("elements_span", Value::Null)]
+        );
+    }
+
+    #[test]
+    fn the_summary_counts_every_values_list_scanned_not_only_the_flagged_ones() {
+        let report = report("(values-list (list a))\n(values-list xs)\n(values-list (list))\n");
+        assert_eq!(report.summary, vec![("values_list_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }
