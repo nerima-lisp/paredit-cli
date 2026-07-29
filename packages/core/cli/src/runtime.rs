@@ -125,6 +125,16 @@ pub struct RuntimeSettings {
     /// caller who wants group-readable output (a shared checkout, a CI
     /// artifact directory) wants it for all of them, not one at a time.
     pub new_file_mode: Option<u32>,
+    /// Refuse a write whose target's parent path climbs through a symlinked
+    /// directory above the immediate parent (which is refused unconditionally
+    /// already, `O_NOFOLLOW` catching only the last path component).
+    ///
+    /// Default off: `/tmp` is a symlink to `/private/tmp` on macOS, and
+    /// similar stable, root-owned redirections are common enough elsewhere
+    /// that refusing them unconditionally would break routine use. This is
+    /// for a caller who wants the stricter policy — CI writing into a
+    /// less-trusted checkout, for instance — not a universal default.
+    pub refuse_symlinked_ancestors: bool,
 }
 
 static RUNTIME: OnceLock<RuntimeSettings> = OnceLock::new();

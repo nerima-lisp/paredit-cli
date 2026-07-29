@@ -59,6 +59,7 @@ pub fn resolve(settings: &Settings) -> RuntimeSettings {
         progress: false,
         dry_run: false,
         new_file_mode: None,
+        refuse_symlinked_ancestors: false,
     }
 }
 

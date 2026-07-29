@@ -118,6 +118,12 @@ struct Cli {
     /// leading 0 (for example 644). Unix only; the built-in default is 600.
     #[arg(long, global = true, value_name = "MODE")]
     new_file_mode: Option<String>,
+    /// Refuse a write whose parent directory climbs through a symlink above
+    /// its immediate parent (which is refused unconditionally already). Off
+    /// by default: `/tmp` is a symlink to `/private/tmp` on macOS, and this
+    /// would refuse writes there along with any similar stable redirection.
+    #[arg(long, global = true)]
+    refuse_symlinked_ancestors: bool,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -346,6 +352,9 @@ fn bootstrap() -> Cli {
         },
         None => None,
     };
+    runtime.refuse_symlinked_ancestors = raw
+        .iter()
+        .any(|token| token == "--refuse-symlinked-ancestors");
     paredit_core_cli::runtime::install(runtime);
 
     // A configuration with errors contributes nothing. Injecting from a file

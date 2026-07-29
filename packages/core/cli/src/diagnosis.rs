@@ -520,7 +520,8 @@ const fn classify_refusal(error: &IoRefusal) -> ErrorCode {
         | IoRefusal::WriteNonRegularFile { .. }
         | IoRefusal::DuplicateWriteTarget { .. }
         | IoRefusal::WriteTargetHasNoFileName { .. }
-        | IoRefusal::WritableParentDirectory { .. } => ErrorCode::RefusalWriteTarget,
+        | IoRefusal::WritableParentDirectory { .. }
+        | IoRefusal::SymlinkedAncestorDirectory { .. } => ErrorCode::RefusalWriteTarget,
         IoRefusal::DryRun => ErrorCode::RefusalDryRun,
         IoRefusal::OverlappingRewriteSpans => ErrorCode::RefusalOverlappingSpans,
         IoRefusal::RewriteSpanOutOfBounds => ErrorCode::RefusalSpanOutOfBounds,

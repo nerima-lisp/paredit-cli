@@ -2151,6 +2151,9 @@ fn open_anchored_parent(path: &FsPath) -> CliResult<(AnchoredDirectory, OsString
         })?
         .to_os_string();
     let display_path = write_target_parent(path).to_path_buf();
+    if crate::runtime::current().refuse_symlinked_ancestors {
+        refuse_symlinked_ancestors(&display_path)?;
+    }
     let handle = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -2184,6 +2187,76 @@ fn open_anchored_parent(path: &FsPath) -> CliResult<(AnchoredDirectory, OsString
         },
         target_name,
     ))
+}
+
+/// Refuses every *ancestor* of `parent_path` — everything above it, not
+/// `parent_path` itself — that is a symlink.
+///
+/// `open_anchored_parent` opens `parent_path` with `O_NOFOLLOW`, which
+/// refuses a symlinked immediate parent; a symlinked target file is refused
+/// the same way elsewhere. `O_NOFOLLOW` only constrains the *last* path
+/// component the kernel resolves, though, so a symlinked grandparent (or
+/// higher) in a path like `a/b/c` — where `b` is a symlink and `parent_path`
+/// is `a/b/c` — is still followed by ordinary lookup. This walks that chain
+/// itself, one capability-relative hop at a time from a trusted anchor (`/`
+/// for an absolute path, `.` for a relative one), so each hop can refuse a
+/// symlink instead of following it.
+#[cfg(unix)]
+fn refuse_symlinked_ancestors(parent_path: &FsPath) -> CliResult<()> {
+    use cap_std::fs::OpenOptionsExt;
+
+    let mut ancestors: Vec<&OsStr> = parent_path
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(name) => Some(name),
+            _ => None,
+        })
+        .collect();
+    // The last of these names is `parent_path` itself, already checked by
+    // its own `O_NOFOLLOW` open; only what sits above it needs walking here.
+    if ancestors.pop().is_none() {
+        return Ok(());
+    }
+
+    let anchor: &FsPath = if parent_path.is_absolute() {
+        FsPath::new("/")
+    } else {
+        FsPath::new(".")
+    };
+    let mut current = cap_std::fs::Dir::open_ambient_dir(anchor, cap_std::ambient_authority())
+        .map_err(CliError::io(format!(
+            "failed to open {} while checking {} for symlinked ancestor directories",
+            anchor.display(),
+            parent_path.display()
+        )))?;
+
+    for name in ancestors {
+        let metadata = current
+            .symlink_metadata(name)
+            .map_err(CliError::io(format!(
+                "failed to inspect an ancestor directory of {}",
+                parent_path.display()
+            )))?;
+        if metadata.file_type().is_symlink() {
+            return Err(IoRefusal::SymlinkedAncestorDirectory {
+                path: parent_path.display().to_string(),
+            }
+            .into());
+        }
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC);
+        let opened = current
+            .open_with(name, &options)
+            .map_err(CliError::io(format!(
+                "failed to open an ancestor directory of {}",
+                parent_path.display()
+            )))?;
+        current = cap_std::fs::Dir::from_std_file(opened.into_std());
+    }
+
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -3569,6 +3642,44 @@ mod tests {
             fs::read_to_string(&real).expect("read link destination"),
             "(old)"
         );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(all(unix, test))]
+    #[test]
+    fn refuse_symlinked_ancestors_detects_a_symlinked_directory_above_the_immediate_parent() {
+        let directory = test_directory("symlinked-ancestor");
+        let real_subdirectory = directory.join("real");
+        fs::create_dir(&real_subdirectory).expect("create real ancestor directory");
+        let linked_subdirectory = directory.join("linked");
+        std::os::unix::fs::symlink(&real_subdirectory, &linked_subdirectory)
+            .expect("create symlinked ancestor directory");
+
+        // `nested` need not exist: only the ancestors of the path handed in are
+        // walked, the same way `open_anchored_parent`'s own `O_NOFOLLOW` open
+        // already covers the last component on its own.
+        let error = refuse_symlinked_ancestors(&linked_subdirectory.join("nested"))
+            .expect_err("a symlinked grandparent directory must be refused");
+
+        assert!(error.chain().contains("symlinked ancestor directory"));
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(all(unix, test))]
+    #[test]
+    fn refuse_symlinked_ancestors_allows_a_chain_of_plain_directories() {
+        let directory = test_directory("plain-ancestor-chain");
+        // Canonicalized because `test_directory` lives under the process
+        // temporary directory, which is itself a symlink on macOS
+        // (`/tmp` -> `/private/tmp`) — exactly the kind of ancestor this
+        // check exists to catch, so the "nothing to refuse" case has to be
+        // built on the resolved path rather than the symlinked one.
+        let directory = fs::canonicalize(&directory).expect("canonicalize test directory");
+        let nested = directory.join("a").join("b");
+        fs::create_dir_all(&nested).expect("create plain nested directories");
+
+        refuse_symlinked_ancestors(&nested).expect("a chain with no symlinks must be allowed");
+
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 

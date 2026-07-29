@@ -84,6 +84,14 @@ pub enum IoRefusal {
     #[error("refusing writable parent directory {path}")]
     WritableParentDirectory { path: String },
 
+    /// A directory *above* the immediate parent is a symlink. `O_NOFOLLOW`
+    /// only constrains the last path component the kernel resolves, so a
+    /// symlinked grandparent (or higher) would otherwise be followed
+    /// silently even though a symlinked immediate parent or a symlinked
+    /// target file is already refused.
+    #[error("refusing to write through symlinked ancestor directory of {path}")]
+    SymlinkedAncestorDirectory { path: String },
+
     /// `--dry-run` reached a write the argument layer could not turn into a
     /// preview, because the command does not spell writing as `--write`.
     #[error(
