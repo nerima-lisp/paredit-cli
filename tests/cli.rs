@@ -187,6 +187,8 @@ mod extract_function;
 mod extract_local_function;
 #[path = "cli/feature_dependency_contract.rs"]
 mod feature_dependency_contract;
+#[path = "cli/fix_namespace.rs"]
+mod fix_namespace;
 #[path = "cli/flatten_progn.rs"]
 mod flatten_progn;
 #[path = "cli/fold_constants.rs"]
@@ -293,6 +295,8 @@ mod merge_nested_flet;
 mod merge_nested_let_star;
 #[path = "cli/merge_split_let.rs"]
 mod merge_split_let;
+#[path = "cli/migrate_namespace.rs"]
+mod migrate_namespace;
 #[path = "cli/modify_macro_arity_report.rs"]
 mod modify_macro_arity_report;
 #[path = "cli/multiple_value_list_of_values_report.rs"]
@@ -357,6 +361,8 @@ mod project_inventory_report;
 mod public_api_docs_contract;
 #[path = "cli/public_module_docs_contract.rs"]
 mod public_module_docs_contract;
+#[path = "cli/query_namespace.rs"]
+mod query_namespace;
 #[path = "cli/quoted_case_key_report.rs"]
 mod quoted_case_key_report;
 #[path = "cli/reachability_report.rs"]

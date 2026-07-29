@@ -215,6 +215,20 @@ pub enum ArgumentError {
         index: usize,
         available: usize,
     },
+
+    /// A flag or positional argument named something this build does not have.
+    ///
+    /// Deliberately general — `what` names the kind of thing ("migration
+    /// recipe") and `available` lists what exists. A caller who typoed a name
+    /// gets an argument error naming the alternatives, rather than
+    /// `internal.unclassified`, whose documented meaning is "a defect in this
+    /// tool, please report it".
+    #[error("no {what} named {name:?}; available: {available}")]
+    UnknownName {
+        what: &'static str,
+        name: String,
+        available: String,
+    },
 }
 
 /// A write failed, and then undoing it failed too.

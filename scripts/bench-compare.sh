@@ -80,10 +80,32 @@ trap cleanup EXIT
 printf 'bench-compare: baseline %s -> %s\n' "$baseline_ref" "$worktree"
 git worktree add --detach --quiet "$worktree" "$baseline_ref"
 
-# The baseline is benchmarked into *this* tree's target directory, so both runs
-# share one Criterion data directory and the comparison has something to
-# compare against. CARGO_TARGET_DIR is what makes that happen without copying.
-export CARGO_TARGET_DIR="$repository_root/target"
+# Both runs must write into ONE Criterion data directory, or there is nothing
+# to compare against. They must NOT share a build directory.
+#
+# Sharing `CARGO_TARGET_DIR` did both at once, and the second half is wrong.
+# The two trees hold packages of the same name and version — `paredit-core-syntax
+# v1.2.1` is `paredit-core-syntax v1.2.1` in each — so the baseline's build
+# lands on the same artifact filenames as the working tree's, and whichever ran
+# first wins. It ran first, so the working tree linked the *baseline's* library.
+#
+# That is invisible while a branch only changes function bodies: the stale
+# rlib has the same shape and links fine, and the numbers it produces are the
+# baseline's, silently. It becomes visible the moment a branch adds a new item
+# to a core package that a new member imports — which is how it was found
+# (`selector::rewrite`, added for `query replace`): the working-tree build
+# failed with `no plan_rewrite in selector`, naming a module that is right
+# there in the source.
+#
+# So: separate build directories, one shared `CRITERION_HOME`. Criterion reads
+# that in preference to `$CARGO_TARGET_DIR/criterion`, which is exactly the
+# seam needed.
+#
+# The cost is that the baseline no longer reuses the working tree's compiled
+# third-party dependencies and builds its own copy — a few minutes on a cold
+# CI runner. That is the right trade: the alternative shares the dependencies
+# *and* the local packages, and there is no way to have only the first.
+export CRITERION_HOME="$repository_root/target/criterion"
 
 # Extra Criterion arguments, for a smoke run that does not take ten minutes:
 #
@@ -122,7 +144,12 @@ printf 'bench-compare: measuring baseline\n'
 #
 # So: say so, loudly, and exit without a verdict. A missing comparison is
 # visible in the log; a wrong one is not.
-if ! (cd "$worktree" && cargo bench --quiet --package paredit-cli "${bench_targets[@]}" -- --save-baseline bench-compare-base "${bench_args[@]}" >/dev/null); then
+if ! (
+  cd "$worktree" &&
+    CARGO_TARGET_DIR="$worktree/target" \
+      cargo bench --quiet --package paredit-cli "${bench_targets[@]}" \
+      -- --save-baseline bench-compare-base "${bench_args[@]}" >/dev/null
+); then
   cat <<MESSAGE >&2
 
 bench-compare: the baseline ($baseline_ref) could not be benchmarked.
@@ -139,7 +166,7 @@ printf 'bench-compare: measuring working tree\n'
 cargo bench --quiet --package paredit-cli "${bench_targets[@]}" -- --baseline bench-compare-base "${bench_args[@]}" >/dev/null
 
 printf 'bench-compare: comparing (threshold %s%%)\n' "$threshold"
-python3 - "$repository_root/target/criterion" "$threshold" "$baseline_ref" "$report_path" <<'PYTHON'
+python3 - "$CRITERION_HOME" "$threshold" "$baseline_ref" "$report_path" <<'PYTHON'
 import json
 import os
 import sys

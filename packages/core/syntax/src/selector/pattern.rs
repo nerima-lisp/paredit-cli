@@ -268,7 +268,12 @@ fn push_unique(names: &mut Vec<String>, name: &str) {
 }
 
 /// The token a pattern atom carries, once its special spellings are read off.
-enum AtomToken {
+///
+/// Visible to [`super::rewrite`] so a `--rewrite` template reads `?name`,
+/// `?name:kind` and `?name...` with the tokenizer the `--query` pattern uses.
+/// Two copies of this grammar would drift, and the drift would be a template
+/// that silently writes a literal `?name` into the source.
+pub(super) enum AtomToken {
     Wildcard {
         capture: Option<String>,
         kind: CaptureKind,
@@ -277,7 +282,7 @@ enum AtomToken {
     Literal,
 }
 
-fn classify_atom(text: &str) -> Result<AtomToken, PatternError> {
+pub(super) fn classify_atom(text: &str) -> Result<AtomToken, PatternError> {
     if text == "_" {
         return Ok(AtomToken::Wildcard {
             capture: None,

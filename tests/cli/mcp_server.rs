@@ -172,6 +172,58 @@ fn cli_mcp_read_only_leaves_the_file_exactly_as_it_found_it() {
     );
 }
 
+/// A command that spells the write in its *name* rather than in a flag.
+///
+/// `--read-only` was a flag list — `--write`, `--fix`, `--apply`,
+/// `--in-place` — and that was a complete gate for exactly as long as every
+/// writing command carried one of them. `paredit fix apply` carries none: the
+/// whole point of the `fix` namespace is that the write is in the command
+/// name. It ran, and it wrote, while the server's own `initialize` response
+/// said "every command that would modify a file is refused".
+#[test]
+fn cli_mcp_read_only_refuses_a_command_that_writes_without_a_writing_flag() {
+    let source = "(defun f (x)\n  (setf x (1+ x))\n  x)\n";
+    let file = fixture("mcp-read-only-fix", source);
+    let responses = session(
+        &["--read-only"],
+        &[
+            initialize(),
+            call(
+                2,
+                "paredit_run",
+                serde_json::json!({
+                    "args": ["fix", "apply", file.display().to_string()],
+                }),
+            ),
+        ],
+    );
+
+    assert_eq!(reply(&responses, 2)["isError"], true);
+    assert_eq!(
+        fs::read_to_string(&file).expect("read fixture"),
+        source,
+        "--read-only must refuse `fix apply`, which writes with no writing flag"
+    );
+}
+
+/// The gate matches a leading subcommand *sequence*, not any occurrence of the
+/// word, or it would refuse reads that merely mention it.
+#[test]
+fn cli_mcp_read_only_still_permits_a_read_that_merely_mentions_a_writing_command() {
+    let responses = session(
+        &["--read-only"],
+        &[
+            initialize(),
+            call(
+                2,
+                "paredit_run",
+                serde_json::json!({ "args": ["fix", "list"] }),
+            ),
+        ],
+    );
+    assert_eq!(reply(&responses, 2)["isError"], false);
+}
+
 /// Without `--read-only` the same call is allowed, or the flag would be
 /// meaningless.
 #[test]
