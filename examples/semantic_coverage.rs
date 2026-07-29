@@ -12,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use paredit_cli::application::usecase::semantic_coverage::{
+use paredit_cli::semantic_coverage::{
     DiscoveredSemanticCoverageFile, SemanticCoverageInventory, SemanticCoverageReport,
     SemanticCoverageRequest, SemanticCoverageSourcePort, build_semantic_coverage_report,
 };

@@ -1,11 +1,12 @@
 use paredit_core_cli::{CliError, CliResult, CommandResult};
+use paredit_core_lint_engine::suppression::LintSuppressions;
 
-use crate::application::usecase::lint_report::{
-    CATEGORIES, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, LintSuppressions,
-    RULES, RuleFilter, RuleFixFor, RulePreset, RuleSettings, RuleTag, RuleTimings, Severity,
-    SeverityOverrides, apply_severity_override, collect_lint_findings, evaluate_lint_policy,
-    lint_gate_violations, resolve_active_rules, rule_setting, rule_tags, rule_timing_report,
-    run_lint_pass, summarize_lint_findings,
+use crate::lint::report::{
+    CATEGORIES, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, RULES, RuleFilter,
+    RuleFixFor, RulePreset, RuleSettings, RuleTag, RuleTimings, Severity, SeverityOverrides,
+    apply_severity_override, collect_lint_findings, evaluate_lint_policy, lint_gate_violations,
+    resolve_active_rules, rule_setting, rule_tags, rule_timing_report, run_lint_pass,
+    summarize_lint_findings,
 };
 use crate::presentation::cli::lint_report::args::{EmitFormat, LintReportArgs};
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
@@ -221,7 +222,7 @@ fn retain_unbaselined(
 /// end)` so the fix engine can pair a finding with its rewrite.
 ///
 /// The rules themselves now own their repairs (see
-/// [`crate::domain::lint_report::collect_lint_fixes`]); this only reshapes the
+/// [`crate::lint::report::collect_lint_fixes`]); this only reshapes the
 /// domain's list into the map the fixpoint loop, SARIF writer, and fix plan
 /// all index by. Later entries overwrite earlier ones on an identical key,
 /// which is what a rule reporting twice on one span has always resolved to.
@@ -325,7 +326,7 @@ fn resolve_rule_settings(args: &LintReportArgs) -> CliResult<RuleSettings> {
             .into());
         }
         let Some(declared) = rule_setting(rule, key) else {
-            let valid: Vec<&str> = crate::application::usecase::lint_report::rule_settings(rule)
+            let valid: Vec<&str> = crate::lint::report::rule_settings(rule)
                 .iter()
                 .map(|setting| setting.key())
                 .collect();
@@ -1634,7 +1635,7 @@ fn lint_report_test_rules(custom: &CustomRules) -> CommandResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::usecase::lint_report::{FIXABLE_RULES, RULES};
+    use crate::lint::report::{FIXABLE_RULES, RULES};
     use paredit_core_syntax::dialect::Dialect;
     use std::collections::BTreeSet;
     use std::path::PathBuf;

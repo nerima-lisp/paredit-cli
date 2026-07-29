@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::lint_report::collect_lint_findings;
+    use crate::lint::report::collect_lint_findings;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_string_char::char_op_string::rule::META;
@@ -99,7 +99,7 @@ mod tests {
 
 #[cfg(test)]
 mod eq_char_comparison_tests {
-    use crate::domain::lint_report::collect_lint_findings;
+    use crate::lint::report::collect_lint_findings;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_numeric::eq_char_comparison::rule::META;
@@ -185,7 +185,7 @@ mod eq_char_comparison_tests {
 
 #[cfg(test)]
 mod parse_integer_default_radix_tests {
-    use crate::domain::lint_report::collect_lint_findings;
+    use crate::lint::report::collect_lint_findings;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
     use std::path::Path;
@@ -232,7 +232,7 @@ mod parse_integer_default_radix_tests {
 
 #[cfg(test)]
 mod constant_if_test_tests {
-    use crate::domain::lint_report::collect_lint_findings;
+    use crate::lint::report::collect_lint_findings;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
     use std::path::Path;
@@ -290,7 +290,7 @@ mod constant_if_test_tests {
 
 #[cfg(test)]
 mod redundant_the_tests {
-    use crate::domain::lint_report::collect_lint_findings;
+    use crate::lint::report::collect_lint_findings;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_form_shape::redundant_the::rule::META;
@@ -382,7 +382,7 @@ mod redundant_the_tests {
 
 #[cfg(test)]
 mod eq_number_comparison_tests {
-    use crate::domain::lint_report::collect_lint_findings;
+    use crate::lint::report::collect_lint_findings;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_numeric::eq_number_comparison::rule::META;
@@ -470,8 +470,8 @@ mod eq_number_comparison_tests {
 
 #[cfg(test)]
 mod zero_divisor_tests {
-    use crate::domain::lint::policy::RuleSelection;
-    use crate::domain::lint_report::collect_lint_findings;
+    use crate::lint::policy::RuleSelection;
+    use crate::lint::report::collect_lint_findings;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
     use paredit_feature_lint_numeric::zero_divisor::rule::META;

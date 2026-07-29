@@ -8,9 +8,7 @@
 //! below pin each derived length so that gaining or losing a rule is a
 //! deliberate change.
 
-use crate::domain::lint::model::{
-    RuleCategory, RuleExplanation, RuleSetting, RuleTag, RuleTags, Severity,
-};
+use crate::lint::model::{RuleCategory, RuleExplanation, RuleSetting, RuleTag, RuleTags, Severity};
 
 use super::{REGISTRY, RULE_COUNT};
 
@@ -182,7 +180,7 @@ const _: () = assert!(warning_count() == 113);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 const _: () = assert!(PEDANTIC_RULES.len() == 4);
 
-fn meta_of(name: &str) -> Option<&'static crate::domain::lint::model::RuleMeta> {
+fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
     REGISTRY
         .iter()
         .map(super::RuleEntry::meta)

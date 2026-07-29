@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 
 use paredit_core_cli::CliResult;
 
-use crate::application::usecase::lint_report::{
+use crate::lint::report::{
     RULES, Severity, SeverityOverrides, overridden_rule_severity, rule_category, rule_is_fixable,
 };
 use paredit_feature_lint_custom::{CustomFinding, Ruleset, parse_ruleset, run, run_tests};
@@ -309,7 +309,7 @@ mod tests {
     fn a_deny_still_re_ranks_a_shipped_rule_through_the_resolver() {
         let custom = CustomRules::default();
         let mut overrides = SeverityOverrides::new();
-        crate::application::usecase::lint_report::apply_severity_override(
+        crate::lint::report::apply_severity_override(
             &mut overrides,
             "redundant-quote",
             Severity::Error,

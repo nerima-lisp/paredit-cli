@@ -21,6 +21,7 @@ pub use paredit_core_lint_engine::{LintResult, RuleSelectionError, engine, model
 #[cfg(test)]
 mod engine_dispatch_tests;
 pub mod registry;
+pub mod report;
 #[cfg(test)]
 mod rule_registry_tests;
 

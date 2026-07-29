@@ -17,7 +17,7 @@ use paredit_core_syntax::sexpr::{
 };
 
 use super::documents::{Document, PositionEncoding};
-use crate::application::usecase::lint_report::{
+use crate::lint::report::{
     LintPassRequest, RuleFilter, Severity, resolve_active_rules, rule_category, rule_description,
     rule_severity, run_lint_pass,
 };

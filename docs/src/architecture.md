@@ -52,9 +52,17 @@ when that layer has more than one file, and a slice need not have all three.
 
 ## What the root crate still owns
 
-Almost nothing, which is the point. Outside `src/presentation` the root holds
-the lint registry, the module that runs it, and the `semantic_coverage`
-harness — and a contract test keeps it that way.
+Almost nothing, which is the point:
+
+```text
+src/
+├── lib.rs, main.rs      entry points
+├── lint/                the registry, and the pass that runs it
+├── semantic_coverage.rs a development harness
+└── presentation/        the clap tree, dispatch, and the protocol servers
+```
+
+A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
 all 169 rules, and every rule depends on the engine; putting the registry in
@@ -64,7 +72,8 @@ the registry sits in the root reaching six packages for their `META` and
 `RULE`. That is the criterion: **a module that enumerates or aggregates several
 features** belongs in neither core nor any one feature.
 
-`src/domain` and `src/application` used to hold 415 lines of `pub use`
+There is no `domain`, `application` or `infrastructure` module, and the names
+are the reason. They used to hold 415 lines of `pub use`
 re-exporting other packages, on the reasoning that they were "the public API's
 namespace". Measured, 26 of those lines were referenced and the crate is
 `publish = false`, so the namespace had no consumer outside this repository.

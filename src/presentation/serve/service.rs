@@ -21,7 +21,7 @@ use serde_json::{Value, json};
 use paredit_core_jsonrpc::{Outcome, ResponseError, error_codes};
 use paredit_core_syntax::sexpr::SyntaxTree;
 
-use crate::application::usecase::lint_report::{
+use crate::lint::report::{
     LintPassRequest, RuleFilter, resolve_active_rules, rule_severity, run_lint_pass,
 };
 use paredit_core_syntax::dialect::Dialect;

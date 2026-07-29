@@ -1,6 +1,6 @@
 //! Measuring how much of the semantic layer resolves on real source.
 //!
-//! `src/domain/semantics` is conservative by design — it says `Known` only
+//! `paredit-core-semantics` is conservative by design — it says `Known` only
 //! when it can prove something, and stays silent otherwise. That discipline
 //! is only worth its cost if it actually resolves a useful fraction of real
 //! code, and *why* it does not resolve the rest is what decides where the

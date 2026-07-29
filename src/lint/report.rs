@@ -1,7 +1,7 @@
 //! The published surface of the lint suite.
 //!
 //! The rules, the registry they are derived from, and the single pass that
-//! runs them live in `crate::domain::lint`. This module is the stable façade
+//! runs them live in `crate::lint`. This module is the stable façade
 //! the application and CLI layers import: the report types, the catalogue
 //! constants, and the two entry points that produce findings and fixes for one
 //! parsed file.
@@ -13,27 +13,27 @@ use std::path::Path;
 
 use paredit_core_cli::CliResult;
 
-use crate::domain::lint::engine::PassOptions;
-pub use crate::domain::lint::engine::RuleTimings;
-pub use crate::domain::lint::model::RuleFix;
-use crate::domain::lint::policy::RuleSelection;
-use crate::domain::lint::registry::catalog;
+use crate::lint::engine::PassOptions;
+pub use crate::lint::engine::RuleTimings;
+pub use crate::lint::model::RuleFix;
+use crate::lint::policy::RuleSelection;
+use crate::lint::registry::catalog;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
-pub use crate::domain::lint::model::{
+pub use crate::lint::model::{
     FindingId, LintFinding, LintPolicy, LintPolicyOptions, LintSummary, RuleExample,
     RuleExplanation, RuleSetting, RuleSettings, RuleTag, RuleTags, Severity,
 };
-pub use crate::domain::lint::policy::{RuleFilter, RulePreset, SeverityOverrides};
+pub use crate::lint::policy::{RuleFilter, RulePreset, SeverityOverrides};
 // The registry-injecting wrappers, not the raw `policy` functions: those now
 // take the catalogue explicitly so the engine can live without a registry.
-pub use crate::domain::lint::registry::catalog::{
+pub use crate::lint::registry::catalog::{
     CATEGORIES, EXPERIMENTAL_RULES, FIXABLE_RULES, PEDANTIC_RULES, RULE_DOCS, RULES, TAGS,
     WARNING_RULES, rule_description, rule_dialects, rule_explanation, rule_is_fixable,
     rule_setting, rule_settings, rule_severity, rule_tags,
 };
-pub use crate::domain::lint::{
+pub use crate::lint::{
     apply_severity_override, evaluate_lint_policy, lint_gate_violations, overridden_rule_severity,
     resolve_active_rules, summarize_lint_findings,
 };
@@ -58,16 +58,12 @@ pub fn collect_lint_findings(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> CliResult<Vec<LintFinding>> {
-    Ok(crate::domain::lint::collect_lint_outcomes(
-        path,
-        dialect,
-        tree,
-        tree.source(),
-        RuleSelection::All,
-    )?
-    .into_iter()
-    .map(|outcome| outcome.into_parts().0)
-    .collect())
+    Ok(
+        crate::lint::collect_lint_outcomes(path, dialect, tree, tree.source(), RuleSelection::All)?
+            .into_iter()
+            .map(|outcome| outcome.into_parts().0)
+            .collect(),
+    )
 }
 
 /// The automatic rewrite each selected, fixable rule offers for one file,
@@ -84,7 +80,7 @@ pub fn collect_lint_fixes(
     source: &str,
     active: &[&str],
 ) -> CliResult<Vec<RuleFixFor>> {
-    Ok(crate::domain::lint::collect_lint_outcomes(
+    Ok(crate::lint::collect_lint_outcomes(
         path,
         dialect,
         tree,
@@ -110,7 +106,7 @@ pub fn collect_lint_fixes(
 ///
 /// Filtering after the walk is identical to filtering before it, and that is
 /// not an accident of the current rules:
-/// [`crate::domain::lint::policy::RuleSelection`] is a per-rule
+/// [`crate::lint::policy::RuleSelection`] is a per-rule
 /// membership test, rules never observe one another, and a rule left out of
 /// `active` contributes no fix either way. The one thing that must not happen
 /// — a fix from an unselected rule reaching the plan — is exactly what the
@@ -122,13 +118,8 @@ pub fn collect_lint_findings_and_fixes(
     source: &str,
     active: &[&str],
 ) -> CliResult<(Vec<LintFinding>, Vec<RuleFixFor>)> {
-    let outcomes = crate::domain::lint::collect_lint_outcomes(
-        path,
-        dialect,
-        tree,
-        source,
-        RuleSelection::All,
-    )?;
+    let outcomes =
+        crate::lint::collect_lint_outcomes(path, dialect, tree, source, RuleSelection::All)?;
 
     let mut findings = Vec::with_capacity(outcomes.len());
     let mut fixes = Vec::new();
@@ -178,7 +169,7 @@ pub fn run_lint_pass(
     source: &str,
     request: LintPassRequest<'_>,
 ) -> CliResult<LintPassResult> {
-    let outcome = crate::domain::lint::collect_lint_pass(
+    let outcome = crate::lint::collect_lint_pass(
         path,
         dialect,
         tree,

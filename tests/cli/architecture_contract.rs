@@ -214,39 +214,53 @@ const COMPOSITION_ROOT: &[&str] = &[
 /// imports — the answer has been there each time.
 const AWAITING_EXTRACTION: &[&str] = &[];
 
-/// Section 3.1.1: the root's layer modules must not accumulate code again.
+/// Section 3.1.1: the root crate holds the composition root and nothing else.
 ///
-/// They are kept as the public API's namespace, and the cost of keeping them is
-/// this test. Without it, "just put it in domain for now" comes back.
+/// This used to walk `src/domain` and `src/application/usecase` and allow
+/// anything on a list. Both directories are gone — they held 415 lines of
+/// `pub use` re-exporting other packages, 26 of which anything referenced —
+/// so walking them would now pass by finding nothing, which is the worst kind
+/// of green.
+///
+/// It walks `src/` instead, which cannot disappear, and names what may be
+/// there. A new top-level module is a deliberate decision about the
+/// composition root rather than a directory somebody dropped a file into.
 #[test]
-fn root_layer_modules_hold_only_facades_and_the_composition_root() {
-    for (layer, dir) in [
-        ("domain", "src/domain"),
-        ("application", "src/application/usecase"),
-    ] {
-        let Ok(entries) = fs::read_dir(dir) else {
+fn the_root_crate_holds_only_the_composition_root() {
+    const ALSO_ALLOWED: &[&str] = &[
+        // The crate's own entry points.
+        "lib",
+        "main", // The delivery layer: clap tree, dispatch, protocol servers.
+        "presentation",
+    ];
+
+    let entries = fs::read_dir("src").expect("read src/");
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let stem = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if ALSO_ALLOWED.contains(&stem.as_str())
+            || COMPOSITION_ROOT.contains(&stem.as_str())
+            || AWAITING_EXTRACTION.contains(&stem.as_str())
+        {
             continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let stem = path
-                .file_stem()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if stem == "mod"
-                || COMPOSITION_ROOT.contains(&stem.as_str())
-                || AWAITING_EXTRACTION.contains(&stem.as_str())
-            {
-                continue;
-            }
-            panic!(
-                "{} holds `{stem}`, which is neither a facade nor listed as composition \
-                 root. Extract it into a package, or add it to COMPOSITION_ROOT with a \
-                 reason. The {layer} layer exists to name the public API, not to hold code.",
-                path.display()
-            );
         }
+        panic!(
+            "src/ holds `{stem}`, which is not the composition root. Put it in the \
+             package that owns the concept — read its imports, the answer has been \
+             there every time — or add it to COMPOSITION_ROOT with a reason that \
+             survives the criterion: does it aggregate several features?"
+        );
     }
+
+    assert!(
+        !Path::new("src/domain").exists() && !Path::new("src/application").exists(),
+        "src/domain and src/application are gone deliberately. They were re-export \
+         facades, and a directory named `domain` is where \"just put it here for now\" \
+         goes — seven report modules had accumulated in one."
+    );
 }
 
 /// The backlog is empty and stays empty.

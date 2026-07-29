@@ -4,7 +4,7 @@ use paredit_core_cli::CliResult;
 use paredit_core_cli::color::Painter;
 use serde_json::json;
 
-use crate::application::usecase::lint_report::{
+use crate::lint::report::{
     CATEGORIES, LintPolicy, LintSummary, RULE_DOCS, RULES, RulePreset, RuleTag, Severity,
     rule_category, rule_description, rule_dialects, rule_explanation, rule_is_fixable,
     rule_settings, rule_severity, rule_tags,
@@ -647,7 +647,7 @@ pub(super) fn print_lint_stats(stats: &LintStats, output: OutputFormat) -> CliRe
 pub(super) fn print_lint_unused_suppressions(
     entries: &[(
         String,
-        crate::application::usecase::lint_report::UnusedSuppression,
+        paredit_core_lint_engine::suppression::UnusedSuppression,
     )],
     output: OutputFormat,
 ) -> CliResult<()> {

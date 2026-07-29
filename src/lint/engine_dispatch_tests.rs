@@ -10,8 +10,8 @@
 mod tests {
     use std::path::Path;
 
-    use crate::domain::lint::collect_lint_outcomes;
-    use crate::domain::lint::policy::RuleSelection;
+    use crate::lint::collect_lint_outcomes;
+    use crate::lint::policy::RuleSelection;
     use paredit_core_syntax::dialect::Dialect;
     use paredit_core_syntax::sexpr::SyntaxTree;
 

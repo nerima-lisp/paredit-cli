@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
 
-use crate::application::usecase::lint_report::{RulePreset, Severity};
+use crate::lint::report::{RulePreset, Severity};
 use crate::presentation::cli::{DialectArg, OutputFormat};
 
 /// The minimum severity that trips the `--fail-on` gate.
