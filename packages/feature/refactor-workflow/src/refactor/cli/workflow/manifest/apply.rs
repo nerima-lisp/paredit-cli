@@ -22,6 +22,7 @@ use paredit_core_cli::shared::{
 };
 use paredit_core_safety::external::VerificationCommand;
 use paredit_core_safety::journal::{UndoJournal, UndoJournalFile};
+use paredit_core_safety::scope::WriteScope;
 use paredit_core_syntax::sexpr::SyntaxTree;
 use std::time::Duration;
 
@@ -208,6 +209,30 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
         }
     }
 
+    // Built from the *resolved* paths, not the manifest's spelling: a
+    // disclosure that quotes `../src/core.lisp` back at the caller says
+    // nothing about which file that is. Under `--root` the guard has already
+    // canonicalized them; without one the manifest's own spelling is what
+    // came back, so it is resolved here. Computed whether or not `--write`
+    // was passed, so a dry run answers "what could this touch".
+    let scoped_path =
+        |path: &std::path::Path| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let write_scope = WriteScope::new(
+        root_guard
+            .as_ref()
+            .map(|guard| guard.canonical_root.clone()),
+        rewritten_outputs
+            .iter()
+            .zip(&files)
+            .filter(|(_, file)| file.changed)
+            .map(|((path, _, _), _)| scoped_path(path)),
+        rewritten_outputs
+            .iter()
+            .zip(&files)
+            .filter(|(_, file)| !file.changed)
+            .map(|((path, _, _), _)| scoped_path(path)),
+    );
+
     let changed_files = files
         .iter()
         .filter(|file| file.changed)
@@ -237,6 +262,7 @@ pub fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
         write_requested: args.write,
         manifest_policy_passed: manifest.policy_passed,
         manifest_outputs_parse: manifest.all_outputs_parse,
+        write_scope,
         files,
         summary,
     };

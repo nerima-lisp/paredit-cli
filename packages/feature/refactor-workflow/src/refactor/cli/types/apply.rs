@@ -1,5 +1,6 @@
 use super::manifest::RefactorApplyManifestHeader;
 use super::root::RefactorRootReport;
+use paredit_core_safety::scope::WriteScope;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -9,6 +10,12 @@ pub struct RefactorApplyResult {
     pub write_requested: bool,
     pub manifest_policy_passed: bool,
     pub manifest_outputs_parse: bool,
+    /// Exactly which resolved paths this run may rewrite.
+    ///
+    /// Present in the dry run as well as the write, which is the point: a
+    /// caller can see the blast radius *before* passing `--write`, instead of
+    /// inferring it from the absence of a confinement error.
+    pub write_scope: WriteScope,
     pub files: Vec<RefactorApplyFileResult>,
     pub summary: RefactorApplySummary,
 }

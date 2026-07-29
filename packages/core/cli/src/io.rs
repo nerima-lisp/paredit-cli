@@ -3165,6 +3165,228 @@ mod tests {
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 
+    // --- multi-file atomicity ---
+    //
+    // The writer stages every file, then applies every file, and rolls back on
+    // the way out of either phase. Section I item I3 of the feature catalogue
+    // asks for "transaction and rollback" across a multi-file write, and the
+    // implementation has always had it; what was missing is a statement of the
+    // property that fails when someone reorders those two phases. The three
+    // tests below are that statement, one per phase where a batch can die.
+
+    /// A file that would not reparse kills the batch before any file is even
+    /// staged. Central invariant: paredit never persists an unbalanced
+    /// document, and never half-persists a balanced one alongside it.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_containing_an_unparsable_output_writes_nothing() {
+        let directory = test_directory("batch-unparsable");
+        let good = directory.join("good.lisp");
+        let bad = directory.join("bad.lisp");
+        fs::write(&good, "(a)\n").expect("write first target");
+        fs::write(&bad, "(b)\n").expect("write second target");
+
+        let error = write_files_with_rollback([
+            (good.clone(), "(a2)\n".to_owned()),
+            (bad.clone(), "(unbalanced\n".to_owned()),
+        ])
+        .expect_err("an unparsable member must fail the batch");
+
+        assert!(
+            error.to_string().contains("does not reparse"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(fs::read_to_string(&good).expect("read first"), "(a)\n");
+        assert_eq!(fs::read_to_string(&bad).expect("read second"), "(b)\n");
+        assert_eq!(directory_entry_names(&directory), ["bad.lisp", "good.lisp"]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// A member that cannot be staged aborts the batch and removes the staging
+    /// artifacts of the members that were staged before it.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_that_fails_while_staging_leaves_no_file_touched() {
+        let directory = test_directory("batch-stage-failure");
+        let good = directory.join("good.lisp");
+        let link_target = directory.join("elsewhere.lisp");
+        let symlinked = directory.join("linked.lisp");
+        fs::write(&good, "(a)\n").expect("write first target");
+        fs::write(&link_target, "(b)\n").expect("write link target");
+        std::os::unix::fs::symlink(&link_target, &symlinked).expect("create symlink target");
+
+        let error = write_files_with_rollback([
+            (good.clone(), "(a2)\n".to_owned()),
+            (symlinked.clone(), "(b2)\n".to_owned()),
+        ])
+        .expect_err("a symlinked target must fail the batch");
+
+        assert!(
+            error.to_string().contains("refusing to write symlink"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(fs::read_to_string(&good).expect("read first"), "(a)\n");
+        assert_eq!(
+            fs::read_to_string(&link_target).expect("read link target"),
+            "(b)\n"
+        );
+        assert_eq!(
+            source_entry_names(&directory),
+            ["elsewhere.lisp", "good.lisp", "linked.lisp"],
+            "staging artifacts from the aborted batch must be gone"
+        );
+        assert_eq!(
+            directory_entry_names(&directory.join(CLEANUP_QUARANTINE_NAME)),
+            Vec::<String>::new(),
+            "the quarantine may outlive the batch, but nothing may be left in it"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// The batch order is not the failure order. Whichever member fails, every
+    /// other member must be untouched — so the property is checked with the
+    /// refused file first as well as last.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_whose_first_member_fails_leaves_the_rest_untouched() {
+        let directory = test_directory("batch-first-fails");
+        let good = directory.join("good.lisp");
+        let link_target = directory.join("elsewhere.lisp");
+        let symlinked = directory.join("linked.lisp");
+        fs::write(&good, "(a)\n").expect("write target");
+        fs::write(&link_target, "(b)\n").expect("write link target");
+        std::os::unix::fs::symlink(&link_target, &symlinked).expect("create symlink target");
+
+        write_files_with_rollback([
+            (symlinked.clone(), "(b2)\n".to_owned()),
+            (good.clone(), "(a2)\n".to_owned()),
+        ])
+        .expect_err("a symlinked target must fail the batch");
+
+        assert_eq!(fs::read_to_string(&good).expect("read target"), "(a)\n");
+        assert_eq!(
+            fs::read_to_string(&link_target).expect("read link target"),
+            "(b)\n"
+        );
+        assert_eq!(
+            source_entry_names(&directory),
+            ["elsewhere.lisp", "good.lisp", "linked.lisp"]
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// The phase that actually distinguishes a transaction from a loop: the
+    /// first file has already been published when the second fails to apply,
+    /// and the first must be put back from its backup.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_that_fails_while_applying_rolls_the_published_files_back() {
+        let directory = test_directory("batch-apply-failure");
+        let first = directory.join("first.lisp");
+        let second = directory.join("second.lisp");
+        fs::write(&first, "(a)\n").expect("write first target");
+        fs::write(&second, "(b)\n").expect("write second target");
+
+        let expected = |path: &FsPath, content: &str| {
+            ExpectedWriteTarget::from_metadata_and_content(
+                &fs::metadata(path).expect("read target metadata"),
+                content,
+            )
+            .expect("build expected write target")
+        };
+        let first_expected = expected(&first, "(a)\n");
+        let second_expected = expected(&second, "(b)\n");
+
+        // Fires between the two applies: the second target's content changes
+        // under the writer, so the digest its publication guard carries no
+        // longer matches and the apply refuses — with the first file already
+        // published. Changing the content in place rather than replacing the
+        // inode keeps the failure to the apply phase; a new inode would also
+        // block the *cleanup* of the second file, which is a different
+        // property (and one the surrounding tests already cover).
+        let hook_second = second.clone();
+        let _guard = install_before_existing_target_replace_hook(second.clone(), move || {
+            fs::write(&hook_second, "(concurrent)\n").expect("rewrite second target in place");
+        });
+
+        let error = write_files_with_rollback_expected([
+            (first.clone(), "(a2)\n".to_owned(), first_expected),
+            (second.clone(), "(b2)\n".to_owned(), second_expected),
+        ])
+        .expect_err("a target changed under the writer must fail the batch");
+
+        assert!(
+            error.chain().contains("failed to write"),
+            "unexpected error: {}",
+            error.chain()
+        );
+        assert_eq!(
+            fs::read_to_string(&first).expect("read first"),
+            "(a)\n",
+            "the already-published file must be rolled back, not left rewritten"
+        );
+        assert_eq!(
+            fs::read_to_string(&second).expect("read second"),
+            "(concurrent)\n",
+            "the concurrently written content must be preserved"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// Two entries naming the same file have no well-defined result, so the
+    /// batch is refused rather than resolved by ordering.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_naming_one_file_twice_is_refused() {
+        let directory = test_directory("batch-duplicate");
+        let target = directory.join("target.lisp");
+        fs::write(&target, "(a)\n").expect("write target");
+
+        let error = write_files_with_rollback([
+            (target.clone(), "(a2)\n".to_owned()),
+            (target.clone(), "(a3)\n".to_owned()),
+        ])
+        .expect_err("a duplicate target must fail the batch");
+
+        assert!(
+            error.to_string().contains("duplicate write target"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(fs::read_to_string(&target).expect("read target"), "(a)\n");
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// Sorted file names in a directory.
+    #[cfg(unix)]
+    fn directory_entry_names(directory: &FsPath) -> Vec<String> {
+        let mut names = fs::read_dir(directory)
+            .expect("read directory")
+            .map(|entry| {
+                entry
+                    .expect("read directory entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    /// The same, minus the cleanup quarantine.
+    ///
+    /// The quarantine directory deliberately outlives the batch that created
+    /// it: removing it would race with a second `paredit` recovering artifacts
+    /// in the same tree. What must not survive is anything *inside* it, or any
+    /// `.paredit-*` staging or backup sibling beside the sources.
+    #[cfg(unix)]
+    fn source_entry_names(directory: &FsPath) -> Vec<String> {
+        directory_entry_names(directory)
+            .into_iter()
+            .filter(|name| name != CLEANUP_QUARANTINE_NAME)
+            .collect()
+    }
+
     #[test]
     fn bounded_text_reader_rejects_oversized_input() {
         let error = read_text_with_limit(&b"12345"[..], 4, "test input")

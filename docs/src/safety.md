@@ -21,6 +21,103 @@ paredit edit format --file source.lisp --write
 
 Use `paredit refactor plan`, `paredit refactor preview`, and `paredit refactor verify` before `paredit refactor apply` when the workflow is available. These commands make planned changes and verification results visible before a write is requested.
 
+## A multi-file write is one transaction
+
+`refactor apply --write` stages every file it will change, then publishes them
+all. If any file fails at either step, the files already published are restored
+from their backups and the staged copies are removed. There is no state in
+which some of a refactor's files are rewritten and the rest are not — the
+alternative, a loop that writes each file as it goes, would leave exactly that
+on the first permission error.
+
+The guarantee covers four ways a batch can die, each of which has a test:
+
+- a rewritten file that would no longer parse (checked before anything is
+  staged, so nothing is written at all);
+- a target that cannot be staged — a symlink, a non-regular file;
+- a target that changes underneath the writer between staging and publishing;
+- the same file named twice, which has no well-defined result and is refused.
+
+## Undoing a write
+
+`refactor apply --write --undo-out <path>` records a journal of *reverse edits*
+— the text each edit replaced, in the coordinates of the file that was
+produced. `refactor undo --journal <path> --write` puts it back:
+
+```sh
+paredit refactor apply --manifest preview.json --write --undo-out .paredit/undo.json
+paredit refactor undo --journal .paredit/undo.json          # report only
+paredit refactor undo --journal .paredit/undo.json --write  # restore
+```
+
+Both ends are hash-guarded. An undo refuses unless every file is byte-for-byte
+what the write produced, and refuses again if the restored text is not
+byte-for-byte what the write replaced. A journal therefore cannot be applied
+twice, and cannot silently discard an edit somebody made after the refactor.
+
+This complements version control rather than replacing it: a refactor applied
+on top of uncommitted work cannot be reverted with `git checkout` without
+taking the uncommitted work with it.
+
+## Letting your own checks decide
+
+`--verify-command` runs a command after the write and restores every written
+file when it exits non-zero:
+
+```sh
+paredit refactor apply --manifest preview.json --write \
+  --verify-command 'make test' --verify-timeout-ms 600000
+```
+
+The command runs through the platform shell, in the current directory, with
+this process's environment. Its output is echoed to standard error on failure.
+A command that exceeds `--verify-timeout-ms` is killed and treated as a
+failure: a check that did not finish is not a check that passed.
+
+This is also the supported route to stronger, implementation-specific
+verification — compiling with SBCL, running a property suite, comparing
+behaviour before and after — without tying the tool itself to one Lisp
+implementation.
+
+## Knowing the blast radius first
+
+`refactor apply` reports a `write_scope` in both output formats, in the dry run
+as well as the write:
+
+```json
+"write_scope": {
+  "confined": true,
+  "root": "/repo",
+  "target_count": 2,
+  "targets": ["/repo/src/core.lisp", "/repo/src/util.lisp"],
+  "unchanged_count": 5,
+  "escaping_paths": []
+}
+```
+
+`--root` confines every path to one directory through a capability handle, so a
+manifest naming `../../etc/hosts` is refused rather than followed.
+`escaping_paths` re-derives that claim from the resolved paths instead of
+restating it, so a disclosure that contradicts itself is visible rather than
+printed.
+
+## Bounding a run
+
+Every command accepts the same budget flags, and each may lower a built-in
+ceiling but never raise it:
+
+| Flag | Environment variable | Bounds |
+| --- | --- | --- |
+| `--timeout-ms` | — | Wall-clock budget, checked between files and during a lint walk |
+| `--max-input-bytes` | `PAREDIT_MAX_INPUT_BYTES` | One document read |
+| `--max-file-bytes` | `PAREDIT_MAX_FILE_BYTES` | One file found by a directory scan |
+| `--max-total-bytes` | `PAREDIT_MAX_TOTAL_BYTES` | Bytes one scan reads in total |
+| `--max-files` | `PAREDIT_MAX_FILES` | Files one scan may yield |
+
+Unset, they behave exactly as before they existed. A timeout names the file
+that was in flight and how many were already done, so a bounded run reports
+progress rather than only failure.
+
 ## Workspace scope
 
 For workspace operations, start with `paredit inspect workspace` to identify the affected files. Use the workspace planning and preview commands before `paredit refactor workspace-execute`.

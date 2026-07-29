@@ -491,6 +491,8 @@ mod verbose_negation_report;
 mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]
 mod workspace_report;
+#[path = "cli/write_scope.rs"]
+mod write_scope;
 #[path = "cli/zero_divisor_report.rs"]
 mod zero_divisor_report;
 

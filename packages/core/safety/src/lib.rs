@@ -5,3 +5,4 @@ pub mod external;
 pub mod hash;
 pub mod journal;
 pub mod limits;
+pub mod scope;
