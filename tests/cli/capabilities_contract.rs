@@ -77,6 +77,7 @@ fn capabilities_reports_the_canonical_namespaces_and_meta_commands() {
             "edit",
             "refactor",
             "config",
+            "generate",
             "lsp",
             "mcp",
             "serve",

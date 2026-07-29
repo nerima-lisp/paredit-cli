@@ -21,6 +21,7 @@ use std::fs;
 /// a line here in the same commit that adds the `paredit-feature-*`
 /// dependency to a package's `Cargo.toml` — that pairing is the review.
 const ALLOWED_FEATURE_DEPENDENCIES: &[(&str, &[&str])] = &[
+    ("generate", &["project-inventory"]),
     ("inline", &["rename"]),
     ("lint-form-shape", &["function-parameter"]),
     ("project-analysis", &["package", "remove-unused"]),

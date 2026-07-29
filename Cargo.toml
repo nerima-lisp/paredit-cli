@@ -83,6 +83,7 @@ paredit-feature-lint-custom = { path = "packages/feature/lint-custom" }
 paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }
+paredit-feature-generate = { path = "packages/feature/generate" }
 anyhow = "1.0"
 blake3 = "1.8"
 cap-std = "4.0"

@@ -930,6 +930,24 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::ConfigCommand::Schema(args) => config::workflow::schema_report(args)?,
             command::ConfigCommand::Init(args) => config::workflow::init(args)?,
         },
+        Command::Generate { command } => match command {
+            command::GenerateCommand::Defpackage(args) => {
+                generate_defpackage::generate_defpackage(args)?;
+            }
+            command::GenerateCommand::Defsystem(args) => {
+                generate_defsystem::generate_defsystem(args)?;
+            }
+            command::GenerateCommand::Tests(args) => generate_tests::generate_tests(args)?,
+            command::GenerateCommand::Accessors(args) => {
+                generate_accessors::generate_accessors(args)?;
+            }
+            command::GenerateCommand::Defgeneric(args) => {
+                generate_defgeneric::generate_defgeneric(args)?;
+            }
+            command::GenerateCommand::Docstring(args) => {
+                generate_docstring::generate_docstring(args)?;
+            }
+        },
         // Handled in `run`, before dispatch, because they own their exit
         // status: a closed pipe is how a protocol session normally ends, and
         // `tui`'s own `q` quit is not this process failing either.

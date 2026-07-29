@@ -30,19 +30,21 @@ use super::{
     external_diagnostics_report, external_system_report, extract_constant, extract_function,
     extract_local_function, flatten_progn, form_report, format_directive_report,
     format_missing_destination_report, format_newline_report, format_to_string_report,
-    funcall_lambda_report, function_parameter, generic_dispatch_report, getf_default_nil_report,
-    gethash_default_report, handler_case_no_clauses_report, hotspot_report,
-    identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_not_report,
-    if_to_or_report, if_to_unless_report, impact_report, indentation_report, inline_function,
-    inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
-    introduce_let, keyword_arity_report, lambda_list_keyword_order_report,
-    last_default_count_report, let_report, license_report, line_metrics_report, lint_report,
-    list_star_nil_report, list_star_to_cons_report, literal_place_report, loop_report,
-    macro_expansion_report, macro_hygiene_report, make_array_default_keyword_report,
-    make_hash_table_test_report, make_list_default_element_report, malformed_case_clause_report,
-    malformed_cond_clause_report, malformed_iteration_spec_report, malformed_let_binding_report,
-    manual_incf_report, manual_push_report, manual_pushnew_report, merge_nested_flet,
-    merge_nested_let, merge_nested_let_star, method_combination_report, modify_macro_arity_report,
+    funcall_lambda_report, function_parameter, generate_accessors, generate_defgeneric,
+    generate_defpackage, generate_defsystem, generate_docstring, generate_tests,
+    generic_dispatch_report, getf_default_nil_report, gethash_default_report,
+    handler_case_no_clauses_report, hotspot_report, identical_if_branch_report,
+    identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report,
+    if_to_unless_report, impact_report, indentation_report, inline_function, inline_lambda,
+    inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let,
+    keyword_arity_report, lambda_list_keyword_order_report, last_default_count_report, let_report,
+    license_report, line_metrics_report, lint_report, list_star_nil_report,
+    list_star_to_cons_report, literal_place_report, loop_report, macro_expansion_report,
+    macro_hygiene_report, make_array_default_keyword_report, make_hash_table_test_report,
+    make_list_default_element_report, malformed_case_clause_report, malformed_cond_clause_report,
+    malformed_iteration_spec_report, malformed_let_binding_report, manual_incf_report,
+    manual_push_report, manual_pushnew_report, merge_nested_flet, merge_nested_let,
+    merge_nested_let_star, method_combination_report, modify_macro_arity_report,
     multiple_value_list_of_values_report, naming_report, narrowing_report,
     negated_comparison_report, negated_if_report, negated_step_delta_report,
     negated_when_unless_report, nested_boolean_report, nested_char_case_report, nested_cxr_report,
@@ -807,6 +809,33 @@ pub(super) enum RefactorCommand {
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }
 
+/// Generators that produce new Common Lisp source: a `defpackage` from a
+/// file's definitions, an ASDF `defsystem` from a directory, test skeletons
+/// for untested definitions, CLOS accessors for bare slots, a `defgeneric`
+/// for an undeclared method group, and a docstring template for a
+/// definition. Common Lisp only.
+#[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit generate defpackage --file src/app.lisp\n  paredit generate defsystem . --write\n  paredit generate tests src/app.lisp --into tests/app-tests.lisp --write\n  paredit generate accessors --file src/point.lisp --name point --write\n  paredit generate defgeneric --file src/app.lisp --write\n  paredit generate docstring --file src/app.lisp --name render --write"
+)]
+pub(super) enum GenerateCommand {
+    /// Generate a `defpackage` form from a file's own definitions and
+    /// qualified symbol references.
+    Defpackage(generate_defpackage::GenerateDefpackageArgs),
+    /// Generate an ASDF `defsystem` form from a directory of Lisp sources.
+    Defsystem(generate_defsystem::GenerateDefsystemArgs),
+    /// Generate a `deftest` skeleton for every definition with no test.
+    Tests(generate_tests::GenerateTestsArgs),
+    /// Add `:accessor` to every `defclass` slot that has neither `:accessor`,
+    /// `:reader`, nor `:writer`.
+    Accessors(generate_accessors::GenerateAccessorsArgs),
+    /// Generate a `defgeneric` for a name whose `defmethod` forms have no
+    /// declaration.
+    Defgeneric(generate_defgeneric::GenerateDefgenericArgs),
+    /// Insert a docstring template at the position Common Lisp expects it.
+    Docstring(generate_docstring::GenerateDocstringArgs),
+}
+
 /// Configuration introspection. Reads `paredit.toml`; never reads source.
 #[derive(Debug, Subcommand)]
 #[command(
@@ -844,6 +873,12 @@ pub(super) enum Command {
     Config {
         #[command(subcommand)]
         command: ConfigCommand,
+    },
+    /// Generators that produce new Common Lisp source from what this tool
+    /// already knows how to analyze.
+    Generate {
+        #[command(subcommand)]
+        command: GenerateCommand,
     },
     /// Run a Language Server Protocol server over stdio.
     Lsp(crate::presentation::lsp::LspArgs),
