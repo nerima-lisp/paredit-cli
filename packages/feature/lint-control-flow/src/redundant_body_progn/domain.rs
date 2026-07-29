@@ -25,13 +25,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The index at which a form's implicit-progn body begins, or `None` if the head
 /// is not one of the recognized implicit-progn forms. Everything from this index
@@ -62,11 +64,15 @@ fn is_progn(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct RedundantBodyPrognItem {
-    pub path: PathBuf,
     /// The span of the inner (redundant) progn.
     pub span: ByteSpan,
+    /// The 1-based line the inner progn starts on.
+    pub line: usize,
     /// The span covering just the inner progn's body forms, so a fix can splice
     /// that source in place of the wrapper.
+    ///
+    /// The rewrite's input, not the report's: the lint rule slices it to build
+    /// the replacement, and the command has never printed it.
     pub body_span: ByteSpan,
     /// The inner progn's body form count (always >= 2 here).
     pub body_form_count: usize,
@@ -74,43 +80,51 @@ pub struct RedundantBodyPrognItem {
     pub parent: String,
 }
 
-#[derive(Debug)]
-pub struct RedundantBodyPrognSummary {
-    pub implicit_progn_form_count: usize,
-    pub violations: Vec<RedundantBodyPrognItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantBodyPrognPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantBodyPrognPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantBodyPrognItem {
+    /// The rule's own name. The enclosing head is one of fourteen and is
+    /// carried as data rather than as the tag: it is a `String` built per
+    /// finding, not a canonical `&'static str` the analysis already holds.
+    fn kind(&self) -> &'static str {
+        "redundant-body-progn"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantBodyPrognPolicy {
-    pub fail_on_violation: bool,
-    pub implicit_progn_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("parent={}", self.parent),
+            format!("body_form_count={}", self.body_form_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("parent", json!(self.parent)),
+            ("body_form_count", json!(self.body_form_count)),
+        ]
+    }
+
+    /// The same sentence the `redundant-body-progn` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "progn with {} forms is a {} body; splice its forms in",
+            self.body_form_count, self.parent
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     implicit_progn_form_count: &mut usize,
     violations: &mut Vec<RedundantBodyPrognItem>,
 ) {
@@ -131,8 +145,8 @@ pub fn examine_form(
         if body.len() >= 2 {
             let body_span = ByteSpan::new(body[0].span.start(), body[body.len() - 1].span.end());
             violations.push(RedundantBodyPrognItem {
-                path: path.to_path_buf(),
                 span: child.span,
+                line: line_of(source, child.span.start().get()),
                 body_span,
                 body_form_count: body.len(),
                 parent: head.to_ascii_lowercase(),
@@ -142,17 +156,33 @@ pub fn examine_form(
 }
 
 /// Collects every multi-form progn used as a body form of an implicit-progn
-/// macro across a whole file, along with the total number of such macro forms
-/// scanned.
-pub fn collect_redundant_body_progns(
+/// macro in one file, with the number of such *macro* forms scanned as the
+/// denominator beside them.
+///
+/// The denominator counts the enclosing macro forms, not the progns: the
+/// question this report answers is "how many implicit-progn bodies were looked
+/// at, and how many of them wrap their forms needlessly".
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant body progn here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_body_progn_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantBodyPrognItem>)> {
+) -> LintResult<FileFindings<RedundantBodyPrognItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("implicit_progn_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut implicit_progn_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
@@ -160,54 +190,55 @@ pub fn collect_redundant_body_progns(
         for_each_subview(&view, |subview| {
             examine_form(
                 subview,
-                path,
+                source,
                 &mut implicit_progn_form_count,
                 &mut violations,
             );
         });
     }
-    Ok((implicit_progn_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![(
+            "implicit_progn_form_count",
+            json!(implicit_progn_form_count),
+        )],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_redundant_body_progns(
-    implicit_progn_form_count: usize,
-    violations: Vec<RedundantBodyPrognItem>,
-) -> RedundantBodyPrognSummary {
-    RedundantBodyPrognSummary {
-        implicit_progn_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_body_progn_policy(
-    options: RedundantBodyPrognPolicyOptions,
-    summary: &RedundantBodyPrognSummary,
-) -> RedundantBodyPrognPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantBodyPrognPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        implicit_progn_form_count: summary.implicit_progn_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn progns(input: &str) -> (usize, Vec<RedundantBodyPrognItem>) {
+    fn report(input: &str) -> FileFindings<RedundantBodyPrognItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_body_progns(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant body progns")
+        build_redundant_body_progn_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant body progn report")
+    }
+
+    /// The `(implicit_progn_form_count, violations)` pair the report is built
+    /// from.
+    fn progns(input: &str) -> (u64, Vec<RedundantBodyPrognItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "implicit_progn_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("implicit_progn_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -279,33 +310,54 @@ mod tests {
         assert_eq!(violations[0].parent, "when");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(when c (progn a b))", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_redundant_body_progns(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant body progns");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_redundant_body_progn_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build redundant body progn report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(
+            report.summary,
+            vec![("implicit_progn_form_count", json!(0))]
+        );
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = progns("(when c (progn a b))");
-        let summary = summarize_redundant_body_progns(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(when c a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_redundant_body_progn_policy(
-            RedundantBodyPrognPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_parent_and_body_form_count() {
+        let report = report("(defun f (x)\n  (when x (progn a b)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "redundant-body-progn");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("parent", json!("when")), ("body_form_count", json!(2))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["parent=when".to_owned(), "body_form_count=2".to_owned()]
+        );
+    }
 
-        let strict = evaluate_redundant_body_progn_policy(
-            RedundantBodyPrognPolicyOptions::new(true),
-            &summary,
+    /// The denominator counts the *enclosing* implicit-progn macro forms, so it
+    /// moves independently of the finding count — and, deliberately, does not
+    /// count the progns themselves.
+    #[test]
+    fn the_summary_counts_every_implicit_progn_form_not_only_the_flagged_ones() {
+        let report = report("(when c (progn a b))\n(unless d x)\n");
+        assert_eq!(
+            report.summary,
+            vec![("implicit_progn_form_count", json!(2))]
         );
-        assert!(!strict.passed);
+        assert_eq!(report.findings.len(), 1);
     }
 }

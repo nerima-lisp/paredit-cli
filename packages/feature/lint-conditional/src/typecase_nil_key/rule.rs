@@ -46,7 +46,7 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut typecase_form_count = 0;
         let mut items = Vec::new();
-        examine_case(view, context.path(), &mut typecase_form_count, &mut items);
+        examine_case(view, context.source(), &mut typecase_form_count, &mut items);
         for item in items {
             let span = item.span;
 

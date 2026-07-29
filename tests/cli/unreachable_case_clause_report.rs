@@ -14,7 +14,9 @@ fn cli_reports_a_clause_after_a_catch_all() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"case_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"unreachable_count\": 1"));
 }
 
@@ -32,7 +34,11 @@ fn cli_does_not_flag_a_trailing_catch_all() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "nothing stranded in this case" from
+        // "no case form at all".
+        .stdout(predicate::str::contains("\"case_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
 #[test]
@@ -49,7 +55,7 @@ fn cli_does_not_flag_a_literal_t_key_list() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
 }
 
 #[test]
@@ -66,8 +72,47 @@ fn cli_flags_a_typecase_clause_after_t() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"typecase\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"head\": \"typecase\""));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("unreachable-case-clause-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(case x (t 1) (2 :two))\n").expect("write a.clj");
+
+    paredit()
+        .args(["inspect", "unreachable-case-clause", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_unreachable_case_clause_emits_sarif() {
+    let dir = fresh_temp_dir("unreachable-case-clause-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(case x (t 1) (2 :two))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "unreachable-case-clause", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/unreachable-case-clause/unreachable-case-clause\"",
+        ))
+        .stdout(predicate::str::contains(
+            "case has 1 unreachable clause(s) after a t/otherwise catch-all",
+        ));
 }
 
 #[test]
@@ -105,6 +150,6 @@ fn cli_unreachable_case_clause_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"unreachable_count\": 2"));
 }
