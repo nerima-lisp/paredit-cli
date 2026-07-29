@@ -118,6 +118,11 @@ struct Cli {
     /// destination terminal and `NO_COLOR`/`CLICOLOR_FORCE`.
     #[arg(long, global = true, value_enum)]
     color: Option<paredit_core_cli::color::ColorMode>,
+    /// Delegate stdout to `$PAGER` (falling back to `less`) when it is a
+    /// terminal. Never on by default: unlike `--color`, this changes the
+    /// interaction itself.
+    #[arg(long, global = true)]
+    paginate: bool,
     #[command(subcommand)]
     command: Command,
     #[command(flatten)]
@@ -179,10 +184,18 @@ pub fn run() -> ExitCode {
         Command::Serve(args) => return crate::presentation::serve::serve(args),
         command => command,
     };
-    match dispatch::dispatch(command) {
+
+    #[cfg(unix)]
+    let pager = paredit_core_cli::pager::maybe_start();
+    let exit_code = match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_failure(&error, &invocation),
+    };
+    #[cfg(unix)]
+    if let Some(pager) = pager {
+        pager.finish();
     }
+    exit_code
 }
 
 /// Whether this run may not write.
@@ -377,6 +390,7 @@ fn bootstrap() -> Cli {
     let raw: Vec<String> = std::env::args().collect();
     runtime.dry_run = is_dry_run(&raw);
     runtime.progress = raw.iter().any(|token| token == "--progress");
+    runtime.paginate = raw.iter().any(|token| token == "--paginate");
     if let Some(mode) = argv::long_flag_value(&raw, "color")
         .as_deref()
         .and_then(paredit_core_cli::color::ColorMode::from_label)

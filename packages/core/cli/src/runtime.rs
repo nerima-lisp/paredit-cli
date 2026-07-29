@@ -115,6 +115,8 @@ pub struct RuntimeSettings {
     pub color: ColorMode,
     /// Emit JSON Lines progress on stderr.
     pub progress: bool,
+    /// Delegate stdout to `$PAGER` when it is a terminal.
+    pub paginate: bool,
     /// Nothing may be written to disk.
     ///
     /// Resolved before argument parsing rather than per command, because its

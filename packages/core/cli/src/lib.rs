@@ -7,6 +7,7 @@ pub mod error;
 pub mod gate;
 pub mod kill_ring;
 pub mod messages;
+pub mod pager;
 pub mod progress;
 pub mod runtime;
 // `io`, `diff` and `macos_acl` are `shared`'s submodules, declared there with

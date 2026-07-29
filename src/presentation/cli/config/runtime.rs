@@ -55,10 +55,12 @@ pub fn resolve(settings: &Settings) -> RuntimeSettings {
             .text("output.color")
             .and_then(ColorMode::from_label)
             .unwrap_or_default(),
-        // Neither is a configuration key. A `paredit.toml` that quietly made
-        // every write a no-op would be a trap, and progress on stderr is a
-        // property of one invocation rather than of a repository.
+        // None of these three is a configuration key. A `paredit.toml` that
+        // quietly made every write a no-op would be a trap; progress on
+        // stderr and delegating to a pager are both properties of one
+        // invocation rather than of a repository.
         progress: false,
+        paginate: false,
         dry_run: false,
     }
 }

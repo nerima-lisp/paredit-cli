@@ -16,6 +16,7 @@
 //! whether color is on.
 
 use std::io::IsTerminal;
+use std::sync::OnceLock;
 
 use clap::ValueEnum;
 
@@ -89,14 +90,31 @@ pub struct Painter {
     enabled: bool,
 }
 
+/// Whether stdout was a terminal, cached from the first check.
+///
+/// [`crate::pager`] redirects fd 1 to a pipe partway through a run; once that
+/// happens, a fresh `is_terminal()` call would (correctly, but unhelpfully)
+/// say no, and every renderer after that point would think it was piped.
+/// The pager primes this cache itself before redirecting, so a decision made
+/// this way still reflects the terminal a human is watching through it.
+static STDOUT_IS_TERMINAL: OnceLock<bool> = OnceLock::new();
+
+fn stdout_is_terminal() -> bool {
+    *STDOUT_IS_TERMINAL.get_or_init(|| std::io::stdout().is_terminal())
+}
+
+/// Forces [`stdout_is_terminal`]'s cache to resolve now, before something
+/// else changes what fd 1 points at. A no-op once the cache already holds a
+/// value, which is exactly the "first check wins" contract callers need.
+pub fn prime_stdout_terminal_cache() {
+    stdout_is_terminal();
+}
+
 impl Painter {
     #[must_use]
     pub fn stdout() -> Self {
         Self {
-            enabled: resolve(
-                crate::runtime::current().color,
-                std::io::stdout().is_terminal(),
-            ),
+            enabled: resolve(crate::runtime::current().color, stdout_is_terminal()),
         }
     }
 
