@@ -13,9 +13,18 @@ readme = "README.md"
 keywords = ["lisp", "paredit", "refactoring", "cli", "sexp"]
 categories = ["command-line-utilities", "development-tools"]
 
+# `bench = false` on both, so `cargo bench -- <criterion args>` reaches the
+# Criterion targets. Cargo benches every target whose `bench` flag is true,
+# including the library and the binary, and their default libtest harness has
+# no benchmarks to run and rejects `--save-baseline` outright — which made
+# `scripts/bench-compare.sh` fail before it measured anything.
+[lib]
+bench = false
+
 [[bin]]
 name = "paredit"
 path = "src/main.rs"
+bench = false
 
 [profile.release]
 lto = "fat"

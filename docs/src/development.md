@@ -163,6 +163,50 @@ cargo +nightly fuzz run edit_at_offset      # every edit at a caller's offset
 When a run finds a crash, commit the artifact under `fuzz/artifacts/<target>/`.
 The stable replay test picks it up without anyone needing nightly again.
 
+## Performance and test quality
+
+### Benchmark comparison
+
+```sh
+./scripts/bench-compare.sh                 # against origin/main
+./scripts/bench-compare.sh v1.2.0          # against a tag
+THRESHOLD=15 ./scripts/bench-compare.sh    # allow 15% instead of 10%
+```
+
+The script checks the baseline out into a temporary git worktree, benchmarks
+it, benchmarks the working tree, and compares the two runs Criterion just made.
+Nothing is stored between invocations.
+
+That structure is the point. Criterion's absolute numbers are a property of the
+machine as much as of the code — a different runner model, a noisy neighbour,
+or thermal state moves them by tens of percent — so a gate that compared
+today's number against a remembered one would fire constantly and mean nothing.
+Two revisions measured back to back on one machine is the only comparison that
+survives it, and it is what the `benchmark` CI job runs on every pull request.
+
+That job reports rather than blocks: a performance regression is information
+for the reviewer, not grounds for stopping a correctness fix.
+
+### Mutation testing
+
+```sh
+cargo install cargo-mutants
+./scripts/mutants.sh                       # the analysis core
+./scripts/mutants.sh packages/core/syntax  # one package
+```
+
+Line coverage says a line ran. It does not say that changing the line would
+have failed anything, and that distinction is the whole question here: a rule
+with a fixture that exercises it and asserts only "does not crash" is fully
+covered and pins nothing. `cargo-mutants` changes one comparison, constant or
+boolean at a time and re-runs the tests; a mutant that *survives* is a
+statement the tests never make.
+
+A full run is hours, so it is not in the pull-request gate. `--in-diff` narrows
+it to a change set. The exclusions in `.cargo/mutants.toml` each carry a
+reason; an exclusion without one is how a mutation-testing setup becomes a way
+of not looking at things.
+
 ## Documentation is tested
 
 The repository treats documentation as part of the public contract. Tests in

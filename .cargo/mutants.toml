@@ -1,0 +1,44 @@
+# cargo-mutants configuration. See scripts/mutants.sh for how to run it.
+#
+# Every exclusion below is a place where a surviving mutant would be noise
+# rather than a finding, and each one is here for a stated reason. An
+# exclusion without a reason is how a mutation-testing setup becomes a way of
+# not looking at things.
+
+# The test harness itself. Mutating a test cannot fail the tests.
+exclude_globs = [
+  "tests/**",
+  "benches/**",
+  "fuzz/**",
+  "examples/**",
+  # The composition root: `dispatch.rs` is one `match` arm per command, and a
+  # mutant that swaps two arms is caught by the integration suite in a way that
+  # says nothing about the analyses. `command.rs` and `contract.rs` are
+  # declarations.
+  "src/presentation/cli/dispatch.rs",
+  "src/presentation/cli/command.rs",
+  "src/presentation/cli/contract.rs",
+]
+
+# Functions whose mutants are uninteresting by construction.
+exclude_re = [
+  # A `label`/`as_str` returning a different constant string is caught by any
+  # test that prints it, and missed by none that matter. There are several
+  # hundred of them across the dialect and rule enums.
+  "fn label",
+  "fn as_str",
+  "fn description",
+  # `Display` and `Debug` impls: the same argument.
+  "impl Display",
+  "impl Debug",
+]
+
+# A mutant that makes the suite hang must be reported as a timeout rather than
+# stopping the run. The multiplier is against the baseline test-suite time, so
+# it does not need adjusting when the suite grows.
+timeout_multiplier = 5.0
+
+# The baseline run must pass before any mutant is tried. Without this, a
+# workspace that was already failing reports every mutant as "caught" and the
+# whole run means nothing.
+baseline = "Auto"
