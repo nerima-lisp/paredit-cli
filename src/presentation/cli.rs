@@ -89,6 +89,7 @@ use paredit_feature_structural_diff::structural_patch::cli as structural_patch;
 mod dispatch;
 mod emacs_lisp_file_report;
 mod lint_report;
+mod semantic_coverage_report;
 mod writability_report;
 
 use std::process::ExitCode;

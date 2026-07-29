@@ -39,6 +39,20 @@
 //! turns a missing one into a reported problem, so a project can insist that
 //! every silenced finding says why it was silenced.
 //!
+//! ## Expiry
+//!
+//! Any of the three tokens above may carry `-until YYYY-MM-DD` immediately
+//! after the token (`paredit:ignore-until 2026-12-31`,
+//! `paredit:ignore-next-form-until 2026-12-31`,
+//! `paredit:ignore-file-until 2026-12-31`), each still followed by the same
+//! optional rule names and `-- reason`. A directive past its date still
+//! suppresses — expiry is a prompt to renew or delete it, not a silent
+//! deadline — but [`LintSuppressions::expired_directives`] finds it. A
+//! malformed or missing date makes the whole comment not a directive at all
+//! (it suppresses nothing), rather than one that silently never expires:
+//! a typo should show up as a finding reappearing, not as a suppression that
+//! outlives it forever.
+//!
 //! Detection scans the whole file tracking string and `#\` character-literal
 //! state, so a `;` inside `"a ; b"` or `#\;` is never mistaken for a comment.
 
@@ -103,6 +117,10 @@ pub enum SuppressionProblem {
     /// one. Reported separately because the remedy is the opposite: add text
     /// rather than delete the line.
     MissingReason,
+    /// Its `-until` date has passed. Reported independent of use — an expired
+    /// directive that is still silencing something is exactly the one that
+    /// needs a human to decide whether to renew or delete it.
+    Expired,
 }
 
 impl SuppressionProblem {
@@ -111,7 +129,73 @@ impl SuppressionProblem {
         match self {
             Self::Unused => "unused",
             Self::MissingReason => "missing-reason",
+            Self::Expired => "expired",
         }
+    }
+}
+
+/// A calendar date, used only to compare a suppression's `-until` against
+/// today.
+///
+/// Not a general-purpose calendar type: no timezone, no calendar arithmetic
+/// beyond construction and ordering, because expiry needs nothing else. UTC
+/// throughout — a suppression that expires a day early or late at a timezone
+/// boundary is a far smaller problem than one whose expiry depends on where
+/// the check happens to run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Date {
+    year: i64,
+    month: i64,
+    day: i64,
+}
+
+impl Date {
+    /// Parses a strict `YYYY-MM-DD`. Rejects a month or day outside its
+    /// broad numeric range; it does not check the day against the month's
+    /// actual length, which only matters for a date nobody would type.
+    fn parse(text: &str) -> Option<Self> {
+        let mut parts = text.splitn(3, '-');
+        let year: i64 = parts.next()?.parse().ok()?;
+        let month: i64 = parts.next()?.parse().ok()?;
+        let day: i64 = parts.next()?.parse().ok()?;
+        if parts.next().is_some() || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+            return None;
+        }
+        Some(Self { year, month, day })
+    }
+
+    /// Today, from the wall clock.
+    #[must_use]
+    pub fn today() -> Self {
+        let days = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_secs() / 86_400);
+        Self::from_days_since_epoch(i64::try_from(days).unwrap_or(0))
+    }
+
+    /// Howard Hinnant's `civil_from_days`: days-since-1970-01-01 to a
+    /// proleptic-Gregorian (year, month, day). <https://howardhinnant.github.io/date_algorithms.html>
+    const fn from_days_since_epoch(days: i64) -> Self {
+        let z = days + 719_468;
+        let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+        let doe = z - era * 146_097; // [0, 146096]
+        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365; // [0, 399]
+        let y = yoe + era * 400;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+        let mp = (5 * doy + 2) / 153; // [0, 11]
+        let day = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+        let month = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
+        Self {
+            year: if month <= 2 { y + 1 } else { y },
+            month,
+            day,
+        }
+    }
+}
+
+impl std::fmt::Display for Date {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
 }
 
@@ -128,6 +212,8 @@ struct Directive {
     scope: SuppressionScope,
     rules: Scope,
     reason: Option<String>,
+    /// The `-until` date, if the directive carried one.
+    expires: Option<Date>,
     /// Whether non-whitespace code preceded the `;` on the comment's line.
     trailing: bool,
     /// Byte range of the whole comment, from its `;` to the end of the line
@@ -152,6 +238,24 @@ pub struct UnusedSuppression {
     pub unused_rules: Option<Vec<String>>,
     pub scope: SuppressionScope,
     pub problem: SuppressionProblem,
+}
+
+/// One directive as recorded for `--report-suppressions`, independent of
+/// whether it currently silences anything — the full inventory, one step past
+/// [`UnusedSuppression`], which reports only the stale ones.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuppressionInventoryEntry {
+    pub comment_line: usize,
+    pub target_line: usize,
+    pub target_end_line: usize,
+    pub scope: SuppressionScope,
+    /// `None` for a bare directive (every rule); `Some` for a named one.
+    pub rules: Option<Vec<String>>,
+    pub reason: Option<String>,
+    /// `YYYY-MM-DD`, for a directive carrying an `-until` expiry.
+    pub expires: Option<String>,
+    /// Whether the directive currently silences at least one finding.
+    pub used: bool,
 }
 
 /// One in-place edit that removes or narrows a stale directive.
@@ -235,6 +339,7 @@ impl LintSuppressions {
                 scope: parsed.scope,
                 rules: parsed.rules,
                 reason: parsed.reason,
+                expires: parsed.expires,
                 trailing: had_code,
                 comment_span: (comment_offset, line_span.0 + line.len()),
                 line_span,
@@ -363,6 +468,67 @@ impl LintSuppressions {
         unused
     }
 
+    /// The directives whose `-until` date has passed as of `today`, whether or
+    /// not they currently silence anything.
+    ///
+    /// Deliberately independent of `unused_directives`: an expired directive
+    /// that is still actively silencing a finding is exactly the one worth
+    /// flagging — its author is the only one who can say whether the finding
+    /// underneath it is now fine to see again, or whether the date just needs
+    /// pushing out.
+    #[must_use]
+    pub fn expired_directives(&self, today: Date) -> Vec<UnusedSuppression> {
+        self.directives
+            .iter()
+            .filter_map(|directive| {
+                let expires = directive.expires?;
+                (expires < today).then(|| UnusedSuppression {
+                    comment_line: directive.comment_line,
+                    target_line: directive.target_line,
+                    unused_rules: match &directive.rules {
+                        Scope::All => None,
+                        Scope::Rules(rules) => Some(rules.clone()),
+                    },
+                    scope: directive.scope,
+                    problem: SuppressionProblem::Expired,
+                })
+            })
+            .collect()
+    }
+
+    /// Every parsed directive, whether or not it currently silences anything —
+    /// the full surface `--report-suppressions` audits, one step past
+    /// [`Self::unused_directives`], which reports only the stale ones.
+    #[must_use]
+    pub fn inventory(
+        &self,
+        present: &HashMap<usize, HashSet<&'static str>>,
+    ) -> Vec<SuppressionInventoryEntry> {
+        self.directives
+            .iter()
+            .map(|directive| {
+                let in_range = findings_in_range(directive, present);
+                let (rules, used) = match &directive.rules {
+                    Scope::All => (None, !in_range.is_empty()),
+                    Scope::Rules(rules) => (
+                        Some(rules.clone()),
+                        rules.iter().any(|rule| in_range.contains(rule.as_str())),
+                    ),
+                };
+                SuppressionInventoryEntry {
+                    comment_line: directive.comment_line,
+                    target_line: directive.target_line,
+                    target_end_line: directive.target_end_line,
+                    scope: directive.scope,
+                    rules,
+                    reason: directive.reason.clone(),
+                    expires: directive.expires.map(|date| date.to_string()),
+                    used,
+                }
+            })
+            .collect()
+    }
+
     /// The edits that delete every stale directive and narrow every partly
     /// stale one, sorted by position so a caller can apply them in one pass.
     ///
@@ -472,6 +638,7 @@ struct ParsedDirective {
     scope: SuppressionScope,
     rules: Scope,
     reason: Option<String>,
+    expires: Option<Date>,
     rules_span: (usize, usize),
 }
 
@@ -481,8 +648,29 @@ fn parse_directive(comment: &str) -> Option<ParsedDirective> {
     let (scope, position, token) = SuppressionScope::TOKENS
         .iter()
         .find_map(|(token, scope)| comment.find(token).map(|at| (*scope, at, *token)))?;
-    let rest_start = position + token.len();
-    let rest = &comment[rest_start..];
+    let mut names_start = position + token.len();
+
+    // `-until` sits glued to the token (`ignore-until`, `ignore-file-until`,
+    // `ignore-next-form-until`), so it is read here rather than as a fourth
+    // token: the alternative is three more entries in `TOKENS`, one per
+    // existing scope, for a modifier that applies to all of them alike.
+    let expires = match comment[names_start..].strip_prefix("-until") {
+        None => None,
+        Some(after_until) => {
+            let leading_space = after_until.len() - after_until.trim_start().len();
+            let trimmed = after_until.trim_start();
+            let date_text = trimmed
+                .split(|c: char| c.is_whitespace())
+                .next()
+                .unwrap_or("");
+            // A `-until` with no parseable date makes the whole comment not a
+            // directive, rather than one that silently never expires.
+            let date = Date::parse(date_text)?;
+            names_start += "-until".len() + leading_space + date_text.len();
+            Some(date)
+        }
+    };
+    let rest = &comment[names_start..];
 
     // Everything after `--` is prose, not a rule name.
     let (names, reason) = match rest.find("--") {
@@ -506,7 +694,7 @@ fn parse_directive(comment: &str) -> Option<ParsedDirective> {
     // without touching the token before or the reason after.
     let leading = names.len() - names.trim_start().len();
     let trailing = names.len() - names.trim_end().len();
-    let rules_span = (rest_start + leading, rest_start + names.len() - trailing);
+    let rules_span = (names_start + leading, names_start + names.len() - trailing);
 
     Some(ParsedDirective {
         scope,
@@ -515,6 +703,7 @@ fn parse_directive(comment: &str) -> Option<ParsedDirective> {
         } else {
             Scope::Rules(rules)
         },
+        expires,
         reason,
         rules_span,
     })
@@ -866,5 +1055,149 @@ mod tests {
         assert_eq!(edits.len(), 2);
         assert!(edits[0].start < edits[1].start);
         assert_eq!(apply(source, &edits), "(x)\n(y)\n");
+    }
+
+    // --- expiry (`-until`) ---
+
+    #[test]
+    fn a_date_round_trips_through_display() {
+        let date = Date::parse("2026-07-29").expect("parse");
+        assert_eq!(date.to_string(), "2026-07-29");
+    }
+
+    #[test]
+    fn known_epoch_days_convert_to_the_right_date() {
+        assert_eq!(Date::from_days_since_epoch(0).to_string(), "1970-01-01");
+        // 2024 is a leap year; day 366 of it should land on 2024-12-31.
+        assert_eq!(
+            Date::from_days_since_epoch(19_723).to_string(),
+            "2024-01-01"
+        );
+        assert_eq!(
+            Date::from_days_since_epoch(20_088).to_string(),
+            "2024-12-31"
+        );
+    }
+
+    #[test]
+    fn a_directive_still_suppresses_after_it_expires() {
+        let sup = LintSuppressions::parse(
+            ";; paredit:ignore-until 2020-01-01 redundant-quote\n(list '5)\n",
+        );
+        assert!(sup.is_suppressed("redundant-quote", 2));
+    }
+
+    #[test]
+    fn expired_directives_reports_a_past_date() {
+        let sup = LintSuppressions::parse(
+            ";; paredit:ignore-until 2020-01-01 redundant-quote\n(list '5)\n",
+        );
+        let today = Date::parse("2026-01-01").expect("parse");
+        let expired = sup.expired_directives(today);
+        assert_eq!(expired.len(), 1);
+        assert_eq!(expired[0].problem, SuppressionProblem::Expired);
+        assert_eq!(
+            expired[0].unused_rules.as_deref(),
+            Some(&["redundant-quote".to_owned()][..])
+        );
+    }
+
+    #[test]
+    fn a_future_expiry_is_not_reported() {
+        let sup = LintSuppressions::parse(";; paredit:ignore-until 2099-01-01\n(x)\n");
+        let today = Date::parse("2026-01-01").expect("parse");
+        assert!(sup.expired_directives(today).is_empty());
+    }
+
+    #[test]
+    fn a_directive_without_until_never_expires() {
+        let sup = LintSuppressions::parse(";; paredit:ignore redundant-quote\n(list '5)\n");
+        let today = Date::parse("2099-01-01").expect("parse");
+        assert!(sup.expired_directives(today).is_empty());
+    }
+
+    #[test]
+    fn a_malformed_until_date_suppresses_nothing() {
+        let sup = LintSuppressions::parse(";; paredit:ignore-until not-a-date\n(< x)\n");
+        assert!(sup.is_empty());
+        assert!(!sup.is_suppressed("single-arg-comparison", 2));
+    }
+
+    #[test]
+    fn an_until_with_no_date_at_all_suppresses_nothing() {
+        let sup = LintSuppressions::parse(";; paredit:ignore-until\n(< x)\n");
+        assert!(sup.is_empty());
+    }
+
+    #[test]
+    fn until_applies_to_file_and_next_form_scopes_too() {
+        let file_sup =
+            LintSuppressions::parse(";; paredit:ignore-file-until 2020-01-01\n(a)\n(b)\n");
+        assert!(file_sup.is_suppressed("any-rule", 2));
+        let today = Date::parse("2026-01-01").expect("parse");
+        assert_eq!(file_sup.expired_directives(today).len(), 1);
+
+        let source = ";; paredit:ignore-next-form-until 2020-01-01 redundant-quote\n(defun f ()\n  (list '5))\n";
+        let tree = SyntaxTree::parse(source).expect("parse");
+        let form_sup = LintSuppressions::parse_in_tree(source, &tree);
+        assert!(form_sup.is_suppressed("redundant-quote", 3));
+        assert_eq!(form_sup.expired_directives(today).len(), 1);
+    }
+
+    #[test]
+    fn until_keeps_a_trailing_reason_and_rule_list() {
+        let sup = LintSuppressions::parse(
+            ";; paredit:ignore-until 2020-01-01 redundant-quote -- migrating off it\n(list '5)\n",
+        );
+        assert!(sup.is_suppressed("redundant-quote", 2));
+        let unused = sup.unused_directives(&present(&[(2, "redundant-quote")]), true);
+        assert!(unused.is_empty(), "the reason must not be read as a rule");
+    }
+
+    // --- inventory (`--report-suppressions`) ---
+
+    #[test]
+    fn inventory_lists_every_directive_used_or_not() {
+        let source = ";; paredit:ignore redundant-quote -- why\n(list '5)\n\
+                      ;; paredit:ignore single-arg-comparison\n(clean)\n";
+        let sup = LintSuppressions::parse(source);
+        let entries = sup.inventory(&present(&[(2, "redundant-quote")]));
+        assert_eq!(entries.len(), 2);
+
+        let used = entries.iter().find(|e| e.comment_line == 1).expect("entry");
+        assert!(used.used);
+        assert_eq!(used.reason.as_deref(), Some("why"));
+        assert_eq!(
+            used.rules.as_deref(),
+            Some(&["redundant-quote".to_owned()][..])
+        );
+
+        let unused = entries.iter().find(|e| e.comment_line == 3).expect("entry");
+        assert!(!unused.used);
+        assert_eq!(unused.reason, None);
+    }
+
+    #[test]
+    fn inventory_reports_a_bare_directive_as_no_rules() {
+        let sup = LintSuppressions::parse(";; paredit:ignore\n(< x)\n");
+        let entries = sup.inventory(&present(&[(2, "single-arg-comparison")]));
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].rules, None);
+        assert!(entries[0].used);
+    }
+
+    #[test]
+    fn inventory_carries_the_expiry_as_a_date_string() {
+        let sup = LintSuppressions::parse(
+            ";; paredit:ignore-until 2026-12-31 redundant-quote\n(list '5)\n",
+        );
+        let entries = sup.inventory(&present(&[]));
+        assert_eq!(entries[0].expires.as_deref(), Some("2026-12-31"));
+    }
+
+    #[test]
+    fn inventory_is_empty_for_a_file_with_no_directives() {
+        let sup = LintSuppressions::parse("(a)\n(b)\n");
+        assert!(sup.inventory(&present(&[])).is_empty());
     }
 }

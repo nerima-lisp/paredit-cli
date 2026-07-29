@@ -669,6 +669,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::Effects(args) => {
                 effect_report::workflow::effect_report(args)?;
             }
+            command::InspectCommand::SemanticCoverage(args) => {
+                semantic_coverage_report::workflow::semantic_coverage_report(args)?;
+            }
             command::InspectCommand::ContextAt(args) => {
                 context_report::workflow::context_at_report(args)?;
             }

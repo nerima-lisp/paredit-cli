@@ -1,5 +1,5 @@
 use paredit_core_cli::{CliError, CliResult, CommandResult};
-use paredit_core_lint_engine::suppression::LintSuppressions;
+use paredit_core_lint_engine::suppression::{Date, LintSuppressions};
 
 use crate::lint::report::{
     CATEGORIES, FindingId, LintFinding, LintPassRequest, LintPolicyOptions, RULES, RuleFilter,
@@ -13,9 +13,10 @@ use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaselin
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
 use crate::presentation::cli::lint_report::render::{
     FindingIds, LintFileFix, LintFix, LintFixPlanEntry, LintReplacement, LintSarifResult,
-    LintStats, LintSuppressionRemoval, LintTiming, print_lint_docs, print_lint_explanation,
-    print_lint_fix_plan, print_lint_fix_report, print_lint_github_annotation, print_lint_presets,
-    print_lint_report, print_lint_rule_catalog, print_lint_sarif, print_lint_stats,
+    LintStats, LintSuppressionRemoval, LintTiming, print_lint_docs,
+    print_lint_expired_suppressions, print_lint_explanation, print_lint_fix_plan,
+    print_lint_fix_report, print_lint_github_annotation, print_lint_presets, print_lint_report,
+    print_lint_rule_catalog, print_lint_sarif, print_lint_stats, print_lint_suppression_inventory,
     print_lint_suppression_removal, print_lint_tags, print_lint_timings,
     print_lint_unused_suppressions,
 };
@@ -424,6 +425,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
     }
 
     let files = expand_input_files(&args.files, args.dialect)?;
+    let files = filter_suppressed_paths(files, &args.suppress_paths);
 
     if args.timings {
         return Ok(lint_report_timings(&args, &files, &active, &settings)?);
@@ -451,6 +453,14 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
 
     if args.report_unused_suppressions {
         return lint_report_unused_suppressions(&args, &files);
+    }
+
+    if args.report_expired_suppressions {
+        return lint_report_expired_suppressions(&args, &files);
+    }
+
+    if args.report_suppressions {
+        return Ok(lint_report_suppressions(&args, &files)?);
     }
 
     if let Some(out_path) = args.write_baseline.clone() {
@@ -1238,6 +1248,91 @@ fn lint_report_unused_suppressions(
     }
 
     Ok(())
+}
+
+/// Reports every inline suppression directive whose `-until` date has passed,
+/// whether or not it currently silences anything. Unlike
+/// [`lint_report_unused_suppressions`], use is irrelevant here: a directive
+/// still actively hiding a finding past its own deadline is the one that most
+/// needs a human decision. Exits 3 if any are found.
+fn lint_report_expired_suppressions(
+    args: &LintReportArgs,
+    files: &[std::path::PathBuf],
+) -> CommandResult {
+    let today = Date::today();
+    let mut entries = Vec::new();
+
+    for file in files {
+        let (input, _dialect, tree) =
+            read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let suppressions = LintSuppressions::parse_in_tree(&input.text, &tree);
+        for expired in suppressions.expired_directives(today) {
+            entries.push((file.display().to_string(), expired));
+        }
+    }
+
+    let expired_count = entries.len();
+    print_lint_expired_suppressions(&entries, args.output)?;
+
+    if expired_count > 0 {
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
+            "lint-report policy failed: {expired_count} expired suppression(s)"
+        )));
+    }
+
+    Ok(())
+}
+
+/// Lists every inline suppression directive across the scanned files, used or
+/// not — the full survey `--report-suppressions` provides, one step past
+/// `--report-unused-suppressions`'s stale-only view. Always exits 0: a survey,
+/// not a gate.
+fn lint_report_suppressions(args: &LintReportArgs, files: &[std::path::PathBuf]) -> CliResult<()> {
+    let mut entries = Vec::new();
+
+    for file in files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let present = findings_by_line(file, dialect, &tree, &input.text)?;
+        let suppressions = LintSuppressions::parse_in_tree(&input.text, &tree);
+        for entry in suppressions.inventory(&present) {
+            entries.push((file.display().to_string(), entry));
+        }
+    }
+
+    print_lint_suppression_inventory(&entries, args.output)
+}
+
+/// Drops files under any `--suppress-path` prefix, so lint findings never
+/// surface for generated code or vendored dependencies a project cannot edit
+/// to carry an inline `paredit:ignore`. Scoped to `inspect lint` alone; other
+/// commands still see these files — `paths.exclude` is the flag for hiding a
+/// path everywhere.
+fn filter_suppressed_paths(
+    files: Vec<std::path::PathBuf>,
+    prefixes: &[std::path::PathBuf],
+) -> Vec<std::path::PathBuf> {
+    if prefixes.is_empty() {
+        return files;
+    }
+    let normalized: Vec<std::path::PathBuf> = prefixes.iter().map(|p| normalize(p)).collect();
+    files
+        .into_iter()
+        .filter(|file| {
+            let candidate = normalize(file);
+            !normalized
+                .iter()
+                .any(|prefix| candidate.starts_with(prefix))
+        })
+        .collect()
+}
+
+/// The absolute, canonical form of `path`, for a prefix comparison that a
+/// relative invocation directory or a `..` cannot fool. Falls back to a plain
+/// `current_dir`-joined path when `path` does not exist (a `--suppress-path`
+/// is allowed to name a directory with nothing under it yet).
+fn normalize(path: &std::path::Path) -> std::path::PathBuf {
+    std::fs::canonicalize(path)
+        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default().join(path))
 }
 
 /// Emits findings in one of the interchange formats the report envelope

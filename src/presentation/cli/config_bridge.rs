@@ -185,6 +185,13 @@ const BINDINGS: &[Binding] = &[
         omit_when: None,
     },
     Binding {
+        key: "lint.suppress-paths",
+        flag: "suppress-path",
+        shape: Shape::Repeated,
+        scope: Scope::Only(LINT),
+        omit_when: None,
+    },
+    Binding {
         key: "lint.fail-on",
         flag: "fail-on",
         shape: Shape::Value,
