@@ -150,7 +150,7 @@ const FAIL_SEVERITIES: &[&str] = &["never", "warning", "error"];
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 26;
+pub const KEY_COUNT: usize = 27;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -203,8 +203,14 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
     KeySchema {
         key: "paths.respect-gitignore",
         kind: ValueKind::Boolean,
-        default: DefaultValue::Boolean(false),
-        summary: "Skip files excluded by the repository's ignore rules during discovery.",
+        default: DefaultValue::Boolean(true),
+        summary: "Skip files that .gitignore or .git/info/exclude excludes.",
+    },
+    KeySchema {
+        key: "paths.respect-pareditignore",
+        kind: ValueKind::Boolean,
+        default: DefaultValue::Boolean(true),
+        summary: "Skip files that a .pareditignore excludes.",
     },
     // --- [format] ---
     KeySchema {

@@ -73,6 +73,11 @@ pub enum Message {
     RepairPatternSyntax,
     RepairRerunWithoutAll,
     RepairSelectorSyntax,
+    RepairOneInputSelector,
+    RepairGlobSyntax,
+    RepairNeedRepository,
+    RepairNoInputsProduced,
+    RepairArchiveDestination,
 }
 
 impl Message {
@@ -191,6 +196,21 @@ impl Message {
             Self::RepairSelectorSyntax => {
                 "the selector is not well formed; `paredit inspect capabilities` lists each selector's spelling"
             }
+            Self::RepairOneInputSelector => {
+                "pass one input selector only: each of --since, --from-git, --from-manifest, --from-archive and --paths-from replaces the whole file set"
+            }
+            Self::RepairGlobSyntax => {
+                "a glob matches path segments with * and **, and a character class with [...]; quote it so the shell does not expand it first"
+            }
+            Self::RepairNeedRepository => {
+                "run inside the git repository that contains the scanned roots, or drop --since and name the files"
+            }
+            Self::RepairNoInputsProduced => {
+                "the selector resolved to no file inside the scanned roots; widen the roots or check what it produced"
+            }
+            Self::RepairArchiveDestination => {
+                "--from-archive needs somewhere to extract to; add --extract-to <DIR>"
+            }
         }
     }
 
@@ -302,11 +322,26 @@ impl Message {
             Self::RepairSelectorSyntax => {
                 "セレクタの書式が正しくありません。各セレクタの綴りは `paredit inspect capabilities` で確認できます"
             }
+            Self::RepairOneInputSelector => {
+                "入力セレクタは 1 つだけ指定してください。--since / --from-git / --from-manifest / --from-archive / --paths-from はいずれもファイル集合そのものを置き換えます"
+            }
+            Self::RepairGlobSyntax => {
+                "グロブは * と ** でパス要素に、[...] で文字クラスに一致します。シェルが先に展開しないよう引用してください"
+            }
+            Self::RepairNeedRepository => {
+                "走査対象を含む git リポジトリ内で実行するか、--since をやめてファイルを直接指定してください"
+            }
+            Self::RepairNoInputsProduced => {
+                "走査対象の中に該当ファイルがありませんでした。ルートを広げるか、セレクタの出力を確認してください"
+            }
+            Self::RepairArchiveDestination => {
+                "--from-archive には展開先が必要です。--extract-to <DIR> を指定してください"
+            }
         }
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 48] = [
+    pub const ALL: [Self; 53] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -355,6 +390,11 @@ impl Message {
         Self::RepairPatternSyntax,
         Self::RepairRerunWithoutAll,
         Self::RepairSelectorSyntax,
+        Self::RepairOneInputSelector,
+        Self::RepairGlobSyntax,
+        Self::RepairNeedRepository,
+        Self::RepairNoInputsProduced,
+        Self::RepairArchiveDestination,
     ];
 }
 

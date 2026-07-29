@@ -11,7 +11,9 @@ use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SexprResult, SymbolName, SyntaxTree,
 };
-use paredit_core_workspace::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use paredit_core_workspace::workspace::{
+    IgnoreOptions, WorkspaceDiscoveryOptions, discover_workspace_files,
+};
 
 #[path = "diff.rs"]
 mod diff;
@@ -449,6 +451,13 @@ pub fn expand_input_files(
                 include_generated: runtime.include_generated,
                 max_depth: runtime.max_depth,
                 exclude: runtime.exclude_paths.clone(),
+                // These commands take explicit paths and have no input flags of
+                // their own, so `[paths]` in `paredit.toml` and the environment
+                // are the only places a caller can say "look at the generated
+                // files too". The environment narrows what the file allowed,
+                // which is the precedence every other setting follows.
+                ignore: runtime.ignore_options(IgnoreOptions::from_environment()),
+                ..WorkspaceDiscoveryOptions::default()
             })?;
             let files = discovery.into_files();
             crate::progress::discovered(files.len(), input);

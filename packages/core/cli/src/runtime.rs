@@ -96,6 +96,15 @@ pub struct RuntimeSettings {
     pub include_hidden: bool,
     pub include_generated: bool,
     pub max_depth: Option<usize>,
+    /// Do not read `.gitignore` / `.git/info/exclude`.
+    ///
+    /// Stored negated so that `Default` — which every unit test and every
+    /// library consumer sees — keeps reading them, matching the workspace
+    /// package's own default. A positively-named field would default to
+    /// `false` and silently turn ignore handling off everywhere.
+    pub no_gitignore: bool,
+    /// Do not read `.pareditignore`. Negated for the same reason.
+    pub no_pareditignore: bool,
     pub verbosity: Verbosity,
     /// Approximate token budget for a report. Zero means no budget.
     pub max_tokens: usize,
@@ -129,6 +138,23 @@ pub fn current() -> &'static RuntimeSettings {
 }
 
 impl RuntimeSettings {
+    /// The ignore policy, narrowing `environment` by what the configuration
+    /// said.
+    ///
+    /// Both must permit an ignore file for it to be read: the configuration is
+    /// the repository's baseline and the `PAREDIT_NO_*_IGNORE` variables are
+    /// the per-run escape hatch, so the environment can only ever narrow.
+    #[must_use]
+    pub const fn ignore_options(
+        &self,
+        environment: paredit_core_workspace::workspace::IgnoreOptions,
+    ) -> paredit_core_workspace::workspace::IgnoreOptions {
+        paredit_core_workspace::workspace::IgnoreOptions {
+            respect_gitignore: environment.respect_gitignore && !self.no_gitignore,
+            respect_pareditignore: environment.respect_pareditignore && !self.no_pareditignore,
+        }
+    }
+
     /// The dialect to use when an explicit `--dialect` was not given.
     ///
     /// `force` short-circuits detection outright. Without it the configured

@@ -109,6 +109,11 @@ pub enum ErrorCode {
     ArgumentTargetRequired,
     ArgumentTargetAmbiguous,
     ArgumentWriteRequiresFile,
+    ArgumentConflictingInputs,
+    ArgumentInvalidGlob,
+    ArgumentNeedsRepository,
+    ArgumentNoInputsProduced,
+    ArgumentArchiveDestination,
 
     SelectionPathNotReachable,
     SelectionPathInvalid,
@@ -154,6 +159,11 @@ impl ErrorCode {
             Self::ArgumentTargetRequired => "argument.target-required",
             Self::ArgumentTargetAmbiguous => "argument.target-ambiguous",
             Self::ArgumentWriteRequiresFile => "argument.write-requires-file",
+            Self::ArgumentConflictingInputs => "argument.conflicting-inputs",
+            Self::ArgumentInvalidGlob => "argument.invalid-glob",
+            Self::ArgumentNeedsRepository => "argument.needs-repository",
+            Self::ArgumentNoInputsProduced => "argument.no-inputs-produced",
+            Self::ArgumentArchiveDestination => "argument.archive-destination",
 
             Self::SelectionPathNotReachable => "selection.path-not-reachable",
             Self::SelectionPathInvalid => "selection.path-invalid",
@@ -197,7 +207,12 @@ impl ErrorCode {
             Self::ArgumentNoInput
             | Self::ArgumentTargetRequired
             | Self::ArgumentTargetAmbiguous
-            | Self::ArgumentWriteRequiresFile => Category::Argument,
+            | Self::ArgumentWriteRequiresFile
+            | Self::ArgumentConflictingInputs
+            | Self::ArgumentInvalidGlob
+            | Self::ArgumentNeedsRepository
+            | Self::ArgumentNoInputsProduced
+            | Self::ArgumentArchiveDestination => Category::Argument,
 
             Self::SelectionPathNotReachable
             | Self::SelectionPathInvalid
@@ -250,11 +265,16 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 38] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
         Self::ArgumentWriteRequiresFile,
+        Self::ArgumentConflictingInputs,
+        Self::ArgumentInvalidGlob,
+        Self::ArgumentNeedsRepository,
+        Self::ArgumentNoInputsProduced,
+        Self::ArgumentArchiveDestination,
         Self::SelectionPathNotReachable,
         Self::SelectionPathInvalid,
         Self::SelectionOffsetNotFound,
@@ -461,6 +481,15 @@ const fn classify_argument(error: &ArgumentError) -> ErrorCode {
         // Lives in `ArgumentError` but is a safety refusal, not a usage
         // problem: the command line was fine and an earlier edit moved the
         // form this one was going to touch.
+        ArgumentError::ConflictingInputSelectors => ErrorCode::ArgumentConflictingInputs,
+        ArgumentError::InvalidGlob { .. } => ErrorCode::ArgumentInvalidGlob,
+        ArgumentError::SinceRequiresRepository => ErrorCode::ArgumentNeedsRepository,
+        // All three mean the same thing to a caller: the selector ran and
+        // produced no file inside the scanned roots.
+        ArgumentError::NoManifestFound
+        | ArgumentError::EmptyPathList
+        | ArgumentError::EmptyArchive => ErrorCode::ArgumentNoInputsProduced,
+        ArgumentError::ArchiveRequiresDestination => ErrorCode::ArgumentArchiveDestination,
         ArgumentError::AllMatchShifted { .. } => ErrorCode::RefusalMatchShifted,
     }
 }
@@ -673,6 +702,25 @@ fn repairs(code: ErrorCode, error: &anyhow::Error, context: &Context) -> Vec<Rep
 
         ErrorCode::SelectionSpanInvalid => {
             vec![Repair::new("re-read", Message::RepairSpanBoundaries)]
+        }
+
+        ErrorCode::ArgumentConflictingInputs => {
+            vec![Repair::new("pass-flag", Message::RepairOneInputSelector)]
+        }
+        ErrorCode::ArgumentInvalidGlob => {
+            vec![Repair::new("pass-flag", Message::RepairGlobSyntax)]
+        }
+        ErrorCode::ArgumentNeedsRepository => {
+            vec![Repair::new("pass-flag", Message::RepairNeedRepository)]
+        }
+        ErrorCode::ArgumentNoInputsProduced => {
+            vec![Repair::new(
+                "change-selection",
+                Message::RepairNoInputsProduced,
+            )]
+        }
+        ErrorCode::ArgumentArchiveDestination => {
+            vec![Repair::new("pass-flag", Message::RepairArchiveDestination)]
         }
 
         ErrorCode::SelectionMalformed => vec![

@@ -457,6 +457,8 @@ mod single_value_bind_report;
 mod skill_contract;
 #[path = "cli/sort_definitions.rs"]
 mod sort_definitions;
+#[path = "cli/source_report.rs"]
+mod source_report;
 #[path = "cli/split_file.rs"]
 mod split_file;
 #[path = "cli/split_let_star.rs"]

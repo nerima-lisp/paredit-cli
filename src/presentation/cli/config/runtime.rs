@@ -28,6 +28,12 @@ pub fn resolve(settings: &Settings) -> RuntimeSettings {
             .map(PathBuf::from)
             .collect(),
         include_hidden: settings.boolean("paths.include-hidden").unwrap_or(false),
+        // The configuration key is positive and the runtime field is negated;
+        // this is the one place the two spellings meet.
+        no_gitignore: !settings.boolean("paths.respect-gitignore").unwrap_or(true),
+        no_pareditignore: !settings
+            .boolean("paths.respect-pareditignore")
+            .unwrap_or(true),
         include_generated: settings.boolean("paths.include-generated").unwrap_or(false),
         max_depth: settings
             .integer("paths.max-depth")
