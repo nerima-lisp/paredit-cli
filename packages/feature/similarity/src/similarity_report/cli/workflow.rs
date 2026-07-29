@@ -5,10 +5,10 @@ use crate::similarity_report::usecase::{
     SimilarityIndeterminateReason, SimilarityInventory, SimilarityReportOptions,
     SimilarityReportRequest, SimilarityReportSourcePort, build_similarity_report,
 };
+use paredit_core_cli::workspace_args::scan_workspace;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_workspace::workspace::{
-    WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
-    discover_workspace_files_from_list,
+    DiscoveryCache, WorkspaceDiscovery, WorkspaceDiscoveryOptions,
 };
 
 use super::args::SimilarityReportArgs;
@@ -45,6 +45,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
     };
 
     let mut source = CliSimilarityReportSource {
+        cache: args.input.cache()?,
         options: resolved.options,
         from_list: resolved.from_list,
         discovery: None,
@@ -78,6 +79,10 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
 }
 
 struct CliSimilarityReportSource {
+    /// Held rather than taken from the args: `--dialect` widens the options
+    /// below, and a cache key computed from the un-widened set would serve a
+    /// narrower file list than the run asked for.
+    cache: Option<DiscoveryCache>,
     options: WorkspaceDiscoveryOptions,
     from_list: bool,
     discovery: Option<WorkspaceDiscovery>,
@@ -94,11 +99,7 @@ impl SimilarityReportSourcePort for CliSimilarityReportSource {
             include_unknown: self.options.include_unknown || request.forced_dialect.is_some(),
             ..self.options.clone()
         };
-        let discovery = if self.from_list {
-            discover_workspace_files_from_list(&options)?
-        } else {
-            discover_workspace_files(&options)?
-        };
+        let (discovery, _) = scan_workspace(&options, self.from_list, self.cache.as_ref())?;
         let inventory = SimilarityInventory {
             files: discovery
                 .files()

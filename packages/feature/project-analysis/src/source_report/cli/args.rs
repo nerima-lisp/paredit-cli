@@ -19,15 +19,6 @@ pub struct SourceReportArgs {
     /// List every selected file, not just the counts.
     #[arg(long)]
     pub list_files: bool,
-    /// Reuse a previous scan of the same roots from this directory.
-    ///
-    /// Keep it outside the scanned roots: creating it inside changes the tree
-    /// it describes, which invalidates the first entry it writes.
-    #[arg(long, value_name = "DIR")]
-    pub cache_dir: Option<PathBuf>,
-    /// Delete every entry in --cache-dir before scanning.
-    #[arg(long, requires = "cache_dir")]
-    pub clear_cache: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,

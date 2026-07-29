@@ -1109,3 +1109,46 @@ fn following_symlinks_stops_at_a_loop_instead_of_recursing() -> Result<()> {
     fs::remove_dir_all(root)?;
     Ok(())
 }
+
+/// A cache hit has to reconstruct the directory capabilities the walk opened,
+/// or the files it lists cannot be read. This is the property that lets the
+/// cache serve every command rather than only the ones that never open a file.
+#[test]
+fn a_rehydrated_cache_hit_can_still_read_the_files_it_lists() -> Result<()> {
+    let root = unique_temp_dir("rehydrate");
+    let cache_dir = unique_temp_dir("rehydrate-cache");
+    fs::create_dir_all(&root)?;
+    fs::write(root.join("main.lisp"), "(defun main () nil)")?;
+
+    let options = WorkspaceDiscoveryOptions {
+        roots: vec![root.clone()],
+        ..WorkspaceDiscoveryOptions::default()
+    };
+    let cache = DiscoveryCache::new(cache_dir.clone());
+    let walked = discover_workspace_files(&options)?;
+    cache.store(&options, &walked)?;
+
+    let (outcome, cached) = cache.lookup(&options);
+    assert_eq!(outcome, CacheOutcome::Hit);
+    let cached = cached.expect("a stored entry must be found again");
+
+    let rehydrated = rehydrate_cached_discovery(&options, &cached)?;
+    assert_eq!(rehydrated.files(), walked.files());
+    assert_eq!(
+        rehydrated.read_file(&root.join("main.lisp"))?,
+        b"(defun main () nil)".to_vec(),
+        "a rehydrated discovery must read through a freshly opened capability"
+    );
+
+    // The capability is still scoped: a file the entry never selected stays
+    // unreadable even though it sits inside the root.
+    fs::write(root.join("other.lisp"), "(defun other () nil)")?;
+    assert!(
+        rehydrated.read_file(&root.join("other.lisp")).is_err(),
+        "rehydration must not widen what the cached scan selected"
+    );
+
+    fs::remove_dir_all(&root)?;
+    fs::remove_dir_all(&cache_dir)?;
+    Ok(())
+}

@@ -39,7 +39,7 @@ pub fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
 
 pub fn workspace_refactor_plan(args: WorkspaceRefactorPlanArgs) -> Result<()> {
     let resolved = args.input.resolve(&args.roots)?;
-    let workspace = discover_workspace_refactor_scope(args.roots.clone(), &resolved)?;
+    let workspace = discover_workspace_refactor_scope(&args.input, args.roots.clone(), &resolved)?;
 
     emit_refactor_plan(RefactorPlanEmission {
         paths: &workspace.paths,

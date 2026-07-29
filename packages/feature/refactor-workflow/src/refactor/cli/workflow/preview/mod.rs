@@ -48,7 +48,7 @@ pub fn refactor_preview(args: RefactorPreviewArgs) -> Result<()> {
 
 pub fn workspace_refactor_preview(args: WorkspaceRefactorPreviewArgs) -> Result<()> {
     let resolved = args.input.resolve(&args.roots)?;
-    let workspace = discover_workspace_refactor_scope(args.roots.clone(), &resolved)?;
+    let workspace = discover_workspace_refactor_scope(&args.input, args.roots.clone(), &resolved)?;
 
     emit_refactor_preview(RefactorPreviewEmission {
         paths: &workspace.paths,

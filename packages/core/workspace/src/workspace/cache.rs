@@ -106,6 +106,21 @@ pub struct CachedDiscovery {
     pub visited_entry_count: usize,
 }
 
+impl CachedDiscovery {
+    /// One skip counter by name, or `0` for a name this entry does not carry.
+    ///
+    /// By name rather than by index so a counter added to the middle of
+    /// [`skip_counter_names`] cannot silently shift every later reading.
+    #[must_use]
+    pub fn skipped_count(&self, name: &str) -> usize {
+        skip_counter_names()
+            .iter()
+            .position(|counter| *counter == name)
+            .and_then(|index| self.skipped.get(index).copied())
+            .unwrap_or(0)
+    }
+}
+
 /// The skip counters a cache entry carries, in a fixed order.
 ///
 /// Named rather than positional in the stored JSON: a counter added in the

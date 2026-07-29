@@ -6,11 +6,9 @@ use crate::workspace_report::usecase::types::{
     LoadedWorkspaceFile, WorkspaceInventory, WorkspaceReportRequest, WorkspaceReportSourcePort,
 };
 use crate::workspace_report::usecase::workflow::build_workspace_report;
+use paredit_core_cli::workspace_args::{ResolvedWorkspaceInput, WorkspaceInputArgs};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_workspace::workspace::{
-    WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
-    discover_workspace_files_from_list,
-};
+use paredit_core_workspace::workspace::WorkspaceDiscovery;
 
 use super::args::WorkspaceReportArgs;
 use super::render::print_workspace_report;
@@ -29,27 +27,23 @@ pub fn workspace_report(args: WorkspaceReportArgs) -> Result<()> {
         max_depth: args.input.max_depth,
     };
     let mut source = CliWorkspaceReportSource {
-        options: resolved.options,
-        from_list: resolved.from_list,
+        input: &args.input,
+        resolved,
         discovery: None,
     };
     let plan = build_workspace_report(&mut source, request)?;
     print_workspace_report(&plan, output)
 }
 
-struct CliWorkspaceReportSource {
-    options: WorkspaceDiscoveryOptions,
-    from_list: bool,
+struct CliWorkspaceReportSource<'a> {
+    input: &'a WorkspaceInputArgs,
+    resolved: ResolvedWorkspaceInput,
     discovery: Option<WorkspaceDiscovery>,
 }
 
-impl WorkspaceReportSourcePort for CliWorkspaceReportSource {
+impl WorkspaceReportSourcePort for CliWorkspaceReportSource<'_> {
     fn discover(&mut self, _request: &WorkspaceReportRequest) -> Result<WorkspaceInventory> {
-        let discovery = if self.from_list {
-            discover_workspace_files_from_list(&self.options)?
-        } else {
-            discover_workspace_files(&self.options)?
-        };
+        let (discovery, _) = self.input.scan(&self.resolved)?;
         let inventory = WorkspaceInventory {
             files: discovery.files().to_vec(),
             skipped_unknown_count: discovery.skipped_unknown_count(),

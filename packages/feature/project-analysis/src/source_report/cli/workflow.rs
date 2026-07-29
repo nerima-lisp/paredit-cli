@@ -47,12 +47,7 @@ pub enum SourceScan {
 
 pub fn source_report(args: SourceReportArgs) -> Result<()> {
     let resolved = args.input.resolve(&args.roots)?;
-    let cache = args.cache_dir.clone().map(DiscoveryCache::new);
-    if let Some(cache) = cache.as_ref() {
-        if args.clear_cache {
-            cache.clear()?;
-        }
-    }
+    let cache = args.input.cache()?;
 
     let (scan, outcome) = scan(&resolved, cache.as_ref())?;
     print_source_report(&args, &resolved, &scan, outcome, args.output)

@@ -26,11 +26,12 @@ use std::path::{Path, PathBuf};
 use clap::{Args, ValueEnum};
 
 use paredit_core_workspace::workspace::{
-    GlobSet, IgnoreOptions, ManifestKind, ManifestSource, PathListSeparator, SinceOptions,
-    SymlinkPolicy, WorkspaceDiscoveryOptions, changed_paths_since,
+    CacheOutcome, DiscoveryCache, GlobSet, IgnoreOptions, ManifestKind, ManifestSource,
+    PathListSeparator, SinceOptions, SymlinkPolicy, WorkspaceDiscovery, WorkspaceDiscoveryOptions,
+    changed_paths_since, discover_workspace_files, discover_workspace_files_from_list,
     elisp_package_manifests_in_directory, extract_tar_path, find_repository_root,
     manifests_in_directory, parse_manifest, parse_manifest_as, read_path_list,
-    read_path_list_from_stdin, tracked_paths,
+    read_path_list_from_stdin, rehydrate_cached_discovery, tracked_paths,
 };
 
 use crate::error::{ArgumentError, CliError, CliResult};
@@ -117,11 +118,56 @@ pub struct WorkspaceInputArgs {
     /// How --paths-from separates entries.
     #[arg(long, value_enum, default_value_t = PathListSeparatorArg::Newline)]
     pub paths_from_separator: PathListSeparatorArg,
+    /// Reuse a previous scan's file list from this directory.
+    ///
+    /// Keyed on everything that can change which files are selected, and
+    /// validated against the tree before it is reused, so a stale entry is a
+    /// miss rather than a wrong answer.
+    #[arg(long, value_name = "DIR")]
+    pub cache_dir: Option<PathBuf>,
+    /// Delete every entry in --cache-dir before scanning.
+    #[arg(long, requires = "cache_dir")]
+    pub clear_cache: bool,
+}
+
+/// Runs discovery for `options`, consulting `cache` when one is given.
+///
+/// A hit is rehydrated into a full [`WorkspaceDiscovery`] — including freshly
+/// opened root capabilities — so a cached result behaves exactly like a
+/// walked one, `read_file` included. A store failure is reported rather than
+/// swallowed: a cache directory that cannot be written is a configuration
+/// mistake, and silently rescanning forever is how it stays unnoticed.
+pub fn scan_workspace(
+    options: &WorkspaceDiscoveryOptions,
+    from_list: bool,
+    cache: Option<&DiscoveryCache>,
+) -> CliResult<(WorkspaceDiscovery, Option<CacheOutcome>)> {
+    let walk = || -> CliResult<WorkspaceDiscovery> {
+        Ok(if from_list {
+            discover_workspace_files_from_list(options)?
+        } else {
+            discover_workspace_files(options)?
+        })
+    };
+
+    let Some(cache) = cache else {
+        return Ok((walk()?, None));
+    };
+
+    let (outcome, cached) = cache.lookup(options);
+    if let Some(cached) = cached {
+        return Ok((rehydrate_cached_discovery(options, &cached)?, Some(outcome)));
+    }
+    let discovery = walk()?;
+    cache.store(options, &discovery)?;
+    Ok((discovery, Some(outcome)))
 }
 
 impl Default for WorkspaceInputArgs {
     fn default() -> Self {
         Self {
+            cache_dir: None,
+            clear_cache: false,
             include_unknown: false,
             include_hidden: false,
             include_generated: false,
@@ -216,6 +262,31 @@ impl WorkspaceInputArgs {
         } else {
             SymlinkPolicy::Skip
         }
+    }
+
+    /// The discovery cache these flags describe, honouring `--clear-cache`.
+    pub fn cache(&self) -> CliResult<Option<DiscoveryCache>> {
+        let Some(directory) = self.cache_dir.clone() else {
+            return Ok(None);
+        };
+        let cache = DiscoveryCache::new(directory);
+        if self.clear_cache {
+            cache.clear()?;
+        }
+        Ok(Some(cache))
+    }
+
+    /// Runs discovery for `resolved`, consulting `--cache-dir` when given.
+    ///
+    /// The entry point every root-taking command uses. `inspect sources` keeps
+    /// its own path only because it reports the cache outcome and the full
+    /// counter set, which the others do not.
+    pub fn scan(
+        &self,
+        resolved: &ResolvedWorkspaceInput,
+    ) -> CliResult<(WorkspaceDiscovery, Option<CacheOutcome>)> {
+        let cache = self.cache()?;
+        scan_workspace(&resolved.options, resolved.from_list, cache.as_ref())
     }
 
     /// Compiles the `--include` patterns.

@@ -875,3 +875,48 @@ fn cli_commands_taking_explicit_paths_honour_ignore_files_and_the_override() {
         .success()
         .stdout(predicate::str::contains("generated.lisp"));
 }
+
+/// The cache must serve the commands that *parse*, not only the one that does
+/// not. Those read every file through the discovery's directory capability,
+/// which a cache entry cannot carry — so a hit re-opens the capabilities and
+/// rehydrates. Without that, caching would only ever speed up the command for
+/// which scanning was already cheap.
+#[test]
+fn cli_workspace_reads_files_through_a_rehydrated_cache_hit() {
+    let dir = fresh_temp_dir("workspace cache rehydrate");
+    let cache_dir = fresh_temp_dir("workspace cache rehydrate store");
+    fs::write(dir.join("a.lisp"), "(defun a () 1)\n").expect("write a.lisp");
+    fs::write(dir.join("b.lisp"), "(defun b () 2)\n").expect("write b.lisp");
+
+    let scan = || -> serde_json::Value {
+        let output = paredit()
+            .args(["inspect", "workspace", "--output", "json"])
+            .arg("--cache-dir")
+            .arg(&cache_dir)
+            .arg(&dir)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        serde_json::from_slice(&output).expect("workspace report is json")
+    };
+
+    let first = scan();
+    let second = scan();
+    assert_eq!(
+        first["files"], second["files"],
+        "a cache hit must report the same files a walk did"
+    );
+    // The report counts atoms, which it can only do by reading each file —
+    // through the capability a hit had to re-open.
+    assert_eq!(
+        first["atom_count"], second["atom_count"],
+        "a cache hit must still be able to read the files it lists"
+    );
+    assert_eq!(second["parse_error_count"], 0);
+    assert_eq!(
+        second["parsed_count"], 2,
+        "both files must be parsed on the cached run, not merely listed: {second}"
+    );
+}

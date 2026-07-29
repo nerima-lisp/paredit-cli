@@ -19,7 +19,7 @@ use anyhow::Result;
 
 pub fn workspace_refactor_execute(args: WorkspaceRefactorExecuteArgs) -> Result<()> {
     let resolved = args.input.resolve(&args.roots)?;
-    let workspace = discover_workspace_refactor_scope(args.roots.clone(), &resolved)?;
+    let workspace = discover_workspace_refactor_scope(&args.input, args.roots.clone(), &resolved)?;
     let paths = workspace.paths;
 
     let mut preview = build_refactor_preview(BuildRefactorPreviewRequest {

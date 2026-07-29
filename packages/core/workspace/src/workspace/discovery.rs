@@ -11,10 +11,12 @@ use cap_std::fs::Dir;
 #[cfg(unix)]
 use cap_std::fs::{OpenOptions, OpenOptionsExt};
 
+use super::cache::CachedDiscovery;
 use super::filters::{is_generated_workspace_path, is_hidden_workspace_path};
 use super::ignore::{IgnoreCache, IgnoreStack};
 use super::types::{
     DirectoryFingerprint, WorkspaceDiscovery, WorkspaceDiscoveryOptions, WorkspaceLimits,
+    WorkspaceRootCapability,
 };
 use super::vcs::{find_repository_root, is_repository_root};
 use crate::fs_identity::FilesystemIdentity;
@@ -269,6 +271,113 @@ pub(super) fn read_bounded<R: Read>(
     Ok(content)
 }
 
+/// Opens one directory capability per canonical root.
+///
+/// Every read this package performs goes through one of these rather than
+/// through an ambient path, which is what bounds a run to the roots it was
+/// given. Factored out of the walk so a cache hit can re-open them without
+/// re-walking: the capabilities are the one part of a discovery that cannot
+/// be serialised, and re-opening them is O(roots) where the walk is O(tree).
+fn open_root_capabilities(
+    canonical_roots: &[PathBuf],
+) -> std::result::Result<Vec<WorkspaceRootCapability>, WorkspaceError> {
+    canonical_roots
+        .iter()
+        .map(|root| {
+            let capability_base = if root.is_file() {
+                root.parent().ok_or_else(|| WorkspaceError::Io {
+                    context: format!("workspace file root has no parent: {}", root.display()),
+                    source: std::io::Error::other(""),
+                })?
+            } else {
+                root.as_path()
+            };
+            let ambient_metadata =
+                fs::metadata(capability_base).map_err(|source| WorkspaceError::Io {
+                    context: format!(
+                        "failed to inspect ambient workspace root {}",
+                        capability_base.display()
+                    ),
+                    source,
+                })?;
+            let dir =
+                Dir::open_ambient_dir(capability_base, ambient_authority()).map_err(|source| {
+                    WorkspaceError::Io {
+                        context: format!("failed to open workspace root {}", root.display()),
+                        source,
+                    }
+                })?;
+            let capability_metadata = dir.dir_metadata().map_err(|source| WorkspaceError::Io {
+                context: format!(
+                    "failed to inspect workspace root capability {}",
+                    capability_base.display()
+                ),
+                source,
+            })?;
+            let identity = FilesystemIdentity::from_cap(&capability_metadata).ok_or(
+                WorkspaceError::Unavailable("workspace root capability identity is unavailable"),
+            )?;
+            let root_is_unchanged = ambient_metadata.is_dir()
+                && FilesystemIdentity::from_std(&ambient_metadata) == Some(identity);
+            if !root_is_unchanged {
+                return Err(WorkspaceRefusal::RootChanged {
+                    path: capability_base.to_path_buf(),
+                }
+                .into());
+            }
+            Ok((
+                root.clone(),
+                capability_base.to_path_buf(),
+                std::sync::Arc::new(dir),
+                identity,
+            ))
+        })
+        .collect()
+}
+
+/// Rebuilds a full discovery from a cache entry, without walking the tree.
+///
+/// A cache hit restores the file list and the counters, but a
+/// [`WorkspaceDiscovery`] also owns the directory capabilities every read goes
+/// through, and those cannot be serialised. They are re-opened here — which
+/// also re-checks that each root is still the directory it was — so a cached
+/// result supports `read_file` exactly as a fresh one does. Without this the
+/// cache would only serve commands that never read a file, which is the one
+/// command for which scanning was already cheap.
+pub fn rehydrate_cached_discovery(
+    options: &WorkspaceDiscoveryOptions,
+    cached: &CachedDiscovery,
+) -> std::result::Result<WorkspaceDiscovery, WorkspaceError> {
+    // Canonicalised and deduplicated exactly as the walk does, so a hit and a
+    // miss resolve `read_file` against the same capability set.
+    let mut canonical_roots = options
+        .roots
+        .iter()
+        .map(|root| {
+            fs::canonicalize(root).map_err(|source| WorkspaceError::Io {
+                context: format!("failed to resolve workspace root {}", root.display()),
+                source,
+            })
+        })
+        .collect::<std::result::Result<Vec<_>, WorkspaceError>>()?;
+    canonical_roots.sort();
+    canonical_roots.dedup();
+    let root_dirs = open_root_capabilities(&canonical_roots)?;
+    Ok(WorkspaceDiscovery {
+        files: cached.files.clone(),
+        canonical_files: cached.canonical_files.iter().cloned().collect(),
+        skipped_unknown_count: cached.skipped_count("unknown"),
+        skipped_hidden_count: cached.skipped_count("hidden"),
+        skipped_generated_count: cached.skipped_count("generated"),
+        skipped_symlink_count: cached.skipped_count("symlink"),
+        skipped_excluded_count: cached.skipped_count("excluded"),
+        canonical_roots,
+        root_dirs,
+        visited_entry_count: cached.visited_entry_count,
+        ..WorkspaceDiscovery::default()
+    })
+}
+
 pub fn discover_workspace_files(
     options: &WorkspaceDiscoveryOptions,
 ) -> std::result::Result<WorkspaceDiscovery, WorkspaceError> {
@@ -348,59 +457,7 @@ pub(super) fn discover_workspace_files_with_limits(
         .iter()
         .map(|root| root.canonical.clone())
         .collect();
-    discovery.root_dirs = discovery
-        .canonical_roots
-        .iter()
-        .map(|root| {
-            let capability_base = if root.is_file() {
-                root.parent().ok_or_else(|| WorkspaceError::Io {
-                    context: format!("workspace file root has no parent: {}", root.display()),
-                    source: std::io::Error::other(""),
-                })?
-            } else {
-                root.as_path()
-            };
-            let ambient_metadata =
-                fs::metadata(capability_base).map_err(|source| WorkspaceError::Io {
-                    context: format!(
-                        "failed to inspect ambient workspace root {}",
-                        capability_base.display()
-                    ),
-                    source,
-                })?;
-            let dir =
-                Dir::open_ambient_dir(capability_base, ambient_authority()).map_err(|source| {
-                    WorkspaceError::Io {
-                        context: format!("failed to open workspace root {}", root.display()),
-                        source,
-                    }
-                })?;
-            let capability_metadata = dir.dir_metadata().map_err(|source| WorkspaceError::Io {
-                context: format!(
-                    "failed to inspect workspace root capability {}",
-                    capability_base.display()
-                ),
-                source,
-            })?;
-            let identity = FilesystemIdentity::from_cap(&capability_metadata).ok_or(
-                WorkspaceError::Unavailable("workspace root capability identity is unavailable"),
-            )?;
-            let root_is_unchanged = ambient_metadata.is_dir()
-                && FilesystemIdentity::from_std(&ambient_metadata) == Some(identity);
-            if !root_is_unchanged {
-                return Err(WorkspaceRefusal::RootChanged {
-                    path: capability_base.to_path_buf(),
-                }
-                .into());
-            }
-            Ok((
-                root.clone(),
-                capability_base.to_path_buf(),
-                std::sync::Arc::new(dir),
-                identity,
-            ))
-        })
-        .collect::<std::result::Result<Vec<_>, WorkspaceError>>()?;
+    discovery.root_dirs = open_root_capabilities(&discovery.canonical_roots)?;
 
     let covering_directories = resolved_roots
         .iter()

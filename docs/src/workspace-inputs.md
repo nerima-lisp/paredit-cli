@@ -206,6 +206,39 @@ link out of the roots would be read through a capability that was never opened
 for it. The answer is to add that directory as a root. Loops are detected by
 canonical path and counted under `skipped.symlink_cycle`.
 
+## Reusing a scan: `--cache-dir`
+
+A walk over a large tree costs the same every run, and in CI most of those runs
+see an unchanged tree.
+
+```sh
+paredit inspect lint --cache-dir .paredit-cache .
+```
+
+The entry is keyed on everything that can change which files are selected — the
+roots, every selector, every filter, the glob patterns, the ignore policy — so
+two different requests cannot share one. Before it is reused it is validated
+against the tree, and a change makes it a miss rather than a wrong answer.
+`inspect sources --output json` reports which happened:
+
+| `cache` | Meaning |
+| --- | --- |
+| `missing` | no entry for this key; one was written |
+| `hit` | the entry was reused |
+| `stale` | an entry existed but the tree had changed under it |
+| `unusable` | an entry existed but could not be read or understood |
+
+`--clear-cache` empties the directory first.
+
+A hit restores the file list and the skip counters, and re-opens one directory
+capability per root — every read this tool performs goes through one of those,
+so without them a cached result could be listed but not parsed. Re-opening is
+proportional to the number of roots, where the walk is proportional to the size
+of the tree, and it re-checks that each root is still the directory it was.
+
+The cache never widens a result: a file the cached scan did not select stays
+unreadable even if it now sits inside a scanned root.
+
 ## Several repositories at once
 
 Discovery detects repository boundaries and groups the result:

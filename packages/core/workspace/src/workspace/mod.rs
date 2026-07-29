@@ -14,6 +14,7 @@ pub mod vcs;
 
 pub use archive::{ArchiveRefusal, ExtractedArchive, extract_tar, extract_tar_path};
 pub use cache::{CacheOutcome, CachedDiscovery, DiscoveryCache, skip_counter_names};
+pub use discovery::rehydrate_cached_discovery;
 pub use discovery::{discover_workspace_files, discover_workspace_files_from_list};
 pub use error::{WorkspaceError, WorkspaceLimit, WorkspaceRefusal, WorkspaceResult};
 pub use glob::{GlobDecision, GlobParseError, GlobPattern, GlobSet};

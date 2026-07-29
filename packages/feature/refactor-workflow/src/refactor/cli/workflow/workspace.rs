@@ -1,9 +1,6 @@
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use anyhow::Result;
-use paredit_core_cli::workspace_args::ResolvedWorkspaceInput;
-use paredit_core_workspace::workspace::{
-    discover_workspace_files, discover_workspace_files_from_list,
-};
+use paredit_core_cli::workspace_args::{ResolvedWorkspaceInput, WorkspaceInputArgs};
 use std::path::PathBuf;
 
 // Public since the extraction: crate-internal visibility cannot cross a
@@ -21,14 +18,11 @@ pub struct WorkspaceRefactorScope {
 /// list of changed files rather than the directory. Reporting the latter as the
 /// roots would make a plan's manifest describe the diff instead of the project.
 pub fn discover_workspace_refactor_scope(
+    input: &WorkspaceInputArgs,
     roots: Vec<PathBuf>,
     resolved: &ResolvedWorkspaceInput,
 ) -> Result<WorkspaceRefactorScope> {
-    let discovery = if resolved.from_list {
-        discover_workspace_files_from_list(&resolved.options)?
-    } else {
-        discover_workspace_files(&resolved.options)?
-    };
+    let (discovery, _) = input.scan(resolved)?;
     let skipped_unknown_count = discovery.skipped_unknown_count();
     let skipped_hidden_count = discovery.skipped_hidden_count();
     let skipped_generated_count = discovery.skipped_generated_count();
