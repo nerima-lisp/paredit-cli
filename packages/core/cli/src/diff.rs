@@ -34,6 +34,52 @@ pub fn unified_diff(path: &FsPath, before: &str, after: &str) -> String {
     unified_diff_with_limits(path, before, after, DEFAULT_DIFF_LIMITS)
 }
 
+/// A machine-readable summary of a [`unified_diff`]'s size.
+///
+/// For a CI gate that wants a numeric threshold ("fail past N changed
+/// lines") rather than the diff text itself, or than `--check`'s bare
+/// pass/fail with no sense of how much would change.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DiffStat {
+    pub hunks: usize,
+    pub added_lines: usize,
+    pub removed_lines: usize,
+}
+
+/// Counts hunks and changed lines in a string [`unified_diff`] produced.
+///
+/// Parses the rendered text rather than the internal [`DiffOp`] sequence:
+/// `unified_diff` already has an "omitted, too large" fallback whose shape
+/// this must agree with too, and re-deriving these counts from the same
+/// text a caller can also print keeps the two forms of output from ever
+/// disagreeing about what a "hunk" or a "changed line" is.
+#[must_use]
+pub fn diff_stat(diff: &str) -> DiffStat {
+    // The `--- path` / `+++ path` file headers are written exactly once each,
+    // as the first two lines, so they are skipped by position. Skipping them
+    // by prefix instead dropped real content: a removed source line whose own
+    // text begins with `--` renders as `---...`, and Lisp sources do contain
+    // such lines (`--x` is a symbol; a `#'-`-heavy line can start with `-`).
+    let mut lines = diff.lines().peekable();
+    for header in ["--- ", "+++ "] {
+        if lines.peek().is_some_and(|line| line.starts_with(header)) {
+            lines.next();
+        }
+    }
+
+    let mut stat = DiffStat::default();
+    for line in lines {
+        if line.starts_with("@@ ") {
+            stat.hunks += 1;
+        } else if line.starts_with('+') {
+            stat.added_lines += 1;
+        } else if line.starts_with('-') {
+            stat.removed_lines += 1;
+        }
+    }
+    stat
+}
+
 fn unified_diff_with_limits(
     path: &FsPath,
     before: &str,
@@ -550,7 +596,7 @@ fn minimal_omission(max_output_bytes: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        DiffLimits, MAX_DISPLAY_PATH_BYTES, bounded_display_path, escaped_diff_line_len,
+        DiffLimits, MAX_DISPLAY_PATH_BYTES, bounded_display_path, diff_stat, escaped_diff_line_len,
         push_escaped_diff_line, unified_diff, unified_diff_with_limits,
     };
     use std::path::Path;
@@ -583,11 +629,61 @@ mod tests {
     }
 
     #[test]
+    fn diff_stat_counts_hunks_and_changed_lines() {
+        let before = "a\nb\nc\nd\ne\nf\ng\n";
+        let after = "a\nb\nc\nD\ne\nf\ng\n";
+        let diff = unified_diff(Path::new("x.lisp"), before, after);
+        let stat = diff_stat(&diff);
+        assert_eq!(stat.hunks, 1);
+        assert_eq!(stat.added_lines, 1);
+        assert_eq!(stat.removed_lines, 1);
+    }
+
+    #[test]
+    fn diff_stat_counts_content_lines_that_open_with_dashes_or_pluses() {
+        // `--old` renders as `---old` and `++old` as `+++old`, which the
+        // header guard used to swallow along with the two real file headers.
+        let before = "keep\n--old\n++old\n";
+        let after = "keep\n--new\n++new\n";
+        let diff = unified_diff(Path::new("x.lisp"), before, after);
+
+        assert!(diff.contains("\n---old\n"), "{diff}");
+        assert!(diff.contains("\n+++new\n"), "{diff}");
+
+        let stat = diff_stat(&diff);
+        assert_eq!(stat.hunks, 1);
+        assert_eq!(stat.added_lines, 2);
+        assert_eq!(stat.removed_lines, 2);
+    }
+
+    #[test]
+    fn diff_stat_still_skips_the_two_file_headers() {
+        let diff = unified_diff(Path::new("x.lisp"), "a\n", "b\n");
+        assert!(diff.starts_with("--- x.lisp\n+++ x.lisp\n"));
+
+        let stat = diff_stat(&diff);
+        assert_eq!(stat.added_lines, 1);
+        assert_eq!(stat.removed_lines, 1);
+    }
+
+    #[test]
+    fn diff_stat_of_an_unchanged_pair_is_all_zero() {
+        let stat = diff_stat(&unified_diff(Path::new("x.lisp"), "same\n", "same\n"));
+        assert_eq!(stat.hunks, 0);
+        assert_eq!(stat.added_lines, 0);
+        assert_eq!(stat.removed_lines, 0);
+    }
+
+    #[test]
     fn unified_diff_emits_separate_hunks_for_distant_changes() {
         let before = "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n";
         let after = "1x\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12x\n";
         let diff = unified_diff(Path::new("f"), before, after);
         assert_eq!(diff.matches("@@ -").count(), 2);
+        let stat = diff_stat(&diff);
+        assert_eq!(stat.hunks, 2);
+        assert_eq!(stat.added_lines, 2);
+        assert_eq!(stat.removed_lines, 2);
     }
 
     #[test]

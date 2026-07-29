@@ -11,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod accessor_arity_report;
 #[path = "cli/action_contract.rs"]
 mod action_contract;
+#[path = "cli/add_ignore_declaration.rs"]
+mod add_ignore_declaration;
 #[path = "cli/agent_report_budget.rs"]
 mod agent_report_budget;
 #[path = "cli/analysis_report.rs"]
@@ -187,6 +189,8 @@ mod extract_local_function;
 mod feature_dependency_contract;
 #[path = "cli/flatten_progn.rs"]
 mod flatten_progn;
+#[path = "cli/fold_constants.rs"]
+mod fold_constants;
 #[path = "cli/form_report.rs"]
 mod form_report;
 #[path = "cli/format/mod.rs"]

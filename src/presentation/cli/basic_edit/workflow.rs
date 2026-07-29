@@ -5,22 +5,66 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTree};
 use crate::presentation::cli::args::{
     CompactSelectorArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, KillRingArgs,
-    NavigateArgs, NewlineArgs, OutputFormat, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs,
-    TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs, YankPlacement,
+    NavigateArgs, NewlineArgs, NormalizeQuotesArgs, OutputFormat, RaiseArgs, ReindentArgs,
+    RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
+    YankPlacement,
 };
 use std::path::Path;
 
 use crate::presentation::cli::shared::{
-    edit_target, edit_target_with, emit_document, read_input_and_dialect,
-    read_input_dialect_and_tree, resolve_compact, resolve_one, resolve_targets,
+    diff_stat, edit_target, edit_target_with, emit_document, read_input_and_dialect,
+    read_input_dialect_and_tree, resolve_compact, resolve_one, resolve_targets, unified_diff,
 };
 use paredit_core_cli::error::ArgumentError;
 use paredit_core_cli::kill_ring::{KillRingEntry, read_ring, ring_path, write_ring};
 use paredit_core_syntax::selector::target_text;
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
+    let check = args.check;
+    let diff_stat_only = args.diff_stat;
+    let max_width = args.max_width;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    let rendered = Formatter::with_dialect(args.indent, dialect).format(&tree);
+    let mut formatter = Formatter::with_dialect(args.indent, dialect);
+    if let Some(max_width) = max_width {
+        formatter = formatter.with_max_width(max_width);
+    }
+    let rendered = formatter.format(&tree);
+
+    if check {
+        // Neither writes nor prints a diff: a CI gate that runs this over
+        // every file in a tree wants one exit code per file, not a diff
+        // dumped for every clean one too. `edit format --diff` is still
+        // there for "and show me what changed".
+        if rendered == input.text {
+            return Ok(());
+        }
+        let where_ = input
+            .file
+            .as_deref()
+            .map_or_else(|| "stdin".to_owned(), |path| path.display().to_string());
+        bail!("{where_} is not formatted; drop --check to see the diff or write it");
+    }
+
+    if diff_stat_only {
+        let path = input
+            .file
+            .clone()
+            .unwrap_or_else(|| std::path::PathBuf::from("stdin"));
+        let diff = unified_diff(&path, &input.text, &rendered);
+        let stat = diff_stat(&diff);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
+                "changed": !diff.is_empty(),
+                "hunks": stat.hunks,
+                "added_lines": stat.added_lines,
+                "removed_lines": stat.removed_lines,
+            }))?
+        );
+        return Ok(());
+    }
+
     Ok(emit_document(
         &input, dialect, args.write, args.diff, rendered,
     )?)
@@ -149,6 +193,14 @@ pub(in crate::presentation::cli) fn split(args: EditTargetArgs) -> Result<()> {
     Ok(edit_target(args, Edit::split)?)
 }
 
+/// Writes a second copy of the selected form immediately after it.
+///
+/// `edit copy --to-ring` followed by `edit yank --placement after` reaches the
+/// same result in two calls, at the cost of whatever was on the kill ring.
+pub(in crate::presentation::cli) fn duplicate(args: EditTargetArgs) -> Result<()> {
+    Ok(edit_target(args, Edit::duplicate)?)
+}
+
 pub(in crate::presentation::cli) fn join(args: EditTargetArgs) -> Result<()> {
     Ok(edit_target(args, Edit::join)?)
 }
@@ -170,6 +222,28 @@ pub(in crate::presentation::cli) fn raise(args: RaiseArgs) -> Result<()> {
         read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
     let selection = resolve_one(&tree, dialect, &args.target.selector, "edit raise")?;
     let rewritten = Edit::raise_levels(&input.text, &tree, selection, args.levels as usize)?;
+    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
+    Ok(emit_document(
+        &input, dialect, args.write, args.diff, rewritten,
+    )?)
+}
+
+/// Rewrites the selected quote into the requested spelling.
+///
+/// Not routed through `edit_target`, which takes a bare
+/// `fn(&str, &SyntaxTree, Selection) -> _` and so has no room for the style
+/// argument. `raise --levels` is the same shape for the same reason.
+pub(in crate::presentation::cli) fn normalize_quotes(args: NormalizeQuotesArgs) -> Result<()> {
+    let (input, dialect, tree) =
+        read_input_dialect_and_tree(args.target.file, args.target.dialect)?;
+    let selection = resolve_one(
+        &tree,
+        dialect,
+        &args.target.selector,
+        "edit normalize-quotes",
+    )?;
+    let rewritten =
+        Edit::normalize_quotes(&input.text, &tree, selection, args.style.into(), dialect)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
     Ok(emit_document(
         &input, dialect, args.write, args.diff, rewritten,

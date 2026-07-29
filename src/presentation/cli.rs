@@ -4,6 +4,7 @@ macro_rules! safe_text {
     };
 }
 
+mod add_ignore_declaration;
 mod analysis_report;
 mod argv;
 mod basic_edit;
@@ -74,6 +75,7 @@ use paredit_feature_project_inventory::unreachable_expression_report::cli as unr
 use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
+use paredit_feature_semantic_report::fold_constants::cli as fold_constants;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
 use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;

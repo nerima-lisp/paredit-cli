@@ -379,11 +379,13 @@ const INTROSPECTION_COMMANDS: [&str; 227] = [
 
 const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
 
-const STRUCTURAL_COMMANDS: [&str; 29] = [
+const STRUCTURAL_COMMANDS: [&str; 31] = [
     "edit select",
     "edit replace",
     "edit kill",
     "edit copy",
+    "edit duplicate",
+    "edit normalize-quotes",
     "edit yank",
     "edit wrap",
     "edit unwrap-prefix",
@@ -411,7 +413,7 @@ const STRUCTURAL_COMMANDS: [&str; 29] = [
     "edit unescape-string",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 81] = [
+const SEMANTIC_COMMANDS: [&str; 83] = [
     "refactor step",
     "refactor patch",
     "refactor plan",
@@ -427,6 +429,8 @@ const SEMANTIC_COMMANDS: [&str; 81] = [
     "refactor workspace-execute",
     "refactor remove-definition",
     "refactor remove-unused-definitions",
+    "refactor add-ignore-declaration",
+    "refactor fold-constants",
     "refactor move-definition",
     "refactor split-file",
     "refactor sort-definitions",

@@ -676,6 +676,10 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::EditCommand::Replace(args) => basic_edit::workflow::replace(args)?,
             command::EditCommand::Kill(args) => basic_edit::workflow::kill(args)?,
             command::EditCommand::Copy(args) => basic_edit::workflow::copy(args)?,
+            command::EditCommand::Duplicate(args) => basic_edit::workflow::duplicate(args)?,
+            command::EditCommand::NormalizeQuotes(args) => {
+                basic_edit::workflow::normalize_quotes(args)?;
+            }
             command::EditCommand::Yank(args) => basic_edit::workflow::yank(args)?,
             command::EditCommand::Wrap(args) => basic_edit::workflow::wrap(args)?,
             command::EditCommand::UnwrapPrefix(args) => {
@@ -753,6 +757,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::RefactorCommand::RemoveUnusedDefinitions(args) => {
                 definition_removal::remove_unused_definitions::remove_unused_definitions(args)?;
+            }
+            command::RefactorCommand::AddIgnoreDeclaration(args) => {
+                add_ignore_declaration::workflow::add_ignore_declaration(args)?;
+            }
+            command::RefactorCommand::FoldConstants(args) => {
+                fold_constants::workflow::fold_constants(args)?;
             }
             command::RefactorCommand::MoveDefinition(args) => {
                 definition_movement::move_definition::move_definition(args)?;

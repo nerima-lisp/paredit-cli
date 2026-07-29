@@ -117,6 +117,32 @@ impl Edit {
         ))
     }
 
+    /// Writes a second copy of the selection immediately after it.
+    ///
+    /// Composed from [`Edit::copy`] and [`Edit::insert_sibling`] rather than
+    /// spelled out again, so the copy carries the same own-line comment block
+    /// `copy` gives a caller and the separator follows the same layout rule
+    /// `yank` gets. What it adds over running those two is that the kill ring
+    /// is never touched: duplicating a form in place is not a reason to lose
+    /// whatever was on the clipboard.
+    pub fn duplicate(
+        input: &str,
+        tree: &SyntaxTree,
+        selection: Selection<'_>,
+    ) -> SexprResult<String> {
+        let copied = Self::copy(input, tree, selection)?;
+        // The copy carries the indentation of the line it was taken from;
+        // `insert_sibling` supplies the insertion point's own, and keeping
+        // both would indent the duplicate twice.
+        Self::insert_sibling(
+            input,
+            tree,
+            selection,
+            copied.trim_start(),
+            Placement::After,
+        )
+    }
+
     /// Inserts `text` as a new sibling beside the selection.
     ///
     /// The separator follows the selection's own layout: a form that starts its
@@ -308,6 +334,44 @@ mod tests {
         let tree = SyntaxTree::parse(source).unwrap();
         Edit::copy(source, &tree, select(&tree, "0.1")).unwrap();
         assert_eq!(tree.source(), source);
+    }
+
+    #[test]
+    fn duplicate_writes_a_second_copy_on_its_own_line() {
+        let source = "(progn\n  (f y)\n  (g z))";
+        let tree = SyntaxTree::parse(source).unwrap();
+        assert_eq!(
+            Edit::duplicate(source, &tree, select(&tree, "0.1")).unwrap(),
+            "(progn\n  (f y)\n  (f y)\n  (g z))"
+        );
+    }
+
+    #[test]
+    fn duplicate_of_an_inline_form_stays_on_the_line() {
+        let source = "(list a b)";
+        let tree = SyntaxTree::parse(source).unwrap();
+        assert_eq!(
+            Edit::duplicate(source, &tree, select(&tree, "0.1")).unwrap(),
+            "(list a a b)"
+        );
+    }
+
+    #[test]
+    fn duplicate_carries_the_comment_block_with_the_form() {
+        let source = "(progn\n  ;; explain\n  (f y)\n  (g z))";
+        let tree = SyntaxTree::parse(source).unwrap();
+        assert_eq!(
+            Edit::duplicate(source, &tree, select(&tree, "0.1")).unwrap(),
+            "(progn\n  ;; explain\n  (f y)\n  ;; explain\n  (f y)\n  (g z))"
+        );
+    }
+
+    #[test]
+    fn duplicate_leaves_the_document_reparseable() {
+        let source = "(defun outer ()\n  (inner 1))";
+        let tree = SyntaxTree::parse(source).unwrap();
+        let output = Edit::duplicate(source, &tree, select(&tree, "0.2")).unwrap();
+        SyntaxTree::parse(&output).expect("a duplicated form must still reparse");
     }
 
     #[test]
