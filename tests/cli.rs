@@ -441,6 +441,8 @@ mod selector;
 mod self_assignment_report;
 #[path = "cli/self_comparison_report.rs"]
 mod self_comparison_report;
+#[path = "cli/semantic_coverage_report.rs"]
+mod semantic_coverage_report;
 #[path = "cli/semantic_report.rs"]
 mod semantic_report;
 #[path = "cli/serve_daemon.rs"]

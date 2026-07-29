@@ -147,7 +147,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 226] = [
+const INTROSPECTION_COMMANDS: [&str; 227] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -231,6 +231,7 @@ const INTROSPECTION_COMMANDS: [&str; 226] = [
     "inspect constants",
     "inspect value-propagation",
     "inspect effects",
+    "inspect semantic-coverage",
     "inspect class-cycles",
     "inspect struct-cycles",
     "inspect system-conflicts",

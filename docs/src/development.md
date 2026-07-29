@@ -139,6 +139,31 @@ It reads at most 4000 files per run and says so when it stops early. This is
 where `#c(1.0 2.0)` — an ANSI complex literal the reader did not know — was
 found, in alexandria's test suite.
 
+### The semantic coverage baseline
+
+`cargo test --test semantic_coverage_baseline` is the same idea applied to
+`inspect semantic-coverage` instead of the parser: it runs the workflow over a
+fixed corpus and asserts the resolved-binding and known-list-expression counts
+have not dropped below a pinned floor, so a change that quietly narrows the
+transparency table fails CI instead of only showing up next time someone runs
+the command by hand.
+
+It does not reuse `tests/fixtures/corpus` — that corpus is deliberately
+adversarial ("constructs that have historically been awkward"), so its
+resolution rate sits near zero and has no room to regress. A second vendored
+corpus, `tests/fixtures/semantic_coverage_corpus`, holds a small sample of
+*ordinary* Common Lisp instead, and follows the same convention:
+
+```sh
+PAREDIT_CORPUS_DIR=.corpus cargo test --test semantic_coverage_baseline -- --nocapture
+```
+
+Point it at the same `.corpus/` checkouts `./scripts/fetch-corpus.sh` clones,
+or at `~/quicklisp/dists`, to see the resolution rate on a real Common Lisp
+codebase rather than the two vendored files. Raising the pinned floor after a
+real improvement is a one-line edit in the test, the same shape as the pinned
+command counts in `tests/cli/dialect_contract.rs`.
+
 ### The robustness properties
 
 `cargo test --test parser_robustness` drives the same invariants from proptest
