@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod error;
+pub mod macro_construction;
 pub mod rename;
 pub mod rename_control;
 pub mod rename_types;

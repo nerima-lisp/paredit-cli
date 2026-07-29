@@ -11,11 +11,14 @@ use crate::refactor::usecase::plan::{
 };
 use anyhow::Result;
 use paredit_core_cli::args::DialectArg;
+use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_edit::refactor_plan::{RefactorRiskLevel, RefactorVerificationCheck};
 use paredit_core_syntax::sexpr::SymbolName;
 use paredit_feature_project_analysis::impact_report::cli as impact_report;
 use paredit_feature_project_analysis::impact_report::usecase::{
     raw_refactor_risks, summarize_impact_reports,
 };
+use paredit_feature_rename::macro_construction::find_macro_construction_sites;
 use std::path::PathBuf;
 
 pub fn verify_refactor(args: VerifyRefactorArgs) -> Result<()> {
@@ -83,7 +86,7 @@ pub fn build_refactor_verification(
         }
         _ => (before_target_kind, None),
     };
-    let checks = application_refactor_verification_checks(
+    let mut checks = application_refactor_verification_checks(
         RefactorVerificationRequest {
             operation: application_operation,
             phase: application_phase,
@@ -95,6 +98,7 @@ pub fn build_refactor_verification(
         },
         &gates,
     );
+    checks.push(macro_construction_check(paths, dialect, symbol)?);
     let passed = checks.iter().all(|check| check.passed);
     Ok(RefactorVerification {
         operation: application_operation,
@@ -108,6 +112,77 @@ pub fn build_refactor_verification(
         after,
     })
 }
+
+/// Reports the names this refactor cannot reach because they do not exist
+/// until macro-expansion time.
+///
+/// A rename in this tool is syntactic: it rewrites the atoms whose text is the
+/// symbol. `(intern "HANDLE-CLICK")` is not one of those atoms, and a rename
+/// that reported "2 occurrences renamed" while leaving it behind would have
+/// said something false. This check makes the gap part of the verification
+/// rather than something the caller discovers at run time.
+///
+/// It is a `Warning`, not an `Error`. A construction site is not proof the
+/// rename is wrong — most of them name something else entirely — and blocking
+/// every rename in a file that calls `intern` once would make the check the
+/// first thing anyone turned off.
+fn macro_construction_check(
+    paths: &[PathBuf],
+    dialect: Option<DialectArg>,
+    symbol: &SymbolName,
+) -> Result<RefactorVerificationCheck> {
+    let mut sites = Vec::new();
+    for path in paths {
+        let (input, _, tree) = read_input_dialect_and_tree(Some(path.clone()), dialect)?;
+        sites.extend(
+            find_macro_construction_sites(&tree, &input.text, Some(symbol.as_str()))
+                .into_iter()
+                .map(|site| (path.clone(), site)),
+        );
+    }
+
+    let message = if sites.is_empty() {
+        "no symbol is constructed from text that a syntactic rename would miss".to_owned()
+    } else {
+        let described = sites
+            .iter()
+            .take(MACRO_SITES_REPORTED)
+            .map(|(path, site)| {
+                format!(
+                    "{}:{} {} ({})",
+                    path.display(),
+                    site.line,
+                    site.operator,
+                    site.kind.label()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        let remainder = sites.len().saturating_sub(MACRO_SITES_REPORTED);
+        format!(
+            "{} site(s) construct a symbol from text a syntactic rename cannot rewrite: {described}{}",
+            sites.len(),
+            if remainder == 0 {
+                String::new()
+            } else {
+                format!(" (and {remainder} more)")
+            }
+        )
+    };
+
+    Ok(RefactorVerificationCheck {
+        code: "macro-constructed-symbols",
+        level: RefactorRiskLevel::Warning,
+        passed: sites.is_empty(),
+        message,
+        count: sites.len(),
+    })
+}
+
+/// How many construction sites the check names before summarising the rest.
+///
+/// A one-line check message that lists forty sites is a check nobody reads.
+const MACRO_SITES_REPORTED: usize = 5;
 
 fn resolve_target_kind(
     inferred: RefactorPlanTargetKind,

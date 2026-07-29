@@ -21,6 +21,32 @@ paredit edit format --file source.lisp --write
 
 Use `paredit refactor plan`, `paredit refactor preview`, and `paredit refactor verify` before `paredit refactor apply` when the workflow is available. These commands make planned changes and verification results visible before a write is requested.
 
+## Names a rename cannot reach
+
+Renaming here is syntactic: it rewrites the atoms whose text is the symbol.
+A name that is *assembled* is not one of those atoms —
+
+```lisp
+(defmacro define-handler (name)
+  `(defun ,(intern (format nil "HANDLE-~a" name)) (event) ...))
+
+(funcall (intern "HANDLE-CLICK") x)
+```
+
+— and a rename reporting "2 occurrences renamed" while leaving both of those
+behind would have said something false.
+
+`refactor verify` reports them as a `macro-constructed-symbols` check, naming
+the file and line of each site and distinguishing two cases: a string literal
+that names the target (the rename will certainly miss it) from a computed name
+(it may, and only running the code could say). The check does not attempt to
+*follow* the construction — that would mean evaluating arbitrary Lisp at
+analysis time — so it makes the gap visible rather than closing it.
+
+It is a warning rather than an error. A construction site is not proof the
+rename is wrong, and blocking every rename in a file that calls `intern` once
+would make the check the first thing anyone turned off.
+
 ## A multi-file write is one transaction
 
 `refactor apply --write` stages every file it will change, then publishes them

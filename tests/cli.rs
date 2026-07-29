@@ -233,6 +233,8 @@ mod list_star_nil_report;
 mod list_star_to_cons_report;
 #[path = "cli/literal_place_report.rs"]
 mod literal_place_report;
+#[path = "cli/macro_constructed_symbols.rs"]
+mod macro_constructed_symbols;
 #[path = "cli/make_array_default_keyword_report.rs"]
 mod make_array_default_keyword_report;
 #[path = "cli/make_hash_table_test_report.rs"]
