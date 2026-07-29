@@ -67,6 +67,7 @@ pub enum Message {
     RepairConvertEncoding,
     RepairOtherDialect,
     RepairFlagCombination,
+    RepairListAvailableNames,
     RepairSpanBoundaries,
     RepairDropDryRun,
     RepairUsePreviewFlag,
@@ -189,6 +190,10 @@ impl Message {
             }
             Self::RepairFlagCombination => {
                 "these flags do not combine as given; run the command with --help for which ones go together"
+            }
+            Self::RepairListAvailableNames => {
+                "the message lists the names this build accepts; list them again with the \
+                 namespace's own `list` command"
             }
             Self::RepairSpanBoundaries => {
                 "the span does not lie on character boundaries of the current source"
@@ -333,6 +338,10 @@ impl Message {
             Self::RepairFlagCombination => {
                 "指定されたフラグの組み合わせは無効です。--help で併用可能な組み合わせを確認してください"
             }
+            Self::RepairListAvailableNames => {
+                "利用できる名前はメッセージ中に列挙されています。名前空間の `list` \
+                 コマンドでも一覧できます"
+            }
             Self::RepairSpanBoundaries => "範囲が現在のソースの文字境界に一致していません",
             Self::RepairDropDryRun => {
                 "書き込みを行うには --dry-run を外してください（PAREDIT_DRY_RUN も解除）"
@@ -376,7 +385,7 @@ impl Message {
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 57] = [
+    pub const ALL: [Self; 58] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -418,6 +427,7 @@ impl Message {
         Self::RepairConvertEncoding,
         Self::RepairOtherDialect,
         Self::RepairFlagCombination,
+        Self::RepairListAvailableNames,
         Self::RepairSpanBoundaries,
         Self::RepairDropDryRun,
         Self::RepairUsePreviewFlag,

@@ -22,6 +22,50 @@ model, a binding table, nine lint rules, and a per-file report.
   form in this file. `argument.flag-combination` covers the sixteen places that
   each spelled "these flags do not combine" in their own words.
 
+- **Three new namespaces — `query`, `fix`, `migrate`.** The existing three
+  split by what a change costs to undo (`inspect` reads, `edit` transforms one
+  form, `refactor` plans and applies). These split by what the caller is
+  trying to do, over a file set rather than one form. Nothing is removed and
+  no older spelling stops working.
+
+  `paredit query` promotes the `--query` pattern language out of the selector
+  position, where it could only name a form in one named file. `query find`
+  searches a whole workspace and reports each match with its captures, path,
+  and stable selector id, through the shared report envelope (so `--output
+  sarif`, `junit`, `csv` and the rest come with it) and with the full input
+  surface (`--since origin/main`, `--from-git`, `--include`). `query count`
+  tallies several patterns side by side over one file set, which is what makes
+  it a migration's progress bar rather than a number. `query replace` is the
+  one genuinely new capability: a `--rewrite` template whose `?name`
+  placeholders are filled with the **verbatim source bytes** the pattern's
+  `?name` captured, so a captured `1.0d0` stays a double float and a captured
+  string keeps its escapes — nothing is re-serialized, because re-serializing
+  is how a rewrite turns `1.0d0` into `1`.
+
+  `paredit fix` is the write side of `inspect lint`, under a name that says it
+  writes. `fix apply`, `fix check`, `fix plan` and `fix list` were `--fix`,
+  `--fix --check`, `--fix-plan` and `--list-rules`; each builds the arguments
+  its old spelling produced and calls the same engine, so the two paths are
+  identical by construction rather than by testing. `inspect lint` also gains
+  `--fixable`, which narrows `--list-rules` to the rules that carry a fix.
+
+  `paredit migrate` runs a *recipe*: an ordered list of query/rewrite steps
+  scoped to the dialects the rewrite is correct for. Order matters —
+  `(if (not p) a nil)` becomes `(unless p a)` only if the negated step runs
+  first — and so does scope: `(incf x)` → `(cl-incf x)` modernizes Emacs Lisp
+  and breaks Common Lisp, where `incf` is the correct spelling. Two recipes
+  ship (`elisp-cl-lib`, `nil-conditionals`), as embedded Lisp source parsed by
+  the same reader a project's own `.paredit/migrations/*.lisp` goes through.
+
+  Both writing commands refuse three situations that leave source which still
+  parses and is still wrong, and which the reparse guard therefore cannot
+  catch: a match nested inside one already rewritten, a rewrite that would
+  delete a comment no capture carries over, and a match inside quoted data —
+  `'(a (if x y nil) b)` is a *list literal*, and rewriting it changes the
+  program's data rather than its code. All three are counted in every output
+  format, including as zeroes; `--allow-comment-loss` and `--include-quoted`
+  override the two that are overridable.
+
 - Five clone-detection commands built on the existing tree-edit-distance
   scorer, which `similarity` and `duplicates` had been under-using.
   `inspect clone-classes` groups near-duplicate forms into classes, labels each

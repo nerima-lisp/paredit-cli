@@ -420,7 +420,12 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
     }
 
     if args.list_rules {
-        return Ok(print_lint_rule_catalog(&active, &custom, args.output)?);
+        return Ok(print_lint_rule_catalog(
+            &active,
+            &custom,
+            args.fixable,
+            args.output,
+        )?);
     }
 
     let files = expand_input_files(&args.files, args.dialect)?;

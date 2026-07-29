@@ -120,6 +120,8 @@ pub enum ErrorCode {
     ArgumentKillRingIndex,
     /// Two flags that do not combine, or one that needs another.
     ArgumentFlagCombination,
+    /// A name this build does not have — a rule, a preset, a migration.
+    ArgumentUnknownName,
 
     SelectionPathNotReachable,
     SelectionPathInvalid,
@@ -183,6 +185,7 @@ impl ErrorCode {
             Self::ArgumentArchiveDestination => "argument.archive-destination",
             Self::ArgumentKillRingIndex => "argument.kill-ring-index",
             Self::ArgumentFlagCombination => "argument.flag-combination",
+            Self::ArgumentUnknownName => "argument.unknown-name",
 
             Self::SelectionPathNotReachable => "selection.path-not-reachable",
             Self::SelectionPathInvalid => "selection.path-invalid",
@@ -236,7 +239,8 @@ impl ErrorCode {
             | Self::ArgumentNoInputsProduced
             | Self::ArgumentArchiveDestination
             | Self::ArgumentKillRingIndex
-            | Self::ArgumentFlagCombination => Category::Argument,
+            | Self::ArgumentFlagCombination
+            | Self::ArgumentUnknownName => Category::Argument,
 
             Self::SelectionPathNotReachable
             | Self::SelectionPathInvalid
@@ -306,7 +310,7 @@ impl ErrorCode {
 
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
-    pub const ALL: [Self; 43] = [
+    pub const ALL: [Self; 44] = [
         Self::ArgumentNoInput,
         Self::ArgumentTargetRequired,
         Self::ArgumentTargetAmbiguous,
@@ -318,6 +322,7 @@ impl ErrorCode {
         Self::ArgumentArchiveDestination,
         Self::ArgumentKillRingIndex,
         Self::ArgumentFlagCombination,
+        Self::ArgumentUnknownName,
         Self::SelectionPathNotReachable,
         Self::SelectionPathInvalid,
         Self::SelectionOffsetNotFound,
@@ -621,6 +626,10 @@ pub const fn code_for_cli_error(error: &CliError) -> ErrorCode {
         CliError::Workspace(workspace) => classify_workspace(workspace),
         CliError::Argument(argument) => classify_argument(argument),
         CliError::Selector(selector) => classify_selector(selector),
+        // Every way a `--rewrite` template can be wrong is the caller's
+        // command line: unbalanced, two forms where one was wanted, a `?name`
+        // the pattern does not bind.
+        CliError::Pattern(_) | CliError::Rewrite(_) => ErrorCode::SelectionPatternInvalid,
         CliError::NotUtf8 { .. } | CliError::NotValidEncoding { .. } => ErrorCode::InputNotUtf8,
         CliError::Parse { .. } => ErrorCode::InputUnparsable,
         // A sidecar this tool owns did not parse. Same code as a source file
@@ -673,6 +682,7 @@ const fn classify_argument(error: &ArgumentError) -> ErrorCode {
         // `--path`'s absence means, so the same code.
         ArgumentError::SecondTargetRequired => ErrorCode::ArgumentTargetRequired,
         ArgumentError::KillRingIndexOutOfRange { .. } => ErrorCode::ArgumentKillRingIndex,
+        ArgumentError::UnknownName { .. } => ErrorCode::ArgumentUnknownName,
     }
 }
 
@@ -973,6 +983,9 @@ fn repairs(code: ErrorCode, context: &Context) -> Vec<Repair> {
         }
         ErrorCode::ArgumentKillRingIndex => {
             vec![Repair::new("pass-flag", Message::RepairKillRingIndex)]
+        }
+        ErrorCode::ArgumentUnknownName => {
+            vec![Repair::new("pass-flag", Message::RepairListAvailableNames)]
         }
 
         ErrorCode::SelectionMalformed => vec![

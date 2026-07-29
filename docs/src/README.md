@@ -16,7 +16,7 @@ paredit edit format --file source.lisp
 paredit refactor rename-symbol --file source.lisp --from old-name --to new-name
 ```
 
-The CLI has exactly three source-facing namespaces:
+The CLI has six source-facing namespaces:
 
 - [`paredit inspect`](commands.md#inspect): read-only reports and analysis.
 - [`paredit edit`](commands.md#edit): structural edits of a selected form —
@@ -25,9 +25,19 @@ The CLI has exactly three source-facing namespaces:
 - [`paredit refactor`](commands.md#refactor): planned semantic changes with
   preview and verification workflows — see the
   [refactor workflow](workflows.md).
+- [`paredit query`](commands.md#query): search, count, and rewrite by
+  S-expression pattern, across a whole workspace.
+- [`paredit fix`](commands.md#fix): apply the lint auto-fixes — the write side
+  of `inspect lint`, under a name that says it writes.
+- [`paredit migrate`](commands.md#migrate): run a named, ordered,
+  dialect-scoped codemod recipe.
 
-There are no legacy top-level command aliases; the only meta command is
-`paredit completions <shell>`. Forms are addressed with tree paths or byte
+The first three split by what a change costs to undo; the last three by what
+you are trying to do, over a file set rather than one form.
+
+There are no legacy top-level command aliases. Beside the six there are
+`paredit config` and `paredit generate`, the `lsp`/`mcp`/`serve`/`tui`
+servers, and `paredit completions <shell>`. Forms are addressed with tree paths or byte
 offsets — see [Selecting forms](selectors.md). Automation and AI coding
 agents should start with the [agent interface](agents.md), including
 `paredit inspect capabilities` for one-call discovery of the whole command

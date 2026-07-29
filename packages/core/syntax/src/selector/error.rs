@@ -54,6 +54,38 @@ pub enum PatternError {
     ConflictingCaptureKind { name: String },
 }
 
+/// A `--rewrite` template that cannot be paired with its `--query` pattern.
+///
+/// Separate from [`PatternError`] even where the two overlap — both refuse an
+/// empty input and a two-form input — because the caller's fix differs. "The
+/// pattern is empty" sends someone to `--query`; the same words about a
+/// template send them to the wrong flag.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum RewriteError {
+    #[error("rewrite template is empty")]
+    Empty,
+
+    #[error("rewrite template has {count} top-level forms; a template must be exactly one form")]
+    NotOneForm { count: usize },
+
+    #[error("rewrite template does not read as an S-expression: {detail}")]
+    Malformed { detail: String },
+
+    /// A `?…` spelling that the pattern language itself rejects, reported
+    /// through the pattern's own message so the two agree on the grammar.
+    #[error("rewrite template placeholder is not well formed: {0}")]
+    Placeholder(#[source] PatternError),
+
+    #[error(
+        "rewrite template writes `...`, which names no capture; \
+         write `?name...` and bind the same name in the pattern"
+    )]
+    AnonymousRest,
+
+    #[error("rewrite template uses `?{name}`, which the pattern does not bind; it binds {bound}")]
+    UnboundCapture { name: String, bound: String },
+}
+
 /// A selector that cannot be resolved against the parsed document.
 ///
 /// Not `Clone`, because [`Self::Sexpr`] carries a `SexprError` that is not:
