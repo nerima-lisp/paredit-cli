@@ -1,14 +1,11 @@
 #[cfg(unix)]
 use std::cell::Cell;
-#[cfg(unix)]
 use std::collections::BTreeSet;
 #[cfg(unix)]
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fs;
-use std::io::{self, ErrorKind, IsTerminal, Read};
-#[cfg(unix)]
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{self, ErrorKind, IsTerminal, Read, Seek, SeekFrom, Write};
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -20,9 +17,7 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ParseError, SyntaxTree};
 use paredit_core_workspace::fs_identity::FilesystemIdentity;
 
-#[cfg(any(unix, test))]
 static STAGED_WRITE_COUNTER: AtomicU64 = AtomicU64::new(0);
-#[cfg(unix)]
 const UNIQUE_SIBLING_ATTEMPTS: usize = 128;
 #[cfg(unix)]
 const CLEANUP_QUARANTINE_NAME: &str = ".paredit.cleanup";
@@ -588,28 +583,26 @@ pub fn write_files_with_rollback_expected_anchored(
     }
     #[cfg(not(unix))]
     {
-        for AnchoredExpectedWrite {
-            display_path,
-            parent_dir,
-            file_name,
-            content,
-            expected,
-        } in files
-        {
-            let _ = (display_path, parent_dir, file_name, content, expected);
-        }
-        Err(io::Error::new(
-            ErrorKind::Unsupported,
-            "capability-anchored writes are unsupported on this platform",
+        // The capability handle (`parent_dir`/`file_name`) is how the unix path
+        // re-opens the parent without re-walking a path that a symlink could
+        // have redirected in between; cap-std's directory capabilities are not
+        // wired up on this platform, so this falls back to plain path-based
+        // staging with the same before/after digest guard, just without that
+        // extra anchor.
+        validate_write_inputs(files.iter().map(|file| (&file.display_path, &file.content)))?;
+        stage_and_apply_portable(
+            files
+                .into_iter()
+                .map(|file| (file.display_path, file.content, Some(file.expected)))
+                .collect(),
+            |(path, content, expected)| stage_write_target_portable(path, content, expected),
         )
-        .into())
     }
 }
 
 fn write_files_with_rollback_inner(
     files: Vec<(PathBuf, String, Option<ExpectedWriteTarget>)>,
 ) -> CliResult<()> {
-    #[cfg(unix)]
     validate_write_inputs(files.iter().map(|(path, content, _)| (path, content)))?;
     write_files_transactionally(files)
 }
@@ -619,12 +612,9 @@ fn write_files_transactionally(
 ) -> CliResult<()> {
     #[cfg(not(unix))]
     {
-        let _ = files;
-        Err(io::Error::new(
-            ErrorKind::Unsupported,
-            "transactional writes are unsupported on this platform",
-        )
-        .into())
+        stage_and_apply_portable(files, |(path, content, expected)| {
+            stage_write_target_portable(path, content, expected)
+        })
     }
     #[cfg(unix)]
     {
@@ -634,7 +624,6 @@ fn write_files_transactionally(
     }
 }
 
-#[cfg(unix)]
 fn validate_write_inputs<'a>(
     files: impl IntoIterator<Item = (&'a PathBuf, &'a String)>,
 ) -> CliResult<()> {
@@ -648,6 +637,296 @@ fn validate_write_inputs<'a>(
         })?;
     }
     Ok(())
+}
+
+/// The non-unix write path.
+///
+/// Unix gets a capability-anchored writer that refuses a symlinked parent,
+/// preserves ownership/xattrs/ACLs, and re-validates the target by identity at
+/// every open (see [`AnchoredDirectory`] and its neighbours below). None of
+/// that machinery — `O_NOFOLLOW`, `cap_std` directory handles, POSIX
+/// permissions, xattr — has a portable equivalent, so this is deliberately a
+/// smaller guarantee: stage every file's new content and (if the target
+/// exists) a backup copy first, so a failure partway through never leaves a
+/// mix of old and new content on disk, then publish every staged file with
+/// [`fs::rename`], which replaces an existing destination on every platform
+/// Rust supports. What it does not do: refuse a symlinked target via an
+/// open-time flag (checked by `symlink_metadata` instead, which a
+/// same-instant swap could still race), preserve extended attributes, or
+/// detect a hard-linked target.
+#[cfg(any(not(unix), test))]
+#[derive(Debug)]
+struct PortableStagedWrite {
+    path: PathBuf,
+    staged_path: PathBuf,
+    backup_path: Option<PathBuf>,
+}
+
+#[cfg(any(not(unix), test))]
+struct CreatedSiblingPortable {
+    path: PathBuf,
+    file: fs::File,
+}
+
+#[cfg(any(not(unix), test))]
+fn open_exclusive_sibling_portable(
+    path: &FsPath,
+    suffix: &str,
+) -> io::Result<CreatedSiblingPortable> {
+    for _ in 0..UNIQUE_SIBLING_ATTEMPTS {
+        let candidate = unique_sibling_path(path, suffix);
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        match options.open(&candidate) {
+            Ok(file) => {
+                return Ok(CreatedSiblingPortable {
+                    path: candidate,
+                    file,
+                });
+            }
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(
+        ErrorKind::AlreadyExists,
+        format!("could not allocate a unique sibling for {}", path.display()),
+    ))
+}
+
+#[cfg(any(not(unix), test))]
+fn stage_write_target_portable(
+    path: PathBuf,
+    content: String,
+    expected_original: Option<ExpectedWriteTarget>,
+) -> CliResult<PortableStagedWrite> {
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(IoRefusal::WriteSymlink {
+                path: path.display().to_string(),
+            }
+            .into());
+        }
+        Ok(metadata) if !metadata.is_file() => {
+            return Err(IoRefusal::WriteNonRegularFile {
+                path: path.display().to_string(),
+            }
+            .into());
+        }
+        Ok(metadata) => Some(metadata),
+        Err(error) if error.kind() == ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(error).map_err(CliError::io(format!("failed to stat {}", path.display())));
+        }
+    };
+
+    let mut original = if metadata.is_some() {
+        let mut file = fs::File::open(&path).map_err(CliError::io(format!(
+            "failed to open existing target {}",
+            path.display()
+        )))?;
+        let opened_metadata = file.metadata().map_err(CliError::io(format!(
+            "failed to inspect open target {}",
+            path.display()
+        )))?;
+        if !opened_metadata.is_file() {
+            return Err(IoRefusal::WriteNonRegularFile {
+                path: path.display().to_string(),
+            }
+            .into());
+        }
+        if let Some(expected_original) = expected_original {
+            let opened_identity = file_identity(&opened_metadata)?;
+            if opened_identity != expected_original.identity {
+                return Err(IoRefusal::TargetReplacedSinceParsing {
+                    path: path.display().to_string(),
+                }
+                .into());
+            }
+            let digest = digest_reader(&mut file).map_err(CliError::io(format!(
+                "failed to verify parsed target {}",
+                path.display()
+            )))?;
+            if digest != expected_original.digest {
+                return Err(IoRefusal::TargetChangedSinceParsing {
+                    path: path.display().to_string(),
+                }
+                .into());
+            }
+            file.seek(SeekFrom::Start(0)).map_err(CliError::io(format!(
+                "failed to rewind parsed target {}",
+                path.display()
+            )))?;
+        }
+        Some(file)
+    } else {
+        if expected_original.is_some() {
+            return Err(IoRefusal::TargetRemovedSinceParsing {
+                path: path.display().to_string(),
+            }
+            .into());
+        }
+        None
+    };
+
+    let permissions = original
+        .as_ref()
+        .map(|file| file.metadata().map(|metadata| metadata.permissions()))
+        .transpose()
+        .map_err(CliError::io(format!(
+            "failed to inspect open target {}",
+            path.display()
+        )))?;
+
+    let CreatedSiblingPortable {
+        path: staged_path,
+        file: mut staged_file,
+    } = open_exclusive_sibling_portable(&path, "tmp").map_err(CliError::io(format!(
+        "failed to create staging file for {}",
+        path.display()
+    )))?;
+    if let Err(error) = staged_file.write_all(content.as_bytes()) {
+        let _ = fs::remove_file(&staged_path);
+        return Err(CliError::Io {
+            context: format!("failed to stage {}", staged_path.display()),
+            source: error,
+        });
+    }
+    if let Some(permissions) = permissions.as_ref() {
+        if let Err(error) = staged_file.set_permissions(permissions.clone()) {
+            let _ = fs::remove_file(&staged_path);
+            return Err(CliError::Io {
+                context: format!("failed to copy permissions to {}", staged_path.display()),
+                source: error,
+            });
+        }
+    }
+    if let Err(error) = staged_file.sync_all() {
+        let _ = fs::remove_file(&staged_path);
+        return Err(CliError::Io {
+            context: format!("failed to sync {}", staged_path.display()),
+            source: error,
+        });
+    }
+    drop(staged_file);
+
+    let backup_path = if let Some(original) = original.as_mut() {
+        let CreatedSiblingPortable {
+            path: backup_path,
+            file: mut backup_file,
+        } = open_exclusive_sibling_portable(&path, "bak").map_err(CliError::io(format!(
+            "failed to create backup for {}",
+            path.display()
+        )))?;
+        // Three sequential steps rather than a combinator chain: each needs a
+        // fresh mutable borrow of `original` and/or `backup_file`, and folding
+        // them into one `.and_then` chain would ask the borrow checker to hold
+        // more than one of those borrows open across the whole expression.
+        let backed_up = (|| -> io::Result<()> {
+            original.seek(SeekFrom::Start(0))?;
+            io::copy(original, &mut backup_file)?;
+            backup_file.sync_all()
+        })();
+        if let Err(error) = backed_up {
+            let _ = fs::remove_file(&staged_path);
+            let _ = fs::remove_file(&backup_path);
+            return Err(CliError::Io {
+                context: format!("failed to back up {}", path.display()),
+                source: error,
+            });
+        }
+        Some(backup_path)
+    } else {
+        None
+    };
+
+    Ok(PortableStagedWrite {
+        path,
+        staged_path,
+        backup_path,
+    })
+}
+
+#[cfg(any(not(unix), test))]
+fn stage_and_apply_portable<T>(
+    files: Vec<T>,
+    mut stage: impl FnMut(T) -> CliResult<PortableStagedWrite>,
+) -> CliResult<()> {
+    if crate::runtime::current().dry_run {
+        return Err(IoRefusal::DryRun.into());
+    }
+
+    let mut staged = Vec::with_capacity(files.len());
+    for file in files {
+        match stage(file) {
+            Ok(target) => staged.push(target),
+            Err(error) => {
+                cleanup_unstaged_writes_portable(&staged);
+                return Err(error);
+            }
+        }
+    }
+    apply_staged_writes_portable(staged)
+}
+
+#[cfg(any(not(unix), test))]
+fn cleanup_unstaged_writes_portable(staged: &[PortableStagedWrite]) {
+    for target in staged {
+        let _ = fs::remove_file(&target.staged_path);
+        if let Some(backup_path) = target.backup_path.as_ref() {
+            let _ = fs::remove_file(backup_path);
+        }
+    }
+}
+
+#[cfg(any(not(unix), test))]
+fn apply_staged_writes_portable(staged: Vec<PortableStagedWrite>) -> CliResult<()> {
+    for (index, target) in staged.iter().enumerate() {
+        if let Err(error) = fs::rename(&target.staged_path, &target.path) {
+            restore_published_writes_portable(&staged, index);
+            return Err(CliError::Io {
+                context: format!("failed to publish {}", target.path.display()),
+                source: error,
+            });
+        }
+    }
+
+    for target in &staged {
+        if let Some(backup_path) = target.backup_path.as_ref() {
+            let _ = fs::remove_file(backup_path);
+        }
+    }
+
+    Ok(())
+}
+
+/// Restores every target already published before `failed_index`, and removes
+/// the staged/backup siblings of every target from `failed_index` on (the
+/// failed one included, since a failed `rename` may still have partially
+/// consumed its source on some platforms).
+///
+/// Best effort like the rest of this path: a target that came from nothing
+/// gets removed rather than restored, and a restore is a plain `rename` with
+/// no identity re-check, because there is no portable equivalent of the
+/// capability handle the unix path re-validates against.
+#[cfg(any(not(unix), test))]
+fn restore_published_writes_portable(staged: &[PortableStagedWrite], failed_index: usize) {
+    for target in &staged[..failed_index] {
+        match target.backup_path.as_ref() {
+            Some(backup_path) => {
+                let _ = fs::rename(backup_path, &target.path);
+            }
+            None => {
+                let _ = fs::remove_file(&target.path);
+            }
+        }
+    }
+    for target in &staged[failed_index..] {
+        let _ = fs::remove_file(&target.staged_path);
+        if let Some(backup_path) = target.backup_path.as_ref() {
+            let _ = fs::remove_file(backup_path);
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -1810,7 +2089,6 @@ fn with_partial_cleanup(
     ))
 }
 
-#[cfg(unix)]
 fn reject_duplicate_write_targets<'a>(
     files: impl IntoIterator<Item = &'a PathBuf>,
 ) -> CliResult<()> {
@@ -1833,7 +2111,6 @@ fn reject_duplicate_write_targets<'a>(
 /// name such as `source.lisp`, and the empty path cannot be opened or
 /// canonicalized. Both the empty and the absent parent denote the current
 /// directory, so they collapse onto `.` here.
-#[cfg(unix)]
 fn write_target_parent(path: &FsPath) -> &FsPath {
     match path.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
@@ -1841,7 +2118,6 @@ fn write_target_parent(path: &FsPath) -> &FsPath {
     }
 }
 
-#[cfg(unix)]
 fn write_target_identity(path: &FsPath) -> PathBuf {
     if let Ok(identity) = fs::canonicalize(path) {
         return identity;
@@ -2615,7 +2891,6 @@ fn validate_file_snapshot(
     Ok(file)
 }
 
-#[cfg(unix)]
 fn digest_reader(reader: &mut impl Read) -> io::Result<[u8; 32]> {
     let mut hasher = blake3::Hasher::new();
     let mut buffer = [0_u8; 64 * 1024];
@@ -3061,7 +3336,6 @@ fn sync_parent_directory(parent: &AnchoredDirectory, _path: &FsPath) -> io::Resu
     }
 }
 
-#[cfg(unix)]
 fn unique_sibling_path(path: &FsPath, suffix: &str) -> PathBuf {
     let counter = STAGED_WRITE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
@@ -3113,34 +3387,185 @@ mod tests {
         )));
     }
 
-    #[cfg(not(unix))]
+    /// Runs `stage_write_target_portable`/`stage_and_apply_portable` directly.
+    ///
+    /// These are the functions [`write_files_transactionally`] dispatches to
+    /// on a non-unix target; on this platform, the dispatch itself still picks
+    /// the capability-anchored unix path (that is what production should do),
+    /// so exercising the portable path here means calling it directly rather
+    /// than through the public `write_*` entry points. That is also why these
+    /// tests, and the functions they cover, are compiled under
+    /// `cfg(any(not(unix), test))` rather than plain `cfg(not(unix))`: a real
+    /// non-unix build reaches this code through production dispatch, and a
+    /// unix test build reaches it only here.
+    #[cfg(any(not(unix), test))]
     #[test]
-    fn transactional_writes_fail_before_creating_any_artifacts() {
-        let directory = test_directory("unsupported-transactional-write");
-        let existing = directory.join("existing.lisp");
-        let new = directory.join("new.lisp");
-        fs::write(&existing, "(old)").expect("write existing target");
+    fn portable_write_creates_a_new_file() {
+        let directory = test_directory("portable-new-file");
+        let target = directory.join("new.lisp");
 
-        let error = write_files_with_rollback([
-            (existing.clone(), "(replacement)".to_owned()),
-            (new.clone(), "(new)".to_owned()),
-        ])
-        .expect_err("non-Unix transactional writes must be unsupported");
+        stage_and_apply_portable(
+            vec![(target.clone(), "(new)".to_owned(), None)],
+            |(path, content, expected)| stage_write_target_portable(path, content, expected),
+        )
+        .expect("portable write of a new file");
 
         assert_eq!(
-            error.downcast_ref::<io::Error>().expect("I/O error").kind(),
-            ErrorKind::Unsupported
+            fs::read_to_string(&target).expect("read new target"),
+            "(new)"
         );
+        let entries = fs::read_dir(&directory)
+            .expect("read test directory")
+            .map(|entry| entry.expect("read directory entry").file_name())
+            .collect::<Vec<_>>();
+        assert_eq!(entries, [OsString::from("new.lisp")]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn portable_write_replaces_an_existing_file_and_cleans_up_the_backup() {
+        let directory = test_directory("portable-replace-existing");
+        let target = directory.join("existing.lisp");
+        fs::write(&target, "(old)").expect("write existing target");
+
+        stage_and_apply_portable(
+            vec![(target.clone(), "(new)".to_owned(), None)],
+            |(path, content, expected)| stage_write_target_portable(path, content, expected),
+        )
+        .expect("portable write over an existing file");
+
         assert_eq!(
-            fs::read_to_string(&existing).expect("read existing target"),
-            "(old)"
+            fs::read_to_string(&target).expect("read replaced target"),
+            "(new)"
         );
-        assert!(!new.exists());
         let entries = fs::read_dir(&directory)
             .expect("read test directory")
             .map(|entry| entry.expect("read directory entry").file_name())
             .collect::<Vec<_>>();
         assert_eq!(entries, [OsString::from("existing.lisp")]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn portable_write_refuses_a_target_changed_since_parsing() {
+        let directory = test_directory("portable-target-changed");
+        let target = directory.join("target.lisp");
+        fs::write(&target, "(old)").expect("write parsed target");
+        let (_, expected) = read_text_file_with_expected_target(&target, MAX_SOURCE_INPUT_BYTES)
+            .expect("read expected target");
+        fs::write(&target, "(edited elsewhere)").expect("edit target after parsing");
+
+        let error = stage_write_target_portable(target.clone(), "(new)".to_owned(), Some(expected))
+            .expect_err("a target edited after parsing must be refused");
+
+        assert!(error.chain().contains("changed since parsing"));
+        assert_eq!(
+            fs::read_to_string(&target).expect("read target"),
+            "(edited elsewhere)"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn portable_write_refuses_a_target_replaced_since_parsing() {
+        let directory = test_directory("portable-target-replaced");
+        let target = directory.join("target.lisp");
+        let preserved = directory.join("parsed-target.lisp");
+        fs::write(&target, "(old)").expect("write parsed target");
+        let (text, expected) = read_text_file_with_expected_target(&target, MAX_SOURCE_INPUT_BYTES)
+            .expect("read expected target");
+        fs::rename(&target, &preserved).expect("retain parsed identity");
+        fs::write(&target, &text).expect("replace target with identical content");
+
+        let error = stage_write_target_portable(target.clone(), "(new)".to_owned(), Some(expected))
+            .expect_err("a different file at the same path must be refused");
+
+        assert!(error.chain().contains("replaced since parsing"));
+        assert_eq!(fs::read_to_string(&target).expect("read target"), "(old)");
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn portable_write_refuses_a_target_removed_since_parsing() {
+        let directory = test_directory("portable-target-removed");
+        let target = directory.join("target.lisp");
+        fs::write(&target, "(old)").expect("write parsed target");
+        let (_, expected) = read_text_file_with_expected_target(&target, MAX_SOURCE_INPUT_BYTES)
+            .expect("read expected target");
+        fs::remove_file(&target).expect("remove parsed target");
+
+        let error = stage_write_target_portable(target.clone(), "(new)".to_owned(), Some(expected))
+            .expect_err("a target removed after parsing must be refused");
+
+        assert!(error.chain().contains("removed since parsing"));
+        assert!(!target.exists());
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn portable_write_rolls_back_every_target_when_one_fails_to_stage() {
+        let directory = test_directory("portable-rollback");
+        let first = directory.join("first.lisp");
+        let second = directory.join("second.lisp");
+        fs::write(&first, "(old1)").expect("write first target");
+        fs::write(&second, "(old2)").expect("write second target");
+        let (_, stale_expected) =
+            read_text_file_with_expected_target(&second, MAX_SOURCE_INPUT_BYTES)
+                .expect("read expected target");
+        fs::write(&second, "(edited elsewhere)").expect("edit second target after parsing");
+
+        let error = stage_and_apply_portable(
+            vec![
+                (first.clone(), "(new1)".to_owned(), None),
+                (second.clone(), "(new2)".to_owned(), Some(stale_expected)),
+            ],
+            |(path, content, expected)| stage_write_target_portable(path, content, expected),
+        )
+        .expect_err("the second target's stale digest must fail the whole batch");
+
+        assert!(error.chain().contains("changed since parsing"));
+        assert_eq!(
+            fs::read_to_string(&first).expect("read first target"),
+            "(old1)"
+        );
+        assert_eq!(
+            fs::read_to_string(&second).expect("read second target"),
+            "(edited elsewhere)"
+        );
+        let mut entries = fs::read_dir(&directory)
+            .expect("read test directory")
+            .map(|entry| entry.expect("read directory entry").file_name())
+            .collect::<Vec<_>>();
+        entries.sort();
+        assert_eq!(
+            entries,
+            [OsString::from("first.lisp"), OsString::from("second.lisp")]
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(all(unix, test))]
+    #[test]
+    fn portable_write_refuses_a_symlink_target() {
+        let directory = test_directory("portable-symlink-target");
+        let real = directory.join("real.lisp");
+        let link = directory.join("link.lisp");
+        fs::write(&real, "(old)").expect("write link destination");
+        std::os::unix::fs::symlink(&real, &link).expect("create symlink target");
+
+        let error = stage_write_target_portable(link.clone(), "(new)".to_owned(), None)
+            .expect_err("a symlinked target must be refused");
+
+        assert!(error.chain().contains("refusing to write symlink"));
+        assert_eq!(
+            fs::read_to_string(&real).expect("read link destination"),
+            "(old)"
+        );
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 
