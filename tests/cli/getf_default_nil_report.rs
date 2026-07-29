@@ -14,7 +14,11 @@ fn cli_flags_explicit_nil() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"call_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // The fix's span, which the old report published and this one keeps.
+        .stdout(predicate::str::contains("\"removal_span\""));
 }
 
 #[test]
@@ -31,7 +35,50 @@ fn cli_does_not_flag_non_nil() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no explicit nil default in a
+        // `getf` call" from "no `getf` call at all".
+        .stdout(predicate::str::contains("\"call_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_getf_default_nil_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("getf-default-nil-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(getf plist :key nil)\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "getf-default-nil", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_getf_default_nil_emits_sarif() {
+    let dir = fresh_temp_dir("getf-default-nil-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(getf plist :key nil)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "getf-default-nil", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/getf-default-nil/getf-default-nil\"",
+        ))
+        .stdout(predicate::str::contains(
+            "explicit nil default restates getf's default",
+        ));
 }
 
 #[test]

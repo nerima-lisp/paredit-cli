@@ -24,13 +24,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The `make-array` keywords that unconditionally default to `nil` and are
 /// independent of the other keyword arguments.
@@ -51,52 +53,71 @@ fn is_nil_literal(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct MakeArrayDefaultKeywordItem {
-    pub path: PathBuf,
     /// The span of the whole `(make-array …)` call form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span to delete: the ` :adjustable nil` / ` :fill-pointer nil` pair.
+    ///
+    /// The rewrite's input, but the old report published it, so it stays on the
+    /// report too: a consumer applying the edit itself needs the same bytes the
+    /// fix does.
     pub removal_span: ByteSpan,
     /// The keyword name, for the finding message.
     pub keyword: String,
 }
 
-#[derive(Debug)]
-pub struct MakeArrayDefaultKeywordSummary {
-    pub call_form_count: usize,
-    pub violations: Vec<MakeArrayDefaultKeywordItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MakeArrayDefaultKeywordPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl MakeArrayDefaultKeywordPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for MakeArrayDefaultKeywordItem {
+    /// The rule's name, not the keyword: `keyword` is source text carried per
+    /// finding (case as written), and `kind` is a fixed vocabulary the interop
+    /// formats turn into a rule id. It stays a `json_fields` entry and the lone
+    /// text column, where filtering on it still works.
+    fn kind(&self) -> &'static str {
+        "make-array-default-keyword"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct MakeArrayDefaultKeywordPolicy {
-    pub fail_on_violation: bool,
-    pub call_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// The keyword, bare — the prefixing style the old text row used.
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.keyword.clone()]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("keyword", json!(self.keyword)),
+            (
+                "removal_span",
+                json!({
+                    "start": self.removal_span.start().get(),
+                    "end": self.removal_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `make-array-default-keyword` lint rule writes, so
+    /// a SARIF or JUnit consumer reading both sees one finding described one
+    /// way.
+    fn message(&self) -> String {
+        format!(
+            "explicit {} nil restates make-array's default; drop it",
+            self.keyword
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     call_form_count: &mut usize,
     violations: &mut Vec<MakeArrayDefaultKeywordItem>,
 ) {
@@ -123,8 +144,8 @@ pub fn examine(
             view.children[index + 1].span.end(),
         );
         violations.push(MakeArrayDefaultKeywordItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             removal_span,
             keyword,
         });
@@ -132,68 +153,77 @@ pub fn examine(
     }
 }
 
-/// Collects every `make-array` call with a redundant `:adjustable nil` /
-/// `:fill-pointer nil` across a whole file, along with the total number of
-/// `make-array` calls scanned.
-pub fn collect_make_array_default_keywords(
+/// Collects every `make-array` call in one file with a redundant
+/// `:adjustable nil` / `:fill-pointer nil`, with the number of `make-array`
+/// calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no restated default here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_make_array_default_keyword_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<MakeArrayDefaultKeywordItem>)> {
+) -> LintResult<FileFindings<MakeArrayDefaultKeywordItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("call_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut call_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut call_form_count, &mut violations);
+            examine(subview, source, &mut call_form_count, &mut violations);
         });
     }
-    Ok((call_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("call_form_count", json!(call_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_make_array_default_keywords(
-    call_form_count: usize,
-    violations: Vec<MakeArrayDefaultKeywordItem>,
-) -> MakeArrayDefaultKeywordSummary {
-    MakeArrayDefaultKeywordSummary {
-        call_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_make_array_default_keyword_policy(
-    options: MakeArrayDefaultKeywordPolicyOptions,
-    summary: &MakeArrayDefaultKeywordSummary,
-) -> MakeArrayDefaultKeywordPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    MakeArrayDefaultKeywordPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        call_form_count: summary.call_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<MakeArrayDefaultKeywordItem>) {
+    fn report(input: &str) -> FileFindings<MakeArrayDefaultKeywordItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_make_array_default_keywords(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect make-array default keywords")
+        build_make_array_default_keyword_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build make-array default keyword report")
+    }
+
+    /// The `(call_form_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<MakeArrayDefaultKeywordItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "call_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("call_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -251,34 +281,53 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(make-array n :adjustable nil)", Dialect::Clojure)
                 .expect("parse");
-        let (count, violations) =
-            collect_make_array_default_keywords(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect make-array default keywords");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_make_array_default_keyword_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build make-array default keyword report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("call_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(make-array n :adjustable nil)");
-        let summary = summarize_make_array_default_keywords(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(make-array n)").dialect_modelled);
+    }
 
-        let quiet = evaluate_make_array_default_keyword_policy(
-            MakeArrayDefaultKeywordPolicyOptions::new(false),
-            &summary,
+    /// `keyword` and `removal_span` were both on the old JSON, so both stay.
+    #[test]
+    fn a_finding_carries_its_line_its_keyword_and_its_removal_span() {
+        let report = report("(defun f (n)\n  (make-array n :adjustable nil))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "make-array-default-keyword");
+        assert_eq!(finding.text_columns(), vec![":adjustable".to_owned()]);
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("keyword", json!(":adjustable")),
+                (
+                    "removal_span",
+                    json!({
+                        "start": finding.removal_span.start().get(),
+                        "end": finding.removal_span.end().get(),
+                    })
+                ),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    }
 
-        let strict = evaluate_make_array_default_keyword_policy(
-            MakeArrayDefaultKeywordPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(make-array n :adjustable nil)\n(make-array n)\n(make-array n t)\n");
+        assert_eq!(report.summary, vec![("call_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }
