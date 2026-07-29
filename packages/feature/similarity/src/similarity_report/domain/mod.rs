@@ -1,8 +1,10 @@
+mod classify;
 mod collect;
 mod options;
 mod reports;
 mod types;
 
+pub use classify::{classify_form_pair, structural_tree_of};
 pub use collect::{SimilarityCandidateCollectionError, collect_similarity_candidates};
 pub use options::{
     SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,

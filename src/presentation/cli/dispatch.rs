@@ -47,6 +47,21 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?;
             }
+            command::InspectCommand::CloneClasses(args) => {
+                clone_report::workflow::clone_classes(args)?;
+            }
+            command::InspectCommand::CloneSequences(args) => {
+                clone_report::workflow::clone_sequences(args)?;
+            }
+            command::InspectCommand::CloneExternal(args) => {
+                clone_report::workflow::clone_external(args)?;
+            }
+            command::InspectCommand::CloneThreshold(args) => {
+                clone_report::workflow::clone_threshold(args)?;
+            }
+            command::InspectCommand::CloneGenealogy(args) => {
+                clone_report::workflow::clone_genealogy(args)?;
+            }
             command::InspectCommand::Diff(args) => {
                 structural_diff::workflow::structural_diff(args)?;
             }
@@ -645,6 +660,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Effects(args) => {
                 effect_report::workflow::effect_report(args)?;
             }
+            command::InspectCommand::ContextAt(args) => {
+                context_report::workflow::context_at_report(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
@@ -654,7 +672,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::EditCommand::Select(args) => basic_edit::workflow::select(args)?,
             command::EditCommand::Replace(args) => basic_edit::workflow::replace(args)?,
             command::EditCommand::Kill(args) => basic_edit::workflow::kill(args)?,
+            command::EditCommand::Copy(args) => basic_edit::workflow::copy(args)?,
+            command::EditCommand::Yank(args) => basic_edit::workflow::yank(args)?,
             command::EditCommand::Wrap(args) => basic_edit::workflow::wrap(args)?,
+            command::EditCommand::UnwrapPrefix(args) => {
+                basic_edit::workflow::unwrap_prefix(args)?;
+            }
             command::EditCommand::Splice(args) => basic_edit::workflow::splice(args)?,
             command::EditCommand::Split(args) => basic_edit::workflow::split(args)?,
             command::EditCommand::Join(args) => basic_edit::workflow::join(args)?,
@@ -672,12 +695,31 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::EditCommand::TransposeBackward(args) => {
                 basic_edit::workflow::transpose_backward(args)?;
             }
+            command::EditCommand::Transpose(args) => basic_edit::workflow::transpose(args)?,
             command::EditCommand::SlurpForward(args) => basic_edit::workflow::slurp_forward(args)?,
             command::EditCommand::SlurpBackward(args) => {
                 basic_edit::workflow::slurp_backward(args)?;
             }
             command::EditCommand::BarfForward(args) => basic_edit::workflow::barf_forward(args)?,
             command::EditCommand::BarfBackward(args) => basic_edit::workflow::barf_backward(args)?,
+            command::EditCommand::Navigate(args) => basic_edit::workflow::navigate(args)?,
+            command::EditCommand::DeleteForward(args) => {
+                basic_edit::workflow::delete_forward(args)?;
+            }
+            command::EditCommand::DeleteBackward(args) => {
+                basic_edit::workflow::delete_backward(args)?;
+            }
+            command::EditCommand::Newline(args) => basic_edit::workflow::newline(args)?,
+            command::EditCommand::ReindentDefun(args) => {
+                basic_edit::workflow::reindent_defun(args)?;
+            }
+            command::EditCommand::SplitString(args) => basic_edit::workflow::split_string(args)?,
+            command::EditCommand::EscapeString(args) => {
+                basic_edit::workflow::escape_string(args)?;
+            }
+            command::EditCommand::UnescapeString(args) => {
+                basic_edit::workflow::unescape_string(args)?;
+            }
         },
         Command::Refactor { command } => match command {
             command::RefactorCommand::Plan(args) => refactor::workflow::refactor_plan(args)?,

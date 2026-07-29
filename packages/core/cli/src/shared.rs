@@ -318,6 +318,24 @@ pub fn edit_target(
     args: EditTargetArgs,
     f: fn(&str, &SyntaxTree, Selection<'_>) -> SexprResult<String>,
 ) -> CliResult<()> {
+    edit_target_with(args, f, |_| Ok(()))
+}
+
+/// [`edit_target`] with a hook that sees each selection before it is edited.
+///
+/// It exists for `edit kill --to-ring`: capturing what an edit removes must not
+/// cost the command `--all`, the range refusal, or the shifted-match guard, and
+/// resolving the selector a second time in the caller would cost all three —
+/// and would read stdin twice.
+///
+/// The hook runs in reverse source order, the same order the edits are applied
+/// in, because applying them forward would invalidate every span after the
+/// first.
+pub fn edit_target_with(
+    args: EditTargetArgs,
+    f: fn(&str, &SyntaxTree, Selection<'_>) -> SexprResult<String>,
+    mut observe: impl FnMut(Selection<'_>) -> CliResult<()>,
+) -> CliResult<()> {
     let target = args.target;
     let (input, dialect) = read_input_and_dialect(target.file, target.dialect)?;
     let tree = parse_document(&input, dialect)?;
@@ -343,6 +361,7 @@ pub fn edit_target(
             }
             .into());
         }
+        observe(selection)?;
         let rewritten = f(&current, &tree, selection)?;
         current = Edit::normalize_changed_line_trivia(&current, rewritten, dialect)?;
     }

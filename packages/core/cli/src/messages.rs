@@ -68,6 +68,7 @@ pub enum Message {
     RepairSpanBoundaries,
     RepairDropDryRun,
     RepairUsePreviewFlag,
+    RepairKillRingIndex,
     RepairNarrowSelector,
     RepairWidenSelector,
     RepairShowMatches,
@@ -124,6 +125,9 @@ impl Message {
             }
             Self::RepairCheckLength => {
                 "check the document's length and structure before choosing an offset"
+            }
+            Self::RepairKillRingIndex => {
+                "read the ring file, or pass --index 0 for the most recent entry"
             }
             Self::RepairSelectByPath => "select by path instead of by offset, with --path <a.b.c>",
             Self::RepairRereadFile => {
@@ -252,6 +256,9 @@ impl Message {
                 "パスは 0 から数えた子の添字をドットでつないだものです（例: 0.2.1）"
             }
             Self::RepairCheckLength => "位置を決める前に、文書の長さと構造を確認してください",
+            Self::RepairKillRingIndex => {
+                "kill ring ファイルを確認するか、最新の項目を指す --index 0 を渡してください"
+            }
             Self::RepairSelectByPath => {
                 "バイト位置ではなくパスで選択してください（--path <a.b.c>）"
             }
@@ -348,7 +355,7 @@ impl Message {
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 53] = [
+    pub const ALL: [Self; 54] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -402,6 +409,7 @@ impl Message {
         Self::RepairNeedRepository,
         Self::RepairNoInputsProduced,
         Self::RepairArchiveDestination,
+        Self::RepairKillRingIndex,
     ];
 }
 

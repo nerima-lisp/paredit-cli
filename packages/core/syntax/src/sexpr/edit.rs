@@ -103,15 +103,12 @@ impl Edit {
         Ok(output)
     }
 
+    /// Replaces the selection's enclosing list with the selection.
+    ///
+    /// One level, which is what `paredit-raise-sexp` binds.
+    /// [`Edit::raise_levels`] is the same operation with the count exposed.
     pub fn raise(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> SexprResult<String> {
-        validate_edit_context(input, tree, selection)?;
-        let node = selection.node();
-        let parent_id = node.parent.ok_or(StructureError::NoParent)?;
-        let parent = selection.tree.node(parent_id);
-        if parent.kind == NodeKind::Root {
-            return Err(StructureError::RaiseTopLevel.into());
-        }
-        Ok(replace_span(input, parent.span, selection.text()))
+        Self::raise_levels(input, tree, selection, 1)
     }
 
     pub fn transpose_forward(
@@ -489,7 +486,7 @@ fn join_strings(input: &str, node: &Node, sibling: &Node) -> SexprResult<String>
 }
 
 /// Reports whether `text` is a double-quoted string literal (`"..."`).
-fn is_string_literal(text: &str) -> bool {
+pub(in crate::sexpr) fn is_string_literal(text: &str) -> bool {
     let bytes = text.as_bytes();
     bytes.len() >= 2 && bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"'
 }
@@ -526,7 +523,7 @@ fn validate_selection_input(input: &str, selection: Selection<'_>) -> SexprResul
     selection.validate_source(input).map_err(prefix_with_edit)
 }
 
-fn validate_edit_context(
+pub(in crate::sexpr) fn validate_edit_context(
     input: &str,
     tree: &SyntaxTree,
     selection: Selection<'_>,
@@ -601,14 +598,14 @@ fn list_delimiter_offsets(node: &Node) -> SexprResult<(usize, usize)> {
     Ok((open.get(), close.get()))
 }
 
-fn next_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {
+pub(in crate::sexpr) fn next_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {
     let parent = tree.node(node_id).parent?;
     let siblings = &tree.node(parent).children;
     let position = siblings.iter().position(|id| *id == node_id)?;
     siblings.get(position + 1).copied()
 }
 
-fn previous_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {
+pub(in crate::sexpr) fn previous_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {
     let parent = tree.node(node_id).parent?;
     let siblings = &tree.node(parent).children;
     let position = siblings.iter().position(|id| *id == node_id)?;
@@ -617,7 +614,7 @@ fn previous_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {
         .and_then(|previous| siblings.get(previous).copied())
 }
 
-fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
+pub(in crate::sexpr) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     let mut output = String::with_capacity(input.len() + replacement.len());
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);
@@ -625,7 +622,7 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
-fn swap_node_text(input: &str, left: ByteSpan, right: ByteSpan) -> String {
+pub(in crate::sexpr) fn swap_node_text(input: &str, left: ByteSpan, right: ByteSpan) -> String {
     let mut output = String::with_capacity(input.len());
     output.push_str(&input[..left.start().get()]);
     output.push_str(right.slice(input));

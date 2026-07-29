@@ -63,6 +63,11 @@ discovery, impact analysis, and preflight checks.
 | `duplicates` | Report repeated structural S-expression shapes across explicit files. |
 | `diff` | Compare two documents by their parse rather than their lines: which forms were inserted, deleted, or replaced, and at what path. Whitespace, indentation, and comments are not part of the comparison, so a reformatted file reports no changes and an edited argument reports as that argument instead of as the whole wrapped line. `--max-depth` hides the deep edits and leaves the shape changes; `--fail-on-change` gates on the two documents differing structurally. **The blind spot is stated in every run's output:** an empty structural diff does not mean the files are identical, only that the programs are. |
 | `similarity` | Report structurally similar S-expression forms across explicit files. |
+| `clone-classes` | Group near-duplicate forms into clone classes, label each on the Type-1/2/3 taxonomy, and rank them by the lines extracting one would save. Where `similarity` reports pairs, this reports the thing there is to extract: five copies of one helper are one class, not ten pairs. |
+| `clone-sequences` | Report duplicated runs of adjacent sibling forms — the sub-form clones that no whole-form report can see, because the duplication does not line up with a form boundary. Runs whose enclosing forms are themselves clones are left to `clone-classes`. |
+| `clone-external` | Report project forms that duplicate a reference corpus, to find code a dependency already provides. Unlike `similarity` it compares across head symbols, since a local `join-strings` and a library `str:join` disagree on the head and are the point. The reference corpus is scanned *including* generated directories, because that is where dependencies live. |
+| `clone-threshold` | Recommend a `--threshold` from the project's own similarity distribution instead of the built-in 0.87. Reports the histogram, an Otsu split, the widest distribution gap, and percentiles, so the recommendation can be judged rather than taken. |
+| `clone-genealogy` | Order each clone class by the commit that introduced each member, separating the original from the copies and reporting how long the copying went on. Degrades like `blame`: no repository, no `git`, or an untracked file yields `unknown`, never a fabricated date. |
 | `lets` | Report local let bindings and inline safety for refactor planning. |
 | `complexity` | Report per-definition nesting depth and size metrics for refactor prioritization. |
 | `naming` | Report definition names that deviate from idiomatic kebab-case Lisp naming. |
@@ -81,6 +86,7 @@ discovery, impact analysis, and preflight checks.
 | `package-conflicts` | Report distinct defpackage forms that claim the same package name or nickname. |
 | `redefinitions` | Report top-level definitions of the same category and name declared more than once. |
 | `undefined-packages` | Report in-package forms naming a package no analyzed defpackage declares. |
+| `context-at` | Report what kind of text sits at a byte offset — code, a string, a comment, a list delimiter, reader sugar, or the whitespace between forms — together with the enclosing list, the nesting depth, and the stack of open delimiters. The question to ask *before* a character edit rather than after a refused one: `edit delete-forward` and `edit newline` decline every offset this reports as carrying structure, and `--fail-on-structural` turns that into an exit code. |
 | `api-surface` | Report every exported symbol with the signature its export commits to — the defining category, the required and maximum arity, and the lambda list as written. `defpackage`'s `:export` is a list of names; what a caller relies on is those names *plus their shapes*, and that pairing exists nowhere in the source. An export nothing defines is reported rather than dropped: that is usually a rename that missed one side. |
 | `api-diff` | Compare the current API against a `--baseline` `api-surface` snapshot and answer the SemVer question mechanically. Breaking: an export removed, a minimum arity raised, a maximum lowered, or a defining category changed. Compatible: an export added or a range widened. `--intended-bump` fails the run when the diff requires a larger bump than the release claims. |
 | `test-map` | Pair definitions with the tests that name them, by the `test-x` / `x-test` / `x-tests` conventions, and report both sides that have no counterpart — untested definitions and tests nobody can tell what they cover. A list of tests and a list of definitions are each easy to get; neither answers the question. |
@@ -384,21 +390,33 @@ Mutating commands also accept:
 | `repair-unclosed-lists` | Append matching delimiters for parser-detected unclosed lists; refuse all other parse errors. |
 | `select` | Print the S-expression selected by `--path` or `--at`. |
 | `replace` | Replace the selected S-expression with replacement text. |
-| `kill` | Remove the selected S-expression. |
-| `wrap` | Wrap the selected S-expression in a new list. `--delimiter paren\|bracket\|brace` chooses the delimiter (default `paren`). |
+| `kill` | Remove the selected S-expression. `--to-ring` pushes it onto the kill ring first. |
+| `copy` | Print the selected S-expression together with the own-line comment block written above it. `--to-ring` pushes it onto the kill ring. |
+| `yank` | Paste a kill ring entry `--placement before\|after\|replace` the selection. `--index` picks the entry, newest first. |
+| `wrap` | Wrap the selected S-expression. `--delimiter paren\|bracket\|brace\|doublequote` chooses the delimiter; `doublequote` produces a string literal and escapes the selection's own quotes and backslashes. `--prefix quote\|quasiquote\|unquote\|unquote-splicing\|sharp-quote` attaches reader sugar instead. |
+| `unwrap-prefix` | Remove the selected expression's outermost reader prefix, or every one of them with `--all-prefixes`. |
 | `splice` | Remove one list pair while keeping its children. |
 | `split` | Split the enclosing list in two immediately before the selected expression. |
 | `join` | Join the selected list with its next sibling list, or two adjacent string literals, into one form. |
 | `splice-killing-backward` | Splice the enclosing list, keeping the selection and following siblings while removing preceding ones. |
 | `splice-killing-forward` | Splice the enclosing list, keeping the preceding siblings while removing the selection and following ones. |
 | `convolute` | Reverse the nesting of the two lists enclosing the selected list. |
-| `raise` | Replace the selected expression's parent list with the selection. |
+| `raise` | Replace the selected expression's parent list with the selection. `--levels N` climbs N enclosing lists in one step. |
 | `transpose-forward` | Exchange the selected expression with its next sibling while keeping trivia in place. |
 | `transpose-backward` | Exchange the selected expression with its previous sibling while keeping trivia in place. |
 | `slurp-forward` | Pull the next sibling into the selected list. |
 | `slurp-backward` | Pull the previous sibling into the selected list. |
 | `barf-forward` | Push the last child out of the selected list. |
 | `barf-backward` | Push the first child out of the selected list. |
+| `transpose` | Exchange the selection with any other expression in the same list, adjacent or not. The partner is addressed by `--with-path`, `--with-at`, or `--with-select` — its own flag names, because the primary selector already claims `--path`, `--at` and `--select`. |
+| `navigate` | Print the `--path` that `--direction forward\|backward\|up\|down` lands on. Text output is the bare path, so it composes directly into the next command. |
+| `delete-forward` | Delete the character at `--at`, refusing anything that would unbalance the document. An empty `()` or `""` is deleted as a pair. |
+| `delete-backward` | Delete the character before `--at`, under the same rules. |
+| `newline` | Insert a newline at `--at` and reindent the definition it lands in. `--no-reindent` inserts only. |
+| `reindent-defun` | Reindent the selected definition to the Emacs convention without rewrapping its lines. |
+| `split-string` | Split the string literal containing `--at` into two adjacent literals. The inverse of `join` on two strings. |
+| `escape-string` | Escape the selected string literal's contents one level, so it can be embedded in another string. |
+| `unescape-string` | Reverse one level of escaping. Collapses `\\` and `\"` only, and refuses any other sequence rather than guessing what the dialect meant by it. |
 
 For example, preview then apply a wrap of the third child of the first
 top-level form:
@@ -407,6 +425,27 @@ top-level form:
 paredit edit wrap --file source.lisp --path 0.2 --diff
 paredit edit wrap --file source.lisp --path 0.2 --write
 ```
+
+### The kill ring
+
+`kill --to-ring`, `copy --to-ring` and `yank` share a ring file. Its path comes
+from `--ring`, then `$PAREDIT_KILL_RING`, then `.paredit/kill-ring.json` —
+repository-relative by default, so two checkouts do not share a clipboard by
+accident, and the ring stays a file you can read, diff, or delete. `--ring-size`
+caps how many entries it keeps; entry `--index 0` is always the most recent.
+
+`kill --to-ring` stores exactly what it removed. `copy --to-ring` stores the
+comment block as well, because that is what `copy` prints.
+
+### Character edits and where they are safe
+
+`delete-forward`, `delete-backward` and `newline` address a byte offset rather
+than a form, and refuse any offset where the edit would change structure: a
+delimiter with something inside it, the whitespace holding two symbols apart, a
+comment's opening token, the inside of a string or symbol. Run
+[`inspect context-at`](#inspect) first to learn which offsets those are without
+attempting the edit — it reports the kind of text at an offset and whether a
+character edit there is inert.
 
 ## Refactor
 

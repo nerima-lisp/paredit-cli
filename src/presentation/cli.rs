@@ -71,6 +71,7 @@ use paredit_feature_semantic_report::effect_report::cli as effect_report;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
 use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;
+use paredit_feature_similarity::clone_report::cli as clone_report;
 use paredit_feature_similarity::duplicate_report::cli as duplicate_report;
 use paredit_feature_similarity::similarity_report::cli as similarity_report;
 use paredit_feature_structural_diff::structural_diff::cli as structural_diff;
@@ -559,6 +560,7 @@ use paredit_feature_project_analysis::call_graph_report::cli as call_graph_repor
 use paredit_feature_project_analysis::call_report::cli as call_report;
 use paredit_feature_project_analysis::class_cycle_report::cli as class_cycle_report;
 use paredit_feature_project_analysis::complexity_report::cli as complexity_report;
+use paredit_feature_project_analysis::context_report::cli as context_report;
 use paredit_feature_project_analysis::form_report::cli as form_report;
 use paredit_feature_project_analysis::impact_report::cli as impact_report;
 use paredit_feature_project_analysis::naming_report::cli as naming_report;

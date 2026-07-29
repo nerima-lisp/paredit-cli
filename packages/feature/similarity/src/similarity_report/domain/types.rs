@@ -45,6 +45,22 @@ impl SharedFormText {
         self.source.len()
     }
 
+    /// The whole file this form was sliced out of.
+    ///
+    /// Needed to turn the form's byte span into line numbers, which is what
+    /// `git blame` speaks. The source is already retained — every form from one
+    /// file shares this allocation — so the accessor costs nothing that the
+    /// report was not already paying.
+    #[must_use]
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    #[must_use]
+    pub const fn span(&self) -> ByteSpan {
+        self.span
+    }
+
     #[cfg(test)]
     #[must_use]
     pub fn shares_source(&self, other: &Self) -> bool {
@@ -347,6 +363,21 @@ impl SimilarityPairReport {
 
     #[must_use]
     pub fn right(&self) -> &SimilarityFormReport {
+        &self.right
+    }
+
+    /// The left form's handle rather than a borrow of it.
+    ///
+    /// Grouping pairs into clone classes has to hold onto the forms after the
+    /// pair list is gone, and the handle is already shared — every pair that
+    /// mentions a form points at the same allocation.
+    #[must_use]
+    pub const fn left_shared(&self) -> &Arc<SimilarityFormReport> {
+        &self.left
+    }
+
+    #[must_use]
+    pub const fn right_shared(&self) -> &Arc<SimilarityFormReport> {
         &self.right
     }
 

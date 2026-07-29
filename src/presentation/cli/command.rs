@@ -2,45 +2,47 @@ use super::{
     accessor_arity_report, analysis_report, api_diff_report, api_surface_report,
     append_list_to_cons_report, append_nil_report,
     args::{
-        AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs, WrapArgs,
+        AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
+        NewlineArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs,
+        UnwrapPrefixArgs, WrapArgs, YankArgs,
     },
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
     case_nil_key_report, change_summary, char_case_fold_report, char_op_string_report,
-    circular_literal_report, class_cycle_report, class_hierarchy_report,
+    circular_literal_report, class_cycle_report, class_hierarchy_report, clone_report,
     code_char_char_code_report, coerce_to_t_report, cohesion_report, complexity_report,
     cond_t_clause_report, config, cons_to_list_report, constant_if_test_report, constant_report,
-    constant_when_test_report, convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond,
-    convert_if_to_unless, convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let,
-    convert_let_to_let_star, convert_sequential_binding, convert_unless_to_if, convert_when_to_if,
-    de_morgan_report, dead_boolean_operand_report, debt_score_report, definition_movement,
-    definition_removal, definition_report, defpackage_quoted_report, dependency_report,
-    destructive_literal_report, docstring_report, double_reverse_report,
-    duplicate_boolean_operand_report, duplicate_case_key_report, duplicate_cond_test_report,
-    duplicate_export_report, duplicate_keyword_report, duplicate_lambda_list_keyword_report,
-    duplicate_let_binding_report, duplicate_method_report, duplicate_parameter_report,
-    duplicate_report, duplicate_setf_place_report, duplicate_slot_report, duplication_ratio_report,
-    effect_report, eliminate_empty_binding_form, emacs_lisp_file_report, empty_body_report,
-    empty_let_report, eq_char_comparison_report, eq_number_comparison_report,
-    eql_list_comparison_report, eql_search_literal_report, eql_string_comparison_report,
-    equality_arity_report, eval_when_situation_report, exhaustive_case_otherwise_report,
-    explicit_nil_return_report, explicit_step_delta_report, external_diagnostics_report,
-    external_system_report, extract_constant, extract_function, extract_local_function,
-    flatten_progn, form_report, format_directive_report, format_missing_destination_report,
-    format_newline_report, format_to_string_report, funcall_lambda_report, function_parameter,
-    generic_dispatch_report, getf_default_nil_report, gethash_default_report,
-    handler_case_no_clauses_report, hotspot_report, identical_if_branch_report,
-    identity_arithmetic_report, if_arity_report, if_not_report, if_to_or_report,
-    if_to_unless_report, impact_report, indentation_report, inline_function, inline_lambda,
-    inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let,
-    keyword_arity_report, lambda_list_keyword_order_report, last_default_count_report, let_report,
-    license_report, line_metrics_report, lint_report, list_star_nil_report,
-    list_star_to_cons_report, literal_place_report, loop_report, macro_expansion_report,
-    macro_hygiene_report, make_array_default_keyword_report, make_hash_table_test_report,
-    make_list_default_element_report, malformed_case_clause_report, malformed_cond_clause_report,
-    malformed_iteration_spec_report, malformed_let_binding_report, manual_incf_report,
-    manual_push_report, manual_pushnew_report, merge_nested_flet, merge_nested_let,
-    merge_nested_let_star, method_combination_report, modify_macro_arity_report,
+    constant_when_test_report, context_report, convert_cond_to_if, convert_flet_to_labels,
+    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
+    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
+    convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
+    debt_score_report, definition_movement, definition_removal, definition_report,
+    defpackage_quoted_report, dependency_report, destructive_literal_report, docstring_report,
+    double_reverse_report, duplicate_boolean_operand_report, duplicate_case_key_report,
+    duplicate_cond_test_report, duplicate_export_report, duplicate_keyword_report,
+    duplicate_lambda_list_keyword_report, duplicate_let_binding_report, duplicate_method_report,
+    duplicate_parameter_report, duplicate_report, duplicate_setf_place_report,
+    duplicate_slot_report, duplication_ratio_report, effect_report, eliminate_empty_binding_form,
+    emacs_lisp_file_report, empty_body_report, empty_let_report, eq_char_comparison_report,
+    eq_number_comparison_report, eql_list_comparison_report, eql_search_literal_report,
+    eql_string_comparison_report, equality_arity_report, eval_when_situation_report,
+    exhaustive_case_otherwise_report, explicit_nil_return_report, explicit_step_delta_report,
+    external_diagnostics_report, external_system_report, extract_constant, extract_function,
+    extract_local_function, flatten_progn, form_report, format_directive_report,
+    format_missing_destination_report, format_newline_report, format_to_string_report,
+    funcall_lambda_report, function_parameter, generic_dispatch_report, getf_default_nil_report,
+    gethash_default_report, handler_case_no_clauses_report, hotspot_report,
+    identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_not_report,
+    if_to_or_report, if_to_unless_report, impact_report, indentation_report, inline_function,
+    inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
+    introduce_let, keyword_arity_report, lambda_list_keyword_order_report,
+    last_default_count_report, let_report, license_report, line_metrics_report, lint_report,
+    list_star_nil_report, list_star_to_cons_report, literal_place_report, loop_report,
+    macro_expansion_report, macro_hygiene_report, make_array_default_keyword_report,
+    make_hash_table_test_report, make_list_default_element_report, malformed_case_clause_report,
+    malformed_cond_clause_report, malformed_iteration_spec_report, malformed_let_binding_report,
+    manual_incf_report, manual_push_report, manual_pushnew_report, merge_nested_flet,
+    merge_nested_let, merge_nested_let_star, method_combination_report, modify_macro_arity_report,
     multiple_value_list_of_values_report, naming_report, narrowing_report,
     negated_comparison_report, negated_if_report, negated_step_delta_report,
     negated_when_unless_report, nested_boolean_report, nested_char_case_report, nested_cxr_report,
@@ -126,6 +128,16 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Group near-duplicate forms into clone classes, label each Type-1/2/3, and rank them by the lines extracting one would save.
+    CloneClasses(clone_report::args::CloneClassReportArgs),
+    /// Report duplicated runs of adjacent sibling forms, the sub-form clones no whole-form report can see.
+    CloneSequences(clone_report::args::CloneSequenceReportArgs),
+    /// Report project forms that duplicate a reference corpus, to find code a dependency already provides.
+    CloneExternal(clone_report::args::CloneExternalReportArgs),
+    /// Recommend a --threshold from the project's own similarity distribution instead of the built-in default.
+    CloneThreshold(clone_report::args::CloneThresholdReportArgs),
+    /// Order each clone class by the commit that introduced it, separating the original from the copies.
+    CloneGenealogy(clone_report::args::CloneGenealogyReportArgs),
     /// Compare two documents by their parse: which forms were inserted,
     /// deleted, or replaced, ignoring whitespace and comments.
     Diff(structural_diff::args::StructuralDiffArgs),
@@ -547,6 +559,8 @@ pub(super) enum InspectCommand {
     Effects(effect_report::args::EffectReportArgs),
     /// Report in-package forms naming a package no analyzed defpackage declares.
     UndefinedPackages(undefined_package_report::args::UndefinedPackageReportArgs),
+    /// Report whether a byte offset is code, a string, a comment, a delimiter, or reader sugar.
+    ContextAt(context_report::args::ContextAtArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source
@@ -554,7 +568,7 @@ pub(super) enum InspectCommand {
 /// place with reparse validation and rollback.
 #[derive(Debug, Subcommand)]
 #[command(
-    after_help = "Examples:\n  paredit edit select --file src/foo.lisp --path 0.2\n  paredit edit wrap --file src/foo.lisp --path 0.2 --diff\n  paredit edit wrap --file src/foo.lisp --path 0.2 --write\n  paredit edit replace --file src/foo.lisp --at 120 --with '(new-form)' --write\n\nWithout --write the rewritten document is printed to stdout and the file is untouched.\nUse --diff to print a unified diff instead of the whole rewritten document."
+    after_help = "Examples:\n  paredit edit select --file src/foo.lisp --path 0.2\n  paredit edit wrap --file src/foo.lisp --path 0.2 --diff\n  paredit edit wrap --file src/foo.lisp --path 0.2 --write\n  paredit edit replace --file src/foo.lisp --at 120 --with '(new-form)' --write\n  paredit edit navigate --file src/foo.lisp --path 0.2 --direction forward\n\nWithout --write the rewritten document is printed to stdout and the file is untouched.\nUse --diff to print a unified diff instead of the whole rewritten document."
 )]
 pub(super) enum EditCommand {
     /// Print a canonical, indentation-based rendering.
@@ -565,10 +579,16 @@ pub(super) enum EditCommand {
     Select(TargetArgs),
     /// Replace the selected S-expression with replacement text.
     Replace(ReplaceArgs),
-    /// Remove the selected S-expression.
-    Kill(EditTargetArgs),
-    /// Wrap the selected S-expression in a new list, optionally choosing the delimiter.
+    /// Remove the selected S-expression, optionally pushing it onto the kill ring.
+    Kill(KillArgs),
+    /// Print the selected S-expression with the comment block written above it.
+    Copy(CopyArgs),
+    /// Paste a kill ring entry beside, or over, the selected S-expression.
+    Yank(YankArgs),
+    /// Wrap the selected S-expression in a delimiter pair, a string, or a reader prefix.
     Wrap(WrapArgs),
+    /// Remove the selected S-expression's reader prefix, outermost first.
+    UnwrapPrefix(UnwrapPrefixArgs),
     /// Remove one list pair while keeping its children.
     Splice(EditTargetArgs),
     /// Split the enclosing list in two immediately before the selected expression.
@@ -581,12 +601,14 @@ pub(super) enum EditCommand {
     SpliceKillingForward(EditTargetArgs),
     /// Reverse the nesting of the two lists enclosing the selected list.
     Convolute(EditTargetArgs),
-    /// Replace the selected expression's parent list with the selected expression.
-    Raise(EditTargetArgs),
+    /// Replace an enclosing list with the selected expression, --levels deep.
+    Raise(RaiseArgs),
     /// Exchange the selected expression with its next sibling.
     TransposeForward(EditTargetArgs),
     /// Exchange the selected expression with its previous sibling.
     TransposeBackward(EditTargetArgs),
+    /// Exchange the selected expression with any other expression in the same list.
+    Transpose(TransposeArgs),
     /// Pull the next sibling into the selected list.
     SlurpForward(EditTargetArgs),
     /// Pull the previous sibling into the selected list.
@@ -595,6 +617,22 @@ pub(super) enum EditCommand {
     BarfForward(EditTargetArgs),
     /// Push the first child out of the selected list.
     BarfBackward(EditTargetArgs),
+    /// Report the --path one structural move lands on.
+    Navigate(NavigateArgs),
+    /// Delete the character at --at, refusing anything that unbalances the document.
+    DeleteForward(CursorArgs),
+    /// Delete the character before --at, refusing anything that unbalances the document.
+    DeleteBackward(CursorArgs),
+    /// Insert a newline at --at and reindent the definition it lands in.
+    Newline(NewlineArgs),
+    /// Reindent the selected definition without rewrapping its lines.
+    ReindentDefun(ReindentArgs),
+    /// Split the string literal containing --at into two adjacent literals.
+    SplitString(CursorArgs),
+    /// Escape the selected string literal's contents one level.
+    EscapeString(EditTargetArgs),
+    /// Reverse one level of escaping in the selected string literal.
+    UnescapeString(EditTargetArgs),
 }
 
 #[derive(Debug, Subcommand)]

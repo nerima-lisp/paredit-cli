@@ -4,6 +4,7 @@ pub mod args;
 pub mod diagnosis;
 pub mod error;
 pub mod gate;
+pub mod kill_ring;
 pub mod messages;
 pub mod progress;
 pub mod runtime;

@@ -51,6 +51,8 @@ mod char_case_fold_report;
 mod char_op_string_report;
 #[path = "cli/class_cycle_report.rs"]
 mod class_cycle_report;
+#[path = "cli/clone_report.rs"]
+mod clone_report;
 #[path = "cli/code_char_char_code_report.rs"]
 mod code_char_char_code_report;
 #[path = "cli/code_metrics_report.rs"]
@@ -329,6 +331,8 @@ mod package_conflict_report;
 mod package_cycle_report;
 #[path = "cli/parallel_analysis.rs"]
 mod parallel_analysis;
+#[path = "cli/paredit_parity.rs"]
+mod paredit_parity;
 #[path = "cli/parse_integer_default_radix_report.rs"]
 mod parse_integer_default_radix_report;
 #[path = "cli/plan_steps_contract.rs"]
