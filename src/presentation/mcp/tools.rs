@@ -1,0 +1,404 @@
+//! The tools `paredit mcp` offers, and how one is run.
+//!
+//! ## Why not one tool per command
+//!
+//! There are 314 commands. Handing a model 314 tool descriptions costs
+//! thousands of tokens of context before it has read a line of the user's code,
+//! and it makes tool selection *harder*: the difference between
+//! `inspect duplicate-cond-tests` and `inspect duplicate-case-keys` is not one
+//! a model should be spending attention on when `inspect lint` runs both.
+//!
+//! So the catalogue below is small and deliberately chosen — the operations an
+//! agent reaches for constantly — plus one `run` tool that reaches the other
+//! 300, with `paredit://capabilities` as the resource that describes them. That
+//! is the same shape the CLI itself has: a few things you remember, and a
+//! catalogue for the rest.
+//!
+//! ## Why a subprocess
+//!
+//! Each call re-executes this binary. The commands write their results to
+//! stdout, and on this server stdout *is* the protocol channel — so running
+//! them in-process would need the output redirected, which in a crate that
+//! denies `unsafe_code` means threading a writer through 314 command
+//! implementations. Re-executing costs a process launch, buys byte-identical
+//! behaviour with the CLI for free, and cannot corrupt the channel.
+
+use std::process::Command;
+
+use serde_json::{Value, json};
+
+/// One tool in the catalogue.
+pub(super) struct Tool {
+    pub name: &'static str,
+    pub description: &'static str,
+    /// The fixed leading arguments. The tool's own inputs are appended.
+    pub argv: &'static [&'static str],
+    pub schema: fn() -> Value,
+    /// Whether this tool can modify a file. Reported to the client as
+    /// `readOnlyHint`, and refused outright under `--read-only`.
+    pub writes: bool,
+}
+
+/// A JSON Schema for a tool taking one required file path.
+fn one_file(description: &str) -> Value {
+    json!({
+        "type": "object",
+        "required": ["path"],
+        "additionalProperties": false,
+        "properties": { "path": { "type": "string", "description": description } },
+    })
+}
+
+fn files_schema() -> Value {
+    json!({
+        "type": "object",
+        "required": ["paths"],
+        "additionalProperties": false,
+        "properties": {
+            "paths": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1,
+                "description": "Files or directories to scan, scanned recursively.",
+            },
+        },
+    })
+}
+
+pub(super) const TOOLS: &[Tool] = &[
+    Tool {
+        name: "paredit_check",
+        description: "Validate that a Lisp source file is a balanced S-expression document. \
+                      Run this before and after any edit made by other means; it is the \
+                      cheapest way to catch a delimiter mistake.",
+        argv: &["inspect", "check", "--output", "json", "--file"],
+        schema: || one_file("The Lisp source file to validate."),
+        writes: false,
+    },
+    Tool {
+        name: "paredit_outline",
+        description: "List a file's top-level forms with their child-index paths, byte spans, \
+                      and whether each is a definition. The paths are what every `edit` and \
+                      `refactor` command selects with, so this is the usual first call.",
+        argv: &["inspect", "outline", "--output", "json", "--file"],
+        schema: || one_file("The Lisp source file to outline."),
+        writes: false,
+    },
+    Tool {
+        name: "paredit_lint",
+        description: "Run every within-file logic-bug lint rule and report the findings with \
+                      rule, severity, category, and whether an automatic fix exists. Prefer \
+                      this to the individual rule commands.",
+        argv: &["inspect", "lint", "--output", "json"],
+        schema: files_schema,
+        writes: false,
+    },
+    Tool {
+        name: "paredit_format",
+        description: "Print a file in canonical S-expression layout without writing it. \
+                      Compare against the file to decide whether a rewrite is needed.",
+        argv: &["edit", "format", "--file"],
+        schema: || one_file("The Lisp source file to format."),
+        writes: false,
+    },
+    Tool {
+        name: "paredit_diff",
+        description: "Compare two Lisp documents by their parse rather than their lines: which \
+                      forms were inserted, deleted, or replaced. Whitespace and comments are \
+                      not compared, so a reformatting reports no changes.",
+        argv: &["inspect", "diff", "--output", "json"],
+        schema: || {
+            json!({
+                "type": "object",
+                "required": ["old", "new"],
+                "additionalProperties": false,
+                "properties": {
+                    "old": { "type": "string", "description": "The document to compare from." },
+                    "new": { "type": "string", "description": "The document to compare to." },
+                },
+            })
+        },
+        writes: false,
+    },
+    Tool {
+        name: "paredit_capabilities",
+        description: "The machine-readable catalog of every paredit command, flag, default, \
+                      and enum value, plus the per-dialect support matrix. Read this before \
+                      using `paredit_run` for a command not in this tool list.",
+        argv: &[
+            "inspect",
+            "capabilities",
+            "--output",
+            "json",
+            "--schema-version",
+            "3",
+        ],
+        schema: || {
+            json!({
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+            })
+        },
+        writes: false,
+    },
+    Tool {
+        name: "paredit_run",
+        description: "Run any paredit command by its argument vector, for example \
+                      [\"refactor\", \"rename-at\", \"--file\", \"a.lisp\", \"--at\", \"42\", \
+                      \"--to\", \"new-name\"]. Use `paredit_capabilities` to discover the \
+                      commands and their flags. Commands that write a file are refused when \
+                      the server was started with --read-only.",
+        argv: &[],
+        schema: || {
+            json!({
+                "type": "object",
+                "required": ["args"],
+                "additionalProperties": false,
+                "properties": {
+                    "args": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 1,
+                        "description": "The argument vector, without the leading `paredit`.",
+                    },
+                },
+            })
+        },
+        writes: true,
+    },
+];
+
+/// The flags that make a command write.
+///
+/// Checked by name rather than by asking the command, because the check has to
+/// happen *before* the command runs and there is no dry-run that reports "I
+/// would have written". Every writing flag in this tool is one of these; a
+/// contract test asserts the list still covers the catalog.
+pub(super) const WRITING_FLAGS: &[&str] = &["--write", "--fix", "--apply", "--in-place"];
+
+pub(super) fn find(name: &str) -> Option<&'static Tool> {
+    TOOLS.iter().find(|tool| tool.name == name)
+}
+
+/// Builds the argument vector for one call.
+pub(super) fn argv_for(tool: &Tool, arguments: &Value) -> Result<Vec<String>, String> {
+    let mut argv: Vec<String> = tool.argv.iter().map(|part| (*part).to_owned()).collect();
+    match tool.name {
+        "paredit_run" => {
+            let args = arguments["args"]
+                .as_array()
+                .ok_or_else(|| "args must be an array of strings".to_owned())?;
+            for arg in args {
+                argv.push(
+                    arg.as_str()
+                        .ok_or_else(|| "args must be an array of strings".to_owned())?
+                        .to_owned(),
+                );
+            }
+        }
+        "paredit_lint" => {
+            let paths = arguments["paths"]
+                .as_array()
+                .ok_or_else(|| "paths must be an array of strings".to_owned())?;
+            if paths.is_empty() {
+                return Err("paths must not be empty".to_owned());
+            }
+            for path in paths {
+                argv.push(
+                    path.as_str()
+                        .ok_or_else(|| "paths must be an array of strings".to_owned())?
+                        .to_owned(),
+                );
+            }
+        }
+        "paredit_diff" => {
+            for key in ["old", "new"] {
+                argv.push(
+                    arguments[key]
+                        .as_str()
+                        .ok_or_else(|| format!("{key} must be a string path"))?
+                        .to_owned(),
+                );
+            }
+        }
+        "paredit_capabilities" => {}
+        _ => {
+            argv.push(
+                arguments["path"]
+                    .as_str()
+                    .ok_or_else(|| "path must be a string".to_owned())?
+                    .to_owned(),
+            );
+        }
+    }
+    Ok(argv)
+}
+
+/// Whether an argument vector asks for a write.
+pub(super) fn writes(argv: &[String]) -> bool {
+    argv.iter().any(|arg| WRITING_FLAGS.contains(&arg.as_str()))
+}
+
+/// What running a command produced.
+pub(super) struct Output {
+    pub stdout: String,
+    pub stderr: String,
+    pub code: i32,
+}
+
+/// Runs `paredit` with `argv`, as a subprocess of this binary.
+pub(super) fn run(argv: &[String]) -> Result<Output, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("cannot locate the paredit binary: {error}"))?;
+    let output = Command::new(executable)
+        .args(argv)
+        .output()
+        .map_err(|error| format!("cannot run paredit: {error}"))?;
+    Ok(Output {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        // A signal leaves no code. Reporting -1 rather than 0 keeps a killed
+        // command from reading as a successful one.
+        code: output.status.code().unwrap_or(-1),
+    })
+}
+
+/// The MCP `tools/call` result for a finished command.
+///
+/// `isError` is set from the exit status, and the exit status is meaningful
+/// here: 3 is a policy gate failing, which is a *result* and not a malfunction.
+/// Reporting it as an error would have a model retry a command that worked.
+pub(super) fn call_result(output: &Output) -> Value {
+    let gate_failure = output.code == paredit_core_cli::gate::GATE_FAILURE_EXIT_CODE;
+    let mut text = output.stdout.clone();
+    if !output.stderr.is_empty() {
+        if !text.is_empty() {
+            text.push('\n');
+        }
+        text.push_str(&output.stderr);
+    }
+    json!({
+        "content": [{ "type": "text", "text": text }],
+        "isError": output.code != 0 && !gate_failure,
+        "structuredContent": {
+            "exit_code": output.code,
+            "gate_failed": gate_failure,
+        },
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_tool_declares_an_object_schema_with_no_stray_properties() {
+        for tool in TOOLS {
+            let schema = (tool.schema)();
+            assert_eq!(schema["type"], "object", "{}", tool.name);
+            assert_eq!(
+                schema["additionalProperties"], false,
+                "{} must reject unknown arguments, or a typo reads as an omission",
+                tool.name
+            );
+        }
+    }
+
+    /// A model reads the description to choose a tool. An empty or terse one
+    /// is the difference between the right call and three wrong ones.
+    #[test]
+    fn every_tool_description_says_enough_to_choose_it() {
+        for tool in TOOLS {
+            assert!(
+                tool.description.len() > 60,
+                "{} needs a description a model can select on",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
+    fn tool_names_are_unique() {
+        let mut names: Vec<&str> = TOOLS.iter().map(|tool| tool.name).collect();
+        names.sort_unstable();
+        let count = names.len();
+        names.dedup();
+        assert_eq!(names.len(), count);
+    }
+
+    #[test]
+    fn a_run_call_appends_its_argument_vector() {
+        let tool = find("paredit_run").expect("the run tool");
+        let argv = argv_for(
+            tool,
+            &json!({ "args": ["inspect", "check", "--file", "a.lisp"] }),
+        )
+        .expect("builds");
+        assert_eq!(argv, ["inspect", "check", "--file", "a.lisp"]);
+    }
+
+    #[test]
+    fn a_one_file_call_appends_the_path_after_the_fixed_flags() {
+        let tool = find("paredit_outline").expect("the outline tool");
+        let argv = argv_for(tool, &json!({ "path": "src/a.lisp" })).expect("builds");
+        assert_eq!(argv.last().map(String::as_str), Some("src/a.lisp"));
+        assert!(argv.contains(&"--output".to_owned()));
+    }
+
+    #[test]
+    fn a_missing_required_argument_is_named_rather_than_defaulted() {
+        let tool = find("paredit_outline").expect("the outline tool");
+        let error = argv_for(tool, &json!({})).expect_err("no path");
+        assert!(error.contains("path"), "{error}");
+    }
+
+    #[test]
+    fn a_writing_flag_is_recognised_wherever_it_sits_in_the_vector() {
+        assert!(writes(&["edit".into(), "format".into(), "--write".into()]));
+        assert!(writes(&["inspect".into(), "lint".into(), "--fix".into()]));
+        assert!(!writes(&[
+            "inspect".into(),
+            "lint".into(),
+            "--fix-plan".into()
+        ]));
+        assert!(!writes(&["inspect".into(), "outline".into()]));
+    }
+
+    /// Exit code 3 is a policy gate reporting what it found. A model told that
+    /// was an error retries a command that worked.
+    #[test]
+    fn a_failed_gate_is_a_result_and_not_a_tool_error() {
+        let gated = call_result(&Output {
+            stdout: "finding_count\t2".to_owned(),
+            stderr: "lint-report policy failed".to_owned(),
+            code: 3,
+        });
+        assert_eq!(gated["isError"], false);
+        assert_eq!(gated["structuredContent"]["gate_failed"], true);
+
+        let broken = call_result(&Output {
+            stdout: String::new(),
+            stderr: "Error: no such file".to_owned(),
+            code: 1,
+        });
+        assert_eq!(broken["isError"], true);
+    }
+
+    /// stderr carries the reason a command refused. Dropping it leaves a model
+    /// with an empty result and no way to correct itself.
+    #[test]
+    fn a_failures_message_reaches_the_content() {
+        let result = call_result(&Output {
+            stdout: String::new(),
+            stderr: "Error: unsupported dialect".to_owned(),
+            code: 1,
+        });
+        assert!(
+            result["content"][0]["text"]
+                .as_str()
+                .is_some_and(|text| text.contains("unsupported dialect")),
+            "{result}"
+        );
+    }
+}

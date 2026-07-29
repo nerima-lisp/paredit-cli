@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::Args;
 
 use paredit_core_cli::args::DialectArg;
-use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::args::{GraphFormat, OutputFormat};
 use paredit_core_syntax::sexpr::SymbolName;
 
 #[derive(Debug, Args)]
@@ -29,6 +29,10 @@ pub struct CallGraphArgs {
     /// Require at least this many reported internal call graph edges.
     #[arg(long)]
     pub require_internal_edges: Option<usize>,
+    /// Draw the call graph instead of reporting it, as Graphviz DOT or a
+    /// Mermaid flowchart. Replaces --output; the gate still applies.
+    #[arg(long, value_enum, value_name = "FORMAT")]
+    pub graph: Option<GraphFormat>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,
