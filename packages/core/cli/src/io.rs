@@ -616,6 +616,7 @@ pub fn write_files_with_rollback_expected_anchored(
                 Some(file.expected),
                 parent,
                 file.file_name,
+                StagingIntent::Publish,
             )
         })
     }
@@ -741,6 +742,21 @@ fn stage_write_target_portable(
     content: String,
     expected_original: Option<ExpectedWriteTarget>,
 ) -> CliResult<PortableStagedWrite> {
+    stage_write_target_portable_with_intent(
+        path,
+        content,
+        expected_original,
+        StagingIntent::Publish,
+    )
+}
+
+#[cfg(any(not(unix), test))]
+fn stage_write_target_portable_with_intent(
+    path: PathBuf,
+    content: String,
+    expected_original: Option<ExpectedWriteTarget>,
+    intent: StagingIntent,
+) -> CliResult<PortableStagedWrite> {
     let lock = acquire_write_lock(&path)?;
     let metadata = match fs::symlink_metadata(&path) {
         Ok(metadata) if metadata.file_type().is_symlink() => {
@@ -852,7 +868,11 @@ fn stage_write_target_portable(
     }
     drop(staged_file);
 
-    let backup_path = if let Some(original) = original.as_mut() {
+    let backup_source = match intent {
+        StagingIntent::Publish => original.as_mut(),
+        StagingIntent::Probe => None,
+    };
+    let backup_path = if let Some(original) = backup_source {
         let CreatedSiblingPortable {
             path: backup_path,
             file: mut backup_file,
@@ -1084,20 +1104,36 @@ pub struct WritabilityCheck {
 /// Checks whether `path` could be written to right now, changing nothing.
 ///
 /// Reuses the exact staging step a real write goes through — the same
+/// batch-level refusals ([`ensure_writes_are_permitted`]), the same
 /// symlink/regular-file refusals, the same parent-directory permission
 /// check, the same write lock (see [`acquire_write_lock`]), and, because
 /// staging writes a same-size placeholder into a sibling file on the same
 /// filesystem before ever touching `path` itself, the same evidence of
 /// whether there is room for a write of about this size — then discards the
-/// staged (and, if `path` already exists, backup) sibling it created instead
-/// of publishing it.
+/// staged sibling it created instead of publishing it.
 ///
-/// `--dry-run` refuses a write outright, unconditionally, so a wrapper can
-/// append it without inspecting what it is wrapping; this instead answers
-/// "would it work", for a caller that wants to know before committing to one.
+/// The backup copy is the one staging step this deliberately skips, via
+/// [`StagingIntent::Probe`]: it exists only to roll a publish back, and a
+/// probe never publishes. See [`StagingIntent`] for what it used to cost.
+///
+/// `--dry-run` is checked *first*, before any lock or sibling file. The
+/// guarantee that flag makes — nothing is written to disk — has to hold for
+/// every path through this module, and a probe that took a lock and wrote a
+/// 64 MiB placeholder was not honouring it. Under `--dry-run` (and likewise
+/// under a non-UTF-8 `--encoding`) the honest answer is that the write would
+/// be refused, which is exactly what a real write would report, so that is
+/// what comes back rather than a guess obtained by writing.
 #[must_use]
 pub fn check_writable(path: PathBuf) -> WritabilityCheck {
     let target_existed = fs::symlink_metadata(&path).is_ok();
+    if let Err(refusal) = ensure_writes_are_permitted() {
+        return WritabilityCheck {
+            target_existed,
+            writable: false,
+            reason: Some(refusal.chain()),
+        };
+    }
+
     // Bounded rather than the file's exact size: a giant existing file would
     // otherwise turn a permission probe into copying gigabytes.
     const PLACEHOLDER_CEILING: u64 = 64 * 1024 * 1024;
@@ -1108,9 +1144,10 @@ pub fn check_writable(path: PathBuf) -> WritabilityCheck {
     let placeholder = "x".repeat(placeholder_len as usize);
 
     #[cfg(unix)]
-    let staged = stage_write_target_expected(path, placeholder, None);
+    let staged = stage_write_target_with_intent(path, placeholder, None, StagingIntent::Probe);
     #[cfg(not(unix))]
-    let staged = stage_write_target_portable(path, placeholder, None);
+    let staged =
+        stage_write_target_portable_with_intent(path, placeholder, None, StagingIntent::Probe);
 
     match staged {
         Ok(target) => {
@@ -1166,6 +1203,17 @@ struct StagedWriteTarget {
     /// the whole point.
     #[allow(dead_code)]
     lock: WriteLock,
+}
+
+#[cfg(unix)]
+impl StagedWriteTarget {
+    /// Whether a backup copy of the original was actually made.
+    ///
+    /// True for every existing target staged with [`StagingIntent::Publish`],
+    /// and false both for a new target and for a probe, which skips the copy.
+    const fn has_backup(&self) -> bool {
+        self.backup_identity.is_some()
+    }
 }
 
 #[cfg(unix)]
@@ -1234,20 +1282,53 @@ fn stage_write_target(path: PathBuf, content: String) -> CliResult<StagedWriteTa
     stage_write_target_expected(path, content, None)
 }
 
+/// Whether a staging run intends to publish what it stages.
+///
+/// A backup exists for exactly one purpose: restoring the original when a
+/// publish fails partway through a batch. [`check_writable`] never publishes,
+/// so for it the backup is pure cost — and not a small one, because copying
+/// the original is the only step in staging with no size ceiling at all. A
+/// 400 MB file measured 27.8 s and ~865 MB of peak disk to answer a question
+/// advertised as changing nothing.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum StagingIntent {
+    /// The staged content is meant to be published; back the original up.
+    Publish,
+    /// The staged content will be discarded unread; skip the backup.
+    Probe,
+}
+
 #[cfg(unix)]
 fn stage_write_target_expected(
     path: PathBuf,
     content: String,
     expected_original: Option<ExpectedWriteTarget>,
 ) -> CliResult<StagedWriteTarget> {
+    stage_write_target_with_intent(path, content, expected_original, StagingIntent::Publish)
+}
+
+#[cfg(unix)]
+fn stage_write_target_with_intent(
+    path: PathBuf,
+    content: String,
+    expected_original: Option<ExpectedWriteTarget>,
+    intent: StagingIntent,
+) -> CliResult<StagedWriteTarget> {
     #[cfg(unix)]
     {
         let (parent, target_name) = open_anchored_parent(&path)?;
-        stage_write_target_expected_inner(path, content, expected_original, parent, target_name)
+        stage_write_target_expected_inner(
+            path,
+            content,
+            expected_original,
+            parent,
+            target_name,
+            intent,
+        )
     }
     #[cfg(not(unix))]
     {
-        let _ = (path, content, expected_original);
+        let _ = (path, content, expected_original, intent);
         Err(io::Error::new(
             ErrorKind::Unsupported,
             "transactional writes are unsupported on this platform",
@@ -1263,6 +1344,7 @@ fn stage_write_target_expected_inner(
     expected_original: Option<ExpectedWriteTarget>,
     #[cfg(unix)] parent: AnchoredDirectory,
     #[cfg(unix)] target_name: OsString,
+    intent: StagingIntent,
 ) -> CliResult<StagedWriteTarget> {
     let lock = acquire_write_lock(&path)?;
     let staged_digest = *blake3::hash(content.as_bytes()).as_bytes();
@@ -1501,8 +1583,12 @@ fn stage_write_target_expected_inner(
     };
     drop(staged_file);
 
+    let backup_source = match intent {
+        StagingIntent::Publish => original.as_mut(),
+        StagingIntent::Probe => None,
+    };
     let (backup_path, backup_name, backup_identity, original_digest, backup_digest) =
-        if let Some(original) = original.as_mut() {
+        if let Some(original) = backup_source {
             match create_unique_backup_copy(
                 #[cfg(unix)]
                 &parent,
@@ -2028,7 +2114,10 @@ fn cleanup_unapplied_write(target: &StagedWriteTarget, errors: &mut Vec<String>)
         "staging file",
         errors,
     );
-    if target.existed {
+    // Not `target.existed`: a [`StagingIntent::Probe`] skips the backup even
+    // for a target that does exist, and asking for one that was never created
+    // would report a missing-snapshot error for work deliberately not done.
+    if target.has_backup() {
         remove_backup_for_cleanup(target, errors);
     }
 }
@@ -3625,6 +3714,19 @@ fn acquire_write_lock(path: &FsPath) -> CliResult<WriteLock> {
                 // loops rather than assuming the retry succeeds.
                 let _ = fs::remove_file(&lock_path);
             }
+            // The lock is a sibling of the target, so being denied permission
+            // to create it means the *directory* cannot be written in — which
+            // is what the reader needs to be told. Reporting this as "failed
+            // to acquire write lock" named the mechanism and hid the cause,
+            // and a read-only parent directory is precisely what `inspect
+            // writability` exists to report on.
+            Err(error) if error.kind() == ErrorKind::PermissionDenied => {
+                return Err(error).map_err(CliError::io(format!(
+                    "cannot create files in {}: the write lock for {} could not be created",
+                    write_target_parent(path).display(),
+                    path.display()
+                )));
+            }
             Err(error) => {
                 return Err(error).map_err(CliError::io(format!(
                     "failed to acquire write lock for {}",
@@ -3871,6 +3973,102 @@ mod tests {
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 
+    /// Repoints `staged`'s source at a path that does not exist, so publishing
+    /// it fails.
+    ///
+    /// Nothing in `apply_staged_writes_portable` makes `fs::rename` fail on
+    /// its own — every staged source it is handed was created moments earlier
+    /// — so the publish loop, and with it
+    /// [`restore_published_writes_portable`], is unreachable without staging a
+    /// failure deliberately. The real staged file is removed first so the
+    /// assertion on the directory's remaining entries stays meaningful.
+    #[cfg(any(not(unix), test))]
+    fn doom_the_publish_of(staged: &mut PortableStagedWrite) {
+        fs::remove_file(&staged.staged_path).expect("remove the real staged source");
+        staged.staged_path = staged.staged_path.with_file_name("never-staged.tmp");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn portable_publish_failure_restores_an_earlier_target_from_its_backup() {
+        let directory = test_directory("portable-publish-restore-backup");
+        let first = directory.join("first.lisp");
+        let second = directory.join("second.lisp");
+        fs::write(&first, "(old1)").expect("write first target");
+        fs::write(&second, "(old2)").expect("write second target");
+
+        let first_staged = stage_write_target_portable(first.clone(), "(new1)".to_owned(), None)
+            .expect("stage first target");
+        assert!(
+            first_staged.backup_path.is_some(),
+            "an existing target must be backed up, or there is nothing to restore from"
+        );
+        let mut second_staged =
+            stage_write_target_portable(second.clone(), "(new2)".to_owned(), None)
+                .expect("stage second target");
+        doom_the_publish_of(&mut second_staged);
+
+        let error = apply_staged_writes_portable(vec![first_staged, second_staged])
+            .expect_err("a missing staged source must fail the publish");
+
+        assert!(error.chain().contains("failed to publish"));
+        assert_eq!(
+            fs::read_to_string(&first).expect("read first target"),
+            "(old1)",
+            "an already-published target must be restored from its backup"
+        );
+        assert_eq!(
+            fs::read_to_string(&second).expect("read second target"),
+            "(old2)"
+        );
+        let mut entries = fs::read_dir(&directory)
+            .expect("read test directory")
+            .map(|entry| entry.expect("read directory entry").file_name())
+            .collect::<Vec<_>>();
+        entries.sort();
+        assert_eq!(
+            entries,
+            [OsString::from("first.lisp"), OsString::from("second.lisp")],
+            "no staged or backup sibling may survive the restore"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn portable_publish_failure_removes_an_earlier_target_that_came_from_nothing() {
+        let directory = test_directory("portable-publish-restore-new");
+        let first = directory.join("first.lisp");
+        let second = directory.join("second.lisp");
+        fs::write(&second, "(old2)").expect("write second target");
+
+        let first_staged = stage_write_target_portable(first.clone(), "(new1)".to_owned(), None)
+            .expect("stage first target");
+        assert!(
+            first_staged.backup_path.is_none(),
+            "a target that did not exist has nothing to back up"
+        );
+        let mut second_staged =
+            stage_write_target_portable(second.clone(), "(new2)".to_owned(), None)
+                .expect("stage second target");
+        doom_the_publish_of(&mut second_staged);
+
+        let error = apply_staged_writes_portable(vec![first_staged, second_staged])
+            .expect_err("a missing staged source must fail the publish");
+
+        assert!(error.chain().contains("failed to publish"));
+        assert!(
+            !first.exists(),
+            "a target with no backup must be removed again, not left behind"
+        );
+        let entries = fs::read_dir(&directory)
+            .expect("read test directory")
+            .map(|entry| entry.expect("read directory entry").file_name())
+            .collect::<Vec<_>>();
+        assert_eq!(entries, [OsString::from("second.lisp")]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
     #[cfg(all(unix, test))]
     #[test]
     fn portable_write_refuses_a_symlink_target() {
@@ -4037,6 +4235,71 @@ mod tests {
             .filter(|name| name != ".paredit.cleanup")
             .collect();
         assert_eq!(entries, [OsString::from("existing.lisp")]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_probe_stages_an_existing_target_without_copying_it() {
+        let directory = test_directory("probe-skips-backup");
+        let target = directory.join("existing.lisp");
+        fs::write(&target, "(untouched)").expect("write existing target");
+
+        let staged = stage_write_target_with_intent(
+            target.clone(),
+            "xxxxxxxxxxx".to_owned(),
+            None,
+            StagingIntent::Probe,
+        )
+        .expect("stage probe");
+
+        assert!(staged.existed);
+        assert!(
+            !staged.has_backup(),
+            "a probe never publishes, so copying the original buys nothing"
+        );
+        assert!(
+            !staged.backup_path.exists(),
+            "the skipped backup must not exist on disk"
+        );
+
+        let mut errors = Vec::new();
+        cleanup_unapplied_write(&staged, &mut errors);
+        assert_eq!(
+            errors,
+            Vec::<String>::new(),
+            "cleanup must not report a backup that was deliberately never made"
+        );
+        drop(staged);
+        assert_eq!(
+            fs::read_to_string(&target).expect("read target"),
+            "(untouched)"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[cfg(any(not(unix), test))]
+    #[test]
+    fn a_portable_probe_stages_an_existing_target_without_copying_it() {
+        let directory = test_directory("portable-probe-skips-backup");
+        let target = directory.join("existing.lisp");
+        fs::write(&target, "(untouched)").expect("write existing target");
+
+        let staged = stage_write_target_portable_with_intent(
+            target.clone(),
+            "xxxxxxxxxxx".to_owned(),
+            None,
+            StagingIntent::Probe,
+        )
+        .expect("stage probe");
+
+        assert!(staged.backup_path.is_none());
+        cleanup_unstaged_writes_portable(std::slice::from_ref(&staged));
+        drop(staged);
+        assert_eq!(
+            fs::read_to_string(&target).expect("read target"),
+            "(untouched)"
+        );
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 
