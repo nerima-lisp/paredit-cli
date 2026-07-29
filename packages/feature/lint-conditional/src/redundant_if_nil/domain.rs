@@ -14,13 +14,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare atom `nil`.
 fn is_bare_nil(view: &ExpressionView) -> bool {
@@ -29,51 +31,56 @@ fn is_bare_nil(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct RedundantIfNilItem {
-    pub path: PathBuf,
     /// The span of the whole `(if …)` form.
     pub span: ByteSpan,
+    /// The 1-based line the form starts on.
+    pub line: usize,
     /// The span from the end of the then branch to the end of the `nil` else —
     /// the ` nil` a fix deletes to leave `(if test then)`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule deletes exactly
+    /// this range, and neither the old renderer nor this one prints it.
     pub removal_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct RedundantIfNilSummary {
-    pub if_form_count: usize,
-    pub violations: Vec<RedundantIfNilItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantIfNilPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantIfNilPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantIfNilItem {
+    /// The rule's own name. Every finding is the same shape — a bare `nil`
+    /// else — so there is no sub-classification to make.
+    fn kind(&self) -> &'static str {
+        "redundant-if-nil"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantIfNilPolicy {
-    pub fail_on_violation: bool,
-    pub if_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    /// None. The old renderer printed the path and the offset and nothing else,
+    /// and both are the envelope's now.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// None, for the same reason: the old JSON carried only `path` and `span`.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `redundant-if-nil` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "if else branch is a redundant nil; (if c x nil) is (if c x)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<RedundantIfNilItem>,
 ) {
@@ -91,74 +98,83 @@ pub fn examine_if(
     let else_branch = &view.children[3];
     if is_bare_nil(else_branch) && !is_bare_nil(then_branch) {
         violations.push(RedundantIfNilItem {
-            path: path.to_path_buf(),
             span: view.span,
+            line: line_of(source, view.span.start().get()),
             removal_span: ByteSpan::new(then_branch.span.end(), else_branch.span.end()),
         });
     }
 }
 
-/// Collects every `if` with a redundant `nil` else across a whole file, along
-/// with the total number of `if` forms scanned.
-pub fn collect_redundant_if_nils(
+/// Collects every `if` with a redundant `nil` else in one file, with the number
+/// of `if` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant nil else here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_if_nil_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantIfNilItem>)> {
+) -> LintResult<FileFindings<RedundantIfNilItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("if_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, path, &mut if_form_count, &mut violations);
+            examine_if(subview, source, &mut if_form_count, &mut violations);
         });
     }
-    Ok((if_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("if_form_count", json!(if_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_redundant_if_nils(
-    if_form_count: usize,
-    violations: Vec<RedundantIfNilItem>,
-) -> RedundantIfNilSummary {
-    RedundantIfNilSummary {
-        if_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_if_nil_policy(
-    options: RedundantIfNilPolicyOptions,
-    summary: &RedundantIfNilSummary,
-) -> RedundantIfNilPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantIfNilPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        if_form_count: summary.if_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn ifs(input: &str) -> (usize, Vec<RedundantIfNilItem>) {
+    fn report(input: &str) -> FileFindings<RedundantIfNilItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_if_nils(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant if nils")
+        build_redundant_if_nil_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant if nil report")
+    }
+
+    /// The `(if_form_count, violations)` pair the report is built from.
+    fn ifs(input: &str) -> (u64, Vec<RedundantIfNilItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "if_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("if_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -221,28 +237,37 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(if c x nil)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_redundant_if_nils(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant if nils");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_redundant_if_nil_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build redundant if nil report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("if_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = ifs("(if c x nil)");
-        let summary = summarize_redundant_if_nils(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(if c x y)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_redundant_if_nil_policy(RedundantIfNilPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_no_columns_of_its_own() {
+        let report = report("(defun f (c x)\n  (if c x nil))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "redundant-if-nil");
+        assert!(finding.json_fields().is_empty());
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_redundant_if_nil_policy(RedundantIfNilPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_if_scanned_not_only_the_flagged_ones() {
+        let report = report("(if c x nil)\n(if c x y)\n(if d z nil)\n");
+        assert_eq!(report.summary, vec![("if_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

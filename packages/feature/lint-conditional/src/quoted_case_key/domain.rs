@@ -18,16 +18,18 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const CASE_HEADS: [&str; 3] = ["case", "ccase", "ecase"];
 
@@ -49,49 +51,57 @@ fn key_designator_is_quoted(key_designator: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct QuotedCaseKeyItem {
-    pub path: PathBuf,
+    /// The span of the quoted key designator.
     pub span: ByteSpan,
+    /// The 1-based line the key designator starts on.
+    pub line: usize,
+    /// The `case`/`ccase`/`ecase` head, in the source's own casing.
     pub head: String,
+    /// The key designator as written.
     pub key: String,
 }
 
-#[derive(Debug)]
-pub struct QuotedCaseKeySummary {
-    pub case_form_count: usize,
-    pub violations: Vec<QuotedCaseKeyItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct QuotedCaseKeyPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl QuotedCaseKeyPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for QuotedCaseKeyItem {
+    /// The rule's own name, not the `case`/`ccase`/`ecase` head.
+    ///
+    /// The head is kept in the source's casing (`ECASE` stays `ECASE`), which
+    /// makes it data rather than a tag: a consumer grouping on `kind` would get
+    /// one bucket per spelling. It is published as a JSON field instead.
+    fn kind(&self) -> &'static str {
+        "quoted-case-key"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct QuotedCaseKeyPolicy {
-    pub fail_on_violation: bool,
-    pub case_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn line(&self) -> usize {
+        self.line
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("head={}", self.head), format!("key={}", self.key)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("head", json!(self.head)), ("key", json!(self.key))]
+    }
+
+    /// The same sentence the `quoted-case-key` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} key {} is quoted; case keys are not evaluated",
+            self.head, self.key
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    path: &Path,
+    source: &str,
     case_form_count: &mut usize,
     violations: &mut Vec<QuotedCaseKeyItem>,
 ) {
@@ -121,8 +131,8 @@ pub fn examine_case(
         };
         if key_designator_is_quoted(key_designator) {
             violations.push(QuotedCaseKeyItem {
-                path: path.to_path_buf(),
                 span: key_designator.span,
+                line: line_of(source, key_designator.span.start().get()),
                 head: head.to_owned(),
                 key: render_expression(key_designator),
             });
@@ -130,67 +140,77 @@ pub fn examine_case(
     }
 }
 
-/// Collects every `case`/`ccase`/`ecase` clause with a quoted key designator
-/// across a whole file, along with the total number of such forms scanned.
-pub fn collect_quoted_case_keys(
+/// Collects every `case`/`ccase`/`ecase` clause with a quoted key designator in
+/// one file, with the number of such forms scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no quoted key here" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_quoted_case_key_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<QuotedCaseKeyItem>)> {
+) -> LintResult<FileFindings<QuotedCaseKeyItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            Vec::new(),
+            vec![("case_form_count", json!(0))],
+        ));
     }
 
+    let source = tree.source();
     let mut case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, path, &mut case_form_count, &mut violations);
+            examine_case(subview, source, &mut case_form_count, &mut violations);
         });
     }
-    Ok((case_form_count, violations))
+
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        violations,
+        vec![("case_form_count", json!(case_form_count))],
+    ))
 }
 
-#[must_use]
-pub const fn summarize_quoted_case_keys(
-    case_form_count: usize,
-    violations: Vec<QuotedCaseKeyItem>,
-) -> QuotedCaseKeySummary {
-    QuotedCaseKeySummary {
-        case_form_count,
-        violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_quoted_case_key_policy(
-    options: QuotedCaseKeyPolicyOptions,
-    summary: &QuotedCaseKeySummary,
-) -> QuotedCaseKeyPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    QuotedCaseKeyPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        case_form_count: summary.case_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+fn line_of(source: &str, offset: usize) -> usize {
+    1 + source
+        .get(..offset.min(source.len()))
+        .unwrap_or(source)
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn keys(input: &str) -> (usize, Vec<QuotedCaseKeyItem>) {
+    fn report(input: &str) -> FileFindings<QuotedCaseKeyItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_quoted_case_keys(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect quoted case keys")
+        build_quoted_case_key_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build quoted case key report")
+    }
+
+    /// The `(case_form_count, violations)` pair the report is built from.
+    fn keys(input: &str) -> (u64, Vec<QuotedCaseKeyItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "case_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("case_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -260,29 +280,53 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(case x ('a 1))", Dialect::Clojure).expect("parse");
-        let (case_form_count, items) =
-            collect_quoted_case_keys(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect quoted case keys");
-        assert_eq!(case_form_count, 0);
-        assert!(items.is_empty());
+        let report = build_quoted_case_key_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build quoted case key report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("case_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (case_form_count, items) = keys("(case x ('a 1))");
-        let summary = summarize_quoted_case_keys(case_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(case x (a 1))").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_quoted_case_key_policy(QuotedCaseKeyPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_head_and_its_key() {
+        let report = report("(defun f (x)\n  (case x ('a 1)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(finding.line, 2);
+        assert_eq!(finding.kind(), "quoted-case-key");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("head", json!("case")), ("key", json!("'a"))]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["head=case".to_owned(), "key='a".to_owned()]
+        );
+    }
 
-        let strict =
-            evaluate_quoted_case_key_policy(QuotedCaseKeyPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    /// The head keeps the source's casing, which is exactly why it is a JSON
+    /// field rather than the `kind` tag.
+    #[test]
+    fn the_head_is_reported_as_written() {
+        let report = report("(ECASE x ('a 1))");
+        assert_eq!(report.findings[0].head, "ECASE");
+        assert_eq!(report.findings[0].kind(), "quoted-case-key");
+    }
+
+    #[test]
+    fn the_summary_counts_every_case_scanned_not_only_the_flagged_ones() {
+        let report = report("(case x ('a 1))\n(case y (b 2))\n(ecase z ('c 3))\n");
+        assert_eq!(report.summary, vec![("case_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }
