@@ -321,6 +321,42 @@ step: at the end of a list, `forward` fails rather than moving out of it, so a
 composed sequence never silently changes depth. `--output json` reports the
 span, kind, and head of both ends of the move.
 
+## Browsing interactively: `paredit tui`
+
+`paredit tui --file source.lisp` opens a full-screen browser of one file's
+tree, for finding a `--path` by eye instead of chaining `outline` and
+`navigate` reports by hand. Movement is vi-style, with the arrow keys as an
+alias:
+
+| Key | Moves |
+| --- | --- |
+| `j` / `↓` | Next sibling |
+| `k` / `↑` | Previous sibling |
+| `l` / `→` / `Enter` | Into the first child |
+| `h` / `←` | Out to the parent |
+| `q` | Quit |
+
+Each frame shows the current node's path and kind, its own source collapsed
+to one line, and every immediate child indexed underneath. There is no
+editing here — the other ~130 commands under `edit` and `refactor` already
+cover the transform side, each behind its own safety checks (reparse guards,
+hash-anchored writes) that a from-scratch in-loop editor would have to
+either duplicate or bypass. `tui` is scoped to *finding* the `--path` those
+commands need: it prints the path last selected to stdout once the session
+ends, so it composes the same way `git rev-parse` composes with the rest of
+`git`:
+
+```sh
+paredit edit wrap --file source.lisp \
+  --path "$(paredit tui --file source.lisp)"
+```
+
+It needs an interactive terminal on both stdin and stdout — piped input or a
+redirected stdout refuses immediately rather than opening a screen nothing
+can read or drawing to a script that did not ask for one. Raw terminal mode
+is POSIX termios, so `tui` also refuses on non-Unix platforms; every other
+command in this reference is unaffected.
+
 ## Asking what is at an offset
 
 `--at` selects the smallest *expression* containing an offset, which says

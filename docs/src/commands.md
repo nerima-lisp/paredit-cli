@@ -30,6 +30,14 @@ rather than on source:
 - `paredit completions <shell>` prints shell completion scripts for bash,
   zsh, fish, elvish, and powershell.
 
+Four more top-level commands sit outside `inspect`/`edit`/`refactor`
+entirely — long-running or interactive processes rather than one-shot
+reports or edits: `paredit lsp` and `paredit serve` (see
+[Integrations](integrations.md)), `paredit mcp` (see
+[Agent interface](agents.md)), and `paredit tui`, an interactive tree
+browser that prints a `--path` on exit (see
+[Browsing interactively](selectors.md#browsing-interactively-paredit-tui)).
+
 Run `paredit <namespace> --help` for the authoritative list on your installed
 version, and `paredit <namespace> <command> --help` for each command's
 contract, arguments, and output formats. For a machine-readable catalog of
