@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-30
+
 The five shallowest dialects — LFE, Fennel, Janet, Hy, and Carp — gain real
 scope analysis, and the dialect capability matrix stops answering "unknown"
 for 99% of its cells.
@@ -406,6 +408,7 @@ model, a binding table, nine lint rules, and a per-file report.
   `defvar-local`, `defvar-keymap`, `defface`, `defalias`, `define-error`,
   `define-globalized-minor-mode`, `ert-deftest` and the rest — and rejects
   Common Lisp spellings such as `defparameter` and `defpackage`.
+
 ## [1.2.1] - 2026-07-28
 
 No command, flag, exit code, or JSON field changed in this release: nothing
