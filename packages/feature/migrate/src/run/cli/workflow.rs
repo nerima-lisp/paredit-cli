@@ -6,11 +6,13 @@
 //! the plan and writes only under `--write`. A recipe that a caller could
 //! only discover by running it would be a worse tool than no recipe at all.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use paredit_core_cli::{CliResult, CommandResult};
 
-use paredit_core_cli::shared::{emit_document, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{
+    analyze_files, emit_document, note_partial_file_failures, total_file_failure,
+};
 use paredit_core_syntax::selector::RewriteAllowances;
 
 use crate::catalog::{self, DEFAULT_RECIPE_DIRECTORY};
@@ -57,25 +59,31 @@ fn run(args: MigrateRunArgs) -> CommandResult {
     };
     let files = selected_files(&args.input, &args.roots)?;
 
-    let mut outcomes: Vec<(FileOutcome, _)> = Vec::with_capacity(files.len());
-    for file in &files {
-        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let outcome = run_migration(
-            Path::new(file),
-            dialect,
-            tree.source(),
-            &entry.migration,
-            allow,
-        )?;
-        outcomes.push((outcome, (input, dialect)));
+    // A file that will not parse is reported, not fatal, and the source text
+    // is retained only for a file that will actually be written. Both matter
+    // at repository scale: 10% of Emacs's own `lisp/` tree uses a reader
+    // dispatch this parser declines, and one such file aborted a run over the
+    // other 1450.
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
+        let outcome = run_migration(file, dialect, tree.source(), &entry.migration, allow)?;
+        let source = outcome.is_touched().then(|| (input.clone(), dialect));
+        CliResult::Ok((outcome, source))
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let outcomes = analysis.succeeded;
 
-    let plans: Vec<FileOutcome> = outcomes.iter().map(|(plan, _)| plan.clone()).collect();
+    // References, not clones.
+    let plans: Vec<&FileOutcome> = outcomes.iter().map(|(plan, _)| plan).collect();
     let totals = MigrationTotals::of(&plans);
 
     if args.write || args.diff {
-        for (plan, (input, dialect)) in &outcomes {
-            let Some(rewritten) = plan.rewritten.clone() else {
+        for (plan, source) in &outcomes {
+            let (Some(rewritten), Some((input, dialect))) =
+                (plan.rewritten.clone(), source.as_ref())
+            else {
                 continue;
             };
             emit_document(input, *dialect, args.write, args.diff, rewritten)?;

@@ -113,8 +113,13 @@ pub struct RewriteTotals {
 
 impl RewriteTotals {
     /// Adds every file's contribution.
+    ///
+    /// Takes borrowed plans. Each `FileRewrite` holds every match's `before`
+    /// *and* `after` text, so for a top-level pattern the plans are roughly
+    /// twice the corpus — cloning the vector to hand it here doubled that
+    /// again, and measured 374 MB on a 13 MB tree.
     #[must_use]
-    pub fn of(files: &[FileRewrite]) -> Self {
+    pub fn of(files: &[&FileRewrite]) -> Self {
         Self {
             files_scanned: files.len(),
             files_touched: files.iter().filter(|file| file.is_touched()).count(),
@@ -126,7 +131,7 @@ impl RewriteTotals {
 
     /// How many skipped matches carry `reason`, across the run.
     #[must_use]
-    pub fn skipped_for(files: &[FileRewrite], reason: SkipReason) -> usize {
+    pub fn skipped_for(files: &[&FileRewrite], reason: SkipReason) -> usize {
         files
             .iter()
             .flat_map(|file| &file.skipped)
@@ -169,7 +174,8 @@ mod tests {
 
     #[test]
     fn totals_separate_the_skipped_from_the_rewritten() {
-        let files = vec![rewrite("(f (f x))", "(f ?x)", "(g ?x)")];
+        let owned = [rewrite("(f (f x))", "(f ?x)", "(g ?x)")];
+        let files: Vec<&FileRewrite> = owned.iter().collect();
         let totals = RewriteTotals::of(&files);
         assert_eq!(totals.replacements, 1);
         assert_eq!(totals.skipped, 1);
