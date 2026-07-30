@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
@@ -60,7 +60,6 @@ pub struct ArityFinding {
     /// The callee's lambda list, so the finding can be judged in place.
     pub lambda_list: String,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for ArityFinding {
@@ -70,10 +69,6 @@ impl Finding for ArityFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -124,7 +119,7 @@ pub fn build_keyword_arity_report(
     let signatures = collect_signatures(&root, dialect, source);
 
     let mut findings = Vec::new();
-    collect_calls(&root, &signatures, source, &mut findings);
+    collect_calls(&root, &signatures, &mut findings);
 
     FileFindings::new(
         path.to_path_buf(),
@@ -132,6 +127,7 @@ pub fn build_keyword_arity_report(
         // Lambda-list keywords are Common Lisp's, but the required/optional
         // shape is shared; other dialects simply match fewer callees.
         true,
+        tree.source(),
         findings,
         vec![("checked_callee_count", json!(signatures.len()))],
     )
@@ -235,18 +231,17 @@ fn read_signature(parameters: &[ExpressionView], text: String) -> Signature {
 fn collect_calls(
     view: &ExpressionView,
     signatures: &BTreeMap<String, Signature>,
-    source: &str,
     findings: &mut Vec<ArityFinding>,
 ) {
     if is_paren_list(view) {
         if let Some(head) = list_head(view) {
             if let Some(signature) = signatures.get(&fold(head)) {
-                check(view, head, signature, source, findings);
+                check(view, head, signature, findings);
             }
         }
     }
     for child in &view.children {
-        collect_calls(child, signatures, source, findings);
+        collect_calls(child, signatures, findings);
     }
 }
 
@@ -254,7 +249,6 @@ fn check(
     call: &ExpressionView,
     head: &str,
     signature: &Signature,
-    source: &str,
     findings: &mut Vec<ArityFinding>,
 ) {
     let arguments = &call.children[1..];
@@ -267,7 +261,6 @@ fn check(
             supplied,
             lambda_list: signature.text.clone(),
             span: call.span,
-            line: line_of(source, call.span.start().get()),
         });
     };
 

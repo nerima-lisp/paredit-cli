@@ -36,13 +36,13 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        context: &RuleContext<'_>,
+        _context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
         let mut quoted_form_count = 0;
         let mut items = Vec::new();
-        examine_quote(view, context.source(), &mut quoted_form_count, &mut items);
+        examine_quote(view, &mut quoted_form_count, &mut items);
         for item in items {
             let span = item.span;
             // The replacement is the quoted datum's own source, which the

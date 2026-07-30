@@ -31,7 +31,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -128,8 +128,6 @@ impl CharacterMismatch {
 #[derive(Debug, Clone)]
 pub struct CharOpStringItem {
     pub span: ByteSpan,
-    /// The 1-based line the call starts on.
-    pub line: usize,
     /// The character function (`char=`, `char-code`, …).
     pub operator: String,
     pub mismatch: CharacterMismatch,
@@ -142,10 +140,6 @@ impl Finding for CharOpStringItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -209,7 +203,6 @@ const fn never(_: &ExpressionView) -> bool {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    source: &str,
     is_non_character: IsNonCharacterArgument<'_>,
     char_call_count: &mut usize,
     violations: &mut Vec<CharOpStringItem>,
@@ -228,7 +221,6 @@ pub fn examine_call(
     if let Some((_, mismatch)) = first_non_character_argument(view, is_non_character) {
         violations.push(CharOpStringItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             operator: head.to_ascii_lowercase(),
             mismatch,
         });
@@ -253,24 +245,18 @@ pub fn build_char_op_string_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("char_call_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut char_call_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(
-                subview,
-                source,
-                &never,
-                &mut char_call_count,
-                &mut violations,
-            );
+            examine_call(subview, &never, &mut char_call_count, &mut violations);
         });
     }
 
@@ -278,6 +264,7 @@ pub fn build_char_op_string_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("char_call_count", json!(char_call_count))],
     ))
@@ -388,7 +375,7 @@ mod tests {
     fn a_finding_carries_its_line_its_operator_and_its_literal() {
         let report = report("(defun f (c)\n  (char= c \"a\"))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "string-literal");
         assert_eq!(
             finding.json_fields(),

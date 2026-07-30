@@ -27,7 +27,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -46,8 +46,6 @@ fn is_bare_nil_key(key_designator: &ExpressionView) -> bool {
 pub struct TypecaseNilKeyItem {
     /// The span of the offending `nil` type specifier.
     pub span: ByteSpan,
-    /// The 1-based line the type specifier starts on.
-    pub line: usize,
     /// The typecase operator (`typecase`/`etypecase`/`ctypecase`), for the finding message.
     pub head: String,
 }
@@ -61,10 +59,6 @@ impl Finding for TypecaseNilKeyItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -89,7 +83,6 @@ impl Finding for TypecaseNilKeyItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    source: &str,
     typecase_form_count: &mut usize,
     violations: &mut Vec<TypecaseNilKeyItem>,
 ) {
@@ -120,7 +113,6 @@ pub fn examine_case(
         if is_bare_nil_key(key_designator) {
             violations.push(TypecaseNilKeyItem {
                 span: key_designator.span,
-                line: line_of(source, key_designator.span.start().get()),
                 head: head.to_owned(),
             });
         }
@@ -145,18 +137,18 @@ pub fn build_typecase_nil_key_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("typecase_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut typecase_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, source, &mut typecase_form_count, &mut violations);
+            examine_case(subview, &mut typecase_form_count, &mut violations);
         });
     }
 
@@ -164,6 +156,7 @@ pub fn build_typecase_nil_key_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("typecase_form_count", json!(typecase_form_count))],
     ))
@@ -269,7 +262,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_head() {
         let report = report("(defun f (x)\n  (typecase x (nil 1)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "typecase-nil-key");
         assert_eq!(finding.json_fields(), vec![("head", json!("typecase"))]);
         assert_eq!(finding.text_columns(), vec!["typecase".to_owned()]);

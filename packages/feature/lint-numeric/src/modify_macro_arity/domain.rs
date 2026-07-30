@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -73,8 +73,6 @@ fn arity_phrase(min: usize, max: usize) -> String {
 #[derive(Debug, Clone)]
 pub struct ModifyMacroArityItem {
     pub span: ByteSpan,
-    /// The 1-based line the call starts on.
-    pub line: usize,
     /// The macro's canonical lowercase name, which is a closed set of four.
     pub canonical_operator: &'static str,
     /// The macro as it is spelled in the source, whose case is not folded.
@@ -94,10 +92,6 @@ impl Finding for ModifyMacroArityItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -134,7 +128,6 @@ impl Finding for ModifyMacroArityItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    source: &str,
     call_count: &mut usize,
     violations: &mut Vec<ModifyMacroArityItem>,
 ) {
@@ -158,7 +151,6 @@ pub fn examine_call(
     if !(min_arity..=max_arity).contains(&argument_count) {
         violations.push(ModifyMacroArityItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             canonical_operator,
             operator: head.to_owned(),
             argument_count,
@@ -185,18 +177,18 @@ pub fn build_modify_macro_arity_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("call_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut call_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, source, &mut call_count, &mut violations);
+            examine_call(subview, &mut call_count, &mut violations);
         });
     }
 
@@ -204,6 +196,7 @@ pub fn build_modify_macro_arity_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("call_count", json!(call_count))],
     ))
@@ -346,7 +339,7 @@ mod tests {
     fn a_finding_carries_its_line_and_every_field_the_report_publishes() {
         let report = report("(defun f (x)\n  (incf x 1 2))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "incf");
         assert_eq!(
             finding.json_fields(),

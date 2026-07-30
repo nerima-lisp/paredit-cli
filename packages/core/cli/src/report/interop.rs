@@ -82,7 +82,7 @@ impl Flattened {
                     dialect: report.dialect.label(),
                     kind: finding.kind(),
                     severity: finding.severity(),
-                    line: finding.line(),
+                    line: report.line_of(finding),
                     span_start: finding.span().start().get(),
                     span_end: finding.span().end().get(),
                     message: finding.message(),
@@ -734,7 +734,7 @@ mod tests {
 
     #[derive(Debug)]
     struct Probe {
-        line: usize,
+        offset: usize,
         detail: &'static str,
     }
 
@@ -743,10 +743,10 @@ mod tests {
             "probe"
         }
         fn span(&self) -> ByteSpan {
-            ByteSpan::new(ByteOffset::new(self.line), ByteOffset::new(self.line + 4))
-        }
-        fn line(&self) -> usize {
-            self.line
+            ByteSpan::new(
+                ByteOffset::new(self.offset),
+                ByteOffset::new(self.offset + 4),
+            )
         }
         fn text_columns(&self) -> Vec<String> {
             vec![self.detail.to_owned()]
@@ -754,6 +754,12 @@ mod tests {
         fn json_fields(&self) -> Vec<(&'static str, Value)> {
             vec![("detail", json!(self.detail))]
         }
+    }
+
+    /// One byte per line, so a probe at offset `n` lands on line `n + 1` and
+    /// two different offsets are reliably two different lines.
+    fn source() -> String {
+        "\n".repeat(64)
     }
 
     fn flat(findings: Vec<Probe>, modelled: bool) -> Flattened {
@@ -765,6 +771,7 @@ mod tests {
                 Dialect::Fennel
             },
             modelled,
+            &source(),
             findings,
             Vec::new(),
         )];
@@ -794,7 +801,7 @@ mod tests {
         let csv = delimited(
             &flat(
                 vec![Probe {
-                    line: 3,
+                    offset: 3,
                     detail: "x",
                 }],
                 true,
@@ -808,7 +815,7 @@ mod tests {
     fn a_tsv_cell_cannot_break_its_row() {
         let flattened = flat(
             vec![Probe {
-                line: 3,
+                offset: 3,
                 detail: "one\ttwo\nthree",
             }],
             true,
@@ -822,7 +829,7 @@ mod tests {
         let csv = delimited(
             &flat(
                 vec![Probe {
-                    line: 3,
+                    offset: 3,
                     detail: "x",
                 }],
                 true,
@@ -837,14 +844,14 @@ mod tests {
     fn code_climate_fingerprints_survive_a_line_shift() {
         let first = code_climate(&flat(
             vec![Probe {
-                line: 3,
+                offset: 3,
                 detail: "x",
             }],
             true,
         ));
         let second = code_climate(&flat(
             vec![Probe {
-                line: 9,
+                offset: 9,
                 detail: "x",
             }],
             true,
@@ -868,7 +875,7 @@ mod tests {
     fn markup_metacharacters_in_a_message_cannot_escape_their_cell() {
         let flattened = flat(
             vec![Probe {
-                line: 1,
+                offset: 1,
                 detail: "<script>|`",
             }],
             true,

@@ -28,7 +28,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree,
@@ -55,8 +55,6 @@ fn is_catch_all_test(view: &ExpressionView) -> bool {
 pub struct SingleClauseCondItem {
     /// The span of the whole `(cond (…))` form.
     pub span: ByteSpan,
-    /// The 1-based line the `cond` starts on.
-    pub line: usize,
     /// The span of the clause interior (`test body…`, parens excluded), which
     /// the fix wraps as `(when …)`.
     ///
@@ -74,10 +72,6 @@ impl Finding for SingleClauseCondItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// None. The old renderer printed the path and the offset and nothing else,
@@ -103,7 +97,6 @@ impl Finding for SingleClauseCondItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cond(
     view: &ExpressionView,
-    source: &str,
     cond_form_count: &mut usize,
     violations: &mut Vec<SingleClauseCondItem>,
 ) {
@@ -146,7 +139,6 @@ pub fn examine_cond(
 
     violations.push(SingleClauseCondItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         clause_inner_span,
     });
 }
@@ -168,18 +160,18 @@ pub fn build_single_clause_cond_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("cond_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut cond_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_cond(subview, source, &mut cond_form_count, &mut violations);
+            examine_cond(subview, &mut cond_form_count, &mut violations);
         });
     }
 
@@ -187,6 +179,7 @@ pub fn build_single_clause_cond_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("cond_form_count", json!(cond_form_count))],
     ))
@@ -324,7 +317,7 @@ mod tests {
     fn a_finding_carries_its_line_and_no_columns_of_its_own() {
         let report = report("(defun f (x)\n  (cond ((plusp x) (g x))))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "single-clause-cond");
         assert!(finding.json_fields().is_empty());
         assert!(finding.text_columns().is_empty());

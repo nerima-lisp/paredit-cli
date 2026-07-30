@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -55,8 +55,6 @@ fn is_arity_ambiguous(view: &ExpressionView) -> bool {
 #[derive(Debug, Clone)]
 pub struct EqualityArityItem {
     pub span: ByteSpan,
-    /// The 1-based line the call starts on.
-    pub line: usize,
     /// The operator exactly as it was written, so its source casing survives.
     pub operator: String,
     pub argument_count: usize,
@@ -80,10 +78,6 @@ impl Finding for EqualityArityItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -112,7 +106,6 @@ impl Finding for EqualityArityItem {
 
 pub fn examine_call(
     view: &ExpressionView,
-    source: &str,
     call_count: &mut usize,
     violations: &mut Vec<EqualityArityItem>,
 ) {
@@ -139,7 +132,6 @@ pub fn examine_call(
     if argument_count != EXPECTED_ARGUMENTS {
         violations.push(EqualityArityItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             operator: head.to_owned(),
             argument_count,
         });
@@ -163,18 +155,18 @@ pub fn build_equality_arity_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("call_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut call_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, source, &mut call_count, &mut violations);
+            examine_call(subview, &mut call_count, &mut violations);
         });
     }
 
@@ -182,6 +174,7 @@ pub fn build_equality_arity_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("call_count", json!(call_count))],
     ))
@@ -290,7 +283,7 @@ mod tests {
     fn a_finding_carries_its_line_its_operator_and_its_arity() {
         let report = report("(defun f (x)\n  (eq x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "eq");
         assert_eq!(
             finding.json_fields(),

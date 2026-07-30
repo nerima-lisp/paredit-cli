@@ -20,7 +20,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
@@ -38,7 +38,6 @@ pub struct Hotspot {
     /// `churn * complexity`. The ranking key.
     pub score: usize,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for Hotspot {
@@ -48,10 +47,6 @@ impl Finding for Hotspot {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -110,7 +105,6 @@ pub fn build_hotspot_report(
     tree: &SyntaxTree,
     churn: &Churn,
 ) -> FileFindings<Hotspot> {
-    let source = tree.source();
     let commits = churn.commits();
 
     let findings = tree
@@ -128,7 +122,6 @@ pub fn build_hotspot_report(
                 complexity,
                 score: commits.saturating_mul(complexity),
                 span: form.span,
-                line: line_of(source, form.span.start().get()),
             })
         })
         .collect::<Vec<_>>();
@@ -147,7 +140,14 @@ pub fn build_hotspot_report(
         summary.push(("churn_unavailable", json!(reason)));
     }
 
-    FileFindings::new(path.to_path_buf(), dialect, true, findings, summary)
+    FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
+        findings,
+        summary,
+    )
 }
 
 /// Nesting depth plus form count.

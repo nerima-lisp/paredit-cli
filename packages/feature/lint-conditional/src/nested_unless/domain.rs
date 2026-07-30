@@ -30,7 +30,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -51,8 +51,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct NestedUnlessItem {
     /// The span of the whole outer `(unless a (unless b …))` form.
     pub span: ByteSpan,
-    /// The 1-based line the outer `unless` starts on.
-    pub line: usize,
     /// The span of the outer test `a`.
     ///
     /// The rewrite's input, not the report's: the lint rule slices it to build
@@ -78,10 +76,6 @@ impl Finding for NestedUnlessItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     /// None. The old renderer printed the path and the offset and nothing else,
     /// and both are the envelope's now.
     fn text_columns(&self) -> Vec<String> {
@@ -104,7 +98,6 @@ impl Finding for NestedUnlessItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_unless(
     view: &ExpressionView,
-    source: &str,
     unless_form_count: &mut usize,
     violations: &mut Vec<NestedUnlessItem>,
 ) {
@@ -144,7 +137,6 @@ pub fn examine_unless(
 
     violations.push(NestedUnlessItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         outer_test_span: outer_test.span,
         inner_test_span: inner_test.span,
         inner_body_span,
@@ -168,18 +160,18 @@ pub fn build_nested_unless_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("unless_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut unless_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_unless(subview, source, &mut unless_form_count, &mut violations);
+            examine_unless(subview, &mut unless_form_count, &mut violations);
         });
     }
 
@@ -187,6 +179,7 @@ pub fn build_nested_unless_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("unless_form_count", json!(unless_form_count))],
     ))
@@ -300,7 +293,7 @@ mod tests {
     fn a_finding_carries_its_line_and_no_columns_of_its_own() {
         let report = report("(defun f (a b)\n  (unless a (unless b (g))))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "nested-unless");
         assert!(finding.json_fields().is_empty());
         assert!(finding.text_columns().is_empty());

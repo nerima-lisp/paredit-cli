@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -54,8 +54,6 @@ fn binding_variable(binding: &ExpressionView) -> Option<&str> {
 pub struct BindsConstantItem {
     /// The span of the offending binding.
     pub span: ByteSpan,
-    /// The 1-based line the binding starts on.
-    pub line: usize,
     /// The binding operator (`let`, `let*`, `do`, `do*`) as written.
     pub head: String,
     /// The constant that cannot be bound, as written.
@@ -72,10 +70,6 @@ impl Finding for BindsConstantItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -103,7 +97,6 @@ impl Finding for BindsConstantItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_binding_form(
     view: &ExpressionView,
-    source: &str,
     binding_form_count: &mut usize,
     violations: &mut Vec<BindsConstantItem>,
 ) {
@@ -135,7 +128,6 @@ pub fn examine_binding_form(
         if is_constant_variable(variable) {
             violations.push(BindsConstantItem {
                 span: binding.span,
-                line: line_of(source, binding.span.start().get()),
                 head: head.to_owned(),
                 variable: variable.to_owned(),
             });
@@ -161,18 +153,18 @@ pub fn build_binds_constant_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("binding_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut binding_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_binding_form(subview, source, &mut binding_form_count, &mut violations);
+            examine_binding_form(subview, &mut binding_form_count, &mut violations);
         });
     }
 
@@ -180,6 +172,7 @@ pub fn build_binds_constant_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("binding_form_count", json!(binding_form_count))],
     ))
@@ -305,7 +298,7 @@ mod tests {
     fn a_finding_carries_its_line_its_head_and_its_variable() {
         let report = report("(defun f ()\n  (let ((t 1)) t))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "binds-constant");
         assert_eq!(
             finding.json_fields(),

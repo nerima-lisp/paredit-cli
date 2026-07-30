@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -43,8 +43,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct GethashDefaultItem {
     /// The span of the whole `(gethash k h nil)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span to delete: the ` nil` default, from the end of the table operand
     /// through the `nil`.
     ///
@@ -64,10 +62,6 @@ impl Finding for GethashDefaultItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path and location: the old text row carried only
@@ -97,7 +91,6 @@ impl Finding for GethashDefaultItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     gethash_form_count: &mut usize,
     violations: &mut Vec<GethashDefaultItem>,
 ) {
@@ -128,7 +121,6 @@ pub fn examine(
     let removal_span = ByteSpan::new(table.span.end(), default.span.end());
     violations.push(GethashDefaultItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         removal_span,
     });
 }
@@ -150,18 +142,18 @@ pub fn build_gethash_default_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("gethash_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut gethash_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut gethash_form_count, &mut violations);
+            examine(subview, &mut gethash_form_count, &mut violations);
         });
     }
 
@@ -169,6 +161,7 @@ pub fn build_gethash_default_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("gethash_form_count", json!(gethash_form_count))],
     ))
@@ -266,7 +259,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_removal_span() {
         let report = report("(defun f (k h)\n  (gethash k h nil))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "gethash-default");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

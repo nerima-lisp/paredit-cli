@@ -36,18 +36,13 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        context: &RuleContext<'_>,
+        _context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
         let mut eval_when_form_count = 0;
         let mut items = Vec::new();
-        examine_eval_when(
-            view,
-            context.source(),
-            &mut eval_when_form_count,
-            &mut items,
-        );
+        examine_eval_when(view, &mut eval_when_form_count, &mut items);
         for item in items {
             let span = item.span;
 

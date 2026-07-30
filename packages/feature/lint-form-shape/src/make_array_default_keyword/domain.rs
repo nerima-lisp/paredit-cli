@@ -28,7 +28,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -55,8 +55,6 @@ fn is_nil_literal(view: &ExpressionView) -> bool {
 pub struct MakeArrayDefaultKeywordItem {
     /// The span of the whole `(make-array …)` call form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span to delete: the ` :adjustable nil` / ` :fill-pointer nil` pair.
     ///
     /// The rewrite's input, but the old report published it, so it stays on the
@@ -78,10 +76,6 @@ impl Finding for MakeArrayDefaultKeywordItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// The keyword, bare — the prefixing style the old text row used.
@@ -117,7 +111,6 @@ impl Finding for MakeArrayDefaultKeywordItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     call_form_count: &mut usize,
     violations: &mut Vec<MakeArrayDefaultKeywordItem>,
 ) {
@@ -145,7 +138,6 @@ pub fn examine(
         );
         violations.push(MakeArrayDefaultKeywordItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             removal_span,
             keyword,
         });
@@ -171,18 +163,18 @@ pub fn build_make_array_default_keyword_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("call_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut call_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut call_form_count, &mut violations);
+            examine(subview, &mut call_form_count, &mut violations);
         });
     }
 
@@ -190,6 +182,7 @@ pub fn build_make_array_default_keyword_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("call_form_count", json!(call_form_count))],
     ))
@@ -297,7 +290,7 @@ mod tests {
     fn a_finding_carries_its_line_its_keyword_and_its_removal_span() {
         let report = report("(defun f (n)\n  (make-array n :adjustable nil))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "make-array-default-keyword");
         assert_eq!(finding.text_columns(), vec![":adjustable".to_owned()]);
         assert_eq!(

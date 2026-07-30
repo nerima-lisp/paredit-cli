@@ -27,7 +27,7 @@
 
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionView, SyntaxTree, body_form_distinguished,
@@ -45,7 +45,6 @@ pub struct IndentFinding {
     /// The column the Emacs convention puts it at.
     pub expected: usize,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for IndentFinding {
@@ -55,10 +54,6 @@ impl Finding for IndentFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -99,6 +94,7 @@ pub fn build_indentation_report(
         // way; the head table is Common Lisp's, so other dialects simply match
         // fewer forms rather than none.
         true,
+        tree.source(),
         findings,
         vec![("checked_form_count", json!(checked))],
     )
@@ -134,7 +130,6 @@ fn collect(
                             ByteOffset::new(body.span.start().get()),
                             body.span.end(),
                         ),
-                        line: line_of(source, body.span.start().get()),
                     });
                 }
             }
@@ -206,7 +201,10 @@ mod tests {
         // the body's column and it must not be reported.
         let report = report("(defun f\n    (x)\n  (list x))\n");
         assert!(
-            report.findings.iter().all(|finding| finding.line != 2),
+            report
+                .findings
+                .iter()
+                .all(|finding| report.line_of(finding) != 2),
             "{report:?}"
         );
     }

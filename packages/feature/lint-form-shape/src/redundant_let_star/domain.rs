@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -41,8 +41,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct RedundantLetStarItem {
     /// The span of the whole `(let* … …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the `let*` head symbol (for the head-only rewrite to `let`).
     ///
     /// The rewrite's input, not the report's: the lint rule replaces exactly
@@ -61,10 +59,6 @@ impl Finding for RedundantLetStarItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -90,7 +84,6 @@ impl Finding for RedundantLetStarItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let_star(
     view: &ExpressionView,
-    source: &str,
     let_star_form_count: &mut usize,
     violations: &mut Vec<RedundantLetStarItem>,
 ) {
@@ -123,7 +116,6 @@ pub fn examine_let_star(
 
     violations.push(RedundantLetStarItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         head_span: view.children[0].span,
         binding_count,
     });
@@ -146,18 +138,18 @@ pub fn build_redundant_let_star_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("let_star_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut let_star_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let_star(subview, source, &mut let_star_form_count, &mut violations);
+            examine_let_star(subview, &mut let_star_form_count, &mut violations);
         });
     }
 
@@ -165,6 +157,7 @@ pub fn build_redundant_let_star_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("let_star_form_count", json!(let_star_form_count))],
     ))
@@ -282,7 +275,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_binding_count() {
         let report = report("(defun f ()\n  (let* ((x 1)) x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "redundant-let-star");
         assert_eq!(finding.json_fields(), vec![("binding_count", json!(1))]);
         assert_eq!(finding.text_columns(), vec!["bindings=1".to_owned()]);

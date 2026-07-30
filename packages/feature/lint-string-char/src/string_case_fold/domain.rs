@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -57,8 +57,6 @@ fn case_folded(view: &ExpressionView) -> Option<(String, &ExpressionView)> {
 pub struct StringCaseFoldItem {
     /// The span of the whole `(string= …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the first folded operand's argument `a`.
     pub left_span: ByteSpan,
     /// The span of the second folded operand's argument `b`.
@@ -79,10 +77,6 @@ impl Finding for StringCaseFoldItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// None: the old text row carried the path and the offset, both of which
@@ -124,7 +118,6 @@ impl Finding for StringCaseFoldItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     compare_form_count: &mut usize,
     violations: &mut Vec<StringCaseFoldItem>,
 ) {
@@ -156,7 +149,6 @@ pub fn examine(
 
     violations.push(StringCaseFoldItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         left_span: left_arg.span,
         right_span: right_arg.span,
     });
@@ -180,18 +172,18 @@ pub fn build_string_case_fold_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("compare_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut compare_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut compare_form_count, &mut violations);
+            examine(subview, &mut compare_form_count, &mut violations);
         });
     }
 
@@ -199,6 +191,7 @@ pub fn build_string_case_fold_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("compare_form_count", json!(compare_form_count))],
     ))
@@ -316,7 +309,7 @@ mod tests {
         let report =
             report("(defun f (a b)\n  (string= (string-downcase a) (string-downcase b)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "string-case-fold");
         assert_eq!(
             finding.json_fields(),

@@ -26,7 +26,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -47,8 +47,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct IfToUnlessItem {
     /// The span of the whole `(if c nil e)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the test `c`.
     pub test_span: ByteSpan,
     /// The span of the else branch `e`.
@@ -64,10 +62,6 @@ impl Finding for IfToUnlessItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing: the old text row carried only the path and the offset, which
@@ -101,7 +95,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<IfToUnlessItem>,
 ) {
@@ -139,7 +132,6 @@ pub fn examine(
 
     violations.push(IfToUnlessItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         test_span: test.span,
         else_span: else_branch.span,
     });
@@ -162,18 +154,18 @@ pub fn build_if_to_unless_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("if_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut if_form_count, &mut violations);
+            examine(subview, &mut if_form_count, &mut violations);
         });
     }
 
@@ -181,6 +173,7 @@ pub fn build_if_to_unless_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("if_form_count", json!(if_form_count))],
     ))
@@ -284,7 +277,7 @@ mod tests {
         let source = "(defun f ()\n  (if ready nil (do-work)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "if-to-unless");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

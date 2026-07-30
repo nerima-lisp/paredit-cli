@@ -27,7 +27,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -54,8 +54,6 @@ pub enum CharacterEvidence {
 #[derive(Debug, Clone)]
 pub struct EqCharComparisonItem {
     pub span: ByteSpan,
-    /// The 1-based line the comparison starts on.
-    pub line: usize,
     /// The span of the `eq` head symbol, for an `eq` -> `eql` fix.
     ///
     /// The rewrite's input, not the report's: the lint rule reads it to swap
@@ -92,10 +90,6 @@ impl Finding for EqCharComparisonItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -137,7 +131,6 @@ const fn never(_: &ExpressionView) -> bool {
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    source: &str,
     is_character: IsCharacterArgument<'_>,
     comparison_form_count: &mut usize,
     violations: &mut Vec<EqCharComparisonItem>,
@@ -164,7 +157,6 @@ pub fn examine_comparison(
     if let Some(evidence) = evidence {
         violations.push(EqCharComparisonItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             head_span: view.children[0].span,
             evidence,
         });
@@ -188,24 +180,18 @@ pub fn build_eq_char_comparison_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("comparison_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(
-                subview,
-                source,
-                &never,
-                &mut comparison_form_count,
-                &mut violations,
-            );
+            examine_comparison(subview, &never, &mut comparison_form_count, &mut violations);
         });
     }
 
@@ -213,6 +199,7 @@ pub fn build_eq_char_comparison_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("comparison_form_count", json!(comparison_form_count))],
     ))
@@ -319,7 +306,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_literal() {
         let report = report("(defun f (c)\n  (eq c #\\a))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "eq-char-comparison");
         assert_eq!(finding.json_fields(), vec![("literal", json!("#\\a"))]);
         assert_eq!(finding.text_columns(), vec!["literal=#\\a".to_owned()]);

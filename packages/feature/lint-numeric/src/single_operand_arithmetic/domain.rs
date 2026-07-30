@@ -29,7 +29,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -57,8 +57,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct SingleOperandArithmeticItem {
     /// The span of the whole `(+ X)`/`(* X)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The operator (`+` or `*`).
     pub operator: &'static str,
     /// The span of the sole operand `X`.
@@ -80,10 +78,6 @@ impl Finding for SingleOperandArithmeticItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -108,7 +102,6 @@ impl Finding for SingleOperandArithmeticItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_arithmetic(
     view: &ExpressionView,
-    source: &str,
     arithmetic_form_count: &mut usize,
     violations: &mut Vec<SingleOperandArithmeticItem>,
 ) {
@@ -130,7 +123,6 @@ pub fn examine_arithmetic(
     }
     violations.push(SingleOperandArithmeticItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         operator,
         inner_span: operand.span,
     });
@@ -153,18 +145,18 @@ pub fn build_single_operand_arithmetic_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("arithmetic_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut arithmetic_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_arithmetic(subview, source, &mut arithmetic_form_count, &mut violations);
+            examine_arithmetic(subview, &mut arithmetic_form_count, &mut violations);
         });
     }
 
@@ -172,6 +164,7 @@ pub fn build_single_operand_arithmetic_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("arithmetic_form_count", json!(arithmetic_form_count))],
     ))
@@ -293,7 +286,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_operator() {
         let report = report("(defun f (x)\n  (* x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "single-operand-arithmetic");
         assert_eq!(finding.json_fields(), vec![("operator", json!("*"))]);
         assert_eq!(finding.text_columns(), vec!["operator=*".to_owned()]);

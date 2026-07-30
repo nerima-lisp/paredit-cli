@@ -32,7 +32,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -65,8 +65,6 @@ fn is_t_literal(view: &ExpressionView) -> bool {
 pub struct TComparisonItem {
     /// The span of the whole `(eq X t)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The operator, lowercased (`eq`/`eql`/`equal`/`equalp`).
     pub operator: &'static str,
 }
@@ -84,10 +82,6 @@ impl Finding for TComparisonItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the leading `kind`: the old text row's only column was
@@ -112,7 +106,6 @@ impl Finding for TComparisonItem {
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    source: &str,
     comparison_form_count: &mut usize,
     violations: &mut Vec<TComparisonItem>,
 ) {
@@ -141,7 +134,6 @@ pub fn examine_comparison(
 
     violations.push(TComparisonItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         operator,
     });
 }
@@ -163,18 +155,18 @@ pub fn build_t_comparison_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("comparison_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(subview, source, &mut comparison_form_count, &mut violations);
+            examine_comparison(subview, &mut comparison_form_count, &mut violations);
         });
     }
 
@@ -182,6 +174,7 @@ pub fn build_t_comparison_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("comparison_form_count", json!(comparison_form_count))],
     ))
@@ -304,7 +297,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_operator() {
         let report = report("(defun ready? (x)\n  (eq (compute x) t))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "eq");
         assert_eq!(finding.json_fields(), vec![("operator", json!("eq"))]);
         assert!(finding.text_columns().is_empty());

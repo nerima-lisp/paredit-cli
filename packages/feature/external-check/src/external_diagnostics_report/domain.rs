@@ -39,7 +39,6 @@ pub struct PlacedDiagnostic {
     /// The definition the implementation named, when it could be found in the
     /// tree. Diagnostics about the file as a whole have none.
     pub span: ByteSpan,
-    pub line: usize,
     /// Whether this diagnostic is absent from the baseline.
     ///
     /// `false` when no baseline was supplied: without one, nothing is *new*,
@@ -59,10 +58,6 @@ impl Finding for PlacedDiagnostic {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -97,8 +92,8 @@ impl Finding for PlacedDiagnostic {
 /// A context that matches nothing yields the whole document's start, which is
 /// what "this file, somewhere" honestly amounts to.
 #[must_use]
-pub fn locate_context(tree: &SyntaxTree, context: Option<&str>) -> (ByteSpan, usize) {
-    let whole_file = (ByteSpan::new(ByteOffset::new(0), ByteOffset::new(0)), 1);
+pub fn locate_context(tree: &SyntaxTree, context: Option<&str>) -> ByteSpan {
+    let whole_file = ByteSpan::new(ByteOffset::new(0), ByteOffset::new(0));
     let Some(context) = context else {
         return whole_file;
     };
@@ -125,20 +120,10 @@ pub fn locate_context(tree: &SyntaxTree, context: Option<&str>) -> (ByteSpan, us
             .and_then(|form| form.text.as_deref());
 
         if defined_name.is_some_and(|defined| defined.eq_ignore_ascii_case(name)) {
-            return (view.span, line_of(tree.source(), view.span));
+            return view.span;
         }
     }
     whole_file
-}
-
-/// The one-based line a span starts on.
-fn line_of(source: &str, span: ByteSpan) -> usize {
-    let start = span.start().get().min(source.len());
-    source[..start]
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
-        + 1
 }
 
 #[cfg(test)]
@@ -149,6 +134,19 @@ mod tests {
     const SOURCE: &str =
         "(in-package :demo)\n\n(defun bar (x)\n  (+ x 1))\n\n(defmethod transfer ((a t))\n  a)\n";
 
+    /// The line the located span starts on.
+    ///
+    /// `locate_context` answers with a span, and the report envelope turns
+    /// that into a line. Resolving it the same way here keeps these cases
+    /// stated as the line a human reads off a diagnostic, which is what they
+    /// are about.
+    fn line_at(tree: &SyntaxTree, context: Option<&str>) -> usize {
+        paredit_core_cli::report::line_of(
+            tree.source(),
+            locate_context(tree, context).start().get(),
+        )
+    }
+
     #[test]
     fn an_implementation_names_itself_and_its_binary() {
         assert_eq!(Implementation::Sbcl.label(), "sbcl");
@@ -158,8 +156,7 @@ mod tests {
     #[test]
     fn a_defun_context_resolves_to_the_definition_line() {
         let tree = SyntaxTree::parse(SOURCE).expect("parse");
-        let (_, line) = locate_context(&tree, Some("DEFUN BAR"));
-        assert_eq!(line, 3);
+        assert_eq!(line_at(&tree, Some("DEFUN BAR")), 3);
     }
 
     /// SBCL upper-cases; the source does not. Matching has to ignore case or
@@ -167,25 +164,22 @@ mod tests {
     #[test]
     fn context_matching_ignores_case() {
         let tree = SyntaxTree::parse(SOURCE).expect("parse");
-        assert_eq!(locate_context(&tree, Some("DEFUN bar")).1, 3);
-        assert_eq!(locate_context(&tree, Some("defmethod TRANSFER")).1, 6);
+        assert_eq!(line_at(&tree, Some("DEFUN bar")), 3);
+        assert_eq!(line_at(&tree, Some("defmethod TRANSFER")), 6);
     }
 
     /// A qualifier after the name must not stop the match.
     #[test]
     fn a_method_qualifier_does_not_prevent_a_match() {
         let tree = SyntaxTree::parse(SOURCE).expect("parse");
-        assert_eq!(
-            locate_context(&tree, Some("DEFMETHOD TRANSFER :BEFORE")).1,
-            6
-        );
+        assert_eq!(line_at(&tree, Some("DEFMETHOD TRANSFER :BEFORE")), 6);
     }
 
     #[test]
     fn an_unknown_or_absent_context_falls_back_to_the_file() {
         let tree = SyntaxTree::parse(SOURCE).expect("parse");
-        assert_eq!(locate_context(&tree, Some("DEFUN NOWHERE")).1, 1);
-        assert_eq!(locate_context(&tree, None).1, 1);
-        assert_eq!(locate_context(&tree, Some("DEFUN")).1, 1);
+        assert_eq!(line_at(&tree, Some("DEFUN NOWHERE")), 1);
+        assert_eq!(line_at(&tree, None), 1);
+        assert_eq!(line_at(&tree, Some("DEFUN")), 1);
     }
 }

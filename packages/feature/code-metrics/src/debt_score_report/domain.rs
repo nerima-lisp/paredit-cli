@@ -70,7 +70,6 @@ pub struct DebtFinding {
     pub contributions: Vec<String>,
     pub score: usize,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for DebtFinding {
@@ -80,10 +79,6 @@ impl Finding for DebtFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -166,7 +161,6 @@ pub fn build_debt_score_report(
             contributions,
             score,
             span: form.span,
-            line: line_of(source, form.span.start().get()),
         });
     }
 
@@ -182,6 +176,7 @@ pub fn build_debt_score_report(
         dialect,
         // Every input is a shape or comment question, not a dialect one.
         true,
+        tree.source(),
         findings,
         vec![
             ("debt_score", json!(total)),

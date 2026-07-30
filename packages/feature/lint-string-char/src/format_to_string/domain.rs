@@ -29,7 +29,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -63,8 +63,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct FormatToStringItem {
     /// The span of the whole `(format nil "~A" x)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The replacement function name (`princ-to-string` or `prin1-to-string`).
     pub replacement: &'static str,
     /// The span of the single format argument (for reconstructing the fix).
@@ -84,10 +82,6 @@ impl Finding for FormatToStringItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -119,7 +113,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     format_form_count: &mut usize,
     violations: &mut Vec<FormatToStringItem>,
 ) {
@@ -150,7 +143,6 @@ pub fn examine(
 
     violations.push(FormatToStringItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         replacement,
         argument_span: argument.span,
     });
@@ -173,18 +165,18 @@ pub fn build_format_to_string_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("format_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut format_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut format_form_count, &mut violations);
+            examine(subview, &mut format_form_count, &mut violations);
         });
     }
 
@@ -192,6 +184,7 @@ pub fn build_format_to_string_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("format_form_count", json!(format_form_count))],
     ))
@@ -312,7 +305,7 @@ mod tests {
         let source = "(defun f (x)\n  (format nil \"~S\" x))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "prin1-to-string");
         assert_eq!(
             finding.json_fields(),

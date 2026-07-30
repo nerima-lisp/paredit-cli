@@ -33,7 +33,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -86,8 +86,6 @@ impl TheRedundancy {
 pub struct RedundantTheItem {
     /// The span of the whole `(the TYPE form)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the inner form (for reconstructing the fix).
     ///
     /// Published rather than kept internal: the old report emitted it, and a
@@ -104,10 +102,6 @@ impl Finding for RedundantTheItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// The old text row carried nothing past the path and offset, and the
@@ -158,7 +152,6 @@ const fn never(_: &ExpressionView, _: &ExpressionView) -> bool {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_the(
     view: &ExpressionView,
-    source: &str,
     already_known: IsAssertedTypeAlreadyKnown<'_>,
     the_form_count: &mut usize,
     violations: &mut Vec<RedundantTheItem>,
@@ -196,7 +189,6 @@ pub fn examine_the(
 
     violations.push(RedundantTheItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         form_span: form.span,
         redundancy,
     });
@@ -219,24 +211,18 @@ pub fn build_redundant_the_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("the_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut the_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_the(
-                subview,
-                source,
-                &never,
-                &mut the_form_count,
-                &mut violations,
-            );
+            examine_the(subview, &never, &mut the_form_count, &mut violations);
         });
     }
 
@@ -244,6 +230,7 @@ pub fn build_redundant_the_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("the_form_count", json!(the_form_count))],
     ))
@@ -347,7 +334,7 @@ mod tests {
         let source = "(defun f ()\n  (the t (g x)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "vacuous");
         assert!(finding.text_columns().is_empty());
         let span = finding.form_span;

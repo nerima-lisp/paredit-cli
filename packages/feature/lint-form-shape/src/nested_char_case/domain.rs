@@ -23,7 +23,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -46,8 +46,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct NestedCharCaseItem {
     /// The span of the whole `(OUTER (INNER c))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the outer case-op head token, preserved in the fix.
     pub outer_span: ByteSpan,
     /// The span of the character operand `c`.
@@ -64,10 +62,6 @@ impl Finding for NestedCharCaseItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// None. The old text row carried the path and offset the envelope now
@@ -109,7 +103,6 @@ impl Finding for NestedCharCaseItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     char_case_form_count: &mut usize,
     violations: &mut Vec<NestedCharCaseItem>,
 ) {
@@ -146,7 +139,6 @@ pub fn examine(
 
     violations.push(NestedCharCaseItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         outer_span: view.children[0].span,
         char_span: character.span,
     });
@@ -169,18 +161,18 @@ pub fn build_nested_char_case_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("char_case_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut char_case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut char_case_form_count, &mut violations);
+            examine(subview, &mut char_case_form_count, &mut violations);
         });
     }
 
@@ -188,6 +180,7 @@ pub fn build_nested_char_case_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("char_case_form_count", json!(char_case_form_count))],
     ))
@@ -276,7 +269,7 @@ mod tests {
         let source = "(defun f (c)\n  (char-upcase (char-downcase c)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "nested-char-case");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
@@ -34,8 +34,6 @@ const ASSIGNMENT_HEADS: [&str; 4] = ["setq", "psetq", "setf", "psetf"];
 #[derive(Debug, Clone)]
 pub struct SelfAssignmentItem {
     pub span: ByteSpan,
-    /// The 1-based line the assignment form starts on.
-    pub line: usize,
     /// The operator as it is spelled in the source, so its case survives.
     /// Data rather than a tag: `SETQ` and `setq` are the same operator but not
     /// the same string, which is why this is not the finding's `kind`.
@@ -52,10 +50,6 @@ impl Finding for SelfAssignmentItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -83,7 +77,6 @@ impl Finding for SelfAssignmentItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
-    source: &str,
     assignment_form_count: &mut usize,
     self_assignments: &mut Vec<SelfAssignmentItem>,
 ) {
@@ -105,7 +98,6 @@ pub fn examine_assignment(
         if expressions_structurally_equal(place, value) {
             self_assignments.push(SelfAssignmentItem {
                 span: view.span,
-                line: line_of(source, view.span.start().get()),
                 operator: head.to_owned(),
                 place: render_expression(place),
             });
@@ -130,23 +122,18 @@ pub fn build_self_assignment_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("assignment_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut assignment_form_count = 0;
     let mut self_assignments = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_assignment(
-                subview,
-                source,
-                &mut assignment_form_count,
-                &mut self_assignments,
-            );
+            examine_assignment(subview, &mut assignment_form_count, &mut self_assignments);
         });
     }
 
@@ -154,6 +141,7 @@ pub fn build_self_assignment_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         self_assignments,
         vec![("assignment_form_count", json!(assignment_form_count))],
     ))
@@ -258,7 +246,7 @@ mod tests {
     fn a_finding_carries_its_line_its_operator_and_its_place() {
         let report = report("(defun f ()\n  (setf (aref a i) (aref a i)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "self-assignment");
         assert_eq!(
             finding.json_fields(),

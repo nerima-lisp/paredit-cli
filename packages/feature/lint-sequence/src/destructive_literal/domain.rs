@@ -28,7 +28,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
@@ -101,8 +101,6 @@ fn is_quoted_list_literal(view: &ExpressionView) -> bool {
 #[derive(Debug, Clone)]
 pub struct DestructiveLiteralItem {
     pub span: ByteSpan,
-    /// The 1-based line the call starts on.
-    pub line: usize,
     /// The destructive operator (`nreverse`, `sort`, …).
     pub operator: String,
     /// A rendered form of the quoted literal being modified.
@@ -122,10 +120,6 @@ impl Finding for DestructiveLiteralItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -153,7 +147,6 @@ impl Finding for DestructiveLiteralItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    source: &str,
     destructive_call_count: &mut usize,
     violations: &mut Vec<DestructiveLiteralItem>,
 ) {
@@ -172,7 +165,6 @@ pub fn examine_call(
             if is_quoted_list_literal(sequence) {
                 violations.push(DestructiveLiteralItem {
                     span: view.span,
-                    line: line_of(source, view.span.start().get()),
                     operator: head.to_ascii_lowercase(),
                     literal: render_expression(sequence),
                 });
@@ -199,23 +191,18 @@ pub fn collect_destructive_literals(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("destructive_call_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut destructive_call_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(
-                subview,
-                source,
-                &mut destructive_call_count,
-                &mut violations,
-            );
+            examine_call(subview, &mut destructive_call_count, &mut violations);
         });
     }
 
@@ -223,6 +210,7 @@ pub fn collect_destructive_literals(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("destructive_call_count", json!(destructive_call_count))],
     ))
@@ -384,7 +372,7 @@ mod tests {
     fn a_finding_carries_its_line_its_operator_and_its_literal() {
         let report = report("(defun f ()\n  (nbutlast '(1 2 3)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "destructive-literal");
         assert_eq!(
             finding.json_fields(),

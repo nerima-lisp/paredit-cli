@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -52,8 +52,6 @@ fn catch_all_designator(clause: &ExpressionView) -> Option<String> {
 pub struct ExhaustiveCaseOtherwiseItem {
     /// The span of the offending clause.
     pub span: ByteSpan,
-    /// The 1-based line the clause starts on.
-    pub line: usize,
     pub head: String,
     pub designator: String,
 }
@@ -68,10 +66,6 @@ impl Finding for ExhaustiveCaseOtherwiseItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -102,7 +96,6 @@ impl Finding for ExhaustiveCaseOtherwiseItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    source: &str,
     case_form_count: &mut usize,
     violations: &mut Vec<ExhaustiveCaseOtherwiseItem>,
 ) {
@@ -130,7 +123,6 @@ pub fn examine_case(
         if let Some(designator) = catch_all_designator(clause) {
             violations.push(ExhaustiveCaseOtherwiseItem {
                 span: clause.span,
-                line: line_of(source, clause.span.start().get()),
                 head: head.to_owned(),
                 designator,
             });
@@ -156,18 +148,18 @@ pub fn build_exhaustive_case_otherwise_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("case_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, source, &mut case_form_count, &mut violations);
+            examine_case(subview, &mut case_form_count, &mut violations);
         });
     }
 
@@ -175,6 +167,7 @@ pub fn build_exhaustive_case_otherwise_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("case_form_count", json!(case_form_count))],
     ))
@@ -285,7 +278,7 @@ mod tests {
     fn a_finding_carries_its_line_its_head_and_its_designator() {
         let report = report("(defun f (x)\n  (ecase x (1 :a) (t :b)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "exhaustive-case-otherwise");
         assert_eq!(
             finding.json_fields(),

@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -114,8 +114,6 @@ fn explicit_quote_literal(view: &ExpressionView) -> Option<(&str, LiteralKind)> 
 #[derive(Debug, Clone)]
 pub struct RedundantQuoteItem {
     pub span: ByteSpan,
-    /// The 1-based line the quoted form starts on.
-    pub line: usize,
     pub literal: String,
     /// Which self-evaluating category the literal falls in, from
     /// [`LiteralKind::describe`]'s closed set.
@@ -131,10 +129,6 @@ impl Finding for RedundantQuoteItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// The category is already the leading `kind` column, so only the literal
@@ -158,7 +152,6 @@ impl Finding for RedundantQuoteItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_quote(
     view: &ExpressionView,
-    source: &str,
     quoted_form_count: &mut usize,
     violations: &mut Vec<RedundantQuoteItem>,
 ) {
@@ -168,7 +161,6 @@ pub fn examine_quote(
         if let Some((text, kind)) = quoted_literal_atom(view) {
             violations.push(RedundantQuoteItem {
                 span: view.span,
-                line: line_of(source, view.span.start().get()),
                 literal: text.to_owned(),
                 kind: kind.describe(),
             });
@@ -180,7 +172,6 @@ pub fn examine_quote(
         *quoted_form_count += 1;
         violations.push(RedundantQuoteItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             literal: text.to_owned(),
             kind: kind.describe(),
         });
@@ -204,18 +195,18 @@ pub fn build_redundant_quote_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("quoted_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut quoted_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_quote(subview, source, &mut quoted_form_count, &mut violations);
+            examine_quote(subview, &mut quoted_form_count, &mut violations);
         });
     }
 
@@ -223,6 +214,7 @@ pub fn build_redundant_quote_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("quoted_form_count", json!(quoted_form_count))],
     ))
@@ -341,7 +333,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_literal() {
         let report = report("(defparameter *n*\n  '5)\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "number");
         assert_eq!(finding.json_fields(), vec![("literal", json!("5"))]);
         assert_eq!(finding.text_columns(), vec!["literal=5".to_owned()]);

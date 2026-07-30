@@ -23,7 +23,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -53,8 +53,6 @@ fn single_arg_reverse(view: &ExpressionView) -> Option<&ExpressionView> {
 pub struct DoubleReverseItem {
     /// The span of the whole `(reverse (reverse x))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the innermost argument `x` (for reconstructing the fix).
     ///
     /// The rewrite's input, but the old report published it and a consumer
@@ -72,10 +70,6 @@ impl Finding for DoubleReverseItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path and line the envelope already prints: the old
@@ -104,7 +98,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     reverse_form_count: &mut usize,
     violations: &mut Vec<DoubleReverseItem>,
 ) {
@@ -126,7 +119,6 @@ pub fn examine(
 
     violations.push(DoubleReverseItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         inner_span: inner_arg.span,
     });
 }
@@ -148,18 +140,18 @@ pub fn build_double_reverse_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("reverse_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut reverse_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut reverse_form_count, &mut violations);
+            examine(subview, &mut reverse_form_count, &mut violations);
         });
     }
 
@@ -167,6 +159,7 @@ pub fn build_double_reverse_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("reverse_form_count", json!(reverse_form_count))],
     ))
@@ -269,7 +262,7 @@ mod tests {
         let source = "(defun f (xs)\n  (reverse (reverse xs)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "double-reverse");
         assert_eq!(slice(source, finding.inner_span), "xs");
         assert_eq!(

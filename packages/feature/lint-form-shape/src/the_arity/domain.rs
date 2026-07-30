@@ -20,7 +20,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -51,8 +51,6 @@ fn is_arity_ambiguous(view: &ExpressionView) -> bool {
 pub struct TheArityItem {
     /// The span of the whole `(the …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// How many arguments were written, which is anything but two.
     pub argument_count: usize,
 }
@@ -67,10 +65,6 @@ impl Finding for TheArityItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -95,7 +89,6 @@ impl Finding for TheArityItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_the(
     view: &ExpressionView,
-    source: &str,
     the_form_count: &mut usize,
     violations: &mut Vec<TheArityItem>,
 ) {
@@ -116,7 +109,6 @@ pub fn examine_the(
     if argument_count != EXPECTED_ARGUMENTS {
         violations.push(TheArityItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             argument_count,
         });
     }
@@ -139,18 +131,18 @@ pub fn build_the_arity_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("the_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut the_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_the(subview, source, &mut the_form_count, &mut violations);
+            examine_the(subview, &mut the_form_count, &mut violations);
         });
     }
 
@@ -158,6 +150,7 @@ pub fn build_the_arity_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("the_form_count", json!(the_form_count))],
     ))
@@ -250,7 +243,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_argument_count() {
         let report = report("(defun f (x)\n  (the fixnum x x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "the-arity");
         assert_eq!(
             finding.json_fields(),

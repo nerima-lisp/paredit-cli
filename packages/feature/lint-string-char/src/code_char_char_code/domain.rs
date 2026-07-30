@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -40,8 +40,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct CodeCharCharCodeItem {
     /// The span of the whole `(code-char (char-code c))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the character operand `c`.
     pub char_span: ByteSpan,
 }
@@ -55,10 +53,6 @@ impl Finding for CodeCharCharCodeItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -86,7 +80,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     code_char_form_count: &mut usize,
     violations: &mut Vec<CodeCharCharCodeItem>,
 ) {
@@ -123,7 +116,6 @@ pub fn examine(
 
     violations.push(CodeCharCharCodeItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         char_span: character.span,
     });
 }
@@ -145,18 +137,18 @@ pub fn build_code_char_char_code_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("code_char_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut code_char_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut code_char_form_count, &mut violations);
+            examine(subview, &mut code_char_form_count, &mut violations);
         });
     }
 
@@ -164,6 +156,7 @@ pub fn build_code_char_char_code_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("code_char_form_count", json!(code_char_form_count))],
     ))
@@ -259,7 +252,7 @@ mod tests {
         let source = "(defun f (c)\n  (code-char (char-code c)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "code-char-char-code");
         assert_eq!(
             finding.json_fields(),

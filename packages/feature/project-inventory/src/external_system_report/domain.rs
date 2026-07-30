@@ -17,7 +17,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
@@ -38,7 +38,6 @@ pub struct SystemDependency {
     /// The feature a `(:feature :sbcl "y")` dependency is conditional on.
     pub feature: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for SystemDependency {
@@ -52,10 +51,6 @@ impl Finding for SystemDependency {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -85,7 +80,6 @@ pub fn build_external_system_report(
     tree: &SyntaxTree,
 ) -> FileFindings<SystemDependency> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let root = tree.root_view();
 
     let systems: BTreeSet<String> = if modelled {
@@ -117,7 +111,6 @@ pub fn build_external_system_report(
                     version,
                     feature,
                     span: entry.span,
-                    line: line_of(source, entry.span.start().get()),
                 });
             }
         }
@@ -134,6 +127,7 @@ pub fn build_external_system_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("system_count", json!(systems.len())),

@@ -28,7 +28,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -45,8 +45,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct OneArmedIfItem {
     /// The span of the whole `(if TEST THEN)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the `if` head symbol (lets a fix swap it for `when`).
     ///
     /// The rewrite's input, not the report's: the lint rule replaces exactly
@@ -63,10 +61,6 @@ impl Finding for OneArmedIfItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// None. The old renderer printed the path and the offset and nothing else,
@@ -91,7 +85,6 @@ impl Finding for OneArmedIfItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<OneArmedIfItem>,
 ) {
@@ -115,7 +108,6 @@ pub fn examine_if(
 
     violations.push(OneArmedIfItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         head_span: view.children[0].span,
     });
 }
@@ -137,18 +129,18 @@ pub fn build_one_armed_if_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("if_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, source, &mut if_form_count, &mut violations);
+            examine_if(subview, &mut if_form_count, &mut violations);
         });
     }
 
@@ -156,6 +148,7 @@ pub fn build_one_armed_if_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("if_form_count", json!(if_form_count))],
     ))
@@ -259,7 +252,7 @@ mod tests {
     fn a_finding_carries_its_line_and_no_columns_of_its_own() {
         let report = report("(defun f ()\n  (if ready (go)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "one-armed-if");
         assert!(finding.json_fields().is_empty());
         assert!(finding.text_columns().is_empty());

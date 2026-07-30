@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
@@ -33,8 +33,6 @@ const LET_HEADS: [&str; 2] = ["let", "let*"];
 #[derive(Debug, Clone)]
 pub struct MalformedLetBindingItem {
     pub span: ByteSpan,
-    /// The 1-based line the binding starts on.
-    pub line: usize,
     pub binding: String,
     pub element_count: usize,
 }
@@ -53,10 +51,6 @@ impl Finding for MalformedLetBindingItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -87,7 +81,6 @@ impl Finding for MalformedLetBindingItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
-    source: &str,
     let_form_count: &mut usize,
     violations: &mut Vec<MalformedLetBindingItem>,
 ) {
@@ -115,7 +108,6 @@ pub fn examine_let(
         if element_count == 0 || element_count > 2 {
             violations.push(MalformedLetBindingItem {
                 span: binding.span,
-                line: line_of(source, binding.span.start().get()),
                 binding: render_expression(binding),
                 element_count,
             });
@@ -140,18 +132,18 @@ pub fn build_malformed_let_binding_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("let_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut let_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let(subview, source, &mut let_form_count, &mut violations);
+            examine_let(subview, &mut let_form_count, &mut violations);
         });
     }
 
@@ -159,6 +151,7 @@ pub fn build_malformed_let_binding_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("let_form_count", json!(let_form_count))],
     ))
@@ -271,7 +264,7 @@ mod tests {
     fn a_finding_carries_its_line_its_binding_and_its_element_count() {
         let report = report("(defun f ()\n  (let ((x 1 2)) x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "malformed-let-binding");
         assert_eq!(
             finding.json_fields(),

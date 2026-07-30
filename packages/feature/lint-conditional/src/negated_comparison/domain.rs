@@ -28,7 +28,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -58,8 +58,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct NegatedComparisonItem {
     /// The span of the whole `(not (OP a b))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The complementary operator to substitute (`/=`, `>=`, …).
     pub complement: &'static str,
     /// The span covering the two operands (`a b`), reused verbatim in the fix.
@@ -81,10 +79,6 @@ impl Finding for NegatedComparisonItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -109,7 +103,6 @@ impl Finding for NegatedComparisonItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_negation(
     view: &ExpressionView,
-    source: &str,
     negation_form_count: &mut usize,
     violations: &mut Vec<NegatedComparisonItem>,
 ) {
@@ -146,7 +139,6 @@ pub fn examine_negation(
     let operands_span = ByteSpan::new(inner.children[1].span.start(), inner.children[2].span.end());
     violations.push(NegatedComparisonItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         complement,
         operands_span,
     });
@@ -169,18 +161,18 @@ pub fn build_negated_comparison_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("negation_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut negation_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_negation(subview, source, &mut negation_form_count, &mut violations);
+            examine_negation(subview, &mut negation_form_count, &mut violations);
         });
     }
 
@@ -188,6 +180,7 @@ pub fn build_negated_comparison_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("negation_form_count", json!(negation_form_count))],
     ))
@@ -318,7 +311,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_complement() {
         let report = report("(defun distinct? (a b)\n  (not (= a b)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "negated-comparison");
         assert_eq!(finding.json_fields(), vec![("complement", json!("/="))]);
         assert_eq!(finding.text_columns(), vec!["complement=/=".to_owned()]);

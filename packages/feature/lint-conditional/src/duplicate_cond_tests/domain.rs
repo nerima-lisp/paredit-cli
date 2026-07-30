@@ -20,7 +20,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
@@ -31,8 +31,6 @@ use serde_json::{Value, json};
 pub struct DuplicateCondTestItem {
     /// The span of the whole `cond` form the repeat was found in.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     pub test: String,
     pub occurrence_count: usize,
 }
@@ -47,10 +45,6 @@ impl Finding for DuplicateCondTestItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -81,7 +75,6 @@ impl Finding for DuplicateCondTestItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_cond(
     view: &ExpressionView,
-    source: &str,
     cond_form_count: &mut usize,
     duplicates: &mut Vec<DuplicateCondTestItem>,
 ) {
@@ -119,7 +112,6 @@ pub fn examine_cond(
         if occurrence_count >= 2 {
             duplicates.push(DuplicateCondTestItem {
                 span: view.span,
-                line: line_of(source, view.span.start().get()),
                 test: render_expression(tests[anchor]),
                 occurrence_count,
             });
@@ -144,18 +136,18 @@ pub fn build_duplicate_cond_test_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("cond_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut cond_form_count = 0;
     let mut duplicates = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_cond(subview, source, &mut cond_form_count, &mut duplicates);
+            examine_cond(subview, &mut cond_form_count, &mut duplicates);
         });
     }
 
@@ -163,6 +155,7 @@ pub fn build_duplicate_cond_test_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         duplicates,
         vec![("cond_form_count", json!(cond_form_count))],
     ))
@@ -248,7 +241,7 @@ mod tests {
     fn a_finding_carries_its_line_its_test_and_its_count() {
         let report = report("(defun f ()\n  (cond ((foo) 1) ((foo) 2)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "duplicate-cond-tests");
         assert_eq!(
             finding.json_fields(),

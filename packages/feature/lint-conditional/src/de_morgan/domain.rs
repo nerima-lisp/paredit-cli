@@ -26,7 +26,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -66,8 +66,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct DeMorganItem {
     /// The span of the whole `(and …)`/`(or …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The operator, lowercased (`and` or `or`).
     pub operator: &'static str,
     /// The opposite operator to place inside the outer `not` (`or` for `and`).
@@ -95,10 +93,6 @@ impl Finding for DeMorganItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     fn text_columns(&self) -> Vec<String> {
         vec![format!("operator={}", self.operator)]
     }
@@ -121,7 +115,6 @@ impl Finding for DeMorganItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
-    source: &str,
     boolean_form_count: &mut usize,
     violations: &mut Vec<DeMorganItem>,
 ) {
@@ -152,7 +145,6 @@ pub fn examine_boolean(
 
     violations.push(DeMorganItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         operator,
         opposite,
         inner_spans,
@@ -176,18 +168,18 @@ pub fn build_de_morgan_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("boolean_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut boolean_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, source, &mut boolean_form_count, &mut violations);
+            examine_boolean(subview, &mut boolean_form_count, &mut violations);
         });
     }
 
@@ -195,6 +187,7 @@ pub fn build_de_morgan_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("boolean_form_count", json!(boolean_form_count))],
     ))
@@ -319,7 +312,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_operator() {
         let report = report("(defun f ()\n  (or (not a) (not b)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "or");
         assert_eq!(finding.json_fields(), vec![("operator", json!("or"))]);
         assert_eq!(finding.text_columns(), vec!["operator=or".to_owned()]);

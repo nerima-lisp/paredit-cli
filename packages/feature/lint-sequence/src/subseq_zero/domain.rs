@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -43,8 +43,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct SubseqZeroItem {
     /// The span of the whole `(subseq seq 0)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the sequence operand (for reconstructing the fix).
     pub sequence_span: ByteSpan,
 }
@@ -58,10 +56,6 @@ impl Finding for SubseqZeroItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// None: the old text row carried the path and the offset, both of which
@@ -94,7 +88,6 @@ impl Finding for SubseqZeroItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     subseq_form_count: &mut usize,
     violations: &mut Vec<SubseqZeroItem>,
 ) {
@@ -121,7 +114,6 @@ pub fn examine(
 
     violations.push(SubseqZeroItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         sequence_span: sequence.span,
     });
 }
@@ -143,18 +135,18 @@ pub fn build_subseq_zero_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("subseq_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut subseq_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut subseq_form_count, &mut violations);
+            examine(subview, &mut subseq_form_count, &mut violations);
         });
     }
 
@@ -162,6 +154,7 @@ pub fn build_subseq_zero_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("subseq_form_count", json!(subseq_form_count))],
     ))
@@ -266,7 +259,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_sequence_span() {
         let report = report("(defun f (x)\n  (subseq x 0))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "subseq-zero");
         assert_eq!(
             finding.json_fields(),

@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -50,8 +50,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct NestedStringCaseItem {
     /// The span of the whole `(OUTER (INNER s))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the outer case-op head token, preserved in the fix.
     pub outer_span: ByteSpan,
     /// The span of the string operand `s`.
@@ -68,10 +66,6 @@ impl Finding for NestedStringCaseItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -102,7 +96,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     string_case_form_count: &mut usize,
     violations: &mut Vec<NestedStringCaseItem>,
 ) {
@@ -139,7 +132,6 @@ pub fn examine(
 
     violations.push(NestedStringCaseItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         outer_span: view.children[0].span,
         string_span: string.span,
     });
@@ -162,23 +154,18 @@ pub fn build_nested_string_case_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("string_case_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut string_case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(
-                subview,
-                source,
-                &mut string_case_form_count,
-                &mut violations,
-            );
+            examine(subview, &mut string_case_form_count, &mut violations);
         });
     }
 
@@ -186,6 +173,7 @@ pub fn build_nested_string_case_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("string_case_form_count", json!(string_case_form_count))],
     ))
@@ -288,7 +276,7 @@ mod tests {
         let source = "(defun f (s)\n  (string-upcase (string-downcase s)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "nested-string-case");
         assert_eq!(
             finding.json_fields(),

@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
@@ -49,8 +49,6 @@ fn keyword_rank(text: &str) -> Option<u8> {
 #[derive(Debug, Clone)]
 pub struct LambdaListKeywordOrderItem {
     pub span: ByteSpan,
-    /// The 1-based line the definition starts on.
-    pub line: usize,
     pub definition: String,
     pub keyword: String,
     pub after_keyword: String,
@@ -67,10 +65,6 @@ impl Finding for LambdaListKeywordOrderItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -117,12 +111,12 @@ pub fn build_lambda_list_keyword_order_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("definition_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut definition_count = 0;
     let mut violations = Vec::new();
 
@@ -176,7 +170,6 @@ pub fn build_lambda_list_keyword_order_report(
             if *rank < max_rank {
                 violations.push(LambdaListKeywordOrderItem {
                     span: view.span,
-                    line: line_of(source, view.span.start().get()),
                     definition: definition.clone(),
                     keyword: keyword.clone(),
                     after_keyword: max_keyword.clone(),
@@ -194,6 +187,7 @@ pub fn build_lambda_list_keyword_order_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("definition_count", json!(definition_count))],
     ))
@@ -309,7 +303,7 @@ mod tests {
     fn a_finding_carries_its_line_its_definition_and_both_keywords() {
         let report = report("(in-package :app)\n(defun f (&key a &optional b) a)\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "lambda-list-keyword-order");
         assert_eq!(
             finding.json_fields(),

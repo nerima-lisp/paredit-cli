@@ -89,13 +89,7 @@ impl LintRule for Rule {
 
         let mut char_call_count = 0;
         let mut items = Vec::new();
-        examine_call(
-            view,
-            context.source(),
-            &is_non_character,
-            &mut char_call_count,
-            &mut items,
-        );
+        examine_call(view, &is_non_character, &mut char_call_count, &mut items);
         for item in items {
             let span = item.span;
 

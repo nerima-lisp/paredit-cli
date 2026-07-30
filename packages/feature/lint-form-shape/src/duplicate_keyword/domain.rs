@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -56,8 +56,6 @@ fn keyword_name(view: &ExpressionView) -> Option<String> {
 pub struct DuplicateKeywordItem {
     /// The span of the whole call form.
     pub span: ByteSpan,
-    /// The 1-based line the call form starts on.
-    pub line: usize,
     /// The duplicated keyword name, lowercased.
     pub keyword: String,
     /// The span of the duplicate (second) occurrence.
@@ -76,10 +74,6 @@ impl Finding for DuplicateKeywordItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -113,7 +107,6 @@ impl Finding for DuplicateKeywordItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     call_form_count: &mut usize,
     violations: &mut Vec<DuplicateKeywordItem>,
 ) {
@@ -148,7 +141,6 @@ pub fn examine(
         if seen.contains(&name) {
             violations.push(DuplicateKeywordItem {
                 span: view.span,
-                line: line_of(source, view.span.start().get()),
                 keyword: name,
                 duplicate_span: view.children[index].span,
             });
@@ -177,18 +169,18 @@ pub fn build_duplicate_keyword_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("call_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut call_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut call_form_count, &mut violations);
+            examine(subview, &mut call_form_count, &mut violations);
         });
     }
 
@@ -196,6 +188,7 @@ pub fn build_duplicate_keyword_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("call_form_count", json!(call_form_count))],
     ))
@@ -293,7 +286,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_keyword() {
         let report = report("(defun f ()\n  (make-instance 'c :x 1 :x 2))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "duplicate-keyword");
         assert_eq!(finding.text_columns(), vec![":x".to_owned()]);
         assert_eq!(finding.json_fields()[0], ("keyword", json!(":x")));

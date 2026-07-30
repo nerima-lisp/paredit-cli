@@ -16,7 +16,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
@@ -43,7 +43,6 @@ pub struct ApiEntry {
     /// Whether the analyzed files define this export at all.
     pub defined: bool,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl ApiEntry {
@@ -78,10 +77,6 @@ impl Finding for ApiEntry {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -129,6 +124,7 @@ pub fn build_api_surface_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("undefined_export_count", json!(0))],
         );
@@ -176,13 +172,6 @@ pub fn build_api_surface_report(
                     // designator when there is not, since that is the only
                     // thing that exists.
                     span: definition.map_or(exported.span, |found| found.span),
-                    line: line_of(
-                        source,
-                        definition
-                            .map_or(exported.span, |found| found.span)
-                            .start()
-                            .get(),
-                    ),
                     package: package.clone(),
                     name,
                 });
@@ -196,6 +185,7 @@ pub fn build_api_surface_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         findings,
         vec![("undefined_export_count", json!(undefined))],
     )

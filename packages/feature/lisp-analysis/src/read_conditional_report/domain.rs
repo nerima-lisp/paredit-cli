@@ -29,7 +29,7 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 
 /// One reader conditional.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,7 +45,6 @@ pub struct ReadConditional {
     /// The whole region the conditional consumes: the dispatch, the feature
     /// expression, and the guarded datum.
     pub span: ByteSpan,
-    pub line: usize,
     /// The guarded text, elided. What is actually at stake.
     pub guarded: String,
 }
@@ -57,10 +56,6 @@ impl Finding for ReadConditional {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -102,7 +97,6 @@ pub fn build_read_conditional_report(
                     features: feature_names(&expression),
                     feature_expression: expression,
                     span: form.span,
-                    line: line_of(source, form.span.start().get()),
                     guarded: guarded_text(source, form.dispatch_span, form.span),
                 }
             })
@@ -129,6 +123,7 @@ pub fn build_read_conditional_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("distinct_feature_count", json!(distinct)),

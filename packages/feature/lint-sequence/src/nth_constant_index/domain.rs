@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -51,8 +51,6 @@ fn ordinal_for_index(view: &ExpressionView) -> Option<&'static str> {
 pub struct NthConstantIndexItem {
     /// The span of the whole `(nth N x)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The ordinal accessor name (`first` for `(nth 0 x)`).
     pub ordinal: &'static str,
     /// The span of the list argument `x` (for reconstructing the fix).
@@ -77,10 +75,6 @@ impl Finding for NthConstantIndexItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     /// Nothing: the old text row's only column beyond the path and offset was
     /// the ordinal, which now leads the row as the `kind`.
     fn text_columns(&self) -> Vec<String> {
@@ -102,7 +96,6 @@ impl Finding for NthConstantIndexItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_nth(
     view: &ExpressionView,
-    source: &str,
     nth_form_count: &mut usize,
     violations: &mut Vec<NthConstantIndexItem>,
 ) {
@@ -124,7 +117,6 @@ pub fn examine_nth(
 
     violations.push(NthConstantIndexItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         ordinal,
         list_span: view.children[2].span,
     });
@@ -147,18 +139,18 @@ pub fn build_nth_constant_index_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("nth_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut nth_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_nth(subview, source, &mut nth_form_count, &mut violations);
+            examine_nth(subview, &mut nth_form_count, &mut violations);
         });
     }
 
@@ -166,6 +158,7 @@ pub fn build_nth_constant_index_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("nth_form_count", json!(nth_form_count))],
     ))
@@ -293,7 +286,7 @@ mod tests {
     fn a_finding_carries_its_line_and_leads_with_its_ordinal() {
         let report = report("(defun head-of (xs)\n  (nth 0 xs))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         // The ordinal is the kind, so the text row leads with it and carries
         // no further columns.
         assert_eq!(finding.kind(), "first");

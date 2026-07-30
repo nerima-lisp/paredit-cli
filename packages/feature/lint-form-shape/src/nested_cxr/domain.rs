@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
@@ -46,8 +46,6 @@ fn cxr_middle(symbol: &str) -> Option<String> {
 pub struct NestedCxrItem {
     /// The span of the whole `(OUTER (INNER x))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The combined accessor name (`cadr` for `(car (cdr x))`).
     pub combined: String,
     /// The span of the innermost argument `x` (for reconstructing the fix).
@@ -68,10 +66,6 @@ impl Finding for NestedCxrItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -96,7 +90,6 @@ impl Finding for NestedCxrItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_accessor(
     view: &ExpressionView,
-    source: &str,
     accessor_form_count: &mut usize,
     violations: &mut Vec<NestedCxrItem>,
 ) {
@@ -132,7 +125,6 @@ pub fn examine_accessor(
 
     violations.push(NestedCxrItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         combined,
         arg_span: inner.children[1].span,
     });
@@ -155,18 +147,18 @@ pub fn build_nested_cxr_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("accessor_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut accessor_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_accessor(subview, source, &mut accessor_form_count, &mut violations);
+            examine_accessor(subview, &mut accessor_form_count, &mut violations);
         });
     }
 
@@ -174,6 +166,7 @@ pub fn build_nested_cxr_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("accessor_form_count", json!(accessor_form_count))],
     ))
@@ -311,7 +304,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_combined_accessor() {
         let report = report("(defun second-of (pair)\n  (car (cdr pair)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "nested-cxr");
         assert_eq!(finding.json_fields(), vec![("combined", json!("cadr"))]);
         assert_eq!(finding.text_columns(), vec!["combined=cadr".to_owned()]);

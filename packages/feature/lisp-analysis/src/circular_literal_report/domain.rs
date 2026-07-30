@@ -27,7 +27,7 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 
 const DATUM_LIMIT: usize = 48;
 
@@ -74,7 +74,6 @@ pub struct CircularLiteral {
     /// The labelled datum, elided. Empty for a reference, which is the datum.
     pub datum: String,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for CircularLiteral {
@@ -84,10 +83,6 @@ impl Finding for CircularLiteral {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -117,6 +112,7 @@ pub fn build_circular_literal_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("broken_count", json!(0))],
         );
@@ -163,7 +159,6 @@ pub fn build_circular_literal_report(
                 number,
                 datum: datum_text(source, form.dispatch_span, form.span),
                 span: form.span,
-                line: line_of(source, form.span.start().get()),
             }
         })
         .collect::<Vec<_>>();
@@ -177,6 +172,7 @@ pub fn build_circular_literal_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         findings,
         vec![
             ("label_count", json!(definitions.len())),

@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
@@ -31,8 +31,6 @@ use serde_json::{Value, json};
 pub struct RedundantIdentityItem {
     /// The span of the whole `(identity X)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the argument `X` (lets a fix substitute its source).
     ///
     /// The rewrite's input, not the report's: the lint rule reads it to splice
@@ -49,10 +47,6 @@ impl Finding for RedundantIdentityItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// None. The old text row carried the path and offset the envelope now
@@ -78,7 +72,6 @@ impl Finding for RedundantIdentityItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_identity(
     view: &ExpressionView,
-    source: &str,
     identity_form_count: &mut usize,
     violations: &mut Vec<RedundantIdentityItem>,
 ) {
@@ -97,7 +90,6 @@ pub fn examine_identity(
 
     violations.push(RedundantIdentityItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         inner_span: view.children[1].span,
     });
 }
@@ -119,18 +111,18 @@ pub fn build_redundant_identity_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("identity_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut identity_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_identity(subview, source, &mut identity_form_count, &mut violations);
+            examine_identity(subview, &mut identity_form_count, &mut violations);
         });
     }
 
@@ -138,6 +130,7 @@ pub fn build_redundant_identity_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("identity_form_count", json!(identity_form_count))],
     ))
@@ -233,7 +226,7 @@ mod tests {
     fn a_finding_carries_its_line_and_no_extra_fields() {
         let report = report("(defun echo (x)\n  (identity x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "redundant-identity");
         assert!(finding.text_columns().is_empty());
         assert!(finding.json_fields().is_empty());

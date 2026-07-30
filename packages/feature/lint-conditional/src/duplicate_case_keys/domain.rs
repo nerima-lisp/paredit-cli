@@ -23,7 +23,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -66,8 +66,6 @@ fn clause_keys(clause: &ExpressionView) -> Vec<&str> {
 pub struct DuplicateCaseKeyItem {
     /// The span of the whole `case`/`ecase`/`ccase` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The case operator as it is spelled in source.
     pub head: String,
     /// The repeated key, in its first-seen spelling.
@@ -87,10 +85,6 @@ impl Finding for DuplicateCaseKeyItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -123,7 +117,6 @@ impl Finding for DuplicateCaseKeyItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    source: &str,
     case_form_count: &mut usize,
     duplicates: &mut Vec<DuplicateCaseKeyItem>,
 ) {
@@ -159,7 +152,6 @@ pub fn examine_case(
         }
         duplicates.push(DuplicateCaseKeyItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             head: head.to_owned(),
             key: key.clone(),
             occurrence_count: *occurrence_count,
@@ -184,18 +176,18 @@ pub fn build_duplicate_case_key_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("case_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut case_form_count = 0;
     let mut duplicates = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, source, &mut case_form_count, &mut duplicates);
+            examine_case(subview, &mut case_form_count, &mut duplicates);
         });
     }
 
@@ -203,6 +195,7 @@ pub fn build_duplicate_case_key_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         duplicates,
         vec![("case_form_count", json!(case_form_count))],
     ))
@@ -302,7 +295,7 @@ mod tests {
     fn a_finding_carries_its_line_its_key_and_its_count() {
         let report = report("(defun f (x)\n  (case x (:a 1) (:b 2) (:a 3)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "duplicate-case-keys");
         assert_eq!(
             finding.json_fields(),

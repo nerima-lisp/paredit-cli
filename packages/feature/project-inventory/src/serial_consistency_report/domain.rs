@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
@@ -71,7 +71,6 @@ pub struct ComponentFinding {
     /// The declared dependencies that caused the fault.
     pub dependencies: Vec<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for ComponentFinding {
@@ -81,10 +80,6 @@ impl Finding for ComponentFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -116,7 +111,6 @@ pub fn build_serial_consistency_report(
     tree: &SyntaxTree,
 ) -> FileFindings<ComponentFinding> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let mut findings = Vec::new();
 
     if modelled {
@@ -160,7 +154,6 @@ pub fn build_serial_consistency_report(
                     serial,
                     dependencies,
                     span: component.span,
-                    line: line_of(source, component.span.start().get()),
                 });
             }
         }
@@ -175,6 +168,7 @@ pub fn build_serial_consistency_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("fault_count", json!(faults))],
     )

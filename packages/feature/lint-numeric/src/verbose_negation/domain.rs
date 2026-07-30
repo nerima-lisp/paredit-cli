@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -46,8 +46,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct VerboseNegationItem {
     /// The span of the whole `(- 0 x)`/`(* x -1)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the operand `X` that is being negated.
     ///
     /// The rewrite's input, not the report's: the lint rule copies `X`'s source
@@ -67,10 +65,6 @@ impl Finding for VerboseNegationItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the leading `kind`: the old text row carried only the
@@ -97,7 +91,6 @@ impl Finding for VerboseNegationItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    source: &str,
     arithmetic_form_count: &mut usize,
     violations: &mut Vec<VerboseNegationItem>,
 ) {
@@ -137,7 +130,6 @@ pub fn examine_form(
 
     violations.push(VerboseNegationItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         operand_span: operand.span,
     });
 }
@@ -159,18 +151,18 @@ pub fn build_verbose_negation_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("arithmetic_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut arithmetic_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(subview, source, &mut arithmetic_form_count, &mut violations);
+            examine_form(subview, &mut arithmetic_form_count, &mut violations);
         });
     }
 
@@ -178,6 +170,7 @@ pub fn build_verbose_negation_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("arithmetic_form_count", json!(arithmetic_form_count))],
     ))
@@ -294,7 +287,7 @@ mod tests {
     fn a_finding_carries_its_line_and_leans_on_its_message() {
         let report = report("(defun negate (x)\n  (- 0 x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "verbose-negation");
         assert!(finding.json_fields().is_empty());
         assert!(finding.text_columns().is_empty());

@@ -22,7 +22,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Synta
 use paredit_core_syntax::view_query::{is_paren_list, list_head};
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 
 /// What the analysis concluded about one `format` call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +69,6 @@ pub struct FormatCall {
     /// see what was counted without re-parsing.
     pub directives: Vec<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for FormatCall {
@@ -79,10 +78,6 @@ impl Finding for FormatCall {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -143,6 +138,7 @@ pub fn build_format_directive_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("mismatch_count", json!(mismatched))],
     )
@@ -189,7 +185,6 @@ fn format_call(view: &ExpressionView, source: &str) -> Option<FormatCall> {
         supplied,
         control,
         span: view.span,
-        line: line_of(source, view.span.start().get()),
     })
 }
 

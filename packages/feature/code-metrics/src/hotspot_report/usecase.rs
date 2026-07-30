@@ -24,18 +24,7 @@ pub fn evaluate_hotspot_policy(
 
     let failing = reports
         .iter()
-        .map(|report| FileFindings {
-            path: report.path.clone(),
-            dialect: report.dialect,
-            dialect_modelled: report.dialect_modelled,
-            findings: report
-                .findings
-                .iter()
-                .filter(|hotspot| hotspot.score > limit)
-                .cloned()
-                .collect(),
-            summary: report.summary.clone(),
-        })
+        .map(|report| report.retained(|hotspot| hotspot.score > limit))
         .collect::<Vec<_>>();
 
     let mut policy = ReportPolicy::fail_on_any(Some("--max-score"), &failing, |report| {

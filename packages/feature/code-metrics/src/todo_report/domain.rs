@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
@@ -40,7 +40,6 @@ pub struct TaskMarker {
     /// The unit of work a reader would actually pick up.
     pub definition: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for TaskMarker {
@@ -56,10 +55,6 @@ impl Finding for TaskMarker {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -102,7 +97,6 @@ pub fn build_todo_report(
                 author,
                 definition: enclosing_definition(&definitions, span),
                 span,
-                line: line_of(source, span.start().get()),
             })
         })
         .collect::<Vec<_>>();
@@ -118,6 +112,7 @@ pub fn build_todo_report(
         // Comment syntax is `;` in every dialect this tool parses, so the
         // analysis is complete for all of them.
         true,
+        tree.source(),
         findings,
         vec![("urgent_count", json!(urgent))],
     )

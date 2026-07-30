@@ -25,7 +25,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::for_each_subview;
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 
 /// How much of the evaluated form the finding quotes.
 const FORM_LIMIT: usize = 64;
@@ -64,7 +64,6 @@ pub struct ReadTimeEval {
     /// useful field for triage: `+` and `run-program` are not the same finding.
     pub head: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for ReadTimeEval {
@@ -74,10 +73,6 @@ impl Finding for ReadTimeEval {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -123,6 +118,7 @@ pub fn build_read_time_eval_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("live_count", json!(live))],
     )
@@ -145,7 +141,6 @@ fn read_time_eval(view: &ExpressionView, source: &str) -> Option<ReadTimeEval> {
         head: head_of(form),
         form: elide(form),
         span: view.span,
-        line: line_of(source, view.span.start().get()),
     })
 }
 

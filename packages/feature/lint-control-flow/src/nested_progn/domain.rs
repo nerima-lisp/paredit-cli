@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
@@ -39,8 +39,6 @@ fn is_progn(view: &ExpressionView) -> bool {
 pub struct NestedPrognItem {
     /// The span of the inner (nested) progn.
     pub span: ByteSpan,
-    /// The 1-based line the inner progn starts on.
-    pub line: usize,
     /// The span covering just the inner progn's body forms (first form start to
     /// last form end), so a fix can splice that source in place of the wrapper.
     ///
@@ -62,10 +60,6 @@ impl Finding for NestedPrognItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -90,7 +84,6 @@ impl Finding for NestedPrognItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_progn(
     view: &ExpressionView,
-    source: &str,
     progn_form_count: &mut usize,
     violations: &mut Vec<NestedPrognItem>,
 ) {
@@ -115,7 +108,6 @@ pub fn examine_progn(
             );
             violations.push(NestedPrognItem {
                 span: child.span,
-                line: line_of(source, child.span.start().get()),
                 body_span,
                 body_form_count: inner_body_form_count,
             });
@@ -140,18 +132,18 @@ pub fn build_nested_progn_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("progn_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut progn_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_progn(subview, source, &mut progn_form_count, &mut violations);
+            examine_progn(subview, &mut progn_form_count, &mut violations);
         });
     }
 
@@ -159,6 +151,7 @@ pub fn build_nested_progn_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("progn_form_count", json!(progn_form_count))],
     ))
@@ -280,7 +273,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_body_form_count() {
         let report = report("(progn\n  a\n  (progn b c))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 3);
+        assert_eq!(report.line_of(finding), 3);
         assert_eq!(finding.kind(), "nested-progn");
         assert_eq!(finding.json_fields(), vec![("body_form_count", json!(2))]);
         assert_eq!(finding.text_columns(), vec!["body_form_count=2".to_owned()]);

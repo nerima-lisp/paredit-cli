@@ -29,7 +29,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -53,8 +53,6 @@ fn is_catch_all_clause(clause: &ExpressionView) -> bool {
 pub struct UnreachableCaseClauseItem {
     /// The span of the first stranded clause.
     pub span: ByteSpan,
-    /// The 1-based line that clause starts on.
-    pub line: usize,
     /// The dispatch operator (`case`/`typecase`), for the finding message.
     pub head: String,
     /// How many clauses are stranded after the catch-all.
@@ -70,10 +68,6 @@ impl Finding for UnreachableCaseClauseItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -104,7 +98,6 @@ impl Finding for UnreachableCaseClauseItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    source: &str,
     case_form_count: &mut usize,
     violations: &mut Vec<UnreachableCaseClauseItem>,
 ) {
@@ -143,7 +136,6 @@ pub fn examine_case(
     if let Some(first_dead) = unreachable.first() {
         violations.push(UnreachableCaseClauseItem {
             span: first_dead.span,
-            line: line_of(source, first_dead.span.start().get()),
             head: head.to_owned(),
             unreachable_count: unreachable.len(),
         });
@@ -168,18 +160,18 @@ pub fn build_unreachable_case_clause_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("case_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, source, &mut case_form_count, &mut violations);
+            examine_case(subview, &mut case_form_count, &mut violations);
         });
     }
 
@@ -187,6 +179,7 @@ pub fn build_unreachable_case_clause_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("case_form_count", json!(case_form_count))],
     ))
@@ -312,7 +305,7 @@ mod tests {
     fn a_finding_carries_its_line_head_and_count() {
         let report = report("(defun f (x)\n  (case x (t 1) (2 :two)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "unreachable-case-clause");
         assert_eq!(
             finding.json_fields(),

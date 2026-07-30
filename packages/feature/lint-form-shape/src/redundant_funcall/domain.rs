@@ -31,7 +31,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path as SexprPath, ReaderPrefix,
@@ -59,8 +59,6 @@ fn sharp_quoted_symbol(view: &ExpressionView) -> Option<&str> {
 pub struct RedundantFuncallItem {
     /// The span of the whole `(funcall #'FN …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The callee symbol name (`foo` for `#'foo`).
     pub callee: String,
     /// The bytes a fix deletes: from the `funcall` head through the `#'` prefix,
@@ -81,10 +79,6 @@ impl Finding for RedundantFuncallItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -109,7 +103,6 @@ impl Finding for RedundantFuncallItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_funcall(
     view: &ExpressionView,
-    source: &str,
     funcall_form_count: &mut usize,
     violations: &mut Vec<RedundantFuncallItem>,
 ) {
@@ -136,7 +129,6 @@ pub fn examine_funcall(
         ByteOffset::new(function_arg.span.start().get() + function_arg.symbol_offset);
     violations.push(RedundantFuncallItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         callee: callee.to_owned(),
         removal_span: ByteSpan::new(funcall_head.span.start(), callee_symbol_start),
     });
@@ -159,18 +151,18 @@ pub fn build_redundant_funcall_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("funcall_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut funcall_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_funcall(subview, source, &mut funcall_form_count, &mut violations);
+            examine_funcall(subview, &mut funcall_form_count, &mut violations);
         });
     }
 
@@ -178,6 +170,7 @@ pub fn build_redundant_funcall_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("funcall_form_count", json!(funcall_form_count))],
     ))
@@ -295,7 +288,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_callee() {
         let report = report("(defun run (x)\n  (funcall #'process x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "redundant-funcall");
         assert_eq!(finding.json_fields(), vec![("callee", json!("process"))]);
         assert_eq!(finding.text_columns(), vec!["callee=process".to_owned()]);

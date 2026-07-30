@@ -15,7 +15,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
@@ -52,7 +52,6 @@ pub struct CoverageEntry {
     /// The tests that name this definition.
     pub tests: Vec<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for CoverageEntry {
@@ -62,10 +61,6 @@ impl Finding for CoverageEntry {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -90,7 +85,6 @@ pub fn build_test_map_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> FileFindings<CoverageEntry> {
-    let source = tree.source();
     let mut subjects: Vec<(String, ByteSpan)> = Vec::new();
     let mut tests: Vec<(String, ByteSpan)> = Vec::new();
 
@@ -137,7 +131,6 @@ pub fn build_test_map_report(
                 name: name.clone(),
                 tests,
                 span: *span,
-                line: line_of(source, span.start().get()),
             }
         })
         .collect::<Vec<_>>();
@@ -146,7 +139,6 @@ pub fn build_test_map_report(
         name,
         tests: Vec::new(),
         span,
-        line: line_of(source, span.start().get()),
     }));
 
     let tested = findings
@@ -166,6 +158,7 @@ pub fn build_test_map_report(
         dialect,
         // Definition shapes and naming conventions are dialect-neutral.
         true,
+        tree.source(),
         findings,
         vec![
             ("testable_count", json!(testable)),

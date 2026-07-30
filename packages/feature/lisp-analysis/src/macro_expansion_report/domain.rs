@@ -34,7 +34,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::list_head;
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 
 /// Why an expansion was not produced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +69,6 @@ pub struct Expansion {
     /// Why it was declined, if it was.
     pub declined: Option<Declined>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for Expansion {
@@ -80,10 +79,6 @@ impl Finding for Expansion {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -147,6 +142,7 @@ pub fn build_macro_expansion_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("macro_count", json!(macros.len())),
@@ -239,7 +235,6 @@ fn expand(
         expansion: None,
         declined: None,
         span: call.span,
-        line: line_of(source, call.span.start().get()),
     };
 
     if definition.unsupported_lambda_list {

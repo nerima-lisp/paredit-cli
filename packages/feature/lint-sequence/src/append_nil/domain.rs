@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -47,8 +47,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct AppendNilItem {
     /// The span of the whole `(append x nil)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the list operand `x`.
     pub list_span: ByteSpan,
 }
@@ -60,10 +58,6 @@ impl Finding for AppendNilItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing: the old text row carried only the path and the offset, both of
@@ -95,7 +89,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     append_form_count: &mut usize,
     violations: &mut Vec<AppendNilItem>,
 ) {
@@ -122,7 +115,6 @@ pub fn examine(
 
     violations.push(AppendNilItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         list_span: list.span,
     });
 }
@@ -144,18 +136,18 @@ pub fn collect_append_nils(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("append_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut append_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut append_form_count, &mut violations);
+            examine(subview, &mut append_form_count, &mut violations);
         });
     }
 
@@ -163,6 +155,7 @@ pub fn collect_append_nils(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("append_form_count", json!(append_form_count))],
     ))
@@ -262,7 +255,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_list_span() {
         let report = report("(defun f (xs)\n  (append xs nil))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "append-nil");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -51,8 +51,6 @@ fn negated_test(view: &ExpressionView) -> Option<&ExpressionView> {
 pub struct NegatedIfItem {
     /// The span of the whole `(if (not X) A B)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the un-negated test `X`.
     ///
     /// One of three rewrite inputs the lint rule slices to build `(if X B A)`;
@@ -74,10 +72,6 @@ impl Finding for NegatedIfItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing: the old text row carried only the path and the offset, which
@@ -105,7 +99,6 @@ impl Finding for NegatedIfItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<NegatedIfItem>,
 ) {
@@ -133,7 +126,6 @@ pub fn examine_if(
 
     violations.push(NegatedIfItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         test_span: inner.span,
         then_span: view.children[2].span,
         else_span: view.children[3].span,
@@ -157,18 +149,18 @@ pub fn build_negated_if_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("if_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, source, &mut if_form_count, &mut violations);
+            examine_if(subview, &mut if_form_count, &mut violations);
         });
     }
 
@@ -176,6 +168,7 @@ pub fn build_negated_if_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("if_form_count", json!(if_form_count))],
     ))
@@ -289,7 +282,7 @@ mod tests {
     fn a_finding_carries_its_line_and_leans_on_its_message() {
         let report = report("(defun pick (ready)\n  (if (not ready) 0 1))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "negated-if");
         assert!(finding.text_columns().is_empty());
         assert!(finding.json_fields().is_empty());

@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -98,8 +98,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct TypepPredicateItem {
     /// The span of the whole `(typep x 'TYPE)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The dedicated predicate name to rewrite to (`stringp`, `null`, ...).
     pub predicate: &'static str,
     /// The span of the object operand `x`.
@@ -119,10 +117,6 @@ impl Finding for TypepPredicateItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// None: the one column the old text row carried was the predicate, and it
@@ -158,7 +152,6 @@ impl Finding for TypepPredicateItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     typep_form_count: &mut usize,
     violations: &mut Vec<TypepPredicateItem>,
 ) {
@@ -186,7 +179,6 @@ pub fn examine(
 
     violations.push(TypepPredicateItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         predicate,
         object_span: object.span,
     });
@@ -209,18 +201,18 @@ pub fn build_typep_predicate_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("typep_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut typep_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut typep_form_count, &mut violations);
+            examine(subview, &mut typep_form_count, &mut violations);
         });
     }
 
@@ -228,6 +220,7 @@ pub fn build_typep_predicate_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("typep_form_count", json!(typep_form_count))],
     ))
@@ -346,7 +339,7 @@ mod tests {
     fn a_finding_carries_its_line_its_predicate_and_its_object_span() {
         let report = report("(defun f (obj)\n  (typep obj 'string))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "stringp");
         assert_eq!(
             finding.json_fields(),

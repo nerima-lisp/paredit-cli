@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
@@ -47,8 +47,6 @@ fn is_quoted(view: &ExpressionView) -> bool {
 pub struct DefpackageQuotedItem {
     /// The span of the whole `defpackage` form.
     pub span: ByteSpan,
-    /// The 1-based line the `defpackage` form starts on.
-    pub line: usize,
     /// The clause keyword, lowercased (`:export`, ...).
     ///
     /// One of [`DESIGNATOR_CLAUSES`], so it is `&'static str` rather than the
@@ -73,10 +71,6 @@ impl Finding for DefpackageQuotedItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path, line, and leading clause: the old text row
@@ -112,7 +106,6 @@ impl Finding for DefpackageQuotedItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     defpackage_form_count: &mut usize,
     violations: &mut Vec<DefpackageQuotedItem>,
 ) {
@@ -145,7 +138,6 @@ pub fn examine(
             if is_quoted(entry) {
                 violations.push(DefpackageQuotedItem {
                     span: view.span,
-                    line: line_of(source, view.span.start().get()),
                     clause: name,
                     designator_span: entry.span,
                 });
@@ -171,18 +163,18 @@ pub fn build_defpackage_quoted_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("defpackage_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut defpackage_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut defpackage_form_count, &mut violations);
+            examine(subview, &mut defpackage_form_count, &mut violations);
         });
     }
 
@@ -190,6 +182,7 @@ pub fn build_defpackage_quoted_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("defpackage_form_count", json!(defpackage_form_count))],
     ))
@@ -286,7 +279,7 @@ mod tests {
     fn a_finding_leads_with_its_clause_and_carries_its_line() {
         let report = report("(in-package :cl-user)\n(defpackage :app (:use #'cl))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), ":use");
         assert!(finding.text_columns().is_empty());
         assert_eq!(finding.json_fields()[0], ("clause", json!(":use")));

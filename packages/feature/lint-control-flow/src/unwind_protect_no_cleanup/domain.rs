@@ -20,7 +20,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -35,8 +35,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct UnwindProtectNoCleanupItem {
     /// The span of the whole `(unwind-protect x)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the protected form `x` (for reconstructing the fix).
     pub form_span: ByteSpan,
 }
@@ -48,10 +46,6 @@ impl Finding for UnwindProtectNoCleanupItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the leading `kind`, path and line: this report's text
@@ -84,7 +78,6 @@ impl Finding for UnwindProtectNoCleanupItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     unwind_protect_form_count: &mut usize,
     violations: &mut Vec<UnwindProtectNoCleanupItem>,
 ) {
@@ -107,7 +100,6 @@ pub fn examine(
 
     violations.push(UnwindProtectNoCleanupItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         form_span: form.span,
     });
 }
@@ -129,23 +121,18 @@ pub fn build_unwind_protect_no_cleanup_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("unwind_protect_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut unwind_protect_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(
-                subview,
-                source,
-                &mut unwind_protect_form_count,
-                &mut violations,
-            );
+            examine(subview, &mut unwind_protect_form_count, &mut violations);
         });
     }
 
@@ -153,6 +140,7 @@ pub fn build_unwind_protect_no_cleanup_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![(
             "unwind_protect_form_count",
@@ -240,7 +228,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_form_span() {
         let report = report("(defun f (x)\n  (unwind-protect x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "unwind-protect-no-cleanup");
         assert_eq!(
             finding.json_fields(),

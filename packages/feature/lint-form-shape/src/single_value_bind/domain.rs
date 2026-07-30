@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree,
@@ -50,8 +50,6 @@ fn is_plain_variable(view: &ExpressionView) -> bool {
 pub struct SingleValueBindItem {
     /// The span of the whole `(multiple-value-bind (x) form body…)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the single bound variable `x`.
     ///
     /// The rewrite's input, not the report's: the lint rule reads it to build
@@ -78,10 +76,6 @@ impl Finding for SingleValueBindItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     /// Empty, because the old text row carried nothing past the path and
     /// offset: the span alone locates the bind.
     fn text_columns(&self) -> Vec<String> {
@@ -106,7 +100,6 @@ impl Finding for SingleValueBindItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_bind(
     view: &ExpressionView,
-    source: &str,
     bind_form_count: &mut usize,
     violations: &mut Vec<SingleValueBindItem>,
 ) {
@@ -155,7 +148,6 @@ pub fn examine_bind(
 
     violations.push(SingleValueBindItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         var_span: var.span,
         form_span: form.span,
         body_span,
@@ -180,18 +172,18 @@ pub fn build_single_value_bind_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("bind_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut bind_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_bind(subview, source, &mut bind_form_count, &mut violations);
+            examine_bind(subview, &mut bind_form_count, &mut violations);
         });
     }
 
@@ -199,6 +191,7 @@ pub fn build_single_value_bind_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("bind_form_count", json!(bind_form_count))],
     ))
@@ -314,7 +307,7 @@ mod tests {
     fn a_finding_carries_its_line_and_nothing_the_envelope_does_not_already_print() {
         let report = report("(defun g ()\n  (multiple-value-bind (v) (compute) (list v)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "single-value-bind");
         assert!(finding.text_columns().is_empty());
         assert!(finding.json_fields().is_empty());

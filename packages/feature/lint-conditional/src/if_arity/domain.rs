@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -59,8 +59,6 @@ fn is_arity_ambiguous_child(view: &ExpressionView) -> bool {
 pub struct IfArityItem {
     /// The span of the whole misarity `if` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     pub argument_count: usize,
 }
 
@@ -74,10 +72,6 @@ impl Finding for IfArityItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -99,7 +93,6 @@ impl Finding for IfArityItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<IfArityItem>,
 ) {
@@ -122,7 +115,6 @@ pub fn examine_if(
     if !(2..=3).contains(&argument_count) {
         violations.push(IfArityItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             argument_count,
         });
     }
@@ -145,18 +137,18 @@ pub fn build_if_arity_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("if_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, source, &mut if_form_count, &mut violations);
+            examine_if(subview, &mut if_form_count, &mut violations);
         });
     }
 
@@ -164,6 +156,7 @@ pub fn build_if_arity_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("if_form_count", json!(if_form_count))],
     ))
@@ -268,7 +261,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_argument_count() {
         let report = report("(defun f (x)\n  (if x 1 2 3))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "if-arity");
         assert_eq!(finding.json_fields(), vec![("argument_count", json!(4))]);
         assert_eq!(finding.text_columns(), vec!["arguments=4".to_owned()]);

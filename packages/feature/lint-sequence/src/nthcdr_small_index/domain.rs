@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -56,8 +56,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct NthcdrSmallIndexItem {
     /// The span of the whole `(nthcdr n list)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The named accessor to rewrite to (`cdr`, `cddr`, `cdddr`, `cddddr`).
     pub accessor: &'static str,
     /// The span of the list operand (for reconstructing the fix).
@@ -80,10 +78,6 @@ impl Finding for NthcdrSmallIndexItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing: the old text row's only column beyond the path and offset was
@@ -118,7 +112,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     nthcdr_form_count: &mut usize,
     violations: &mut Vec<NthcdrSmallIndexItem>,
 ) {
@@ -145,7 +138,6 @@ pub fn examine(
 
     violations.push(NthcdrSmallIndexItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         accessor,
         list_span: list.span,
     });
@@ -168,18 +160,18 @@ pub fn build_nthcdr_small_index_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("nthcdr_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut nthcdr_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut nthcdr_form_count, &mut violations);
+            examine(subview, &mut nthcdr_form_count, &mut violations);
         });
     }
 
@@ -187,6 +179,7 @@ pub fn build_nthcdr_small_index_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("nthcdr_form_count", json!(nthcdr_form_count))],
     ))
@@ -305,7 +298,7 @@ mod tests {
         let source = "(defun f (xs)\n  (nthcdr 2 (rest xs)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         // The accessor is the kind, so the text row leads with it and carries
         // no further columns.
         assert_eq!(finding.kind(), "cddr");

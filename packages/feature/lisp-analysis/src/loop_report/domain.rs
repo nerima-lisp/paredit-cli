@@ -34,7 +34,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::list_head;
 use serde_json::{Value, json};
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 
 /// What kind of `loop` this is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,7 +77,6 @@ pub struct LoopForm {
     /// separates them. `collect` and `sum` in one loop is a bug.
     pub conflicting_accumulations: Vec<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for LoopForm {
@@ -93,10 +92,6 @@ impl Finding for LoopForm {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -173,11 +168,10 @@ pub fn build_loop_report(
     tree: &SyntaxTree,
 ) -> FileFindings<LoopForm> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let mut findings = Vec::new();
 
     if modelled {
-        collect(&tree.root_view(), source, &mut findings);
+        collect(&tree.root_view(), &mut findings);
     }
 
     let unterminated = findings
@@ -193,6 +187,7 @@ pub fn build_loop_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("unterminated_count", json!(unterminated)),
@@ -201,16 +196,16 @@ pub fn build_loop_report(
     )
 }
 
-fn collect(view: &ExpressionView, source: &str, findings: &mut Vec<LoopForm>) {
+fn collect(view: &ExpressionView, findings: &mut Vec<LoopForm>) {
     if list_head(view).is_some_and(|head| common_lisp_operator_head_eq(head, "loop")) {
-        findings.push(read_loop(view, source));
+        findings.push(read_loop(view));
     }
     for child in &view.children {
-        collect(child, source, findings);
+        collect(child, findings);
     }
 }
 
-fn read_loop(view: &ExpressionView, source: &str) -> LoopForm {
+fn read_loop(view: &ExpressionView) -> LoopForm {
     let tokens = &view.children[1..];
 
     let mut bindings = Vec::new();
@@ -335,7 +330,6 @@ fn read_loop(view: &ExpressionView, source: &str) -> LoopForm {
         terminates: has_return,
         conflicting_accumulations: conflicting,
         span: view.span,
-        line: line_of(source, view.span.start().get()),
     }
 }
 

@@ -20,6 +20,7 @@ pub mod render;
 use std::path::PathBuf;
 
 use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::selector::line_index::LineIndex;
 use paredit_core_syntax::sexpr::ByteSpan;
 use serde_json::Value;
 
@@ -31,7 +32,6 @@ use serde_json::Value;
 pub trait Finding {
     fn kind(&self) -> &'static str;
     fn span(&self) -> ByteSpan;
-    fn line(&self) -> usize;
     /// The tab-separated columns after the leading `kind`, path, and line.
     fn text_columns(&self) -> Vec<String>;
     /// The finding's own JSON fields. `line` and `span` are added around them.
@@ -63,20 +63,22 @@ pub trait Finding {
     }
 }
 
-/// The 1-based line a byte offset falls on.
+/// The 1-based line a byte offset falls on, counted from the start of `source`.
 ///
-/// Reports print spans, which an agent can slice with, and lines, which a
-/// human can navigate with. Counting here rather than per report keeps the
-/// two definitions of "line 1" from drifting — every report on this envelope
-/// had written the same six lines, and six lines repeated is six places for
-/// the off-by-one to appear in only one of them.
+/// **This is O(offset).** A caller that asks for more than a couple of lines
+/// per file wants [`LineIndex`] instead, which pays O(n) once and answers each
+/// lookup in O(log n).
 ///
-/// Counting newlines from the start of the file makes this O(offset), so a
-/// caller that asked for every node's line would be quadratic in the file.
-/// That is acceptable here because the callers ask once per *finding*, and
-/// findings are rare: a file with more than a handful is already a file
-/// someone is about to edit. A report that needs a line for every node wants
-/// a prebuilt line index instead, not this.
+/// That distinction is not hypothetical. Every report on this envelope used to
+/// call this once per finding, and the doc comment here argued it was fine
+/// because "findings are rare". They are not: on a 23 KB document with 1136
+/// findings the counts touched 13.5 MB, and sixteen times the forms produced
+/// three hundred and fifty times the bytes. Worse, the `examine_*` functions
+/// these reports share with the lint engine paid it on the engine's path too,
+/// where the line is computed and immediately discarded. The line for a
+/// *finding* now comes from [`FileFindings::line_of`], and this function is
+/// left only for the callers that genuinely want one or two offsets resolved
+/// against a source they hold anyway — a form's first and last line, say.
 ///
 /// An offset past the end of `source` answers for the end of `source` rather
 /// than panicking, so a stale span degrades to a wrong line rather than a
@@ -142,14 +144,36 @@ pub struct FileFindings<F> {
     pub findings: Vec<F>,
     /// Per-file counts this report wants beside its findings.
     pub summary: Vec<(&'static str, Value)>,
+    /// Line starts for this file, built once in [`FileFindings::new`].
+    ///
+    /// Private, and the reason [`Finding`] has no `line` method. Every report
+    /// on this envelope reports a line for the start of the span it already
+    /// carries, so the line is a *function of the finding*, not a fact about
+    /// it — and a function the envelope can evaluate for itself.
+    ///
+    /// Having each finding carry its own line meant resolving one during the
+    /// analysis, and the only tool for that was a newline count from byte 0:
+    /// O(offset) per finding, quadratic in the file. That cost was paid even
+    /// on the lint engine's path, which shares these analyses through the
+    /// `examine_*` functions, converts each item into a span and a message,
+    /// and never reads the line at all. Holding the index here instead makes
+    /// it O(n) once per file and O(log n) per lookup, and makes it impossible
+    /// for a report to *have* a line without a source to resolve it against.
+    lines: LineIndex,
 }
 
 impl<F: Finding> FileFindings<F> {
+    /// Builds one file's report.
+    ///
+    /// `source` is the text the findings' spans index into. It is taken rather
+    /// than derived because it is what makes [`FileFindings::line_of`] total:
+    /// a report cannot be constructed without the one thing a line needs.
     #[must_use]
     pub fn new(
         path: PathBuf,
         dialect: Dialect,
         dialect_modelled: bool,
+        source: &str,
         mut findings: Vec<F>,
         summary: Vec<(&'static str, Value)>,
     ) -> Self {
@@ -163,6 +187,44 @@ impl<F: Finding> FileFindings<F> {
             dialect_modelled,
             findings,
             summary,
+            lines: LineIndex::new(source),
+        }
+    }
+
+    /// The 1-based line one of this file's findings starts on.
+    ///
+    /// Answers for the start of `finding`'s span, which is what every report
+    /// on this envelope meant by "the line" before the line lived here.
+    #[must_use]
+    pub fn line_of(&self, finding: &F) -> usize {
+        self.lines.line_of(finding.span().start().get())
+    }
+
+    /// The same file carrying only the findings `keep` accepts.
+    ///
+    /// The gate-narrowing shape: a report lists every finding but fails a
+    /// build on only some of them, so the policy is evaluated against a
+    /// subset. This exists rather than a struct literal because the line index
+    /// is private and *not* reconstructible from the public fields — the
+    /// source it was built from is long gone by the time a gate runs.
+    #[must_use]
+    pub fn retained(&self, keep: impl Fn(&F) -> bool) -> Self
+    where
+        F: Clone,
+    {
+        Self {
+            path: self.path.clone(),
+            dialect: self.dialect,
+            dialect_modelled: self.dialect_modelled,
+            // Already in source order; filtering preserves it.
+            findings: self
+                .findings
+                .iter()
+                .filter(|finding| keep(finding))
+                .cloned()
+                .collect(),
+            summary: self.summary.clone(),
+            lines: self.lines.clone(),
         }
     }
 }
@@ -220,9 +282,6 @@ mod tests {
         fn span(&self) -> ByteSpan {
             ByteSpan::new(ByteOffset::new(self.0), ByteOffset::new(self.0 + 1))
         }
-        fn line(&self) -> usize {
-            1
-        }
         fn text_columns(&self) -> Vec<String> {
             Vec::new()
         }
@@ -231,11 +290,16 @@ mod tests {
         }
     }
 
+    /// Four bytes per line, so a probe at offset `n` belongs on line
+    /// `n / 4 + 1` and both an unresolved line and an off-by-one are visible.
+    const SOURCE: &str = "(a)\n(b)\n(c)\n";
+
     fn report(starts: &[usize]) -> FileFindings<Probe> {
         FileFindings::new(
             PathBuf::from("t.lisp"),
             Dialect::CommonLisp,
             true,
+            SOURCE,
             starts.iter().copied().map(Probe).collect(),
             Vec::new(),
         )
@@ -254,6 +318,53 @@ mod tests {
     #[test]
     fn an_offset_past_the_end_still_answers() {
         assert_eq!(line_of("(a)\n", 999), 2);
+    }
+
+    /// The envelope resolves each finding's line from that finding's own span,
+    /// on a fixture with several lines.
+    ///
+    /// A one-line fixture cannot test this: every line there is 1, which is
+    /// also what an unbuilt index or an unresolved field would report.
+    #[test]
+    fn the_envelope_resolves_each_findings_line_from_its_own_span() {
+        let report = report(&[0, 4, 8]);
+        let lines = report
+            .findings
+            .iter()
+            .map(|finding| report.line_of(finding))
+            .collect::<Vec<_>>();
+        assert_eq!(lines, vec![1, 2, 3]);
+    }
+
+    /// The index answers exactly what counting newlines from byte 0 answered,
+    /// at *every* offset in the file including one past the end.
+    ///
+    /// This is the whole no-output-change argument for moving the line into
+    /// the envelope, so it is pinned rather than reasoned about: the two
+    /// definitions of "line 1" cannot drift while this passes.
+    #[test]
+    fn the_index_agrees_with_counting_newlines_at_every_offset() {
+        let report = report(&[]);
+        for offset in 0..=SOURCE.len() {
+            assert_eq!(
+                report.lines.line_of(offset),
+                line_of(SOURCE, offset),
+                "disagreed at offset {offset}"
+            );
+        }
+    }
+
+    /// Narrowing for a gate keeps the line index, so a narrowed report still
+    /// resolves lines rather than silently reporting line 1.
+    #[test]
+    fn a_narrowed_report_still_resolves_its_lines() {
+        let report = report(&[0, 4, 8]).retained(|finding| finding.0 != 4);
+        let lines = report
+            .findings
+            .iter()
+            .map(|finding| report.line_of(finding))
+            .collect::<Vec<_>>();
+        assert_eq!(lines, vec![1, 3]);
     }
 
     #[test]

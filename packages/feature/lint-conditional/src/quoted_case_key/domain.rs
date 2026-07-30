@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
@@ -53,8 +53,6 @@ fn key_designator_is_quoted(key_designator: &ExpressionView) -> bool {
 pub struct QuotedCaseKeyItem {
     /// The span of the quoted key designator.
     pub span: ByteSpan,
-    /// The 1-based line the key designator starts on.
-    pub line: usize,
     /// The `case`/`ccase`/`ecase` head, in the source's own casing.
     pub head: String,
     /// The key designator as written.
@@ -73,10 +71,6 @@ impl Finding for QuotedCaseKeyItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -101,7 +95,6 @@ impl Finding for QuotedCaseKeyItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    source: &str,
     case_form_count: &mut usize,
     violations: &mut Vec<QuotedCaseKeyItem>,
 ) {
@@ -132,7 +125,6 @@ pub fn examine_case(
         if key_designator_is_quoted(key_designator) {
             violations.push(QuotedCaseKeyItem {
                 span: key_designator.span,
-                line: line_of(source, key_designator.span.start().get()),
                 head: head.to_owned(),
                 key: render_expression(key_designator),
             });
@@ -158,18 +150,18 @@ pub fn build_quoted_case_key_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("case_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, source, &mut case_form_count, &mut violations);
+            examine_case(subview, &mut case_form_count, &mut violations);
         });
     }
 
@@ -177,6 +169,7 @@ pub fn build_quoted_case_key_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("case_form_count", json!(case_form_count))],
     ))
@@ -293,7 +286,7 @@ mod tests {
     fn a_finding_carries_its_line_its_head_and_its_key() {
         let report = report("(defun f (x)\n  (case x ('a 1)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "quoted-case-key");
         assert_eq!(
             finding.json_fields(),

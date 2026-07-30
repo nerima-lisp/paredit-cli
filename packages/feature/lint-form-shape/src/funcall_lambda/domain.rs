@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
@@ -40,8 +40,6 @@ fn is_lambda_form(view: &ExpressionView) -> bool {
 pub struct FuncallLambdaItem {
     /// The span of the whole `(funcall (lambda …) …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the `funcall` head symbol.
     ///
     /// The rewrite's input, not the report's: with `lambda_span` it bounds the
@@ -66,10 +64,6 @@ impl Finding for FuncallLambdaItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     /// Nothing beyond the path and location: the old text row carried only
     /// those, and the finding has no field the report published. `message` is
     /// what a reader gets here.
@@ -92,7 +86,6 @@ impl Finding for FuncallLambdaItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_funcall(
     view: &ExpressionView,
-    source: &str,
     funcall_form_count: &mut usize,
     violations: &mut Vec<FuncallLambdaItem>,
 ) {
@@ -115,7 +108,6 @@ pub fn examine_funcall(
 
     violations.push(FuncallLambdaItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         head_span: view.children[0].span,
         lambda_span: callee.span,
     });
@@ -138,18 +130,18 @@ pub fn build_funcall_lambda_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("funcall_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut funcall_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_funcall(subview, source, &mut funcall_form_count, &mut violations);
+            examine_funcall(subview, &mut funcall_form_count, &mut violations);
         });
     }
 
@@ -157,6 +149,7 @@ pub fn build_funcall_lambda_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("funcall_form_count", json!(funcall_form_count))],
     ))
@@ -269,7 +262,7 @@ mod tests {
     fn a_finding_carries_its_line_and_leans_on_its_message() {
         let report = report("(defun f ()\n  (funcall (lambda (x) x) 5))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "funcall-lambda");
         assert!(finding.text_columns().is_empty());
         assert!(finding.json_fields().is_empty());

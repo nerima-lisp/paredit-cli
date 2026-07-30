@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -56,8 +56,6 @@ fn singleton_list(view: &ExpressionView) -> Option<&ExpressionView> {
 pub struct AppendListToConsItem {
     /// The span of the whole `(append (list x) rest)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the singleton element `x`.
     pub element_span: ByteSpan,
     /// The span of the tail `rest`.
@@ -71,10 +69,6 @@ impl Finding for AppendListToConsItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing: the old text row carried only the path and the offset, both of
@@ -109,7 +103,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     append_form_count: &mut usize,
     violations: &mut Vec<AppendListToConsItem>,
 ) {
@@ -139,7 +132,6 @@ pub fn examine(
 
     violations.push(AppendListToConsItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         element_span: element.span,
         rest_span: rest.span,
     });
@@ -162,18 +154,18 @@ pub fn collect_append_list_to_cons(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("append_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut append_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut append_form_count, &mut violations);
+            examine(subview, &mut append_form_count, &mut violations);
         });
     }
 
@@ -181,6 +173,7 @@ pub fn collect_append_list_to_cons(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("append_form_count", json!(append_form_count))],
     ))
@@ -283,7 +276,7 @@ mod tests {
     fn a_finding_carries_its_line_and_both_operand_spans() {
         let report = report("(defun f (x r)\n  (append (list x) r))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "append-list-to-cons");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

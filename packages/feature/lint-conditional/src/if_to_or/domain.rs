@@ -23,7 +23,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -49,8 +49,6 @@ fn bare_atom(view: &ExpressionView) -> Option<&str> {
 pub struct IfToOrItem {
     /// The span of the whole `(if x x y)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the shared test/then atom `x`.
     ///
     /// The rewrite's input, not the report's: the lint rule reads it to build
@@ -69,10 +67,6 @@ impl Finding for IfToOrItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path and line the envelope already prints: the old
@@ -100,7 +94,6 @@ impl Finding for IfToOrItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<IfToOrItem>,
 ) {
@@ -140,7 +133,6 @@ pub fn examine_if(
 
     violations.push(IfToOrItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         test_span: test.span,
         else_span: els.span,
     });
@@ -163,18 +155,18 @@ pub fn build_if_to_or_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("if_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, source, &mut if_form_count, &mut violations);
+            examine_if(subview, &mut if_form_count, &mut violations);
         });
     }
 
@@ -182,6 +174,7 @@ pub fn build_if_to_or_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("if_form_count", json!(if_form_count))],
     ))
@@ -286,7 +279,7 @@ mod tests {
     fn a_finding_carries_its_line_and_no_operand_spans() {
         let report = report("(defun f (x y)\n  (if x x y))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "if-to-or");
         assert!(finding.json_fields().is_empty());
         assert!(finding.text_columns().is_empty());

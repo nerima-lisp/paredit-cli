@@ -29,7 +29,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
@@ -66,8 +66,6 @@ fn is_progn(view: &ExpressionView) -> bool {
 pub struct RedundantBodyPrognItem {
     /// The span of the inner (redundant) progn.
     pub span: ByteSpan,
-    /// The 1-based line the inner progn starts on.
-    pub line: usize,
     /// The span covering just the inner progn's body forms, so a fix can splice
     /// that source in place of the wrapper.
     ///
@@ -90,10 +88,6 @@ impl Finding for RedundantBodyPrognItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -124,7 +118,6 @@ impl Finding for RedundantBodyPrognItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    source: &str,
     implicit_progn_form_count: &mut usize,
     violations: &mut Vec<RedundantBodyPrognItem>,
 ) {
@@ -146,7 +139,6 @@ pub fn examine_form(
             let body_span = ByteSpan::new(body[0].span.start(), body[body.len() - 1].span.end());
             violations.push(RedundantBodyPrognItem {
                 span: child.span,
-                line: line_of(source, child.span.start().get()),
                 body_span,
                 body_form_count: body.len(),
                 parent: head.to_ascii_lowercase(),
@@ -177,23 +169,18 @@ pub fn build_redundant_body_progn_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("implicit_progn_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut implicit_progn_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(
-                subview,
-                source,
-                &mut implicit_progn_form_count,
-                &mut violations,
-            );
+            examine_form(subview, &mut implicit_progn_form_count, &mut violations);
         });
     }
 
@@ -201,6 +188,7 @@ pub fn build_redundant_body_progn_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![(
             "implicit_progn_form_count",
@@ -327,7 +315,7 @@ mod tests {
     fn a_finding_carries_its_line_parent_and_body_form_count() {
         let report = report("(defun f (x)\n  (when x (progn a b)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "redundant-body-progn");
         assert_eq!(
             finding.json_fields(),

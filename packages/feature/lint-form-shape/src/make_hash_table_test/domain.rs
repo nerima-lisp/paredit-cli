@@ -23,7 +23,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -63,8 +63,6 @@ fn is_test_keyword(view: &ExpressionView) -> bool {
 pub struct MakeHashTableTestItem {
     /// The span of the whole `make-hash-table` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span to delete: the ` :test 'eql` argument pair.
     ///
     /// Both the fix's input and part of the report: an agent that wants to
@@ -82,10 +80,6 @@ impl Finding for MakeHashTableTestItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -113,7 +107,6 @@ impl Finding for MakeHashTableTestItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     make_hash_table_form_count: &mut usize,
     violations: &mut Vec<MakeHashTableTestItem>,
 ) {
@@ -138,7 +131,6 @@ pub fn examine(
         let removal_span = ByteSpan::new(view.children[index - 1].span.end(), value.span.end());
         violations.push(MakeHashTableTestItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             removal_span,
         });
         return;
@@ -162,23 +154,18 @@ pub fn build_make_hash_table_test_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("make_hash_table_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut make_hash_table_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(
-                subview,
-                source,
-                &mut make_hash_table_form_count,
-                &mut violations,
-            );
+            examine(subview, &mut make_hash_table_form_count, &mut violations);
         });
     }
 
@@ -186,6 +173,7 @@ pub fn build_make_hash_table_test_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![(
             "make_hash_table_form_count",
@@ -294,7 +282,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_removal_span() {
         let report = report("(defun f ()\n  (make-hash-table :test 'eql))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "make-hash-table-test");
         assert_eq!(
             finding.json_fields(),

@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -42,8 +42,6 @@ fn is_one_literal(view: &ExpressionView) -> bool {
 pub struct ButlastDefaultCountItem {
     /// The span of the whole `(butlast …)` call form.
     pub span: ByteSpan,
-    /// The 1-based line the call form starts on.
-    pub line: usize,
     /// The span to delete: the trailing ` 1` count argument.
     ///
     /// The rewrite's input, and also published: the old report printed it, and
@@ -60,10 +58,6 @@ impl Finding for ButlastDefaultCountItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path and line the envelope already prints: the old
@@ -93,7 +87,6 @@ impl Finding for ButlastDefaultCountItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     call_form_count: &mut usize,
     violations: &mut Vec<ButlastDefaultCountItem>,
 ) {
@@ -118,7 +111,6 @@ pub fn examine(
     let removal_span = ByteSpan::new(view.children[1].span.end(), view.children[2].span.end());
     violations.push(ButlastDefaultCountItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         removal_span,
     });
 }
@@ -140,18 +132,18 @@ pub fn build_butlast_default_count_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("call_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut call_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut call_form_count, &mut violations);
+            examine(subview, &mut call_form_count, &mut violations);
         });
     }
 
@@ -159,6 +151,7 @@ pub fn build_butlast_default_count_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("call_form_count", json!(call_form_count))],
     ))
@@ -247,7 +240,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_removal_span() {
         let report = report("(defun f (xs)\n  (butlast xs 1))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "butlast-default-count");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

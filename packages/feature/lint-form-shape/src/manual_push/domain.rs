@@ -30,7 +30,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -68,8 +68,6 @@ fn cons_push_element(value: &ExpressionView, place_text: &str) -> Option<ByteSpa
 pub struct ManualPushItem {
     /// The span of the whole `(setf P (cons E P))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the assigned variable `P` (for reconstructing the fix).
     ///
     /// The rewrite's input, not the report's: the lint rule slices it to build
@@ -94,10 +92,6 @@ impl Finding for ManualPushItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     fn text_columns(&self) -> Vec<String> {
         Vec::new()
     }
@@ -117,7 +111,6 @@ impl Finding for ManualPushItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
-    source: &str,
     assignment_form_count: &mut usize,
     violations: &mut Vec<ManualPushItem>,
 ) {
@@ -148,7 +141,6 @@ pub fn examine_assignment(
 
     violations.push(ManualPushItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         place_span: place.span,
         element_span,
     });
@@ -171,18 +163,18 @@ pub fn build_manual_push_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("assignment_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut assignment_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_assignment(subview, source, &mut assignment_form_count, &mut violations);
+            examine_assignment(subview, &mut assignment_form_count, &mut violations);
         });
     }
 
@@ -190,6 +182,7 @@ pub fn build_manual_push_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("assignment_form_count", json!(assignment_form_count))],
     ))
@@ -309,7 +302,7 @@ mod tests {
     fn a_finding_carries_its_line_and_leaves_the_description_to_its_message() {
         let report = report("(defun record (item)\n  (setf log (cons item log)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "manual-push");
         assert!(finding.json_fields().is_empty());
         assert!(finding.text_columns().is_empty());

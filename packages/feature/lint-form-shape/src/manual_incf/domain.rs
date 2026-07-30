@@ -32,7 +32,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -89,8 +89,6 @@ fn incf_decf_rewrite(
 pub struct ManualIncfItem {
     /// The span of the whole `(setf V …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The suggested modify macro (`incf` or `decf`).
     pub suggested_head: &'static str,
     /// The span of the assigned variable `V` (for reconstructing the fix).
@@ -120,10 +118,6 @@ impl Finding for ManualIncfItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     fn text_columns(&self) -> Vec<String> {
         vec![format!("suggested={}", self.suggested_head)]
     }
@@ -146,7 +140,6 @@ impl Finding for ManualIncfItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
-    source: &str,
     assignment_form_count: &mut usize,
     violations: &mut Vec<ManualIncfItem>,
 ) {
@@ -177,7 +170,6 @@ pub fn examine_assignment(
 
     violations.push(ManualIncfItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         suggested_head,
         place_span: place.span,
         delta_span,
@@ -201,18 +193,18 @@ pub fn build_manual_incf_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("assignment_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut assignment_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_assignment(subview, source, &mut assignment_form_count, &mut violations);
+            examine_assignment(subview, &mut assignment_form_count, &mut violations);
         });
     }
 
@@ -220,6 +212,7 @@ pub fn build_manual_incf_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("assignment_form_count", json!(assignment_form_count))],
     ))
@@ -364,7 +357,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_suggested_macro() {
         let report = report("(defun step ()\n  (setf counter (1+ counter)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "incf");
         assert_eq!(finding.json_fields(), vec![("suggested", json!("incf"))]);
         assert_eq!(finding.text_columns(), vec!["suggested=incf".to_owned()]);

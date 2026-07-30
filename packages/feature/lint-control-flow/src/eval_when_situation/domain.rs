@@ -19,7 +19,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -52,8 +52,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct EvalWhenSituationItem {
     /// The span of the offending situation.
     pub span: ByteSpan,
-    /// The 1-based line the situation starts on.
-    pub line: usize,
     /// The invalid situation as written, or `()` when it is not an atom.
     pub situation: String,
 }
@@ -68,10 +66,6 @@ impl Finding for EvalWhenSituationItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -93,7 +87,6 @@ impl Finding for EvalWhenSituationItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_eval_when(
     view: &ExpressionView,
-    source: &str,
     eval_when_form_count: &mut usize,
     violations: &mut Vec<EvalWhenSituationItem>,
 ) {
@@ -123,7 +116,6 @@ pub fn examine_eval_when(
         if !valid {
             violations.push(EvalWhenSituationItem {
                 span: situation.span,
-                line: line_of(source, situation.span.start().get()),
                 situation: atom_text(situation).unwrap_or("()").to_owned(),
             });
         }
@@ -147,18 +139,18 @@ pub fn build_eval_when_situation_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("eval_when_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut eval_when_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_eval_when(subview, source, &mut eval_when_form_count, &mut violations);
+            examine_eval_when(subview, &mut eval_when_form_count, &mut violations);
         });
     }
 
@@ -166,6 +158,7 @@ pub fn build_eval_when_situation_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("eval_when_form_count", json!(eval_when_form_count))],
     ))
@@ -286,7 +279,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_situation() {
         let report = report("(progn\n  (eval-when (:bogus) 1))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "eval-when-situation");
         assert_eq!(finding.json_fields(), vec![("situation", json!(":bogus"))]);
         assert_eq!(finding.text_columns(), vec!["situation=:bogus".to_owned()]);

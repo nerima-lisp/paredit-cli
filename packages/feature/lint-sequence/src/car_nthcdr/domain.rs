@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -38,8 +38,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct CarNthcdrItem {
     /// The span of the whole `(car (nthcdr n x))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the count operand `n`.
     pub count_span: ByteSpan,
     /// The span of the list operand `x`.
@@ -53,10 +51,6 @@ impl Finding for CarNthcdrItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing: the old text row carried only the path and the offset, both of
@@ -91,7 +85,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     car_form_count: &mut usize,
     violations: &mut Vec<CarNthcdrItem>,
 ) {
@@ -129,7 +122,6 @@ pub fn examine(
 
     violations.push(CarNthcdrItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         count_span: count.span,
         list_span: list.span,
     });
@@ -152,18 +144,18 @@ pub fn collect_car_nthcdrs(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("car_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut car_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut car_form_count, &mut violations);
+            examine(subview, &mut car_form_count, &mut violations);
         });
     }
 
@@ -171,6 +163,7 @@ pub fn collect_car_nthcdrs(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("car_form_count", json!(car_form_count))],
     ))
@@ -272,7 +265,7 @@ mod tests {
     fn a_finding_carries_its_line_and_both_operand_spans() {
         let report = report("(defun f (n x)\n  (car (nthcdr n x)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "car-nthcdr");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

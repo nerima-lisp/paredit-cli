@@ -31,7 +31,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -55,8 +55,6 @@ fn is_newline_control(text: &str) -> bool {
 pub struct FormatNewlineItem {
     /// The span of the whole `(format t "~%")` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
 }
 
 impl Finding for FormatNewlineItem {
@@ -68,10 +66,6 @@ impl Finding for FormatNewlineItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -95,7 +89,6 @@ impl Finding for FormatNewlineItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     format_form_count: &mut usize,
     violations: &mut Vec<FormatNewlineItem>,
 ) {
@@ -120,10 +113,7 @@ pub fn examine(
         return;
     }
 
-    violations.push(FormatNewlineItem {
-        span: view.span,
-        line: line_of(source, view.span.start().get()),
-    });
+    violations.push(FormatNewlineItem { span: view.span });
 }
 
 /// Collects every `(format t "~%")` in one file, with the number of `format`
@@ -143,18 +133,18 @@ pub fn build_format_newline_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("format_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut format_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut format_form_count, &mut violations);
+            examine(subview, &mut format_form_count, &mut violations);
         });
     }
 
@@ -162,6 +152,7 @@ pub fn build_format_newline_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("format_form_count", json!(format_form_count))],
     ))
@@ -261,7 +252,7 @@ mod tests {
     fn a_finding_carries_its_line() {
         let report = report("(defun f ()\n  (format t \"~%\"))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "format-newline");
         assert!(finding.json_fields().is_empty());
         assert!(finding.text_columns().is_empty());

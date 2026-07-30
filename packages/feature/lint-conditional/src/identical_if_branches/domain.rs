@@ -19,7 +19,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
@@ -30,8 +30,6 @@ use serde_json::{Value, json};
 pub struct IdenticalIfBranchItem {
     /// The span of the whole `(if test then else)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     pub branch: String,
 }
 
@@ -45,10 +43,6 @@ impl Finding for IdenticalIfBranchItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -70,7 +64,6 @@ impl Finding for IdenticalIfBranchItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    source: &str,
     if_form_count: &mut usize,
     identical: &mut Vec<IdenticalIfBranchItem>,
 ) {
@@ -87,7 +80,6 @@ pub fn examine_if(
     if expressions_structurally_equal(then_branch, else_branch) {
         identical.push(IdenticalIfBranchItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             branch: render_expression(then_branch),
         });
     }
@@ -111,18 +103,18 @@ pub fn build_identical_if_branch_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("if_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut if_form_count = 0;
     let mut identical = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, source, &mut if_form_count, &mut identical);
+            examine_if(subview, &mut if_form_count, &mut identical);
         });
     }
 
@@ -130,6 +122,7 @@ pub fn build_identical_if_branch_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         identical,
         vec![("if_form_count", json!(if_form_count))],
     ))
@@ -214,7 +207,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_branch() {
         let report = report("(defun f (test x)\n  (if test (g x) (g x)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "identical-if-branches");
         assert_eq!(finding.json_fields(), vec![("branch", json!("(g x)"))]);
         assert_eq!(finding.text_columns(), vec!["branch=(g x)".to_owned()]);

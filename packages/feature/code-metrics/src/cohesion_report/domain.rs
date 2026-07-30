@@ -24,7 +24,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
@@ -45,7 +45,6 @@ pub struct DefinitionCoupling {
     /// file. An isolated definition is the unit a split would move first.
     pub isolated: bool,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for DefinitionCoupling {
@@ -59,10 +58,6 @@ impl Finding for DefinitionCoupling {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -89,7 +84,6 @@ pub fn build_cohesion_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> FileFindings<DefinitionCoupling> {
-    let source = tree.source();
     let root = tree.root_view();
 
     let mut definitions = Vec::new();
@@ -149,7 +143,6 @@ pub fn build_cohesion_report(
                 external_calls: *external,
                 isolated: *internal == 0 && !called_by.contains_key(key),
                 span: form.span,
-                line: line_of(source, form.span.start().get()),
             },
         )
         .collect::<Vec<_>>();
@@ -174,6 +167,7 @@ pub fn build_cohesion_report(
         dialect,
         // Call heads and definition shapes are dialect-neutral.
         true,
+        tree.source(),
         findings,
         vec![
             ("definition_count", json!(definitions.len())),

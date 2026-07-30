@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -42,8 +42,6 @@ fn is_bare_literal(view: &ExpressionView, expected: &str) -> bool {
 pub struct IfNotItem {
     /// The span of the whole `(if test nil t)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the test, copied verbatim into `(not …)`.
     ///
     /// The rewrite's input, but the report has always published it, so it stays
@@ -60,10 +58,6 @@ impl Finding for IfNotItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path and line the envelope already prints: the old
@@ -94,7 +88,6 @@ impl Finding for IfNotItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    source: &str,
     if_form_count: &mut usize,
     violations: &mut Vec<IfNotItem>,
 ) {
@@ -118,7 +111,6 @@ pub fn examine_if(
 
     violations.push(IfNotItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         test_span: view.children[1].span,
     });
 }
@@ -140,18 +132,18 @@ pub fn build_if_not_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("if_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut if_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, source, &mut if_form_count, &mut violations);
+            examine_if(subview, &mut if_form_count, &mut violations);
         });
     }
 
@@ -159,6 +151,7 @@ pub fn build_if_not_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("if_form_count", json!(if_form_count))],
     ))
@@ -268,7 +261,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_test_span() {
         let report = report("(defun f (x)\n  (if x nil t))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "if-not");
         assert_eq!(
             finding.json_fields(),

@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -41,8 +41,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct SingleArgComparisonItem {
     /// The span of the whole `(< x)`-style form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The comparison operator (`<`, `>`, `<=`, `>=`, `=`, or `/=`).
     pub operator: &'static str,
 }
@@ -68,10 +66,6 @@ impl Finding for SingleArgComparisonItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     fn text_columns(&self) -> Vec<String> {
         vec![format!("operator={}", self.operator)]
     }
@@ -92,7 +86,6 @@ impl Finding for SingleArgComparisonItem {
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    source: &str,
     comparison_form_count: &mut usize,
     violations: &mut Vec<SingleArgComparisonItem>,
 ) {
@@ -110,7 +103,6 @@ pub fn examine_comparison(
     }
     violations.push(SingleArgComparisonItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         operator,
     });
 }
@@ -132,18 +124,18 @@ pub fn build_single_arg_comparison_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("comparison_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut comparison_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(subview, source, &mut comparison_form_count, &mut violations);
+            examine_comparison(subview, &mut comparison_form_count, &mut violations);
         });
     }
 
@@ -151,6 +143,7 @@ pub fn build_single_arg_comparison_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("comparison_form_count", json!(comparison_form_count))],
     ))
@@ -267,7 +260,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_operator() {
         let report = report("(defun f (x)\n  (when (/= x) (go)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "single-arg-comparison");
         assert_eq!(finding.json_fields(), vec![("operator", json!("/="))]);
         assert_eq!(finding.text_columns(), vec!["operator=/=".to_owned()]);

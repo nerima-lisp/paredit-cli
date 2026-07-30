@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -44,8 +44,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct ExplicitStepDeltaItem {
     /// The span of the whole `(incf place 1)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the `incf`/`decf` head symbol (preserves its exact source).
     ///
     /// The rewrite's input, not the report's: the lint rule copies it into the
@@ -73,10 +71,6 @@ impl Finding for ExplicitStepDeltaItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     /// None: the only thing the old text row carried past the location was the
     /// operator, and that now leads the row as the `kind`.
     fn text_columns(&self) -> Vec<String> {
@@ -99,7 +93,6 @@ impl Finding for ExplicitStepDeltaItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_step(
     view: &ExpressionView,
-    source: &str,
     step_form_count: &mut usize,
     violations: &mut Vec<ExplicitStepDeltaItem>,
 ) {
@@ -130,7 +123,6 @@ pub fn examine_step(
 
     violations.push(ExplicitStepDeltaItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         head_span: view.children[0].span,
         place_span: place.span,
         operator,
@@ -154,18 +146,18 @@ pub fn build_explicit_step_delta_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("step_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut step_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_step(subview, source, &mut step_form_count, &mut violations);
+            examine_step(subview, &mut step_form_count, &mut violations);
         });
     }
 
@@ -173,6 +165,7 @@ pub fn build_explicit_step_delta_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("step_form_count", json!(step_form_count))],
     ))
@@ -291,7 +284,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_operator() {
         let report = report("(defun f ()\n  (decf n 1))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "decf");
         assert_eq!(finding.json_fields(), vec![("operator", json!("decf"))]);
         // The operator leads the row as the `kind`, so nothing follows it.

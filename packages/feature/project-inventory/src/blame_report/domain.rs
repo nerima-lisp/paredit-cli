@@ -37,7 +37,6 @@ pub struct Attribution {
     /// The abbreviated commit that touched it last.
     pub commit: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for Attribution {
@@ -51,10 +50,6 @@ impl Finding for Attribution {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -143,7 +138,6 @@ pub fn build_blame_report(
                 date: attribution.map(|found| found.date.clone()),
                 commit: attribution.map(|found| found.commit.clone()),
                 span: form.span,
-                line: start,
             })
         })
         .collect::<Vec<_>>();
@@ -158,7 +152,14 @@ pub fn build_blame_report(
         summary.push(("blame_unavailable", json!(reason)));
     }
 
-    FileFindings::new(path.to_path_buf(), dialect, true, findings, summary)
+    FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
+        findings,
+        summary,
+    )
 }
 
 /// Runs `git blame` and reads its porcelain output.

@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -101,8 +101,6 @@ fn is_test_keyword(view: &ExpressionView) -> bool {
 pub struct RedundantEqlTestItem {
     /// The span of the whole call form.
     pub span: ByteSpan,
-    /// The 1-based line the call starts on.
-    pub line: usize,
     /// The span to delete: the ` :test #'eql` argument pair, from the end of the
     /// preceding argument through the eql designator.
     ///
@@ -124,10 +122,6 @@ impl Finding for RedundantEqlTestItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -152,7 +146,6 @@ impl Finding for RedundantEqlTestItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    source: &str,
     call_form_count: &mut usize,
     violations: &mut Vec<RedundantEqlTestItem>,
 ) {
@@ -182,7 +175,6 @@ pub fn examine_call(
         let removal_span = ByteSpan::new(view.children[index - 1].span.end(), value.span.end());
         violations.push(RedundantEqlTestItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             removal_span,
             head: head.to_owned(),
         });
@@ -208,18 +200,18 @@ pub fn build_redundant_eql_test_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("call_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut call_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, source, &mut call_form_count, &mut violations);
+            examine_call(subview, &mut call_form_count, &mut violations);
         });
     }
 
@@ -227,6 +219,7 @@ pub fn build_redundant_eql_test_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("call_form_count", json!(call_form_count))],
     ))
@@ -351,7 +344,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_head_but_not_the_removal_span() {
         let report = report("(defun f (x list)\n  (find x list :test #'eql))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "redundant-eql-test");
         assert_eq!(finding.text_columns(), vec!["find".to_owned()]);
         assert_eq!(finding.json_fields(), vec![("head", json!("find"))]);

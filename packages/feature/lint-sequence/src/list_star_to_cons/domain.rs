@@ -21,7 +21,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -37,8 +37,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct ListStarToConsItem {
     /// The span of the whole `(list* a b)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the first operand `a`.
     ///
     /// The rewrite's input, but the old report published it and a consumer
@@ -58,10 +56,6 @@ impl Finding for ListStarToConsItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path and line the envelope already prints: the old
@@ -93,7 +87,6 @@ fn span_json(span: ByteSpan) -> Value {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     list_star_form_count: &mut usize,
     violations: &mut Vec<ListStarToConsItem>,
 ) {
@@ -117,7 +110,6 @@ pub fn examine(
 
     violations.push(ListStarToConsItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         car_span: car.span,
         cdr_span: cdr.span,
     });
@@ -140,18 +132,18 @@ pub fn build_list_star_to_cons_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("list_star_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut list_star_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut list_star_form_count, &mut violations);
+            examine(subview, &mut list_star_form_count, &mut violations);
         });
     }
 
@@ -159,6 +151,7 @@ pub fn build_list_star_to_cons_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("list_star_form_count", json!(list_star_form_count))],
     ))
@@ -256,7 +249,7 @@ mod tests {
         let source = "(defun f (a b)\n  (list* (car a) (cdr b)))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "list-star-to-cons");
         assert_eq!(slice(source, finding.car_span), "(car a)");
         assert_eq!(slice(source, finding.cdr_span), "(cdr b)");

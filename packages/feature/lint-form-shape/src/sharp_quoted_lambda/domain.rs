@@ -19,7 +19,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
@@ -36,8 +36,6 @@ fn is_lambda_form(view: &ExpressionView) -> bool {
 pub struct SharpQuotedLambdaItem {
     /// The span of the whole `#'(lambda …)` form (prefix included).
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
 }
 
 impl Finding for SharpQuotedLambdaItem {
@@ -49,10 +47,6 @@ impl Finding for SharpQuotedLambdaItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Empty, because the old text row carried nothing past the path and
@@ -78,7 +72,6 @@ impl Finding for SharpQuotedLambdaItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_lambda(
     view: &ExpressionView,
-    source: &str,
     lambda_form_count: &mut usize,
     violations: &mut Vec<SharpQuotedLambdaItem>,
 ) {
@@ -89,10 +82,7 @@ pub fn examine_lambda(
 
     // Flag only a lambda form whose sole reader prefix is the function `#'`.
     if view.reader_prefixes.len() == 1 && view.reader_prefixes[0] == ReaderPrefix::Function {
-        violations.push(SharpQuotedLambdaItem {
-            span: view.span,
-            line: line_of(source, view.span.start().get()),
-        });
+        violations.push(SharpQuotedLambdaItem { span: view.span });
     }
 }
 
@@ -113,18 +103,18 @@ pub fn build_sharp_quoted_lambda_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("lambda_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut lambda_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_lambda(subview, source, &mut lambda_form_count, &mut violations);
+            examine_lambda(subview, &mut lambda_form_count, &mut violations);
         });
     }
 
@@ -132,6 +122,7 @@ pub fn build_sharp_quoted_lambda_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("lambda_form_count", json!(lambda_form_count))],
     ))
@@ -230,7 +221,7 @@ mod tests {
     fn a_finding_carries_its_line_and_nothing_the_envelope_does_not_already_print() {
         let report = report("(defun g ()\n  (sort xs #'(lambda (a b) (< a b))))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "sharp-quoted-lambda");
         assert!(finding.text_columns().is_empty());
         assert!(finding.json_fields().is_empty());

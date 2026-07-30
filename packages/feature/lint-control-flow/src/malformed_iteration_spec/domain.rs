@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
@@ -56,8 +56,6 @@ fn is_arity_ambiguous(view: &ExpressionView) -> bool {
 pub struct MalformedIterationSpecItem {
     /// The span of the offending spec.
     pub span: ByteSpan,
-    /// The 1-based line the spec starts on.
-    pub line: usize,
     /// The iteration operator (`dolist`, `dotimes`) as written.
     pub head: String,
     /// The spec, re-rendered from the tree.
@@ -75,10 +73,6 @@ impl Finding for MalformedIterationSpecItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -111,7 +105,6 @@ impl Finding for MalformedIterationSpecItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_iteration(
     view: &ExpressionView,
-    source: &str,
     iteration_form_count: &mut usize,
     violations: &mut Vec<MalformedIterationSpecItem>,
 ) {
@@ -143,7 +136,6 @@ pub fn examine_iteration(
         // A bare atom (or bracket/brace form) is never a valid spec.
         violations.push(MalformedIterationSpecItem {
             span: spec.span,
-            line: line_of(source, spec.span.start().get()),
             head: head.to_owned(),
             spec: render_expression(spec),
             element_count: spec.children.len(),
@@ -160,7 +152,6 @@ pub fn examine_iteration(
     if !(2..=3).contains(&element_count) {
         violations.push(MalformedIterationSpecItem {
             span: spec.span,
-            line: line_of(source, spec.span.start().get()),
             head: head.to_owned(),
             spec: render_expression(spec),
             element_count,
@@ -185,18 +176,18 @@ pub fn build_malformed_iteration_spec_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("iteration_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut iteration_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_iteration(subview, source, &mut iteration_form_count, &mut violations);
+            examine_iteration(subview, &mut iteration_form_count, &mut violations);
         });
     }
 
@@ -204,6 +195,7 @@ pub fn build_malformed_iteration_spec_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("iteration_form_count", json!(iteration_form_count))],
     ))
@@ -321,7 +313,7 @@ mod tests {
     fn a_finding_carries_its_line_its_head_its_arity_and_its_spec() {
         let report = report("(defun f (xs)\n  (dolist (x) (print x)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "malformed-iteration-spec");
         assert_eq!(
             finding.json_fields(),

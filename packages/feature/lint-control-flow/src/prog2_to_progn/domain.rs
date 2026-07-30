@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -37,8 +37,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct Prog2ToPrognItem {
     /// The span of the whole `(prog2 a b)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the `prog2` operator token (rewritten to `progn`).
     pub head_span: ByteSpan,
 }
@@ -52,10 +50,6 @@ impl Finding for Prog2ToPrognItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Empty: the old text row carried nothing beyond the path and offset, both
@@ -88,7 +82,6 @@ impl Finding for Prog2ToPrognItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     prog2_form_count: &mut usize,
     violations: &mut Vec<Prog2ToPrognItem>,
 ) {
@@ -110,7 +103,6 @@ pub fn examine(
 
     violations.push(Prog2ToPrognItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         head_span: view.children[0].span,
     });
 }
@@ -132,18 +124,18 @@ pub fn build_prog2_to_progn_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("prog2_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut prog2_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut prog2_form_count, &mut violations);
+            examine(subview, &mut prog2_form_count, &mut violations);
         });
     }
 
@@ -151,6 +143,7 @@ pub fn build_prog2_to_progn_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("prog2_form_count", json!(prog2_form_count))],
     ))
@@ -236,7 +229,7 @@ mod tests {
         let source = "(defun f (a b)\n  (prog2 a b))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "prog2-to-progn");
         assert!(finding.text_columns().is_empty());
         assert_eq!(

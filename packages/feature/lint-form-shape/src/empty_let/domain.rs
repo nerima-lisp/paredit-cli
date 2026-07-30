@@ -26,7 +26,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -52,8 +52,6 @@ fn is_declare_form(view: &ExpressionView) -> bool {
 pub struct EmptyLetItem {
     /// The span of the whole `(let () body…)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the `(let ()` prefix (form start through the binding list),
     /// which the fix replaces with `(progn`.
     ///
@@ -71,10 +69,6 @@ impl Finding for EmptyLetItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Nothing beyond the path and location: the old text row carried only
@@ -99,7 +93,6 @@ impl Finding for EmptyLetItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
-    source: &str,
     let_form_count: &mut usize,
     violations: &mut Vec<EmptyLetItem>,
 ) {
@@ -127,7 +120,6 @@ pub fn examine_let(
     let prefix_span = ByteSpan::new(view.span.start(), binding.span.end());
     violations.push(EmptyLetItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         prefix_span,
     });
 }
@@ -149,18 +141,18 @@ pub fn build_empty_let_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("let_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut let_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let(subview, source, &mut let_form_count, &mut violations);
+            examine_let(subview, &mut let_form_count, &mut violations);
         });
     }
 
@@ -168,6 +160,7 @@ pub fn build_empty_let_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("let_form_count", json!(let_form_count))],
     ))
@@ -279,7 +272,7 @@ mod tests {
     fn a_finding_carries_its_line_and_leans_on_its_message() {
         let report = report("(defun f ()\n  (let () (side-effect) (result)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "empty-let");
         assert!(finding.text_columns().is_empty());
         assert!(finding.json_fields().is_empty());

@@ -22,7 +22,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
@@ -32,8 +32,6 @@ use serde_json::{Value, json};
 #[derive(Debug, Clone)]
 pub struct DuplicateLambdaListKeywordItem {
     pub span: ByteSpan,
-    /// The 1-based line the definition starts on.
-    pub line: usize,
     pub definition: String,
     pub keyword: String,
     pub occurrence_count: usize,
@@ -51,10 +49,6 @@ impl Finding for DuplicateLambdaListKeywordItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -102,12 +96,12 @@ pub fn build_duplicate_lambda_list_keyword_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("definition_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut definition_count = 0;
     let mut duplicates = Vec::new();
 
@@ -156,7 +150,6 @@ pub fn build_duplicate_lambda_list_keyword_report(
             }
             duplicates.push(DuplicateLambdaListKeywordItem {
                 span: view.span,
-                line: line_of(source, view.span.start().get()),
                 definition: definition.clone(),
                 keyword: keyword.clone(),
                 occurrence_count: *occurrence_count,
@@ -168,6 +161,7 @@ pub fn build_duplicate_lambda_list_keyword_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         duplicates,
         vec![("definition_count", json!(definition_count))],
     ))
@@ -273,7 +267,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_columns() {
         let report = report("(defun g (a) a)\n(defun f (&key b &key c) b)\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "duplicate-lambda-list-keyword");
         assert_eq!(
             finding.text_columns(),

@@ -23,7 +23,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -39,8 +39,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct MultipleValueListOfValuesItem {
     /// The span of the whole `(multiple-value-list (values …))` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the element list (`a b …`, the `values` head and parens
     /// excluded), or `None` for an empty `(values)` (rewrite to `(list)`).
     ///
@@ -60,10 +58,6 @@ impl Finding for MultipleValueListOfValuesItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -96,7 +90,6 @@ impl Finding for MultipleValueListOfValuesItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     mvl_form_count: &mut usize,
     violations: &mut Vec<MultipleValueListOfValuesItem>,
 ) {
@@ -138,7 +131,6 @@ pub fn examine(
 
     violations.push(MultipleValueListOfValuesItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         elements_span,
     });
 }
@@ -160,18 +152,18 @@ pub fn build_multiple_value_list_of_values_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("mvl_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut mvl_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut mvl_form_count, &mut violations);
+            examine(subview, &mut mvl_form_count, &mut violations);
         });
     }
 
@@ -179,6 +171,7 @@ pub fn build_multiple_value_list_of_values_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("mvl_form_count", json!(mvl_form_count))],
     ))
@@ -289,7 +282,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_elements_span() {
         let report = report("(defun f (a b)\n  (multiple-value-list (values a b)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "multiple-value-list-of-values");
         let span = finding.elements_span.expect("elements span");
         assert_eq!(

@@ -24,7 +24,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -85,8 +85,6 @@ fn is_nil_literal(view: &ExpressionView) -> bool {
 pub struct RedundantEndNilItem {
     /// The span of the whole call form.
     pub span: ByteSpan,
-    /// The 1-based line the call starts on.
-    pub line: usize,
     /// The span to delete: the ` :end nil` argument pair.
     pub removal_span: ByteSpan,
     /// The operator name, as spelled at the call site.
@@ -103,10 +101,6 @@ impl Finding for RedundantEndNilItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -143,7 +137,6 @@ impl Finding for RedundantEndNilItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     call_form_count: &mut usize,
     violations: &mut Vec<RedundantEndNilItem>,
 ) {
@@ -168,7 +161,6 @@ pub fn examine(
         );
         violations.push(RedundantEndNilItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             removal_span,
             head: head.to_owned(),
         });
@@ -193,18 +185,18 @@ pub fn build_redundant_end_nil_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("call_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut call_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, source, &mut call_form_count, &mut violations);
+            examine(subview, &mut call_form_count, &mut violations);
         });
     }
 
@@ -212,6 +204,7 @@ pub fn build_redundant_end_nil_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("call_form_count", json!(call_form_count))],
     ))
@@ -309,7 +302,7 @@ mod tests {
         let source = "(defun f (x seq)\n  (find x seq :end nil))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "redundant-end-nil");
         assert_eq!(finding.text_columns(), vec!["find".to_owned()]);
         assert_eq!(

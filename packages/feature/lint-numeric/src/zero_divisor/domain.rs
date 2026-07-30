@@ -25,7 +25,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -74,8 +74,6 @@ fn divisor_indices(head: &str, child_count: usize) -> Vec<usize> {
 pub struct ZeroDivisorItem {
     /// The span of the whole division form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The operator, lowercased.
     pub operator: String,
     /// The span of the literal `0` divisor.
@@ -96,10 +94,6 @@ impl Finding for ZeroDivisorItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     /// Bare rather than `operator=…`, which is the column this report's text
@@ -147,7 +141,6 @@ pub type IsZeroDivisor<'a> = &'a dyn Fn(&ExpressionView) -> bool;
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    source: &str,
     is_zero: IsZeroDivisor<'_>,
     division_form_count: &mut usize,
     violations: &mut Vec<ZeroDivisorItem>,
@@ -166,7 +159,6 @@ pub fn examine(
         if is_zero(divisor) {
             violations.push(ZeroDivisorItem {
                 span: view.span,
-                line: line_of(source, view.span.start().get()),
                 operator: lower.clone(),
                 divisor_span: divisor.span,
             });
@@ -192,12 +184,12 @@ pub fn build_zero_divisor_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("division_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut division_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
@@ -205,7 +197,6 @@ pub fn build_zero_divisor_report(
         for_each_subview(&view, |subview| {
             examine(
                 subview,
-                source,
                 &is_zero_literal,
                 &mut division_form_count,
                 &mut violations,
@@ -217,6 +208,7 @@ pub fn build_zero_divisor_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("division_form_count", json!(division_form_count))],
     ))
@@ -326,7 +318,7 @@ mod tests {
         let source = "(defun f (x)\n  (mod x 0))\n";
         let report = report(source);
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "zero-divisor");
         assert_eq!(finding.text_columns(), vec!["mod".to_owned()]);
 

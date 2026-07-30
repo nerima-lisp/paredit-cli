@@ -28,7 +28,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
@@ -66,8 +66,6 @@ fn is_structurally_opaque(clause: &ExpressionView) -> bool {
 #[derive(Debug, Clone)]
 pub struct MalformedCaseClauseItem {
     pub span: ByteSpan,
-    /// The 1-based line the clause starts on.
-    pub line: usize,
     /// The `case`-family head as written, in the source's own case.
     pub head: String,
     pub clause: String,
@@ -85,10 +83,6 @@ impl Finding for MalformedCaseClauseItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -116,7 +110,6 @@ impl Finding for MalformedCaseClauseItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    source: &str,
     case_form_count: &mut usize,
     violations: &mut Vec<MalformedCaseClauseItem>,
 ) {
@@ -143,7 +136,6 @@ pub fn examine_case(
         if !is_paren_list(clause) || clause.children.is_empty() {
             violations.push(MalformedCaseClauseItem {
                 span: clause.span,
-                line: line_of(source, clause.span.start().get()),
                 head: head.to_owned(),
                 clause: render_expression(clause),
             });
@@ -168,18 +160,18 @@ pub fn build_malformed_case_clause_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("case_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut case_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, source, &mut case_form_count, &mut violations);
+            examine_case(subview, &mut case_form_count, &mut violations);
         });
     }
 
@@ -187,6 +179,7 @@ pub fn build_malformed_case_clause_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("case_form_count", json!(case_form_count))],
     ))
@@ -312,7 +305,7 @@ mod tests {
     fn a_finding_carries_its_line_its_head_and_its_clause() {
         let report = report("(defun f (x)\n  (case x (1 :one) oops))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "malformed-case-clause");
         assert_eq!(
             finding.json_fields(),

@@ -29,7 +29,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
@@ -52,8 +52,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 pub struct ExplicitNilReturnItem {
     /// The span of the whole `(return nil)` / `(return-from b nil)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the `return`/`return-from` head symbol (exact source).
     ///
     /// The rewrite's input, not the report's: the lint rule copies the operator
@@ -81,10 +79,6 @@ impl Finding for ExplicitNilReturnItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     /// Empty: the operator is the only thing the old text row carried beyond
     /// the path and offset, and it now leads every row as the `kind`.
     fn text_columns(&self) -> Vec<String> {
@@ -109,7 +103,6 @@ impl Finding for ExplicitNilReturnItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_return(
     view: &ExpressionView,
-    source: &str,
     return_form_count: &mut usize,
     violations: &mut Vec<ExplicitNilReturnItem>,
 ) {
@@ -135,7 +128,6 @@ pub fn examine_return(
         }
         violations.push(ExplicitNilReturnItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             head_span,
             block_span: None,
             operator: "return",
@@ -153,7 +145,6 @@ pub fn examine_return(
         }
         violations.push(ExplicitNilReturnItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             head_span,
             block_span: Some(block.span),
             operator: "return-from",
@@ -179,18 +170,18 @@ pub fn build_explicit_nil_return_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("return_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut return_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_return(subview, source, &mut return_form_count, &mut violations);
+            examine_return(subview, &mut return_form_count, &mut violations);
         });
     }
 
@@ -198,6 +189,7 @@ pub fn build_explicit_nil_return_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("return_form_count", json!(return_form_count))],
     ))
@@ -313,7 +305,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_operator() {
         let report = report("(loop\n  (return nil))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "return");
         assert_eq!(finding.json_fields(), vec![("operator", json!("return"))]);
         assert!(finding.text_columns().is_empty());

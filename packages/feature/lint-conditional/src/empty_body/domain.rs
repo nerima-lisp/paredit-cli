@@ -19,7 +19,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
@@ -44,8 +44,6 @@ fn body_start(head: &str) -> Option<usize> {
 pub struct EmptyBodyItem {
     /// The span of the whole body-less form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The form head (`when`, `unless`, `dolist`, or `dotimes`).
     pub head: String,
 }
@@ -60,10 +58,6 @@ impl Finding for EmptyBodyItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -88,7 +82,6 @@ impl Finding for EmptyBodyItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    source: &str,
     body_form_count: &mut usize,
     violations: &mut Vec<EmptyBodyItem>,
 ) {
@@ -106,7 +99,6 @@ pub fn examine_form(
     if view.children.len() == start {
         violations.push(EmptyBodyItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             head: head.to_ascii_lowercase(),
         });
     }
@@ -129,18 +121,18 @@ pub fn build_empty_body_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("body_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut body_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(subview, source, &mut body_form_count, &mut violations);
+            examine_form(subview, &mut body_form_count, &mut violations);
         });
     }
 
@@ -148,6 +140,7 @@ pub fn build_empty_body_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("body_form_count", json!(body_form_count))],
     ))
@@ -260,7 +253,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_head() {
         let report = report("(defun f (x)\n  (when x))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "empty-body");
         assert_eq!(finding.json_fields(), vec![("head", json!("when"))]);
         assert_eq!(finding.text_columns(), vec!["head=when".to_owned()]);

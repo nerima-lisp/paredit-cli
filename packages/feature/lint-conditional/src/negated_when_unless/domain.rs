@@ -19,7 +19,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
@@ -57,8 +57,6 @@ fn single_negation(view: &ExpressionView) -> Option<&'static str> {
 pub struct NegatedWhenUnlessItem {
     /// The span of the whole `(when …)`/`(unless …)` form.
     pub span: ByteSpan,
-    /// The 1-based line the form starts on.
-    pub line: usize,
     /// The span of the head symbol (`when`/`unless`), for a flip-the-macro fix.
     pub head_span: ByteSpan,
     /// The span of the whole `(not X)`/`(null X)` test, replaced by `X`.
@@ -90,10 +88,6 @@ impl Finding for NegatedWhenUnlessItem {
         self.span
     }
 
-    fn line(&self) -> usize {
-        self.line
-    }
-
     /// The negator and the suggestion, in the order the old text row had them.
     /// The head that led that row is now the leading `kind`.
     fn text_columns(&self) -> Vec<String> {
@@ -122,7 +116,6 @@ impl Finding for NegatedWhenUnlessItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_conditional(
     view: &ExpressionView,
-    source: &str,
     conditional_form_count: &mut usize,
     violations: &mut Vec<NegatedWhenUnlessItem>,
 ) {
@@ -149,7 +142,6 @@ pub fn examine_conditional(
     let canonical_head = complement_head(suggested_head).expect("complement is involutive");
     violations.push(NegatedWhenUnlessItem {
         span: view.span,
-        line: line_of(source, view.span.start().get()),
         head_span: view.children[0].span,
         test_span: test.span,
         inner_span,
@@ -176,23 +168,18 @@ pub fn build_negated_when_unless_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("conditional_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut conditional_form_count = 0;
     let mut violations = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_conditional(
-                subview,
-                source,
-                &mut conditional_form_count,
-                &mut violations,
-            );
+            examine_conditional(subview, &mut conditional_form_count, &mut violations);
         });
     }
 
@@ -200,6 +187,7 @@ pub fn build_negated_when_unless_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         violations,
         vec![("conditional_form_count", json!(conditional_form_count))],
     ))
@@ -346,7 +334,7 @@ mod tests {
     fn a_finding_carries_its_line_its_head_and_its_suggestion() {
         let report = report("(defun f ()\n  (when (not ready) (go)))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "when");
         assert_eq!(
             finding.json_fields(),

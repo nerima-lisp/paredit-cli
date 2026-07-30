@@ -20,7 +20,7 @@ use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
@@ -39,8 +39,6 @@ fn binding_name(binding: &ExpressionView) -> Option<&str> {
 #[derive(Debug, Clone)]
 pub struct DuplicateLetBindingItem {
     pub span: ByteSpan,
-    /// The 1-based line the `let` form starts on.
-    pub line: usize,
     pub name: String,
     pub occurrence_count: usize,
 }
@@ -56,10 +54,6 @@ impl Finding for DuplicateLetBindingItem {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -90,7 +84,6 @@ impl Finding for DuplicateLetBindingItem {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
-    source: &str,
     let_form_count: &mut usize,
     duplicates: &mut Vec<DuplicateLetBindingItem>,
 ) {
@@ -125,7 +118,6 @@ pub fn examine_let(
         }
         duplicates.push(DuplicateLetBindingItem {
             span: view.span,
-            line: line_of(source, view.span.start().get()),
             name: name.clone(),
             occurrence_count: *occurrence_count,
         });
@@ -149,18 +141,18 @@ pub fn build_duplicate_let_binding_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("let_form_count", json!(0))],
         ));
     }
 
-    let source = tree.source();
     let mut let_form_count = 0;
     let mut duplicates = Vec::new();
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let(subview, source, &mut let_form_count, &mut duplicates);
+            examine_let(subview, &mut let_form_count, &mut duplicates);
         });
     }
 
@@ -168,6 +160,7 @@ pub fn build_duplicate_let_binding_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         duplicates,
         vec![("let_form_count", json!(let_form_count))],
     ))
@@ -260,7 +253,7 @@ mod tests {
     fn a_finding_carries_its_line_and_its_columns() {
         let report = report("(defun f ()\n  (let ((a 1) (a 2)) a))\n");
         let finding = &report.findings[0];
-        assert_eq!(finding.line, 2);
+        assert_eq!(report.line_of(finding), 2);
         assert_eq!(finding.kind(), "duplicate-let-bindings");
         assert_eq!(
             finding.text_columns(),

@@ -20,7 +20,7 @@
 
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding, line_of};
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
@@ -74,7 +74,6 @@ pub struct DocstringFinding {
     /// the file.
     pub summary: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for DocstringFinding {
@@ -84,10 +83,6 @@ impl Finding for DocstringFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -144,6 +139,7 @@ pub fn build_docstring_report(
         // Docstrings are a shape question, not a Common Lisp one: every dialect
         // this build parses puts them in the same place.
         true,
+        tree.source(),
         findings,
         vec![
             ("documented_count", json!(documented)),
@@ -193,7 +189,6 @@ fn read_definition(
             undocumented: parameters,
             summary: None,
             span: form.span,
-            line: line_of(source, form.span.start().get()),
         });
     };
 
@@ -237,7 +232,6 @@ fn read_definition(
         undocumented,
         summary: Some(elide(&docstring)),
         span: form.span,
-        line: line_of(source, form.span.start().get()),
     })
 }
 
