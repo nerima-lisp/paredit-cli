@@ -66,6 +66,14 @@ model, a binding table, nine lint rules, and a per-file report.
   format, including as zeroes; `--allow-comment-loss` and `--include-quoted`
   override the two that are overridable.
 
+  `query find`/`query count`/`query replace` and `migrate run` survive a file
+  that will not parse: it is reported on stderr and excluded, and the files
+  that did parse still get a report. Only a run where every file fails is a
+  hard error. `migrate run` also skips a step before parsing it when none of
+  the step's pattern's literal atoms appear in the file's current text — a
+  sound, one-directional prefilter that avoids materializing a syntax tree
+  for a step that cannot match.
+
 - Five clone-detection commands built on the existing tree-edit-distance
   scorer, which `similarity` and `duplicates` had been under-using.
   `inspect clone-classes` groups near-duplicate forms into classes, labels each
