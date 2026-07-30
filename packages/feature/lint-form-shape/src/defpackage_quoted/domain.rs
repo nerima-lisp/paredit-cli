@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// `defpackage` option keywords whose entries are symbol/package designators.
 const DESIGNATOR_CLAUSES: [&str; 7] = [
@@ -43,52 +45,67 @@ fn is_quoted(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct DefpackageQuotedItem {
-    pub path: PathBuf,
     /// The span of the whole `defpackage` form.
     pub span: ByteSpan,
     /// The clause keyword, lowercased (`:export`, ...).
-    pub clause: String,
+    ///
+    /// One of [`DESIGNATOR_CLAUSES`], so it is `&'static str` rather than the
+    /// spelling read from the source: the set is closed and the report leads
+    /// each row with it.
+    pub clause: &'static str,
     /// The span of the quoted designator.
     pub designator_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct DefpackageQuotedSummary {
-    pub defpackage_form_count: usize,
-    pub violations: Vec<DefpackageQuotedItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DefpackageQuotedPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl DefpackageQuotedPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for DefpackageQuotedItem {
+    /// The clause the quote appears in, so `:export` and `:import-from` are
+    /// separable without parsing JSON.
+    ///
+    /// They are different mistakes with different blast radii — a quoted
+    /// `:export` name is a symbol nobody can find, a quoted `:use` package is a
+    /// load-time failure — and a consumer filtering on one of them is asking a
+    /// real question.
+    fn kind(&self) -> &'static str {
+        self.clause
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DefpackageQuotedPolicy {
-    pub fail_on_violation: bool,
-    pub defpackage_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing beyond the path, line, and leading clause: the old text row
+    /// carried exactly those, and the clause is now the leading `kind`.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("clause", json!(self.clause)),
+            (
+                "designator_span",
+                json!({
+                    "start": self.designator_span.start().get(),
+                    "end": self.designator_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `defpackage-quoted` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one defect described one way.
+    fn message(&self) -> String {
+        format!(
+            "defpackage does not evaluate its options; drop the quote in the {} clause",
+            self.clause
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     defpackage_form_count: &mut usize,
     violations: &mut Vec<DefpackageQuotedItem>,
 ) {
@@ -109,16 +126,19 @@ pub fn examine(
             continue;
         };
         let lower = keyword.to_ascii_lowercase();
-        if !DESIGNATOR_CLAUSES.contains(&lower.as_str()) {
+        let Some(name) = DESIGNATOR_CLAUSES
+            .iter()
+            .copied()
+            .find(|candidate| *candidate == lower)
+        else {
             continue;
-        }
+        };
         // Entries follow the clause keyword; flag any quoted designator.
         for entry in clause.children.iter().skip(1) {
             if is_quoted(entry) {
                 violations.push(DefpackageQuotedItem {
-                    path: path.to_path_buf(),
                     span: view.span,
-                    clause: lower.clone(),
+                    clause: name,
                     designator_span: entry.span,
                 });
             }
@@ -126,15 +146,27 @@ pub fn examine(
     }
 }
 
-/// Collects every quoted designator inside a `defpackage` across a whole file,
-/// along with the total number of `defpackage` forms scanned.
-pub fn collect_defpackage_quoted(
+/// Collects every quoted designator inside a `defpackage` in one file, with the
+/// number of `defpackage` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no quoted designator here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_defpackage_quoted_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DefpackageQuotedItem>)> {
+) -> LintResult<FileFindings<DefpackageQuotedItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("defpackage_form_count", json!(0))],
+        ));
     }
 
     let mut defpackage_form_count = 0;
@@ -142,51 +174,40 @@ pub fn collect_defpackage_quoted(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut defpackage_form_count, &mut violations);
+            examine(subview, &mut defpackage_form_count, &mut violations);
         });
     }
-    Ok((defpackage_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_defpackage_quoted(
-    defpackage_form_count: usize,
-    violations: Vec<DefpackageQuotedItem>,
-) -> DefpackageQuotedSummary {
-    DefpackageQuotedSummary {
-        defpackage_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_defpackage_quoted_policy(
-    options: DefpackageQuotedPolicyOptions,
-    summary: &DefpackageQuotedSummary,
-) -> DefpackageQuotedPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    DefpackageQuotedPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        defpackage_form_count: summary.defpackage_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("defpackage_form_count", json!(defpackage_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn packages(input: &str) -> (usize, Vec<DefpackageQuotedItem>) {
+    fn report(input: &str) -> FileFindings<DefpackageQuotedItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_defpackage_quoted(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect defpackage quoted")
+        build_defpackage_quoted_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build defpackage quoted report")
+    }
+
+    /// The `(defpackage_form_count, violations)` pair the report is built from.
+    fn packages(input: &str) -> (u64, Vec<DefpackageQuotedItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "defpackage_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("defpackage_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -235,30 +256,39 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(defpackage :app (:export 'foo))", Dialect::Clojure)
                 .expect("parse");
-        let (count, violations) =
-            collect_defpackage_quoted(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect defpackage quoted");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_defpackage_quoted_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build defpackage quoted report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("defpackage_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = packages("(defpackage :app (:export 'foo))");
-        let summary = summarize_defpackage_quoted(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(defpackage :app (:export foo))").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_defpackage_quoted_policy(DefpackageQuotedPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_leads_with_its_clause_and_carries_its_line() {
+        let report = report("(in-package :cl-user)\n(defpackage :app (:use #'cl))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), ":use");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(finding.json_fields()[0], ("clause", json!(":use")));
+    }
 
-        let strict =
-            evaluate_defpackage_quoted_policy(DefpackageQuotedPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_defpackage_scanned_not_only_the_flagged_ones() {
+        let report = report("(defpackage :a (:export 'x))\n(defpackage :b (:export y))\n");
+        assert_eq!(report.summary, vec![("defpackage_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

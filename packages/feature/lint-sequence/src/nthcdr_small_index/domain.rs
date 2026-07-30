@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The named `cdr` accessor for a literal count `1`–`4`, or `None` for any other
 /// spelling (`0`, `5`+, floats, prefixed, or non-numeric).
@@ -52,52 +54,64 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct NthcdrSmallIndexItem {
-    pub path: PathBuf,
     /// The span of the whole `(nthcdr n list)` form.
     pub span: ByteSpan,
     /// The named accessor to rewrite to (`cdr`, `cddr`, `cdddr`, `cddddr`).
     pub accessor: &'static str,
     /// The span of the list operand (for reconstructing the fix).
+    ///
+    /// The rewrite's input, but the old report published it and a consumer
+    /// synthesizing its own `(cddr …)` needs it, so it stays on the report.
     pub list_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct NthcdrSmallIndexSummary {
-    pub nthcdr_form_count: usize,
-    pub violations: Vec<NthcdrSmallIndexItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NthcdrSmallIndexPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NthcdrSmallIndexPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NthcdrSmallIndexItem {
+    /// The `cdr` accessor the count maps to, so `(nthcdr 1 …)` and
+    /// `(nthcdr 4 …)` are separable without parsing JSON.
+    ///
+    /// A closed set of four `&'static str` values this module already models,
+    /// and the one a consumer would filter on — a lone `cdr` and a `cddddr`
+    /// are very different things to find in a codebase.
+    fn kind(&self) -> &'static str {
+        self.accessor
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    /// Nothing: the old text row's only column beyond the path and offset was
+    /// the bare accessor, which now leads the row as the `kind`.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("accessor", json!(self.accessor)),
+            ("list_span", span_json(self.list_span)),
+        ]
+    }
+
+    /// The same sentence the `nthcdr-small-index` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "nthcdr with a small count has a named cdr accessor; use ({} …)",
+            self.accessor
+        )
     }
 }
 
-#[derive(Debug)]
-pub struct NthcdrSmallIndexPolicy {
-    pub fail_on_violation: bool,
-    pub nthcdr_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+/// A sub-span in the shape the old hand-written report published it.
+fn span_json(span: ByteSpan) -> Value {
+    json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     nthcdr_form_count: &mut usize,
     violations: &mut Vec<NthcdrSmallIndexItem>,
 ) {
@@ -123,22 +137,33 @@ pub fn examine(
     };
 
     violations.push(NthcdrSmallIndexItem {
-        path: path.to_path_buf(),
         span: view.span,
         accessor,
         list_span: list.span,
     });
 }
 
-/// Collects every `(nthcdr 1..=4 list)` across a whole file, along with the
-/// total number of `nthcdr` forms scanned.
-pub fn collect_nthcdr_small_indexes(
+/// Collects every `(nthcdr 1..=4 list)` in one file, with the number of
+/// `nthcdr` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no small-count nthcdr here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_nthcdr_small_index_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NthcdrSmallIndexItem>)> {
+) -> LintResult<FileFindings<NthcdrSmallIndexItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("nthcdr_form_count", json!(0))],
+        ));
     }
 
     let mut nthcdr_form_count = 0;
@@ -146,51 +171,40 @@ pub fn collect_nthcdr_small_indexes(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut nthcdr_form_count, &mut violations);
+            examine(subview, &mut nthcdr_form_count, &mut violations);
         });
     }
-    Ok((nthcdr_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_nthcdr_small_indexes(
-    nthcdr_form_count: usize,
-    violations: Vec<NthcdrSmallIndexItem>,
-) -> NthcdrSmallIndexSummary {
-    NthcdrSmallIndexSummary {
-        nthcdr_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_nthcdr_small_index_policy(
-    options: NthcdrSmallIndexPolicyOptions,
-    summary: &NthcdrSmallIndexSummary,
-) -> NthcdrSmallIndexPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NthcdrSmallIndexPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        nthcdr_form_count: summary.nthcdr_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("nthcdr_form_count", json!(nthcdr_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn nthcdrs(input: &str) -> (usize, Vec<NthcdrSmallIndexItem>) {
+    fn report(input: &str) -> FileFindings<NthcdrSmallIndexItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_nthcdr_small_indexes(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect nthcdr small indexes")
+        build_nthcdr_small_index_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build nthcdr small index report")
+    }
+
+    /// The `(nthcdr_form_count, violations)` pair the report is built from.
+    fn nthcdrs(input: &str) -> (u64, Vec<NthcdrSmallIndexItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "nthcdr_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("nthcdr_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -262,28 +276,47 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(nthcdr 1 x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_nthcdr_small_indexes(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect nthcdr small indexes");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_nthcdr_small_index_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build nthcdr small index report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("nthcdr_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = nthcdrs("(nthcdr 1 x)");
-        let summary = summarize_nthcdr_small_indexes(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(nthcdr n x)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_nthcdr_small_index_policy(NthcdrSmallIndexPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_leads_with_its_accessor_and_keeps_the_list_span() {
+        let source = "(defun f (xs)\n  (nthcdr 2 (rest xs)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        // The accessor is the kind, so the text row leads with it and carries
+        // no further columns.
+        assert_eq!(finding.kind(), "cddr");
+        assert_eq!(slice(source, finding.list_span), "(rest xs)");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("accessor", json!("cddr")),
+                ("list_span", span_json(finding.list_span)),
+            ]
+        );
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_nthcdr_small_index_policy(NthcdrSmallIndexPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_nthcdr_form_not_only_the_flagged_ones() {
+        let report = report("(nthcdr 1 x)\n(nthcdr 0 x)\n(nthcdr 5 x)\n");
+        assert_eq!(report.summary, vec![("nthcdr_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
@@ -73,7 +73,6 @@ pub struct LineFinding {
     pub measured: usize,
     pub threshold: usize,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for LineFinding {
@@ -83,10 +82,6 @@ impl Finding for LineFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -133,7 +128,6 @@ pub fn build_line_metrics_report(
                 measured: width,
                 threshold: thresholds.max_line_length,
                 span: span_at(offset, offset + line.len()),
-                line: index + 1,
             });
         }
         // `lines()` strips the terminator, so it is added back to keep the
@@ -150,7 +144,6 @@ pub fn build_line_metrics_report(
             measured: total_lines,
             threshold: thresholds.max_file_lines,
             span: span_at(0, source.len()),
-            line: 1,
         });
     }
 
@@ -173,7 +166,6 @@ pub fn build_line_metrics_report(
                 measured: height,
                 threshold: thresholds.max_definition_lines,
                 span: form.span,
-                line: start,
             });
         }
     }
@@ -184,6 +176,7 @@ pub fn build_line_metrics_report(
         // Line shape is not a dialect question; every parsed dialect is
         // measured the same way.
         true,
+        tree.source(),
         findings,
         vec![
             ("total_lines", json!(total_lines)),
@@ -195,15 +188,6 @@ pub fn build_line_metrics_report(
 
 const fn span_at(start: usize, end: usize) -> ByteSpan {
     ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

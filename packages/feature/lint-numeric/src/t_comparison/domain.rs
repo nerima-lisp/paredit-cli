@@ -28,13 +28,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The canonical operator name for an object-equality predicate head, or `None`
 /// otherwise. `=` is intentionally excluded (numeric, and a type error on `t`).
@@ -61,48 +63,49 @@ fn is_t_literal(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct TComparisonItem {
-    pub path: PathBuf,
     /// The span of the whole `(eq X t)` form.
     pub span: ByteSpan,
     /// The operator, lowercased (`eq`/`eql`/`equal`/`equalp`).
     pub operator: &'static str,
 }
 
-#[derive(Debug)]
-pub struct TComparisonSummary {
-    pub comparison_form_count: usize,
-    pub violations: Vec<TComparisonItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct TComparisonPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl TComparisonPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for TComparisonItem {
+    /// The equality predicate, so `eq` and `equalp` are separable without
+    /// parsing JSON.
+    ///
+    /// A closed set of four, already normalized to lowercase `&'static str` by
+    /// [`equality_operator`] — the source casing is not retained, so this is
+    /// the canonical name rather than whatever the file spelled.
+    fn kind(&self) -> &'static str {
+        self.operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct TComparisonPolicy {
-    pub fail_on_violation: bool,
-    pub comparison_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing beyond the leading `kind`: the old text row's only column was
+    /// `operator=…`, which the `kind` column now carries.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("operator", json!(self.operator))]
+    }
+
+    /// The same sentence the `t-comparison` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} against t matches only the symbol T, not any true value",
+            self.operator
+        )
+    }
 }
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    path: &Path,
     comparison_form_count: &mut usize,
     violations: &mut Vec<TComparisonItem>,
 ) {
@@ -130,21 +133,32 @@ pub fn examine_comparison(
     }
 
     violations.push(TComparisonItem {
-        path: path.to_path_buf(),
         span: view.span,
         operator,
     });
 }
 
-/// Collects every t comparison across a whole file, along with the total number
-/// of eq/eql/equal/equalp forms scanned.
-pub fn collect_t_comparisons(
+/// Collects every t comparison in one file, with the number of
+/// eq/eql/equal/equalp forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no comparison against `t` here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_t_comparison_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<TComparisonItem>)> {
+) -> LintResult<FileFindings<TComparisonItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("comparison_form_count", json!(0))],
+        ));
     }
 
     let mut comparison_form_count = 0;
@@ -152,51 +166,40 @@ pub fn collect_t_comparisons(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(subview, path, &mut comparison_form_count, &mut violations);
+            examine_comparison(subview, &mut comparison_form_count, &mut violations);
         });
     }
-    Ok((comparison_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_t_comparisons(
-    comparison_form_count: usize,
-    violations: Vec<TComparisonItem>,
-) -> TComparisonSummary {
-    TComparisonSummary {
-        comparison_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_t_comparison_policy(
-    options: TComparisonPolicyOptions,
-    summary: &TComparisonSummary,
-) -> TComparisonPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    TComparisonPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        comparison_form_count: summary.comparison_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("comparison_form_count", json!(comparison_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn comparisons(input: &str) -> (usize, Vec<TComparisonItem>) {
+    fn report(input: &str) -> FileFindings<TComparisonItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_t_comparisons(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect t comparisons")
+        build_t_comparison_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build t comparison report")
+    }
+
+    /// The `(comparison_form_count, violations)` pair the report is built from.
+    fn comparisons(input: &str) -> (u64, Vec<TComparisonItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "comparison_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("comparison_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -273,26 +276,41 @@ mod tests {
         assert_eq!(violations[0].operator, "eq");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(eq x t)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_t_comparisons(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect t comparisons");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_t_comparison_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build t comparison report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = comparisons("(eq x t)");
-        let summary = summarize_t_comparisons(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(eq x y)").dialect_modelled);
+    }
 
-        let quiet = evaluate_t_comparison_policy(TComparisonPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(defun ready? (x)\n  (eq (compute x) t))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "eq");
+        assert_eq!(finding.json_fields(), vec![("operator", json!("eq"))]);
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.message(),
+            "eq against t matches only the symbol T, not any true value"
+        );
+    }
 
-        let strict = evaluate_t_comparison_policy(TComparisonPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_comparison_scanned_not_only_the_flagged_ones() {
+        let report = report("(eq x t)\n(eql a b)\n(equal c d)\n");
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

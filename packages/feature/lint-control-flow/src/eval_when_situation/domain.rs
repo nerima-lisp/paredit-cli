@@ -15,15 +15,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether a situation atom is one CLHS accepts.
 fn is_valid_situation(text: &str) -> bool {
@@ -48,48 +50,43 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct EvalWhenSituationItem {
-    pub path: PathBuf,
+    /// The span of the offending situation.
     pub span: ByteSpan,
+    /// The invalid situation as written, or `()` when it is not an atom.
     pub situation: String,
 }
 
-#[derive(Debug)]
-pub struct EvalWhenSituationSummary {
-    pub eval_when_form_count: usize,
-    pub violations: Vec<EvalWhenSituationItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EvalWhenSituationPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EvalWhenSituationPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EvalWhenSituationItem {
+    /// The rule's own name. The situation is the misspelling itself — an open
+    /// set, not a vocabulary a consumer could filter on — so it is a field
+    /// rather than a variant.
+    fn kind(&self) -> &'static str {
+        "eval-when-situation"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EvalWhenSituationPolicy {
-    pub fail_on_violation: bool,
-    pub eval_when_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("situation={}", self.situation)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("situation", json!(self.situation))]
+    }
+
+    /// The same sentence the `eval-when-situation` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!("eval-when situation {} is not valid", self.situation)
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_eval_when(
     view: &ExpressionView,
-    path: &Path,
     eval_when_form_count: &mut usize,
     violations: &mut Vec<EvalWhenSituationItem>,
 ) {
@@ -118,7 +115,6 @@ pub fn examine_eval_when(
         let valid = atom_text(situation).is_some_and(is_valid_situation);
         if !valid {
             violations.push(EvalWhenSituationItem {
-                path: path.to_path_buf(),
                 span: situation.span,
                 situation: atom_text(situation).unwrap_or("()").to_owned(),
             });
@@ -126,15 +122,27 @@ pub fn examine_eval_when(
     }
 }
 
-/// Collects every `eval-when` with an invalid situation across a whole file,
-/// along with the total number of `eval-when` forms scanned.
-pub fn collect_eval_when_situations(
+/// Collects every `eval-when` with an invalid situation in one file, with the
+/// number of `eval-when` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every situation is valid here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_eval_when_situation_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EvalWhenSituationItem>)> {
+) -> LintResult<FileFindings<EvalWhenSituationItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("eval_when_form_count", json!(0))],
+        ));
     }
 
     let mut eval_when_form_count = 0;
@@ -142,51 +150,40 @@ pub fn collect_eval_when_situations(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_eval_when(subview, path, &mut eval_when_form_count, &mut violations);
+            examine_eval_when(subview, &mut eval_when_form_count, &mut violations);
         });
     }
-    Ok((eval_when_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_eval_when_situations(
-    eval_when_form_count: usize,
-    violations: Vec<EvalWhenSituationItem>,
-) -> EvalWhenSituationSummary {
-    EvalWhenSituationSummary {
-        eval_when_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_eval_when_situation_policy(
-    options: EvalWhenSituationPolicyOptions,
-    summary: &EvalWhenSituationSummary,
-) -> EvalWhenSituationPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EvalWhenSituationPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        eval_when_form_count: summary.eval_when_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("eval_when_form_count", json!(eval_when_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<EvalWhenSituationItem>) {
+    fn report(input: &str) -> FileFindings<EvalWhenSituationItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_eval_when_situations(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect eval-when situations")
+        build_eval_when_situation_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build eval-when situation report")
+    }
+
+    /// The `(eval_when_form_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<EvalWhenSituationItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "eval_when_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("eval_when_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -259,33 +256,40 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(eval-when (:bad) 1)", Dialect::Clojure)
             .expect("parse input");
-        let (form_count, items) =
-            collect_eval_when_situations(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect eval-when situations");
-        assert_eq!(form_count, 0);
-        assert!(items.is_empty());
+        let report =
+            build_eval_when_situation_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build eval-when situation report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("eval_when_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (form_count, items) = violations("(eval-when (:bad) 1)");
-        let summary = summarize_eval_when_situations(form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(eval-when (:execute) 1)").dialect_modelled);
+    }
 
-        let quiet = evaluate_eval_when_situation_policy(
-            EvalWhenSituationPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_situation() {
+        let report = report("(progn\n  (eval-when (:bogus) 1))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "eval-when-situation");
+        assert_eq!(finding.json_fields(), vec![("situation", json!(":bogus"))]);
+        assert_eq!(finding.text_columns(), vec!["situation=:bogus".to_owned()]);
+        assert_eq!(finding.message(), "eval-when situation :bogus is not valid");
+    }
 
-        let strict = evaluate_eval_when_situation_policy(
-            EvalWhenSituationPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_eval_when_scanned_not_only_the_flagged_ones() {
+        let report = report("(eval-when (:bogus) 1)\n(eval-when (:execute) 2)\n");
+        assert_eq!(report.summary, vec![("eval_when_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

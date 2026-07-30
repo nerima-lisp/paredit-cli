@@ -23,13 +23,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const TYPECASE_HEADS: [&str; 3] = ["typecase", "etypecase", "ctypecase"];
 
@@ -42,50 +44,45 @@ fn is_bare_nil_key(key_designator: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct TypecaseNilKeyItem {
-    pub path: PathBuf,
     /// The span of the offending `nil` type specifier.
     pub span: ByteSpan,
     /// The typecase operator (`typecase`/`etypecase`/`ctypecase`), for the finding message.
     pub head: String,
 }
 
-#[derive(Debug)]
-pub struct TypecaseNilKeySummary {
-    pub typecase_form_count: usize,
-    pub violations: Vec<TypecaseNilKeyItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct TypecaseNilKeyPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl TypecaseNilKeyPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for TypecaseNilKeyItem {
+    /// The rule's own name. The operator is carried as data rather than as the
+    /// tag, because it is taken verbatim from source and keeps its casing.
+    fn kind(&self) -> &'static str {
+        "typecase-nil-key"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct TypecaseNilKeyPolicy {
-    pub fail_on_violation: bool,
-    pub typecase_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.head.clone()]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("head", json!(self.head))]
+    }
+
+    /// The same sentence the `typecase-nil-key` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} clause type nil is the empty type and never matches; use null",
+            self.head
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    path: &Path,
     typecase_form_count: &mut usize,
     violations: &mut Vec<TypecaseNilKeyItem>,
 ) {
@@ -115,7 +112,6 @@ pub fn examine_case(
         };
         if is_bare_nil_key(key_designator) {
             violations.push(TypecaseNilKeyItem {
-                path: path.to_path_buf(),
                 span: key_designator.span,
                 head: head.to_owned(),
             });
@@ -124,15 +120,27 @@ pub fn examine_case(
 }
 
 /// Collects every `typecase`/`etypecase`/`ctypecase` clause whose head is a bare
-/// `nil` type specifier across a whole file, along with the total number of such
-/// forms scanned.
-pub fn collect_typecase_nil_keys(
+/// `nil` type specifier in one file, with the number of such forms scanned as
+/// the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no bare nil type here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_typecase_nil_key_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<TypecaseNilKeyItem>)> {
+) -> LintResult<FileFindings<TypecaseNilKeyItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("typecase_form_count", json!(0))],
+        ));
     }
 
     let mut typecase_form_count = 0;
@@ -140,51 +148,40 @@ pub fn collect_typecase_nil_keys(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, path, &mut typecase_form_count, &mut violations);
+            examine_case(subview, &mut typecase_form_count, &mut violations);
         });
     }
-    Ok((typecase_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_typecase_nil_keys(
-    typecase_form_count: usize,
-    violations: Vec<TypecaseNilKeyItem>,
-) -> TypecaseNilKeySummary {
-    TypecaseNilKeySummary {
-        typecase_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_typecase_nil_key_policy(
-    options: TypecaseNilKeyPolicyOptions,
-    summary: &TypecaseNilKeySummary,
-) -> TypecaseNilKeyPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    TypecaseNilKeyPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        typecase_form_count: summary.typecase_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("typecase_form_count", json!(typecase_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn keys(input: &str) -> (usize, Vec<TypecaseNilKeyItem>) {
+    fn report(input: &str) -> FileFindings<TypecaseNilKeyItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_typecase_nil_keys(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect typecase nil keys")
+        build_typecase_nil_key_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build typecase nil key report")
+    }
+
+    /// The `(typecase_form_count, violations)` pair the report is built from.
+    fn keys(input: &str) -> (u64, Vec<TypecaseNilKeyItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "typecase_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("typecase_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -243,29 +240,38 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(typecase x (nil 1))", Dialect::Clojure)
             .expect("parse");
-        let (typecase_form_count, items) =
-            collect_typecase_nil_keys(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect typecase nil keys");
-        assert_eq!(typecase_form_count, 0);
-        assert!(items.is_empty());
+        let report = build_typecase_nil_key_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build typecase nil key report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("typecase_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (typecase_form_count, items) = keys("(typecase x (nil 1))");
-        let summary = summarize_typecase_nil_keys(typecase_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(typecase x (t 1))").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_typecase_nil_key_policy(TypecaseNilKeyPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_head() {
+        let report = report("(defun f (x)\n  (typecase x (nil 1)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "typecase-nil-key");
+        assert_eq!(finding.json_fields(), vec![("head", json!("typecase"))]);
+        assert_eq!(finding.text_columns(), vec!["typecase".to_owned()]);
+    }
 
-        let strict =
-            evaluate_typecase_nil_key_policy(TypecaseNilKeyPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_typecase_scanned_not_only_the_flagged_ones() {
+        let report = report("(typecase x (nil 1))\n(typecase y (integer 1))\n");
+        assert_eq!(report.summary, vec![("typecase_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

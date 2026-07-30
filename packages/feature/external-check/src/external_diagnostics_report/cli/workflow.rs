@@ -61,6 +61,7 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
                 file.clone(),
                 dialect,
                 false,
+                tree.source(),
                 Vec::new(),
                 Vec::new(),
             ));
@@ -113,16 +114,12 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
         let findings = outcome
             .diagnostics
             .iter()
-            .map(|diagnostic| {
-                let (span, line) = locate_context(&tree, diagnostic.context.as_deref());
-                PlacedDiagnostic {
-                    diagnostic: diagnostic.clone(),
-                    span,
-                    line,
-                    introduced: baseline
-                        .as_ref()
-                        .is_some_and(|baseline| !baseline.contains(diagnostic)),
-                }
+            .map(|diagnostic| PlacedDiagnostic {
+                diagnostic: diagnostic.clone(),
+                span: locate_context(&tree, diagnostic.context.as_deref()),
+                introduced: baseline
+                    .as_ref()
+                    .is_some_and(|baseline| !baseline.contains(diagnostic)),
             })
             .collect::<Vec<_>>();
 
@@ -131,6 +128,7 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
             file.clone(),
             dialect,
             true,
+            tree.source(),
             findings,
             vec![
                 ("timed_out", serde_json::json!(outcome.timed_out)),
@@ -180,18 +178,7 @@ fn evaluate_policy(
     let mut policy = if args.fail_on_introduced {
         let introduced = reports
             .iter()
-            .map(|report| FileFindings {
-                path: report.path.clone(),
-                dialect: report.dialect,
-                dialect_modelled: report.dialect_modelled,
-                findings: report
-                    .findings
-                    .iter()
-                    .filter(|finding| finding.introduced)
-                    .cloned()
-                    .collect(),
-                summary: report.summary.clone(),
-            })
+            .map(|report| report.retained(|finding| finding.introduced))
             .collect::<Vec<_>>();
         ReportPolicy::fail_on_any(Some("--fail-on-introduced"), &introduced, |report| {
             format!(

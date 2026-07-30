@@ -25,13 +25,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal `nil` destination (no reader prefixes).
 fn is_nil_destination(view: &ExpressionView) -> bool {
@@ -59,7 +61,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct FormatToStringItem {
-    pub path: PathBuf,
     /// The span of the whole `(format nil "~A" x)` form.
     pub span: ByteSpan,
     /// The replacement function name (`princ-to-string` or `prin1-to-string`).
@@ -68,43 +69,50 @@ pub struct FormatToStringItem {
     pub argument_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct FormatToStringSummary {
-    pub format_form_count: usize,
-    pub violations: Vec<FormatToStringItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct FormatToStringPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl FormatToStringPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for FormatToStringItem {
+    /// The replacement function, so `~A` and `~S` are separable without parsing
+    /// JSON.
+    ///
+    /// They are two different rewrites — `~A` is `princ` semantics, `~S` is
+    /// `prin1` — and a consumer filtering on one of them is asking a real
+    /// question.
+    fn kind(&self) -> &'static str {
+        self.replacement
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.replacement.to_owned()]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("replacement", json!(self.replacement)),
+            ("argument_span", span_json(self.argument_span)),
+        ]
+    }
+
+    /// The same sentence the `format-to-string` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "format to a string is just {}; use ({} x)",
+            self.replacement, self.replacement
+        )
     }
 }
 
-#[derive(Debug)]
-pub struct FormatToStringPolicy {
-    pub fail_on_violation: bool,
-    pub format_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+fn span_json(span: ByteSpan) -> Value {
+    json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     format_form_count: &mut usize,
     violations: &mut Vec<FormatToStringItem>,
 ) {
@@ -134,22 +142,33 @@ pub fn examine(
     };
 
     violations.push(FormatToStringItem {
-        path: path.to_path_buf(),
         span: view.span,
         replacement,
         argument_span: argument.span,
     });
 }
 
-/// Collects every `(format nil "~A"/"~S" x)` across a whole file, along with the
-/// total number of `format` forms scanned.
-pub fn collect_format_to_strings(
+/// Collects every `(format nil "~A"/"~S" x)` in one file, with the number of
+/// `format` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no single-directive format-to-string
+/// here" for Common Lisp and "nothing was looked for" for Clojure, and the two
+/// read identically without the flag.
+pub fn build_format_to_string_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<FormatToStringItem>)> {
+) -> LintResult<FileFindings<FormatToStringItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("format_form_count", json!(0))],
+        ));
     }
 
     let mut format_form_count = 0;
@@ -157,51 +176,40 @@ pub fn collect_format_to_strings(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut format_form_count, &mut violations);
+            examine(subview, &mut format_form_count, &mut violations);
         });
     }
-    Ok((format_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_format_to_strings(
-    format_form_count: usize,
-    violations: Vec<FormatToStringItem>,
-) -> FormatToStringSummary {
-    FormatToStringSummary {
-        format_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_format_to_string_policy(
-    options: FormatToStringPolicyOptions,
-    summary: &FormatToStringSummary,
-) -> FormatToStringPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    FormatToStringPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        format_form_count: summary.format_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("format_form_count", json!(format_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn formats(input: &str) -> (usize, Vec<FormatToStringItem>) {
+    fn report(input: &str) -> FileFindings<FormatToStringItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_format_to_strings(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect format to strings")
+        build_format_to_string_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build format to string report")
+    }
+
+    /// The `(format_form_count, violations)` pair the report is built from.
+    fn formats(input: &str) -> (u64, Vec<FormatToStringItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "format_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("format_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -274,29 +282,46 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(format nil \"~A\" x)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_format_to_strings(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect format to strings");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_format_to_string_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build format to string report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("format_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = formats("(format nil \"~A\" x)");
-        let summary = summarize_format_to_strings(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(format t \"~A\" x)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_format_to_string_policy(FormatToStringPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_replacement() {
+        let source = "(defun f (x)\n  (format nil \"~S\" x))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "prin1-to-string");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("replacement", json!("prin1-to-string")),
+                ("argument_span", span_json(finding.argument_span)),
+            ]
+        );
+        assert_eq!(slice(source, finding.argument_span), "x");
+        assert_eq!(finding.text_columns(), vec!["prin1-to-string".to_owned()]);
+    }
 
-        let strict =
-            evaluate_format_to_string_policy(FormatToStringPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_format_scanned_not_only_the_flagged_ones() {
+        let report = report("(format nil \"~A\" x)\n(format nil \"~D\" y)\n");
+        assert_eq!(report.summary, vec![("format_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

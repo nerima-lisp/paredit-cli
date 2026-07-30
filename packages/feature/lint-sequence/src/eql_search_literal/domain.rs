@@ -23,16 +23,18 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The 0-based index of the searched item argument for a default-`eql` search
 /// function, or `None` if the head is not one of them. Required positionals sit
@@ -93,7 +95,6 @@ fn has_explicit_test(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct EqlSearchLiteralItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     /// The search function (`member`, `assoc`, …).
     pub operator: String,
@@ -101,43 +102,48 @@ pub struct EqlSearchLiteralItem {
     pub literal: String,
 }
 
-#[derive(Debug)]
-pub struct EqlSearchLiteralSummary {
-    pub search_call_count: usize,
-    pub violations: Vec<EqlSearchLiteralItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EqlSearchLiteralPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EqlSearchLiteralPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EqlSearchLiteralItem {
+    /// The rule's own name, not the operator.
+    ///
+    /// The operator is the natural discriminator here, but it is a `String`
+    /// read out of the source and `kind` is `&'static str`; the fourteen heads
+    /// are not modelled as a closed set anywhere in this module. It stays a
+    /// text column and a JSON field instead.
+    fn kind(&self) -> &'static str {
+        "eql-search-literal"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EqlSearchLiteralPolicy {
-    pub fail_on_violation: bool,
-    pub search_call_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// The old text row's trailing columns: the bare operator, then the
+    /// `literal=`-prefixed literal, in that order.
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.operator.clone(), format!("literal={}", self.literal)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("literal", json!(self.literal)),
+        ]
+    }
+
+    /// The same sentence the `eql-search-literal` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} searches for literal {} with the default eql test; add :test",
+            self.operator, self.literal
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    path: &Path,
     search_call_count: &mut usize,
     violations: &mut Vec<EqlSearchLiteralItem>,
 ) {
@@ -154,7 +160,6 @@ pub fn examine_call(
     };
     if (is_string_literal(item) || is_quoted_list_literal(item)) && !has_explicit_test(view) {
         violations.push(EqlSearchLiteralItem {
-            path: path.to_path_buf(),
             span: view.span,
             operator: head.to_ascii_lowercase(),
             literal: render_expression(item),
@@ -162,15 +167,27 @@ pub fn examine_call(
     }
 }
 
-/// Collects every default-eql search for a string/list literal across a whole
-/// file, along with the total number of search calls scanned.
-pub fn collect_eql_search_literals(
+/// Collects every default-eql search for a string/list literal in one file,
+/// with the number of search calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no default-eql literal search here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_eql_search_literal_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EqlSearchLiteralItem>)> {
+) -> LintResult<FileFindings<EqlSearchLiteralItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("search_call_count", json!(0))],
+        ));
     }
 
     let mut search_call_count = 0;
@@ -178,51 +195,40 @@ pub fn collect_eql_search_literals(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &mut search_call_count, &mut violations);
+            examine_call(subview, &mut search_call_count, &mut violations);
         });
     }
-    Ok((search_call_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_eql_search_literals(
-    search_call_count: usize,
-    violations: Vec<EqlSearchLiteralItem>,
-) -> EqlSearchLiteralSummary {
-    EqlSearchLiteralSummary {
-        search_call_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_eql_search_literal_policy(
-    options: EqlSearchLiteralPolicyOptions,
-    summary: &EqlSearchLiteralSummary,
-) -> EqlSearchLiteralPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EqlSearchLiteralPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        search_call_count: summary.search_call_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("search_call_count", json!(search_call_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn searches(input: &str) -> (usize, Vec<EqlSearchLiteralItem>) {
+    fn report(input: &str) -> FileFindings<EqlSearchLiteralItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_eql_search_literals(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect eql search literals")
+        build_eql_search_literal_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build eql search literal report")
+    }
+
+    /// The `(search_call_count, violations)` pair the report is built from.
+    fn searches(input: &str) -> (u64, Vec<EqlSearchLiteralItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "search_call_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("search_call_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -320,29 +326,46 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(member \"x\" items)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_eql_search_literals(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect eql search literals");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_eql_search_literal_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build eql search literal report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("search_call_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = searches("(member \"x\" items)");
-        let summary = summarize_eql_search_literals(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(member x items)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_eql_search_literal_policy(EqlSearchLiteralPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_literal() {
+        let report = report("(defun f (items)\n  (member \"x\" items))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        // The operator is a source-read String, so the kind stays the rule's
+        // own name and the operator rides along beside it.
+        assert_eq!(finding.kind(), "eql-search-literal");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("member")), ("literal", json!("\"x\""))]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["member".to_owned(), "literal=\"x\"".to_owned()]
+        );
+    }
 
-        let strict =
-            evaluate_eql_search_literal_policy(EqlSearchLiteralPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_search_call_not_only_the_flagged_ones() {
+        let report = report("(member \"x\" items)\n(find 5 xs)\n(position k xs)\n");
+        assert_eq!(report.summary, vec![("search_call_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

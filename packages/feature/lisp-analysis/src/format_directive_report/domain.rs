@@ -69,7 +69,6 @@ pub struct FormatCall {
     /// see what was counted without re-parsing.
     pub directives: Vec<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for FormatCall {
@@ -79,10 +78,6 @@ impl Finding for FormatCall {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -143,6 +138,7 @@ pub fn build_format_directive_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("mismatch_count", json!(mismatched))],
     )
@@ -189,7 +185,6 @@ fn format_call(view: &ExpressionView, source: &str) -> Option<FormatCall> {
         supplied,
         control,
         span: view.span,
-        line: line_of(source, view.span.start().get()),
     })
 }
 
@@ -289,15 +284,6 @@ fn directives(control: &str) -> impl Iterator<Item = (char, String)> + '_ {
             }
         }
     })
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

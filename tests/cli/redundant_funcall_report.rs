@@ -14,8 +14,10 @@ fn cli_flags_sharp_quoted_funcall() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"callee\": \"process\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"callee\": \"process\""))
+        .stdout(predicate::str::contains("\"funcall_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"));
 }
 
 #[test]
@@ -37,7 +39,56 @@ fn cli_does_not_flag_variable_lambda_or_quote() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no sharp-quoted symbol among
+        // three funcalls" from "no funcall at all"; the apply is not one.
+        .stdout(predicate::str::contains("\"funcall_form_count\": 3"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_redundant_funcall_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("redundant-funcall-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(funcall #'foo a)\n").expect("write a.clj");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-funcall")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_redundant_funcall_emits_sarif() {
+    let dir = fresh_temp_dir("redundant-funcall-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(funcall #'process x)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-funcall")
+        .arg("--output")
+        .arg("sarif")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/redundant-funcall/redundant-funcall\"",
+        ))
+        .stdout(predicate::str::contains(
+            "funcall of #'process is a direct call",
+        ));
 }
 
 #[test]
@@ -74,7 +125,7 @@ fn cli_redundant_funcall_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
 
 #[test]

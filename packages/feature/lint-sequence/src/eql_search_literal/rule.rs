@@ -53,13 +53,13 @@ impl LintRule for Rule {
 
     fn check(
         &self,
-        context: &RuleContext<'_>,
+        _context: &RuleContext<'_>,
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
         let mut search_call_count = 0;
         let mut items = Vec::new();
-        examine_call(view, context.path(), &mut search_call_count, &mut items);
+        examine_call(view, &mut search_call_count, &mut items);
         for item in items {
             let span = item.span;
 

@@ -15,13 +15,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// For an arithmetic head, the identity literal that is redundant and the first
 /// operand index at which it may appear (1 for the commutative `+`/`*`, 2 for
@@ -38,7 +40,6 @@ fn identity_for(head: &str) -> Option<(&'static str, usize)> {
 
 #[derive(Debug, Clone)]
 pub struct IdentityArithmeticItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     /// The arithmetic operator (`+`, `-`, `*`, or `/`).
     pub operator: String,
@@ -46,43 +47,47 @@ pub struct IdentityArithmeticItem {
     pub identity: &'static str,
 }
 
-#[derive(Debug)]
-pub struct IdentityArithmeticSummary {
-    pub arithmetic_form_count: usize,
-    pub violations: Vec<IdentityArithmeticItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct IdentityArithmeticPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl IdentityArithmeticPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for IdentityArithmeticItem {
+    /// The rule's own name rather than one of its four operators.
+    ///
+    /// The operator would be the natural variant — it is a closed set, and the
+    /// item already carries it — but `+`, `-`, `*` and `/` are punctuation, and
+    /// `kind` is pasted into a SARIF `ruleId` (`inspect/identity-arithmetic/…`)
+    /// and a CSV column. A rule id ending in `/` is worse than no split at all,
+    /// so the operator stays a JSON field and a text column.
+    fn kind(&self) -> &'static str {
+        "identity-arithmetic"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct IdentityArithmeticPolicy {
-    pub fail_on_violation: bool,
-    pub arithmetic_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.operator.clone(), format!("identity={}", self.identity)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("identity", json!(self.identity)),
+        ]
+    }
+
+    /// The same sentence the `identity-arithmetic` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} has a redundant identity operand {} (it does nothing)",
+            self.operator, self.identity
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    path: &Path,
     arithmetic_form_count: &mut usize,
     violations: &mut Vec<IdentityArithmeticItem>,
 ) {
@@ -104,7 +109,6 @@ pub fn examine_form(
         .any(|child| atom_text(child) == Some(identity));
     if has_identity {
         violations.push(IdentityArithmeticItem {
-            path: path.to_path_buf(),
             span: view.span,
             operator: head.to_owned(),
             identity,
@@ -112,15 +116,28 @@ pub fn examine_form(
     }
 }
 
-/// Collects every arithmetic form with a redundant identity operand across a
-/// whole file, along with the total number of arithmetic forms scanned.
-pub fn collect_identity_arithmetic(
+/// Collects every arithmetic form with a redundant identity operand in one
+/// file, with the number of arithmetic forms scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant operand here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_identity_arithmetic_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<IdentityArithmeticItem>)> {
+) -> LintResult<FileFindings<IdentityArithmeticItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("arithmetic_form_count", json!(0))],
+        ));
     }
 
     let mut arithmetic_form_count = 0;
@@ -128,51 +145,40 @@ pub fn collect_identity_arithmetic(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(subview, path, &mut arithmetic_form_count, &mut violations);
+            examine_form(subview, &mut arithmetic_form_count, &mut violations);
         });
     }
-    Ok((arithmetic_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_identity_arithmetic(
-    arithmetic_form_count: usize,
-    violations: Vec<IdentityArithmeticItem>,
-) -> IdentityArithmeticSummary {
-    IdentityArithmeticSummary {
-        arithmetic_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_identity_arithmetic_policy(
-    options: IdentityArithmeticPolicyOptions,
-    summary: &IdentityArithmeticSummary,
-) -> IdentityArithmeticPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    IdentityArithmeticPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        arithmetic_form_count: summary.arithmetic_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("arithmetic_form_count", json!(arithmetic_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn forms(input: &str) -> (usize, Vec<IdentityArithmeticItem>) {
+    fn report(input: &str) -> FileFindings<IdentityArithmeticItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_identity_arithmetic(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect identity arithmetic")
+        build_identity_arithmetic_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build identity arithmetic report")
+    }
+
+    /// The `(arithmetic_form_count, violations)` pair the report is built from.
+    fn forms(input: &str) -> (u64, Vec<IdentityArithmeticItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "arithmetic_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("arithmetic_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -253,32 +259,44 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(+ x 0)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_identity_arithmetic(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect identity arithmetic");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_identity_arithmetic_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build identity arithmetic report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("arithmetic_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = forms("(+ x 0)");
-        let summary = summarize_identity_arithmetic(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(+ x 2)").dialect_modelled);
+    }
 
-        let quiet = evaluate_identity_arithmetic_policy(
-            IdentityArithmeticPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_identity() {
+        let report = report("(defun f (x)\n  (* x 1))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "identity-arithmetic");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("*")), ("identity", json!("1"))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["*".to_owned(), "identity=1".to_owned()]
+        );
+    }
 
-        let strict = evaluate_identity_arithmetic_policy(
-            IdentityArithmeticPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_arithmetic_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(+ x 0)\n(+ x 2)\n(* y 3)\n");
+        assert_eq!(report.summary, vec![("arithmetic_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

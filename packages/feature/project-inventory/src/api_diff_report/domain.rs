@@ -75,7 +75,6 @@ pub struct ApiChange {
     /// Why this impact, in one clause.
     pub reason: &'static str,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for ApiChange {
@@ -85,10 +84,6 @@ impl Finding for ApiChange {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -198,6 +193,7 @@ pub fn build_api_diff_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("required_bump", json!("patch"))],
         );
@@ -224,7 +220,6 @@ pub fn build_api_diff_report(
                 after: Some(entry.signature()),
                 reason: "a new export breaks no existing caller",
                 span: entry.span,
-                line: entry.line,
             }),
             Some(old) => {
                 let (impact, reason) = compare(old, entry);
@@ -240,7 +235,6 @@ pub fn build_api_diff_report(
                     after: Some(entry.signature()),
                     reason,
                     span: entry.span,
-                    line: entry.line,
                 });
             }
         }
@@ -261,7 +255,6 @@ pub fn build_api_diff_report(
             // A removal has no site in the current source, so it anchors at the
             // start of the file rather than inventing a span.
             span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(0)),
-            line: 1,
         });
     }
 
@@ -275,6 +268,7 @@ pub fn build_api_diff_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         changes,
         vec![
             ("baseline_export_count", json!(baseline.len())),

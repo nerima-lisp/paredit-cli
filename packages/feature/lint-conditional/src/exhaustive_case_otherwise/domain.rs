@@ -20,13 +20,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const EXHAUSTIVE_HEADS: [&str; 4] = ["ecase", "ccase", "etypecase", "ctypecase"];
 
@@ -48,49 +50,52 @@ fn catch_all_designator(clause: &ExpressionView) -> Option<String> {
 
 #[derive(Debug, Clone)]
 pub struct ExhaustiveCaseOtherwiseItem {
-    pub path: PathBuf,
+    /// The span of the offending clause.
     pub span: ByteSpan,
     pub head: String,
     pub designator: String,
 }
 
-#[derive(Debug)]
-pub struct ExhaustiveCaseOtherwiseSummary {
-    pub case_form_count: usize,
-    pub violations: Vec<ExhaustiveCaseOtherwiseItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ExhaustiveCaseOtherwisePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ExhaustiveCaseOtherwisePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ExhaustiveCaseOtherwiseItem {
+    /// The rule's own name rather than the head or the designator. Both are
+    /// copied source-cased out of the file and typed `String`, not one of a
+    /// closed set of `&'static str` names, so both stay JSON fields and columns.
+    fn kind(&self) -> &'static str {
+        "exhaustive-case-otherwise"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ExhaustiveCaseOtherwisePolicy {
-    pub fail_on_violation: bool,
-    pub case_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("head={}", self.head),
+            format!("designator={}", self.designator),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("designator", json!(self.designator)),
+        ]
+    }
+
+    /// The same sentence the `exhaustive-case-otherwise` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} does not permit a {} clause (it is exhaustive)",
+            self.head, self.designator
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    path: &Path,
     case_form_count: &mut usize,
     violations: &mut Vec<ExhaustiveCaseOtherwiseItem>,
 ) {
@@ -117,7 +122,6 @@ pub fn examine_case(
         }
         if let Some(designator) = catch_all_designator(clause) {
             violations.push(ExhaustiveCaseOtherwiseItem {
-                path: path.to_path_buf(),
                 span: clause.span,
                 head: head.to_owned(),
                 designator,
@@ -127,15 +131,27 @@ pub fn examine_case(
 }
 
 /// Collects every exhaustive case form (`ecase`/`ccase`/`etypecase`/
-/// `ctypecase`) with a forbidden `t`/`otherwise` clause across a whole file,
-/// along with the total number of such forms scanned.
-pub fn collect_exhaustive_case_otherwise(
+/// `ctypecase`) with a forbidden `t`/`otherwise` clause in one file, with the
+/// number of such forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no forbidden default here" for Common
+/// Lisp and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_exhaustive_case_otherwise_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ExhaustiveCaseOtherwiseItem>)> {
+) -> LintResult<FileFindings<ExhaustiveCaseOtherwiseItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("case_form_count", json!(0))],
+        ));
     }
 
     let mut case_form_count = 0;
@@ -143,51 +159,40 @@ pub fn collect_exhaustive_case_otherwise(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, path, &mut case_form_count, &mut violations);
+            examine_case(subview, &mut case_form_count, &mut violations);
         });
     }
-    Ok((case_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_exhaustive_case_otherwise(
-    case_form_count: usize,
-    violations: Vec<ExhaustiveCaseOtherwiseItem>,
-) -> ExhaustiveCaseOtherwiseSummary {
-    ExhaustiveCaseOtherwiseSummary {
-        case_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_exhaustive_case_otherwise_policy(
-    options: ExhaustiveCaseOtherwisePolicyOptions,
-    summary: &ExhaustiveCaseOtherwiseSummary,
-) -> ExhaustiveCaseOtherwisePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ExhaustiveCaseOtherwisePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        case_form_count: summary.case_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("case_form_count", json!(case_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<ExhaustiveCaseOtherwiseItem>) {
+    fn report(input: &str) -> FileFindings<ExhaustiveCaseOtherwiseItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_exhaustive_case_otherwise(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect exhaustive case otherwise")
+        build_exhaustive_case_otherwise_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build exhaustive case otherwise report")
+    }
+
+    /// The `(case_form_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<ExhaustiveCaseOtherwiseItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "case_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("case_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -250,33 +255,45 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(ecase x (t 1))", Dialect::Clojure)
             .expect("parse input");
-        let (form_count, items) =
-            collect_exhaustive_case_otherwise(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect exhaustive case otherwise");
-        assert_eq!(form_count, 0);
-        assert!(items.is_empty());
+        let report =
+            build_exhaustive_case_otherwise_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build exhaustive case otherwise report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("case_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (form_count, items) = violations("(ecase x (t 1))");
-        let summary = summarize_exhaustive_case_otherwise(form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(ecase x (1 :a))").dialect_modelled);
+    }
 
-        let quiet = evaluate_exhaustive_case_otherwise_policy(
-            ExhaustiveCaseOtherwisePolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_head_and_its_designator() {
+        let report = report("(defun f (x)\n  (ecase x (1 :a) (t :b)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "exhaustive-case-otherwise");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("head", json!("ecase")), ("designator", json!("t"))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["head=ecase".to_owned(), "designator=t".to_owned()]
+        );
+    }
 
-        let strict = evaluate_exhaustive_case_otherwise_policy(
-            ExhaustiveCaseOtherwisePolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_exhaustive_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(ecase x (t 1))\n(etypecase y (integer 1))\n");
+        assert_eq!(report.summary, vec![("case_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

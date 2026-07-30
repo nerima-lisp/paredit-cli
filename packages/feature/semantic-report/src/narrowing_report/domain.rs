@@ -20,6 +20,7 @@
 
 use std::path::PathBuf;
 
+use paredit_core_cli::report::line_of;
 use paredit_core_semantics::semantics::NodeKey;
 use paredit_core_semantics::semantics::binding::BindingTable;
 use paredit_core_semantics::semantics::typing::Ty;
@@ -30,7 +31,7 @@ use paredit_core_syntax::sexpr::reader::atom_symbol_text;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView};
 use paredit_core_syntax::view_query::{is_paren_list, list_head};
 
-use crate::shared::{SemanticFile, line_of, snippet};
+use crate::shared::{SemanticFile, snippet};
 
 const SNIPPET_LIMIT: usize = 56;
 

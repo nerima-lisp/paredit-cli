@@ -40,7 +40,6 @@ pub struct TaskMarker {
     /// The unit of work a reader would actually pick up.
     pub definition: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for TaskMarker {
@@ -56,10 +55,6 @@ impl Finding for TaskMarker {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -102,7 +97,6 @@ pub fn build_todo_report(
                 author,
                 definition: enclosing_definition(&definitions, span),
                 span,
-                line: line_of(source, span.start().get()),
             })
         })
         .collect::<Vec<_>>();
@@ -118,6 +112,7 @@ pub fn build_todo_report(
         // Comment syntax is `;` in every dialect this tool parses, so the
         // analysis is complete for all of them.
         true,
+        tree.source(),
         findings,
         vec![("urgent_count", json!(urgent))],
     )
@@ -189,15 +184,6 @@ fn clean_note(text: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

@@ -21,15 +21,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Operators whose `:test` keyword argument defaults to `eql` per CLHS.
 const EQL_TEST_HEADS: [&str; 30] = [
@@ -97,53 +99,53 @@ fn is_test_keyword(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct RedundantEqlTestItem {
-    pub path: PathBuf,
     /// The span of the whole call form.
     pub span: ByteSpan,
     /// The span to delete: the ` :test #'eql` argument pair, from the end of the
     /// preceding argument through the eql designator.
+    ///
+    /// The rewrite's input, not the report's: the lint rule deletes it, and
+    /// unlike its `:start`/`:end`/`:count`/`:from-end` siblings this command
+    /// has never printed it.
     pub removal_span: ByteSpan,
-    /// The operator name, for the finding message.
+    /// The operator name, as spelled at the call site.
     pub head: String,
 }
 
-#[derive(Debug)]
-pub struct RedundantEqlTestSummary {
-    pub call_form_count: usize,
-    pub violations: Vec<RedundantEqlTestItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantEqlTestPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantEqlTestPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantEqlTestItem {
+    /// The rule's own name. The operator varies per finding, but it is a
+    /// source-cased `String` off the call site rather than a canonical tag, so
+    /// it stays data in `head` and the kind names the rule.
+    fn kind(&self) -> &'static str {
+        "redundant-eql-test"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantEqlTestPolicy {
-    pub fail_on_violation: bool,
-    pub call_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.head.clone()]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("head", json!(self.head))]
+    }
+
+    /// The same sentence the `redundant-eql-test` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} defaults :test to eql; the explicit :test #'eql is redundant",
+            self.head
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    path: &Path,
     call_form_count: &mut usize,
     violations: &mut Vec<RedundantEqlTestItem>,
 ) {
@@ -172,7 +174,6 @@ pub fn examine_call(
         // designator, so the leading whitespace before `:test` goes too.
         let removal_span = ByteSpan::new(view.children[index - 1].span.end(), value.span.end());
         violations.push(RedundantEqlTestItem {
-            path: path.to_path_buf(),
             span: view.span,
             removal_span,
             head: head.to_owned(),
@@ -182,14 +183,27 @@ pub fn examine_call(
 }
 
 /// Collects every eql-defaulting call with a redundant explicit `:test #'eql`
-/// across a whole file, along with the total number of such calls scanned.
-pub fn collect_redundant_eql_tests(
+/// in one file, with the number of such calls scanned as the denominator
+/// beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant `:test #'eql` here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_redundant_eql_test_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantEqlTestItem>)> {
+) -> LintResult<FileFindings<RedundantEqlTestItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("call_form_count", json!(0))],
+        ));
     }
 
     let mut call_form_count = 0;
@@ -197,51 +211,40 @@ pub fn collect_redundant_eql_tests(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &mut call_form_count, &mut violations);
+            examine_call(subview, &mut call_form_count, &mut violations);
         });
     }
-    Ok((call_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_redundant_eql_tests(
-    call_form_count: usize,
-    violations: Vec<RedundantEqlTestItem>,
-) -> RedundantEqlTestSummary {
-    RedundantEqlTestSummary {
-        call_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_eql_test_policy(
-    options: RedundantEqlTestPolicyOptions,
-    summary: &RedundantEqlTestSummary,
-) -> RedundantEqlTestPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantEqlTestPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        call_form_count: summary.call_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("call_form_count", json!(call_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<RedundantEqlTestItem>) {
+    fn report(input: &str) -> FileFindings<RedundantEqlTestItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_eql_tests(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant eql tests")
+        build_redundant_eql_test_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant eql test report")
+    }
+
+    /// The `(call_form_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<RedundantEqlTestItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "call_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("call_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -317,29 +320,41 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(find x list :test #'eql)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_redundant_eql_tests(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant eql tests");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_redundant_eql_test_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build redundant eql test report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("call_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(find x list :test #'eql)");
-        let summary = summarize_redundant_eql_tests(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(find x list)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_redundant_eql_test_policy(RedundantEqlTestPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// `removal_span` stays off the report: unlike its sibling rules, this
+    /// one's JSON never carried it.
+    #[test]
+    fn a_finding_carries_its_line_and_its_head_but_not_the_removal_span() {
+        let report = report("(defun f (x list)\n  (find x list :test #'eql))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "redundant-eql-test");
+        assert_eq!(finding.text_columns(), vec!["find".to_owned()]);
+        assert_eq!(finding.json_fields(), vec![("head", json!("find"))]);
+    }
 
-        let strict =
-            evaluate_redundant_eql_test_policy(RedundantEqlTestPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report =
+            report("(find x list :test #'eql)\n(member y ys)\n(count z zs :test #'equal)\n");
+        assert_eq!(report.summary, vec![("call_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

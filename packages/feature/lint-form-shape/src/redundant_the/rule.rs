@@ -69,13 +69,7 @@ impl LintRule for Rule {
 
         let mut the_form_count = 0;
         let mut items = Vec::new();
-        examine_the(
-            view,
-            context.path(),
-            &already_known,
-            &mut the_form_count,
-            &mut items,
-        );
+        examine_the(view, &already_known, &mut the_form_count, &mut items);
         for item in items {
             let span = item.span;
             let (message, hint) = match &item.redundancy {

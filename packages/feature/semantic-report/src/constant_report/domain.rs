@@ -18,6 +18,7 @@
 
 use std::path::PathBuf;
 
+use paredit_core_cli::report::line_of;
 use paredit_core_semantics::semantics::value::{LiteralValue, Value, evaluate_constant};
 use paredit_core_syntax::common_lisp::{
     common_lisp_reader_conditional_kind, common_lisp_reader_label_kind,
@@ -25,7 +26,7 @@ use paredit_core_syntax::common_lisp::{
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix};
 
-use crate::shared::{SemanticFile, line_of, snippet};
+use crate::shared::{SemanticFile, snippet};
 
 const SNIPPET_LIMIT: usize = 64;
 

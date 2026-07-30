@@ -16,13 +16,15 @@
 //! the way the reader does.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The bound variable name of one `let` binding: a bare symbol, or the head
 /// of a `(name init)` list.
@@ -36,49 +38,52 @@ fn binding_name(binding: &ExpressionView) -> Option<&str> {
 
 #[derive(Debug, Clone)]
 pub struct DuplicateLetBindingItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     pub name: String,
     pub occurrence_count: usize,
 }
 
-#[derive(Debug)]
-pub struct DuplicateLetBindingSummary {
-    pub let_form_count: usize,
-    pub duplicates: Vec<DuplicateLetBindingItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateLetBindingPolicyOptions {
-    fail_on_duplicate: bool,
-}
-
-impl DuplicateLetBindingPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_duplicate: bool) -> Self {
-        Self { fail_on_duplicate }
+impl Finding for DuplicateLetBindingItem {
+    /// The rule's own name, not the variable.
+    ///
+    /// The variable is read from the source and so is an open set, while `kind`
+    /// is `&'static str`. It stays a text column and a JSON field instead.
+    fn kind(&self) -> &'static str {
+        "duplicate-let-bindings"
     }
 
-    #[must_use]
-    pub const fn fail_on_duplicate(self) -> bool {
-        self.fail_on_duplicate
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DuplicateLetBindingPolicy {
-    pub fail_on_duplicate: bool,
-    pub let_form_count: usize,
-    pub duplicate_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("name={}", self.name),
+            format!("count={}", self.occurrence_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("name", json!(self.name)),
+            ("occurrence_count", json!(self.occurrence_count)),
+        ]
+    }
+
+    /// The same sentence the `duplicate-let-bindings` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one defect described one way.
+    fn message(&self) -> String {
+        format!(
+            "let binds {} more than once ({}×)",
+            self.name, self.occurrence_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
-    path: &Path,
     let_form_count: &mut usize,
     duplicates: &mut Vec<DuplicateLetBindingItem>,
 ) {
@@ -112,7 +117,6 @@ pub fn examine_let(
             continue;
         }
         duplicates.push(DuplicateLetBindingItem {
-            path: path.to_path_buf(),
             span: view.span,
             name: name.clone(),
             occurrence_count: *occurrence_count,
@@ -120,15 +124,27 @@ pub fn examine_let(
     }
 }
 
-/// Collects every duplicated parallel-`let` binding across a whole file,
-/// along with the total number of `let` forms scanned.
-pub fn collect_duplicate_let_bindings(
+/// Collects every duplicated parallel-`let` binding in one file, with the
+/// number of `let` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated binding here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_duplicate_let_binding_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateLetBindingItem>)> {
+) -> LintResult<FileFindings<DuplicateLetBindingItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("let_form_count", json!(0))],
+        ));
     }
 
     let mut let_form_count = 0;
@@ -136,51 +152,40 @@ pub fn collect_duplicate_let_bindings(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let(subview, path, &mut let_form_count, &mut duplicates);
+            examine_let(subview, &mut let_form_count, &mut duplicates);
         });
     }
-    Ok((let_form_count, duplicates))
-}
 
-#[must_use]
-pub const fn summarize_duplicate_let_bindings(
-    let_form_count: usize,
-    duplicates: Vec<DuplicateLetBindingItem>,
-) -> DuplicateLetBindingSummary {
-    DuplicateLetBindingSummary {
-        let_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         duplicates,
-    }
-}
-
-#[must_use]
-pub fn evaluate_duplicate_let_binding_policy(
-    options: DuplicateLetBindingPolicyOptions,
-    summary: &DuplicateLetBindingSummary,
-) -> DuplicateLetBindingPolicy {
-    let duplicate_count = summary.duplicates.len();
-    let mut violations = Vec::new();
-    if options.fail_on_duplicate() && duplicate_count > 0 {
-        violations.push(format!("duplicate_count {duplicate_count} exceeds 0"));
-    }
-
-    DuplicateLetBindingPolicy {
-        fail_on_duplicate: options.fail_on_duplicate(),
-        let_form_count: summary.let_form_count,
-        duplicate_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("let_form_count", json!(let_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn duplicates(input: &str) -> (usize, Vec<DuplicateLetBindingItem>) {
+    fn report(input: &str) -> FileFindings<DuplicateLetBindingItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_duplicate_let_bindings(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect duplicate let bindings")
+        build_duplicate_let_binding_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build duplicate let binding report")
+    }
+
+    /// The `(let_form_count, duplicates)` pair the report is built from.
+    fn duplicates(input: &str) -> (u64, Vec<DuplicateLetBindingItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "let_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("let_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -226,32 +231,44 @@ mod tests {
         assert_eq!(duplicates.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(let ((x 1) (x 2)) x)").expect("parse input");
-        let (let_form_count, duplicates) =
-            collect_duplicate_let_bindings(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect duplicate let bindings");
-        assert_eq!(let_form_count, 0);
-        assert!(duplicates.is_empty());
+        let report =
+            build_duplicate_let_binding_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build duplicate let binding report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("let_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (let_form_count, items) = duplicates("(let ((x 1) (x 2)) x)");
-        let summary = summarize_duplicate_let_bindings(let_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(let ((x 1)) x)").dialect_modelled);
+    }
 
-        let quiet = evaluate_duplicate_let_binding_policy(
-            DuplicateLetBindingPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_columns() {
+        let report = report("(defun f ()\n  (let ((a 1) (a 2)) a))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "duplicate-let-bindings");
+        assert_eq!(
+            finding.text_columns(),
+            vec!["name=a".to_owned(), "count=2".to_owned()]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.duplicate_count, 1);
+        assert_eq!(
+            finding.json_fields(),
+            vec![("name", json!("a")), ("occurrence_count", json!(2))]
+        );
+    }
 
-        let strict = evaluate_duplicate_let_binding_policy(
-            DuplicateLetBindingPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_let_scanned_not_only_the_flagged_ones() {
+        let report = report("(let ((x 1) (x 2)) x)\n(let ((y 1)) y)\n");
+        assert_eq!(report.summary, vec![("let_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

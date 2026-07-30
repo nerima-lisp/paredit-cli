@@ -94,7 +94,6 @@ pub struct SystemLicense {
     /// same file, so the combined work ships under the stronger one.
     pub superseded_by: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for SystemLicense {
@@ -108,10 +107,6 @@ impl Finding for SystemLicense {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -140,7 +135,6 @@ pub fn build_license_report(
     tree: &SyntaxTree,
 ) -> FileFindings<SystemLicense> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
 
     let mut systems = Vec::new();
     if modelled {
@@ -161,7 +155,6 @@ pub fn build_license_report(
                 license,
                 superseded_by: None,
                 span: form.span,
-                line: line_of(source, form.span.start().get()),
             });
         }
     }
@@ -197,6 +190,7 @@ pub fn build_license_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         systems,
         vec![
             ("distinct_license_count", json!(distinct)),
@@ -237,15 +231,6 @@ fn designator(name: &str) -> String {
         .trim_start_matches(':')
         .trim_matches(['|', '"'])
         .to_ascii_lowercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

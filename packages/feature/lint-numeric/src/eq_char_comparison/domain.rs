@@ -23,13 +23,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 fn character_argument(view: &ExpressionView) -> Option<&str> {
     atom_text(view).filter(|text| text.starts_with("#\\"))
@@ -51,9 +53,11 @@ pub enum CharacterEvidence {
 
 #[derive(Debug, Clone)]
 pub struct EqCharComparisonItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     /// The span of the `eq` head symbol, for an `eq` -> `eql` fix.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to swap
+    /// `eq` for `eql`, and the command never prints it.
     pub head_span: ByteSpan,
     pub evidence: CharacterEvidence,
 }
@@ -73,36 +77,42 @@ impl EqCharComparisonItem {
     }
 }
 
-#[derive(Debug)]
-pub struct EqCharComparisonSummary {
-    pub comparison_form_count: usize,
-    pub violations: Vec<EqCharComparisonItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EqCharComparisonPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EqCharComparisonPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EqCharComparisonItem {
+    /// The rule's own name rather than a variant of it.
+    ///
+    /// [`CharacterEvidence`] is the only thing that varies, and the standalone
+    /// command that produces this report passes [`never`] — so every finding it
+    /// can emit is a `Literal` one. A `kind` with a single reachable value
+    /// would name a distinction the report cannot make.
+    fn kind(&self) -> &'static str {
+        "eq-char-comparison"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EqCharComparisonPolicy {
-    pub fail_on_violation: bool,
-    pub comparison_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("literal={}", self.literal())]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("literal", json!(self.literal()))]
+    }
+
+    /// The same sentence the `eq-char-comparison` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        match &self.evidence {
+            CharacterEvidence::Literal(literal) => {
+                format!("eq compares against character literal {literal}; use eql or char=")
+            }
+            CharacterEvidence::InferredType => {
+                "eq compares against an argument of inferred type character; use eql or char="
+                    .to_owned()
+            }
+        }
+    }
 }
 
 /// Whether an argument is provably a character without being spelled as one.
@@ -121,7 +131,6 @@ const fn never(_: &ExpressionView) -> bool {
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    path: &Path,
     is_character: IsCharacterArgument<'_>,
     comparison_form_count: &mut usize,
     violations: &mut Vec<EqCharComparisonItem>,
@@ -147,7 +156,6 @@ pub fn examine_comparison(
 
     if let Some(evidence) = evidence {
         violations.push(EqCharComparisonItem {
-            path: path.to_path_buf(),
             span: view.span,
             head_span: view.children[0].span,
             evidence,
@@ -155,15 +163,27 @@ pub fn examine_comparison(
     }
 }
 
-/// Collects every `eq` call with a character-literal argument across a whole
-/// file, along with the total number of `eq` calls scanned.
-pub fn collect_eq_char_comparisons(
+/// Collects every `eq` call with a character-literal argument in one file, with
+/// the number of `eq` calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no such comparison here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_eq_char_comparison_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EqCharComparisonItem>)> {
+) -> LintResult<FileFindings<EqCharComparisonItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("comparison_form_count", json!(0))],
+        ));
     }
 
     let mut comparison_form_count = 0;
@@ -171,57 +191,40 @@ pub fn collect_eq_char_comparisons(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(
-                subview,
-                path,
-                &never,
-                &mut comparison_form_count,
-                &mut violations,
-            );
+            examine_comparison(subview, &never, &mut comparison_form_count, &mut violations);
         });
     }
-    Ok((comparison_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_eq_char_comparisons(
-    comparison_form_count: usize,
-    violations: Vec<EqCharComparisonItem>,
-) -> EqCharComparisonSummary {
-    EqCharComparisonSummary {
-        comparison_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_eq_char_comparison_policy(
-    options: EqCharComparisonPolicyOptions,
-    summary: &EqCharComparisonSummary,
-) -> EqCharComparisonPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EqCharComparisonPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        comparison_form_count: summary.comparison_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("comparison_form_count", json!(comparison_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn comparisons(input: &str) -> (usize, Vec<EqCharComparisonItem>) {
+    fn report(input: &str) -> FileFindings<EqCharComparisonItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_eq_char_comparisons(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect eq char comparisons")
+        build_eq_char_comparison_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build eq char comparison report")
+    }
+
+    /// The `(comparison_form_count, violations)` pair the report is built from.
+    fn comparisons(input: &str) -> (u64, Vec<EqCharComparisonItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "comparison_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("comparison_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -279,31 +282,40 @@ mod tests {
         );
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         // Parse as Common Lisp (whose `#\a` char syntax the tree understands),
         // but collect as Clojure to prove the dialect gate short-circuits.
         let tree =
             SyntaxTree::parse_with_dialect("(eq c #\\a)", Dialect::CommonLisp).expect("parse");
-        let (count, violations) =
-            collect_eq_char_comparisons(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect eq char comparisons");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_eq_char_comparison_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build eq char comparison report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = comparisons("(eq c #\\a)");
-        let summary = summarize_eq_char_comparisons(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(eq x y)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_eq_char_comparison_policy(EqCharComparisonPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_literal() {
+        let report = report("(defun f (c)\n  (eq c #\\a))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "eq-char-comparison");
+        assert_eq!(finding.json_fields(), vec![("literal", json!("#\\a"))]);
+        assert_eq!(finding.text_columns(), vec!["literal=#\\a".to_owned()]);
+    }
 
-        let strict =
-            evaluate_eq_char_comparison_policy(EqCharComparisonPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_eq_scanned_not_only_the_flagged_ones() {
+        let report = report("(eq c #\\a)\n(eq x y)\n");
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

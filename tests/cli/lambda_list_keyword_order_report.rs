@@ -14,7 +14,10 @@ fn cli_reports_optional_after_key() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"definition_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"definition\": \"f\""))
         .stdout(predicate::str::contains("\"&optional\""))
         .stdout(predicate::str::contains("\"after_keyword\": \"&key\""));
 }
@@ -37,7 +40,50 @@ fn cli_does_not_flag_canonical_order() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "a canonically ordered lambda
+        // list" from "no callable definition at all".
+        .stdout(predicate::str::contains("\"definition_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_lambda_list_keyword_order_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("lambda-list-keyword-order-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn f [a b] a)\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "lambda-list-keyword-order", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_lambda_list_keyword_order_emits_sarif() {
+    let dir = fresh_temp_dir("lambda-list-keyword-order-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun f (&key a &optional b) a)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lambda-list-keyword-order", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/lambda-list-keyword-order/lambda-list-keyword-order\"",
+        ))
+        .stdout(predicate::str::contains(
+            "f lists lambda-list keyword &optional after &key",
+        ));
 }
 
 #[test]
@@ -54,7 +100,10 @@ fn cli_does_not_flag_a_body_lambda_list() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        // `&body` makes the lambda list unrankable, so the definition is
+        // counted as scanned but produces no finding.
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        .stdout(predicate::str::contains("\"definition_count\": 1"));
 }
 
 #[test]
@@ -91,5 +140,5 @@ fn cli_lambda_list_keyword_order_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }

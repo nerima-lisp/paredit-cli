@@ -14,7 +14,9 @@ fn cli_flags_constant_true_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"if_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"test\": \"t\""));
 }
 
@@ -32,7 +34,71 @@ fn cli_does_not_flag_variable_or_truthy_literal_test() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no constant test in two `if`
+        // forms" from "no `if` form at all".
+        .stdout(predicate::str::contains("\"if_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// The test literal leads the text row as the finding's `kind`, so it must not
+/// also appear as a `test=` column — that printed `t` twice on one line. The
+/// JSON keeps the field, having no leading-kind column for it to duplicate.
+#[test]
+fn cli_text_rows_do_not_repeat_the_leading_kind() {
+    let dir = fresh_temp_dir("constant-if-test-report-text");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun pick () (if t 1 2))\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("constant-if-test")
+        .arg("--output")
+        .arg("text")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("test=").not())
+        .stdout(predicate::str::contains("finding_count\t1"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("constant-if-test-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn pick [] (if true 1 2))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "constant-if-test", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_constant_if_test_emits_sarif() {
+    let dir = fresh_temp_dir("constant-if-test-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun pick () (if nil 1 2))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "constant-if-test", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/constant-if-test/nil\"",
+        ))
+        .stdout(predicate::str::contains(
+            "if test is the constant nil; one branch is dead",
+        ));
 }
 
 #[test]

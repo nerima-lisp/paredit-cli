@@ -14,8 +14,11 @@ fn cli_flags_duplicate_initarg() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
-        .stdout(predicate::str::contains("\"keyword\": \":x\""));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"call_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"keyword\": \":x\""))
+        .stdout(predicate::str::contains("\"duplicate_span\""));
 }
 
 #[test]
@@ -32,7 +35,7 @@ fn cli_flags_make_hash_table_dup() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
 
 #[test]
@@ -49,7 +52,50 @@ fn cli_does_not_flag_distinct_keywords() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no repeated keyword in one
+        // allowlisted call" from "no allowlisted call at all".
+        .stdout(predicate::str::contains("\"call_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("duplicate-keyword-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(make-instance :c :x 1 :x 2)\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "duplicate-keyword", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_duplicate_keyword_emits_sarif() {
+    let dir = fresh_temp_dir("duplicate-keyword-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(make-instance 'c :x 1 :x 2)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "duplicate-keyword", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/duplicate-keyword/duplicate-keyword\"",
+        ))
+        .stdout(predicate::str::contains(
+            "keyword :x is passed more than once; the leftmost value wins",
+        ));
 }
 
 #[test]

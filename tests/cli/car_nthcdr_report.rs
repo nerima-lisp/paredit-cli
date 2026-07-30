@@ -14,7 +14,12 @@ fn cli_flags_car_nthcdr() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"car_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // Both operand spans were in the old JSON and stay in it.
+        .stdout(predicate::str::contains("\"count_span\""))
+        .stdout(predicate::str::contains("\"list_span\""));
 }
 
 #[test]
@@ -31,7 +36,11 @@ fn cli_does_not_flag_cdr_outer() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // A `cdr` outer accessor is not a `car`, so nothing was even counted;
+        // the denominator says so rather than leaving it to be inferred.
+        .stdout(predicate::str::contains("\"car_form_count\": 0"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
 #[test]
@@ -68,4 +77,43 @@ fn cli_lint_fix_rewrites_to_nth() {
 
     let fixed = fs::read_to_string(&file).expect("read fixed file");
     assert_eq!(fixed, "(nth (+ i 1) xs)\n");
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model_car_nthcdr() {
+    let dir = fresh_temp_dir("car-nthcdr-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn f [n xs] (. xs n))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "car-nthcdr", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_car_nthcdr_emits_sarif() {
+    let dir = fresh_temp_dir("car-nthcdr-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(car (nthcdr n items))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "car-nthcdr", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/car-nthcdr/car-nthcdr\"",
+        ))
+        .stdout(predicate::str::contains(
+            "car of an nthcdr is nth; (car (nthcdr n x)) is (nth n x)",
+        ));
 }

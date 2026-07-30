@@ -14,63 +14,73 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
+use serde_json::{Value, json};
 
 const BOOLEAN_HEADS: [&str; 2] = ["and", "or"];
 
 #[derive(Debug, Clone)]
 pub struct DuplicateBooleanOperandItem {
-    pub path: PathBuf,
+    /// The span of the whole `(and …)`/`(or …)` form.
     pub span: ByteSpan,
+    /// The operator as it is spelled in source (`and` or `or`).
     pub head: String,
+    /// The repeated operand, rendered from its first occurrence.
     pub operand: String,
+    /// How many times it appears.
     pub occurrence_count: usize,
 }
 
-#[derive(Debug)]
-pub struct DuplicateBooleanOperandSummary {
-    pub boolean_form_count: usize,
-    pub duplicates: Vec<DuplicateBooleanOperandItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateBooleanOperandPolicyOptions {
-    fail_on_duplicate: bool,
-}
-
-impl DuplicateBooleanOperandPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_duplicate: bool) -> Self {
-        Self { fail_on_duplicate }
+impl Finding for DuplicateBooleanOperandItem {
+    /// The rule's own name. `and` and `or` are both idempotent, so a repeat is
+    /// the same redundancy in either, and the operator that carried it stays in
+    /// the JSON rather than splitting the kind.
+    fn kind(&self) -> &'static str {
+        "duplicate-boolean-operands"
     }
 
-    #[must_use]
-    pub const fn fail_on_duplicate(self) -> bool {
-        self.fail_on_duplicate
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DuplicateBooleanOperandPolicy {
-    pub fail_on_duplicate: bool,
-    pub boolean_form_count: usize,
-    pub duplicate_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("head={}", self.head),
+            format!("operand={}", self.operand),
+            format!("count={}", self.occurrence_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("operand", json!(self.operand)),
+            ("occurrence_count", json!(self.occurrence_count)),
+        ]
+    }
+
+    /// The same sentence the `duplicate-boolean-operands` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} repeats operand {} ({}×)",
+            self.head, self.operand, self.occurrence_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
-    path: &Path,
     boolean_form_count: &mut usize,
     duplicates: &mut Vec<DuplicateBooleanOperandItem>,
 ) {
@@ -105,7 +115,6 @@ pub fn examine_boolean(
         }
         if occurrence_count >= 2 {
             duplicates.push(DuplicateBooleanOperandItem {
-                path: path.to_path_buf(),
                 span: view.span,
                 head: head.to_owned(),
                 operand: render_expression(operands[anchor]),
@@ -115,15 +124,27 @@ pub fn examine_boolean(
     }
 }
 
-/// Collects every duplicated `and`/`or` operand across a whole file, along
-/// with the total number of `and`/`or` forms scanned.
-pub fn collect_duplicate_boolean_operands(
+/// Collects every duplicated `and`/`or` operand in one file, with the number of
+/// `and`/`or` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated operand here" for Common
+/// Lisp and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_duplicate_boolean_operand_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateBooleanOperandItem>)> {
+) -> LintResult<FileFindings<DuplicateBooleanOperandItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("boolean_form_count", json!(0))],
+        ));
     }
 
     let mut boolean_form_count = 0;
@@ -131,51 +152,40 @@ pub fn collect_duplicate_boolean_operands(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, path, &mut boolean_form_count, &mut duplicates);
+            examine_boolean(subview, &mut boolean_form_count, &mut duplicates);
         });
     }
-    Ok((boolean_form_count, duplicates))
-}
 
-#[must_use]
-pub const fn summarize_duplicate_boolean_operands(
-    boolean_form_count: usize,
-    duplicates: Vec<DuplicateBooleanOperandItem>,
-) -> DuplicateBooleanOperandSummary {
-    DuplicateBooleanOperandSummary {
-        boolean_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         duplicates,
-    }
-}
-
-#[must_use]
-pub fn evaluate_duplicate_boolean_operand_policy(
-    options: DuplicateBooleanOperandPolicyOptions,
-    summary: &DuplicateBooleanOperandSummary,
-) -> DuplicateBooleanOperandPolicy {
-    let duplicate_count = summary.duplicates.len();
-    let mut violations = Vec::new();
-    if options.fail_on_duplicate() && duplicate_count > 0 {
-        violations.push(format!("duplicate_count {duplicate_count} exceeds 0"));
-    }
-
-    DuplicateBooleanOperandPolicy {
-        fail_on_duplicate: options.fail_on_duplicate(),
-        boolean_form_count: summary.boolean_form_count,
-        duplicate_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("boolean_form_count", json!(boolean_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn duplicates(input: &str) -> (usize, Vec<DuplicateBooleanOperandItem>) {
-        let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_duplicate_boolean_operands(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect duplicate boolean operands")
+    fn report(input: &str) -> FileFindings<DuplicateBooleanOperandItem> {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
+        build_duplicate_boolean_operand_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build duplicate boolean operand report")
+    }
+
+    /// The `(boolean_form_count, duplicates)` pair the report is built from.
+    fn duplicates(input: &str) -> (u64, Vec<DuplicateBooleanOperandItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "boolean_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("boolean_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -216,32 +226,53 @@ mod tests {
         assert_eq!(duplicates.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
-        let tree = SyntaxTree::parse("(or x x)").expect("parse input");
-        let (boolean_form_count, duplicates) =
-            collect_duplicate_boolean_operands(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect duplicate boolean operands");
-        assert_eq!(boolean_form_count, 0);
-        assert!(duplicates.is_empty());
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
+        let tree =
+            SyntaxTree::parse_with_dialect("(or x x)", Dialect::Clojure).expect("parse input");
+        let report =
+            build_duplicate_boolean_operand_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build duplicate boolean operand report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (boolean_form_count, items) = duplicates("(or x x)");
-        let summary = summarize_duplicate_boolean_operands(boolean_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(and a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_duplicate_boolean_operand_policy(
-            DuplicateBooleanOperandPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_operand_and_its_count() {
+        let report = report("(defun f (x)\n  (or x y x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "duplicate-boolean-operands");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("head", json!("or")),
+                ("operand", json!("x")),
+                ("occurrence_count", json!(2)),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.duplicate_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "head=or".to_owned(),
+                "operand=x".to_owned(),
+                "count=2".to_owned()
+            ]
+        );
+    }
 
-        let strict = evaluate_duplicate_boolean_operand_policy(
-            DuplicateBooleanOperandPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_boolean_scanned_not_only_the_flagged_ones() {
+        let report = report("(or x x)\n(and a b)\n");
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

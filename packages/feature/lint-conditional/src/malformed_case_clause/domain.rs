@@ -24,16 +24,18 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const CASE_HEADS: [&str; 6] = [
     "case",
@@ -63,49 +65,51 @@ fn is_structurally_opaque(clause: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct MalformedCaseClauseItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The `case`-family head as written, in the source's own case.
     pub head: String,
     pub clause: String,
 }
 
-#[derive(Debug)]
-pub struct MalformedCaseClauseSummary {
-    pub case_form_count: usize,
-    pub violations: Vec<MalformedCaseClauseItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MalformedCaseClausePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl MalformedCaseClausePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for MalformedCaseClauseItem {
+    /// The rule's own name, not the head.
+    ///
+    /// `head` is the source's spelling — `CASE`, `Typecase`, `ecase` — and a
+    /// `kind` is a fixed vocabulary a consumer can match on. The head is a
+    /// `json_fields` entry instead, where its casing is data rather than a tag.
+    fn kind(&self) -> &'static str {
+        "malformed-case-clause"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct MalformedCaseClausePolicy {
-    pub fail_on_violation: bool,
-    pub case_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("head={}", self.head),
+            format!("clause={}", self.clause),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("head", json!(self.head)), ("clause", json!(self.clause))]
+    }
+
+    /// The same sentence the `malformed-case-clause` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} clause {} is not a non-empty list",
+            self.head, self.clause
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    path: &Path,
     case_form_count: &mut usize,
     violations: &mut Vec<MalformedCaseClauseItem>,
 ) {
@@ -131,7 +135,6 @@ pub fn examine_case(
         }
         if !is_paren_list(clause) || clause.children.is_empty() {
             violations.push(MalformedCaseClauseItem {
-                path: path.to_path_buf(),
                 span: clause.span,
                 head: head.to_owned(),
                 clause: render_expression(clause),
@@ -140,15 +143,27 @@ pub fn examine_case(
     }
 }
 
-/// Collects every malformed `case`-family clause across a whole file, along
-/// with the total number of `case`-family forms scanned.
-pub fn collect_malformed_case_clauses(
+/// Collects every malformed `case`-family clause in one file, with the number
+/// of `case`-family forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every clause is well formed" for Common
+/// Lisp and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_malformed_case_clause_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<MalformedCaseClauseItem>)> {
+) -> LintResult<FileFindings<MalformedCaseClauseItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("case_form_count", json!(0))],
+        ));
     }
 
     let mut case_form_count = 0;
@@ -156,53 +171,42 @@ pub fn collect_malformed_case_clauses(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, path, &mut case_form_count, &mut violations);
+            examine_case(subview, &mut case_form_count, &mut violations);
         });
     }
-    Ok((case_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_malformed_case_clauses(
-    case_form_count: usize,
-    violations: Vec<MalformedCaseClauseItem>,
-) -> MalformedCaseClauseSummary {
-    MalformedCaseClauseSummary {
-        case_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_malformed_case_clause_policy(
-    options: MalformedCaseClausePolicyOptions,
-    summary: &MalformedCaseClauseSummary,
-) -> MalformedCaseClausePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    MalformedCaseClausePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        case_form_count: summary.case_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("case_form_count", json!(case_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn clauses(input: &str) -> (usize, Vec<MalformedCaseClauseItem>) {
+    fn report(input: &str) -> FileFindings<MalformedCaseClauseItem> {
         // Use the dialect-aware parse the CLI path uses, which groups Common
         // Lisp `#+`/`#-` reader conditionals into a single node.
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_malformed_case_clauses(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect malformed case clauses")
+        build_malformed_case_clause_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build malformed case clause report")
+    }
+
+    /// The `(case_form_count, violations)` pair the report is built from.
+    fn clauses(input: &str) -> (u64, Vec<MalformedCaseClauseItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "case_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("case_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -278,33 +282,49 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(case x (1 :one) foo)", Dialect::Clojure)
             .expect("parse input");
-        let (case_form_count, violations) =
-            collect_malformed_case_clauses(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect malformed case clauses");
-        assert_eq!(case_form_count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_malformed_case_clause_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build malformed case clause report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("case_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (case_form_count, items) = clauses("(case x (1 :one) foo)");
-        let summary = summarize_malformed_case_clauses(case_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(case x (1 :one))").dialect_modelled);
+    }
 
-        let quiet = evaluate_malformed_case_clause_policy(
-            MalformedCaseClausePolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_head_and_its_clause() {
+        let report = report("(defun f (x)\n  (case x (1 :one) oops))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "malformed-case-clause");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("head", json!("case")), ("clause", json!("oops"))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["head=case".to_owned(), "clause=oops".to_owned()]
+        );
+        assert_eq!(
+            finding.message(),
+            "case clause oops is not a non-empty list"
+        );
+    }
 
-        let strict = evaluate_malformed_case_clause_policy(
-            MalformedCaseClausePolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_case_scanned_not_only_the_flagged_ones() {
+        let report = report("(case x (1 :one) oops)\n(case y (2 :two))\n");
+        assert_eq!(report.summary, vec![("case_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

@@ -25,6 +25,7 @@
 
 use std::path::PathBuf;
 
+use paredit_core_cli::report::line_of;
 use paredit_core_semantics::semantics::binding::Binding;
 use paredit_core_semantics::semantics::typing::model::meet;
 use paredit_core_semantics::semantics::typing::{Ty, Type};
@@ -32,7 +33,7 @@ use paredit_core_semantics::semantics::value::PropagatableValue;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::ByteSpan;
 
-use crate::shared::{SemanticFile, line_of, snippet};
+use crate::shared::{SemanticFile, snippet};
 
 /// How much of a form this report quotes back. A `defun` body is not a label,
 /// so a finding's snippet is capped rather than unbounded.

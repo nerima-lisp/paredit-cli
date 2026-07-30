@@ -19,13 +19,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled arity.
@@ -45,52 +47,53 @@ fn bare_atom(view: &ExpressionView) -> Option<&str> {
 
 #[derive(Debug, Clone)]
 pub struct IfToOrItem {
-    pub path: PathBuf,
     /// The span of the whole `(if x x y)` form.
     pub span: ByteSpan,
     /// The span of the shared test/then atom `x`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to build
+    /// `(or x y)`, and the command has never printed it.
     pub test_span: ByteSpan,
-    /// The span of the else branch `y`.
+    /// The span of the else branch `y`. The rewrite's input, like `test_span`.
     pub else_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct IfToOrSummary {
-    pub if_form_count: usize,
-    pub violations: Vec<IfToOrItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct IfToOrPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl IfToOrPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for IfToOrItem {
+    /// The rule's own name. This rule matches exactly one shape, so there is no
+    /// discriminator to draw a narrower kind from.
+    fn kind(&self) -> &'static str {
+        "if-to-or"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct IfToOrPolicy {
-    pub fail_on_violation: bool,
-    pub if_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing beyond the path and line the envelope already prints: the old
+    /// text row carried only those two. The `message` override is what carries
+    /// the finding's meaning here.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Nothing beyond the span the envelope already prints. The two operand
+    /// spans exist only to feed the autofix, and the old JSON never published
+    /// them.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `if-to-or` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "if returns its test or the else; (if x x y) is (or x y)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    path: &Path,
     if_form_count: &mut usize,
     violations: &mut Vec<IfToOrItem>,
 ) {
@@ -129,22 +132,33 @@ pub fn examine_if(
     }
 
     violations.push(IfToOrItem {
-        path: path.to_path_buf(),
         span: view.span,
         test_span: test.span,
         else_span: els.span,
     });
 }
 
-/// Collects every `(if x x y)` (test == then, both bare atoms) across a whole
-/// file, along with the total number of `if` forms scanned.
-pub fn collect_if_to_ors(
+/// Collects every `(if x x y)` (test == then, both bare atoms) in one file, with
+/// the number of `if` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no `if` here is an `or` in disguise" for
+/// Common Lisp and "nothing was looked for" for Fennel, and the two read
+/// identically without the flag.
+pub fn build_if_to_or_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<IfToOrItem>)> {
+) -> LintResult<FileFindings<IfToOrItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("if_form_count", json!(0))],
+        ));
     }
 
     let mut if_form_count = 0;
@@ -152,51 +166,40 @@ pub fn collect_if_to_ors(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(subview, path, &mut if_form_count, &mut violations);
+            examine_if(subview, &mut if_form_count, &mut violations);
         });
     }
-    Ok((if_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_if_to_ors(
-    if_form_count: usize,
-    violations: Vec<IfToOrItem>,
-) -> IfToOrSummary {
-    IfToOrSummary {
-        if_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_if_to_or_policy(
-    options: IfToOrPolicyOptions,
-    summary: &IfToOrSummary,
-) -> IfToOrPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    IfToOrPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        if_form_count: summary.if_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("if_form_count", json!(if_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn ifs(input: &str) -> (usize, Vec<IfToOrItem>) {
+    fn report(input: &str) -> FileFindings<IfToOrItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_if_to_ors(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect if-to-or")
+        build_if_to_or_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build if-to-or report")
+    }
+
+    /// The `(if_form_count, violations)` pair the report is built from.
+    fn ifs(input: &str) -> (u64, Vec<IfToOrItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "if_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("if_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -253,26 +256,39 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(if x x y)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_if_to_ors(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect if-to-or");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_if_to_or_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build if-to-or report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("if_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = ifs("(if x x y)");
-        let summary = summarize_if_to_ors(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(if a b c)").dialect_modelled);
+    }
 
-        let quiet = evaluate_if_to_or_policy(IfToOrPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The two operand spans feed the autofix only; the old JSON never
+    /// published them, so the envelope does not either.
+    #[test]
+    fn a_finding_carries_its_line_and_no_operand_spans() {
+        let report = report("(defun f (x y)\n  (if x x y))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "if-to-or");
+        assert!(finding.json_fields().is_empty());
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_if_to_or_policy(IfToOrPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_if_scanned_not_only_the_flagged_ones() {
+        let report = report("(if x x y)\n(if a b c)\n");
+        assert_eq!(report.summary, vec![("if_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

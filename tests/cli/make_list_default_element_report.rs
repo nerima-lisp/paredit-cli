@@ -14,14 +14,17 @@ fn cli_flags_initial_element_nil() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"call_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"removal_span\""));
 }
 
 #[test]
 fn cli_does_not_flag_non_nil() {
     let dir = fresh_temp_dir("make-list-default-element-report-clean");
     let file = dir.join("a.lisp");
-    fs::write(&file, "(make-list n :initial-element 0)\n").expect("write a.lisp");
+    fs::write(&file, "(make-list n :initial-element 0)\n(make-list n)\n").expect("write a.lisp");
 
     let mut cmd = paredit();
     cmd.arg("inspect")
@@ -31,7 +34,50 @@ fn cli_does_not_flag_non_nil() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no restated default in two
+        // `make-list` calls" from "no `make-list` call at all".
+        .stdout(predicate::str::contains("\"call_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("make-list-default-element-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn build [n] (make-list n :initial-element nil))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "make-list-default-element", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_make_list_default_element_emits_sarif() {
+    let dir = fresh_temp_dir("make-list-default-element-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(make-list n :initial-element nil)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "make-list-default-element", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/make-list-default-element/make-list-default-element\"",
+        ))
+        .stdout(predicate::str::contains(
+            "explicit :initial-element nil restates make-list's default; drop it",
+        ));
 }
 
 #[test]

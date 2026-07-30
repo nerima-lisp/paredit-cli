@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is a `(when …)` form.
 fn is_when(view: &ExpressionView) -> bool {
@@ -42,54 +44,56 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct NestedWhenItem {
-    pub path: PathBuf,
     /// The span of the whole outer `(when a (when b …))` form.
     pub span: ByteSpan,
     /// The span of the outer test `a`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule slices it to build
+    /// the merged `(and a b)`, and neither the old renderer nor this one prints
+    /// it.
     pub outer_test_span: ByteSpan,
-    /// The span of the inner test `b`.
+    /// The span of the inner test `b`. Unreported, for the same reason as
+    /// `outer_test_span`.
     pub inner_test_span: ByteSpan,
-    /// The span covering the inner `when`'s body forms (`None` when it has none).
+    /// The span covering the inner `when`'s body forms (`None` when it has
+    /// none). Unreported, for the same reason as `outer_test_span`.
     pub inner_body_span: Option<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct NestedWhenSummary {
-    pub when_form_count: usize,
-    pub violations: Vec<NestedWhenItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NestedWhenPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NestedWhenPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NestedWhenItem {
+    /// The rule's own name. There is no sub-classification to make here — every
+    /// finding is the same shape, a `when` wrapping a `when`.
+    fn kind(&self) -> &'static str {
+        "nested-when"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NestedWhenPolicy {
-    pub fail_on_violation: bool,
-    pub when_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// None. The old renderer printed the path and the offset and nothing else,
+    /// and both are the envelope's now.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// None, for the same reason: the old JSON carried only `path` and `span`.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `nested-when` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "when whose only body is a when merges by and; (when a (when b c)) is (when (and a b) c)"
+            .to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_when(
     view: &ExpressionView,
-    path: &Path,
     when_form_count: &mut usize,
     violations: &mut Vec<NestedWhenItem>,
 ) {
@@ -128,7 +132,6 @@ pub fn examine_when(
     };
 
     violations.push(NestedWhenItem {
-        path: path.to_path_buf(),
         span: view.span,
         outer_test_span: outer_test.span,
         inner_test_span: inner_test.span,
@@ -136,15 +139,27 @@ pub fn examine_when(
     });
 }
 
-/// Collects every `when` whose sole body form is a `when` across a whole file,
-/// along with the total number of `when` forms scanned.
-pub fn collect_nested_whens(
+/// Collects every `when` whose sole body form is a `when` in one file, with the
+/// number of `when` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no nested when here" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_nested_when_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NestedWhenItem>)> {
+) -> LintResult<FileFindings<NestedWhenItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("when_form_count", json!(0))],
+        ));
     }
 
     let mut when_form_count = 0;
@@ -152,51 +167,40 @@ pub fn collect_nested_whens(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_when(subview, path, &mut when_form_count, &mut violations);
+            examine_when(subview, &mut when_form_count, &mut violations);
         });
     }
-    Ok((when_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_nested_whens(
-    when_form_count: usize,
-    violations: Vec<NestedWhenItem>,
-) -> NestedWhenSummary {
-    NestedWhenSummary {
-        when_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_nested_when_policy(
-    options: NestedWhenPolicyOptions,
-    summary: &NestedWhenSummary,
-) -> NestedWhenPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NestedWhenPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        when_form_count: summary.when_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("when_form_count", json!(when_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn nested(input: &str) -> (usize, Vec<NestedWhenItem>) {
+    fn report(input: &str) -> FileFindings<NestedWhenItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_nested_whens(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect nested whens")
+        build_nested_when_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build nested when report")
+    }
+
+    /// The `(when_form_count, violations)` pair the report is built from.
+    fn nested(input: &str) -> (u64, Vec<NestedWhenItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "when_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("when_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -264,27 +268,40 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(when a (when b c))", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_nested_whens(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect nested whens");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_nested_when_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build nested when report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("when_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = nested("(when a (when b c))");
-        let summary = summarize_nested_whens(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(when a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_nested_when_policy(NestedWhenPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_no_columns_of_its_own() {
+        let report = report("(defun f (a b)\n  (when a (when b (g))))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "nested-when");
+        assert!(finding.json_fields().is_empty());
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_nested_when_policy(NestedWhenPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_when_scanned_not_only_the_flagged_ones() {
+        let report = report("(when a (when b c))\n(when d e)\n");
+        // Three when forms (the nested pair and the standalone one), one
+        // finding.
+        assert_eq!(report.summary, vec![("when_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

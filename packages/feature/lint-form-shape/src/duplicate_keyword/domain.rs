@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Operators whose keyword plist starts after a fixed number of positional
 /// arguments, so a repeated keyword is unambiguously a duplicate.
@@ -52,7 +54,6 @@ fn keyword_name(view: &ExpressionView) -> Option<String> {
 
 #[derive(Debug, Clone)]
 pub struct DuplicateKeywordItem {
-    pub path: PathBuf,
     /// The span of the whole call form.
     pub span: ByteSpan,
     /// The duplicated keyword name, lowercased.
@@ -61,43 +62,51 @@ pub struct DuplicateKeywordItem {
     pub duplicate_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct DuplicateKeywordSummary {
-    pub call_form_count: usize,
-    pub violations: Vec<DuplicateKeywordItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateKeywordPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl DuplicateKeywordPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for DuplicateKeywordItem {
+    /// The rule's own name, not the keyword.
+    ///
+    /// The keyword is read from the source and so is an open set — any
+    /// initarg a program invents — while `kind` is `&'static str`. It stays a
+    /// text column and a JSON field instead.
+    fn kind(&self) -> &'static str {
+        "duplicate-keyword"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DuplicateKeywordPolicy {
-    pub fail_on_violation: bool,
-    pub call_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.keyword.clone()]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("keyword", json!(self.keyword)),
+            (
+                "duplicate_span",
+                json!({
+                    "start": self.duplicate_span.start().get(),
+                    "end": self.duplicate_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `duplicate-keyword` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one defect described one way.
+    fn message(&self) -> String {
+        format!(
+            "keyword {} is passed more than once; the leftmost value wins",
+            self.keyword
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     call_form_count: &mut usize,
     violations: &mut Vec<DuplicateKeywordItem>,
 ) {
@@ -131,7 +140,6 @@ pub fn examine(
         };
         if seen.contains(&name) {
             violations.push(DuplicateKeywordItem {
-                path: path.to_path_buf(),
                 span: view.span,
                 keyword: name,
                 duplicate_span: view.children[index].span,
@@ -144,14 +152,27 @@ pub fn examine(
 }
 
 /// Collects every call in `KEY_OPERATORS` passing a duplicate keyword argument
-/// across a whole file, along with the total number of such calls scanned.
-pub fn collect_duplicate_keywords(
+/// in one file, with the number of such calls scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated keyword here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_duplicate_keyword_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateKeywordItem>)> {
+) -> LintResult<FileFindings<DuplicateKeywordItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("call_form_count", json!(0))],
+        ));
     }
 
     let mut call_form_count = 0;
@@ -159,51 +180,40 @@ pub fn collect_duplicate_keywords(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut call_form_count, &mut violations);
+            examine(subview, &mut call_form_count, &mut violations);
         });
     }
-    Ok((call_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_duplicate_keywords(
-    call_form_count: usize,
-    violations: Vec<DuplicateKeywordItem>,
-) -> DuplicateKeywordSummary {
-    DuplicateKeywordSummary {
-        call_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_duplicate_keyword_policy(
-    options: DuplicateKeywordPolicyOptions,
-    summary: &DuplicateKeywordSummary,
-) -> DuplicateKeywordPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    DuplicateKeywordPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        call_form_count: summary.call_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("call_form_count", json!(call_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<DuplicateKeywordItem>) {
+    fn report(input: &str) -> FileFindings<DuplicateKeywordItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_duplicate_keywords(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect duplicate keywords")
+        build_duplicate_keyword_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build duplicate keyword report")
+    }
+
+    /// The `(call_form_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<DuplicateKeywordItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "call_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("call_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -254,29 +264,38 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(make-instance 'c :x 1 :x 2)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_duplicate_keywords(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect duplicate keywords");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_duplicate_keyword_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build duplicate keyword report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("call_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(make-instance 'c :x 1 :x 2)");
-        let summary = summarize_duplicate_keywords(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(make-instance 'c :x 1)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_duplicate_keyword_policy(DuplicateKeywordPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_keyword() {
+        let report = report("(defun f ()\n  (make-instance 'c :x 1 :x 2))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "duplicate-keyword");
+        assert_eq!(finding.text_columns(), vec![":x".to_owned()]);
+        assert_eq!(finding.json_fields()[0], ("keyword", json!(":x")));
+    }
 
-        let strict =
-            evaluate_duplicate_keyword_policy(DuplicateKeywordPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(make-instance 'c :x 1 :x 2)\n(make-hash-table :test 'eq)\n");
+        assert_eq!(report.summary, vec![("call_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

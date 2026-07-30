@@ -15,13 +15,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The index at which a body-requiring form's body begins, or `None` if the
 /// head is not one of the covered forms. All four take a single prefix element
@@ -40,49 +42,46 @@ fn body_start(head: &str) -> Option<usize> {
 
 #[derive(Debug, Clone)]
 pub struct EmptyBodyItem {
-    pub path: PathBuf,
+    /// The span of the whole body-less form.
     pub span: ByteSpan,
     /// The form head (`when`, `unless`, `dolist`, or `dotimes`).
     pub head: String,
 }
 
-#[derive(Debug)]
-pub struct EmptyBodySummary {
-    pub body_form_count: usize,
-    pub violations: Vec<EmptyBodyItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EmptyBodyPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EmptyBodyPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EmptyBodyItem {
+    /// The rule's own name rather than the head. The head is case-folded from
+    /// the source at scan time and typed `String`, not one of a closed set of
+    /// `&'static str` names, so it stays a JSON field and a column instead.
+    fn kind(&self) -> &'static str {
+        "empty-body"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EmptyBodyPolicy {
-    pub fail_on_violation: bool,
-    pub body_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("head={}", self.head)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("head", json!(self.head))]
+    }
+
+    /// The same sentence the `empty-body` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} has no body; the test/spec runs, then nothing",
+            self.head
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_form(
     view: &ExpressionView,
-    path: &Path,
     body_form_count: &mut usize,
     violations: &mut Vec<EmptyBodyItem>,
 ) {
@@ -99,22 +98,33 @@ pub fn examine_form(
     // (malformed, a different concern); a longer one has a body.
     if view.children.len() == start {
         violations.push(EmptyBodyItem {
-            path: path.to_path_buf(),
             span: view.span,
             head: head.to_ascii_lowercase(),
         });
     }
 }
 
-/// Collects every empty-bodied `when`/`unless`/`dolist`/`dotimes` across a whole
-/// file, along with the total number of such forms scanned.
-pub fn collect_empty_bodies(
+/// Collects every empty-bodied `when`/`unless`/`dolist`/`dotimes` in one file,
+/// with the number of such forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every body-taking form here has a body"
+/// for Common Lisp and "nothing was looked for" for Fennel, and the two read
+/// identically without the flag.
+pub fn build_empty_body_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EmptyBodyItem>)> {
+) -> LintResult<FileFindings<EmptyBodyItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("body_form_count", json!(0))],
+        ));
     }
 
     let mut body_form_count = 0;
@@ -122,51 +132,40 @@ pub fn collect_empty_bodies(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_form(subview, path, &mut body_form_count, &mut violations);
+            examine_form(subview, &mut body_form_count, &mut violations);
         });
     }
-    Ok((body_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_empty_bodies(
-    body_form_count: usize,
-    violations: Vec<EmptyBodyItem>,
-) -> EmptyBodySummary {
-    EmptyBodySummary {
-        body_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_empty_body_policy(
-    options: EmptyBodyPolicyOptions,
-    summary: &EmptyBodySummary,
-) -> EmptyBodyPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EmptyBodyPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        body_form_count: summary.body_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("body_form_count", json!(body_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn bodies(input: &str) -> (usize, Vec<EmptyBodyItem>) {
+    fn report(input: &str) -> FileFindings<EmptyBodyItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_empty_bodies(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect empty bodies")
+        build_empty_body_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build empty body report")
+    }
+
+    /// The `(body_form_count, violations)` pair the report is built from.
+    fn bodies(input: &str) -> (u64, Vec<EmptyBodyItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "body_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("body_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -233,26 +232,37 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(when ready)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_empty_bodies(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect empty bodies");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_empty_body_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build empty body report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("body_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = bodies("(when ready)");
-        let summary = summarize_empty_bodies(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(when ready (go))").dialect_modelled);
+    }
 
-        let quiet = evaluate_empty_body_policy(EmptyBodyPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_head() {
+        let report = report("(defun f (x)\n  (when x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "empty-body");
+        assert_eq!(finding.json_fields(), vec![("head", json!("when"))]);
+        assert_eq!(finding.text_columns(), vec!["head=when".to_owned()]);
+    }
 
-        let strict = evaluate_empty_body_policy(EmptyBodyPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_body_form_scanned_not_only_the_flagged_ones() {
+        let report = report("(when ready)\n(when ready (go))\n(dolist (x items))\n");
+        assert_eq!(report.summary, vec![("body_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

@@ -44,7 +44,6 @@ pub struct RepeatedShape {
     pub redundant_bytes: usize,
     /// The first occurrence, which is where a reader should look.
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for RepeatedShape {
@@ -54,10 +53,6 @@ impl Finding for RepeatedShape {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -129,7 +124,6 @@ pub fn build_duplication_ratio_report(
             nodes: first.nodes,
             redundant_bytes: redundant,
             span: first.span,
-            line: line_of(source, first.span.start().get()),
         });
     }
 
@@ -146,6 +140,7 @@ pub fn build_duplication_ratio_report(
         dialect,
         // Structural repetition is not a dialect question.
         true,
+        tree.source(),
         findings,
         vec![
             ("source_bytes", json!(total_bytes)),
@@ -231,15 +226,6 @@ fn count_nodes(view: &ExpressionView) -> usize {
 
 const fn width(span: ByteSpan) -> usize {
     span.end().get() - span.start().get()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

@@ -20,13 +20,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The non-destructive string case operations that fold to a canonical case.
 const CASE_OPS: [&str; 2] = ["string-downcase", "string-upcase"];
@@ -53,7 +55,6 @@ fn case_folded(view: &ExpressionView) -> Option<(String, &ExpressionView)> {
 
 #[derive(Debug, Clone)]
 pub struct StringCaseFoldItem {
-    pub path: PathBuf,
     /// The span of the whole `(string= …)` form.
     pub span: ByteSpan,
     /// The span of the first folded operand's argument `a`.
@@ -62,43 +63,61 @@ pub struct StringCaseFoldItem {
     pub right_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct StringCaseFoldSummary {
-    pub compare_form_count: usize,
-    pub violations: Vec<StringCaseFoldItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct StringCaseFoldPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl StringCaseFoldPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for StringCaseFoldItem {
+    /// One tag for every finding: this report has a single shape to describe, a
+    /// case-insensitive comparison spelled as a case-sensitive one over two
+    /// folded copies.
+    ///
+    /// Which case operation was folded with (`string-downcase` or
+    /// `string-upcase`) is not it: both sides must agree for the form to be
+    /// flagged at all, and the rewrite is the same either way.
+    fn kind(&self) -> &'static str {
+        "string-case-fold"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct StringCaseFoldPolicy {
-    pub fail_on_violation: bool,
-    pub compare_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// None: the old text row carried the path and the offset, both of which
+    /// the envelope prints itself.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The two operand spans are the rewrite's input, but the old JSON
+    /// published both, so a consumer reconstructing `(string-equal a b)` from
+    /// this report keeps them.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            (
+                "left_span",
+                json!({
+                    "start": self.left_span.start().get(),
+                    "end": self.left_span.end().get(),
+                }),
+            ),
+            (
+                "right_span",
+                json!({
+                    "start": self.right_span.start().get(),
+                    "end": self.right_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `string-case-fold` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "case-folding both sides of string= is case-insensitive; use string-equal".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     compare_form_count: &mut usize,
     violations: &mut Vec<StringCaseFoldItem>,
 ) {
@@ -129,7 +148,6 @@ pub fn examine(
     }
 
     violations.push(StringCaseFoldItem {
-        path: path.to_path_buf(),
         span: view.span,
         left_span: left_arg.span,
         right_span: right_arg.span,
@@ -137,14 +155,27 @@ pub fn examine(
 }
 
 /// Collects every `(string= (string-downcase a) (string-downcase b))` (or
-/// upcase) across a whole file, along with the total number of `string=` forms.
-pub fn collect_string_case_folds(
+/// upcase) in one file, with the number of `string=` forms scanned as the
+/// denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no folded comparison here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_string_case_fold_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<StringCaseFoldItem>)> {
+) -> LintResult<FileFindings<StringCaseFoldItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("compare_form_count", json!(0))],
+        ));
     }
 
     let mut compare_form_count = 0;
@@ -152,51 +183,40 @@ pub fn collect_string_case_folds(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut compare_form_count, &mut violations);
+            examine(subview, &mut compare_form_count, &mut violations);
         });
     }
-    Ok((compare_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_string_case_folds(
-    compare_form_count: usize,
-    violations: Vec<StringCaseFoldItem>,
-) -> StringCaseFoldSummary {
-    StringCaseFoldSummary {
-        compare_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_string_case_fold_policy(
-    options: StringCaseFoldPolicyOptions,
-    summary: &StringCaseFoldSummary,
-) -> StringCaseFoldPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    StringCaseFoldPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        compare_form_count: summary.compare_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("compare_form_count", json!(compare_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn cmps(input: &str) -> (usize, Vec<StringCaseFoldItem>) {
+    fn report(input: &str) -> FileFindings<StringCaseFoldItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_string_case_folds(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect string case folds")
+        build_string_case_fold_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build string case fold report")
+    }
+
+    /// The `(compare_form_count, violations)` pair the report is built from.
+    fn cmps(input: &str) -> (u64, Vec<StringCaseFoldItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "compare_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("compare_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -263,32 +283,62 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect(
             "(string= (string-downcase a) (string-downcase b))",
             Dialect::Clojure,
         )
         .expect("parse");
-        let (count, violations) =
-            collect_string_case_folds(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect string case folds");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_string_case_fold_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build string case fold report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("compare_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = cmps("(string= (string-downcase a) (string-downcase b))");
-        let summary = summarize_string_case_folds(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(string= a b)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_string_case_fold_policy(StringCaseFoldPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_both_operand_spans() {
+        let report =
+            report("(defun f (a b)\n  (string= (string-downcase a) (string-downcase b)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "string-case-fold");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                (
+                    "left_span",
+                    json!({
+                        "start": finding.left_span.start().get(),
+                        "end": finding.left_span.end().get(),
+                    })
+                ),
+                (
+                    "right_span",
+                    json!({
+                        "start": finding.right_span.start().get(),
+                        "end": finding.right_span.end().get(),
+                    })
+                ),
+            ]
+        );
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_string_case_fold_policy(StringCaseFoldPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_comparison_scanned_not_only_the_flagged_ones() {
+        let report = report(
+            "(string= (string-downcase a) (string-downcase b))\n(string= a b)\n(string= (string-upcase a) (string-upcase b))\n",
+        );
+        assert_eq!(report.summary, vec![("compare_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

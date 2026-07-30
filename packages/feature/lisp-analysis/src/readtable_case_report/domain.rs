@@ -70,7 +70,6 @@ pub struct CaseSensitiveSymbol {
     /// What the default `:upcase` reader produces, so the two can be compared.
     pub upcased: String,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for CaseSensitiveSymbol {
@@ -80,10 +79,6 @@ impl Finding for CaseSensitiveSymbol {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -106,12 +101,11 @@ pub fn build_readtable_case_report(
     tree: &SyntaxTree,
 ) -> FileFindings<CaseSensitiveSymbol> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let mut findings = Vec::new();
 
     if modelled {
         for_each_subview(&tree.root_view(), |view| {
-            if let Some(finding) = case_sensitive(view, source) {
+            if let Some(finding) = case_sensitive(view) {
                 findings.push(finding);
             }
         });
@@ -135,6 +129,7 @@ pub fn build_readtable_case_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("fragile_count", json!(fragile)),
@@ -143,7 +138,7 @@ pub fn build_readtable_case_report(
     )
 }
 
-fn case_sensitive(view: &ExpressionView, source: &str) -> Option<CaseSensitiveSymbol> {
+fn case_sensitive(view: &ExpressionView) -> Option<CaseSensitiveSymbol> {
     if view.kind != ExpressionKind::Atom {
         return None;
     }
@@ -170,7 +165,6 @@ fn case_sensitive(view: &ExpressionView, source: &str) -> Option<CaseSensitiveSy
         upcased: text.to_ascii_uppercase(),
         name: text.to_owned(),
         span: view.span,
-        line: line_of(source, view.span.start().get()),
     })
 }
 
@@ -181,15 +175,6 @@ fn case_sensitive(view: &ExpressionView, source: &str) -> Option<CaseSensitiveSy
 /// identity that depends on which case is in effect.
 fn is_mixed_case(text: &str) -> bool {
     text.chars().any(char::is_uppercase) && text.chars().any(char::is_lowercase)
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

@@ -17,62 +17,70 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::render_expression;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const LET_HEADS: [&str; 2] = ["let", "let*"];
 
 #[derive(Debug, Clone)]
 pub struct MalformedLetBindingItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     pub binding: String,
     pub element_count: usize,
 }
 
-#[derive(Debug)]
-pub struct MalformedLetBindingSummary {
-    pub let_form_count: usize,
-    pub violations: Vec<MalformedLetBindingItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MalformedLetBindingPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl MalformedLetBindingPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for MalformedLetBindingItem {
+    /// The rule's own name.
+    ///
+    /// `element_count` is the natural discriminator, but a `kind` is a tag from
+    /// a closed set and an element count is unbounded data — a consumer wanting
+    /// to select the four-element bindings reads `element_count` from
+    /// `json_fields`, where it is a number rather than a string smuggled into a
+    /// rule id.
+    fn kind(&self) -> &'static str {
+        "malformed-let-binding"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct MalformedLetBindingPolicy {
-    pub fail_on_violation: bool,
-    pub let_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("elements={}", self.element_count),
+            format!("binding={}", self.binding),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("element_count", json!(self.element_count)),
+            ("binding", json!(self.binding)),
+        ]
+    }
+
+    /// The same sentence the `malformed-let-binding` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "let binding {} has {} elements; expected a symbol or (var value)",
+            self.binding, self.element_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_let(
     view: &ExpressionView,
-    path: &Path,
     let_form_count: &mut usize,
     violations: &mut Vec<MalformedLetBindingItem>,
 ) {
@@ -99,7 +107,6 @@ pub fn examine_let(
         let element_count = binding.children.len();
         if element_count == 0 || element_count > 2 {
             violations.push(MalformedLetBindingItem {
-                path: path.to_path_buf(),
                 span: binding.span,
                 binding: render_expression(binding),
                 element_count,
@@ -108,15 +115,27 @@ pub fn examine_let(
     }
 }
 
-/// Collects every malformed `let`/`let*` binding across a whole file, along
-/// with the total number of `let`/`let*` forms scanned.
-pub fn collect_malformed_let_bindings(
+/// Collects every malformed `let`/`let*` binding in one file, with the number of
+/// `let`/`let*` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every binding is well-formed" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_malformed_let_binding_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<MalformedLetBindingItem>)> {
+) -> LintResult<FileFindings<MalformedLetBindingItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("let_form_count", json!(0))],
+        ));
     }
 
     let mut let_form_count = 0;
@@ -124,51 +143,40 @@ pub fn collect_malformed_let_bindings(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_let(subview, path, &mut let_form_count, &mut violations);
+            examine_let(subview, &mut let_form_count, &mut violations);
         });
     }
-    Ok((let_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_malformed_let_bindings(
-    let_form_count: usize,
-    violations: Vec<MalformedLetBindingItem>,
-) -> MalformedLetBindingSummary {
-    MalformedLetBindingSummary {
-        let_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_malformed_let_binding_policy(
-    options: MalformedLetBindingPolicyOptions,
-    summary: &MalformedLetBindingSummary,
-) -> MalformedLetBindingPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    MalformedLetBindingPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        let_form_count: summary.let_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("let_form_count", json!(let_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn bindings(input: &str) -> (usize, Vec<MalformedLetBindingItem>) {
-        let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_malformed_let_bindings(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect malformed let bindings")
+    fn report(input: &str) -> FileFindings<MalformedLetBindingItem> {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
+        build_malformed_let_binding_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build malformed let binding report")
+    }
+
+    /// The `(let_form_count, violations)` pair the report is built from.
+    fn bindings(input: &str) -> (u64, Vec<MalformedLetBindingItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "let_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("let_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -233,32 +241,51 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
-        let tree = SyntaxTree::parse("(let ((x 1 2)) x)").expect("parse input");
-        let (let_form_count, violations) =
-            collect_malformed_let_bindings(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect malformed let bindings");
-        assert_eq!(let_form_count, 0);
-        assert!(violations.is_empty());
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
+        let tree =
+            SyntaxTree::parse_with_dialect("(let ((x 1 2)) x)", Dialect::Clojure).expect("parse");
+        let report =
+            build_malformed_let_binding_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build malformed let binding report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("let_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (let_form_count, items) = bindings("(let ((x 1 2)) x)");
-        let summary = summarize_malformed_let_bindings(let_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(let ((x 1)) x)").dialect_modelled);
+    }
 
-        let quiet = evaluate_malformed_let_binding_policy(
-            MalformedLetBindingPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_binding_and_its_element_count() {
+        let report = report("(defun f ()\n  (let ((x 1 2)) x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "malformed-let-binding");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("element_count", json!(3)),
+                ("binding", json!(finding.binding)),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "elements=3".to_owned(),
+                format!("binding={}", finding.binding),
+            ]
+        );
+    }
 
-        let strict = evaluate_malformed_let_binding_policy(
-            MalformedLetBindingPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_let_scanned_not_only_the_flagged_ones() {
+        let report = report("(let ((x 1)) x)\n(let ((y 1 2)) y)\n");
+        assert_eq!(report.summary, vec![("let_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

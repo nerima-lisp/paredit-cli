@@ -74,7 +74,6 @@ pub struct DocstringFinding {
     /// the file.
     pub summary: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for DocstringFinding {
@@ -84,10 +83,6 @@ impl Finding for DocstringFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -144,6 +139,7 @@ pub fn build_docstring_report(
         // Docstrings are a shape question, not a Common Lisp one: every dialect
         // this build parses puts them in the same place.
         true,
+        tree.source(),
         findings,
         vec![
             ("documented_count", json!(documented)),
@@ -193,7 +189,6 @@ fn read_definition(
             undocumented: parameters,
             summary: None,
             span: form.span,
-            line: line_of(source, form.span.start().get()),
         });
     };
 
@@ -237,7 +232,6 @@ fn read_definition(
         undocumented,
         summary: Some(elide(&docstring)),
         span: form.span,
-        line: line_of(source, form.span.start().get()),
     })
 }
 
@@ -299,15 +293,6 @@ fn elide(text: &str) -> String {
         .take(SUMMARY_LIMIT.saturating_sub(1))
         .collect::<String>();
     format!("{head}…")
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

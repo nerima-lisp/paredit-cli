@@ -86,7 +86,7 @@ fn print_text<F: Finding>(reports: &[FileFindings<F>], policy: &ReportPolicy) {
             let mut row = vec![
                 finding.kind().to_owned(),
                 terminal_safe(&report.path.display()).to_string(),
-                finding.line().to_string(),
+                report.line_of(finding).to_string(),
             ];
             row.extend(
                 finding
@@ -215,7 +215,7 @@ fn file_json<F: Finding>(report: &FileFindings<F>) -> Value {
             .map(|finding| {
                 let mut entry = json!({
                     "kind": finding.kind(),
-                    "line": finding.line(),
+                    "line": report.line_of(finding),
                     "span": {
                         "start": finding.span().start().get(),
                         "end": finding.span().end().get(),
@@ -277,9 +277,6 @@ mod tests {
         fn span(&self) -> ByteSpan {
             ByteSpan::new(ByteOffset::new(0), ByteOffset::new(1))
         }
-        fn line(&self) -> usize {
-            1
-        }
         fn text_columns(&self) -> Vec<String> {
             Vec::new()
         }
@@ -293,6 +290,7 @@ mod tests {
             PathBuf::from("t.lisp"),
             Dialect::CommonLisp,
             true,
+            "(a)\n(b)\n",
             Vec::new(),
             summary,
         )

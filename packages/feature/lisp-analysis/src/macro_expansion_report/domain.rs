@@ -69,7 +69,6 @@ pub struct Expansion {
     /// Why it was declined, if it was.
     pub declined: Option<Declined>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for Expansion {
@@ -80,10 +79,6 @@ impl Finding for Expansion {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -147,6 +142,7 @@ pub fn build_macro_expansion_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("macro_count", json!(macros.len())),
@@ -239,7 +235,6 @@ fn expand(
         expansion: None,
         declined: None,
         span: call.span,
-        line: line_of(source, call.span.start().get()),
     };
 
     if definition.unsupported_lambda_list {
@@ -336,15 +331,6 @@ fn is_quasiquoted(view: &ExpressionView) -> bool {
             .text
             .as_deref()
             .is_some_and(|text| text.starts_with('`'))
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

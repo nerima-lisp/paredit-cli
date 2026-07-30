@@ -24,13 +24,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The boolean operator (`and`/`or`) heading `view`, or `None` when `view` is
 /// not such a form.
@@ -50,53 +52,56 @@ fn boolean_operator(view: &ExpressionView) -> Option<&'static str> {
 
 #[derive(Debug, Clone)]
 pub struct NestedBooleanItem {
-    pub path: PathBuf,
     /// The span of the inner (nested) `and`/`or` form.
     pub span: ByteSpan,
     /// The span of the inner form's interior (`op`'s operands, parens excluded),
     /// which a fix splices in place of the wrapper.
+    ///
+    /// The rewrite's input, not the report's: the lint rule slices it to build
+    /// the replacement, and the command has never printed it.
     pub inner_span: ByteSpan,
     /// The shared operator (`and`/`or`), for the finding message.
     pub operator: &'static str,
 }
 
-#[derive(Debug)]
-pub struct NestedBooleanSummary {
-    pub boolean_form_count: usize,
-    pub violations: Vec<NestedBooleanItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NestedBooleanPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NestedBooleanPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NestedBooleanItem {
+    /// The shared operator, so `and` and `or` are separable without parsing
+    /// JSON.
+    ///
+    /// A closed, canonical pair — `boolean_operator` accepts nothing else and
+    /// returns the lowercased form regardless of how the source spelled it — so
+    /// it is a fixed vocabulary rather than an echo of the file.
+    fn kind(&self) -> &'static str {
+        self.operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NestedBooleanPolicy {
-    pub fail_on_violation: bool,
-    pub boolean_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing: the old text row's only column beyond the path and the offset
+    /// was the operator, which now leads the row as the `kind`.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("operator", json!(self.operator))]
+    }
+
+    /// The same sentence the `nested-boolean` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    /// Load-bearing here, since this finding has no text columns of its own.
+    fn message(&self) -> String {
+        let operator = self.operator;
+        format!("{operator} nested in a {operator} flattens; its operands splice in")
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
-    path: &Path,
     boolean_form_count: &mut usize,
     violations: &mut Vec<NestedBooleanItem>,
 ) {
@@ -127,7 +132,6 @@ pub fn examine_boolean(
             operands[operands.len() - 1].span.end(),
         );
         violations.push(NestedBooleanItem {
-            path: path.to_path_buf(),
             span: child.span,
             inner_span,
             operator: op,
@@ -136,15 +140,27 @@ pub fn examine_boolean(
 }
 
 /// Collects every `and`/`or` nested directly inside a same-operator `and`/`or`
-/// across a whole file, along with the total number of `and`/`or` forms
-/// scanned.
-pub fn collect_nested_booleans(
+/// in one file, with the number of `and`/`or` forms scanned as the denominator
+/// beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant nesting here" for Common
+/// Lisp and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_nested_boolean_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NestedBooleanItem>)> {
+) -> LintResult<FileFindings<NestedBooleanItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("boolean_form_count", json!(0))],
+        ));
     }
 
     let mut boolean_form_count = 0;
@@ -152,51 +168,40 @@ pub fn collect_nested_booleans(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, path, &mut boolean_form_count, &mut violations);
+            examine_boolean(subview, &mut boolean_form_count, &mut violations);
         });
     }
-    Ok((boolean_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_nested_booleans(
-    boolean_form_count: usize,
-    violations: Vec<NestedBooleanItem>,
-) -> NestedBooleanSummary {
-    NestedBooleanSummary {
-        boolean_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_nested_boolean_policy(
-    options: NestedBooleanPolicyOptions,
-    summary: &NestedBooleanSummary,
-) -> NestedBooleanPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NestedBooleanPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        boolean_form_count: summary.boolean_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("boolean_form_count", json!(boolean_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn nested(input: &str) -> (usize, Vec<NestedBooleanItem>) {
+    fn report(input: &str) -> FileFindings<NestedBooleanItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_nested_booleans(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect nested booleans")
+        build_nested_boolean_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build nested boolean report")
+    }
+
+    /// The `(boolean_form_count, violations)` pair the report is built from.
+    fn nested(input: &str) -> (u64, Vec<NestedBooleanItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "boolean_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("boolean_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -278,29 +283,48 @@ mod tests {
         assert!(violations.is_empty());
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(or a (or b c))", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_nested_booleans(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect nested booleans");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_nested_boolean_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build nested boolean report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = nested("(or a (or b c))");
-        let summary = summarize_nested_booleans(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(or a b)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_nested_boolean_policy(NestedBooleanPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The operator leads the row as the `kind`, and stays in the JSON where
+    /// the old renderer published it.
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(defun f ()\n  (or a (or b c) d))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "or");
+        assert_eq!(finding.json_fields(), vec![("operator", json!("or"))]);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_nested_boolean_policy(NestedBooleanPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    /// `and` is the other half of the closed pair, so the two are separable on
+    /// `kind` alone.
+    #[test]
+    fn an_and_finding_is_a_different_kind_from_an_or_finding() {
+        assert_eq!(report("(and a (and b c))").findings[0].kind(), "and");
+    }
+
+    #[test]
+    fn the_summary_counts_every_boolean_scanned_not_only_the_flagged_ones() {
+        // Three `or` forms: the outer, the nested one, and the clean sibling.
+        let report = report("(or a (or b c))\n(or d e)\n");
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

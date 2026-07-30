@@ -82,7 +82,6 @@ pub struct GenericFinding {
     /// The `defgeneric` when there is one, otherwise the first method — so a
     /// finding always points at a form that exists.
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for GenericFinding {
@@ -92,10 +91,6 @@ impl Finding for GenericFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -143,7 +138,6 @@ pub fn build_generic_dispatch_report(
     tree: &SyntaxTree,
 ) -> FileFindings<GenericFinding> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let mut generics: BTreeMap<String, Generic> = BTreeMap::new();
 
     if modelled {
@@ -190,7 +184,6 @@ pub fn build_generic_dispatch_report(
                     })
                     .collect(),
                 span,
-                line: line_of(source, span.start().get()),
             })
         })
         .collect::<Vec<_>>();
@@ -204,6 +197,7 @@ pub fn build_generic_dispatch_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("defect_count", json!(defects))],
     )
@@ -308,15 +302,6 @@ fn specializer_key(lambda_list: &ExpressionView) -> String {
 
 fn fold(name: &str) -> String {
     name.to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

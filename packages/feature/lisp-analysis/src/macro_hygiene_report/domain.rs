@@ -66,7 +66,6 @@ pub struct HygieneFinding {
     /// The remedy, named rather than left to the reader.
     pub remedy: &'static str,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for HygieneFinding {
@@ -76,10 +75,6 @@ impl Finding for HygieneFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -112,7 +107,6 @@ pub fn build_macro_hygiene_report(
     tree: &SyntaxTree,
 ) -> FileFindings<HygieneFinding> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let mut findings = Vec::new();
     let mut macro_count = 0;
 
@@ -128,7 +122,7 @@ pub fn build_macro_hygiene_report(
                 continue;
             };
             macro_count += 1;
-            analyze(form, name, source, &mut findings);
+            analyze(form, name, &mut findings);
         }
     }
 
@@ -136,12 +130,13 @@ pub fn build_macro_hygiene_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("macro_count", json!(macro_count))],
     )
 }
 
-fn analyze(form: &ExpressionView, name: &str, source: &str, findings: &mut Vec<HygieneFinding>) {
+fn analyze(form: &ExpressionView, name: &str, findings: &mut Vec<HygieneFinding>) {
     let parameters = form
         .children
         .get(2)
@@ -154,8 +149,8 @@ fn analyze(form: &ExpressionView, name: &str, source: &str, findings: &mut Vec<H
     let gensym_bound = gensym_bindings(form);
 
     for body in form.children.iter().skip(3) {
-        find_captures(body, name, &gensym_bound, source, findings);
-        find_multiple_evaluation(body, name, &parameters, source, findings);
+        find_captures(body, name, &gensym_bound, findings);
+        find_multiple_evaluation(body, name, &parameters, findings);
     }
 }
 
@@ -216,12 +211,11 @@ fn find_captures(
     view: &ExpressionView,
     macro_name: &str,
     gensym_bound: &BTreeMap<String, ()>,
-    source: &str,
     findings: &mut Vec<HygieneFinding>,
 ) {
     if !is_quasiquoted(view) {
         for child in &view.children {
-            find_captures(child, macro_name, gensym_bound, source, findings);
+            find_captures(child, macro_name, gensym_bound, findings);
         }
         return;
     }
@@ -265,7 +259,6 @@ fn find_captures(
                 occurrences: 0,
                 remedy: "bind the name to (gensym) outside the template and unquote it",
                 span: binding.span,
-                line: line_of(source, binding.span.start().get()),
             });
         }
     });
@@ -276,12 +269,11 @@ fn find_multiple_evaluation(
     view: &ExpressionView,
     macro_name: &str,
     parameters: &[String],
-    source: &str,
     findings: &mut Vec<HygieneFinding>,
 ) {
     if !is_quasiquoted(view) {
         for child in &view.children {
-            find_multiple_evaluation(child, macro_name, parameters, source, findings);
+            find_multiple_evaluation(child, macro_name, parameters, findings);
         }
         return;
     }
@@ -317,7 +309,6 @@ fn find_multiple_evaluation(
             occurrences,
             remedy: "bind the argument once in the expansion (the once-only idiom)",
             span: view.span,
-            line: line_of(source, view.span.start().get()),
         });
     }
 }
@@ -364,15 +355,6 @@ fn walk(view: &ExpressionView, visit: &mut impl FnMut(&ExpressionView)) {
     for child in &view.children {
         walk(child, visit);
     }
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

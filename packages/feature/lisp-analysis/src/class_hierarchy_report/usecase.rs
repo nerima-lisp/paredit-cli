@@ -17,18 +17,7 @@ pub fn evaluate_fail_on_shadowed_slot_policy(
     // a class shadowing an inherited slot is the finding; every class is listed.
     let failing = reports
         .iter()
-        .map(|report| FileFindings {
-            path: report.path.clone(),
-            dialect: report.dialect,
-            dialect_modelled: report.dialect_modelled,
-            findings: report
-                .findings
-                .iter()
-                .filter(|class| !class.shadowed_slots.is_empty())
-                .cloned()
-                .collect(),
-            summary: report.summary.clone(),
-        })
+        .map(|report| report.retained(|class| !class.shadowed_slots.is_empty()))
         .collect::<Vec<_>>();
 
     let mut policy = ReportPolicy::fail_on_any(

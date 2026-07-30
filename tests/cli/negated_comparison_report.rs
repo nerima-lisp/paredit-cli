@@ -14,7 +14,12 @@ fn cli_flags_not_equal() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"negation_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // The complement is a field rather than the `kind`: `/=` is punctuation
+        // and would make the leading column of every text row unreadable.
+        .stdout(predicate::str::contains("\"kind\": \"negated-comparison\""))
         .stdout(predicate::str::contains("\"complement\": \"/=\""));
 }
 
@@ -32,7 +37,7 @@ fn cli_flags_null_of_comparison() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"complement\": \"<\""));
 }
 
@@ -50,7 +55,50 @@ fn cli_does_not_flag_three_arg_or_non_comparison() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no complement among three
+        // negations" from "no negation at all".
+        .stdout(predicate::str::contains("\"negation_form_count\": 3"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("negated-comparison-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn distinct? [a b] (not (= a b)))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "negated-comparison", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_negated_comparison_emits_sarif() {
+    let dir = fresh_temp_dir("negated-comparison-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(not (= a b))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "negated-comparison", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/negated-comparison/negated-comparison\"",
+        ))
+        .stdout(predicate::str::contains(
+            "negated comparison has a complement operator; use /=",
+        ));
 }
 
 #[test]

@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The ordinal accessor for a bare decimal index `0`–`9`, or `None` otherwise.
 fn ordinal_for_index(view: &ExpressionView) -> Option<&'static str> {
@@ -47,52 +49,53 @@ fn ordinal_for_index(view: &ExpressionView) -> Option<&'static str> {
 
 #[derive(Debug, Clone)]
 pub struct NthConstantIndexItem {
-    pub path: PathBuf,
     /// The span of the whole `(nth N x)` form.
     pub span: ByteSpan,
     /// The ordinal accessor name (`first` for `(nth 0 x)`).
     pub ordinal: &'static str,
     /// The span of the list argument `x` (for reconstructing the fix).
+    ///
+    /// The rewrite's input only: the old report never published it, and the
+    /// finding's own span already locates the call for a consumer.
     pub list_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct NthConstantIndexSummary {
-    pub nth_form_count: usize,
-    pub violations: Vec<NthConstantIndexItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NthConstantIndexPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NthConstantIndexPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NthConstantIndexItem {
+    /// The ordinal the index maps to, so `(nth 0 …)` and `(nth 9 …)` are
+    /// separable without parsing JSON.
+    ///
+    /// A closed set of ten `&'static str` values this module already models,
+    /// and the one a consumer would filter on — "show me every `first`" is a
+    /// real question about a codebase's shape.
+    fn kind(&self) -> &'static str {
+        self.ordinal
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NthConstantIndexPolicy {
-    pub fail_on_violation: bool,
-    pub nth_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing: the old text row's only column beyond the path and offset was
+    /// the ordinal, which now leads the row as the `kind`.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("ordinal", json!(self.ordinal))]
+    }
+
+    /// The same sentence the `nth-constant-index` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!("nth with a constant index; use ({} …)", self.ordinal)
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_nth(
     view: &ExpressionView,
-    path: &Path,
     nth_form_count: &mut usize,
     violations: &mut Vec<NthConstantIndexItem>,
 ) {
@@ -113,22 +116,33 @@ pub fn examine_nth(
     };
 
     violations.push(NthConstantIndexItem {
-        path: path.to_path_buf(),
         span: view.span,
         ordinal,
         list_span: view.children[2].span,
     });
 }
 
-/// Collects every constant-index `nth` across a whole file, along with the total
-/// number of `nth` forms scanned.
-pub fn collect_nth_constant_indexes(
+/// Collects every constant-index `nth` in one file, with the number of `nth`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no constant index here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_nth_constant_index_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NthConstantIndexItem>)> {
+) -> LintResult<FileFindings<NthConstantIndexItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("nth_form_count", json!(0))],
+        ));
     }
 
     let mut nth_form_count = 0;
@@ -136,51 +150,40 @@ pub fn collect_nth_constant_indexes(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_nth(subview, path, &mut nth_form_count, &mut violations);
+            examine_nth(subview, &mut nth_form_count, &mut violations);
         });
     }
-    Ok((nth_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_nth_constant_indexes(
-    nth_form_count: usize,
-    violations: Vec<NthConstantIndexItem>,
-) -> NthConstantIndexSummary {
-    NthConstantIndexSummary {
-        nth_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_nth_constant_index_policy(
-    options: NthConstantIndexPolicyOptions,
-    summary: &NthConstantIndexSummary,
-) -> NthConstantIndexPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NthConstantIndexPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        nth_form_count: summary.nth_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("nth_form_count", json!(nth_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn nths(input: &str) -> (usize, Vec<NthConstantIndexItem>) {
+    fn report(input: &str) -> FileFindings<NthConstantIndexItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_nth_constant_indexes(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect nth constant indexes")
+        build_nth_constant_index_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build nth constant index report")
+    }
+
+    /// The `(nth_form_count, violations)` pair the report is built from.
+    fn nths(input: &str) -> (u64, Vec<NthConstantIndexItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "nth_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("nth_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -262,28 +265,39 @@ mod tests {
         assert_eq!(violations[0].ordinal, "third");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(nth 0 xs)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_nth_constant_indexes(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect nth constant indexes");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_nth_constant_index_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build nth constant index report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("nth_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = nths("(nth 0 xs)");
-        let summary = summarize_nth_constant_indexes(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(nth i xs)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_nth_constant_index_policy(NthConstantIndexPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_leads_with_its_ordinal() {
+        let report = report("(defun head-of (xs)\n  (nth 0 xs))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        // The ordinal is the kind, so the text row leads with it and carries
+        // no further columns.
+        assert_eq!(finding.kind(), "first");
+        assert_eq!(finding.json_fields(), vec![("ordinal", json!("first"))]);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_nth_constant_index_policy(NthConstantIndexPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_nth_form_not_only_the_flagged_ones() {
+        let report = report("(nth 0 xs)\n(nth 10 xs)\n(nth i xs)\n");
+        assert_eq!(report.summary, vec![("nth_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

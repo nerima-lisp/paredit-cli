@@ -22,13 +22,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal atom `expected` (`nil`/`t`), no prefixes.
 fn is_bare_literal(view: &ExpressionView, expected: &str) -> bool {
@@ -43,7 +45,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct IfToUnlessItem {
-    pub path: PathBuf,
     /// The span of the whole `(if c nil e)` form.
     pub span: ByteSpan,
     /// The span of the test `c`.
@@ -52,43 +53,48 @@ pub struct IfToUnlessItem {
     pub else_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct IfToUnlessSummary {
-    pub if_form_count: usize,
-    pub violations: Vec<IfToUnlessItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct IfToUnlessPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl IfToUnlessPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for IfToUnlessItem {
+    /// The rule's own name. Every finding here is the one shape `(if c nil e)`,
+    /// with nothing to sub-divide it by.
+    fn kind(&self) -> &'static str {
+        "if-to-unless"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    /// Nothing: the old text row carried only the path and the offset, which
+    /// the envelope prints itself.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The two operand spans, which this report has always published. They are
+    /// the rewrite's inputs, but a consumer reading them out of the JSON to
+    /// build its own `unless` is doing something this report already supported.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("test_span", span_json(self.test_span)),
+            ("else_span", span_json(self.else_span)),
+        ]
+    }
+
+    /// The same sentence the `if-to-unless` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "an if with a nil then-branch is an unless; (if c nil e) is (unless c e)".to_owned()
     }
 }
 
-#[derive(Debug)]
-pub struct IfToUnlessPolicy {
-    pub fail_on_violation: bool,
-    pub if_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+fn span_json(span: ByteSpan) -> Value {
+    json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     if_form_count: &mut usize,
     violations: &mut Vec<IfToUnlessItem>,
 ) {
@@ -125,22 +131,33 @@ pub fn examine(
     }
 
     violations.push(IfToUnlessItem {
-        path: path.to_path_buf(),
         span: view.span,
         test_span: test.span,
         else_span: else_branch.span,
     });
 }
 
-/// Collects every `(if c nil e)` rewritable to `unless` across a whole file,
-/// along with the total number of `if` forms scanned.
-pub fn collect_if_to_unless(
+/// Collects every `(if c nil e)` rewritable to `unless` in one file, with the
+/// number of `if` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no rewritable `if` here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_if_to_unless_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<IfToUnlessItem>)> {
+) -> LintResult<FileFindings<IfToUnlessItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("if_form_count", json!(0))],
+        ));
     }
 
     let mut if_form_count = 0;
@@ -148,51 +165,40 @@ pub fn collect_if_to_unless(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut if_form_count, &mut violations);
+            examine(subview, &mut if_form_count, &mut violations);
         });
     }
-    Ok((if_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_if_to_unless(
-    if_form_count: usize,
-    violations: Vec<IfToUnlessItem>,
-) -> IfToUnlessSummary {
-    IfToUnlessSummary {
-        if_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_if_to_unless_policy(
-    options: IfToUnlessPolicyOptions,
-    summary: &IfToUnlessSummary,
-) -> IfToUnlessPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    IfToUnlessPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        if_form_count: summary.if_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("if_form_count", json!(if_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn ifs(input: &str) -> (usize, Vec<IfToUnlessItem>) {
+    fn report(input: &str) -> FileFindings<IfToUnlessItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_if_to_unless(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect if to unless")
+        build_if_to_unless_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build if to unless report")
+    }
+
+    /// The `(if_form_count, violations)` pair the report is built from.
+    fn ifs(input: &str) -> (u64, Vec<IfToUnlessItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "if_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("if_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -249,26 +255,46 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(if c nil e)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_if_to_unless(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect if to unless");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_if_to_unless_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build if to unless report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("if_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = ifs("(if c nil e)");
-        let summary = summarize_if_to_unless(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(if ready nil (do-work))").dialect_modelled);
+    }
 
-        let quiet = evaluate_if_to_unless_policy(IfToUnlessPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_both_operand_spans() {
+        let source = "(defun f ()\n  (if ready nil (do-work)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "if-to-unless");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("test_span", span_json(finding.test_span)),
+                ("else_span", span_json(finding.else_span)),
+            ]
+        );
+        assert_eq!(slice(source, finding.test_span), "ready");
+        assert_eq!(slice(source, finding.else_span), "(do-work)");
+    }
 
-        let strict = evaluate_if_to_unless_policy(IfToUnlessPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_if_scanned_not_only_the_flagged_ones() {
+        let report = report("(if a nil e)\n(if b c d)\n");
+        assert_eq!(report.summary, vec![("if_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

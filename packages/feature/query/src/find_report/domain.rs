@@ -17,7 +17,6 @@ pub const DEFAULT_PREVIEW_BYTES: usize = 80;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatternHit {
     pub span: ByteSpan,
-    pub line: usize,
     pub column: usize,
     /// The tree path, so the hit feeds straight into `--path` on any edit.
     pub path: String,
@@ -42,7 +41,6 @@ impl PatternHit {
         let text = &source[found.span.start().get()..found.span.end().get()];
         Self {
             span: found.span,
-            line: position.line(),
             column: position.column(),
             path: found.path.to_string(),
             id,
@@ -63,10 +61,6 @@ impl Finding for PatternHit {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {

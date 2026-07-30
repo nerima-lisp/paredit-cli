@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is a bare `(lambda …)` form (no reader prefix, so a
 /// `#'(lambda …)` is excluded — its prefix would be illegal in operator
@@ -36,53 +38,54 @@ fn is_lambda_form(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct FuncallLambdaItem {
-    pub path: PathBuf,
     /// The span of the whole `(funcall (lambda …) …)` form.
     pub span: ByteSpan,
     /// The span of the `funcall` head symbol.
+    ///
+    /// The rewrite's input, not the report's: with `lambda_span` it bounds the
+    /// text the fix deletes, and neither the old report nor this one printed
+    /// it.
     pub head_span: ByteSpan,
     /// The span of the `(lambda …)` form (its start marks where the rewrite
     /// keeps the source; everything from the head to here is dropped).
+    ///
+    /// Unreported for the same reason as `head_span`.
     pub lambda_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct FuncallLambdaSummary {
-    pub funcall_form_count: usize,
-    pub violations: Vec<FuncallLambdaItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct FuncallLambdaPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl FuncallLambdaPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for FuncallLambdaItem {
+    /// The rule's name. Every finding here is the one shape — a `funcall` of a
+    /// literal lambda — so there is no closed set to discriminate on.
+    fn kind(&self) -> &'static str {
+        "funcall-lambda"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct FuncallLambdaPolicy {
-    pub fail_on_violation: bool,
-    pub funcall_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing beyond the path and location: the old text row carried only
+    /// those, and the finding has no field the report published. `message` is
+    /// what a reader gets here.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        Vec::new()
+    }
+
+    /// The same sentence the `funcall-lambda` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "funcall of a lambda applies it directly; ((lambda …) …) drops the funcall".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_funcall(
     view: &ExpressionView,
-    path: &Path,
     funcall_form_count: &mut usize,
     violations: &mut Vec<FuncallLambdaItem>,
 ) {
@@ -104,22 +107,33 @@ pub fn examine_funcall(
     }
 
     violations.push(FuncallLambdaItem {
-        path: path.to_path_buf(),
         span: view.span,
         head_span: view.children[0].span,
         lambda_span: callee.span,
     });
 }
 
-/// Collects every `funcall` of a bare lambda form across a whole file, along
-/// with the total number of `funcall` forms scanned.
-pub fn collect_funcall_lambdas(
+/// Collects every `funcall` of a bare lambda form in one file, with the number
+/// of `funcall` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no funcall of a lambda here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_funcall_lambda_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<FuncallLambdaItem>)> {
+) -> LintResult<FileFindings<FuncallLambdaItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("funcall_form_count", json!(0))],
+        ));
     }
 
     let mut funcall_form_count = 0;
@@ -127,51 +141,40 @@ pub fn collect_funcall_lambdas(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_funcall(subview, path, &mut funcall_form_count, &mut violations);
+            examine_funcall(subview, &mut funcall_form_count, &mut violations);
         });
     }
-    Ok((funcall_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_funcall_lambdas(
-    funcall_form_count: usize,
-    violations: Vec<FuncallLambdaItem>,
-) -> FuncallLambdaSummary {
-    FuncallLambdaSummary {
-        funcall_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_funcall_lambda_policy(
-    options: FuncallLambdaPolicyOptions,
-    summary: &FuncallLambdaSummary,
-) -> FuncallLambdaPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    FuncallLambdaPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        funcall_form_count: summary.funcall_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("funcall_form_count", json!(funcall_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn funcalls(input: &str) -> (usize, Vec<FuncallLambdaItem>) {
+    fn report(input: &str) -> FileFindings<FuncallLambdaItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_funcall_lambdas(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect funcall lambdas")
+        build_funcall_lambda_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build funcall lambda report")
+    }
+
+    /// The `(funcall_form_count, violations)` pair the report is built from.
+    fn funcalls(input: &str) -> (u64, Vec<FuncallLambdaItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "funcall_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("funcall_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -237,29 +240,42 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(funcall (lambda (x) x) 5)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_funcall_lambdas(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect funcall lambdas");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_funcall_lambda_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build funcall lambda report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("funcall_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = funcalls("(funcall (lambda (x) x) 5)");
-        let summary = summarize_funcall_lambdas(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(funcall fn 1 2)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_funcall_lambda_policy(FuncallLambdaPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_leans_on_its_message() {
+        let report = report("(defun f ()\n  (funcall (lambda (x) x) 5))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "funcall-lambda");
+        assert!(finding.text_columns().is_empty());
+        assert!(finding.json_fields().is_empty());
+        assert_eq!(
+            finding.message(),
+            "funcall of a lambda applies it directly; ((lambda …) …) drops the funcall"
+        );
+    }
 
-        let strict =
-            evaluate_funcall_lambda_policy(FuncallLambdaPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_funcall_scanned_not_only_the_flagged_ones() {
+        let report = report("(funcall (lambda (x) x) 5)\n(funcall #'foo 1)\n(funcall fn)\n");
+        assert_eq!(report.summary, vec![("funcall_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

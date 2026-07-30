@@ -24,13 +24,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal `t` or `nil` (no reader prefixes); returns
 /// which one so the caller can decide the branch.
@@ -50,7 +52,6 @@ fn constant_test(view: &ExpressionView) -> Option<bool> {
 
 #[derive(Debug, Clone)]
 pub struct ConstantWhenTestItem {
-    pub path: PathBuf,
     /// The span of the whole `(when TEST …)`/`(unless TEST …)` form.
     pub span: ByteSpan,
     /// The head operator, lowercased (`when` or `unless`).
@@ -62,46 +63,60 @@ pub struct ConstantWhenTestItem {
     pub always_runs: bool,
     /// For the "always runs" rewrite: the span from the form's opening paren
     /// through the test atom, replaced wholesale with `(progn`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to splice
+    /// the head down to `progn`, and the command never printed it.
     pub splice_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct ConstantWhenTestSummary {
-    pub when_form_count: usize,
-    pub violations: Vec<ConstantWhenTestItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ConstantWhenTestPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ConstantWhenTestPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ConstantWhenTestItem {
+    /// Which way the form collapses, in the vocabulary the text output already
+    /// used. `(when t …)` and `(unless nil …)` are the same defect — a wrapper
+    /// that is really a `progn` — while `(when nil …)` and `(unless t …)` are
+    /// dead code, and a consumer that cares about one of those rarely cares
+    /// about the other. The `head`/`test` pair that produced it stays in the
+    /// JSON for anyone who wants the finer split.
+    fn kind(&self) -> &'static str {
+        if self.always_runs { "progn" } else { "dead" }
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ConstantWhenTestPolicy {
-    pub fail_on_violation: bool,
-    pub when_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("head={}", self.head), format!("test={}", self.test)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("test", json!(self.test)),
+            ("always_runs", json!(self.always_runs)),
+        ]
+    }
+
+    /// The same sentence the `constant-when-test` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        if self.always_runs {
+            format!(
+                "{} test is the constant {}; the body always runs, so this is a progn",
+                self.head, self.test
+            )
+        } else {
+            format!(
+                "{} test is the constant {}; the body never runs, so this is nil",
+                self.head, self.test
+            )
+        }
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_when(
     view: &ExpressionView,
-    path: &Path,
     when_form_count: &mut usize,
     violations: &mut Vec<ConstantWhenTestItem>,
 ) {
@@ -129,7 +144,6 @@ pub fn examine_when(
     let splice_span = ByteSpan::new(view.span.start(), test.span.end());
 
     violations.push(ConstantWhenTestItem {
-        path: path.to_path_buf(),
         span: view.span,
         head: if is_when { "when" } else { "unless" },
         test: if is_true { "t" } else { "nil" },
@@ -138,15 +152,27 @@ pub fn examine_when(
     });
 }
 
-/// Collects every constant-test `when`/`unless` across a whole file, along with
-/// the total number of `when`/`unless` forms scanned.
-pub fn collect_constant_when_tests(
+/// Collects every constant-test `when`/`unless` in one file, with the number of
+/// `when`/`unless` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no constant test here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_constant_when_test_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ConstantWhenTestItem>)> {
+) -> LintResult<FileFindings<ConstantWhenTestItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("when_form_count", json!(0))],
+        ));
     }
 
     let mut when_form_count = 0;
@@ -154,51 +180,40 @@ pub fn collect_constant_when_tests(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_when(subview, path, &mut when_form_count, &mut violations);
+            examine_when(subview, &mut when_form_count, &mut violations);
         });
     }
-    Ok((when_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_constant_when_tests(
-    when_form_count: usize,
-    violations: Vec<ConstantWhenTestItem>,
-) -> ConstantWhenTestSummary {
-    ConstantWhenTestSummary {
-        when_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_constant_when_test_policy(
-    options: ConstantWhenTestPolicyOptions,
-    summary: &ConstantWhenTestSummary,
-) -> ConstantWhenTestPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ConstantWhenTestPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        when_form_count: summary.when_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("when_form_count", json!(when_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn whens(input: &str) -> (usize, Vec<ConstantWhenTestItem>) {
+    fn report(input: &str) -> FileFindings<ConstantWhenTestItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_constant_when_tests(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect constant when tests")
+        build_constant_when_test_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build constant when test report")
+    }
+
+    /// The `(when_form_count, violations)` pair the report is built from.
+    fn whens(input: &str) -> (u64, Vec<ConstantWhenTestItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "when_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("when_form_count in the summary");
+        (count, report.findings)
     }
 
     fn splice<'a>(source: &'a str, item: &ConstantWhenTestItem) -> &'a str {
@@ -279,28 +294,55 @@ mod tests {
         assert!(violations[0].always_runs);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(when t a b)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_constant_when_tests(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect constant when tests");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_constant_when_test_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build constant when test report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("when_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = whens("(when t a b)");
-        let summary = summarize_constant_when_tests(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(when ready a)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_constant_when_test_policy(ConstantWhenTestPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_how_the_form_collapses() {
+        let report = report("(defun f ()\n  (when t 1 2))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "progn");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("head", json!("when")),
+                ("test", json!("t")),
+                ("always_runs", json!(true)),
+            ]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["head=when".to_owned(), "test=t".to_owned()]
+        );
+    }
 
-        let strict =
-            evaluate_constant_when_test_policy(ConstantWhenTestPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    /// A body that never runs is dead code, not a redundant wrapper, and the
+    /// kind separates them.
+    #[test]
+    fn a_never_running_body_is_kinded_as_dead() {
+        let report = report("(unless t (go))");
+        assert_eq!(report.findings[0].kind(), "dead");
+    }
+
+    #[test]
+    fn the_summary_counts_every_when_scanned_not_only_the_flagged_ones() {
+        let report = report("(when t 1)\n(when ready 2)\n(unless nil 3)\n");
+        assert_eq!(report.summary, vec![("when_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

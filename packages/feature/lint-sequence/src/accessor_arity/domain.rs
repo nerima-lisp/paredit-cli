@@ -20,15 +20,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The inclusive `(min, max)` argument arity of a standard accessor, or `None`
 /// if `head` is not one this rule checks.
@@ -65,51 +67,63 @@ fn arity_phrase(min: usize, max: usize) -> String {
 
 #[derive(Debug, Clone)]
 pub struct AccessorArityItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The accessor as it is written in the source, so a report reproduces the
+    /// spelling the reader will find at that span.
     pub operator: String,
     pub argument_count: usize,
     pub min_arity: usize,
     pub max_arity: usize,
 }
 
-#[derive(Debug)]
-pub struct AccessorAritySummary {
-    pub call_count: usize,
-    pub violations: Vec<AccessorArityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct AccessorArityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl AccessorArityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for AccessorArityItem {
+    /// The rule's name, not the accessor.
+    ///
+    /// `operator` is the source spelling — `gethash`, `GETHASH` — so it is a
+    /// per-finding `String` and cannot be a `&'static str` kind. It stays a
+    /// JSON field and a text column, where a consumer can still filter on it.
+    fn kind(&self) -> &'static str {
+        "accessor-arity"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct AccessorArityPolicy {
-    pub fail_on_violation: bool,
-    pub call_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("op={}", self.operator),
+            format!("expected={}", expected_arity_phrase(self)),
+            format!("arguments={}", self.argument_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("argument_count", json!(self.argument_count)),
+            ("min_arity", json!(self.min_arity)),
+            ("max_arity", json!(self.max_arity)),
+            ("expected", json!(expected_arity_phrase(self))),
+        ]
+    }
+
+    /// The same sentence the `accessor-arity` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} takes {} argument(s) but has {}",
+            self.operator,
+            expected_arity_phrase(self),
+            self.argument_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_call(
     view: &ExpressionView,
-    path: &Path,
     call_count: &mut usize,
     violations: &mut Vec<AccessorArityItem>,
 ) {
@@ -132,7 +146,6 @@ pub fn examine_call(
     let argument_count = view.children.len() - 1;
     if !(min_arity..=max_arity).contains(&argument_count) {
         violations.push(AccessorArityItem {
-            path: path.to_path_buf(),
             span: view.span,
             operator: head.to_owned(),
             argument_count,
@@ -142,15 +155,27 @@ pub fn examine_call(
     }
 }
 
-/// Collects every misarity accessor call across a whole file, along with the
-/// total number of such calls scanned.
+/// Collects every misarity accessor call in one file, with the number of
+/// accessor calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every accessor call here is well-formed"
+/// for Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
 pub fn collect_accessor_arity_violations(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<AccessorArityItem>)> {
+) -> LintResult<FileFindings<AccessorArityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("call_count", json!(0))],
+        ));
     }
 
     let mut call_count = 0;
@@ -158,41 +183,18 @@ pub fn collect_accessor_arity_violations(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &mut call_count, &mut violations);
+            examine_call(subview, &mut call_count, &mut violations);
         });
     }
-    Ok((call_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_accessor_arity(
-    call_count: usize,
-    violations: Vec<AccessorArityItem>,
-) -> AccessorAritySummary {
-    AccessorAritySummary {
-        call_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_accessor_arity_policy(
-    options: AccessorArityPolicyOptions,
-    summary: &AccessorAritySummary,
-) -> AccessorArityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    AccessorArityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        call_count: summary.call_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("call_count", json!(call_count))],
+    ))
 }
 
 /// A human phrase for the expected arity of one violation, e.g. `exactly 2`.
@@ -205,10 +207,22 @@ pub fn expected_arity_phrase(item: &AccessorArityItem) -> String {
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<AccessorArityItem>) {
+    fn report(input: &str) -> FileFindings<AccessorArityItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_accessor_arity_violations(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
+        collect_accessor_arity_violations(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
             .expect("collect accessor arity violations")
+    }
+
+    /// The `(call_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<AccessorArityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "call_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("call_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -277,29 +291,59 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(gethash key)", Dialect::Clojure).expect("parse input");
-        let (call_count, items) =
-            collect_accessor_arity_violations(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
+        let report =
+            collect_accessor_arity_violations(Path::new("app.clj"), Dialect::Clojure, &tree)
                 .expect("collect accessor arity violations");
-        assert_eq!(call_count, 0);
-        assert!(items.is_empty());
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("call_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (call_count, items) = violations("(nth n)");
-        let summary = summarize_accessor_arity(call_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(nth i items)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_accessor_arity_policy(AccessorArityPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_arity() {
+        let report = report("(defun f (k)\n  (gethash k))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "accessor-arity");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("operator", json!("gethash")),
+                ("argument_count", json!(1)),
+                ("min_arity", json!(2)),
+                ("max_arity", json!(3)),
+                ("expected", json!("2 or 3")),
+            ]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "op=gethash".to_owned(),
+                "expected=2 or 3".to_owned(),
+                "arguments=1".to_owned(),
+            ]
+        );
+        assert_eq!(
+            finding.message(),
+            "gethash takes 2 or 3 argument(s) but has 1"
+        );
+    }
 
-        let strict =
-            evaluate_accessor_arity_policy(AccessorArityPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(nth n)\n(nth n items)\n(elt seq 0)\n");
+        assert_eq!(report.summary, vec![("call_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

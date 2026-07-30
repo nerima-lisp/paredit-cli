@@ -16,13 +16,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The canonical operator name for an `and`/`or` head, or `None` otherwise.
 fn boolean_operator(head: &str) -> Option<&'static str> {
@@ -44,52 +46,54 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct SingleOperandBooleanItem {
-    pub path: PathBuf,
     /// The span of the whole `(and X)`/`(or X)` form.
     pub span: ByteSpan,
     /// The operator, lowercased (`and` or `or`).
     pub operator: &'static str,
     /// The span of the sole operand `X` (lets a fix substitute its source).
+    ///
+    /// The rewrite's input, not the report's: the lint rule slices it to build
+    /// the replacement, and the command has never printed it.
     pub inner_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct SingleOperandBooleanSummary {
-    pub boolean_form_count: usize,
-    pub violations: Vec<SingleOperandBooleanItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SingleOperandBooleanPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SingleOperandBooleanPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SingleOperandBooleanItem {
+    /// The operator, so `and` and `or` are separable without parsing JSON.
+    ///
+    /// A closed two-value set the analysis has already case-folded to a
+    /// canonical spelling, which is what makes it a tag rather than data.
+    fn kind(&self) -> &'static str {
+        self.operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SingleOperandBooleanPolicy {
-    pub fail_on_violation: bool,
-    pub boolean_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing beyond the leading `kind`, which is the operator this report's
+    /// only text column used to carry.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("operator", json!(self.operator))]
+    }
+
+    /// The same sentence the `single-operand-boolean` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} has a single operand; ({} X) is just X",
+            self.operator, self.operator
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
-    path: &Path,
     boolean_form_count: &mut usize,
     violations: &mut Vec<SingleOperandBooleanItem>,
 ) {
@@ -110,22 +114,33 @@ pub fn examine_boolean(
         return;
     }
     violations.push(SingleOperandBooleanItem {
-        path: path.to_path_buf(),
         span: view.span,
         operator,
         inner_span: operand.span,
     });
 }
 
-/// Collects every single-operand `and`/`or` across a whole file, along with the
-/// total number of `and`/`or` forms scanned.
-pub fn collect_single_operand_booleans(
+/// Collects every single-operand `and`/`or` in one file, with the number of
+/// `and`/`or` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no single-operand boolean here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_single_operand_boolean_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SingleOperandBooleanItem>)> {
+) -> LintResult<FileFindings<SingleOperandBooleanItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("boolean_form_count", json!(0))],
+        ));
     }
 
     let mut boolean_form_count = 0;
@@ -133,51 +148,40 @@ pub fn collect_single_operand_booleans(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, path, &mut boolean_form_count, &mut violations);
+            examine_boolean(subview, &mut boolean_form_count, &mut violations);
         });
     }
-    Ok((boolean_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_single_operand_booleans(
-    boolean_form_count: usize,
-    violations: Vec<SingleOperandBooleanItem>,
-) -> SingleOperandBooleanSummary {
-    SingleOperandBooleanSummary {
-        boolean_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_single_operand_boolean_policy(
-    options: SingleOperandBooleanPolicyOptions,
-    summary: &SingleOperandBooleanSummary,
-) -> SingleOperandBooleanPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SingleOperandBooleanPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        boolean_form_count: summary.boolean_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("boolean_form_count", json!(boolean_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn booleans(input: &str) -> (usize, Vec<SingleOperandBooleanItem>) {
+    fn report(input: &str) -> FileFindings<SingleOperandBooleanItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_single_operand_booleans(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect single-operand booleans")
+        build_single_operand_boolean_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build single-operand boolean report")
+    }
+
+    /// The `(boolean_form_count, violations)` pair the report is built from.
+    fn booleans(input: &str) -> (u64, Vec<SingleOperandBooleanItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "boolean_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("boolean_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -246,32 +250,38 @@ mod tests {
         assert_eq!(violations[0].operator, "or");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(and x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_single_operand_booleans(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect single-operand booleans");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_single_operand_boolean_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build single-operand boolean report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = booleans("(and x)");
-        let summary = summarize_single_operand_booleans(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(and x y)").dialect_modelled);
+    }
 
-        let quiet = evaluate_single_operand_boolean_policy(
-            SingleOperandBooleanPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(defun f (x)\n  (or x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "or");
+        assert_eq!(finding.json_fields(), vec![("operator", json!("or"))]);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_single_operand_boolean_policy(
-            SingleOperandBooleanPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_boolean_scanned_not_only_the_flagged_ones() {
+        let report = report("(and x)\n(or a b)\n(or y)\n");
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

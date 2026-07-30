@@ -27,16 +27,18 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path as SexprPath, ReaderPrefix,
     SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The sharp-quoted symbol name of `view` (`#'foo` → `foo`), or `None` when
 /// `view` is not an atom carrying exactly the `#'` function prefix over a
@@ -55,7 +57,6 @@ fn sharp_quoted_symbol(view: &ExpressionView) -> Option<&str> {
 
 #[derive(Debug, Clone)]
 pub struct RedundantFuncallItem {
-    pub path: PathBuf,
     /// The span of the whole `(funcall #'FN …)` form.
     pub span: ByteSpan,
     /// The callee symbol name (`foo` for `#'foo`).
@@ -63,46 +64,45 @@ pub struct RedundantFuncallItem {
     /// The bytes a fix deletes: from the `funcall` head through the `#'` prefix,
     /// i.e. everything up to the callee symbol. Deleting this turns
     /// `(funcall #'foo a b)` into `(foo a b)`.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to make
+    /// the cut, and the command never printed it.
     pub removal_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct RedundantFuncallSummary {
-    pub funcall_form_count: usize,
-    pub violations: Vec<RedundantFuncallItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantFuncallPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantFuncallPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantFuncallItem {
+    /// The rule's own name. The callee is a symbol read out of the source, not
+    /// a tag from a closed set, so it stays a JSON field.
+    fn kind(&self) -> &'static str {
+        "redundant-funcall"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantFuncallPolicy {
-    pub fail_on_violation: bool,
-    pub funcall_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("callee={}", self.callee)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("callee", json!(self.callee))]
+    }
+
+    /// The same sentence the `redundant-funcall` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "funcall of #'{} is a direct call; (funcall #'{} …) is ({} …)",
+            self.callee, self.callee, self.callee
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_funcall(
     view: &ExpressionView,
-    path: &Path,
     funcall_form_count: &mut usize,
     violations: &mut Vec<RedundantFuncallItem>,
 ) {
@@ -128,22 +128,33 @@ pub fn examine_funcall(
     let callee_symbol_start =
         ByteOffset::new(function_arg.span.start().get() + function_arg.symbol_offset);
     violations.push(RedundantFuncallItem {
-        path: path.to_path_buf(),
         span: view.span,
         callee: callee.to_owned(),
         removal_span: ByteSpan::new(funcall_head.span.start(), callee_symbol_start),
     });
 }
 
-/// Collects every redundant `(funcall #'symbol …)` across a whole file, along
-/// with the total number of `funcall` forms scanned.
-pub fn collect_redundant_funcalls(
+/// Collects every redundant `(funcall #'symbol …)` in one file, with the number
+/// of `funcall` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant funcall here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_funcall_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantFuncallItem>)> {
+) -> LintResult<FileFindings<RedundantFuncallItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("funcall_form_count", json!(0))],
+        ));
     }
 
     let mut funcall_form_count = 0;
@@ -151,51 +162,40 @@ pub fn collect_redundant_funcalls(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_funcall(subview, path, &mut funcall_form_count, &mut violations);
+            examine_funcall(subview, &mut funcall_form_count, &mut violations);
         });
     }
-    Ok((funcall_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_redundant_funcalls(
-    funcall_form_count: usize,
-    violations: Vec<RedundantFuncallItem>,
-) -> RedundantFuncallSummary {
-    RedundantFuncallSummary {
-        funcall_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_funcall_policy(
-    options: RedundantFuncallPolicyOptions,
-    summary: &RedundantFuncallSummary,
-) -> RedundantFuncallPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantFuncallPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        funcall_form_count: summary.funcall_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("funcall_form_count", json!(funcall_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn funcalls(input: &str) -> (usize, Vec<RedundantFuncallItem>) {
+    fn report(input: &str) -> FileFindings<RedundantFuncallItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_funcalls(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant funcalls")
+        build_redundant_funcall_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant funcall report")
+    }
+
+    /// The `(funcall_form_count, violations)` pair the report is built from.
+    fn funcalls(input: &str) -> (u64, Vec<RedundantFuncallItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "funcall_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("funcall_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -266,29 +266,38 @@ mod tests {
         assert_eq!(violations[0].callee, "h");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(funcall #'foo a)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_redundant_funcalls(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant funcalls");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_redundant_funcall_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build redundant funcall report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("funcall_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = funcalls("(funcall #'foo a)");
-        let summary = summarize_redundant_funcalls(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(funcall fn a)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_redundant_funcall_policy(RedundantFuncallPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_callee() {
+        let report = report("(defun run (x)\n  (funcall #'process x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "redundant-funcall");
+        assert_eq!(finding.json_fields(), vec![("callee", json!("process"))]);
+        assert_eq!(finding.text_columns(), vec!["callee=process".to_owned()]);
+    }
 
-        let strict =
-            evaluate_redundant_funcall_policy(RedundantFuncallPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_funcall_scanned_not_only_the_flagged_ones() {
+        let report = report("(funcall #'foo a)\n(funcall fn b)\n");
+        assert_eq!(report.summary, vec![("funcall_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

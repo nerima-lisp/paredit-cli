@@ -20,13 +20,15 @@
 //! Scope: Common Lisp only. The empty list `()` is treated as the `nil`
 //! literal it reads as.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 fn is_nil_literal(view: &ExpressionView) -> bool {
     atom_text(view).is_some_and(|text| text.eq_ignore_ascii_case("nil"))
@@ -39,49 +41,56 @@ fn is_t_literal(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct DeadBooleanOperandItem {
-    pub path: PathBuf,
+    /// The span of the whole `(and …)`/`(or …)` form.
     pub span: ByteSpan,
+    /// The operator as it is spelled in source (`and` or `or`).
     pub head: String,
+    /// The literal that short-circuits it (`nil` for `and`, `t` for `or`).
     pub constant: String,
 }
 
-#[derive(Debug)]
-pub struct DeadBooleanOperandSummary {
-    pub boolean_form_count: usize,
-    pub violations: Vec<DeadBooleanOperandItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DeadBooleanOperandPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl DeadBooleanOperandPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for DeadBooleanOperandItem {
+    /// The rule's own name. `and` short-circuiting at `nil` and `or`
+    /// short-circuiting at `t` are the same defect under duality — every
+    /// operand after the constant is unreachable — so splitting the kind by
+    /// operator would offer a distinction without a difference. The operator
+    /// and its constant stay in the JSON for anyone who wants them.
+    fn kind(&self) -> &'static str {
+        "dead-boolean-operand"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DeadBooleanOperandPolicy {
-    pub fail_on_violation: bool,
-    pub boolean_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("head={}", self.head),
+            format!("constant={}", self.constant),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("constant", json!(self.constant)),
+        ]
+    }
+
+    /// The same sentence the `dead-boolean-operand` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} short-circuits at literal {}; later operands are dead",
+            self.head, self.constant
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
-    path: &Path,
     boolean_form_count: &mut usize,
     violations: &mut Vec<DeadBooleanOperandItem>,
 ) {
@@ -106,7 +115,6 @@ pub fn examine_boolean(
     let last_index = operands.len().saturating_sub(1);
     if operands.iter().take(last_index).any(is_short_circuit) {
         violations.push(DeadBooleanOperandItem {
-            path: path.to_path_buf(),
             span: view.span,
             head: head.to_owned(),
             constant: constant.to_owned(),
@@ -114,16 +122,28 @@ pub fn examine_boolean(
     }
 }
 
-/// Collects every `and`/`or` with a short-circuiting non-final constant
-/// across a whole file, along with the total number of `and`/`or` forms
-/// scanned.
-pub fn collect_dead_boolean_operands(
+/// Collects every `and`/`or` with a short-circuiting non-final constant in one
+/// file, with the number of `and`/`or` forms scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no dead operand here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_dead_boolean_operand_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DeadBooleanOperandItem>)> {
+) -> LintResult<FileFindings<DeadBooleanOperandItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("boolean_form_count", json!(0))],
+        ));
     }
 
     let mut boolean_form_count = 0;
@@ -131,51 +151,40 @@ pub fn collect_dead_boolean_operands(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, path, &mut boolean_form_count, &mut violations);
+            examine_boolean(subview, &mut boolean_form_count, &mut violations);
         });
     }
-    Ok((boolean_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_dead_boolean_operands(
-    boolean_form_count: usize,
-    violations: Vec<DeadBooleanOperandItem>,
-) -> DeadBooleanOperandSummary {
-    DeadBooleanOperandSummary {
-        boolean_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_dead_boolean_operand_policy(
-    options: DeadBooleanOperandPolicyOptions,
-    summary: &DeadBooleanOperandSummary,
-) -> DeadBooleanOperandPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    DeadBooleanOperandPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        boolean_form_count: summary.boolean_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("boolean_form_count", json!(boolean_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<DeadBooleanOperandItem>) {
-        let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_dead_boolean_operands(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect dead boolean operands")
+    fn report(input: &str) -> FileFindings<DeadBooleanOperandItem> {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
+        build_dead_boolean_operand_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build dead boolean operand report")
+    }
+
+    /// The `(boolean_form_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<DeadBooleanOperandItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "boolean_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("boolean_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -227,32 +236,45 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
-        let tree = SyntaxTree::parse("(and a nil b)").expect("parse input");
-        let (boolean_form_count, violations) =
-            collect_dead_boolean_operands(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect dead boolean operands");
-        assert_eq!(boolean_form_count, 0);
-        assert!(violations.is_empty());
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
+        let tree =
+            SyntaxTree::parse_with_dialect("(and a nil b)", Dialect::Clojure).expect("parse input");
+        let report =
+            build_dead_boolean_operand_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build dead boolean operand report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (boolean_form_count, items) = violations("(and a nil b)");
-        let summary = summarize_dead_boolean_operands(boolean_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(and a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_dead_boolean_operand_policy(
-            DeadBooleanOperandPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_head_and_its_constant() {
+        let report = report("(defun f (a b)\n  (or a t b))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "dead-boolean-operand");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("head", json!("or")), ("constant", json!("t"))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["head=or".to_owned(), "constant=t".to_owned()]
+        );
+    }
 
-        let strict = evaluate_dead_boolean_operand_policy(
-            DeadBooleanOperandPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_boolean_scanned_not_only_the_flagged_ones() {
+        let report = report("(and a nil b)\n(or x y)\n");
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

@@ -13,12 +13,13 @@
 
 use std::path::PathBuf;
 
+use paredit_core_cli::report::line_of;
 use paredit_core_semantics::semantics::binding::{Binding, BindingKind};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::ByteSpan;
 
 use crate::constant_report::domain::literal_text;
-use crate::shared::{SemanticFile, line_of};
+use crate::shared::SemanticFile;
 use paredit_core_semantics::semantics::value::LiteralValue;
 
 /// Why a binding's value did not reach the value table.

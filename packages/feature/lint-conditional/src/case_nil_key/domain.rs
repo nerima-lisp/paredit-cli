@@ -21,13 +21,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 const CASE_HEADS: [&str; 3] = ["case", "ccase", "ecase"];
 
@@ -40,50 +42,47 @@ fn is_bare_nil_key(key_designator: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct CaseNilKeyItem {
-    pub path: PathBuf,
     /// The span of the offending `nil` key designator.
     pub span: ByteSpan,
     /// The case operator (`case`/`ccase`/`ecase`), for the finding message.
     pub head: String,
 }
 
-#[derive(Debug)]
-pub struct CaseNilKeySummary {
-    pub case_form_count: usize,
-    pub violations: Vec<CaseNilKeyItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CaseNilKeyPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl CaseNilKeyPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for CaseNilKeyItem {
+    /// The rule's own name. There is one defect here, not a family of them: the
+    /// operator varies but the mistake — a bare `nil` where a key *list* was
+    /// meant — is the same one in `case`, `ccase`, and `ecase`, so splitting the
+    /// kind by operator would offer a filter no consumer is asking for.
+    fn kind(&self) -> &'static str {
+        "case-nil-key"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct CaseNilKeyPolicy {
-    pub fail_on_violation: bool,
-    pub case_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("head={}", self.head)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("head", json!(self.head))]
+    }
+
+    /// The same sentence the `case-nil-key` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} clause key nil is the empty key list and never matches; use ((nil) …)",
+            self.head
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_case(
     view: &ExpressionView,
-    path: &Path,
     case_form_count: &mut usize,
     violations: &mut Vec<CaseNilKeyItem>,
 ) {
@@ -113,7 +112,6 @@ pub fn examine_case(
         };
         if is_bare_nil_key(key_designator) {
             violations.push(CaseNilKeyItem {
-                path: path.to_path_buf(),
                 span: key_designator.span,
                 head: head.to_owned(),
             });
@@ -122,14 +120,27 @@ pub fn examine_case(
 }
 
 /// Collects every `case`/`ccase`/`ecase` clause with a bare `nil` key designator
-/// across a whole file, along with the total number of such forms scanned.
-pub fn collect_case_nil_keys(
+/// in one file, with the number of such forms scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no bare nil key here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_case_nil_key_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<CaseNilKeyItem>)> {
+) -> LintResult<FileFindings<CaseNilKeyItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("case_form_count", json!(0))],
+        ));
     }
 
     let mut case_form_count = 0;
@@ -137,51 +148,40 @@ pub fn collect_case_nil_keys(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_case(subview, path, &mut case_form_count, &mut violations);
+            examine_case(subview, &mut case_form_count, &mut violations);
         });
     }
-    Ok((case_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_case_nil_keys(
-    case_form_count: usize,
-    violations: Vec<CaseNilKeyItem>,
-) -> CaseNilKeySummary {
-    CaseNilKeySummary {
-        case_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_case_nil_key_policy(
-    options: CaseNilKeyPolicyOptions,
-    summary: &CaseNilKeySummary,
-) -> CaseNilKeyPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    CaseNilKeyPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        case_form_count: summary.case_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("case_form_count", json!(case_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn keys(input: &str) -> (usize, Vec<CaseNilKeyItem>) {
+    fn report(input: &str) -> FileFindings<CaseNilKeyItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_case_nil_keys(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect case nil keys")
+        build_case_nil_key_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build case nil key report")
+    }
+
+    /// The `(case_form_count, violations)` pair the report is built from.
+    fn keys(input: &str) -> (u64, Vec<CaseNilKeyItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "case_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("case_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -240,27 +240,38 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(case x (nil 1))", Dialect::Clojure).expect("parse");
-        let (case_form_count, items) =
-            collect_case_nil_keys(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect case nil keys");
-        assert_eq!(case_form_count, 0);
-        assert!(items.is_empty());
+        let report = build_case_nil_key_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build case nil key report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("case_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (case_form_count, items) = keys("(case x (nil 1))");
-        let summary = summarize_case_nil_keys(case_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(case x (a 1))").dialect_modelled);
+    }
 
-        let quiet = evaluate_case_nil_key_policy(CaseNilKeyPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_head() {
+        let report = report("(defun f (x)\n  (ecase x (nil 1)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "case-nil-key");
+        assert_eq!(finding.json_fields(), vec![("head", json!("ecase"))]);
+        assert_eq!(finding.text_columns(), vec!["head=ecase".to_owned()]);
+    }
 
-        let strict = evaluate_case_nil_key_policy(CaseNilKeyPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_case_scanned_not_only_the_flagged_ones() {
+        let report = report("(case x (nil 1))\n(case y (a 1))\n");
+        assert_eq!(report.summary, vec![("case_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

@@ -29,13 +29,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare `t` type specifier (no reader prefixes).
 fn is_t_type(view: &ExpressionView) -> bool {
@@ -65,46 +67,71 @@ pub enum TheRedundancy {
     AlreadySatisfied(String),
 }
 
+impl TheRedundancy {
+    /// This redundancy's tag, for the report's `kind` column.
+    ///
+    /// The two are different facts — vacuous for every form there is, versus
+    /// already satisfied by this one — and a consumer filtering on one of them
+    /// is asking a real question.
+    #[must_use]
+    pub const fn tag(&self) -> &'static str {
+        match self {
+            Self::Vacuous => "vacuous",
+            Self::AlreadySatisfied(_) => "already-satisfied",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RedundantTheItem {
-    pub path: PathBuf,
     /// The span of the whole `(the TYPE form)` form.
     pub span: ByteSpan,
     /// The span of the inner form (for reconstructing the fix).
+    ///
+    /// Published rather than kept internal: the old report emitted it, and a
+    /// consumer that wants to apply the rewrite itself needs the extent of the
+    /// text that survives it.
     pub form_span: ByteSpan,
     pub redundancy: TheRedundancy,
 }
 
-#[derive(Debug)]
-pub struct RedundantTheSummary {
-    pub the_form_count: usize,
-    pub violations: Vec<RedundantTheItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantThePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantThePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantTheItem {
+    fn kind(&self) -> &'static str {
+        self.redundancy.tag()
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantThePolicy {
-    pub fail_on_violation: bool,
-    pub the_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// The old text row carried nothing past the path and offset, and the
+    /// redundancy is already the leading `kind` column.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "form_span",
+            json!({
+                "start": self.form_span.start().get(),
+                "end": self.form_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `redundant-the` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        match &self.redundancy {
+            TheRedundancy::Vacuous => {
+                "(the t form) is a vacuous type declaration; it is just form".to_owned()
+            }
+            TheRedundancy::AlreadySatisfied(name) => {
+                format!("(the {name} form) asserts a type the form already has; it is just form")
+            }
+        }
+    }
 }
 
 /// Whether `form` provably already has the type `value_type` asserts.
@@ -125,7 +152,6 @@ const fn never(_: &ExpressionView, _: &ExpressionView) -> bool {
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_the(
     view: &ExpressionView,
-    path: &Path,
     already_known: IsAssertedTypeAlreadyKnown<'_>,
     the_form_count: &mut usize,
     violations: &mut Vec<RedundantTheItem>,
@@ -162,22 +188,33 @@ pub fn examine_the(
     };
 
     violations.push(RedundantTheItem {
-        path: path.to_path_buf(),
         span: view.span,
         form_span: form.span,
         redundancy,
     });
 }
 
-/// Collects every `(the t form)` across a whole file, along with the total
-/// number of `the` forms scanned.
-pub fn collect_redundant_thes(
+/// Collects every `(the t form)` in one file, with the number of `the` forms
+/// scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no vacuous `the` here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_the_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantTheItem>)> {
+) -> LintResult<FileFindings<RedundantTheItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("the_form_count", json!(0))],
+        ));
     }
 
     let mut the_form_count = 0;
@@ -185,51 +222,40 @@ pub fn collect_redundant_thes(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_the(subview, path, &never, &mut the_form_count, &mut violations);
+            examine_the(subview, &never, &mut the_form_count, &mut violations);
         });
     }
-    Ok((the_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_redundant_thes(
-    the_form_count: usize,
-    violations: Vec<RedundantTheItem>,
-) -> RedundantTheSummary {
-    RedundantTheSummary {
-        the_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_the_policy(
-    options: RedundantThePolicyOptions,
-    summary: &RedundantTheSummary,
-) -> RedundantThePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantThePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        the_form_count: summary.the_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("the_form_count", json!(the_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn thes(input: &str) -> (usize, Vec<RedundantTheItem>) {
+    fn report(input: &str) -> FileFindings<RedundantTheItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_thes(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect redundant the")
+        build_redundant_the_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant the report")
+    }
+
+    /// The `(the_form_count, violations)` pair the report is built from.
+    fn thes(input: &str) -> (u64, Vec<RedundantTheItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "the_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("the_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -284,26 +310,48 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(the t x)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_redundant_thes(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect redundant the");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_redundant_the_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build redundant the report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("the_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = thes("(the t x)");
-        let summary = summarize_redundant_thes(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(the fixnum x)").dialect_modelled);
+    }
 
-        let quiet = evaluate_redundant_the_policy(RedundantThePolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The inner form's span is the one extra field the old report published,
+    /// and it still crosses.
+    #[test]
+    fn a_finding_carries_its_line_its_kind_and_the_inner_form_span() {
+        let source = "(defun f ()\n  (the t (g x)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "vacuous");
+        assert!(finding.text_columns().is_empty());
+        let span = finding.form_span;
+        assert_eq!(&source[span.start().get()..span.end().get()], "(g x)");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "form_span",
+                json!({ "start": span.start().get(), "end": span.end().get() })
+            )]
+        );
+    }
 
-        let strict = evaluate_redundant_the_policy(RedundantThePolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_the_scanned_not_only_the_flagged_ones() {
+        let report = report("(the t x)\n(the fixnum y)\n(the t z)\n");
+        assert_eq!(report.summary, vec![("the_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

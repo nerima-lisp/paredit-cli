@@ -14,7 +14,9 @@ fn cli_flags_explicit_identity_key() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"call_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"head\": \"sort\""));
 }
 
@@ -32,7 +34,7 @@ fn cli_flags_nil_key() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }
 
 #[test]
@@ -54,7 +56,50 @@ fn cli_does_not_flag_custom_key_or_non_key_head() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no redundant :key in one
+        // :key-taking call" from "no such call at all"; tree-equal is not one.
+        .stdout(predicate::str::contains("\"call_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("redundant-identity-key-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(sort xs #'< :key #'identity)\n").expect("write a.clj");
+
+    paredit()
+        .args(["inspect", "redundant-identity-key", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_redundant_identity_key_emits_sarif() {
+    let dir = fresh_temp_dir("redundant-identity-key-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(sort xs #'< :key #'identity)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "redundant-identity-key", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/redundant-identity-key/redundant-identity-key\"",
+        ))
+        .stdout(predicate::str::contains(
+            "sort defaults :key to identity; the explicit :key #'identity is redundant",
+        ));
 }
 
 #[test]

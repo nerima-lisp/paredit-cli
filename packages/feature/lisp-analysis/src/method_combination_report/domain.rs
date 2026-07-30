@@ -84,7 +84,6 @@ pub struct MethodFinding {
     /// The specializer of each required parameter, `t` where unspecialized.
     pub specializers: Vec<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for MethodFinding {
@@ -98,10 +97,6 @@ impl Finding for MethodFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -129,12 +124,11 @@ pub fn build_method_combination_report(
     tree: &SyntaxTree,
 ) -> FileFindings<MethodFinding> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
 
     let mut methods = Vec::new();
     if modelled {
         for form in &tree.root_view().children {
-            if let Some(method) = read_method(form, source) {
+            if let Some(method) = read_method(form) {
                 methods.push(method);
             }
         }
@@ -166,6 +160,7 @@ pub fn build_method_combination_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         methods,
         vec![
             ("generic_function_count", json!(generics)),
@@ -179,7 +174,7 @@ pub fn build_method_combination_report(
 /// A method's qualifier sits between the name and the lambda list and may be
 /// absent, so the lambda list is found by *shape* — the first list-valued child
 /// — rather than by a fixed index.
-fn read_method(form: &ExpressionView, source: &str) -> Option<MethodFinding> {
+fn read_method(form: &ExpressionView) -> Option<MethodFinding> {
     let head = list_head(form)?;
     if !common_lisp_operator_head_eq(head, "defmethod") {
         return None;
@@ -206,7 +201,6 @@ fn read_method(form: &ExpressionView, source: &str) -> Option<MethodFinding> {
         qualifier,
         specializers: specializers(&form.children[lambda_index]),
         span: form.span,
-        line: line_of(source, form.span.start().get()),
     })
 }
 
@@ -244,15 +238,6 @@ fn specializers(lambda_list: &ExpressionView) -> Vec<String> {
 
 fn fold(name: &str) -> String {
     name.to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

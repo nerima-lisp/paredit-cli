@@ -26,13 +26,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 fn is_number_literal(text: &str) -> bool {
     text.starts_with(|character: char| {
@@ -60,9 +62,11 @@ pub enum NumberEvidence {
 
 #[derive(Debug, Clone)]
 pub struct EqNumberComparisonItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     /// The span of the `eq` head symbol, for an `eq` -> `eql` fix.
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to swap
+    /// `eq` for `eql`, and the command never prints it.
     pub head_span: ByteSpan,
     pub evidence: NumberEvidence,
 }
@@ -82,36 +86,41 @@ impl EqNumberComparisonItem {
     }
 }
 
-#[derive(Debug)]
-pub struct EqNumberComparisonSummary {
-    pub comparison_form_count: usize,
-    pub violations: Vec<EqNumberComparisonItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EqNumberComparisonPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EqNumberComparisonPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EqNumberComparisonItem {
+    /// The rule's own name rather than a variant of it.
+    ///
+    /// [`NumberEvidence`] is the only thing that varies, and the standalone
+    /// command that produces this report passes [`never`] — so every finding it
+    /// can emit is a `Literal` one. A `kind` with a single reachable value
+    /// would name a distinction the report cannot make.
+    fn kind(&self) -> &'static str {
+        "eq-number-comparison"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EqNumberComparisonPolicy {
-    pub fail_on_violation: bool,
-    pub comparison_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("literal={}", self.literal())]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("literal", json!(self.literal()))]
+    }
+
+    /// The same sentence the `eq-number-comparison` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        match &self.evidence {
+            NumberEvidence::Literal(literal) => {
+                format!("eq compares against number literal {literal}")
+            }
+            NumberEvidence::InferredType => {
+                "eq compares against an argument of inferred type number".to_owned()
+            }
+        }
+    }
 }
 
 /// Whether an argument is provably a number without being spelled as one.
@@ -130,7 +139,6 @@ const fn never(_: &ExpressionView) -> bool {
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    path: &Path,
     is_number: IsNumberArgument<'_>,
     comparison_form_count: &mut usize,
     violations: &mut Vec<EqNumberComparisonItem>,
@@ -156,7 +164,6 @@ pub fn examine_comparison(
 
     if let Some(evidence) = evidence {
         violations.push(EqNumberComparisonItem {
-            path: path.to_path_buf(),
             span: view.span,
             head_span: view.children[0].span,
             evidence,
@@ -164,15 +171,27 @@ pub fn examine_comparison(
     }
 }
 
-/// Collects every `eq` call with a numeric-literal argument across a whole
-/// file, along with the total number of `eq` calls scanned.
-pub fn collect_eq_number_comparisons(
+/// Collects every `eq` call with a numeric-literal argument in one file, with
+/// the number of `eq` calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no such comparison here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_eq_number_comparison_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EqNumberComparisonItem>)> {
+) -> LintResult<FileFindings<EqNumberComparisonItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("comparison_form_count", json!(0))],
+        ));
     }
 
     let mut comparison_form_count = 0;
@@ -180,57 +199,40 @@ pub fn collect_eq_number_comparisons(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(
-                subview,
-                path,
-                &never,
-                &mut comparison_form_count,
-                &mut violations,
-            );
+            examine_comparison(subview, &never, &mut comparison_form_count, &mut violations);
         });
     }
-    Ok((comparison_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_eq_number_comparisons(
-    comparison_form_count: usize,
-    violations: Vec<EqNumberComparisonItem>,
-) -> EqNumberComparisonSummary {
-    EqNumberComparisonSummary {
-        comparison_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_eq_number_comparison_policy(
-    options: EqNumberComparisonPolicyOptions,
-    summary: &EqNumberComparisonSummary,
-) -> EqNumberComparisonPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EqNumberComparisonPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        comparison_form_count: summary.comparison_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("comparison_form_count", json!(comparison_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn comparisons(input: &str) -> (usize, Vec<EqNumberComparisonItem>) {
+    fn report(input: &str) -> FileFindings<EqNumberComparisonItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_eq_number_comparisons(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect eq number comparisons")
+        build_eq_number_comparison_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build eq number comparison report")
+    }
+
+    /// The `(comparison_form_count, violations)` pair the report is built from.
+    fn comparisons(input: &str) -> (u64, Vec<EqNumberComparisonItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "comparison_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("comparison_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -295,32 +297,38 @@ mod tests {
         );
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(eq n 5)").expect("parse input");
-        let (comparison_form_count, violations) =
-            collect_eq_number_comparisons(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect eq number comparisons");
-        assert_eq!(comparison_form_count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_eq_number_comparison_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build eq number comparison report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (comparison_form_count, items) = comparisons("(eq n 5)");
-        let summary = summarize_eq_number_comparisons(comparison_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(eq x y)").dialect_modelled);
+    }
 
-        let quiet = evaluate_eq_number_comparison_policy(
-            EqNumberComparisonPolicyOptions::new(false),
-            &summary,
-        );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_literal() {
+        let report = report("(defun f (n)\n  (eq n 5))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "eq-number-comparison");
+        assert_eq!(finding.json_fields(), vec![("literal", json!("5"))]);
+        assert_eq!(finding.text_columns(), vec!["literal=5".to_owned()]);
+    }
 
-        let strict = evaluate_eq_number_comparison_policy(
-            EqNumberComparisonPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_eq_scanned_not_only_the_flagged_ones() {
+        let report = report("(eq n 5)\n(eq x y)\n");
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

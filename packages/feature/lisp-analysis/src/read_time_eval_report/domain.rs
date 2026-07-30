@@ -64,7 +64,6 @@ pub struct ReadTimeEval {
     /// useful field for triage: `+` and `run-program` are not the same finding.
     pub head: Option<String>,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for ReadTimeEval {
@@ -74,10 +73,6 @@ impl Finding for ReadTimeEval {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -123,6 +118,7 @@ pub fn build_read_time_eval_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("live_count", json!(live))],
     )
@@ -145,7 +141,6 @@ fn read_time_eval(view: &ExpressionView, source: &str) -> Option<ReadTimeEval> {
         head: head_of(form),
         form: elide(form),
         span: view.span,
-        line: line_of(source, view.span.start().get()),
     })
 }
 
@@ -185,15 +180,6 @@ fn elide(form: &str) -> String {
         .take(FORM_LIMIT.saturating_sub(1))
         .collect::<String>();
     format!("{head}…")
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

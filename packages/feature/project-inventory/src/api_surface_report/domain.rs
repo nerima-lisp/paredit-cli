@@ -43,7 +43,6 @@ pub struct ApiEntry {
     /// Whether the analyzed files define this export at all.
     pub defined: bool,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl ApiEntry {
@@ -78,10 +77,6 @@ impl Finding for ApiEntry {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -129,6 +124,7 @@ pub fn build_api_surface_report(
             path.to_path_buf(),
             dialect,
             false,
+            tree.source(),
             Vec::new(),
             vec![("undefined_export_count", json!(0))],
         );
@@ -176,13 +172,6 @@ pub fn build_api_surface_report(
                     // designator when there is not, since that is the only
                     // thing that exists.
                     span: definition.map_or(exported.span, |found| found.span),
-                    line: line_of(
-                        source,
-                        definition
-                            .map_or(exported.span, |found| found.span)
-                            .start()
-                            .get(),
-                    ),
                     package: package.clone(),
                     name,
                 });
@@ -196,6 +185,7 @@ pub fn build_api_surface_report(
         path.to_path_buf(),
         dialect,
         true,
+        tree.source(),
         findings,
         vec![("undefined_export_count", json!(undefined))],
     )
@@ -248,15 +238,6 @@ fn designator(name: &str) -> String {
         .trim_start_matches(':')
         .trim_matches('|')
         .to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

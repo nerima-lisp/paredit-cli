@@ -16,15 +16,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 const EXPECTED_ARGUMENTS: usize = 2;
 
@@ -47,48 +49,46 @@ fn is_arity_ambiguous(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct TheArityItem {
-    pub path: PathBuf,
+    /// The span of the whole `(the …)` form.
     pub span: ByteSpan,
+    /// How many arguments were written, which is anything but two.
     pub argument_count: usize,
 }
 
-#[derive(Debug)]
-pub struct TheAritySummary {
-    pub the_form_count: usize,
-    pub violations: Vec<TheArityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct TheArityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl TheArityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for TheArityItem {
+    /// One tag for every finding: what separates these is the argument count,
+    /// and a count is a quantity rather than a class of defect. It stays in the
+    /// columns and the JSON, where a consumer can compare it numerically.
+    fn kind(&self) -> &'static str {
+        "the-arity"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct TheArityPolicy {
-    pub fail_on_violation: bool,
-    pub the_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("arguments={}", self.argument_count)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("argument_count", json!(self.argument_count))]
+    }
+
+    /// The same sentence the `the-arity` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "the takes exactly 2 arguments (a type and a form) but has {}",
+            self.argument_count
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_the(
     view: &ExpressionView,
-    path: &Path,
     the_form_count: &mut usize,
     violations: &mut Vec<TheArityItem>,
 ) {
@@ -108,22 +108,33 @@ pub fn examine_the(
     let argument_count = view.children.len() - 1;
     if argument_count != EXPECTED_ARGUMENTS {
         violations.push(TheArityItem {
-            path: path.to_path_buf(),
             span: view.span,
             argument_count,
         });
     }
 }
 
-/// Collects every misarity `the` form across a whole file, along with the total
-/// number of `the` forms scanned.
-pub fn collect_the_arity_violations(
+/// Collects every misarity `the` form in one file, with the number of `the`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every `the` here is well-formed" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_the_arity_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<TheArityItem>)> {
+) -> LintResult<FileFindings<TheArityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("the_form_count", json!(0))],
+        ));
     }
 
     let mut the_form_count = 0;
@@ -131,51 +142,40 @@ pub fn collect_the_arity_violations(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_the(subview, path, &mut the_form_count, &mut violations);
+            examine_the(subview, &mut the_form_count, &mut violations);
         });
     }
-    Ok((the_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_the_arity(
-    the_form_count: usize,
-    violations: Vec<TheArityItem>,
-) -> TheAritySummary {
-    TheAritySummary {
-        the_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_the_arity_policy(
-    options: TheArityPolicyOptions,
-    summary: &TheAritySummary,
-) -> TheArityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    TheArityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        the_form_count: summary.the_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("the_form_count", json!(the_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<TheArityItem>) {
+    fn report(input: &str) -> FileFindings<TheArityItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_the_arity_violations(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect the arity violations")
+        build_the_arity_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build the arity report")
+    }
+
+    /// The `(the_form_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<TheArityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "the_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("the_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -221,27 +221,41 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(the fixnum)", Dialect::Clojure).expect("parse input");
-        let (the_form_count, items) =
-            collect_the_arity_violations(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect the arity violations");
-        assert_eq!(the_form_count, 0);
-        assert!(items.is_empty());
+        let report = build_the_arity_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build the arity report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("the_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (the_form_count, items) = violations("(the fixnum)");
-        let summary = summarize_the_arity(the_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(the fixnum x)").dialect_modelled);
+    }
 
-        let quiet = evaluate_the_arity_policy(TheArityPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_argument_count() {
+        let report = report("(defun f (x)\n  (the fixnum x x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "the-arity");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("argument_count", json!(3_usize))]
+        );
+        assert_eq!(finding.text_columns(), vec!["arguments=3".to_owned()]);
+    }
 
-        let strict = evaluate_the_arity_policy(TheArityPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_the_scanned_not_only_the_flagged_ones() {
+        let report = report("(the fixnum)\n(the fixnum x)\n(the fixnum x y)\n");
+        assert_eq!(report.summary, vec![("the_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

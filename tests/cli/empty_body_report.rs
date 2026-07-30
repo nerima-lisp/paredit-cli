@@ -14,7 +14,9 @@ fn cli_flags_when_with_no_body() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"body_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
         .stdout(predicate::str::contains("\"head\": \"when\""));
 }
 
@@ -32,7 +34,7 @@ fn cli_flags_dolist_with_no_body() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
         .stdout(predicate::str::contains("\"head\": \"dolist\""));
 }
 
@@ -50,7 +52,50 @@ fn cli_does_not_flag_forms_with_a_body() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "both body-taking forms have a
+        // body" from "no body-taking form at all".
+        .stdout(predicate::str::contains("\"body_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("empty-body-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn f [ready] (when ready))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "empty-body", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_empty_body_emits_sarif() {
+    let dir = fresh_temp_dir("empty-body-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(unless done)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "empty-body", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/empty-body/empty-body\"",
+        ))
+        .stdout(predicate::str::contains(
+            "unless has no body; the test/spec runs, then nothing",
+        ));
 }
 
 #[test]
@@ -85,5 +130,5 @@ fn cli_empty_body_expands_directory_inputs() {
         .arg(&dir)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"));
 }

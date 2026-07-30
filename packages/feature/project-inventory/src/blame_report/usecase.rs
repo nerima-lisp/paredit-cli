@@ -17,18 +17,7 @@ pub fn evaluate_blame_policy(
 ) -> ReportPolicy {
     let failing = reports
         .iter()
-        .map(|report| FileFindings {
-            path: report.path.clone(),
-            dialect: report.dialect,
-            dialect_modelled: report.dialect_modelled,
-            findings: report
-                .findings
-                .iter()
-                .filter(|attribution| attribution.author.is_none())
-                .cloned()
-                .collect(),
-            summary: report.summary.clone(),
-        })
+        .map(|report| report.retained(|attribution| attribution.author.is_none()))
         .collect::<Vec<_>>();
 
     let mut policy = ReportPolicy::fail_on_any(

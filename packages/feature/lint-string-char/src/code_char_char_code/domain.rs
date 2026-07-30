@@ -20,13 +20,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled operand list.
@@ -36,50 +38,48 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct CodeCharCharCodeItem {
-    pub path: PathBuf,
     /// The span of the whole `(code-char (char-code c))` form.
     pub span: ByteSpan,
     /// The span of the character operand `c`.
     pub char_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct CodeCharCharCodeSummary {
-    pub code_char_form_count: usize,
-    pub violations: Vec<CodeCharCharCodeItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CodeCharCharCodePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl CodeCharCharCodePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for CodeCharCharCodeItem {
+    /// The rule's own name: the round-trip has one shape, and the reverse
+    /// direction is deliberately not matched, so there is nothing to separate.
+    fn kind(&self) -> &'static str {
+        "code-char-char-code"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The operand span, which the old report already published and a caller
+    /// unwrapping the round-trip reads.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("char_span", span_json(self.char_span))]
+    }
+
+    /// The same sentence the `code-char-char-code` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "code-char of char-code is a round-trip; (code-char (char-code c)) is c".to_owned()
     }
 }
 
-#[derive(Debug)]
-pub struct CodeCharCharCodePolicy {
-    pub fail_on_violation: bool,
-    pub code_char_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+fn span_json(span: ByteSpan) -> Value {
+    json!({ "start": span.start().get(), "end": span.end().get() })
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     code_char_form_count: &mut usize,
     violations: &mut Vec<CodeCharCharCodeItem>,
 ) {
@@ -115,21 +115,32 @@ pub fn examine(
     }
 
     violations.push(CodeCharCharCodeItem {
-        path: path.to_path_buf(),
         span: view.span,
         char_span: character.span,
     });
 }
 
-/// Collects every `(code-char (char-code c))` across a whole file, along with the
-/// total number of `code-char` forms scanned.
-pub fn collect_code_char_char_codes(
+/// Collects every `(code-char (char-code c))` in one file, with the number of
+/// `code-char` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no round-trip here" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_code_char_char_code_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<CodeCharCharCodeItem>)> {
+) -> LintResult<FileFindings<CodeCharCharCodeItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("code_char_form_count", json!(0))],
+        ));
     }
 
     let mut code_char_form_count = 0;
@@ -137,51 +148,40 @@ pub fn collect_code_char_char_codes(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut code_char_form_count, &mut violations);
+            examine(subview, &mut code_char_form_count, &mut violations);
         });
     }
-    Ok((code_char_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_code_char_char_codes(
-    code_char_form_count: usize,
-    violations: Vec<CodeCharCharCodeItem>,
-) -> CodeCharCharCodeSummary {
-    CodeCharCharCodeSummary {
-        code_char_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_code_char_char_code_policy(
-    options: CodeCharCharCodePolicyOptions,
-    summary: &CodeCharCharCodeSummary,
-) -> CodeCharCharCodePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    CodeCharCharCodePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        code_char_form_count: summary.code_char_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("code_char_form_count", json!(code_char_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn code_chars(input: &str) -> (usize, Vec<CodeCharCharCodeItem>) {
+    fn report(input: &str) -> FileFindings<CodeCharCharCodeItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_code_char_char_codes(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect code char char codes")
+        build_code_char_char_code_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build code char char code report")
+    }
+
+    /// The `(code_char_form_count, violations)` pair the report is built from.
+    fn code_chars(input: &str) -> (u64, Vec<CodeCharCharCodeItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "code_char_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("code_char_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -228,31 +228,44 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(code-char (char-code c))", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_code_char_char_codes(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect code char char codes");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_code_char_char_code_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build code char char code report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("code_char_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = code_chars("(code-char (char-code c))");
-        let summary = summarize_code_char_char_codes(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(code-char n)").dialect_modelled);
+    }
 
-        let quiet = evaluate_code_char_char_code_policy(
-            CodeCharCharCodePolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_operand_span() {
+        let source = "(defun f (c)\n  (code-char (char-code c)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "code-char-char-code");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("char_span", span_json(finding.char_span))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(slice(source, finding.char_span), "c");
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_code_char_char_code_policy(CodeCharCharCodePolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_code_char_scanned_not_only_the_flagged_ones() {
+        let report = report("(code-char (char-code c))\n(code-char n)\n");
+        assert_eq!(report.summary, vec![("code_char_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

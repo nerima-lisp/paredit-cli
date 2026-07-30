@@ -21,18 +21,7 @@ pub fn evaluate_fail_on_mismatch_policy(
     // anything, so it must not fail a build.
     let mismatched = reports
         .iter()
-        .map(|report| FileFindings {
-            path: report.path.clone(),
-            dialect: report.dialect,
-            dialect_modelled: report.dialect_modelled,
-            findings: report
-                .findings
-                .iter()
-                .filter(|call| call.verdict.is_mismatch())
-                .cloned()
-                .collect(),
-            summary: report.summary.clone(),
-        })
+        .map(|report| report.retained(|call| call.verdict.is_mismatch()))
         .collect::<Vec<_>>();
 
     let mut policy = ReportPolicy::fail_on_any(

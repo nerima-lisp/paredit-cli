@@ -1,7 +1,29 @@
 //! Literal-place modify-macro (`(incf 5)`, `(push x 3)`, … — a literal where a
 //! place belongs) detection across explicit files.
 
-pub use crate::literal_place::domain::{
-    LiteralPlaceItem, LiteralPlacePolicy, LiteralPlacePolicyOptions, LiteralPlaceSummary,
-    collect_literal_places, evaluate_literal_place_policy, summarize_literal_places,
-};
+pub use crate::literal_place::domain::{LiteralPlaceItem, build_literal_place_report};
+
+use paredit_core_cli::report::{FileFindings, ReportPolicy};
+
+/// Evaluates this report's gate.
+///
+/// Armed by a flag rather than always on. A literal place fails at
+/// macroexpansion, but it is a build-breaking finding only in a project that
+/// has decided it is.
+#[must_use]
+pub fn evaluate_fail_on_violation_policy(
+    fail_on_violation: bool,
+    reports: &[FileFindings<LiteralPlaceItem>],
+) -> ReportPolicy {
+    ReportPolicy::fail_on_any(
+        fail_on_violation.then_some("--fail-on-violation"),
+        reports,
+        |report| {
+            format!(
+                "{} has {} literal place(s)",
+                report.path.display(),
+                report.findings.len()
+            )
+        },
+    )
+}

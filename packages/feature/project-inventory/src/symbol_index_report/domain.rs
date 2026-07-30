@@ -33,8 +33,6 @@ pub struct IndexEntry {
     pub name: String,
     /// The head that defined it, when the analyzed files do.
     pub category: Option<String>,
-    /// Line of the definition, or of the first reference when external.
-    pub line: usize,
     /// How many times it occurs outside its own definition.
     pub reference_count: usize,
     /// Byte offsets of every occurrence, so a consumer can jump without
@@ -54,10 +52,6 @@ impl Finding for IndexEntry {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -84,7 +78,6 @@ pub fn build_symbol_index_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> FileFindings<IndexEntry> {
-    let source = tree.source();
     let root = tree.root_view();
 
     // Definitions first: an occurrence is a reference only relative to a
@@ -150,7 +143,6 @@ pub fn build_symbol_index_report(
             IndexEntry {
                 category: definition.map(|(category, _)| category.clone()),
                 reference_count: sites.len().saturating_sub(self_reference),
-                line: line_of(source, span.start().get()),
                 occurrences: sites,
                 span,
                 name,
@@ -167,6 +159,7 @@ pub fn build_symbol_index_report(
         dialect,
         // Symbols and definition shapes exist in every dialect this parses.
         true,
+        tree.source(),
         findings,
         vec![
             ("symbol_count", json!(defined.len() + external)),
@@ -227,15 +220,6 @@ impl NameChild for paredit_core_syntax::definition::DefinitionShape {
             .find(|(_, child)| atom_symbol_text(child) == Some(name))
             .map(|(index, _)| index)
     }
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

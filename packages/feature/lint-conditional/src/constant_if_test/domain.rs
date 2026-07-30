@@ -16,13 +16,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal `t` or `nil` (no reader prefixes); returns
 /// which one so the caller can pick the live branch.
@@ -48,46 +50,50 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct ConstantIfTestItem {
-    pub path: PathBuf,
     /// The span of the whole `(if TEST …)` form.
     pub span: ByteSpan,
     /// The literal test, lowercased (`t` or `nil`).
     pub test: &'static str,
     /// The span of the live branch to keep, or `None` when the result is the
     /// literal `nil` (a false one-armed `if`).
+    ///
+    /// The rewrite's input, not the report's: the lint rule reads it to splice
+    /// the live branch in, and the command never prints it.
     pub result_span: Option<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct ConstantIfTestSummary {
-    pub if_form_count: usize,
-    pub violations: Vec<ConstantIfTestItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ConstantIfTestPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ConstantIfTestPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ConstantIfTestItem {
+    /// The literal test, so `t` and `nil` are separable without parsing JSON.
+    ///
+    /// They are two different collapses — `t` kills the else branch, `nil`
+    /// kills the then branch — and a consumer filtering on one of them is
+    /// asking a real question.
+    fn kind(&self) -> &'static str {
+        self.test
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ConstantIfTestPolicy {
-    pub fail_on_violation: bool,
-    pub if_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// None: the test already leads the row as the `kind`, and a column
+    /// repeating it would print `t` twice on the same line.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The JSON keeps `test` even though the text row drops it: the old JSON
+    /// published the field, and a JSON object has no leading `kind` column for
+    /// it to duplicate.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("test", json!(self.test))]
+    }
+
+    /// The same sentence the `constant-if-test` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!("if test is the constant {}; one branch is dead", self.test)
+    }
 }
 
 /// Whether a test is provably constant, and to what.
@@ -106,7 +112,6 @@ pub type ConstantTest<'a> = &'a dyn Fn(&ExpressionView) -> Option<bool>;
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_if(
     view: &ExpressionView,
-    path: &Path,
     constant_test: ConstantTest<'_>,
     if_form_count: &mut usize,
     violations: &mut Vec<ConstantIfTestItem>,
@@ -142,22 +147,33 @@ pub fn examine_if(
     };
 
     violations.push(ConstantIfTestItem {
-        path: path.to_path_buf(),
         span: view.span,
         test: if is_true { "t" } else { "nil" },
         result_span,
     });
 }
 
-/// Collects every constant-test `if` across a whole file, along with the total
-/// number of `if` forms scanned.
-pub fn collect_constant_if_tests(
+/// Collects every constant-test `if` in one file, with the number of `if` forms
+/// scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no constant test here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_constant_if_test_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ConstantIfTestItem>)> {
+) -> LintResult<FileFindings<ConstantIfTestItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("if_form_count", json!(0))],
+        ));
     }
 
     let mut if_form_count = 0;
@@ -165,57 +181,40 @@ pub fn collect_constant_if_tests(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_if(
-                subview,
-                path,
-                &constant_test,
-                &mut if_form_count,
-                &mut violations,
-            );
+            examine_if(subview, &constant_test, &mut if_form_count, &mut violations);
         });
     }
-    Ok((if_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_constant_if_tests(
-    if_form_count: usize,
-    violations: Vec<ConstantIfTestItem>,
-) -> ConstantIfTestSummary {
-    ConstantIfTestSummary {
-        if_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_constant_if_test_policy(
-    options: ConstantIfTestPolicyOptions,
-    summary: &ConstantIfTestSummary,
-) -> ConstantIfTestPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ConstantIfTestPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        if_form_count: summary.if_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("if_form_count", json!(if_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn ifs(input: &str) -> (usize, Vec<ConstantIfTestItem>) {
+    fn report(input: &str) -> FileFindings<ConstantIfTestItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_constant_if_tests(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect constant if tests")
+        build_constant_if_test_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build constant if test report")
+    }
+
+    /// The `(if_form_count, violations)` pair the report is built from.
+    fn ifs(input: &str) -> (u64, Vec<ConstantIfTestItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "if_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("if_form_count in the summary");
+        (count, report.findings)
     }
 
     fn result<'a>(source: &'a str, item: &ConstantIfTestItem) -> &'a str {
@@ -291,28 +290,39 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(if t a b)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_constant_if_tests(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect constant if tests");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_constant_if_test_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build constant if test report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("if_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = ifs("(if t a b)");
-        let summary = summarize_constant_if_tests(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(if ready a b)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_constant_if_test_policy(ConstantIfTestPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_test() {
+        let report = report("(defun f ()\n  (if t 1 2))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "t");
+        assert_eq!(finding.json_fields(), vec![("test", json!("t"))]);
+        // The test leads the row as the `kind`; a column repeating it would
+        // print `t` twice on one line.
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict =
-            evaluate_constant_if_test_policy(ConstantIfTestPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_if_scanned_not_only_the_flagged_ones() {
+        let report = report("(if t 1 2)\n(if a 3 4)\n(if nil 5 6)\n");
+        assert_eq!(report.summary, vec![("if_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

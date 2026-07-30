@@ -14,7 +14,9 @@ fn cli_flags_identity_call() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"identity_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"));
 }
 
 #[test]
@@ -35,7 +37,57 @@ fn cli_does_not_flag_reference_or_arity_mismatch() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "two identity calls, neither of
+        // them the one-argument shape" from "no identity call at all"; the
+        // `#'identity` reference is not a call.
+        .stdout(predicate::str::contains("\"identity_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_redundant_identity_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("redundant-identity-report-unmodelled");
+    let file = dir.join("a.clj");
+    fs::write(&file, "(identity x)\n").expect("write a.clj");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-identity")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_redundant_identity_emits_sarif() {
+    let dir = fresh_temp_dir("redundant-identity-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(identity x)\n").expect("write a.lisp");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("redundant-identity")
+        .arg("--output")
+        .arg("sarif")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/redundant-identity/redundant-identity\"",
+        ))
+        .stdout(predicate::str::contains(
+            "identity returns its argument unchanged; (identity x) is x",
+        ));
 }
 
 #[test]

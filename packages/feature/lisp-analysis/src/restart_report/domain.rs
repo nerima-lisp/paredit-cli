@@ -79,7 +79,6 @@ pub struct RestartFinding {
     /// The form that established or invoked it.
     pub form: String,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for RestartFinding {
@@ -89,10 +88,6 @@ impl Finding for RestartFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -123,7 +118,6 @@ pub fn build_restart_report(
     tree: &SyntaxTree,
 ) -> FileFindings<RestartFinding> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let mut raw = Vec::new();
 
     if modelled {
@@ -157,7 +151,6 @@ pub fn build_restart_report(
             name: item.name.clone(),
             form: item.form.clone(),
             span: item.span,
-            line: line_of(source, item.span.start().get()),
         })
         .collect::<Vec<_>>();
 
@@ -174,6 +167,7 @@ pub fn build_restart_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("handler_count", json!(handlers)),
@@ -283,15 +277,6 @@ fn shorthand_invocation(head: &str) -> Option<String> {
 
 fn fold(name: &str) -> String {
     name.to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

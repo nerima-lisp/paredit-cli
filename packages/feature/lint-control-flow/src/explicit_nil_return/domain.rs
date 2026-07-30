@@ -25,13 +25,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare `nil` literal (case-insensitive, no reader
 /// prefixes so a quoted/`,`-prefixed `nil` is excluded).
@@ -48,54 +50,59 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct ExplicitNilReturnItem {
-    pub path: PathBuf,
     /// The span of the whole `(return nil)` / `(return-from b nil)` form.
     pub span: ByteSpan,
     /// The span of the `return`/`return-from` head symbol (exact source).
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies the operator
+    /// from it, and the command never prints it.
     pub head_span: ByteSpan,
     /// The span of the block name (`return-from` only; `None` for `return`).
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies the block
+    /// name from it, and the command never prints it.
     pub block_span: Option<ByteSpan>,
     /// The canonical operator name (`return`/`return-from`), for the message.
     pub operator: &'static str,
 }
 
-#[derive(Debug)]
-pub struct ExplicitNilReturnSummary {
-    pub return_form_count: usize,
-    pub violations: Vec<ExplicitNilReturnItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ExplicitNilReturnPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl ExplicitNilReturnPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for ExplicitNilReturnItem {
+    /// The operator, so `return` and `return-from` are separable without
+    /// parsing JSON. They are two different edits — one drops an operand, the
+    /// other drops an operand and keeps a block name — and a consumer filtering
+    /// on one of them is asking a real question.
+    fn kind(&self) -> &'static str {
+        self.operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct ExplicitNilReturnPolicy {
-    pub fail_on_violation: bool,
-    pub return_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Empty: the operator is the only thing the old text row carried beyond
+    /// the path and offset, and it now leads every row as the `kind`.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("operator", json!(self.operator))]
+    }
+
+    /// The same sentence the `explicit-nil-return` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} nil result is the default; drop the redundant nil",
+            self.operator
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_return(
     view: &ExpressionView,
-    path: &Path,
     return_form_count: &mut usize,
     violations: &mut Vec<ExplicitNilReturnItem>,
 ) {
@@ -120,7 +127,6 @@ pub fn examine_return(
             return;
         }
         violations.push(ExplicitNilReturnItem {
-            path: path.to_path_buf(),
             span: view.span,
             head_span,
             block_span: None,
@@ -138,7 +144,6 @@ pub fn examine_return(
             return;
         }
         violations.push(ExplicitNilReturnItem {
-            path: path.to_path_buf(),
             span: view.span,
             head_span,
             block_span: Some(block.span),
@@ -147,16 +152,28 @@ pub fn examine_return(
     }
 }
 
-/// Collects every `return`/`return-from` with an explicit `nil` result across a
-/// whole file, along with the total number of `return`/`return-from` forms
-/// scanned.
-pub fn collect_explicit_nil_returns(
+/// Collects every `return`/`return-from` with an explicit `nil` result in one
+/// file, with the number of `return`/`return-from` forms scanned as the
+/// denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant nil result here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_explicit_nil_return_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<ExplicitNilReturnItem>)> {
+) -> LintResult<FileFindings<ExplicitNilReturnItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("return_form_count", json!(0))],
+        ));
     }
 
     let mut return_form_count = 0;
@@ -164,51 +181,40 @@ pub fn collect_explicit_nil_returns(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_return(subview, path, &mut return_form_count, &mut violations);
+            examine_return(subview, &mut return_form_count, &mut violations);
         });
     }
-    Ok((return_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_explicit_nil_returns(
-    return_form_count: usize,
-    violations: Vec<ExplicitNilReturnItem>,
-) -> ExplicitNilReturnSummary {
-    ExplicitNilReturnSummary {
-        return_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_explicit_nil_return_policy(
-    options: ExplicitNilReturnPolicyOptions,
-    summary: &ExplicitNilReturnSummary,
-) -> ExplicitNilReturnPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    ExplicitNilReturnPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        return_form_count: summary.return_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("return_form_count", json!(return_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn returns(input: &str) -> (usize, Vec<ExplicitNilReturnItem>) {
+    fn report(input: &str) -> FileFindings<ExplicitNilReturnItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_explicit_nil_returns(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect explicit nil returns")
+        build_explicit_nil_return_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build explicit nil return report")
+    }
+
+    /// The `(return_form_count, violations)` pair the report is built from.
+    fn returns(input: &str) -> (u64, Vec<ExplicitNilReturnItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "return_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("return_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -277,32 +283,42 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(return nil)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_explicit_nil_returns(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect explicit nil returns");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_explicit_nil_return_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build explicit nil return report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("return_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = returns("(return nil)");
-        let summary = summarize_explicit_nil_returns(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(return 5)").dialect_modelled);
+    }
 
-        let quiet = evaluate_explicit_nil_return_policy(
-            ExplicitNilReturnPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(loop\n  (return nil))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "return");
+        assert_eq!(finding.json_fields(), vec![("operator", json!("return"))]);
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.message(),
+            "return nil result is the default; drop the redundant nil"
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    }
 
-        let strict = evaluate_explicit_nil_return_policy(
-            ExplicitNilReturnPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_return_scanned_not_only_the_flagged_ones() {
+        let report = report("(return nil)\n(return 5)\n(return-from foo nil)\n");
+        assert_eq!(report.summary, vec![("return_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

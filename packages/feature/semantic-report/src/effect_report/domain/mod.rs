@@ -25,12 +25,13 @@ mod policy;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
+use paredit_core_cli::report::line_of;
 use paredit_core_syntax::definition::{DefinitionShape, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView};
 use paredit_core_syntax::view_query::list_head;
 
-use crate::shared::{SemanticFile, line_of};
+use crate::shared::SemanticFile;
 
 pub use policy::{HeadEffect, head_effect};
 

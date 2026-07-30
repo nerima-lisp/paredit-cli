@@ -50,7 +50,6 @@ pub struct ClassFinding {
     /// How many edges from a root. `0` for a class with no known superclass.
     pub depth: usize,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for ClassFinding {
@@ -64,10 +63,6 @@ impl Finding for ClassFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -114,7 +109,6 @@ pub fn build_class_hierarchy_report(
     tree: &SyntaxTree,
 ) -> FileFindings<ClassFinding> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
 
     let mut raw = Vec::new();
     if modelled {
@@ -155,7 +149,6 @@ pub fn build_class_hierarchy_report(
                 shadowed_slots: shadowed,
                 depth,
                 span: class.span,
-                line: line_of(source, class.span.start().get()),
             }
         })
         .collect::<Vec<_>>();
@@ -170,6 +163,7 @@ pub fn build_class_hierarchy_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![
             ("class_count", json!(raw.len())),
@@ -323,15 +317,6 @@ fn is_string_literal(view: &ExpressionView) -> bool {
 
 fn fold(name: &str) -> String {
     name.to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

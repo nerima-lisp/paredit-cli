@@ -14,7 +14,10 @@ fn cli_flags_repeated_setf_place() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"assignment_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"operator\": \"setf\""))
         .stdout(predicate::str::contains("\"place\": \"total\""));
 }
 
@@ -36,7 +39,50 @@ fn cli_does_not_flag_distinct_places_or_compound() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no repeated place in two
+        // assignment forms" from "no assignment form at all".
+        .stdout(predicate::str::contains("\"assignment_form_count\": 2"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_duplicate_setf_place_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("duplicate-setf-place-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(set a 1)\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "duplicate-setf-places", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_duplicate_setf_place_emits_sarif() {
+    let dir = fresh_temp_dir("duplicate-setf-place-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(setf a 1 a 2)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "duplicate-setf-places", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/duplicate-setf-places/duplicate-setf-places\"",
+        ))
+        .stdout(predicate::str::contains(
+            "setf assigns variable a more than once; the earlier assignment is dead",
+        ));
 }
 
 #[test]

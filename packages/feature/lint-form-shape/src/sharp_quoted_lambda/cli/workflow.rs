@@ -3,38 +3,28 @@ use paredit_core_cli::CommandResult;
 use crate::sharp_quoted_lambda::cli::args::SharpQuotedLambdaReportArgs;
 use crate::sharp_quoted_lambda::cli::render::print_sharp_quoted_lambda_report;
 use crate::sharp_quoted_lambda::usecase::{
-    SharpQuotedLambdaPolicyOptions, collect_sharp_quoted_lambdas,
-    evaluate_sharp_quoted_lambda_policy, summarize_sharp_quoted_lambdas,
+    build_sharp_quoted_lambda_report, evaluate_fail_on_violation_policy,
 };
 use paredit_core_cli::shared::{expand_input_files, read_input_dialect_and_tree};
 
 pub fn sharp_quoted_lambda_report(args: SharpQuotedLambdaReportArgs) -> CommandResult {
     let files = expand_input_files(&args.files, args.dialect)?;
 
-    let mut lambda_form_count = 0;
-    let mut violations = Vec::new();
-
+    let mut reports = Vec::with_capacity(files.len());
     for file in &files {
         let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let (file_form_count, file_violations) =
-            collect_sharp_quoted_lambdas(file, dialect, &tree)?;
-        lambda_form_count += file_form_count;
-        violations.extend(file_violations);
+        reports.push(build_sharp_quoted_lambda_report(file, dialect, &tree)?);
     }
 
-    let summary = summarize_sharp_quoted_lambdas(lambda_form_count, violations);
-    let policy = evaluate_sharp_quoted_lambda_policy(
-        SharpQuotedLambdaPolicyOptions::new(args.fail_on_violation),
-        &summary,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
+    let policy = evaluate_fail_on_violation_policy(args.fail_on_violation, &reports);
+    let passed = policy.passed;
+    let message = policy.violations.join("; ");
 
-    print_sharp_quoted_lambda_report(&summary, &policy, args.output)?;
+    print_sharp_quoted_lambda_report(&reports, &policy, args.output)?;
 
-    if !policy_passed {
+    if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
-            "sharp-quoted-lambda-report policy failed: {policy_message}"
+            "sharp-quoted-lambda-report policy failed: {message}"
         )));
     }
 

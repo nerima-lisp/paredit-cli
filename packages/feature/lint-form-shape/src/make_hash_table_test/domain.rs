@@ -19,15 +19,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` designates the `eql` function: `#'eql`, `'eql`, or the
 /// explicit `(function eql)` / `(quote eql)` list.
@@ -59,50 +61,52 @@ fn is_test_keyword(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct MakeHashTableTestItem {
-    pub path: PathBuf,
     /// The span of the whole `make-hash-table` form.
     pub span: ByteSpan,
     /// The span to delete: the ` :test 'eql` argument pair.
+    ///
+    /// Both the fix's input and part of the report: an agent that wants to
+    /// perform the deletion itself needs the exact bytes, and the old report
+    /// published them.
     pub removal_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct MakeHashTableTestSummary {
-    pub make_hash_table_form_count: usize,
-    pub violations: Vec<MakeHashTableTestItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MakeHashTableTestPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl MakeHashTableTestPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for MakeHashTableTestItem {
+    /// The rule's own name. Every finding here is the same defect — an explicit
+    /// `:test 'eql` — with nothing to sub-divide it by.
+    fn kind(&self) -> &'static str {
+        "make-hash-table-test"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct MakeHashTableTestPolicy {
-    pub fail_on_violation: bool,
-    pub make_hash_table_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "removal_span",
+            json!({
+                "start": self.removal_span.start().get(),
+                "end": self.removal_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `make-hash-table-test` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "the make-hash-table :test defaults to eql; drop the explicit :test 'eql".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     make_hash_table_form_count: &mut usize,
     violations: &mut Vec<MakeHashTableTestItem>,
 ) {
@@ -126,7 +130,6 @@ pub fn examine(
         }
         let removal_span = ByteSpan::new(view.children[index - 1].span.end(), value.span.end());
         violations.push(MakeHashTableTestItem {
-            path: path.to_path_buf(),
             span: view.span,
             removal_span,
         });
@@ -134,15 +137,27 @@ pub fn examine(
     }
 }
 
-/// Collects every `(make-hash-table … :test 'eql …)` across a whole file, along
-/// with the total number of `make-hash-table` forms scanned.
-pub fn collect_make_hash_table_tests(
+/// Collects every `(make-hash-table … :test 'eql …)` in one file, with the
+/// number of `make-hash-table` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant `:test`" for Common Lisp and
+/// "nothing was looked for" for Clojure, and the two read identically without
+/// the flag.
+pub fn build_make_hash_table_test_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<MakeHashTableTestItem>)> {
+) -> LintResult<FileFindings<MakeHashTableTestItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("make_hash_table_form_count", json!(0))],
+        ));
     }
 
     let mut make_hash_table_form_count = 0;
@@ -150,56 +165,44 @@ pub fn collect_make_hash_table_tests(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(
-                subview,
-                path,
-                &mut make_hash_table_form_count,
-                &mut violations,
-            );
+            examine(subview, &mut make_hash_table_form_count, &mut violations);
         });
     }
-    Ok((make_hash_table_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_make_hash_table_tests(
-    make_hash_table_form_count: usize,
-    violations: Vec<MakeHashTableTestItem>,
-) -> MakeHashTableTestSummary {
-    MakeHashTableTestSummary {
-        make_hash_table_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_make_hash_table_test_policy(
-    options: MakeHashTableTestPolicyOptions,
-    summary: &MakeHashTableTestSummary,
-) -> MakeHashTableTestPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    MakeHashTableTestPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        make_hash_table_form_count: summary.make_hash_table_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![(
+            "make_hash_table_form_count",
+            json!(make_hash_table_form_count),
+        )],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<MakeHashTableTestItem>) {
+    fn report(input: &str) -> FileFindings<MakeHashTableTestItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_make_hash_table_tests(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect make-hash-table tests")
+        build_make_hash_table_test_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build make-hash-table test report")
+    }
+
+    /// The `(make_hash_table_form_count, violations)` pair the report is built
+    /// from.
+    fn calls(input: &str) -> (u64, Vec<MakeHashTableTestItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "make_hash_table_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("make_hash_table_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -253,33 +256,56 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(make-hash-table :test 'eql)", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_make_hash_table_tests(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect make-hash-table tests");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_make_hash_table_test_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build make-hash-table test report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(
+            report.summary,
+            vec![("make_hash_table_form_count", json!(0))]
+        );
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(make-hash-table :test 'eql)");
-        let summary = summarize_make_hash_table_tests(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(make-hash-table)").dialect_modelled);
+    }
 
-        let quiet = evaluate_make_hash_table_test_policy(
-            MakeHashTableTestPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_removal_span() {
+        let report = report("(defun f ()\n  (make-hash-table :test 'eql))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "make-hash-table-test");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "removal_span",
+                json!({
+                    "start": finding.removal_span.start().get(),
+                    "end": finding.removal_span.end().get(),
+                }),
+            )]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_make_hash_table_test_policy(
-            MakeHashTableTestPolicyOptions::new(true),
-            &summary,
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report(
+            "(make-hash-table)\n(make-hash-table :test 'equal)\n(make-hash-table :test 'eql)\n",
         );
-        assert!(!strict.passed);
+        assert_eq!(
+            report.summary,
+            vec![("make_hash_table_form_count", json!(3))]
+        );
+        assert_eq!(report.findings.len(), 1);
     }
 }

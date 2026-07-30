@@ -22,7 +22,7 @@
 
 use std::path::Path;
 
-use paredit_core_cli::report::{FileFindings, Finding};
+use paredit_core_cli::report::{FileFindings, Finding, line_of};
 use paredit_core_syntax::definition::{DefinitionCategory, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
@@ -70,7 +70,6 @@ pub struct DebtFinding {
     pub contributions: Vec<String>,
     pub score: usize,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for DebtFinding {
@@ -80,10 +79,6 @@ impl Finding for DebtFinding {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -166,7 +161,6 @@ pub fn build_debt_score_report(
             contributions,
             score,
             span: form.span,
-            line: line_of(source, form.span.start().get()),
         });
     }
 
@@ -182,6 +176,7 @@ pub fn build_debt_score_report(
         dialect,
         // Every input is a shape or comment question, not a dialect one.
         true,
+        tree.source(),
         findings,
         vec![
             ("debt_score", json!(total)),
@@ -242,15 +237,6 @@ fn is_string_literal(view: &ExpressionView) -> bool {
             .text
             .as_deref()
             .is_some_and(|text| text.starts_with('"'))
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

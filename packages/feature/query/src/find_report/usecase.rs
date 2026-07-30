@@ -48,7 +48,14 @@ pub fn build_find_report(
     // reader, both of which every dialect this build parses provides. There is
     // no dialect for which a match means less than it does here, so the
     // envelope's "not modelled" notice would be a false warning.
-    FileFindings::new(path.to_path_buf(), dialect, true, hits, summary)
+    FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
+        hits,
+        summary,
+    )
 }
 
 /// Evaluates the two gates, which point in opposite directions.

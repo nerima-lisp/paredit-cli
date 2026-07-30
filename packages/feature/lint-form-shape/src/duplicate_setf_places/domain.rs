@@ -17,13 +17,15 @@
 //! Scope: Common Lisp only.
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 const ASSIGNMENT_HEADS: [&str; 4] = ["setq", "psetq", "setf", "psetf"];
 
@@ -38,7 +40,6 @@ fn symbol_place(view: &ExpressionView) -> Option<&str> {
 
 #[derive(Debug, Clone)]
 pub struct DuplicateSetfPlaceItem {
-    pub path: PathBuf,
     /// The span of the whole assignment form.
     pub span: ByteSpan,
     /// The operator, lowercased (`setf`/`setq`/`psetf`/`psetq`).
@@ -47,43 +48,47 @@ pub struct DuplicateSetfPlaceItem {
     pub place: String,
 }
 
-#[derive(Debug)]
-pub struct DuplicateSetfPlaceSummary {
-    pub assignment_form_count: usize,
-    pub violations: Vec<DuplicateSetfPlaceItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DuplicateSetfPlacePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl DuplicateSetfPlacePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for DuplicateSetfPlaceItem {
+    /// The rule's name, not the operator: `operator` is source text lowercased
+    /// per finding, and `kind` is a fixed vocabulary the interop formats turn
+    /// into a rule id. It stays a `json_fields` entry, where filtering on it
+    /// still works.
+    fn kind(&self) -> &'static str {
+        "duplicate-setf-places"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DuplicateSetfPlacePolicy {
-    pub fail_on_violation: bool,
-    pub assignment_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("operator={}", self.operator),
+            format!("place={}", self.place),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("place", json!(self.place)),
+        ]
+    }
+
+    /// The same sentence the `duplicate-setf-places` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} assigns variable {} more than once; the earlier assignment is dead",
+            self.operator, self.place
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_assignment(
     view: &ExpressionView,
-    path: &Path,
     assignment_form_count: &mut usize,
     violations: &mut Vec<DuplicateSetfPlaceItem>,
 ) {
@@ -110,7 +115,6 @@ pub fn examine_assignment(
         let key = name.to_ascii_lowercase();
         if !seen.insert(key.clone()) && reported.insert(key) {
             violations.push(DuplicateSetfPlaceItem {
-                path: path.to_path_buf(),
                 span: view.span,
                 operator: head.to_ascii_lowercase(),
                 place: name.to_owned(),
@@ -119,15 +123,27 @@ pub fn examine_assignment(
     }
 }
 
-/// Collects every duplicated symbol place across a whole file, along with the
-/// total number of assignment forms scanned.
-pub fn collect_duplicate_setf_places(
+/// Collects every duplicated symbol place in one file, with the number of
+/// assignment forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no repeated place here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_duplicate_setf_place_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DuplicateSetfPlaceItem>)> {
+) -> LintResult<FileFindings<DuplicateSetfPlaceItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("assignment_form_count", json!(0))],
+        ));
     }
 
     let mut assignment_form_count = 0;
@@ -135,51 +151,40 @@ pub fn collect_duplicate_setf_places(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_assignment(subview, path, &mut assignment_form_count, &mut violations);
+            examine_assignment(subview, &mut assignment_form_count, &mut violations);
         });
     }
-    Ok((assignment_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_duplicate_setf_places(
-    assignment_form_count: usize,
-    violations: Vec<DuplicateSetfPlaceItem>,
-) -> DuplicateSetfPlaceSummary {
-    DuplicateSetfPlaceSummary {
-        assignment_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_duplicate_setf_place_policy(
-    options: DuplicateSetfPlacePolicyOptions,
-    summary: &DuplicateSetfPlaceSummary,
-) -> DuplicateSetfPlacePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    DuplicateSetfPlacePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        assignment_form_count: summary.assignment_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("assignment_form_count", json!(assignment_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn places(input: &str) -> (usize, Vec<DuplicateSetfPlaceItem>) {
+    fn report(input: &str) -> FileFindings<DuplicateSetfPlaceItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_duplicate_setf_places(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect duplicate setf places")
+        build_duplicate_setf_place_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build duplicate setf place report")
+    }
+
+    /// The `(assignment_form_count, violations)` pair the report is built from.
+    fn places(input: &str) -> (u64, Vec<DuplicateSetfPlaceItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "assignment_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("assignment_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -255,33 +260,45 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(setf a 1 a 2)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_duplicate_setf_places(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect duplicate setf places");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_duplicate_setf_place_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build duplicate setf place report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("assignment_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = places("(setf a 1 a 2)");
-        let summary = summarize_duplicate_setf_places(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(setf a 1 b 2)").dialect_modelled);
+    }
 
-        let quiet = evaluate_duplicate_setf_place_policy(
-            DuplicateSetfPlacePolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_place() {
+        let report = report("(defun reset ()\n  (setf total 0 total 1))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "duplicate-setf-places");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("setf")), ("place", json!("total"))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["operator=setf".to_owned(), "place=total".to_owned()]
+        );
+    }
 
-        let strict = evaluate_duplicate_setf_place_policy(
-            DuplicateSetfPlacePolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_assignment_scanned_not_only_the_flagged_ones() {
+        let report = report("(setf a 1 a 2)\n(setq b 1)\n(psetq c 1 d 2)\n");
+        assert_eq!(report.summary, vec![("assignment_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

@@ -20,15 +20,17 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionView, Path as SexprPath, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 const EQUALITY_HEADS: [&str; 4] = ["eq", "eql", "equal", "equalp"];
 const EXPECTED_ARGUMENTS: usize = 2;
@@ -52,47 +54,58 @@ fn is_arity_ambiguous(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct EqualityArityItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
+    /// The operator exactly as it was written, so its source casing survives.
     pub operator: String,
     pub argument_count: usize,
 }
 
-#[derive(Debug)]
-pub struct EqualityAritySummary {
-    pub call_count: usize,
-    pub violations: Vec<EqualityArityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EqualityArityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl EqualityArityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for EqualityArityItem {
+    /// Which of the four equality predicates was miscalled, normalized to the
+    /// spelling this rule matched on.
+    ///
+    /// A consumer chasing a misarity call cares which predicate it is — the
+    /// four are separate functions with separate call sites — and can select
+    /// one without parsing JSON. `operator` keeps the source casing that this
+    /// discards.
+    fn kind(&self) -> &'static str {
+        EQUALITY_HEADS
+            .iter()
+            .find(|name| self.operator.eq_ignore_ascii_case(name))
+            .copied()
+            .unwrap_or("equality-arity")
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct EqualityArityPolicy {
-    pub fail_on_violation: bool,
-    pub call_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("op={}", self.operator),
+            format!("arguments={}", self.argument_count),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("argument_count", json!(self.argument_count)),
+        ]
+    }
+
+    /// The same sentence the `equality-arity` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} takes exactly {EXPECTED_ARGUMENTS} arguments but has {}",
+            self.operator, self.argument_count
+        )
+    }
 }
 
 pub fn examine_call(
     view: &ExpressionView,
-    path: &Path,
     call_count: &mut usize,
     violations: &mut Vec<EqualityArityItem>,
 ) {
@@ -118,7 +131,6 @@ pub fn examine_call(
     let argument_count = view.children.len() - 1;
     if argument_count != EXPECTED_ARGUMENTS {
         violations.push(EqualityArityItem {
-            path: path.to_path_buf(),
             span: view.span,
             operator: head.to_owned(),
             argument_count,
@@ -126,15 +138,27 @@ pub fn examine_call(
     }
 }
 
-/// Collects every misarity equality-predicate call across a whole file, along
-/// with the total number of such calls scanned.
-pub fn collect_equality_arity_violations(
+/// Collects every misarity equality-predicate call in one file, with the number
+/// of such calls scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "every call is binary" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_equality_arity_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<EqualityArityItem>)> {
+) -> LintResult<FileFindings<EqualityArityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("call_count", json!(0))],
+        ));
     }
 
     let mut call_count = 0;
@@ -142,51 +166,40 @@ pub fn collect_equality_arity_violations(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_call(subview, path, &mut call_count, &mut violations);
+            examine_call(subview, &mut call_count, &mut violations);
         });
     }
-    Ok((call_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_equality_arity(
-    call_count: usize,
-    violations: Vec<EqualityArityItem>,
-) -> EqualityAritySummary {
-    EqualityAritySummary {
-        call_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_equality_arity_policy(
-    options: EqualityArityPolicyOptions,
-    summary: &EqualityAritySummary,
-) -> EqualityArityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    EqualityArityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        call_count: summary.call_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("call_count", json!(call_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<EqualityArityItem>) {
+    fn report(input: &str) -> FileFindings<EqualityArityItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_equality_arity_violations(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect equality arity violations")
+        build_equality_arity_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build equality arity report")
+    }
+
+    /// The `(call_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<EqualityArityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "call_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("call_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -249,28 +262,53 @@ mod tests {
         assert_eq!(items.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(eq x)", Dialect::Clojure).expect("parse input");
-        let (call_count, items) =
-            collect_equality_arity_violations(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect equality arity violations");
-        assert_eq!(call_count, 0);
-        assert!(items.is_empty());
+        let report = build_equality_arity_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build equality arity report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("call_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (call_count, items) = violations("(eq x)");
-        let summary = summarize_equality_arity(call_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(eq a b)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_equality_arity_policy(EqualityArityPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_arity() {
+        let report = report("(defun f (x)\n  (eq x))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "eq");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("eq")), ("argument_count", json!(1))]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["op=eq".to_owned(), "arguments=1".to_owned()]
+        );
+        assert_eq!(finding.message(), "eq takes exactly 2 arguments but has 1");
+    }
 
-        let strict =
-            evaluate_equality_arity_policy(EqualityArityPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    /// The `kind` normalizes; the `operator` field does not, so the source
+    /// spelling is still recoverable from the report.
+    #[test]
+    fn a_shouted_operator_normalizes_only_in_the_kind() {
+        let (_, items) = violations("(EQUALP a)");
+        assert_eq!(items[0].kind(), "equalp");
+        assert_eq!(items[0].operator, "EQUALP");
+    }
+
+    #[test]
+    fn the_summary_counts_every_call_scanned_not_only_the_flagged_ones() {
+        let report = report("(eq x)\n(eq a b)\n");
+        assert_eq!(report.summary, vec![("call_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

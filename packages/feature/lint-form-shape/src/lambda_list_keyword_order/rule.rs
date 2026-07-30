@@ -6,7 +6,7 @@
 
 use paredit_core_lint_engine::LintResult;
 
-use crate::lambda_list_keyword_order::domain::collect_lambda_list_keyword_order;
+use crate::lambda_list_keyword_order::domain::build_lambda_list_keyword_order_report;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
 use paredit_core_lint_engine::rule::LintRule;
@@ -36,9 +36,12 @@ impl LintRule for Rule {
         _view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
-        let (_, items) =
-            collect_lambda_list_keyword_order(context.path(), context.dialect(), context.tree())?;
-        for item in items {
+        let report = build_lambda_list_keyword_order_report(
+            context.path(),
+            context.dialect(),
+            context.tree(),
+        )?;
+        for item in report.findings {
             let span = item.span;
 
             sink.report(

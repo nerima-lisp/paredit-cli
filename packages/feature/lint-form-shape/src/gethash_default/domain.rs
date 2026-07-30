@@ -17,13 +17,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// Whether `view` is the bare literal `nil` (no reader prefixes).
 fn is_nil_literal(view: &ExpressionView) -> bool {
@@ -39,51 +41,56 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct GethashDefaultItem {
-    pub path: PathBuf,
     /// The span of the whole `(gethash k h nil)` form.
     pub span: ByteSpan,
     /// The span to delete: the ` nil` default, from the end of the table operand
     /// through the `nil`.
+    ///
+    /// The rewrite's input, but the old report published it, so it stays on the
+    /// report too: a consumer applying the edit itself needs the same bytes the
+    /// fix does.
     pub removal_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct GethashDefaultSummary {
-    pub gethash_form_count: usize,
-    pub violations: Vec<GethashDefaultItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct GethashDefaultPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl GethashDefaultPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for GethashDefaultItem {
+    /// The rule's name. Every finding here is the one shape — a `gethash` whose
+    /// third operand is the literal `nil` — so there is no closed set to
+    /// discriminate on.
+    fn kind(&self) -> &'static str {
+        "gethash-default"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct GethashDefaultPolicy {
-    pub fail_on_violation: bool,
-    pub gethash_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Nothing beyond the path and location: the old text row carried only
+    /// those. `message` is what a reader gets here.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "removal_span",
+            json!({
+                "start": self.removal_span.start().get(),
+                "end": self.removal_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `gethash-default` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "the gethash default is nil; (gethash k h nil) is (gethash k h)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     gethash_form_count: &mut usize,
     violations: &mut Vec<GethashDefaultItem>,
 ) {
@@ -113,21 +120,32 @@ pub fn examine(
     // whitespace before `nil` goes too.
     let removal_span = ByteSpan::new(table.span.end(), default.span.end());
     violations.push(GethashDefaultItem {
-        path: path.to_path_buf(),
         span: view.span,
         removal_span,
     });
 }
 
-/// Collects every `(gethash k h nil)` across a whole file, along with the total
-/// number of `gethash` forms scanned.
-pub fn collect_gethash_defaults(
+/// Collects every `(gethash k h nil)` in one file, with the number of `gethash`
+/// forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant default here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_gethash_default_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<GethashDefaultItem>)> {
+) -> LintResult<FileFindings<GethashDefaultItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("gethash_form_count", json!(0))],
+        ));
     }
 
     let mut gethash_form_count = 0;
@@ -135,51 +153,40 @@ pub fn collect_gethash_defaults(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut gethash_form_count, &mut violations);
+            examine(subview, &mut gethash_form_count, &mut violations);
         });
     }
-    Ok((gethash_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_gethash_defaults(
-    gethash_form_count: usize,
-    violations: Vec<GethashDefaultItem>,
-) -> GethashDefaultSummary {
-    GethashDefaultSummary {
-        gethash_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_gethash_default_policy(
-    options: GethashDefaultPolicyOptions,
-    summary: &GethashDefaultSummary,
-) -> GethashDefaultPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    GethashDefaultPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        gethash_form_count: summary.gethash_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("gethash_form_count", json!(gethash_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn gethashes(input: &str) -> (usize, Vec<GethashDefaultItem>) {
+    fn report(input: &str) -> FileFindings<GethashDefaultItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_gethash_defaults(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect gethash defaults")
+        build_gethash_default_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build gethash default report")
+    }
+
+    /// The `(gethash_form_count, violations)` pair the report is built from.
+    fn gethashes(input: &str) -> (u64, Vec<GethashDefaultItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "gethash_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("gethash_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -228,29 +235,49 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(gethash k h nil)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_gethash_defaults(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect gethash defaults");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_gethash_default_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build gethash default report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("gethash_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = gethashes("(gethash k h nil)");
-        let summary = summarize_gethash_defaults(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(gethash k table)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_gethash_default_policy(GethashDefaultPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// `removal_span` was on the old JSON, so it stays: it is what a consumer
+    /// applying the edit itself needs.
+    #[test]
+    fn a_finding_carries_its_line_and_its_removal_span() {
+        let report = report("(defun f (k h)\n  (gethash k h nil))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "gethash-default");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "removal_span",
+                json!({
+                    "start": finding.removal_span.start().get(),
+                    "end": finding.removal_span.end().get(),
+                })
+            )]
+        );
+    }
 
-        let strict =
-            evaluate_gethash_default_policy(GethashDefaultPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_gethash_scanned_not_only_the_flagged_ones() {
+        let report = report("(gethash a h nil)\n(gethash b h)\n(gethash c h 0)\n");
+        assert_eq!(report.summary, vec![("gethash_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

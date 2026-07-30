@@ -14,7 +14,13 @@ fn cli_flags_car_reverse() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"));
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"accessor_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        // Both sub-spans were in the old JSON and stay in it; `accessor_span`
+        // is the only place the car/first spelling is reported at all.
+        .stdout(predicate::str::contains("\"accessor_span\""))
+        .stdout(predicate::str::contains("\"list_span\""));
 }
 
 #[test]
@@ -31,7 +37,11 @@ fn cli_does_not_flag_nreverse() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "one car, not of a reverse" from
+        // "no car at all".
+        .stdout(predicate::str::contains("\"accessor_form_count\": 1"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
 }
 
 #[test]
@@ -68,4 +78,43 @@ fn cli_lint_fix_rewrites_to_last() {
 
     let fixed = fs::read_to_string(&file).expect("read fixed file");
     assert_eq!(fixed, "(car (last xs))\n");
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model_car_reverse() {
+    let dir = fresh_temp_dir("car-reverse-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(fn last [xs] (. xs (length xs)))\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "car-reverse", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`.
+#[test]
+fn cli_car_reverse_emits_sarif() {
+    let dir = fresh_temp_dir("car-reverse-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(car (reverse items))\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "car-reverse", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/car-reverse/car-reverse\"",
+        ))
+        .stdout(predicate::str::contains(
+            "car of a reverse copies the whole list to read one element; use (car (last x))",
+        ));
 }

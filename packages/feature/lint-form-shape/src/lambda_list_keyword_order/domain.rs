@@ -21,14 +21,16 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, list_head};
+use serde_json::{Value, json};
 
 /// The canonical rank of an ordinary lambda-list keyword, or `None` for a
 /// keyword whose position this rule does not rank (`&whole`, `&environment`,
@@ -46,54 +48,73 @@ fn keyword_rank(text: &str) -> Option<u8> {
 
 #[derive(Debug, Clone)]
 pub struct LambdaListKeywordOrderItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     pub definition: String,
     pub keyword: String,
     pub after_keyword: String,
 }
 
-#[derive(Debug)]
-pub struct LambdaListKeywordOrderSummary {
-    pub definition_count: usize,
-    pub violations: Vec<LambdaListKeywordOrderItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct LambdaListKeywordOrderPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl LambdaListKeywordOrderPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for LambdaListKeywordOrderItem {
+    /// The rule's name, not the misplaced keyword: `keyword` is source text
+    /// carried per finding, and `kind` is a fixed vocabulary the interop
+    /// formats turn into a rule id. It stays a `json_fields` entry, where
+    /// filtering on it still works.
+    fn kind(&self) -> &'static str {
+        "lambda-list-keyword-order"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("definition={}", self.definition),
+            format!("keyword={}", self.keyword),
+            format!("after={}", self.after_keyword),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("definition", json!(self.definition)),
+            ("keyword", json!(self.keyword)),
+            ("after_keyword", json!(self.after_keyword)),
+        ]
+    }
+
+    /// The same sentence the `lambda-list-keyword-order` lint rule writes, so a
+    /// SARIF or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} lists lambda-list keyword {} after {}",
+            self.definition, self.keyword, self.after_keyword
+        )
     }
 }
 
-#[derive(Debug)]
-pub struct LambdaListKeywordOrderPolicy {
-    pub fail_on_violation: bool,
-    pub definition_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
-}
-
-/// Collects every callable definition whose lambda-list keywords are out of
-/// order, along with the total number of callable definitions scanned.
-pub fn collect_lambda_list_keyword_order(
+/// Collects every callable definition in one file whose lambda-list keywords
+/// are out of order, with the number of callable definitions scanned as the
+/// denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no misordered lambda list here" for
+/// Common Lisp and "nothing was looked for" for Clojure, and the two read
+/// identically without the flag.
+pub fn build_lambda_list_keyword_order_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<LambdaListKeywordOrderItem>)> {
+) -> LintResult<FileFindings<LambdaListKeywordOrderItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("definition_count", json!(0))],
+        ));
     }
 
     let mut definition_count = 0;
@@ -148,7 +169,6 @@ pub fn collect_lambda_list_keyword_order(
         for (keyword, rank) in &ranked {
             if *rank < max_rank {
                 violations.push(LambdaListKeywordOrderItem {
-                    path: path.to_path_buf(),
                     span: view.span,
                     definition: definition.clone(),
                     keyword: keyword.clone(),
@@ -163,48 +183,36 @@ pub fn collect_lambda_list_keyword_order(
         }
     }
 
-    Ok((definition_count, violations))
-}
-
-#[must_use]
-pub const fn summarize_lambda_list_keyword_order(
-    definition_count: usize,
-    violations: Vec<LambdaListKeywordOrderItem>,
-) -> LambdaListKeywordOrderSummary {
-    LambdaListKeywordOrderSummary {
-        definition_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_lambda_list_keyword_order_policy(
-    options: LambdaListKeywordOrderPolicyOptions,
-    summary: &LambdaListKeywordOrderSummary,
-) -> LambdaListKeywordOrderPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    LambdaListKeywordOrderPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        definition_count: summary.definition_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("definition_count", json!(definition_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn violations(input: &str) -> (usize, Vec<LambdaListKeywordOrderItem>) {
+    fn report(input: &str) -> FileFindings<LambdaListKeywordOrderItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_lambda_list_keyword_order(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect lambda list keyword order")
+        build_lambda_list_keyword_order_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build lambda list keyword order report")
+    }
+
+    /// The `(definition_count, violations)` pair the report is built from.
+    fn violations(input: &str) -> (u64, Vec<LambdaListKeywordOrderItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "definition_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("definition_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -271,34 +279,54 @@ mod tests {
         assert!(items.is_empty());
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(defun f (&key a &optional b) a)", Dialect::Clojure)
                 .expect("parse input");
-        let (definition_count, items) =
-            collect_lambda_list_keyword_order(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect lambda list keyword order");
-        assert_eq!(definition_count, 0);
-        assert!(items.is_empty());
+        let report =
+            build_lambda_list_keyword_order_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build lambda list keyword order report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("definition_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (definition_count, items) = violations("(defun f (&key a &optional b) a)");
-        let summary = summarize_lambda_list_keyword_order(definition_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(defun f (a b) a)").dialect_modelled);
+    }
 
-        let quiet = evaluate_lambda_list_keyword_order_policy(
-            LambdaListKeywordOrderPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_definition_and_both_keywords() {
+        let report = report("(in-package :app)\n(defun f (&key a &optional b) a)\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "lambda-list-keyword-order");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("definition", json!("f")),
+                ("keyword", json!("&optional")),
+                ("after_keyword", json!("&key")),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec![
+                "definition=f".to_owned(),
+                "keyword=&optional".to_owned(),
+                "after=&key".to_owned(),
+            ]
+        );
+    }
 
-        let strict = evaluate_lambda_list_keyword_order_policy(
-            LambdaListKeywordOrderPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_definition_scanned_not_only_the_flagged_ones() {
+        let report = report("(defun f (&key a &optional b) a)\n(defun g (a b) a)\n");
+        assert_eq!(report.summary, vec![("definition_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

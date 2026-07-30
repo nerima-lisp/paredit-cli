@@ -19,13 +19,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The character case operations. Both are non-destructive.
 const CASE_OPS: [&str; 2] = ["char-upcase", "char-downcase"];
@@ -42,7 +44,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct NestedCharCaseItem {
-    pub path: PathBuf,
     /// The span of the whole `(OUTER (INNER c))` form.
     pub span: ByteSpan,
     /// The span of the outer case-op head token, preserved in the fix.
@@ -51,43 +52,57 @@ pub struct NestedCharCaseItem {
     pub char_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct NestedCharCaseSummary {
-    pub char_case_form_count: usize,
-    pub violations: Vec<NestedCharCaseItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NestedCharCasePolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NestedCharCasePolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NestedCharCaseItem {
+    /// The rule's own name. There is nothing to discriminate on: every finding
+    /// is the same collapse, and which of the four upcase/downcase pairings
+    /// produced it lives in the source the spans point at.
+    fn kind(&self) -> &'static str {
+        "nested-char-case"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NestedCharCasePolicy {
-    pub fail_on_violation: bool,
-    pub char_case_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// None. The old text row carried the path and offset the envelope now
+    /// prints itself, and nothing else.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Both spans the previous renderer emitted, unchanged. They are the fix's
+    /// inputs, but they were part of this report's published JSON, so dropping
+    /// them here would be a silent break for anything already reading them.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            (
+                "outer_span",
+                json!({
+                    "start": self.outer_span.start().get(),
+                    "end": self.outer_span.end().get(),
+                }),
+            ),
+            (
+                "char_span",
+                json!({
+                    "start": self.char_span.start().get(),
+                    "end": self.char_span.end().get(),
+                }),
+            ),
+        ]
+    }
+
+    /// The same sentence the `nested-char-case` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "the outer char case op dominates; the inner one is dead work".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     char_case_form_count: &mut usize,
     violations: &mut Vec<NestedCharCaseItem>,
 ) {
@@ -123,22 +138,33 @@ pub fn examine(
     }
 
     violations.push(NestedCharCaseItem {
-        path: path.to_path_buf(),
         span: view.span,
         outer_span: view.children[0].span,
         char_span: character.span,
     });
 }
 
-/// Collects every nested `(OUTER (INNER c))` char case-op pair across a whole
-/// file, along with the total number of outer case-op forms scanned.
-pub fn collect_nested_char_cases(
+/// Collects every nested `(OUTER (INNER c))` char case-op pair in one file, with
+/// the number of outer case-op forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no nested char case here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_nested_char_case_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NestedCharCaseItem>)> {
+) -> LintResult<FileFindings<NestedCharCaseItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("char_case_form_count", json!(0))],
+        ));
     }
 
     let mut char_case_form_count = 0;
@@ -146,51 +172,40 @@ pub fn collect_nested_char_cases(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut char_case_form_count, &mut violations);
+            examine(subview, &mut char_case_form_count, &mut violations);
         });
     }
-    Ok((char_case_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_nested_char_cases(
-    char_case_form_count: usize,
-    violations: Vec<NestedCharCaseItem>,
-) -> NestedCharCaseSummary {
-    NestedCharCaseSummary {
-        char_case_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_nested_char_case_policy(
-    options: NestedCharCasePolicyOptions,
-    summary: &NestedCharCaseSummary,
-) -> NestedCharCasePolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NestedCharCasePolicy {
-        fail_on_violation: options.fail_on_violation(),
-        char_case_form_count: summary.char_case_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("char_case_form_count", json!(char_case_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn cases(input: &str) -> (usize, Vec<NestedCharCaseItem>) {
+    fn report(input: &str) -> FileFindings<NestedCharCaseItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_nested_char_cases(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect nested char cases")
+        build_nested_char_case_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build nested char case report")
+    }
+
+    /// The `(char_case_form_count, violations)` pair the report is built from.
+    fn cases(input: &str) -> (u64, Vec<NestedCharCaseItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "char_case_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("char_case_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -230,30 +245,58 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(char-upcase (char-downcase c))", Dialect::Clojure)
                 .expect("parse");
-        let (count, violations) =
-            collect_nested_char_cases(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect nested char cases");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_nested_char_case_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build nested char case report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("char_case_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = cases("(char-upcase (char-downcase c))");
-        let summary = summarize_nested_char_cases(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(char-upcase c)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_nested_char_case_policy(NestedCharCasePolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_both_fix_spans() {
+        let source = "(defun f (c)\n  (char-upcase (char-downcase c)))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "nested-char-case");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                (
+                    "outer_span",
+                    json!({
+                        "start": finding.outer_span.start().get(),
+                        "end": finding.outer_span.end().get(),
+                    })
+                ),
+                (
+                    "char_span",
+                    json!({
+                        "start": finding.char_span.start().get(),
+                        "end": finding.char_span.end().get(),
+                    })
+                ),
+            ]
+        );
+    }
 
-        let strict =
-            evaluate_nested_char_case_policy(NestedCharCasePolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_case_op_scanned_not_only_the_flagged_ones() {
+        let report = report("(char-upcase (char-downcase c))\n(char-upcase d)\n");
+        assert_eq!(report.summary, vec![("char_case_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

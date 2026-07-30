@@ -15,18 +15,7 @@ pub fn evaluate_fail_on_external_policy(
 ) -> ReportPolicy {
     let failing = reports
         .iter()
-        .map(|report| FileFindings {
-            path: report.path.clone(),
-            dialect: report.dialect,
-            dialect_modelled: report.dialect_modelled,
-            findings: report
-                .findings
-                .iter()
-                .filter(|entry| entry.category.is_none())
-                .cloned()
-                .collect(),
-            summary: report.summary.clone(),
-        })
+        .map(|report| report.retained(|entry| entry.category.is_none()))
         .collect::<Vec<_>>();
 
     let mut policy = ReportPolicy::fail_on_any(

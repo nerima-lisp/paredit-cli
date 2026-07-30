@@ -59,7 +59,6 @@ pub struct UnreachableExpression {
     /// The dead form, elided.
     pub text: String,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for UnreachableExpression {
@@ -69,10 +68,6 @@ impl Finding for UnreachableExpression {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -111,6 +106,7 @@ pub fn build_unreachable_expression_report(
         // The exit operators are Common Lisp's, but the shape is shared; other
         // dialects simply match fewer forms.
         true,
+        tree.source(),
         findings,
         vec![("dead_form_count", json!(dead))],
     )
@@ -131,7 +127,6 @@ fn collect(view: &ExpressionView, source: &str, findings: &mut Vec<UnreachableEx
                         within: head.to_owned(),
                         text: elide(source, dead.span),
                         span: dead.span,
-                        line: line_of(source, dead.span.start().get()),
                     });
                 }
             }
@@ -171,15 +166,6 @@ fn elide(source: &str, span: ByteSpan) -> String {
         .take(TEXT_LIMIT.saturating_sub(1))
         .collect::<String>();
     format!("{head}…")
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

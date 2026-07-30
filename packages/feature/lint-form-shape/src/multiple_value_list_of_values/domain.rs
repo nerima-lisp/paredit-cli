@@ -19,13 +19,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent, so a
 /// form containing one has no settled operand list.
@@ -35,51 +37,59 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct MultipleValueListOfValuesItem {
-    pub path: PathBuf,
     /// The span of the whole `(multiple-value-list (values …))` form.
     pub span: ByteSpan,
     /// The span of the element list (`a b …`, the `values` head and parens
     /// excluded), or `None` for an empty `(values)` (rewrite to `(list)`).
+    ///
+    /// Both the fix's input and part of the report: an agent that wants to
+    /// perform the rewrite itself needs the exact bytes, and the old report
+    /// published them — `null` included, for the empty `(values)` case.
     pub elements_span: Option<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct MultipleValueListOfValuesSummary {
-    pub mvl_form_count: usize,
-    pub violations: Vec<MultipleValueListOfValuesItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MultipleValueListOfValuesPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl MultipleValueListOfValuesPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for MultipleValueListOfValuesItem {
+    /// The rule's own name. Every finding here is the same rewrite — a
+    /// `multiple-value-list` of a literal `values` — with nothing to sub-divide
+    /// it by.
+    fn kind(&self) -> &'static str {
+        "multiple-value-list-of-values"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct MultipleValueListOfValuesPolicy {
-    pub fail_on_violation: bool,
-    pub mvl_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "elements_span",
+            match self.elements_span {
+                Some(span) => json!({
+                    "start": span.start().get(),
+                    "end": span.end().get(),
+                }),
+                None => json!(null),
+            },
+        )]
+    }
+
+    /// The same sentence the `multiple-value-list-of-values` lint rule writes,
+    /// so a SARIF or JUnit consumer reading both sees one finding described one
+    /// way.
+    fn message(&self) -> String {
+        "multiple-value-list of a values form is just list; (multiple-value-list (values a b)) is (list a b)"
+            .to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     mvl_form_count: &mut usize,
     violations: &mut Vec<MultipleValueListOfValuesItem>,
 ) {
@@ -120,21 +130,32 @@ pub fn examine(
     };
 
     violations.push(MultipleValueListOfValuesItem {
-        path: path.to_path_buf(),
         span: view.span,
         elements_span,
     });
 }
 
-/// Collects every `(multiple-value-list (values …))` across a whole file, along
-/// with the total number of `multiple-value-list` forms scanned.
-pub fn collect_multiple_value_list_of_values(
+/// Collects every `(multiple-value-list (values …))` in one file, with the
+/// number of `multiple-value-list` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no `multiple-value-list` of a literal
+/// `values`" for Common Lisp and "nothing was looked for" for Clojure, and the
+/// two read identically without the flag.
+pub fn build_multiple_value_list_of_values_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<MultipleValueListOfValuesItem>)> {
+) -> LintResult<FileFindings<MultipleValueListOfValuesItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("mvl_form_count", json!(0))],
+        ));
     }
 
     let mut mvl_form_count = 0;
@@ -142,55 +163,44 @@ pub fn collect_multiple_value_list_of_values(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut mvl_form_count, &mut violations);
+            examine(subview, &mut mvl_form_count, &mut violations);
         });
     }
-    Ok((mvl_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_multiple_value_list_of_values(
-    mvl_form_count: usize,
-    violations: Vec<MultipleValueListOfValuesItem>,
-) -> MultipleValueListOfValuesSummary {
-    MultipleValueListOfValuesSummary {
-        mvl_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_multiple_value_list_of_values_policy(
-    options: MultipleValueListOfValuesPolicyOptions,
-    summary: &MultipleValueListOfValuesSummary,
-) -> MultipleValueListOfValuesPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    MultipleValueListOfValuesPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        mvl_form_count: summary.mvl_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("mvl_form_count", json!(mvl_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn calls(input: &str) -> (usize, Vec<MultipleValueListOfValuesItem>) {
+    fn report(input: &str) -> FileFindings<MultipleValueListOfValuesItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_multiple_value_list_of_values(
-            &PathBuf::from("test.lisp"),
+        build_multiple_value_list_of_values_report(
+            Path::new("test.lisp"),
             Dialect::CommonLisp,
             &tree,
         )
-        .expect("collect multiple-value-list of values")
+        .expect("build multiple-value-list of values report")
+    }
+
+    /// The `(mvl_form_count, violations)` pair the report is built from.
+    fn calls(input: &str) -> (u64, Vec<MultipleValueListOfValuesItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "mvl_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("mvl_form_count in the summary");
+        (count, report.findings)
     }
 
     fn elements<'a>(source: &'a str, item: &MultipleValueListOfValuesItem) -> &'a str {
@@ -245,37 +255,62 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(multiple-value-list (values a b))", Dialect::Clojure)
                 .expect("parse");
-        let (count, violations) = collect_multiple_value_list_of_values(
-            &PathBuf::from("app.clj"),
+        let report = build_multiple_value_list_of_values_report(
+            Path::new("app.clj"),
             Dialect::Clojure,
             &tree,
         )
-        .expect("collect multiple-value-list of values");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        .expect("build multiple-value-list of values report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("mvl_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = calls("(multiple-value-list (values a b))");
-        let summary = summarize_multiple_value_list_of_values(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(multiple-value-list (compute))").dialect_modelled);
+    }
 
-        let quiet = evaluate_multiple_value_list_of_values_policy(
-            MultipleValueListOfValuesPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_and_its_elements_span() {
+        let report = report("(defun f (a b)\n  (multiple-value-list (values a b)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "multiple-value-list-of-values");
+        let span = finding.elements_span.expect("elements span");
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "elements_span",
+                json!({ "start": span.start().get(), "end": span.end().get() }),
+            )]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert!(finding.text_columns().is_empty());
+    }
 
-        let strict = evaluate_multiple_value_list_of_values_policy(
-            MultipleValueListOfValuesPolicyOptions::new(true),
-            &summary,
+    /// The empty `(values)` still publishes the key, as `null`, exactly as the
+    /// hand-written renderer did.
+    #[test]
+    fn an_empty_values_reports_a_null_elements_span() {
+        let report = report("(multiple-value-list (values))");
+        assert_eq!(
+            report.findings[0].json_fields(),
+            vec![("elements_span", json!(null))]
         );
-        assert!(!strict.passed);
+    }
+
+    #[test]
+    fn the_summary_counts_every_form_scanned_not_only_the_flagged_ones() {
+        let report =
+            report("(multiple-value-list (compute))\n(multiple-value-list (values a b))\n");
+        assert_eq!(report.summary, vec![("mvl_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

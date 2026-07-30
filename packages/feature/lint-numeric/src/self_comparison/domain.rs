@@ -19,14 +19,16 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::expression_equality::{expressions_structurally_equal, render_expression};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, list_head};
+use serde_json::{Value, json};
 
 const COMPARISON_HEADS: [&str; 14] = [
     "eq", "eql", "equal", "equalp", "string=", "char=", "<", ">", "<=", ">=", "string<", "string>",
@@ -35,47 +37,52 @@ const COMPARISON_HEADS: [&str; 14] = [
 
 #[derive(Debug, Clone)]
 pub struct SelfComparisonItem {
-    pub path: PathBuf,
     pub span: ByteSpan,
     pub operator: String,
     pub operand: String,
 }
 
-#[derive(Debug)]
-pub struct SelfComparisonSummary {
-    pub comparison_form_count: usize,
-    pub violations: Vec<SelfComparisonItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SelfComparisonPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl SelfComparisonPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for SelfComparisonItem {
+    /// The rule's own name rather than the operator.
+    ///
+    /// Half of the fourteen heads this rule matches are punctuation (`<`, `>=`,
+    /// `char<`), which a rule id or a `grep` pattern reads badly, and the
+    /// operator is not a closed set of `&'static str` here anyway — it is the
+    /// source spelling. It stays a field instead.
+    fn kind(&self) -> &'static str {
+        "self-comparison"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct SelfComparisonPolicy {
-    pub fail_on_violation: bool,
-    pub comparison_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("op={}", self.operator),
+            format!("operand={}", self.operand),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("operand", json!(self.operand)),
+        ]
+    }
+
+    /// The same sentence the `self-comparison` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} compares operand {} with itself",
+            self.operator, self.operand
+        )
+    }
 }
 
 pub fn examine_comparison(
     view: &ExpressionView,
-    path: &Path,
     comparison_form_count: &mut usize,
     violations: &mut Vec<SelfComparisonItem>,
 ) {
@@ -97,7 +104,6 @@ pub fn examine_comparison(
         for candidate in (anchor + 1)..operands.len() {
             if expressions_structurally_equal(operands[anchor], operands[candidate]) {
                 violations.push(SelfComparisonItem {
-                    path: path.to_path_buf(),
                     span: view.span,
                     operator: head.to_owned(),
                     operand: render_expression(operands[anchor]),
@@ -108,16 +114,28 @@ pub fn examine_comparison(
     }
 }
 
-/// Collects every comparison call with two structurally-equal operands
-/// across a whole file, along with the total number of comparison calls
-/// scanned.
-pub fn collect_self_comparisons(
+/// Collects every comparison call with two structurally-equal operands in one
+/// file, with the number of comparison calls scanned as the denominator beside
+/// them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no comparison repeats an operand" for
+/// Common Lisp and "nothing was looked for" for Fennel, and the two read
+/// identically without the flag.
+pub fn build_self_comparison_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<SelfComparisonItem>)> {
+) -> LintResult<FileFindings<SelfComparisonItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("comparison_form_count", json!(0))],
+        ));
     }
 
     let mut comparison_form_count = 0;
@@ -125,51 +143,40 @@ pub fn collect_self_comparisons(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_comparison(subview, path, &mut comparison_form_count, &mut violations);
+            examine_comparison(subview, &mut comparison_form_count, &mut violations);
         });
     }
-    Ok((comparison_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_self_comparisons(
-    comparison_form_count: usize,
-    violations: Vec<SelfComparisonItem>,
-) -> SelfComparisonSummary {
-    SelfComparisonSummary {
-        comparison_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_self_comparison_policy(
-    options: SelfComparisonPolicyOptions,
-    summary: &SelfComparisonSummary,
-) -> SelfComparisonPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    SelfComparisonPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        comparison_form_count: summary.comparison_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("comparison_form_count", json!(comparison_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn comparisons(input: &str) -> (usize, Vec<SelfComparisonItem>) {
+    fn report(input: &str) -> FileFindings<SelfComparisonItem> {
         let tree = SyntaxTree::parse(input).expect("parse input");
-        collect_self_comparisons(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect self comparisons")
+        build_self_comparison_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build self comparison report")
+    }
+
+    /// The `(comparison_form_count, violations)` pair the report is built from.
+    fn comparisons(input: &str) -> (u64, Vec<SelfComparisonItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "comparison_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("comparison_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -216,28 +223,53 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse("(eq x x)").expect("parse input");
-        let (comparison_form_count, violations) =
-            collect_self_comparisons(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect self comparisons");
-        assert_eq!(comparison_form_count, 0);
-        assert!(violations.is_empty());
+        let report = build_self_comparison_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build self comparison report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (comparison_form_count, items) = comparisons("(eq x x)");
-        let summary = summarize_self_comparisons(comparison_form_count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(eq x y)").dialect_modelled);
+    }
 
-        let quiet =
-            evaluate_self_comparison_policy(SelfComparisonPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    /// The kind is the rule's name, not the operator: half the heads this rule
+    /// matches are punctuation. The operator stays a field.
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_operand() {
+        let report = report("(defun f (x)\n  (when (eql x x) 1))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "self-comparison");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("eql")), ("operand", json!("x"))]
+        );
+        assert_eq!(
+            finding.text_columns(),
+            vec!["op=eql".to_owned(), "operand=x".to_owned()]
+        );
+    }
 
-        let strict =
-            evaluate_self_comparison_policy(SelfComparisonPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn a_punctuation_operator_still_reports_the_rule_name_as_its_kind() {
+        let report = report("(< (rank a) (rank a))");
+        let finding = &report.findings[0];
+        assert_eq!(finding.kind(), "self-comparison");
+        assert_eq!(finding.operator, "<");
+    }
+
+    #[test]
+    fn the_summary_counts_every_comparison_scanned_not_only_the_flagged_ones() {
+        let report = report("(eq x x)\n(eq a b)\n(eql y y)\n");
+        assert_eq!(report.summary, vec![("comparison_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

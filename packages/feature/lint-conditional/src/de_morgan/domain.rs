@@ -22,13 +22,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The opposite boolean operator (`and`↔`or`) for a boolean head, or `None`
 /// otherwise.
@@ -62,54 +64,57 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct DeMorganItem {
-    pub path: PathBuf,
     /// The span of the whole `(and …)`/`(or …)` form.
     pub span: ByteSpan,
     /// The operator, lowercased (`and` or `or`).
     pub operator: &'static str,
     /// The opposite operator to place inside the outer `not` (`or` for `and`).
+    ///
+    /// Determined by `operator`, so the report carries only the latter; the
+    /// rewrite and the finding message read this one.
     pub opposite: &'static str,
     /// The spans of each negation's inner operand, in order.
+    ///
+    /// The rewrite's input, not the report's: the lint rule copies each inner
+    /// operand from source, and the command never printed them.
     pub inner_spans: Vec<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct DeMorganSummary {
-    pub boolean_form_count: usize,
-    pub violations: Vec<DeMorganItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DeMorganPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl DeMorganPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for DeMorganItem {
+    /// The operator that collapses, so an `and` of negations and an `or` of
+    /// negations are separable without parsing JSON. They produce opposite
+    /// rewrites — `(not (or …))` versus `(not (and …))` — and a consumer
+    /// filtering on one of them is asking a real question.
+    fn kind(&self) -> &'static str {
+        self.operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct DeMorganPolicy {
-    pub fail_on_violation: bool,
-    pub boolean_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![format!("operator={}", self.operator)]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![("operator", json!(self.operator))]
+    }
+
+    /// The same sentence the `de-morgan` lint rule writes, so a SARIF or JUnit
+    /// consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} of negations collapses by De Morgan to (not ({} …))",
+            self.operator, self.opposite
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
-    path: &Path,
     boolean_form_count: &mut usize,
     violations: &mut Vec<DeMorganItem>,
 ) {
@@ -139,7 +144,6 @@ pub fn examine_boolean(
     }
 
     violations.push(DeMorganItem {
-        path: path.to_path_buf(),
         span: view.span,
         operator,
         opposite,
@@ -147,15 +151,27 @@ pub fn examine_boolean(
     });
 }
 
-/// Collects every De Morgan-collapsible boolean form across a whole file, along
-/// with the total number of `and`/`or` forms scanned.
-pub fn collect_de_morgans(
+/// Collects every De Morgan-collapsible boolean form in one file, with the
+/// number of `and`/`or` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no collapsible boolean here" for Common
+/// Lisp and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_de_morgan_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<DeMorganItem>)> {
+) -> LintResult<FileFindings<DeMorganItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("boolean_form_count", json!(0))],
+        ));
     }
 
     let mut boolean_form_count = 0;
@@ -163,51 +179,40 @@ pub fn collect_de_morgans(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, path, &mut boolean_form_count, &mut violations);
+            examine_boolean(subview, &mut boolean_form_count, &mut violations);
         });
     }
-    Ok((boolean_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_de_morgans(
-    boolean_form_count: usize,
-    violations: Vec<DeMorganItem>,
-) -> DeMorganSummary {
-    DeMorganSummary {
-        boolean_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_de_morgan_policy(
-    options: DeMorganPolicyOptions,
-    summary: &DeMorganSummary,
-) -> DeMorganPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    DeMorganPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        boolean_form_count: summary.boolean_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("boolean_form_count", json!(boolean_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn booleans(input: &str) -> (usize, Vec<DeMorganItem>) {
+    fn report(input: &str) -> FileFindings<DeMorganItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_de_morgans(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect de morgans")
+        build_de_morgan_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build de morgan report")
+    }
+
+    /// The `(boolean_form_count, violations)` pair the report is built from.
+    fn booleans(input: &str) -> (u64, Vec<DeMorganItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "boolean_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("boolean_form_count in the summary");
+        (count, report.findings)
     }
 
     fn inners<'a>(source: &'a str, item: &DeMorganItem) -> Vec<&'a str> {
@@ -285,27 +290,38 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(and (not a) (not b))", Dialect::Clojure)
             .expect("parse");
-        let (count, violations) =
-            collect_de_morgans(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect de morgans");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_de_morgan_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build de morgan report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = booleans("(and (not a) (not b))");
-        let summary = summarize_de_morgans(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(and a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_de_morgan_policy(DeMorganPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator() {
+        let report = report("(defun f ()\n  (or (not a) (not b)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "or");
+        assert_eq!(finding.json_fields(), vec![("operator", json!("or"))]);
+        assert_eq!(finding.text_columns(), vec!["operator=or".to_owned()]);
+    }
 
-        let strict = evaluate_de_morgan_policy(DeMorganPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_boolean_scanned_not_only_the_flagged_ones() {
+        let report = report("(and (not a) (not b))\n(or a b)\n");
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

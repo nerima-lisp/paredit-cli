@@ -76,7 +76,6 @@ pub struct PackageLock {
     /// The form that caused it (`defun`, `let`, `defpackage`, …).
     pub form: String,
     pub span: ByteSpan,
-    pub line: usize,
 }
 
 impl Finding for PackageLock {
@@ -86,10 +85,6 @@ impl Finding for PackageLock {
 
     fn span(&self) -> ByteSpan {
         self.span
-    }
-
-    fn line(&self) -> usize {
-        self.line
     }
 
     fn text_columns(&self) -> Vec<String> {
@@ -122,11 +117,10 @@ pub fn build_package_lock_report(
     tree: &SyntaxTree,
 ) -> FileFindings<PackageLock> {
     let modelled = dialect == Dialect::CommonLisp;
-    let source = tree.source();
     let mut findings = Vec::new();
 
     if modelled {
-        collect(&tree.root_view(), dialect, source, &mut findings);
+        collect(&tree.root_view(), dialect, &mut findings);
     }
 
     let undefined = findings
@@ -138,24 +132,18 @@ pub fn build_package_lock_report(
         path.to_path_buf(),
         dialect,
         modelled,
+        tree.source(),
         findings,
         vec![("undefined_behavior_count", json!(undefined))],
     )
 }
 
-fn collect(view: &ExpressionView, dialect: Dialect, source: &str, findings: &mut Vec<PackageLock>) {
+fn collect(view: &ExpressionView, dialect: Dialect, findings: &mut Vec<PackageLock>) {
     if let Some(head) = list_head(view) {
         // A definition of a standard name.
         if let Some(shape) = definition_shape(dialect, view, head) {
             if let Some(name) = shape.name(view) {
-                push(
-                    findings,
-                    Collision::Redefinition,
-                    name,
-                    head,
-                    view.span,
-                    source,
-                );
+                push(findings, Collision::Redefinition, name, head, view.span);
             }
         }
 
@@ -170,14 +158,7 @@ fn collect(view: &ExpressionView, dialect: Dialect, source: &str, findings: &mut
                 .unwrap_or_default()
             {
                 if let Some(name) = binding_name(binding) {
-                    push(
-                        findings,
-                        Collision::Binding,
-                        name,
-                        head,
-                        binding.span,
-                        source,
-                    );
+                    push(findings, Collision::Binding, name, head, binding.span);
                 }
             }
         }
@@ -192,14 +173,7 @@ fn collect(view: &ExpressionView, dialect: Dialect, source: &str, findings: &mut
                 }
                 for designator in option.children.iter().skip(1) {
                     if let Some(name) = atom_symbol_text(designator) {
-                        push(
-                            findings,
-                            Collision::Shadow,
-                            name,
-                            head,
-                            designator.span,
-                            source,
-                        );
+                        push(findings, Collision::Shadow, name, head, designator.span);
                     }
                 }
             }
@@ -207,7 +181,7 @@ fn collect(view: &ExpressionView, dialect: Dialect, source: &str, findings: &mut
     }
 
     for child in &view.children {
-        collect(child, dialect, source, findings);
+        collect(child, dialect, findings);
     }
 }
 
@@ -222,7 +196,6 @@ fn push(
     name: &str,
     form: &str,
     span: ByteSpan,
-    source: &str,
 ) {
     let normalized = normalize(name);
     if !is_standard_symbol(&normalized) {
@@ -233,7 +206,6 @@ fn push(
         name: normalized,
         form: form.to_owned(),
         span,
-        line: line_of(source, span.start().get()),
     });
 }
 
@@ -251,15 +223,6 @@ fn normalize(name: &str) -> String {
         .trim_start_matches(':')
         .trim_matches('|')
         .to_ascii_uppercase()
-}
-
-fn line_of(source: &str, offset: usize) -> usize {
-    1 + source
-        .get(..offset.min(source.len()))
-        .unwrap_or(source)
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 #[cfg(test)]

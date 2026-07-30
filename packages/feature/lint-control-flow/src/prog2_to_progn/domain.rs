@@ -18,13 +18,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// A reader-conditional atom (`#+feature`/`#-feature`) is build-dependent.
 fn is_reader_conditional(view: &ExpressionView) -> bool {
@@ -33,50 +35,53 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct Prog2ToPrognItem {
-    pub path: PathBuf,
     /// The span of the whole `(prog2 a b)` form.
     pub span: ByteSpan,
     /// The span of the `prog2` operator token (rewritten to `progn`).
     pub head_span: ByteSpan,
 }
 
-#[derive(Debug)]
-pub struct Prog2ToPrognSummary {
-    pub prog2_form_count: usize,
-    pub violations: Vec<Prog2ToPrognItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Prog2ToPrognPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl Prog2ToPrognPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for Prog2ToPrognItem {
+    /// The rule's own name. There is exactly one shape this rule flags — the
+    /// two-form `(prog2 a b)` — so there is no variant to separate.
+    fn kind(&self) -> &'static str {
+        "prog2-to-progn"
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct Prog2ToPrognPolicy {
-    pub fail_on_violation: bool,
-    pub prog2_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// Empty: the old text row carried nothing beyond the path and offset, both
+    /// of which the envelope supplies.
+    fn text_columns(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// `head_span` is the operator token the fix rewrites. It is on the report
+    /// because the hand-written renderer published it, and a consumer applying
+    /// the same edit itself needs it.
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![(
+            "head_span",
+            json!({
+                "start": self.head_span.start().get(),
+                "end": self.head_span.end().get(),
+            }),
+        )]
+    }
+
+    /// The same sentence the `prog2-to-progn` lint rule writes, so a SARIF or
+    /// JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        "a two-form prog2 is just progn; (prog2 a b) is (progn a b)".to_owned()
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine(
     view: &ExpressionView,
-    path: &Path,
     prog2_form_count: &mut usize,
     violations: &mut Vec<Prog2ToPrognItem>,
 ) {
@@ -97,21 +102,32 @@ pub fn examine(
     }
 
     violations.push(Prog2ToPrognItem {
-        path: path.to_path_buf(),
         span: view.span,
         head_span: view.children[0].span,
     });
 }
 
-/// Collects every two-form `(prog2 a b)` across a whole file, along with the
-/// total number of `prog2` forms scanned.
-pub fn collect_prog2_to_progn(
+/// Collects every two-form `(prog2 a b)` in one file, with the number of
+/// `prog2` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no two-form prog2 here" for Common Lisp
+/// and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_prog2_to_progn_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<Prog2ToPrognItem>)> {
+) -> LintResult<FileFindings<Prog2ToPrognItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("prog2_form_count", json!(0))],
+        ));
     }
 
     let mut prog2_form_count = 0;
@@ -119,51 +135,40 @@ pub fn collect_prog2_to_progn(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine(subview, path, &mut prog2_form_count, &mut violations);
+            examine(subview, &mut prog2_form_count, &mut violations);
         });
     }
-    Ok((prog2_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_prog2_to_progn(
-    prog2_form_count: usize,
-    violations: Vec<Prog2ToPrognItem>,
-) -> Prog2ToPrognSummary {
-    Prog2ToPrognSummary {
-        prog2_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_prog2_to_progn_policy(
-    options: Prog2ToPrognPolicyOptions,
-    summary: &Prog2ToPrognSummary,
-) -> Prog2ToPrognPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    Prog2ToPrognPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        prog2_form_count: summary.prog2_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("prog2_form_count", json!(prog2_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn prog2s(input: &str) -> (usize, Vec<Prog2ToPrognItem>) {
+    fn report(input: &str) -> FileFindings<Prog2ToPrognItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_prog2_to_progn(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect prog2 to progn")
+        build_prog2_to_progn_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build prog2 to progn report")
+    }
+
+    /// The `(prog2_form_count, violations)` pair the report is built from.
+    fn prog2s(input: &str) -> (u64, Vec<Prog2ToPrognItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "prog2_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("prog2_form_count in the summary");
+        (count, report.findings)
     }
 
     fn slice(source: &str, span: ByteSpan) -> &str {
@@ -202,26 +207,48 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(prog2 a b)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_prog2_to_progn(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect prog2 to progn");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report = build_prog2_to_progn_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+            .expect("build prog2 to progn report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("prog2_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = prog2s("(prog2 a b)");
-        let summary = summarize_prog2_to_progn(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(prog2 a b c)").dialect_modelled);
+    }
 
-        let quiet = evaluate_prog2_to_progn_policy(Prog2ToPrognPolicyOptions::new(false), &summary);
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+    #[test]
+    fn a_finding_carries_its_line_and_its_operator_span() {
+        let source = "(defun f (a b)\n  (prog2 a b))\n";
+        let report = report(source);
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "prog2-to-progn");
+        assert!(finding.text_columns().is_empty());
+        assert_eq!(
+            finding.json_fields(),
+            vec![(
+                "head_span",
+                json!({
+                    "start": finding.head_span.start().get(),
+                    "end": finding.head_span.end().get(),
+                })
+            )]
+        );
+        assert_eq!(slice(source, finding.head_span), "prog2");
+    }
 
-        let strict = evaluate_prog2_to_progn_policy(Prog2ToPrognPolicyOptions::new(true), &summary);
-        assert!(!strict.passed);
+    #[test]
+    fn the_summary_counts_every_prog2_scanned_not_only_the_flagged_ones() {
+        let report = report("(prog2 a b)\n(prog2 a b c)\n");
+        assert_eq!(report.summary, vec![("prog2_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

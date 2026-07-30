@@ -27,13 +27,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, list_head};
+use serde_json::{Value, json};
 
 /// The canonical operator name (`and`/`or`) and its identity element (`t`/`nil`)
 /// for a boolean head, or `None` otherwise.
@@ -61,7 +63,6 @@ fn is_reader_conditional(view: &ExpressionView) -> bool {
 
 #[derive(Debug, Clone)]
 pub struct RedundantBooleanIdentityItem {
-    pub path: PathBuf,
     /// The span of the whole `(and …)`/`(or …)` form.
     pub span: ByteSpan,
     /// The operator, lowercased (`and` or `or`).
@@ -70,46 +71,58 @@ pub struct RedundantBooleanIdentityItem {
     pub identity: &'static str,
     /// The spans of the operands to keep, in order (empty means the form
     /// collapses to the bare identity).
+    ///
+    /// The rewrite's input, not the report's: the lint rule slices them to
+    /// rebuild the form, and neither the old renderer nor this one prints them.
     pub kept_spans: Vec<ByteSpan>,
 }
 
-#[derive(Debug)]
-pub struct RedundantBooleanIdentitySummary {
-    pub boolean_form_count: usize,
-    pub violations: Vec<RedundantBooleanIdentityItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RedundantBooleanIdentityPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl RedundantBooleanIdentityPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for RedundantBooleanIdentityItem {
+    /// The operator, so an `and` finding and an `or` finding are separable
+    /// without parsing JSON.
+    ///
+    /// It is a legitimate tag rather than data: `boolean_identity` normalises
+    /// the head to one of two `&'static str`s, so `(AND …)` and `(and …)` land
+    /// in the same bucket. The two are different cleanups — `and` drops a `t`,
+    /// `or` drops a `nil` — and a consumer filtering on one is asking a real
+    /// question.
+    fn kind(&self) -> &'static str {
+        self.operator
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct RedundantBooleanIdentityPolicy {
-    pub fail_on_violation: bool,
-    pub boolean_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    fn text_columns(&self) -> Vec<String> {
+        vec![
+            format!("operator={}", self.operator),
+            format!("identity={}", self.identity),
+        ]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("operator", json!(self.operator)),
+            ("identity", json!(self.identity)),
+        ]
+    }
+
+    /// The same sentence the `redundant-boolean-identity` lint rule writes, so
+    /// a SARIF or JUnit consumer reading both sees one finding described one
+    /// way.
+    fn message(&self) -> String {
+        format!(
+            "{} has a redundant {} operand; drop it",
+            self.operator, self.identity
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_boolean(
     view: &ExpressionView,
-    path: &Path,
     boolean_form_count: &mut usize,
     violations: &mut Vec<RedundantBooleanIdentityItem>,
 ) {
@@ -148,7 +161,6 @@ pub fn examine_boolean(
 
     if removed_any {
         violations.push(RedundantBooleanIdentityItem {
-            path: path.to_path_buf(),
             span: view.span,
             operator,
             identity,
@@ -157,15 +169,27 @@ pub fn examine_boolean(
     }
 }
 
-/// Collects every boolean form with a redundant identity operand across a whole
-/// file, along with the total number of `and`/`or` forms scanned.
-pub fn collect_redundant_boolean_identities(
+/// Collects every boolean form with a redundant identity operand in one file,
+/// with the number of `and`/`or` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no redundant identity here" for Common
+/// Lisp and "nothing was looked for" for Clojure, and the two read identically
+/// without the flag.
+pub fn build_redundant_boolean_identity_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<RedundantBooleanIdentityItem>)> {
+) -> LintResult<FileFindings<RedundantBooleanIdentityItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("boolean_form_count", json!(0))],
+        ));
     }
 
     let mut boolean_form_count = 0;
@@ -173,55 +197,40 @@ pub fn collect_redundant_boolean_identities(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_boolean(subview, path, &mut boolean_form_count, &mut violations);
+            examine_boolean(subview, &mut boolean_form_count, &mut violations);
         });
     }
-    Ok((boolean_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_redundant_boolean_identities(
-    boolean_form_count: usize,
-    violations: Vec<RedundantBooleanIdentityItem>,
-) -> RedundantBooleanIdentitySummary {
-    RedundantBooleanIdentitySummary {
-        boolean_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_redundant_boolean_identity_policy(
-    options: RedundantBooleanIdentityPolicyOptions,
-    summary: &RedundantBooleanIdentitySummary,
-) -> RedundantBooleanIdentityPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    RedundantBooleanIdentityPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        boolean_form_count: summary.boolean_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("boolean_form_count", json!(boolean_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn booleans(input: &str) -> (usize, Vec<RedundantBooleanIdentityItem>) {
+    fn report(input: &str) -> FileFindings<RedundantBooleanIdentityItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_redundant_boolean_identities(
-            &PathBuf::from("test.lisp"),
-            Dialect::CommonLisp,
-            &tree,
-        )
-        .expect("collect redundant boolean identities")
+        build_redundant_boolean_identity_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build redundant boolean identity report")
+    }
+
+    /// The `(boolean_form_count, violations)` pair the report is built from.
+    fn booleans(input: &str) -> (u64, Vec<RedundantBooleanIdentityItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "boolean_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("boolean_form_count in the summary");
+        (count, report.findings)
     }
 
     fn kept<'a>(source: &'a str, item: &RedundantBooleanIdentityItem) -> Vec<&'a str> {
@@ -300,35 +309,52 @@ mod tests {
         assert_eq!(violations[0].operator, "or");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree = SyntaxTree::parse_with_dialect("(and a t b)", Dialect::Clojure).expect("parse");
-        let (count, violations) = collect_redundant_boolean_identities(
-            &PathBuf::from("app.clj"),
-            Dialect::Clojure,
-            &tree,
-        )
-        .expect("collect redundant boolean identities");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_redundant_boolean_identity_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build redundant boolean identity report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = booleans("(and a t b)");
-        let summary = summarize_redundant_boolean_identities(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(and a b)").dialect_modelled);
+    }
 
-        let quiet = evaluate_redundant_boolean_identity_policy(
-            RedundantBooleanIdentityPolicyOptions::new(false),
-            &summary,
+    #[test]
+    fn a_finding_carries_its_line_its_operator_and_its_identity() {
+        let report = report("(defun ok? (a b)\n  (and a t b))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "and");
+        assert_eq!(
+            finding.json_fields(),
+            vec![("operator", json!("and")), ("identity", json!("t"))]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["operator=and".to_owned(), "identity=t".to_owned()]
+        );
+    }
 
-        let strict = evaluate_redundant_boolean_identity_policy(
-            RedundantBooleanIdentityPolicyOptions::new(true),
-            &summary,
-        );
-        assert!(!strict.passed);
+    /// The operator is normalised before it is stored, so it survives as a tag
+    /// whatever the source's casing.
+    #[test]
+    fn the_kind_is_case_normalised() {
+        assert_eq!(report("(AND x T y)").findings[0].kind(), "and");
+        assert_eq!(report("(OR x NIL y)").findings[0].kind(), "or");
+    }
+
+    #[test]
+    fn the_summary_counts_every_boolean_scanned_not_only_the_flagged_ones() {
+        let report = report("(and a t b)\n(and a b)\n(or c nil d)\n");
+        assert_eq!(report.summary, vec![("boolean_form_count", json!(3))]);
+        assert_eq!(report.findings.len(), 2);
     }
 }

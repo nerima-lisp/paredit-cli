@@ -14,7 +14,10 @@ fn cli_flags_t_in_and() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"finding_count\": 1"))
+        .stdout(predicate::str::contains("\"boolean_form_count\": 1"))
+        .stdout(predicate::str::contains("\"line\": 1"))
+        .stdout(predicate::str::contains("\"kind\": \"and\""))
         .stdout(predicate::str::contains("\"operator\": \"and\""))
         .stdout(predicate::str::contains("\"identity\": \"t\""));
 }
@@ -34,7 +37,51 @@ fn cli_does_not_flag_trailing_t_or_dominant_elements() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"violation_count\": 0"));
+        .stdout(predicate::str::contains("\"finding_count\": 0"))
+        // The denominator is what separates "no redundant identity among four
+        // boolean forms" from "no boolean form at all".
+        .stdout(predicate::str::contains("\"boolean_form_count\": 4"))
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"));
+}
+
+/// An empty finding list is ambiguous, so a dialect this rule does not model
+/// must be labelled rather than silently reported as clean.
+#[test]
+fn cli_labels_a_dialect_the_rule_does_not_model() {
+    let dir = fresh_temp_dir("redundant-boolean-identity-report-unmodelled");
+    let file = dir.join("a.fnl");
+    fs::write(&file, "(and a t b)\n").expect("write a.fnl");
+
+    paredit()
+        .args(["inspect", "redundant-boolean-identity", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": false"))
+        .stdout(predicate::str::contains("\"finding_count\": 0"));
+}
+
+/// The envelope's interchange formats, which this report reached by moving onto
+/// it. Asserted here only far enough to prove the command accepts them; their
+/// content is covered once in `report_interop`. The `or` in the rule id is the
+/// finding's `kind`, which this report gets from its operator.
+#[test]
+fn cli_redundant_boolean_identity_emits_sarif() {
+    let dir = fresh_temp_dir("redundant-boolean-identity-report-sarif");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(or found nil next)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "redundant-boolean-identity", "--output", "sarif"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"ruleId\": \"inspect/redundant-boolean-identity/or\"",
+        ))
+        .stdout(predicate::str::contains(
+            "or has a redundant nil operand; drop it",
+        ));
 }
 
 #[test]

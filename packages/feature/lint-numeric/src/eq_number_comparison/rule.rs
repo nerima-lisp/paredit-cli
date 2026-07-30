@@ -57,13 +57,7 @@ impl LintRule for Rule {
 
         let mut comparison_form_count = 0;
         let mut items = Vec::new();
-        examine_comparison(
-            view,
-            context.path(),
-            &is_number,
-            &mut comparison_form_count,
-            &mut items,
-        );
+        examine_comparison(view, &is_number, &mut comparison_form_count, &mut items);
         for item in items {
             let span = item.span;
             let fix = {

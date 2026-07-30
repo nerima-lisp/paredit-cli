@@ -15,13 +15,15 @@
 //!
 //! Scope: Common Lisp only.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use paredit_core_lint_engine::LintResult;
 
+use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, Path as SexprPath, SyntaxTree};
 use paredit_core_syntax::view_query::{for_each_subview, is_paren_list, list_head};
+use serde_json::{Value, json};
 
 /// The complement macro for a `when`/`unless` head: flipping the conditional is
 /// half of removing the redundant negation.
@@ -53,7 +55,6 @@ fn single_negation(view: &ExpressionView) -> Option<&'static str> {
 
 #[derive(Debug, Clone)]
 pub struct NegatedWhenUnlessItem {
-    pub path: PathBuf,
     /// The span of the whole `(when …)`/`(unless …)` form.
     pub span: ByteSpan,
     /// The span of the head symbol (`when`/`unless`), for a flip-the-macro fix.
@@ -70,43 +71,51 @@ pub struct NegatedWhenUnlessItem {
     pub suggested_head: &'static str,
 }
 
-#[derive(Debug)]
-pub struct NegatedWhenUnlessSummary {
-    pub conditional_form_count: usize,
-    pub violations: Vec<NegatedWhenUnlessItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct NegatedWhenUnlessPolicyOptions {
-    fail_on_violation: bool,
-}
-
-impl NegatedWhenUnlessPolicyOptions {
-    #[must_use]
-    pub const fn new(fail_on_violation: bool) -> Self {
-        Self { fail_on_violation }
+impl Finding for NegatedWhenUnlessItem {
+    /// The conditional macro, so `when` and `unless` are separable without
+    /// parsing JSON.
+    ///
+    /// A closed, canonical pair — `complement_head` accepts nothing else and
+    /// stores the lowercased form regardless of how the source spelled it — so
+    /// it is a fixed vocabulary rather than an echo of the file. They are also
+    /// two different double-negatives, and a consumer filtering on one of them
+    /// is asking a real question.
+    fn kind(&self) -> &'static str {
+        self.head
     }
 
-    #[must_use]
-    pub const fn fail_on_violation(self) -> bool {
-        self.fail_on_violation
+    fn span(&self) -> ByteSpan {
+        self.span
     }
-}
 
-#[derive(Debug)]
-pub struct NegatedWhenUnlessPolicy {
-    pub fail_on_violation: bool,
-    pub conditional_form_count: usize,
-    pub violation_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
+    /// The negator and the suggestion, in the order the old text row had them.
+    /// The head that led that row is now the leading `kind`.
+    fn text_columns(&self) -> Vec<String> {
+        vec![self.negator.to_owned(), self.suggested_head.to_owned()]
+    }
+
+    fn json_fields(&self) -> Vec<(&'static str, Value)> {
+        vec![
+            ("head", json!(self.head)),
+            ("negator", json!(self.negator)),
+            ("suggested_head", json!(self.suggested_head)),
+        ]
+    }
+
+    /// The same sentence the `negated-when-unless` lint rule writes, so a SARIF
+    /// or JUnit consumer reading both sees one finding described one way.
+    fn message(&self) -> String {
+        format!(
+            "{} test is ({} …); use {} on the un-negated test",
+            self.head, self.negator, self.suggested_head
+        )
+    }
 }
 
 /// Examines one node. Shared with the lint suite's rule, which reaches every
 /// node through the single dispatch pass instead of walking the tree again.
 pub fn examine_conditional(
     view: &ExpressionView,
-    path: &Path,
     conditional_form_count: &mut usize,
     violations: &mut Vec<NegatedWhenUnlessItem>,
 ) {
@@ -132,7 +141,6 @@ pub fn examine_conditional(
     // stored form is the complement of the suggestion.
     let canonical_head = complement_head(suggested_head).expect("complement is involutive");
     violations.push(NegatedWhenUnlessItem {
-        path: path.to_path_buf(),
         span: view.span,
         head_span: view.children[0].span,
         test_span: test.span,
@@ -143,15 +151,27 @@ pub fn examine_conditional(
     });
 }
 
-/// Collects every negated `when`/`unless` across a whole file, along with the
-/// total number of `when`/`unless` forms scanned.
-pub fn collect_negated_when_unless(
+/// Collects every negated `when`/`unless` in one file, with the number of
+/// `when`/`unless` forms scanned as the denominator beside them.
+///
+/// A dialect this rule does not model is reported as unmodelled rather than as
+/// clean: an empty finding list means "no negated test here" for Common Lisp
+/// and "nothing was looked for" for Fennel, and the two read identically
+/// without the flag.
+pub fn build_negated_when_unless_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
-) -> LintResult<(usize, Vec<NegatedWhenUnlessItem>)> {
+) -> LintResult<FileFindings<NegatedWhenUnlessItem>> {
     if dialect != Dialect::CommonLisp {
-        return Ok((0, Vec::new()));
+        return Ok(FileFindings::new(
+            path.to_path_buf(),
+            dialect,
+            false,
+            tree.source(),
+            Vec::new(),
+            vec![("conditional_form_count", json!(0))],
+        ));
     }
 
     let mut conditional_form_count = 0;
@@ -159,51 +179,40 @@ pub fn collect_negated_when_unless(
     for index in 0..tree.root_children().len() {
         let view = tree.select_path(&SexprPath::root_child(index))?.view();
         for_each_subview(&view, |subview| {
-            examine_conditional(subview, path, &mut conditional_form_count, &mut violations);
+            examine_conditional(subview, &mut conditional_form_count, &mut violations);
         });
     }
-    Ok((conditional_form_count, violations))
-}
 
-#[must_use]
-pub const fn summarize_negated_when_unless(
-    conditional_form_count: usize,
-    violations: Vec<NegatedWhenUnlessItem>,
-) -> NegatedWhenUnlessSummary {
-    NegatedWhenUnlessSummary {
-        conditional_form_count,
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        true,
+        tree.source(),
         violations,
-    }
-}
-
-#[must_use]
-pub fn evaluate_negated_when_unless_policy(
-    options: NegatedWhenUnlessPolicyOptions,
-    summary: &NegatedWhenUnlessSummary,
-) -> NegatedWhenUnlessPolicy {
-    let violation_count = summary.violations.len();
-    let mut violations = Vec::new();
-    if options.fail_on_violation() && violation_count > 0 {
-        violations.push(format!("violation_count {violation_count} exceeds 0"));
-    }
-
-    NegatedWhenUnlessPolicy {
-        fail_on_violation: options.fail_on_violation(),
-        conditional_form_count: summary.conditional_form_count,
-        violation_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+        vec![("conditional_form_count", json!(conditional_form_count))],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn conditionals(input: &str) -> (usize, Vec<NegatedWhenUnlessItem>) {
+    fn report(input: &str) -> FileFindings<NegatedWhenUnlessItem> {
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse input");
-        collect_negated_when_unless(&PathBuf::from("test.lisp"), Dialect::CommonLisp, &tree)
-            .expect("collect negated when/unless")
+        build_negated_when_unless_report(Path::new("test.lisp"), Dialect::CommonLisp, &tree)
+            .expect("build negated when/unless report")
+    }
+
+    /// The `(conditional_form_count, violations)` pair the report is built from.
+    fn conditionals(input: &str) -> (u64, Vec<NegatedWhenUnlessItem>) {
+        let report = report(input);
+        let count = report
+            .summary
+            .iter()
+            .find(|(name, _)| *name == "conditional_form_count")
+            .and_then(|(_, value)| value.as_u64())
+            .expect("conditional_form_count in the summary");
+        (count, report.findings)
     }
 
     #[test]
@@ -300,33 +309,61 @@ mod tests {
         assert_eq!(violations[0].suggested_head, "unless");
     }
 
+    /// A dialect this rule cannot read must say so, rather than return the
+    /// empty finding list a clean Common Lisp file returns.
     #[test]
-    fn ignores_non_common_lisp_dialects() {
+    fn a_non_common_lisp_dialect_is_reported_as_unmodelled() {
         let tree =
             SyntaxTree::parse_with_dialect("(when (not x) y)", Dialect::Clojure).expect("parse");
-        let (count, violations) =
-            collect_negated_when_unless(&PathBuf::from("app.clj"), Dialect::Clojure, &tree)
-                .expect("collect negated when/unless");
-        assert_eq!(count, 0);
-        assert!(violations.is_empty());
+        let report =
+            build_negated_when_unless_report(Path::new("app.clj"), Dialect::Clojure, &tree)
+                .expect("build negated when/unless report");
+        assert!(!report.dialect_modelled);
+        assert!(report.findings.is_empty());
+        assert_eq!(report.summary, vec![("conditional_form_count", json!(0))]);
     }
 
     #[test]
-    fn policy_fails_only_when_flag_set() {
-        let (count, items) = conditionals("(when (not x) y)");
-        let summary = summarize_negated_when_unless(count, items);
+    fn a_common_lisp_file_is_reported_as_modelled() {
+        assert!(report("(when ready (go))").dialect_modelled);
+    }
 
-        let quiet = evaluate_negated_when_unless_policy(
-            NegatedWhenUnlessPolicyOptions::new(false),
-            &summary,
+    /// The head leads the row as the `kind`, and stays in the JSON where the
+    /// old renderer published it.
+    #[test]
+    fn a_finding_carries_its_line_its_head_and_its_suggestion() {
+        let report = report("(defun f ()\n  (when (not ready) (go)))\n");
+        let finding = &report.findings[0];
+        assert_eq!(report.line_of(finding), 2);
+        assert_eq!(finding.kind(), "when");
+        assert_eq!(
+            finding.json_fields(),
+            vec![
+                ("head", json!("when")),
+                ("negator", json!("not")),
+                ("suggested_head", json!("unless")),
+            ]
         );
-        assert!(quiet.passed);
-        assert_eq!(quiet.violation_count, 1);
+        assert_eq!(
+            finding.text_columns(),
+            vec!["not".to_owned(), "unless".to_owned()]
+        );
+    }
 
-        let strict = evaluate_negated_when_unless_policy(
-            NegatedWhenUnlessPolicyOptions::new(true),
-            &summary,
+    /// `unless` is the other half of the closed pair, so the two are separable
+    /// on `kind` alone.
+    #[test]
+    fn an_unless_finding_is_a_different_kind_from_a_when_finding() {
+        assert_eq!(
+            report("(unless (not ok) (run))").findings[0].kind(),
+            "unless"
         );
-        assert!(!strict.passed);
+    }
+
+    #[test]
+    fn the_summary_counts_every_conditional_scanned_not_only_the_flagged_ones() {
+        let report = report("(when (not x) y)\n(when ready (go))\n");
+        assert_eq!(report.summary, vec![("conditional_form_count", json!(2))]);
+        assert_eq!(report.findings.len(), 1);
     }
 }

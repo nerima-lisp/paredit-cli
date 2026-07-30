@@ -306,6 +306,43 @@ model, a binding table, nine lint rules, and a per-file report.
   overwritten and so cannot hold an inline directive; scoped to `inspect
   lint` alone, unlike `paths.exclude` which hides a path from every command.
 
+### Changed
+
+- **The 134 per-rule `inspect` reports now go through the shared report
+  envelope.** Each of them hand-wrote its own `serde_json::json!` literal, and
+  not one used `paredit_core_cli::report` — the envelope written for exactly
+  this shape. Moving them across is a **breaking change to their JSON**, and
+  needs a major release: the flat `violations` array becomes `files[].findings[]`
+  with the path on the file rather than on each finding, `violation_count`
+  becomes `finding_count`, and `policy.fail_on_violation` becomes `policy.gate`.
+
+  What the reports gain in exchange:
+
+  `--output sarif`, `code-climate`, `junit`, `csv`, `tsv`, `html`, `markdown`
+  and `github` — eight formats clap previously rejected outright. A per-rule
+  report is now a CI artifact without a shell pipeline in between.
+
+  An `unmodelled` row for a file outside the rule's dialect scope. Pointed at
+  a Fennel file, these commands used to print zero violations, which reads as a
+  clean bill of health and is not one — it is the silence
+  `presentation/cli/contract.rs` already complains about. They now say so.
+
+  Line numbers, and per-file grouping rather than one flat list across the
+  whole input.
+
+  Nothing is lost. Every rule's denominator (`if_form_count`,
+  `comparison_form_count`, and 63 more) moves to the envelope's per-file
+  `summary` and is still aggregated to the top level, and every per-finding
+  field the old JSON published — `literal`, `head`, `occurrence_count`,
+  `accessor_span`, `removal_span` — moves to `json_fields`. Fields a rule
+  carried only to feed its autofix, and never published, stay unpublished.
+
+- 165 byte-identical private `line_of` helpers collapse into one `pub fn`
+  beside the `Finding` trait. Seven others that share the name — and two that
+  share the signature — stay where they are: one is 0-based, two take a
+  `ByteSpan`, two binary-search a prebuilt index, and two count bytes in a way
+  that diverges from the rest the moment an offset is not a UTF-8 boundary.
+
 ### Fixed
 
 - Ordinary refusals were reported to callers as `internal.unclassified` —
