@@ -10,10 +10,10 @@
 //! file would let `--query '(defun'` be reported as a failure of the four
 //! hundredth file rather than of the command line.
 
-use paredit_core_cli::CommandResult;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use paredit_core_cli::args::DialectArg;
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::selector::Pattern;
 
@@ -26,17 +26,25 @@ pub fn query_find(args: QueryFindArgs) -> CommandResult {
     let pattern = Pattern::parse(&args.query, pattern_dialect(args.dialect))?;
     let files = selected_files(&args.input, &args.roots)?;
 
-    let mut reports = Vec::with_capacity(files.len());
-    for file in &files {
-        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        reports.push(build_find_report(
+    // Per file, and a file that will not parse is *reported*, not fatal. A
+    // workspace command that aborts on the first unreadable file is unusable
+    // on a real repository: 10% of Emacs's own `lisp/` tree uses a reader
+    // dispatch this parser declines, and one of them killed a run over the
+    // other 1450.
+    let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, _| {
+        CliResult::Ok(build_find_report(
             file,
             dialect,
-            &tree,
+            tree,
             &pattern,
             args.preview_bytes,
-        ));
+        ))
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let reports = analysis.succeeded;
 
     let policy = evaluate_find_policy(args.fail_on_match, args.fail_on_no_match, &reports);
     let passed = policy.passed;

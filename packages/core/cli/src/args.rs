@@ -798,7 +798,7 @@ pub enum ThreadStyleArg {
     Last,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SourceInput {
     pub text: String,
     pub file: Option<PathBuf>,

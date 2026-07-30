@@ -80,12 +80,12 @@ pub fn print_explain(entry: &CatalogEntry, output: OutputFormat) -> CliResult<()
 
 pub fn print_run_report(
     entry: &CatalogEntry,
-    files: &[FileOutcome],
+    files: &[&FileOutcome],
     totals: &MigrationTotals,
     written: bool,
     output: OutputFormat,
 ) -> CliResult<()> {
-    let touched: Vec<&FileOutcome> = files.iter().filter(|file| file.is_touched()).collect();
+    let touched: Vec<&&FileOutcome> = files.iter().filter(|file| file.is_touched()).collect();
 
     match output {
         OutputFormat::Text => {

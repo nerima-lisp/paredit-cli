@@ -29,13 +29,23 @@ pub fn build_find_report(
     // that — comparing an `ExpressionPath`, which is a `Vec`, every step — is
     // quadratic in a file's size. It showed: a 700 KB source took two seconds
     // to *report* matches that took 70 ms to rewrite.
-    let all_ids = stable_selector_ids(tree, dialect);
+    let matches = match_all(tree, pattern, dialect);
+    // Only when something matched. `stable_selector_ids` is a second full walk
+    // of the tree that allocates an id per node, and over a repository the
+    // overwhelming majority of files match nothing at all — it made a
+    // zero-match `query find` over a 57 MB tree take 3.2 s where the same work
+    // through `query count` took 0.9 s.
+    let all_ids = if matches.is_empty() {
+        Vec::new()
+    } else {
+        stable_selector_ids(tree, dialect)
+    };
     let ids: HashMap<&ExpressionPath, &str> = all_ids
         .iter()
         .map(|(path, id)| (path, id.as_str()))
         .collect();
 
-    let hits: Vec<PatternHit> = match_all(tree, pattern, dialect)
+    let hits: Vec<PatternHit> = matches
         .iter()
         .map(|found| {
             let id = ids.get(&found.path).map(|id| (*id).to_owned());

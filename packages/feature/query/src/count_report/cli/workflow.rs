@@ -8,7 +8,7 @@
 
 use paredit_core_cli::{CliResult, CommandResult};
 
-use paredit_core_cli::shared::read_input_dialect_and_tree;
+use paredit_core_cli::shared::{analyze_files, note_partial_file_failures, total_file_failure};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::selector::Pattern;
 
@@ -31,14 +31,16 @@ pub fn query_count(args: QueryCountArgs) -> CommandResult {
         .collect::<CliResult<Vec<_>>>()?;
 
     let files = selected_files(&args.input, &args.roots)?;
-    let mut tallies = Vec::with_capacity(files.len());
-    for file in &files {
-        let (_, file_dialect, tree) =
-            read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        tallies.push(tally_file(file, file_dialect, &tree, &patterns));
+    // A file that will not parse is reported, not fatal — see `query find`.
+    let analysis = analyze_files(&files, args.dialect, |file, file_dialect, tree, _| {
+        CliResult::Ok(tally_file(file, file_dialect, tree, &patterns))
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
 
-    let report = build_count_report(&patterns, tallies);
+    let report = build_count_report(&patterns, analysis.succeeded);
     let total = report.grand_total();
     print_count_report(&report, args.per_file, args.include_empty, args.output)?;
 

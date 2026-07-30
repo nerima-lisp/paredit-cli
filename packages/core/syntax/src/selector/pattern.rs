@@ -226,6 +226,34 @@ impl Pattern {
         convert(form, 0, &mut kinds)
     }
 
+    /// Every literal atom this pattern requires, in no particular order.
+    ///
+    /// A pattern matches only where *all* of these appear, so a document
+    /// containing none of them cannot match and need not be walked. That makes
+    /// a substring test a sound prefilter — sound in the direction that
+    /// matters, since it can only ever say "cannot match", never "matches".
+    ///
+    /// The caller has to compare case-insensitively, or gate the test to a
+    /// case-sensitive dialect: Common Lisp's reader folds case, so
+    /// [`super::matcher`] matches `DEFUN` against the literal `defun` and a
+    /// case-sensitive `contains` would skip a step that should have run.
+    #[must_use]
+    pub fn required_literals(&self) -> Vec<&str> {
+        let mut literals = Vec::new();
+        let mut pending = vec![self];
+        while let Some(pattern) = pending.pop() {
+            match pattern {
+                Self::Atom { text, .. } => literals.push(text.as_str()),
+                Self::Wildcard { .. } => {}
+                Self::List { before, after, .. } => {
+                    pending.extend(after.iter());
+                    pending.extend(before.iter());
+                }
+            }
+        }
+        literals
+    }
+
     /// Every capture name this pattern binds, in first-appearance order.
     #[must_use]
     pub fn capture_names(&self) -> Vec<String> {

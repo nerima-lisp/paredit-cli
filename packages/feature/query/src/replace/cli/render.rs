@@ -21,12 +21,12 @@ const SKIP_REASONS: [SkipReason; 3] = [
 ];
 
 pub fn print_replace_report(
-    files: &[FileRewrite],
+    files: &[&FileRewrite],
     totals: &RewriteTotals,
     args: &QueryReplaceArgs,
     output: OutputFormat,
 ) -> CliResult<()> {
-    let touched: Vec<&FileRewrite> = files
+    let touched: Vec<&&FileRewrite> = files
         .iter()
         .filter(|file| file.is_touched() || !file.skipped.is_empty())
         .collect();

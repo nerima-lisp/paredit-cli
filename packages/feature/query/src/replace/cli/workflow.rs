@@ -24,10 +24,12 @@
 //! command carries it out. The reviewable artifact is the plan, which is why
 //! it prints by default.
 
-use paredit_core_cli::CommandResult;
+use paredit_core_cli::{CliResult, CommandResult};
 
 use paredit_core_cli::args::DialectArg;
-use paredit_core_cli::shared::{emit_document, read_input_dialect_and_tree};
+use paredit_core_cli::shared::{
+    analyze_files, emit_document, note_partial_file_failures, total_file_failure,
+};
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::selector::{Pattern, RewriteAllowances, Template};
 
@@ -50,20 +52,31 @@ pub fn query_replace(args: QueryReplaceArgs) -> CommandResult {
         quoted: args.include_quoted,
     };
     let files = selected_files(&args.input, &args.roots)?;
-    let mut rewrites: Vec<(FileRewrite, _)> = Vec::with_capacity(files.len());
-    for file in &files {
-        let (input, file_dialect, tree) =
-            read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let rewrite = build_file_rewrite(file, file_dialect, &tree, &pattern, &template, allow);
-        rewrites.push((rewrite, (input, file_dialect)));
+    // A file that will not parse is reported, not fatal: a workspace command
+    // that aborts on the first unreadable file is unusable on a real
+    // repository. The source text is kept only for a file that will actually
+    // be written — retaining every file's bytes for the whole run cost 200 MB
+    // on a 57 MB tree that matched nothing.
+    let analysis = analyze_files(&files, args.dialect, |file, file_dialect, tree, input| {
+        let rewrite = build_file_rewrite(file, file_dialect, tree, &pattern, &template, allow);
+        let source = rewrite.is_touched().then(|| (input.clone(), file_dialect));
+        CliResult::Ok((rewrite, source))
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
     }
+    note_partial_file_failures(&analysis.failed);
+    let rewrites = analysis.succeeded;
 
-    let plans: Vec<FileRewrite> = rewrites.iter().map(|(plan, _)| plan.clone()).collect();
+    // References, not clones: a `Vec<&FileRewrite>` is a vector of pointers.
+    let plans: Vec<&FileRewrite> = rewrites.iter().map(|(plan, _)| plan).collect();
     let totals = RewriteTotals::of(&plans);
 
     if args.write || args.diff {
-        for (plan, (input, file_dialect)) in &rewrites {
-            let Some(rewritten) = plan.rewritten.clone() else {
+        for (plan, source) in &rewrites {
+            let (Some(rewritten), Some((input, file_dialect))) =
+                (plan.rewritten.clone(), source.as_ref())
+            else {
                 continue;
             };
             emit_document(input, *file_dialect, args.write, args.diff, rewritten)?;

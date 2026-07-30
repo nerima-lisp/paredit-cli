@@ -668,6 +668,50 @@ impl<T> FileAnalysis<T> {
     }
 }
 
+/// The error a run whose every file failed should return.
+///
+/// Beside [`analyze_files`] because it is the other half of the same
+/// abstraction: a per-file failure is data, right up until there is no file
+/// left that succeeded, and then it is the command's failure. Names the
+/// first failure by input order, the same file a fully serial run would have
+/// stopped on first.
+#[must_use]
+pub fn total_file_failure(failures: Vec<FileFailure>) -> crate::error::FeatureRefusal {
+    let first = failures
+        .into_iter()
+        .next()
+        .expect("total failure has at least one failure");
+    crate::error::FeatureRefusal::message(
+        crate::diagnosis::ErrorCode::InputUnparsable,
+        format!(
+            "failed to analyze {}: {}",
+            first.file.display(),
+            first.message
+        ),
+    )
+}
+
+/// Notes on stderr the files [`analyze_files`] could not produce a result for,
+/// without failing the command over them.
+///
+/// The files that *did* succeed still have a report worth producing — but a
+/// report that quietly covers 1450 of 1453 files is a report that reads as
+/// covering all of them. The note is on stderr because it is an aside about
+/// the run rather than part of the report body, so a consumer piping stdout
+/// through `jq` still gets clean JSON and a human still sees the warning.
+pub fn note_partial_file_failures(failures: &[FileFailure]) {
+    if failures.is_empty() {
+        return;
+    }
+    eprintln!(
+        "warning: {} of the requested files could not be analyzed and are excluded from this report:",
+        failures.len()
+    );
+    for failure in failures {
+        eprintln!("  {}: {}", failure.file.display(), failure.message);
+    }
+}
+
 /// Reads, parses, and analyzes a list of files, using every available core.
 ///
 /// The shape every multi-file report in this tool has is
