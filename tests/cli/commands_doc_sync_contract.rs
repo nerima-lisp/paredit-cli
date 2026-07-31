@@ -1,4 +1,4 @@
-//! FEATURE-CANDIDATES.md section P4: `docs/src/commands.md` drifts from the
+//! docs/src/project/feature-candidates.md section P4: `docs/src/commands.md` drifts from the
 //! actual command surface silently, because nothing reads both. This asserts
 //! every leaf command under `inspect`/`edit`/`refactor`/`config` — as
 //! `paredit inspect capabilities` reports them, the same source of truth

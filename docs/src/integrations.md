@@ -81,6 +81,13 @@ header without a CORS preflight this server never approves, which is why the
 token is not accepted in the URL or a cookie. Binding off loopback needs
 `--allow-remote`; prefer an SSH tunnel.
 
+`--token <TOKEN>` pins the bearer token instead of minting one at startup, for
+a supervisor that must know it before the process starts — note that a token
+passed on a command line is visible in the process table, unlike the one
+`serve` prints to stderr by default. `--max-requests <N>` serves that many
+requests and exits, for scripts and tests that want a server for a bounded
+amount of work rather than a resident one.
+
 ## Report output formats
 
 Every report whose output is a list of located findings accepts the same set of

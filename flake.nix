@@ -33,11 +33,14 @@
       cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       msrvToolchainVersion = "${cargoToml.package.rust-version}.0";
 
+      # x86_64-linux and nothing else. Only what a gate verifies is declared,
+      # and the only gate is CI. aarch64-linux, x86_64-darwin and
+      # aarch64-darwin were declared without anything ever building them, which
+      # advertised support no run confirms. Every output -- packages, checks,
+      # apps AND devShells -- comes from this one list, so development happens
+      # on Linux. See PACKAGE_STANDARD.md "systems".
       systems = [
         "x86_64-linux"
-        "aarch64-linux"
-        "x86_64-darwin"
-        "aarch64-darwin"
       ];
 
       pkgsFor = lib.genAttrs systems (

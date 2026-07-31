@@ -51,7 +51,7 @@ the same thing:
 
 Note that the root crate re-exports `lexical_scope` as `pub` and the other four
 as `pub(crate)`, mirroring their original declarations. In particular
-`domain::semantics` is **not** public API, despite the 1.1.0 CHANGELOG entry
+`domain::semantics` is **not** public API, despite the 1.1.0 release-notes entry
 describing it as one — it has always been `pub(crate) mod semantics`.
 
 `semantics` carries a module-level `#![allow(dead_code, unused_imports)]` with

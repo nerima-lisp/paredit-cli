@@ -36,19 +36,19 @@ release.
 1. Set the new version in `Cargo.toml`.
 2. Refresh `Cargo.lock` (`cargo update --workspace --offline`, or any build)
    so the recorded `paredit-cli` version matches.
-3. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`. This is not
-   optional: the "Extract release notes" step in `release.yml` builds the
-   GitHub release body by running an `awk` script over this file, and it fails
-   the workflow if the section for the pushed tag is missing or empty. The
-   heading must match `## [X.Y.Z] - YYYY-MM-DD` exactly — the script matches it
-   literally, so a malformed heading yields an empty body rather than an error.
+3. Draft the release notes. There is no `CHANGELOG.md` in this repository: the
+   GitHub Release description is the only canonical history, and `release.yml`
+   deliberately writes no body at all. Read `git log <previous-tag>..HEAD` and
+   select entries by "does a user of `paredit` have to change their own code".
+   Keep the text to hand — it is pasted in at publish time, in the section
+   below.
 4. Update the documentation for anything the release changes, including the
    `vX.Y.Z` in the install examples in `installation.md` and `releases.md`.
 5. Commit as `chore(release): vX.Y.Z`.
 
-`nix flake check` verifies steps 1–4: `compatibility_contract` runs
-`release.yml`'s real `awk` script against the real `CHANGELOG.md`, so a missing
-section fails the gate rather than the tag push.
+`nix flake check` verifies steps 1, 2 and 4: `compatibility_contract` asserts
+that `release.yml` still creates an empty draft rather than publishing a
+machine-written body, and that this page still explains how to publish it.
 
 ## Verify the release candidate
 
@@ -71,11 +71,22 @@ README and the MkDocs site describe the released command surface.
 
 1. Create the annotated Git tag on the verified commit and push the branch and
    the tag: `git push origin main && git push origin vX.Y.Z`.
-2. Publish the GitHub release from that tag with the notes below.
-3. Confirm the GitHub Pages documentation build and that
+2. Wait for `release.yml` to go green. It verifies the tag against
+   `Cargo.toml`, runs `nix flake check` on the tagged tree, and creates the
+   GitHub Release as an empty **draft** — it writes no body.
+3. Paste in the notes drafted above and publish the draft:
+
+   ```sh
+   gh release edit vX.Y.Z --notes-file <file> --draft=false
+   ```
+
+   The draft is deliberate. A draft appears neither under "Latest release" nor
+   in the default output of `gh release list`, so a release whose notes were
+   forgotten never reaches downstream.
+4. Confirm the GitHub Pages documentation build and that
    `nix run github:nerima-lisp/paredit-cli/vX.Y.Z -- --version` reports the
    released version.
-4. If the release changes JSON output, command paths, flags, exit codes, the
+5. If the release changes JSON output, command paths, flags, exit codes, the
    MSRV, or Nix interfaces, call out the migration in the release notes.
 
 The release process does not replace the compatibility rules in the

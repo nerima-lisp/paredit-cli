@@ -54,6 +54,22 @@ selectors and filters — `--since`, `--from-git`, `--from-manifest`,
 run `paredit inspect sources` to see exactly which files a given combination
 selects.
 
+## Global options
+
+Every command accepts the same top-level flags. `--dry-run`, `--progress`, and
+the `--config`/`--no-config`/`--no-config-env` trio are covered in
+[Run-wide controls](agents.md#run-wide-controls); `--timeout-ms` and the
+`--max-*` budgets in [Bounding a run](safety.md#bounding-a-run); and
+`--new-file-mode`/`--refuse-symlinked-ancestors` in
+[Write permissions and symlinked ancestors](safety.md#write-permissions-and-symlinked-ancestors).
+The remaining two are terminal presentation, not safety, and apply nowhere
+else:
+
+| Flag | What it does |
+| --- | --- |
+| `--color <auto\|always\|never>` | Whether text output may use ANSI color. `auto`, the default, colors if and only if the destination stream is a terminal, `NO_COLOR` is unset, and `CLICOLOR_FORCE` has not already decided the question. |
+| `--paginate` | Delegates stdout to `$PAGER` (falling back to `less`) when it is a terminal. Off by default — unlike `--color`, paging changes the interaction itself, so it has to be asked for. |
+
 ## Inspect
 
 `paredit inspect` never writes source files. Prefer these commands for
@@ -297,7 +313,7 @@ output is a list of located findings accept the interchange formats as well —
 
 ### Choosing and tuning lint rules
 
-With 169 rules, `inspect lint` needs more than an on/off switch per rule. The
+With 165 rules, `inspect lint` needs more than an on/off switch per rule. The
 flags below are about the rule *set* rather than about any one rule, and all of
 them work with `--list-rules` as well as with a scan — so a run can be
 inspected before it is made.
@@ -322,7 +338,7 @@ key for baselines and suppression tooling.
 
 ### Rules a project writes for itself
 
-The 169 shipped rules are the ones everybody gets. A rule like "in *this*
+The 165 shipped rules are the ones everybody gets. A rule like "in *this*
 codebase, `defentity` must always be given a `:table`" is the majority of what
 a mature project wants and none of what a linter can ship, so a project writes
 those itself, in Lisp, in `.paredit/rules/*.lisp`:

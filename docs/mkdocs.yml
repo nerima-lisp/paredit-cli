@@ -93,7 +93,9 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  # pymdownx.snippets is deliberately absent: its only use in this org was
+  # including the top-level CHANGELOG.md, and the 2026-08-01 revision
+  # abolished CHANGELOG.md. Leaving the extension configured invites a new use.
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -137,6 +139,8 @@ nav:
       - Integrations: integrations.md
       - Releases and Compatibility: releases.md
       - Release Checklist: releasing.md
+  - Project:
+      - Feature Candidates: project/feature-candidates.md
   - Contributing:
       - Development: development.md
       - Repository Documentation: repository.md

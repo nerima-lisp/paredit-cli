@@ -65,7 +65,7 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 169 rules, and every rule depends on the engine; putting the registry in
+all 165 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
 the registry sits in the root reaching six packages for their `META` and
@@ -141,13 +141,13 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-The 169 shipped rules live in eleven themed packages, split three ways. A
+The 165 shipped rules live in eleven themed packages, split three ways. A
 twelfth, `feature/lint-custom`, holds no rules at all: it is the pattern
 language and the second pass that run the rules a *project* writes for itself.
 
 Six are split by the Lisp syntax they are about —
 `feature/lint-{conditional,sequence,numeric,control-flow,form-shape,string-char}`.
-`feature/lint-emacs-lisp` is split by *dialect*: its rules are about Emacs
+`feature/emacs-lisp` is split by *dialect*: its rules are about Emacs
 Lisp's own file conventions (`lexical-binding`, `;;;###autoload`, `defcustom`
 options, the `cl.el` names Emacs 27 removed) rather than about S-expression
 shape, so none of them has a Common Lisp counterpart to share a theme with.
@@ -171,7 +171,7 @@ newer packages give each rule a single module: they ship as lint rules only,
 reachable through `inspect lint --rule <name>`, so there is one consumer and
 the three-file split would be indirection with nothing on the other end.
 
-**`REGISTRY` is in neither.** It names all 169 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 165 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

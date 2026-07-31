@@ -17,27 +17,6 @@ fn release_workflow() -> String {
     fs::read_to_string(".github/workflows/release.yml").expect("read release workflow")
 }
 
-/// Extracts the exact awk program text from release.yml's "Extract release
-/// notes" step, so this test runs the real script instead of a hand-retyped
-/// copy that could silently drift from it.
-fn release_notes_awk_script() -> String {
-    let workflow = release_workflow();
-    let start_marker = "awk -v v=\"$version\" '";
-    let start = workflow
-        .find(start_marker)
-        .expect("release.yml invokes awk to extract release notes")
-        + start_marker.len();
-    let end = start
-        + workflow[start..]
-            .find("' CHANGELOG.md")
-            .expect("awk invocation is closed before piping into CHANGELOG.md");
-    workflow[start..end].to_owned()
-}
-
-fn changelog() -> String {
-    fs::read_to_string("CHANGELOG.md").expect("read CHANGELOG.md")
-}
-
 /// A major-version bump must be a deliberate act: the compatibility guide names
 /// the series it applies to, so releasing `2.0.0` cannot silently inherit the
 /// `1.x` promises.
@@ -165,87 +144,54 @@ fn release_checklist_and_compatibility_guide_reference_each_other() {
     );
 }
 
-/// `release.yml`'s "Extract release notes" step has no test coverage of its
-/// own; a change to the awk script, or to CHANGELOG.md's heading format,
-/// would only surface when a tag is actually pushed. This runs the real
-/// script (extracted above) against the real CHANGELOG.md and mirrors the
-/// step's own `[[ ! -s release-notes.md ]]` failure check as an assertion on
-/// the command's stdout.
+/// The release workflow publishes an EMPTY DRAFT and writes no body. As of the
+/// 2026-08-01 org revision the GitHub Release description is the only canonical
+/// changelog — there is no CHANGELOG.md to extract a body from — so the failure
+/// this test guards against is the opposite of the old one: not "the changelog
+/// section is missing", but "someone reintroduced a body-generating step and
+/// the release publishes itself with machine-written notes".
+///
+/// `draft: true` is the load-bearing half. Without it, forgetting the notes is
+/// a user-visible state: the release appears under "Latest release" and in
+/// `gh release list` with an empty description.
 #[test]
-fn release_notes_awk_script_extracts_the_current_version_section() {
-    let script = release_notes_awk_script();
-    let version = manifest_version();
-
-    // `awk` is a system dependency, not a Rust crate: it is present in the
-    // Nix devShell/sandbox and on standard macOS/Linux, so this is a low but
-    // non-zero portability assumption for this one test.
-    let output = std::process::Command::new("awk")
-        .arg("-v")
-        .arg(format!("v={version}"))
-        .arg(&script)
-        .arg("CHANGELOG.md")
-        .output()
-        .expect("run awk against CHANGELOG.md");
+fn release_workflow_creates_an_empty_draft_release() {
+    let workflow = release_workflow();
 
     assert!(
-        output.status.success(),
-        "awk exited non-zero extracting release notes for {version}: {}",
-        String::from_utf8_lossy(&output.stderr)
+        workflow.contains("draft: true"),
+        ".github/workflows/release.yml must create the release as a draft, so a \
+         release whose notes were never written cannot reach downstream"
     );
     assert!(
-        !output.stdout.is_empty(),
-        "release.yml's awk script produced no release-notes.md content for \
-         version {version}; CHANGELOG.md must keep a `## [{version}]` section, \
-         mirroring the `[[ ! -s release-notes.md ]]` failure check in \
-         .github/workflows/release.yml"
+        !workflow.contains("body_path:"),
+        ".github/workflows/release.yml must not set body_path: the release body \
+         is written by hand into the GitHub Release description, which is the \
+         only canonical changelog in this org"
+    );
+    assert!(
+        !workflow.contains("generate_release_notes"),
+        ".github/workflows/release.yml must not generate release notes: notes \
+         are selected by \"does a user have to change their own code\", a \
+         judgement no generator can make"
+    );
+    assert!(
+        !workflow.contains("name: Extract release notes"),
+        ".github/workflows/release.yml must not carry a release-notes extraction \
+         step: CHANGELOG.md was abolished in the 2026-08-01 org revision, so \
+         there is nothing to extract from"
     );
 }
 
-/// `release.yml`'s awk script matches headings literally as `## [X.Y.Z]`, so
-/// a malformed future CHANGELOG.md entry (wrong bracket, missing date, extra
-/// whitespace) would silently produce an empty release body instead of
-/// failing loudly. This checks every heading, not just the current release.
+/// The maintainer checklist has to describe the draft-and-publish flow, since
+/// the workflow deliberately stops short of publishing.
 #[test]
-fn changelog_headings_match_the_keep_a_changelog_format() {
-    let changelog = changelog();
+fn release_checklist_describes_publishing_the_draft() {
+    let guide = fs::read_to_string("docs/src/releasing.md").expect("read docs/src/releasing.md");
 
-    for line in changelog.lines().filter(|line| line.starts_with("## [")) {
-        assert!(
-            is_unreleased_heading(line) || is_dated_release_heading(line),
-            "CHANGELOG.md heading does not match `## [Unreleased]` or \
-             `## [X.Y.Z] - YYYY-MM-DD`: {line}"
-        );
-    }
-}
-
-fn is_unreleased_heading(line: &str) -> bool {
-    line == "## [Unreleased]"
-}
-
-fn is_dated_release_heading(line: &str) -> bool {
-    let Some(rest) = line.strip_prefix("## [") else {
-        return false;
-    };
-    let Some((version, date)) = rest.split_once("] - ") else {
-        return false;
-    };
-    is_semver(version) && is_iso_date(date)
-}
-
-fn is_semver(version: &str) -> bool {
-    let parts: Vec<&str> = version.split('.').collect();
-    parts.len() == 3
-        && parts
-            .iter()
-            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
-}
-
-fn is_iso_date(date: &str) -> bool {
-    let bytes = date.as_bytes();
-    bytes.len() == 10
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && date[0..4].bytes().all(|byte| byte.is_ascii_digit())
-        && date[5..7].bytes().all(|byte| byte.is_ascii_digit())
-        && date[8..10].bytes().all(|byte| byte.is_ascii_digit())
+    assert!(
+        guide.contains("--draft=false"),
+        "docs/src/releasing.md must tell the maintainer how to publish the \
+         draft release the workflow creates"
+    );
 }

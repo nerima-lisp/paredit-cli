@@ -1,20 +1,19 @@
 name: CI
 
 on:
+  # `push: branches: [main]` is declared here rather than in a separate
+  # main.yml that called this workflow through `workflow_call`. That wrapper was
+  # a fifth workflow whose only job was to re-trigger this one, and the org
+  # standard allows exactly ci.yml / docs.yml / release.yml / flake-update.yml
+  # unless a file states why its work cannot run inside the Nix sandbox — which
+  # a re-trigger cannot. Triggering directly also removes the `secrets:` block
+  # the wrapper needed: a workflow reached by `push` reads
+  # `secrets.CACHIX_AUTH_TOKEN` from the repository without it being forwarded,
+  # and forwarding an undeclared name is what used to fail every push to main
+  # with no jobs and no logs.
+  push:
+    branches: [main]
   pull_request:
-  # A caller that passes secrets explicitly — as main.yml does — may only pass
-  # names declared here. Passing an undeclared one is rejected when the run is
-  # created, so the whole workflow fails to start with no jobs and no logs.
-  # `secrets: inherit` needs no declaration, which is why dropping it in favour
-  # of explicit passing broke every push to main until this block existed.
-  workflow_call:
-    secrets:
-      CACHIX_AUTH_TOKEN:
-        description: >-
-          Cachix auth token, forwarded to .github/actions/nix-setup. Optional:
-          absent or empty configures the cache pull-only, which is also what
-          fork pull requests get.
-        required: false
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

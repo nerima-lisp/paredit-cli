@@ -1,4 +1,4 @@
-//! FEATURE-CANDIDATES.md section P5: which feature package may depend on
+//! docs/src/project/feature-candidates.md section P5: which feature package may depend on
 //! which other feature package is a deliberate decision
 //! (`SPEC-package-by-feature.md` section 2.2 measured 89 such edges among the
 //! pre-split slices and treated every one as a choice, not an accident), not

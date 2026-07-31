@@ -93,7 +93,7 @@ Each cell carries one of four statuses:
 `silent` is the one worth reading carefully. Almost every `inspect` command
 exits `0` for every dialect, so a `finding_count` of `0` looks identical
 whether the code is clean or the tool has nothing to say about it. Roughly 155
-of the 325 commands are `silent` outside Common Lisp; treat their output as
+of the 369 commands are `silent` outside Common Lisp; treat their output as
 absent rather than negative.
 
 Each command also reports the `tier` it needs from a dialect — `syntax`

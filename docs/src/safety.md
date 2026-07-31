@@ -96,6 +96,21 @@ The guarantee covers four ways a batch can die, each of which has a test:
 - a target that changes underneath the writer between staging and publishing;
 - the same file named twice, which has no well-defined result and is refused.
 
+## Write permissions and symlinked ancestors
+
+`--new-file-mode <MODE>` sets the permission bits a brand-new file is created
+with — octal, no leading `0` (`644`, not `0644`). Unix only; the built-in
+default is `600`, so a file this tool creates is not readable by other users
+unless asked to be.
+
+A write already refuses a target whose immediate parent directory is a
+symlink (`refusal.write-target`, [Refusal](errors.md#refusal.write-target)).
+`--refuse-symlinked-ancestors` extends that further up the path: it also
+refuses when any ancestor *above* the immediate parent climbs through a
+symlink. Off by default, because `/tmp` is a symlink to `/private/tmp` on
+macOS, and turning it on unconditionally would refuse every write there along
+with any similar stable redirection a platform sets up on purpose.
+
 ## Undoing a write
 
 `refactor apply --write --undo-out <path>` records a journal of *reverse edits*
