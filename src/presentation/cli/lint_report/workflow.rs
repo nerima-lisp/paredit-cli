@@ -13,7 +13,7 @@ use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaselin
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
 use crate::presentation::cli::lint_report::render::{
     FindingIds, LintFileFix, LintFix, LintFixPlanEntry, LintReplacement, LintSarifResult,
-    LintStats, LintSuppressionRemoval, LintTiming, print_lint_docs,
+    LintStats, LintSuppressionRemoval, LintTiming, print_custom_lint_explanation, print_lint_docs,
     print_lint_expired_suppressions, print_lint_explanation, print_lint_fix_plan,
     print_lint_fix_report, print_lint_github_annotation, print_lint_presets, print_lint_report,
     print_lint_rule_catalog, print_lint_sarif, print_lint_stats, print_lint_suppression_inventory,
@@ -381,10 +381,19 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
     let meta = RuleMetaResolver::new(&overrides, &custom);
 
     if args.test_rules {
-        return lint_report_test_rules(&custom);
+        return lint_report_test_rules(&args, &custom);
     }
 
     if let Some(rule) = &args.explain {
+        // A custom rule loaded successfully above and already shows up in
+        // `--list-rules`/`--docs` through the same catalogue; refusing to
+        // explain it here would be the one place it is not indistinguishable
+        // from a shipped rule. Checked first since a custom rule's name can
+        // never collide with a shipped one (`Ruleset::validate` rejects that
+        // at load time), so the order cannot change which branch answers.
+        if let Some(found) = custom.rule(rule) {
+            return Ok(print_custom_lint_explanation(found, args.output)?);
+        }
         if !RULES.contains(&rule.as_str()) {
             let suggestion =
                 paredit_core_lint_engine::error::did_you_mean(RULES.iter().copied(), rule);
@@ -417,7 +426,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
     }
 
     if args.docs {
-        return Ok(print_lint_docs(&active)?);
+        return Ok(print_lint_docs(&active, &custom)?);
     }
 
     if args.list_rules {
@@ -470,7 +479,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
 
     if let Some(out_path) = args.write_baseline.clone() {
         return Ok(lint_report_write_baseline(
-            &args, &files, &active, &out_path,
+            &args, &files, &active, &custom, &out_path,
         )?);
     }
 
@@ -1087,26 +1096,37 @@ fn lint_report_fix(
     )?)
 }
 
-/// Writes the current findings (for the active rules, after suppression) to a
-/// baseline file, so a later `--baseline` run can gate only on new findings.
+/// Writes the current findings (for the active rules plus any custom rules,
+/// after suppression) to a baseline file, so a later `--baseline` run can gate
+/// only on new findings.
 /// Prints a one-line summary and exits 0.
+///
+/// Custom findings are merged in exactly as [`lint_report_stats`] and the main
+/// scan do: a rule that is "indistinguishable from a shipped one" everywhere
+/// downstream (see `custom.rs`'s module doc) must also be something
+/// `--write-baseline` can capture, or a later `--baseline` run has no entry to
+/// suppress it with.
 fn lint_report_write_baseline(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
+    custom: &CustomRules,
     out_path: &std::path::Path,
 ) -> CliResult<()> {
     let mut entries = Vec::new();
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-        let findings = retain_unsuppressed(
+        let findings = merge_custom(
             collect_lint_findings(file, dialect, &tree)?,
-            &input.text,
+            custom,
+            file,
             &tree,
+            &input.text,
         );
+        let findings = retain_unsuppressed(findings, &input.text, &tree);
         for finding in findings {
-            if !active.contains(&finding.rule) {
+            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
                 continue;
             }
             entries.push(BaselineEntry {
@@ -1711,16 +1731,50 @@ fn active_with_custom(active: &[&'static str], custom: &CustomRules) -> Vec<&'st
 /// A separate mode rather than part of a scan: a rule file is code, and code
 /// nobody can check goes wrong quietly. Exits 3 on any failure so CI can keep
 /// a project's own rules correct the same way it keeps its own tests correct.
-fn lint_report_test_rules(custom: &CustomRules) -> CommandResult {
-    let failures = custom.test();
+///
+/// Honors `--output`: text keeps the original tab-separated lines, and JSON
+/// emits one object per [`paredit_feature_lint_custom::TestFailure`] (`rule`,
+/// `clause`, `input`, `expected`, `actual`) instead of flattening it into a
+/// single string, so a caller parsing the output does not have to re-split
+/// the text-mode line.
+fn lint_report_test_rules(args: &LintReportArgs, custom: &CustomRules) -> CommandResult {
+    let failures = custom.test_failures();
     let rule_count = custom.ruleset().rules.len();
     let test_count = custom.ruleset().tests.len();
 
-    println!("custom_rule_count\t{rule_count}");
-    println!("custom_test_count\t{test_count}");
-    println!("failure_count\t{}", failures.len());
-    for failure in &failures {
-        println!("failure\t{failure}");
+    match args.output {
+        crate::presentation::cli::OutputFormat::Text => {
+            println!("custom_rule_count\t{rule_count}");
+            println!("custom_test_count\t{test_count}");
+            println!("failure_count\t{}", failures.len());
+            for failure in &failures {
+                println!(
+                    "failure\t{}\t{}\t{}\texpected {}\tgot {}",
+                    failure.rule, failure.clause, failure.input, failure.expected, failure.actual
+                );
+            }
+        }
+        crate::presentation::cli::OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "schema_version": 1,
+                    "custom_rule_count": rule_count,
+                    "custom_test_count": test_count,
+                    "failure_count": failures.len(),
+                    "failures": failures
+                        .iter()
+                        .map(|failure| serde_json::json!({
+                            "rule": failure.rule,
+                            "clause": failure.clause,
+                            "input": failure.input,
+                            "expected": failure.expected,
+                            "actual": failure.actual,
+                        }))
+                        .collect::<Vec<_>>(),
+                }))?
+            );
+        }
     }
 
     if !failures.is_empty() {

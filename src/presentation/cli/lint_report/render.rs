@@ -12,6 +12,7 @@ use crate::lint::report::{
 use crate::presentation::cli::OutputFormat;
 use crate::presentation::cli::lint_report::custom::{CustomRules, RuleMetaResolver};
 use crate::presentation::cli::shared::FileFailure;
+use paredit_feature_lint_custom::CustomRule;
 
 /// The stable identity of each finding in a summary, keyed by its position.
 ///
@@ -299,7 +300,14 @@ pub(super) fn print_lint_tags(output: OutputFormat) -> CliResult<()> {
 /// documentation contradicts: everything below is read from the same `RULE_DOCS`
 /// the report and `--list-rules` read. The output is the document, so it ignores
 /// `--output` and goes to stdout for redirection.
-pub(super) fn print_lint_docs(active: &[&str]) -> CliResult<()> {
+///
+/// `custom`'s rules follow in their own section: they are a project's own
+/// rules, not the shipped catalogue, so they are kept visually distinct rather
+/// than interleaved into `by_category`. Each one's `deftest` clauses (if any)
+/// are rendered as worked examples — living documentation sourced from the
+/// same file the rule itself lives in, so it cannot drift from what the rule
+/// actually does the way hand-written prose could.
+pub(super) fn print_lint_docs(active: &[&str], custom: &CustomRules) -> CliResult<()> {
     println!("# Lint rules");
     println!();
     println!(
@@ -371,6 +379,140 @@ pub(super) fn print_lint_docs(active: &[&str]) -> CliResult<()> {
                     );
                 }
             }
+        }
+    }
+
+    print_custom_lint_docs(custom);
+
+    Ok(())
+}
+
+/// The `--docs` section for a project's own rules, appended after the shipped
+/// catalogue. Grouped by category the same way the shipped section is, but
+/// kept under its own heading so a reader can tell a project rule from a
+/// shipped one at a glance.
+fn print_custom_lint_docs(custom: &CustomRules) {
+    if custom.is_empty() {
+        return;
+    }
+
+    println!();
+    println!("# Custom rules");
+    println!();
+    println!(
+        "{} project rule(s), loaded from `.paredit/rules` (or `--custom-rules`). Each \
+         rule's worked examples below come from its own `deftest` clauses, not hand-written \
+         prose.",
+        custom.ruleset().rules.len()
+    );
+
+    let mut by_category: BTreeMap<&str, Vec<&CustomRule>> = BTreeMap::new();
+    for rule in &custom.ruleset().rules {
+        by_category
+            .entry(rule.category.as_str())
+            .or_default()
+            .push(rule);
+    }
+
+    for (category, rules) in &by_category {
+        println!();
+        println!("## {category}");
+        for rule in rules {
+            println!();
+            println!("### `{}`", rule.name);
+            println!();
+            println!("{}", rule.description);
+            println!();
+            println!("| | |");
+            println!("| --- | --- |");
+            println!("| severity | `{}` |", rule.severity.as_str());
+            println!(
+                "| auto-fixable | {} |",
+                if rule.fix.is_some() { "yes" } else { "no" }
+            );
+            println!("| message | {} |", rule.message);
+            if !rule.note.is_empty() {
+                println!("| note | {} |", rule.note);
+            }
+
+            let Some(test) = custom
+                .ruleset()
+                .tests
+                .iter()
+                .find(|test| test.rule == rule.name)
+            else {
+                continue;
+            };
+            if test.matches.is_empty() && test.no_match.is_empty() && test.fixes.is_empty() {
+                continue;
+            }
+            println!();
+            println!("**Examples** (from this rule's `deftest`):");
+            for input in &test.matches {
+                println!();
+                println!("```lisp");
+                println!(";; reported");
+                println!("{input}");
+                println!("```");
+            }
+            for input in &test.no_match {
+                println!();
+                println!("```lisp");
+                println!(";; not reported");
+                println!("{input}");
+                println!("```");
+            }
+            for (before, after) in &test.fixes {
+                println!();
+                println!("```lisp");
+                println!(";; fix");
+                println!("{before}");
+                println!(";; ->");
+                println!("{after}");
+                println!("```");
+            }
+        }
+    }
+}
+
+/// Prints a custom rule's own metadata for `--explain <rule>`, when `rule`
+/// names a project rule rather than a shipped one.
+///
+/// A custom rule has no `doc_url`, no declared tags, dialects, or settings —
+/// those columns are omitted here rather than reported as empty/unknown, the
+/// same way [`print_lint_docs`] leaves off a shipped rule's absent sections.
+pub(super) fn print_custom_lint_explanation(
+    rule: &CustomRule,
+    output: OutputFormat,
+) -> CliResult<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("rule\t{}", safe_text!(rule.name));
+            println!("source\tcustom");
+            println!("category\t{}", rule.category.as_str());
+            println!("severity\t{}", rule.severity.as_str());
+            println!("fixable\t{}", rule.fix.is_some());
+            println!("description\t{}", safe_text!(rule.description));
+            println!("message\t{}", safe_text!(rule.message));
+            if !rule.note.is_empty() {
+                println!("note\t{}", safe_text!(rule.note));
+            }
+        }
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "schema_version": 1,
+                    "rule": rule.name,
+                    "source": "custom",
+                    "category": rule.category.as_str(),
+                    "severity": rule.severity.as_str(),
+                    "fixable": rule.fix.is_some(),
+                    "description": rule.description,
+                    "message": rule.message,
+                    "note": (!rule.note.is_empty()).then(|| rule.note.clone()),
+                }))?
+            );
         }
     }
 
