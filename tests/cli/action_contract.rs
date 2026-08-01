@@ -270,11 +270,15 @@ fn external_github_actions_are_immutably_pinned() {
         );
     }
 
-    let pin = "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7";
-    assert!(
-        ci.contains(pin),
-        "CI must keep the approved immutable action pin: {pin}"
-    );
+    for pin in [
+        "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7",
+        "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6",
+    ] {
+        assert!(
+            ci.contains(pin),
+            "CI must keep the approved immutable action pin: {pin}"
+        );
+    }
 
     for pin in [
         "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7",
@@ -328,6 +332,7 @@ fn external_github_actions_are_immutably_pinned() {
     ] {
         for mutable_tag in [
             "actions/checkout@v",
+            "actions/cache@v",
             "cachix/install-nix-action@v",
             "cachix/cachix-action@v",
             "actions/configure-pages@v",

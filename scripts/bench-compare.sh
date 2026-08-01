@@ -104,8 +104,40 @@ git worktree add --detach --quiet "$worktree" "$baseline_ref"
 # The cost is that the baseline no longer reuses the working tree's compiled
 # third-party dependencies and builds its own copy — a few minutes on a cold
 # CI runner. That is the right trade: the alternative shares the dependencies
-# *and* the local packages, and there is no way to have only the first.
+# *and* the local packages, and there is no way to have only the first. CI now
+# caches both builds' `CARGO_TARGET_DIR`s across runs (see ci.yml), so a warm
+# cache mostly avoids paying that cost again; a cold cache (a new base commit,
+# or a `Cargo.lock` change) still pays it in full.
 export CRITERION_HOME="$repository_root/target/criterion"
+
+# `target/` (which `$CRITERION_HOME` lives under) is now one of the things CI
+# caches across runs. Criterion's own saved baselines have no fingerprint- or
+# mtime-based staleness check the way a compiled artifact does - the
+# comparison at the bottom of this script just walks whatever
+# `change/estimates.json` files already exist - so a `bench-compare-base`
+# entry left over from an *earlier* push to the same PR (e.g. a benchmark
+# renamed or removed since) would otherwise sit there and could get compared
+# against silently instead of being reported as missing. That would violate
+# this script's own rule from the top of the file: "nothing is stored between
+# invocations." Wiping it here, unconditionally, restores that rule regardless
+# of what `actions/cache` restored into `target/`; it is a tiny fraction of
+# the directory's size, so this costs nothing on a cache hit.
+rm -rf "$CRITERION_HOME"
+
+# The baseline's build output lives outside the ephemeral `$worktree` on
+# purpose: that directory is `git worktree remove --force`d on exit (see the
+# `cleanup` trap above), which would delete a `$worktree/target` build cache
+# right along with the checkout. A separate, stable path survives the
+# worktree's lifecycle and gives CI something fixed to point `actions/cache`
+# at across runs, instead of paying this script's own "few minutes on a cold
+# CI runner" cost on every single invocation.
+#
+# That path is now fixed rather than randomized, unlike `$worktree` above -
+# safe under CI (one job per runner) and under a single local invocation, but
+# two concurrent local invocations of this script would collide on it. Set
+# `BENCH_BASELINE_TARGET_DIR` to something else if running more than one at
+# once.
+baseline_target_dir="${BENCH_BASELINE_TARGET_DIR:-${TMPDIR:-/tmp}/paredit-bench-baseline-target}"
 
 # Extra Criterion arguments, for a smoke run that does not take ten minutes:
 #
@@ -162,7 +194,7 @@ printf 'bench-compare: measuring baseline\n'
 # visible in the log; a wrong one is not.
 if ! (
   cd "$worktree" &&
-    CARGO_TARGET_DIR="$worktree/target" \
+    CARGO_TARGET_DIR="$baseline_target_dir" \
       cargo bench --quiet --package paredit-cli "${bench_targets[@]}" \
       -- --save-baseline bench-compare-base "${bench_args[@]}" >/dev/null
 ); then
