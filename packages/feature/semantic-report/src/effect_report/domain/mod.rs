@@ -19,6 +19,17 @@
 //! Effects propagate along the file's own call graph to a fixpoint: a function
 //! whose body is nothing but a call to an effectful sibling is itself
 //! effectful, however clean it reads.
+//!
+//! One case gets help from the value layer: a Common Lisp `if` whose test is
+//! a `let`/`let*`-bound or `defconstant`-named constant the value layer has
+//! already proven. `if` itself is not in [`policy`]'s tables — nothing
+//! is — so ordinarily its every use defaults the verdict to `Unknown`, same as
+//! any other unrecognized head, and both branches are walked. When the test's
+//! value is provably known, the dead branch can never run, so it is skipped
+//! rather than charged against the definition's purity, and `if` no longer
+//! counts as an unresolved head. This is deliberately narrow: only two
+//! sources are trusted (see [`resolve_constant`]), and a test that is not one
+//! of them falls straight back to today's behavior, unchanged.
 
 mod policy;
 
@@ -26,8 +37,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use paredit_core_cli::report::line_of;
+use paredit_core_semantics::semantics::NodeKey;
+use paredit_core_semantics::semantics::binding::BindingTable;
+use paredit_core_semantics::semantics::value::service::constant_key;
+use paredit_core_semantics::semantics::value::{LiteralValue, PropagatableValue, ValueTable};
 use paredit_core_syntax::definition::{DefinitionShape, definition_shape};
 use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::sexpr::reader::{atom_symbol_span, atom_symbol_text};
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView};
 use paredit_core_syntax::view_query::list_head;
 
@@ -144,9 +160,16 @@ pub fn build_effect_report(file: &SemanticFile) -> EffectReportFile {
         // A name defined twice keeps the first verdict rather than the last:
         // which one a call sees is not knowable, and the first is at least a
         // stable choice.
-        locals
-            .entry(key.clone())
-            .or_insert_with(|| local_verdict(file.dialect, form, *shape, &defined));
+        locals.entry(key.clone()).or_insert_with(|| {
+            local_verdict(
+                file.dialect,
+                form,
+                *shape,
+                &defined,
+                &file.bindings,
+                &file.values,
+            )
+        });
     }
 
     let resolved = resolve_effects(&locals);
@@ -230,6 +253,8 @@ fn local_verdict(
     form: &ExpressionView,
     shape: DefinitionShape,
     defined: &BTreeSet<String>,
+    bindings: &BindingTable,
+    values: &ValueTable,
 ) -> LocalVerdict {
     let mut purity = Purity::Pure;
     let mut cause = None;
@@ -240,6 +265,8 @@ fn local_verdict(
             dialect,
             body_form,
             defined,
+            bindings,
+            values,
             &mut purity,
             &mut cause,
             &mut calls,
@@ -253,15 +280,34 @@ fn local_verdict(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn walk(
     dialect: Dialect,
     view: &ExpressionView,
     defined: &BTreeSet<String>,
+    bindings: &BindingTable,
+    values: &ValueTable,
     purity: &mut Purity,
     cause: &mut Option<String>,
     calls: &mut BTreeSet<String>,
 ) {
     if let Some(head) = list_head(view) {
+        if dialect == Dialect::CommonLisp && head.eq_ignore_ascii_case("if") {
+            if let Some(live) = resolve_if_branch(view, bindings, values) {
+                // The test is provably constant: the branch that cannot run
+                // is never walked, and `if` itself contributes nothing to the
+                // verdict — unlike the unresolved-head fallback below, it is
+                // not charged as an unmodelled operator, because which branch
+                // executes is no longer in doubt.
+                if let Some(live) = live {
+                    walk(
+                        dialect, live, defined, bindings, values, purity, cause, calls,
+                    );
+                }
+                return;
+            }
+        }
+
         match head_effect(dialect, head) {
             Some(HeadEffect::Effectful) => {
                 if *purity != Purity::Effectful {
@@ -287,8 +333,75 @@ fn walk(
     }
 
     for child in &view.children {
-        walk(dialect, child, defined, purity, cause, calls);
+        walk(
+            dialect, child, defined, bindings, values, purity, cause, calls,
+        );
     }
+}
+
+/// The live branch of `(if test then [else])`, when the value layer has
+/// already proven `test`'s truth value.
+///
+/// `Some(None)` means the test is known false and there is no `else`, so
+/// nothing runs. `None` means the test is not resolvable this way at all — a
+/// non-symbol test, a reference to something the value layer does not track,
+/// or (by construction, since the caller only reaches this for
+/// `Dialect::CommonLisp`) any other dialect — and the caller must fall back
+/// to treating `if` like any other unregistered head, exactly as before this
+/// bridge existed.
+fn resolve_if_branch<'a>(
+    view: &'a ExpressionView,
+    bindings: &BindingTable,
+    values: &ValueTable,
+) -> Option<Option<&'a ExpressionView>> {
+    let test = view.children.get(1)?;
+    let value = resolve_constant(test, bindings, values)?;
+    let truthy = LiteralValue::from(value.clone()).is_truthy(Dialect::CommonLisp);
+    Some(if truthy {
+        view.children.get(2)
+    } else {
+        view.children.get(3)
+    })
+}
+
+/// The provably constant value a bare symbol atom denotes, via whichever half
+/// of the value layer names it: a lexical `let`/`let*` binding, or a
+/// file-level `defconstant`.
+///
+/// Deliberately narrower than every binding [`BindingTable::resolve`] can
+/// find. A `&optional`/`&key` lambda-list parameter gets a `BindingId` and an
+/// `init_form` exactly like a `let` binding does, but the value on file is
+/// only the *default* — a caller-supplied argument overrides it in a way this
+/// layer never records as a reassignment. Trusting that value here would let
+/// a branch that is not actually dead look proven dead, which is exactly the
+/// false-`Pure` outcome this bridge must never produce. So only a binding
+/// whose introducing form is `let` or `let*` is consulted; every other
+/// lexical binding (a parameter, an `&aux`/`&optional`/`&key` default, a `do`
+/// variable, …) is left to the existing conservative default, same as an
+/// unresolved reference.
+fn resolve_constant<'a>(
+    view: &ExpressionView,
+    bindings: &BindingTable,
+    values: &'a ValueTable,
+) -> Option<&'a PropagatableValue> {
+    let name = atom_symbol_text(view)?;
+    let span = atom_symbol_span(view)?;
+
+    if let Some(id) = bindings.resolve(NodeKey::atom(span)) {
+        let lexically_bound = bindings.binding(id).binder_head().is_some_and(|head| {
+            head.eq_ignore_ascii_case("let") || head.eq_ignore_ascii_case("let*")
+        });
+        // A name that resolves to *any* binding is shadowed at this point,
+        // trusted or not: falling through to the file-level constant below
+        // would risk answering with an unrelated `defconstant` of the same
+        // name, so an untrusted binding ends the search rather than widening
+        // it.
+        return lexically_bound.then(|| values.binding_value(id)).flatten();
+    }
+
+    // This bridge is only ever reached for `Dialect::CommonLisp` (guarded in
+    // `walk`), same as the `is_truthy(Dialect::CommonLisp)` call above.
+    constant_key(Dialect::CommonLisp, name).and_then(|key| values.constant_value(&key))
 }
 
 /// A definition's name, defining head, and shape, when the form is one.
@@ -363,6 +476,74 @@ mod tests {
         let f = definition(&report, "f");
         assert_eq!(f.purity, Purity::Unknown);
         assert_eq!(f.cause.as_deref(), Some("my-macro"));
+    }
+
+    #[test]
+    fn an_if_whose_test_is_not_provably_constant_still_defaults_to_unknown() {
+        // Regression: a genuinely unresolvable `if` test — an ordinary
+        // parameter, which the value layer never treats as constant — must
+        // keep today's conservative behavior. `if` is not in `policy`'s
+        // tables, so it is charged as an unregistered head exactly as before
+        // this bridge existed, and both branches are still walked.
+        let report = report("(defun f (x) (if x 1 2))");
+        let f = definition(&report, "f");
+        assert_eq!(f.purity, Purity::Unknown);
+        assert_eq!(f.cause.as_deref(), Some("if"));
+    }
+
+    #[test]
+    fn an_optional_parameters_default_is_not_trusted_as_a_constant_test() {
+        // A `&optional` default gets a `BindingId` and an `init_form` exactly
+        // like a `let` binding, but a caller may pass any value for `flag` —
+        // trusting the default here would let this genuinely live effectful
+        // branch look dead and overclaim `Pure`. `resolve_constant` only
+        // trusts `let`/`let*` bindings, so this must stay unchanged.
+        let report = report("(defun f (&optional (flag t)) (if flag (write-line \"x\") (+ 1 2)))");
+        assert_eq!(definition(&report, "f").purity, Purity::Effectful);
+    }
+
+    #[test]
+    fn a_defconstant_proven_false_prunes_the_dead_effectful_branch() {
+        // The acceptance scenario: before this bridge, `write-line` sits in a
+        // branch that can never run, but the walk had no way to know that —
+        // `if` alone drove the verdict to `Unknown`, and `write-line`
+        // unconditionally overwrote it to `Effectful`. The value layer has
+        // already proven `+debug+` is `nil`, so the bridge now prunes the
+        // dead branch and the verdict is exactly `Pure`, not merely
+        // "less conservative".
+        let report = report(
+            "(defconstant +debug+ nil)\n(defun f (x) (if +debug+ (write-line \"debug\") (+ x 1)))",
+        );
+        assert_eq!(definition(&report, "f").purity, Purity::Pure);
+    }
+
+    #[test]
+    fn a_defconstant_proven_true_prunes_the_dead_effectful_else_branch() {
+        let report = report(
+            "(defconstant +debug+ t)\n(defun f (x) (if +debug+ (+ x 1) (write-line \"debug\")))",
+        );
+        assert_eq!(definition(&report, "f").purity, Purity::Pure);
+    }
+
+    #[test]
+    fn a_defconstant_proven_false_with_no_else_branch_is_pure() {
+        let report =
+            report("(defconstant +debug+ nil)\n(defun f () (if +debug+ (write-line \"debug\")))");
+        assert_eq!(definition(&report, "f").purity, Purity::Pure);
+    }
+
+    #[test]
+    fn a_lexically_shadowed_name_is_not_confused_with_a_same_named_constant() {
+        // `+debug+` is a parameter here, not the file's `defconstant`. Lexical
+        // shadowing must win: the parameter is not trusted (it is not a
+        // `let`/`let*` binding), and the search must not fall through to the
+        // unrelated file-level constant of the same name — so the `if` is not
+        // resolved, and the effectful branch is walked like any other
+        // unresolved `if`, same as before this bridge existed.
+        let report = report(
+            "(defconstant +debug+ nil)\n(defun f (+debug+) (if +debug+ (write-line \"x\") 1))",
+        );
+        assert_eq!(definition(&report, "f").purity, Purity::Effectful);
     }
 
     #[test]
