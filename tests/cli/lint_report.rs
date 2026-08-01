@@ -2796,6 +2796,92 @@ fn cli_lint_a_custom_finding_trips_the_severity_gate() {
         .failure();
 }
 
+// --- FR-E16: `--deny`/`--warn`/`--rule`/`--exclude` — what `lint.deny` /
+// `lint.warn` / `lint.enable` / `lint.disable` become on the command line —
+// also recognise a loaded custom rule by name, not just the shipped
+// catalogue. ---
+
+#[test]
+fn cli_lint_deny_promotes_a_loaded_custom_rule_to_error() {
+    let rules = rule_dir(
+        "lint-custom-deny-promote",
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-deny-promote-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+
+    // The custom rule ships at warning severity by default.
+    let plain = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(plain["findings"][0]["severity"], "warning");
+
+    // `--deny my-custom-rule` promotes it, and that is what turns
+    // `--fail-on error` into a failing exit code.
+    let denied = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--deny", "my-custom-rule", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(denied["findings"][0]["severity"], "error");
+
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--deny", "my-custom-rule", "--fail-on", "error"])
+        .arg(&file)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn cli_lint_exclude_stops_a_loaded_custom_rule_from_being_reported() {
+    let rules = rule_dir(
+        "lint-custom-exclude",
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-exclude-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--exclude", "my-custom-rule", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 0);
+}
+
+/// A name that is neither shipped nor loaded is still rejected — loading a
+/// custom ruleset widens what `--deny` accepts, it does not turn the check
+/// off.
+#[test]
+fn cli_lint_deny_still_rejects_an_unrelated_unknown_name_with_custom_rules_loaded() {
+    let rules = rule_dir(
+        "lint-custom-deny-unknown",
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--list-rules", "--deny", "not-a-real-rule"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown lint rule"));
+}
+
 #[test]
 fn cli_lint_deprecate_reports_any_call_to_the_named_operator() {
     let rules = rule_dir(

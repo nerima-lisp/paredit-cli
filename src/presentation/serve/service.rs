@@ -127,7 +127,7 @@ fn analyze(path: &Path, text: &str, dialect: Dialect) -> Result<Analysis, String
         })
         .collect();
 
-    let active = resolve_active_rules(&RuleFilter::default()).unwrap_or_default();
+    let active = resolve_active_rules(&RuleFilter::default(), &[]).unwrap_or_default();
     let findings = run_lint_pass(
         path,
         dialect,

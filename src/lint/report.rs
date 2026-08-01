@@ -352,7 +352,7 @@ mod tests {
 
     /// The historical three selectors, which is what most of these tests vary.
     fn resolve(only: &[String], exclude: &[String], categories: &[String]) -> Vec<&'static str> {
-        resolve_active_rules(&RuleFilter::named(only, exclude, categories)).expect("resolve")
+        resolve_active_rules(&RuleFilter::named(only, exclude, categories), &[]).expect("resolve")
     }
 
     /// Every rule the default preset admits — which is every shipped rule that
@@ -380,7 +380,7 @@ mod tests {
             ..RuleFilter::default()
         };
         assert_eq!(
-            resolve_active_rules(&filter).expect("resolve"),
+            resolve_active_rules(&filter, &[]).expect("resolve"),
             RULES.to_vec()
         );
     }
@@ -432,13 +432,13 @@ mod tests {
     #[test]
     fn resolve_active_rules_rejects_an_unknown_rule() {
         let only = ["not-a-rule".to_owned()];
-        assert!(resolve_active_rules(&RuleFilter::named(&only, &[], &[])).is_err());
+        assert!(resolve_active_rules(&RuleFilter::named(&only, &[], &[]), &[]).is_err());
     }
 
     #[test]
     fn resolve_active_rules_rejects_an_unknown_category() {
         let categories = ["not-a-category".to_owned()];
-        assert!(resolve_active_rules(&RuleFilter::named(&[], &[], &categories)).is_err());
+        assert!(resolve_active_rules(&RuleFilter::named(&[], &[], &categories), &[]).is_err());
     }
 
     #[test]
@@ -447,7 +447,7 @@ mod tests {
             preset: RulePreset::Minimal,
             ..RuleFilter::default()
         };
-        let minimal = resolve_active_rules(&filter).expect("resolve");
+        let minimal = resolve_active_rules(&filter, &[]).expect("resolve");
         let expected: Vec<&str> = recommended()
             .into_iter()
             .filter(|rule| rule_severity(rule) == Severity::Error)
@@ -465,9 +465,10 @@ mod tests {
             overridden_rule_severity(&overrides, "redundant-quote"),
             Severity::Warning
         );
-        apply_severity_override(&mut overrides, "redundant-quote", Severity::Error)
+        apply_severity_override(&mut overrides, "redundant-quote", Severity::Error, &[])
             .expect("known rule");
-        apply_severity_override(&mut overrides, "if-arity", Severity::Warning).expect("known rule");
+        apply_severity_override(&mut overrides, "if-arity", Severity::Warning, &[])
+            .expect("known rule");
         assert_eq!(
             overridden_rule_severity(&overrides, "redundant-quote"),
             Severity::Error
@@ -476,13 +477,15 @@ mod tests {
             overridden_rule_severity(&overrides, "if-arity"),
             Severity::Warning
         );
-        assert!(apply_severity_override(&mut overrides, "no-such-rule", Severity::Error).is_err());
+        assert!(
+            apply_severity_override(&mut overrides, "no-such-rule", Severity::Error, &[]).is_err()
+        );
     }
 
     #[test]
     fn a_category_severity_override_reaches_every_rule_in_it() {
         let mut overrides = SeverityOverrides::new();
-        apply_severity_override(&mut overrides, "arity", Severity::Warning)
+        apply_severity_override(&mut overrides, "arity", Severity::Warning, &[])
             .expect("known category");
         for rule in RULES {
             if rule_category(rule) == Some("arity") {
@@ -598,7 +601,7 @@ mod tests {
         // ...until the run says otherwise. A `--deny` that changed only the
         // printed severity would have changed nothing that matters.
         let mut overrides = SeverityOverrides::new();
-        apply_severity_override(&mut overrides, "redundant-quote", Severity::Error)
+        apply_severity_override(&mut overrides, "redundant-quote", Severity::Error, &[])
             .expect("known rule");
         assert!(!evaluate_lint_policy(&overrides, options, &summary).passed);
     }
@@ -610,7 +613,7 @@ mod tests {
         assert!(!evaluate_lint_policy(&SeverityOverrides::new(), options, &summary).passed);
 
         let mut overrides = SeverityOverrides::new();
-        apply_severity_override(&mut overrides, "literal-place", Severity::Warning)
+        apply_severity_override(&mut overrides, "literal-place", Severity::Warning, &[])
             .expect("known rule");
         assert!(evaluate_lint_policy(&overrides, options, &summary).passed);
     }
