@@ -4,9 +4,9 @@ use super::{
     accessor_arity_report, add_ignore_declaration, analysis_report, api_diff_report,
     api_surface_report, append_list_to_cons_report, append_nil_report,
     args::{
-        AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
-        NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs,
-        TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
+        AnalyzeArgs, CanonicalizeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs,
+        NavigateArgs, NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs,
+        ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
     },
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
@@ -586,6 +586,8 @@ pub(super) enum EditCommand {
     Format(FormatArgs),
     /// Append required closing delimiters only when input has unclosed lists.
     RepairUnclosedLists(RepairArgs),
+    /// Sort an alist- or plist-shaped data file's keys and flatten its whitespace to a single space between elements.
+    Canonicalize(CanonicalizeArgs),
     /// Print the S-expression selected by --path or --at.
     Select(TargetArgs),
     /// Replace the selected S-expression with replacement text.

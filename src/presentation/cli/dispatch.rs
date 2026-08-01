@@ -690,6 +690,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::EditCommand::RepairUnclosedLists(args) => {
                 basic_edit::workflow::repair_unclosed_lists(args)?;
             }
+            command::EditCommand::Canonicalize(args) => {
+                basic_edit::workflow::canonicalize(args)?;
+            }
             command::EditCommand::Select(args) => basic_edit::workflow::select(args)?,
             command::EditCommand::Replace(args) => basic_edit::workflow::replace(args)?,
             command::EditCommand::Kill(args) => basic_edit::workflow::kill(args)?,

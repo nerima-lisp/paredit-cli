@@ -2,10 +2,10 @@ use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::presentation::cli::args::{
-    CompactSelectorArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, KillRingArgs,
-    NavigateArgs, NewlineArgs, NormalizeQuotesArgs, OutputFormat, RaiseArgs, ReindentArgs,
-    RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
-    YankPlacement,
+    CanonicalizeArgs, CompactSelectorArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs,
+    KillArgs, KillRingArgs, NavigateArgs, NewlineArgs, NormalizeQuotesArgs, OutputFormat,
+    RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs,
+    WrapArgs, YankArgs, YankPlacement,
 };
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTree};
@@ -88,6 +88,45 @@ pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> C
         .into());
     }
     emit_document(&input, dialect, args.write, args.diff, repaired)
+}
+
+/// Sorts an alist- or plist-shaped data file's keys and flattens its
+/// whitespace to a single space between elements, refusing a file that has
+/// no confidently alist- or plist-shaped list anywhere in it.
+///
+/// Routed through the same [`emit_document`] every other `edit` command
+/// writes through, so it inherits the same reparse guard, the same rollback,
+/// and the same CRLF restoration `edit format` already relies on — this
+/// command's own write-safety concern is narrower than "does it reparse", so
+/// `canonicalize::same_data` is checked first and refuses before
+/// `emit_document` is ever reached.
+pub(in crate::presentation::cli) fn canonicalize(args: CanonicalizeArgs) -> CliResult<()> {
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
+    let Some(rendered) = super::canonicalize::canonicalize_document(&input.text, &tree) else {
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            "no alist- or plist-shaped list found; refusing to canonicalize a file that is not \
+             confidently data",
+        )
+        .into());
+    };
+
+    let reparsed = SyntaxTree::parse_with_dialect(&rendered, dialect).map_err(|_| {
+        paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+            "refusing to write: the canonicalized document does not reparse",
+        )
+    })?;
+    if !super::canonicalize::same_data(&input.text, &tree, &rendered, &reparsed) {
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+            "refusing to write: the canonicalized document does not carry the same keys and \
+             values as the input",
+        )
+        .into());
+    }
+
+    emit_document(&input, dialect, args.write, args.diff, rendered)
 }
 
 /// Prints the selected source text.

@@ -35,6 +35,8 @@ mod call_cycle_report;
 mod call_graph_report;
 #[path = "cli/call_report.rs"]
 mod call_report;
+#[path = "cli/canonicalize.rs"]
+mod canonicalize;
 #[path = "cli/capabilities_contract.rs"]
 mod capabilities_contract;
 #[path = "cli/capabilities_schema.rs"]

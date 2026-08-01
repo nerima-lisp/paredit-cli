@@ -498,7 +498,11 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "migrate explain",
 ];
 
-const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
+const FORMAT_COMMANDS: [&str; 3] = [
+    "edit format",
+    "edit repair-unclosed-lists",
+    "edit canonicalize",
+];
 
 const STRUCTURAL_COMMANDS: [&str; 33] = [
     "edit select",

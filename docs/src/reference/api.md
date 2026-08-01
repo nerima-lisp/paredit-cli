@@ -459,6 +459,7 @@ Mutating commands also accept:
 | --- | --- |
 | `format` | Print a canonical, indentation-based rendering. |
 | `repair-unclosed-lists` | Append matching delimiters for parser-detected unclosed lists; refuse all other parse errors. |
+| `canonicalize` | Sort an alist- or plist-shaped data file's keys and flatten its whitespace to a single space between elements. Refuses a file with no confidently alist- or plist-shaped list anywhere in it, and never reorders or rewrites inside a reader-prefixed subtree (`#+feature (...)`, a quoted or quasiquoted form) — this is deliberately not `format`, which renders code; a data file is not read as nested code blocks. |
 | `select` | Print the S-expression selected by `--path` or `--at`. |
 | `replace` | Replace the selected S-expression with replacement text. |
 | `kill` | Remove the selected S-expression. `--to-ring` pushes it onto the kill ring first. |
