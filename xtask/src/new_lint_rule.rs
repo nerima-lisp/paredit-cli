@@ -5,9 +5,9 @@
 //! are pure arithmetic over a single well-known pattern:
 //!
 //! - `RULE_COUNT` and the `REGISTRY` array in
-//!   `src/domain/lint/registry/mod.rs`
+//!   `src/lint/registry/mod.rs`
 //! - the matching `fixable_count()`/`warning_count()` assertions in
-//!   `src/domain/lint/registry/catalog.rs`, derived from the `Fixability`/
+//!   `src/lint/registry/catalog.rs`, derived from the `Fixability`/
 //!   `Severity` this rule's own generated `META` declares
 //!
 //! Everything past that — the standalone `inspect <rule>` command's six-file
@@ -268,7 +268,7 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     write_new_file(
         &rule_dir.join("cli").join("render.rs"),
         &format!(
-            "use crate::error::Result;\n\
+            "use paredit_core_cli::CliResult;\n\
              use paredit_core_cli::safe_text;\n\
              use serde_json::json;\n\n\
              use crate::{snake}::usecase::{{{pascal}Policy, {pascal}Summary}};\n\
@@ -277,7 +277,7 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
              \x20   summary: &{pascal}Summary,\n\
              \x20   policy: &{pascal}Policy,\n\
              \x20   output: OutputFormat,\n\
-             ) -> Result<()> {{\n\
+             ) -> CliResult<()> {{\n\
              \x20   match output {{\n\
              \x20       OutputFormat::Text => {{\n\
              \x20           println!(\"scanned_form_count\\t{{}}\", summary.scanned_form_count);\n\
@@ -327,14 +327,14 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     write_new_file(
         &rule_dir.join("cli").join("workflow.rs"),
         &format!(
-            "use crate::error::Result;\n\n\
+            "use paredit_core_cli::CommandResult;\n\n\
              use crate::{snake}::cli::args::{pascal}ReportArgs;\n\
              use crate::{snake}::cli::render::print_{snake}_report;\n\
              use crate::{snake}::usecase::{{\n\
              \x20   {pascal}PolicyOptions, collect_{snake}, evaluate_{snake}_policy, summarize_{snake},\n\
              }};\n\
              use paredit_core_cli::shared::{{expand_input_files, read_input_dialect_and_tree}};\n\n\
-             pub fn {snake}_report(args: {pascal}ReportArgs) -> Result<()> {{\n\
+             pub fn {snake}_report(args: {pascal}ReportArgs) -> CommandResult {{\n\
              \x20   let files = expand_input_files(&args.files, args.dialect)?;\n\n\
              \x20   let mut scanned_form_count = 0;\n\
              \x20   let mut violations = Vec::new();\n\n\
@@ -370,9 +370,9 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     println!();
     println!(
         "Generated `{snake}` inside {}, and registered it: RULE_COUNT {old_count} -> {new_count} \
-         in src/domain/lint/registry/mod.rs, warning_count() assertion bumped to match (this \
+         in src/lint/registry/mod.rs, warning_count() assertion bumped to match (this \
          rule's META defaults to Severity::Warning / Fixability::ReportOnly — if you change \
-         either, fix the matching assertion in src/domain/lint/registry/catalog.rs by hand).",
+         either, fix the matching assertion in src/lint/registry/catalog.rs by hand).",
         package_dir.display()
     );
     println!("Fill in `domain.rs`'s `examine()` — everything else is plumbing.");
@@ -403,32 +403,26 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
 }
 
 fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u32, u32)> {
-    let path = repo.path("src/domain/lint/registry/mod.rs");
+    let path = repo.path("src/lint/registry/mod.rs");
     let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!(
         "read {}",
         path.display()
     )))?;
 
     let marker = "pub const RULE_COUNT: usize = ";
-    let start = text
-        .find(marker)
-        .map_err(crate::error::XtaskError::io(format!(
+    let start = text.find(marker).ok_or_else(|| {
+        crate::error::XtaskError::refused(format!(
             "`{marker}` not found in {}",
             path.display()
-        )))?
-        + marker.len();
+        ))
+    })? + marker.len();
     let end = start
-        + text[start..]
-            .find(';')
-            .map_err(crate::error::XtaskError::io(
-                "no `;` after RULE_COUNT value",
-            ))?;
-    let old_count: u32 = text[start..end]
-        .trim()
-        .parse()
-        .map_err(crate::error::XtaskError::io(
-            "RULE_COUNT value is not a number",
-        ))?;
+        + text[start..].find(';').ok_or_else(|| {
+            crate::error::XtaskError::refused("no `;` after RULE_COUNT value")
+        })?;
+    let old_count: u32 = text[start..end].trim().parse().map_err(|_| {
+        crate::error::XtaskError::refused("RULE_COUNT value is not a number")
+    })?;
     let new_count = old_count + 1;
     text.replace_range(start..end, &new_count.to_string());
 
@@ -436,9 +430,9 @@ fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u
         "    RuleEntry::new(\n        &{crate_name}::{snake}::rule::META,\n        \
          &{crate_name}::{snake}::rule::RULE,\n    ),\n"
     );
-    let closing = text.rfind("\n];").map_err(crate::error::XtaskError::io(
-        "closing `];` of REGISTRY not found",
-    ))?;
+    let closing = text.rfind("\n];").ok_or_else(|| {
+        crate::error::XtaskError::refused("closing `];` of REGISTRY not found")
+    })?;
     text.insert_str(closing + 1, &insertion);
 
     fs::write(&path, &text).map_err(crate::error::XtaskError::io(format!(
@@ -450,7 +444,7 @@ fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u
 }
 
 fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Result<()> {
-    let path = repo.path("src/domain/lint/registry/catalog.rs");
+    let path = repo.path("src/lint/registry/catalog.rs");
     let mut text = fs::read_to_string(&path).map_err(crate::error::XtaskError::io(format!(
         "read {}",
         path.display()
@@ -475,21 +469,115 @@ fn bump_catalog_counts(repo: &Repo, is_fixable: bool, is_warning: bool) -> Resul
 fn bump_assert(text: &str, marker: &str) -> Result<String> {
     let start = text
         .find(marker)
-        .map_err(crate::error::XtaskError::io(format!(
-            "`{marker}` not found"
-        )))?
+        .ok_or_else(|| crate::error::XtaskError::refused(format!("`{marker}` not found")))?
         + marker.len();
     let rest = &text[start..];
-    let end_offset = rest.find(')').map_err(crate::error::XtaskError::io(
-        "no closing `)` after assertion value",
-    ))?;
-    let old: i64 = rest[..end_offset]
-        .trim()
-        .parse()
-        .map_err(crate::error::XtaskError::io(format!(
-            "`{marker}` value is not a number"
-        )))?;
+    let end_offset = rest.find(')').ok_or_else(|| {
+        crate::error::XtaskError::refused("no closing `)` after assertion value")
+    })?;
+    let old: i64 = rest[..end_offset].trim().parse().map_err(|_| {
+        crate::error::XtaskError::refused(format!("`{marker}` value is not a number"))
+    })?;
     let mut result = text.to_owned();
     result.replace_range(start..start + end_offset, &(old + 1).to_string());
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    /// A throwaway directory shaped like enough of the real repository root
+    /// for `run` to work against, so a hardcoded path drifting out of sync
+    /// with the real tree (as `src/domain/lint/registry/*` once did) fails
+    /// this test with an I/O error instead of only surfacing when a
+    /// contributor runs `cargo xtask new-lint-rule` by hand.
+    struct FixtureRepo {
+        root: std::path::PathBuf,
+    }
+
+    impl Drop for FixtureRepo {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn build_fixture_repo() -> FixtureRepo {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "xtask-new-lint-rule-test-{}-{unique}",
+            std::process::id()
+        ));
+
+        let package_dir = root.join("packages/feature/lint-demo");
+        fs::create_dir_all(package_dir.join("src")).expect("create package dir");
+        fs::write(
+            package_dir.join("Cargo.toml"),
+            "[package]\nname = \"paredit_feature_lint_demo\"\n",
+        )
+        .expect("write package Cargo.toml");
+        fs::write(package_dir.join("src/lib.rs"), "pub mod placeholder;\n")
+            .expect("write package lib.rs");
+
+        fs::create_dir_all(root.join("src/lint/registry")).expect("create registry dir");
+        fs::write(
+            root.join("src/lint/registry/mod.rs"),
+            "pub const RULE_COUNT: usize = 1;\n\n\
+             pub const REGISTRY: &[RuleEntry] = &[\n\
+             \x20   RuleEntry::new(&existing::rule::META, &existing::rule::RULE),\n\
+             ];\n",
+        )
+        .expect("write registry mod.rs");
+        fs::write(
+            root.join("src/lint/registry/catalog.rs"),
+            "const _: () = assert!(RULE_COUNT == 1);\n\
+             const _: () = assert!(fixable_count() == 0);\n\
+             const _: () = assert!(warning_count() == 1);\n",
+        )
+        .expect("write registry catalog.rs");
+
+        fs::create_dir_all(root.join("src/presentation/cli")).expect("create presentation dir");
+        fs::write(root.join("src/presentation/cli/contract.rs"), "")
+            .expect("write contract.rs stub");
+        fs::create_dir_all(root.join("tests/cli")).expect("create tests/cli dir");
+        fs::write(root.join("tests/cli/dialect_contract.rs"), "")
+            .expect("write dialect_contract.rs stub");
+
+        FixtureRepo { root }
+    }
+
+    #[test]
+    fn scaffolds_a_rule_and_bumps_the_registry_against_the_real_path_shape() {
+        let fixture = build_fixture_repo();
+        let repo = Repo::for_test(fixture.root.clone());
+        let options = NewLintRuleOptions {
+            theme: "demo".to_owned(),
+            name: Name::parse("char-case-fold").expect("valid rule name"),
+            description: "flags a suspicious case fold".to_owned(),
+        };
+
+        run(&repo, &options).expect("scaffolding must succeed against a well-formed fixture repo");
+
+        let rule_dir = fixture
+            .root
+            .join("packages/feature/lint-demo/src/char_case_fold");
+        assert!(rule_dir.join("mod.rs").is_file());
+        assert!(rule_dir.join("domain.rs").is_file());
+        assert!(rule_dir.join("usecase.rs").is_file());
+        assert!(rule_dir.join("rule.rs").is_file());
+        assert!(rule_dir.join("cli").join("args.rs").is_file());
+
+        let registry = fs::read_to_string(fixture.root.join("src/lint/registry/mod.rs"))
+            .expect("read bumped registry mod.rs");
+        assert!(registry.contains("pub const RULE_COUNT: usize = 2;"));
+        assert!(registry.contains("paredit_feature_lint_demo::char_case_fold::rule::META"));
+
+        let catalog = fs::read_to_string(fixture.root.join("src/lint/registry/catalog.rs"))
+            .expect("read bumped registry catalog.rs");
+        assert!(catalog.contains("assert!(RULE_COUNT == 2)"));
+        assert!(catalog.contains("assert!(warning_count() == 2)"));
+        assert!(catalog.contains("assert!(fixable_count() == 0)"));
+    }
 }

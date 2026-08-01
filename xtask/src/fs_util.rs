@@ -44,10 +44,12 @@ pub fn insert_sorted_mod_line(lib_rs: &Path, module_line: &str) -> Result<()> {
     let first = lines
         .iter()
         .position(|line| line.starts_with("pub mod "))
-        .map_err(crate::error::XtaskError::io(format!(
-            "{} has no `pub mod` line to anchor on",
-            lib_rs.display()
-        )))?;
+        .ok_or_else(|| {
+            crate::error::XtaskError::refused(format!(
+                "{} has no `pub mod` line to anchor on",
+                lib_rs.display()
+            ))
+        })?;
     let mut last = first;
     while last + 1 < lines.len() && lines[last + 1].starts_with("pub mod ") {
         last += 1;

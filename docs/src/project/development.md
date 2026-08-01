@@ -2,9 +2,11 @@
 
 Everything a contributor needs is provided by the Nix flake; no manually
 installed Rust toolchain is required. Before changing code, read the
-[architecture guide](../reference/architecture.md) to know which of the four layers
-(`domain`, `application`, `infrastructure`, `presentation`) a change belongs
-in.
+[architecture guide](../reference/architecture.md) to know which
+`packages/core/*` or `packages/feature/*` package a change belongs in — `src/`
+is only the composition root that wires those packages into the `paredit`
+binary. Layers (`domain`, `usecase`, `rule`, `cli`, ...) are a naming
+convention for files *within* a package, not top-level directories.
 
 ## Environment
 
@@ -45,13 +47,13 @@ cargo xtask new-command <inspect|edit|refactor> <package> <command-name> --descr
 `new-lint-rule` scaffolds the rule's `domain`/`usecase`/`rule`/`cli` files
 inside an existing `lint-<theme>` package and also registers it — bumping
 `RULE_COUNT` and appending its entry in
-`src/domain/lint/registry/mod.rs`, and the matching pinned-count assertions
-in `src/domain/lint/registry/catalog.rs` — because that step is pure
+`src/lint/registry/mod.rs`, and the matching pinned-count assertions
+in `src/lint/registry/catalog.rs` — because that step is pure
 arithmetic over one well-known pattern. `new-command` scaffolds the same
 shape without the rule registration, for a command outside the lint suite.
 
 Neither generator touches the composition root
-(`src/presentation/cli/{cli,command,dispatch,contract}.rs`,
+(`src/presentation/cli/{command,dispatch,contract}.rs`,
 `tests/cli/dialect_contract.rs`, `docs/src/reference/api.md`). Wiring a command in
 by hand there is unavoidable — clap needs a real enum variant and match arm to
 add — and a script that edits those files blind has, in this project's own
@@ -139,8 +141,8 @@ and Linux cannot even compile them:
 
 | Code | What it does |
 | --- | --- |
-| `src/presentation/cli/macos_acl.rs` | Reads and restores POSIX ACLs so an autofix preserves file permissions. Twelve `unsafe` blocks over `libc`. |
-| the `target_os = "macos"` arm in `src/presentation/cli/io.rs` | The Darwin path of the atomic file replacement used by every write. |
+| `packages/core/cli/src/macos_acl.rs` | Reads and restores POSIX ACLs so an autofix preserves file permissions. Twelve `unsafe` blocks over `libc`. |
+| the `target_os = "macos"` arm in `packages/core/cli/src/io.rs` | The Darwin path of the atomic file replacement used by every write. |
 
 Both sit on the path that rewrites a user's source files, so a regression there
 is expensive and CI will not catch it. Until that changes, **run

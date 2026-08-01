@@ -189,14 +189,14 @@ Adding a rule touches exactly three places:
 1. Add `packages/feature/lint-<theme>/src/your_rule/` with `rule.rs` and
    `domain.rs`.
 2. Add one `RuleEntry::new(...)` line to `REGISTRY` in
-   `src/domain/lint/registry/mod.rs`. `RULE_COUNT`'s const assertion means
+   `src/lint/registry/mod.rs`. `RULE_COUNT`'s const assertion means
    forgetting this is a compile error, not a silently shorter report.
 3. Add one integration test in `tests/cli/lint_report.rs`, or a fixture pair
    under `tests/fixtures/lint_golden` for the golden test.
 
 ## Semantics: read-only tables beside the tree
 
-`src/domain/semantics` lets a rule reason about what code *means* rather than
+`packages/core/semantics` lets a rule reason about what code *means* rather than
 how it is spelled. It is why `zero-divisor` flags `(let ((z 0)) (/ x z))` and
 not just `(/ x 0)`.
 

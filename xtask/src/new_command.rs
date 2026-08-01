@@ -153,7 +153,7 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
     write_new_file(
         &module_dir.join("cli").join("workflow.rs"),
         &format!(
-            "use paredit_core_cli::CliResult;\n\n\
+            "use paredit_core_cli::CommandResult;\n\n\
              use crate::{snake}::cli::args::{pascal}Args;\n\
              use crate::{snake}::cli::render::print_{snake}_report;\n\
              use crate::{snake}::usecase::{{analyze, summarize}};\n\

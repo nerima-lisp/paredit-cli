@@ -39,6 +39,15 @@ impl Repo {
         self.root.join(relative)
     }
 
+    /// Points a `Repo` at an arbitrary directory, bypassing the paredit-cli
+    /// root check `discover` performs. Only for pointing generators at a
+    /// throwaway fixture tree in tests.
+    #[cfg(test)]
+    #[must_use]
+    pub fn for_test(root: PathBuf) -> Self {
+        Self { root }
+    }
+
     /// `packages/feature/<name>`, checked to exist.
     pub fn feature_package(&self, name: &str) -> Result<PathBuf> {
         let path = self.path(&format!("packages/feature/{name}"));
