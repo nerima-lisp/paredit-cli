@@ -136,7 +136,7 @@ fn matches_here<'a>(
             }
             match capture {
                 None => true,
-                Some(name) => bind(bindings, name, vec![(view, path.clone())], source),
+                Some(name) => bind(bindings, name, vec![(view, path.clone())], source, dialect),
             }
         }
         Pattern::Atom { text, prefixes } => {
@@ -234,7 +234,7 @@ fn match_children<'a>(
             let swallowed = (before.len()..tail_start)
                 .map(|index| (&children[index], path.child(index)))
                 .collect();
-            bind(bindings, name, swallowed, source)
+            bind(bindings, name, swallowed, source, dialect)
         }
     }
 }
@@ -243,12 +243,17 @@ fn match_children<'a>(
 ///
 /// A repeated name is what makes `(eq ?x ?x)` mean "compared with itself"
 /// rather than "compared with anything". Equality is on normalized text, so
-/// `(eq  x   x)` still matches while `(eq x y)` does not.
+/// `(eq  x   x)` still matches while `(eq x y)` does not — and, in Common
+/// Lisp, `(eq  X   x)` still matches too: the reader upcases both `X` and `x`
+/// to the same symbol before either is compared with anything, so the two
+/// spellings name the same place. Emacs Lisp, Scheme, Racket and Clojure
+/// don't fold, and neither does this: `(eq X x)` there is two symbols.
 fn bind<'a>(
     bindings: &mut Vec<Binding<'a>>,
     name: &str,
     views: Vec<(&'a ExpressionView, ExpressionPath)>,
     source: &str,
+    dialect: Dialect,
 ) -> bool {
     let rendered = |views: &[(&ExpressionView, ExpressionPath)]| {
         views
@@ -259,7 +264,11 @@ fn bind<'a>(
     };
 
     match bindings.iter().find(|binding| binding.name == name) {
-        Some(existing) => rendered(&existing.views) == rendered(&views),
+        Some(existing) => {
+            let (previous, current) = (rendered(&existing.views), rendered(&views));
+            previous == current
+                || (dialect == Dialect::CommonLisp && previous.eq_ignore_ascii_case(&current))
+        }
         None => {
             bindings.push(Binding {
                 name: name.to_owned(),
@@ -275,15 +284,27 @@ fn atom_symbol(view: &ExpressionView) -> &str {
     &text[view.symbol_offset.min(text.len())..]
 }
 
+/// Whether a *pattern's* literal spelling is a string or number rather than a
+/// symbol.
+///
+/// Common Lisp's reader upcases and package-qualifies a bare symbol, but
+/// never touches the contents of a string literal or the digits of a number —
+/// `"a"` and `"A"` are two different strings, not the same place spelled two
+/// ways. [`symbol_matches`] uses this to fold only where the reader would.
+fn is_exact_literal(text: &str) -> bool {
+    text.starts_with('"') || super::pattern::is_number_literal(text)
+}
+
 /// Compares a literal pattern atom with a source atom.
 ///
 /// Only Common Lisp folds case and package qualifiers, because only there does
 /// the reader do it: `DEFUN`, `defun` and `cl:defun` name one operator. Emacs
 /// Lisp, Scheme, Racket and Clojure are case-sensitive, and folding case for
 /// them would make `--query '(Foo)'` match `(foo)` in a language where those
-/// are two different symbols.
+/// are two different symbols. A string or number pattern is never folded,
+/// even in Common Lisp — see [`is_exact_literal`].
 pub(super) fn symbol_matches(candidate: &str, expected: &str, dialect: Dialect) -> bool {
-    if dialect == Dialect::CommonLisp {
+    if dialect == Dialect::CommonLisp && !is_exact_literal(expected) {
         crate::common_lisp::common_lisp_symbol_reference_eq(candidate, expected)
     } else {
         candidate == expected
