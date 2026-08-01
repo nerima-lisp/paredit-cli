@@ -613,7 +613,7 @@ plan/preview/verify/apply lifecycle.
 | `introduce-let` | Replace the selected expression with a local binding in the enclosing list. |
 | `inline-let` | Inline a single local let binding into its body. |
 | `convert-let-to-let-star` | Convert a Common Lisp or Emacs Lisp `let` to `let*` when later initializers do not reference earlier bindings. |
-| `convert-let-star-to-let` | Convert a Common Lisp `let*` to `let` when later initializers do not reference earlier bindings. |
+| `convert-let-star-to-let` | Convert a Common Lisp `let*` to `let` when later initializers do not reference earlier bindings. `--allow-partial` splits off the longest independent prefix into an outer `let` wrapping a nested `let*` instead of refusing. |
 | `convert-do-star-to-do` | Convert a Common Lisp `do*` to `do` when later initializers and step expressions do not reference earlier bindings. |
 | `convert-prog-star-to-prog` | Convert a Common Lisp `prog*` to `prog` when later initializers do not reference earlier bindings. |
 | `merge-nested-let-star` | Merge a directly nested Common Lisp or Emacs Lisp `let*` into one sequential binding form. |
