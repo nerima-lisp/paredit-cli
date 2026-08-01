@@ -92,6 +92,30 @@ fn definitions(version: u8) -> Value {
                          did not look\" stay distinguishable.",
                     "items": { "$ref": "#/$defs/gate" },
                 },
+                "writes": {
+                    "type": "boolean",
+                    "description":
+                        "Whether this command is capable of modifying a file under some \
+                         argument combination — a `--write`/`--fix`/`--apply`/`--in-place` \
+                         flag, or a command whose name is itself the write (`fix apply`). \
+                         Present only on an invocable command, absent on a namespace node \
+                         that only groups other commands. `false` on a command that can \
+                         still touch disk outside this promise — the kill ring \
+                         (`--to-ring`) and archive extraction (`--extract-to`) are not \
+                         counted, matching the `--read-only` MCP gate this mirrors.",
+                },
+                "possible_error_codes": {
+                    "type": "array",
+                    "description":
+                        "The `ErrorCode` labels (see `docs/src/reference/errors.md`) this \
+                         command can realistically exit with, such as \
+                         `input.dialect-unsupported` or `selection.no-match`. A superset \
+                         gathered from the command's own argument shape rather than a \
+                         proof of completeness: absence of a code here means no known \
+                         signal predicts it, not that it is provably unreachable. Present \
+                         only on an invocable command, same as `writes`.",
+                    "items": { "type": "string" },
+                },
             },
         },
         "gate": {

@@ -6,6 +6,7 @@ use clap::{Arg, ArgAction, Args, CommandFactory, ValueEnum};
 use paredit_core_cli::CliResult;
 use serde_json::{Value, json};
 
+mod classify;
 mod schema;
 
 use super::args::OutputFormat;
@@ -89,7 +90,7 @@ pub(super) fn capabilities(args: CapabilitiesArgs) -> CliResult<()> {
                 "name": root.get_name(),
                 "version": root.get_version(),
                 "about": about_text(&root),
-                "commands": subcommand_reports(&root, args.schema_version),
+                "commands": subcommand_reports(&root, args.schema_version, &mut Vec::new()),
             });
             if args.schema_version.includes_dialect_contract() {
                 report["dialect_contract"] =
@@ -109,23 +110,40 @@ pub(super) fn capabilities(args: CapabilitiesArgs) -> CliResult<()> {
 fn subcommand_reports(
     command: &ClapCommand,
     schema_version: CapabilitiesSchemaVersion,
+    path: &mut Vec<String>,
 ) -> Vec<Value> {
     command
         .get_subcommands()
         .filter(|subcommand| subcommand.get_name() != "help")
         .map(|subcommand| {
-            let nested = subcommand_reports(subcommand, schema_version);
+            path.push(subcommand.get_name().to_owned());
+            let nested = subcommand_reports(subcommand, schema_version, path);
+            let args: Vec<&Arg> = subcommand.get_arguments().collect();
+            let gates = gate_reports(subcommand);
             let mut report = json!({
                 "name": subcommand.get_name(),
                 "about": about_text(subcommand),
                 "args": argument_reports(subcommand, schema_version),
             });
-            if let Some(gates) = gate_reports(subcommand) {
+            if let Some(gates) = gates.clone() {
                 report["gates"] = gates;
             }
-            if !nested.is_empty() {
+            if nested.is_empty() {
+                // A leaf: the classification below only means something for
+                // an invocable command. A namespace node (`inspect`, `edit`)
+                // gets neither field, the same way it gets no `gates` —
+                // "cannot write" and "we did not look" have to stay
+                // distinguishable, and a namespace is the second one.
+                let writes = classify::writes(path, &args);
+                let category = super::contract::command_category(&path.join(" "));
+                report["writes"] = json!(writes);
+                report["possible_error_codes"] = json!(classify::possible_error_codes(
+                    path, &args, category, writes,
+                ));
+            } else {
                 report["commands"] = Value::Array(nested);
             }
+            path.pop();
             report
         })
         .collect()

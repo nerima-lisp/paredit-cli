@@ -19,8 +19,8 @@ pub(super) const DIALECTS: [&str; 10] = [
     "fennel",
 ];
 
-#[derive(Clone, Copy, Debug)]
-enum CommandCategory {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum CommandCategory {
     Introspection,
     Format,
     Structural,
@@ -1003,7 +1003,11 @@ fn dialect_depth_report() -> Value {
     Value::Array(entries)
 }
 
-fn command_category(command_path: &str) -> Option<CommandCategory> {
+/// The category [`crate::presentation::cli::capabilities::classify`] keys its
+/// own write and error-code classification on, so that classification cannot
+/// drift from the dialect contract's own per-command inventory — this *is*
+/// the 358-command list the dialect contract publishes, read a second way.
+pub(super) fn command_category(command_path: &str) -> Option<CommandCategory> {
     COMMAND_GROUPS
         .iter()
         .find(|(paths, _)| paths.contains(&command_path))
