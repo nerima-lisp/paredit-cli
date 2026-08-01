@@ -291,7 +291,7 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"rule_count\": 169"))
+        .stdout(predicate::str::contains("\"rule_count\": 170"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -319,7 +319,7 @@ fn cli_list_rules_filters_by_category() {
     // Every listed rule is in the requested category, and it's a strict subset.
     assert!(!rules.is_empty());
     assert!(rules.iter().all(|r| r["category"] == "dead-code"));
-    assert!(rules.len() < 169);
+    assert!(rules.len() < 170);
     assert_eq!(value["rule_count"], rules.len());
 }
 
@@ -962,7 +962,7 @@ fn cli_lint_list_rules_marks_severity() {
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
     // The default preset is `recommended`, which holds back the four
     // `pedantic` rules; `--preset all` is what lists the whole suite.
-    assert_eq!(warnings, 112);
+    assert_eq!(warnings, 113);
 }
 
 #[test]

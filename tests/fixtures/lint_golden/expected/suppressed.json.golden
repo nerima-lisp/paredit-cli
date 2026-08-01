@@ -1030,6 +1030,12 @@
       "count": 0,
       "description": "a comment whose entire body is a balanced s-expression rather than prose",
       "rule": "commented-out-code"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a top-level form that runs at load time and references a name this file only defines later",
+      "rule": "execution-order-dependency"
     }
   ],
   "policy": {

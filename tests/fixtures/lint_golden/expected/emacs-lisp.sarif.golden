@@ -2523,6 +2523,22 @@
               "shortDescription": {
                 "text": "a comment whose entire body is a balanced s-expression rather than prose"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "A file loads by evaluating its top-level forms in order. defun/defmacro/defclass and friends only install a definition, so a forward reference inside one is ordinary — by the time it runs, the file has finished loading. defvar/defparameter and every other top-level form run immediately, and a forward reference inside one depends on the file's current order to work at all."
+              },
+              "id": "execution-order-dependency",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A file loads by evaluating its top-level forms in order. defun/defmacro/defclass and friends only install a definition, so a forward reference inside one is ordinary — by the time it runs, the file has finished loading. defvar/defparameter and every other top-level form run immediately, and a forward reference inside one depends on the file's current order to work at all.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a top-level form that runs at load time and references a name this file only defines later"
+              }
             }
           ]
         }
