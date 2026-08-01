@@ -70,6 +70,7 @@ use paredit_feature_project_inventory::api_surface_report::cli as api_surface_re
 use paredit_feature_project_inventory::blame_report::cli as blame_report;
 use paredit_feature_project_inventory::external_system_report::cli as external_system_report;
 use paredit_feature_project_inventory::keyword_arity_report::cli as keyword_arity_report;
+use paredit_feature_project_inventory::license_header_report::cli as license_header_report;
 use paredit_feature_project_inventory::license_report::cli as license_report;
 use paredit_feature_project_inventory::serial_consistency_report::cli as serial_consistency_report;
 use paredit_feature_project_inventory::symbol_index_report::cli as symbol_index_report;
@@ -82,6 +83,7 @@ use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
 use paredit_feature_semantic_report::fold_constants::cli as fold_constants;
+use paredit_feature_semantic_report::magic_number_report::cli as magic_number_report;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
 use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;
@@ -717,6 +719,7 @@ use paredit_feature_package::system_conflict_report::cli as system_conflict_repo
 use paredit_feature_package::unused_export_report::cli as unused_export_report;
 use paredit_feature_package::unused_nickname_report::cli as unused_nickname_report;
 use paredit_feature_package::unused_package_report::cli as unused_package_report;
+use paredit_feature_package::use_widening_report::cli as use_widening_report;
 use paredit_feature_project_analysis::call_cycle_report::cli as call_cycle_report;
 use paredit_feature_project_analysis::call_graph_report::cli as call_graph_report;
 use paredit_feature_project_analysis::call_report::cli as call_report;

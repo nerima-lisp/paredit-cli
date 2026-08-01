@@ -253,6 +253,8 @@ mod lambda_list_keyword_order_report;
 mod last_default_count_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/license_header_report.rs"]
+mod license_header_report;
 #[path = "cli/lint_cache.rs"]
 mod lint_cache;
 #[path = "cli/lint_custom_baseline_contract.rs"]
@@ -273,6 +275,8 @@ mod literal_place_report;
 mod lsp_server;
 #[path = "cli/macro_constructed_symbols.rs"]
 mod macro_constructed_symbols;
+#[path = "cli/magic_number_report.rs"]
+mod magic_number_report;
 #[path = "cli/make_array_default_keyword_report.rs"]
 mod make_array_default_keyword_report;
 #[path = "cli/make_hash_table_test_report.rs"]
@@ -559,6 +563,8 @@ mod unused_parameter_report;
 mod unwind_protect_no_cleanup_report;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
+#[path = "cli/use_widening_report.rs"]
+mod use_widening_report;
 #[path = "cli/values_list_of_list_report.rs"]
 mod values_list_of_list_report;
 #[path = "cli/verbose_negation_report.rs"]

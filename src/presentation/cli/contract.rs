@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 236] = [
+const INTROSPECTION_COMMANDS: [&str; 239] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -291,6 +291,7 @@ const INTROSPECTION_COMMANDS: [&str; 236] = [
     "inspect unused-packages",
     "inspect unused-exports",
     "inspect unused-nicknames",
+    "inspect use-widening",
     "inspect package-conflicts",
     "inspect redefinitions",
     "inspect undefined-packages",
@@ -303,6 +304,7 @@ const INTROSPECTION_COMMANDS: [&str; 236] = [
     "inspect external-diagnostics",
     "inspect external-systems",
     "inspect licenses",
+    "inspect license-headers",
     "inspect serial-consistency",
     "inspect blame",
     "inspect duplication-ratio",
@@ -329,6 +331,7 @@ const INTROSPECTION_COMMANDS: [&str; 236] = [
     "inspect types",
     "inspect narrowing",
     "inspect constants",
+    "inspect magic-numbers",
     "inspect value-propagation",
     "inspect effects",
     "inspect semantic-coverage",
