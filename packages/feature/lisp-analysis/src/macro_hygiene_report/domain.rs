@@ -41,6 +41,15 @@ pub enum HygieneRisk {
     VariableCapture,
     /// The template unquotes one parameter more than once.
     MultipleEvaluation,
+    /// The template unquotes two or more distinct parameters in an order
+    /// that differs from their left-to-right position in the lambda list.
+    ///
+    /// `` `(list ,b ,a) `` for `(m (a b) ...)` evaluates `b`'s argument form
+    /// before `a`'s, even though the call site reads `a` before `b`. When
+    /// either argument form has a side effect — the overwhelmingly common
+    /// reason to notice evaluation order at all — the caller's own left-to-
+    /// right expectation is silently violated.
+    ParameterReordering,
 }
 
 impl HygieneRisk {
@@ -49,6 +58,7 @@ impl HygieneRisk {
         match self {
             Self::VariableCapture => "variable-capture",
             Self::MultipleEvaluation => "multiple-evaluation",
+            Self::ParameterReordering => "parameter-reordering",
         }
     }
 }
@@ -59,10 +69,14 @@ pub struct HygieneFinding {
     pub risk: HygieneRisk,
     /// The macro the template belongs to.
     pub macro_name: String,
-    /// The captured binding name, or the multiply-evaluated parameter.
+    /// The captured binding name, the multiply-evaluated parameter, or —
+    /// for [`HygieneRisk::ParameterReordering`] — every out-of-order
+    /// parameter, comma-joined in the order the template unquotes them.
     pub subject: String,
     /// How many times the parameter is unquoted, for
-    /// [`HygieneRisk::MultipleEvaluation`]. `0` for a capture.
+    /// [`HygieneRisk::MultipleEvaluation`]; how many parameters are
+    /// out-of-order, for [`HygieneRisk::ParameterReordering`]. `0` for a
+    /// capture.
     pub occurrences: usize,
     /// The remedy, named rather than left to the reader.
     pub remedy: &'static str,
@@ -177,6 +191,7 @@ fn analyze(dialect: Dialect, form: &ExpressionView, name: &str, findings: &mut V
     for body in form.children.iter().skip(3) {
         find_captures(body, name, &gensym_bound, findings);
         find_multiple_evaluation(body, name, &parameters, findings);
+        find_parameter_reordering(body, name, &parameters, findings);
     }
 }
 
@@ -349,6 +364,74 @@ fn find_multiple_evaluation(
     }
 }
 
+/// Reports a template that unquotes two or more distinct parameters in an
+/// order that differs from their left-to-right position in the lambda list.
+///
+/// Only the first unquote of each distinct parameter fixes that parameter's
+/// place in the template's order — a parameter [`find_multiple_evaluation`]
+/// already flags as unquoted more than once does not need flagging twice
+/// here for the same reason. A single parameter, however many times it
+/// repeats, is trivially "in order" with itself, so at least two distinct
+/// parameters must appear before an order even exists to compare.
+fn find_parameter_reordering(
+    view: &ExpressionView,
+    macro_name: &str,
+    parameters: &[String],
+    findings: &mut Vec<HygieneFinding>,
+) {
+    if !is_quasiquoted(view) {
+        for child in &view.children {
+            find_parameter_reordering(child, macro_name, parameters, findings);
+        }
+        return;
+    }
+
+    let mut template_order: Vec<String> = Vec::new();
+    walk(view, &mut |inner| {
+        if inner.kind != ExpressionKind::Atom {
+            return;
+        }
+        if !inner.reader_prefixes.contains(&ReaderPrefix::Unquote) {
+            return;
+        }
+        let Some(name) = atom_symbol_text(inner) else {
+            return;
+        };
+        let folded = name.to_ascii_uppercase();
+        if parameters.contains(&folded) && !template_order.contains(&folded) {
+            template_order.push(folded);
+        }
+    });
+
+    if template_order.len() < 2 {
+        return;
+    }
+
+    // The lambda list's own order, restricted to the parameters the
+    // template actually unquotes: this is what "in order" means here, since
+    // a parameter the template never mentions has nothing to be out of
+    // order with.
+    let lambda_list_order: Vec<&String> = parameters
+        .iter()
+        .filter(|parameter| template_order.contains(parameter))
+        .collect();
+
+    if template_order.iter().collect::<Vec<_>>() == lambda_list_order {
+        return;
+    }
+
+    findings.push(HygieneFinding {
+        risk: HygieneRisk::ParameterReordering,
+        macro_name: macro_name.to_ascii_uppercase(),
+        subject: template_order.join(", "),
+        occurrences: template_order.len(),
+        remedy: "the template evaluates these argument forms in a different order than the \
+                 call site writes them; reorder the template or bind each argument in the \
+                 call's own order before using it",
+        span: view.span,
+    });
+}
+
 /// The node a binding binds: the binding itself when it is a bare name, or its
 /// first child when it is a `(name value)` pair.
 ///
@@ -468,6 +551,69 @@ mod tests {
                 .all(|finding| finding.risk != HygieneRisk::MultipleEvaluation),
             "{report:?}"
         );
+    }
+
+    #[test]
+    fn two_parameters_unquoted_out_of_lambda_list_order_is_a_reordering_risk() {
+        let report = report("(defmacro m (a b) `(list ,b ,a))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::ParameterReordering)
+            .expect("parameter reordering is reported");
+        assert_eq!(finding.subject, "B, A");
+        assert_eq!(finding.occurrences, 2);
+    }
+
+    #[test]
+    fn two_parameters_unquoted_in_lambda_list_order_is_not_reported() {
+        let report = report("(defmacro m (a b) `(list ,a ,b))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::ParameterReordering),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn three_parameters_partially_reordered_still_report() {
+        // `a` and `c` stay in order; `b` jumps ahead of both.
+        let report = report("(defmacro m (a b c) `(list ,b ,a ,c))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::ParameterReordering)
+            .expect("parameter reordering is reported");
+        assert_eq!(finding.subject, "B, A, C");
+    }
+
+    #[test]
+    fn a_single_parameter_repeated_is_not_a_reordering_risk() {
+        // Only one distinct parameter, however many times it repeats, has no
+        // order to be out of; this stays a multiple-evaluation finding only.
+        let report = report("(defmacro m (x) `(if (> ,x 0) ,x 0))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::ParameterReordering),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn a_parameter_the_template_never_mentions_does_not_block_reordering() {
+        // `a` and `b` are reordered; `c` is never unquoted at all and so has
+        // no bearing on whether `a`/`b`'s order is a violation.
+        let report = report("(defmacro m (a b c) `(list ,b ,a))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::ParameterReordering)
+            .expect("parameter reordering is reported");
+        assert_eq!(finding.subject, "B, A");
     }
 
     #[test]
