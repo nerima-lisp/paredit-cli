@@ -12,12 +12,12 @@ use crate::presentation::cli::lint_report::args::{EmitFormat, LintReportArgs};
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
 use crate::presentation::cli::lint_report::render::{
-    DensityBucket, FindingIds, LintFileFix, LintFix, LintFixPlanEntry, LintReplacement,
-    LintSarifResult, LintStats, LintSuppressionRemoval, LintTiming, SeverityDensitySuggestion,
-    print_custom_lint_explanation, print_lint_docs, print_lint_expired_suppressions,
-    print_lint_explanation, print_lint_fix_plan, print_lint_fix_report,
-    print_lint_github_annotation, print_lint_presets, print_lint_report, print_lint_rule_catalog,
-    print_lint_sarif, print_lint_stats, print_lint_suggest_severity,
+    CustomLintTiming, DensityBucket, FindingIds, LintFileFix, LintFix, LintFixPlanEntry,
+    LintReplacement, LintSarifResult, LintStats, LintSuppressionRemoval, LintTiming,
+    SeverityDensitySuggestion, print_custom_lint_explanation, print_lint_docs,
+    print_lint_expired_suppressions, print_lint_explanation, print_lint_fix_plan,
+    print_lint_fix_report, print_lint_github_annotation, print_lint_presets, print_lint_report,
+    print_lint_rule_catalog, print_lint_sarif, print_lint_stats, print_lint_suggest_severity,
     print_lint_suppression_inventory, print_lint_suppression_removal, print_lint_tags,
     print_lint_timings, print_lint_unused_suppressions,
 };
@@ -467,7 +467,9 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
     let files = filter_suppressed_paths(files, &args.suppress_paths);
 
     if args.timings {
-        return Ok(lint_report_timings(&args, &files, &active, &settings)?);
+        return Ok(lint_report_timings(
+            &args, &files, &active, &settings, &custom,
+        )?);
     }
 
     if args.sarif || args.emit == Some(EmitFormat::Sarif) {
@@ -533,12 +535,25 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
     // values rather than from the flags the caller typed.
     let discriminator = lint_cache_discriminator(&active, &custom, &settings);
     let statistics = std::sync::Mutex::new(paredit_core_safety::cache::CacheStatistics::default());
+    // FR-E12: how many loaded custom rules a file's dialect put out of scope,
+    // summed across the run. `:dialects` is a guard, not a hint — a rule it
+    // excludes never even attempts to match — so this is worth reporting
+    // rather than leaving a project to notice only that a rule never fires.
+    let dialect_skips = std::sync::Mutex::new(0usize);
 
     // The 170-rule pass over each file is the heaviest per-file work in this
     // tool and has no dependency between files, so it runs on every core.
     // `analyze_files` returns results in input order, which is what keeps the
     // report byte-identical however the workers were scheduled.
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
+        if !custom.is_empty() {
+            let skipped = custom.dialect_skip_count(dialect);
+            if skipped > 0 {
+                if let Ok(mut total) = dialect_skips.lock() {
+                    *total += skipped;
+                }
+            }
+        }
         // The cached value is the *pre-baseline* finding set: a baseline is a
         // filter over the answer, not part of the question, so changing one
         // must not throw the analysis away.
@@ -628,6 +643,11 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
             );
         }
     }
+    if let Ok(skipped) = dialect_skips.lock() {
+        if *skipped > 0 {
+            eprintln!("custom rules: {skipped} rule application(s) skipped by :dialects scope");
+        }
+    }
 
     // `active` already carries the eligible custom rule names alongside the
     // shipped ones (FR-E16's widened `resolve_active_rules`), so a rule
@@ -662,13 +682,23 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
 /// Deliberately serial, unlike the report and SARIF paths. Sixteen workers
 /// contending for memory bandwidth measure the machine rather than the rules,
 /// and a per-rule cost that changes with `--jobs` is not a per-rule cost.
+///
+/// The loaded custom rules (FR-E5) are measured the same way, serially, for
+/// the identical reason — see [`paredit_feature_lint_custom::timed_run`] —
+/// and reported as their own section, since they cannot join
+/// [`RuleTimings`]: that table is indexed by a rule's compile-time
+/// registration position, which a rule read from a file at startup does not
+/// have.
 fn lint_report_timings(
     args: &LintReportArgs,
     files: &[std::path::PathBuf],
     active: &[&str],
     settings: &RuleSettings,
+    custom: &CustomRules,
 ) -> CliResult<()> {
     let mut total: Option<RuleTimings> = None;
+    let mut custom_total: std::collections::BTreeMap<String, (std::time::Duration, u64)> =
+        std::collections::BTreeMap::new();
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
@@ -683,17 +713,56 @@ fn lint_report_timings(
                 measure: true,
             },
         )?;
-        let Some(measured) = result.timings else {
-            continue;
-        };
-        match &mut total {
-            Some(accumulated) => accumulated.merge(&measured),
-            None => total = Some(measured),
+        if let Some(measured) = result.timings {
+            match &mut total {
+                Some(accumulated) => accumulated.merge(&measured),
+                None => total = Some(measured),
+            }
+        }
+        if !custom.is_empty() {
+            for (rule, elapsed) in custom.timed_findings(&tree, dialect) {
+                let entry = custom_total
+                    .entry(rule)
+                    .or_insert((std::time::Duration::ZERO, 0));
+                entry.0 += elapsed;
+                entry.1 += 1;
+            }
         }
     }
 
+    let custom_total_micros: u128 = custom_total
+        .values()
+        .map(|(elapsed, _)| elapsed.as_micros())
+        .sum();
+    let mut custom_rows: Vec<CustomLintTiming> = custom_total
+        .into_iter()
+        .filter(|(rule, _)| active.contains(&rule.as_str()))
+        .map(|(rule, (elapsed, invocations))| {
+            let micros = elapsed.as_micros();
+            CustomLintTiming {
+                rule,
+                micros,
+                invocations,
+                #[allow(clippy::cast_precision_loss)]
+                share: if custom_total_micros == 0 {
+                    0.0
+                } else {
+                    (micros as f64 / custom_total_micros as f64) * 100.0
+                },
+            }
+        })
+        .collect();
+    custom_rows.sort_by(|a, b| b.micros.cmp(&a.micros).then(a.rule.cmp(&b.rule)));
+
     let Some(total) = total else {
-        return print_lint_timings(&[], 0, files.len(), args.output);
+        return print_lint_timings(
+            &[],
+            0,
+            files.len(),
+            &custom_rows,
+            custom_total_micros,
+            args.output,
+        );
     };
     let total_micros = total.total().as_micros();
     let mut rows: Vec<LintTiming> = rule_timing_report(&total)
@@ -718,7 +787,14 @@ fn lint_report_timings(
     // the same table.
     rows.sort_by(|a, b| b.micros.cmp(&a.micros).then(a.rule.cmp(b.rule)));
 
-    print_lint_timings(&rows, total_micros, files.len(), args.output)
+    print_lint_timings(
+        &rows,
+        total_micros,
+        files.len(),
+        &custom_rows,
+        custom_total_micros,
+        args.output,
+    )
 }
 
 /// Deletes the `paredit:ignore` directives that silence nothing, and narrows

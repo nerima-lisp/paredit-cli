@@ -360,6 +360,7 @@ those itself, in Lisp, in `.paredit/rules/*.lisp`:
   :category malformed          ; optional; defaults to suspicious
   :severity error              ; optional; defaults to warning
   :description "a defentity with no :table option"
+  :dialects (common-lisp)       ; optional; defaults to every dialect
   :pattern (defentity ?name ...)
   :message "defentity needs a :table"
   :fix (defentity ?name :table "TODO"))   ; optional
@@ -375,6 +376,27 @@ those itself, in Lisp, in `.paredit/rules/*.lisp`:
 The directory is read automatically when it exists; `--custom-rules <DIR>`
 points elsewhere. A rule file that does not load fails the run — a project that
 has written a rule and sees a green build has been told the rule passed.
+
+`:dialects` is a guard, not a hint, the same as `defmigration`'s own clause:
+naming dialects skips every file outside them entirely (reported as a skip
+count on stderr), rather than matching them and finding nothing. Omitting it,
+as every rule written before this clause existed does, keeps the rule scoped
+to every dialect — unchanged.
+
+A rule set may also register a named, reusable pattern fragment:
+
+```lisp
+(defpattern bare-print (print ?x))
+
+(defrule no-print-in-handler
+  :pattern (handler-case (:fragment bare-print) ...)
+  :message "do not print from inside a handler")
+```
+
+`(:fragment name)` stands for that fragment's own pattern, substituted in
+whole before any rule matches — including inside another `defpattern`, so
+fragments may build on each other. Referencing an undefined fragment, or a
+cycle between fragments, fails the rule file at load time.
 
 Three spellings are special in a `:pattern`:
 
@@ -399,7 +421,15 @@ than its author meant.
 Custom findings are then indistinguishable from shipped ones — same suppression
 comments, same baseline, same stable ids, same `--fail-on` gate, same SARIF and
 GitHub output, same `--fix`. `--list-rules` lists them in a separate
-`custom_rules` block so the two are still tellable apart.
+`custom_rules` block so the two are still tellable apart. A custom rule's name
+must be unique, both against the shipped catalogue and against every other
+custom rule loaded in the same run (even across files) — a rule file where two
+rules share a name fails to load rather than leaving it to whichever code path
+happens to pick one of them.
+
+`--timings` reports the loaded custom rules' own per-rule cost as a separate
+section alongside the shipped suite's, measured the same way: serially, since a
+per-rule cost that changes with `--jobs` is not a per-rule cost.
 
 ### Suppressing findings in source
 

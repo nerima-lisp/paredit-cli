@@ -132,8 +132,11 @@ fn check_paredit_config() -> Vec<PareditConfigFileReport> {
     // Checked once across every file, the same way a real load does: a
     // collision or a dangling `deftest` is a property of the whole set, and a
     // per-file check would miss a `deftest` in one file naming a rule defined
-    // in another.
-    if let Err(error) = merged.validate(&crate::lint::report::RULES) {
+    // in another (or, since FR-E14, a fragment defined in another).
+    let outcome = merged
+        .resolve_fragments()
+        .and_then(|()| merged.validate(&crate::lint::report::RULES));
+    if let Err(error) = outcome {
         reports.push(PareditConfigFileReport {
             path: DEFAULT_PAREDIT_RULE_DIRECTORY.to_owned(),
             syntax_errors: Vec::new(),
