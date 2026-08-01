@@ -137,7 +137,8 @@ fn capabilities_documents_edit_write_flag_and_enum_values() {
 #[test]
 fn command_reference_documents_every_leaf_command() {
     let report = capabilities_json();
-    let reference = fs::read_to_string("docs/src/reference/api.md").expect("read docs/src/reference/api.md");
+    let reference =
+        fs::read_to_string("docs/src/reference/api.md").expect("read docs/src/reference/api.md");
 
     let mut missing = Vec::new();
     for namespace in report["commands"].as_array().expect("commands") {
