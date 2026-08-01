@@ -365,6 +365,8 @@ mod parallel_analysis;
 mod paredit_parity;
 #[path = "cli/parse_integer_default_radix_report.rs"]
 mod parse_integer_default_radix_report;
+#[path = "cli/pattern_grammar_sync_contract.rs"]
+mod pattern_grammar_sync_contract;
 #[path = "cli/plan_steps_contract.rs"]
 mod plan_steps_contract;
 #[path = "cli/prog2_to_progn_report.rs"]
