@@ -73,6 +73,16 @@ pub enum HygieneRisk {
     /// escape wrong in a way that only shows up when the macro that builds
     /// the macro is itself expanded.
     DeepQuasiquoteNesting,
+    /// Emacs Lisp only: the macro's body does not open with a
+    /// `(declare (indent ...))` and/or `(declare (debug ...))` form.
+    ///
+    /// Neither is required by the language, but their absence is a gap in
+    /// the macro's editor integration rather than in the macro itself: with
+    /// no `indent` declaration, `M-x indent-region` falls back to indenting
+    /// every call to this macro as if it were an ordinary function call, and
+    /// with no `debug` declaration, Edebug cannot step through the
+    /// arguments a call to it actually evaluates.
+    MissingEditorDeclaration,
 }
 
 impl HygieneRisk {
@@ -83,6 +93,7 @@ impl HygieneRisk {
             Self::MultipleEvaluation => "multiple-evaluation",
             Self::ParameterReordering => "parameter-reordering",
             Self::DeepQuasiquoteNesting => "deep-quasiquote-nesting",
+            Self::MissingEditorDeclaration => "missing-editor-declaration",
         }
     }
 }
@@ -227,6 +238,8 @@ fn analyze(
         find_symbol_macrolet_multiple_evaluation(body, name, findings);
         find_deep_quasiquote_nesting(body, name, findings);
     }
+
+    find_missing_editor_declaration(dialect, form, name, findings);
 }
 
 /// The required and `&body`/`&rest` parameter names of a macro lambda list.
@@ -622,6 +635,65 @@ fn quasiquote_depth(view: &ExpressionView) -> usize {
     own + deepest_child
 }
 
+/// Emacs Lisp only: reports a macro whose body does not open with a
+/// `(declare (indent ...))` and/or `(declare (debug ...))` form.
+///
+/// A leading docstring is skipped, since `(declare ...)` conventionally
+/// follows it rather than the arglist directly — `(defmacro m (x) "doc"
+/// (declare (indent 1)) ...)` is the ordinary shape a documented macro
+/// takes, not a missing declaration.
+fn find_missing_editor_declaration(
+    dialect: Dialect,
+    form: &ExpressionView,
+    macro_name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
+    if dialect != Dialect::EmacsLisp {
+        return;
+    }
+
+    let first_body_index = match form.children.get(3) {
+        Some(child) if is_string_literal(child) => 4,
+        _ => 3,
+    };
+
+    let has_declaration = form
+        .children
+        .get(first_body_index)
+        .and_then(|first_body| {
+            let head = list_head(first_body)?;
+            common_lisp_operator_head_eq(head, "declare").then_some(first_body)
+        })
+        .is_some_and(|declare_form| {
+            declare_form.children.iter().skip(1).any(|clause| {
+                list_head(clause).is_some_and(|clause_head| {
+                    common_lisp_operator_head_eq(clause_head, "indent")
+                        || common_lisp_operator_head_eq(clause_head, "debug")
+                })
+            })
+        });
+
+    if has_declaration {
+        return;
+    }
+
+    findings.push(HygieneFinding {
+        risk: HygieneRisk::MissingEditorDeclaration,
+        macro_name: macro_name.to_ascii_uppercase(),
+        subject: String::new(),
+        occurrences: 0,
+        remedy: "add a leading (declare (indent ...)) and/or (declare (debug ...)) form so \
+                 Emacs indents and Edebug instruments calls to this macro correctly",
+        span: form.span,
+    });
+}
+
+/// Whether a node is a string literal atom.
+fn is_string_literal(view: &ExpressionView) -> bool {
+    view.kind == ExpressionKind::Atom
+        && view.text.as_deref().is_some_and(|text| text.starts_with('"'))
+}
+
 /// The node a binding binds: the binding itself when it is a bare name, or its
 /// first child when it is a `(name value)` pair.
 ///
@@ -981,13 +1053,18 @@ mod tests {
             ),
         ] {
             let report = report_in(source, dialect);
-            assert_eq!(report.findings.len(), 1, "{dialect:?}: {report:?}");
-            assert_eq!(
-                report.findings[0].risk,
-                HygieneRisk::VariableCapture,
-                "{dialect:?}"
-            );
-            assert_eq!(report.findings[0].subject, "RESULT", "{dialect:?}");
+            // Filtered to `VariableCapture` rather than asserting the whole
+            // findings list is exactly one: Emacs Lisp also reports
+            // `MissingEditorDeclaration` for a macro with no leading
+            // `declare`, which every fixture here has, and that is a
+            // separate concern from this test.
+            let captures: Vec<_> = report
+                .findings
+                .iter()
+                .filter(|finding| finding.risk == HygieneRisk::VariableCapture)
+                .collect();
+            assert_eq!(captures.len(), 1, "{dialect:?}: {report:?}");
+            assert_eq!(captures[0].subject, "RESULT", "{dialect:?}");
         }
     }
 
@@ -1039,7 +1116,7 @@ mod tests {
     #[test]
     fn cl_gensym_bound_name_is_not_a_capture_risk_in_emacs_lisp() {
         let report = report_in(
-            "(defmacro m (form) (let ((result (cl-gensym))) `(let ((,result ,form)) (list ,result))))",
+            "(defmacro m (form) (declare (indent 1)) (let ((result (cl-gensym))) `(let ((,result ,form)) (list ,result))))",
             Dialect::EmacsLisp,
         );
         assert!(report.findings.is_empty(), "{report:?}");
@@ -1048,7 +1125,7 @@ mod tests {
     #[test]
     fn make_symbol_bound_name_is_not_a_capture_risk_in_emacs_lisp() {
         let report = report_in(
-            "(defmacro m (form) (let ((result (make-symbol \"result\"))) `(let ((,result ,form)) (list ,result))))",
+            "(defmacro m (form) (declare (indent 1)) (let ((result (make-symbol \"result\"))) `(let ((,result ,form)) (list ,result))))",
             Dialect::EmacsLisp,
         );
         assert!(report.findings.is_empty(), "{report:?}");
@@ -1064,5 +1141,77 @@ mod tests {
         );
         assert_eq!(report.findings.len(), 1, "{report:?}");
         assert_eq!(report.findings[0].risk, HygieneRisk::VariableCapture);
+    }
+
+    #[test]
+    fn an_emacs_lisp_macro_with_no_leading_declare_is_reported() {
+        let report = report_in("(defmacro m (x) (list 'progn x))", Dialect::EmacsLisp);
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.risk == HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_macro_with_a_leading_indent_declare_is_not_reported() {
+        let report = report_in(
+            "(defmacro m (x) (declare (indent 1)) (list 'progn x))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_macro_with_a_leading_debug_declare_is_not_reported() {
+        let report = report_in(
+            "(defmacro m (x) (declare (debug t)) (list 'progn x))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_macros_declare_may_follow_a_docstring() {
+        let report = report_in(
+            "(defmacro m (x) \"Docstring.\" (declare (indent 1)) (list 'progn x))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn the_missing_editor_declaration_check_does_not_apply_outside_emacs_lisp() {
+        // Common Lisp `defmacro` has no `(declare (indent ...))`/`(declare
+        // (debug ...))` convention at all, so a Common Lisp macro missing
+        // one is not a gap to report.
+        let report = report("(defmacro m (x) (list 'progn x))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
     }
 }
