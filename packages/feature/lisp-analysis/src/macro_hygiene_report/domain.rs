@@ -39,7 +39,21 @@ use paredit_core_cli::report::{FileFindings, Finding};
 pub enum HygieneRisk {
     /// The template binds a literal name that is not obviously a gensym.
     VariableCapture,
-    /// The template unquotes one parameter more than once.
+    /// A form that re-evaluates on every reference is referenced more than
+    /// once.
+    ///
+    /// Two unrelated shapes report this: a template that unquotes one
+    /// parameter more than once, and a `symbol-macrolet`/`cl-symbol-macrolet`
+    /// binding whose expansion form is not provably side-effect-free (not a
+    /// literal atom or a quoted form — a function call, `incf`, and the
+    /// like) but is referenced by name more than once in its body. Both are
+    /// the same failure by another name: a name that looks like an ordinary
+    /// binding actually re-runs a computation at every use, and a reader
+    /// counting names cannot tell that apart from an ordinary reference
+    /// without knowing which names are like this. Kept as one variant rather
+    /// than two because the remedy is identical in both cases — bind the
+    /// form's value once — and a caller filtering findings by risk should
+    /// not have to know there are two shapes of it.
     MultipleEvaluation,
     /// The template unquotes two or more distinct parameters in an order
     /// that differs from their left-to-right position in the lambda list.
@@ -192,6 +206,7 @@ fn analyze(dialect: Dialect, form: &ExpressionView, name: &str, findings: &mut V
         find_captures(body, name, &gensym_bound, findings);
         find_multiple_evaluation(body, name, &parameters, findings);
         find_parameter_reordering(body, name, &parameters, findings);
+        find_symbol_macrolet_multiple_evaluation(body, name, findings);
     }
 }
 
@@ -432,6 +447,98 @@ fn find_parameter_reordering(
     });
 }
 
+/// `symbol-macrolet`/`cl-symbol-macrolet`'s special-form name.
+///
+/// These are not in [`BINDING_FORMS`]: a `let` binding evaluates its value
+/// once and binds a name to the result, while a `symbol-macrolet` binding
+/// substitutes a fresh copy of the expansion form at every reference — a
+/// `let`'s capture risk does not apply to it, and a different risk does.
+const SYMBOL_MACROLET_FORMS: [&str; 2] = ["symbol-macrolet", "cl-symbol-macrolet"];
+
+/// Reports a `symbol-macrolet` expansion form that is not provably
+/// side-effect-free and is referenced more than once in the form's body.
+///
+/// Every reference substitutes another copy of the expansion form, so
+/// `(symbol-macrolet ((x (incf y))) (+ x x))` runs `(incf y)` twice — the
+/// same failure [`find_multiple_evaluation`] reports for a template that
+/// unquotes one macro parameter twice, just reached through a different
+/// binding form. Not gated on being inside a quasiquoted template: a
+/// `symbol-macrolet` in the macro's own generating code is exactly as live a
+/// risk as one written into the template it returns.
+fn find_symbol_macrolet_multiple_evaluation(
+    view: &ExpressionView,
+    macro_name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
+    walk(view, &mut |inner| {
+        let Some(head) = list_head(inner) else { return };
+        if !SYMBOL_MACROLET_FORMS
+            .iter()
+            .any(|form_name| common_lisp_operator_head_eq(head, form_name))
+        {
+            return;
+        }
+
+        for binding in inner
+            .children
+            .get(1)
+            .map(|list| list.children.as_slice())
+            .unwrap_or_default()
+        {
+            let Some(name) = binding.children.first().and_then(atom_symbol_text) else {
+                continue;
+            };
+            let Some(expansion) = binding.children.get(1) else {
+                continue;
+            };
+            if is_side_effect_free(expansion) {
+                continue;
+            }
+            let folded = name.to_ascii_uppercase();
+
+            let mut occurrences = 0usize;
+            for scoped_body in inner.children.iter().skip(2) {
+                walk(scoped_body, &mut |node| {
+                    if node.kind == ExpressionKind::Atom
+                        && atom_symbol_text(node)
+                            .is_some_and(|text| text.to_ascii_uppercase() == folded)
+                    {
+                        occurrences += 1;
+                    }
+                });
+            }
+            if occurrences < 2 {
+                continue;
+            }
+
+            findings.push(HygieneFinding {
+                risk: HygieneRisk::MultipleEvaluation,
+                macro_name: macro_name.to_ascii_uppercase(),
+                subject: folded,
+                occurrences,
+                remedy: "this symbol-macrolet expansion is not side-effect-free; bind its value \
+                         once instead of letting each reference re-evaluate it",
+                span: binding.span,
+            });
+        }
+    });
+}
+
+/// Whether a form's evaluation is guaranteed to have no side effect: a
+/// literal atom (a self-evaluating value or a variable reference — neither
+/// calls anything), or a quoted form (`quote` never evaluates its argument).
+/// Anything else — a function call, `incf`, and the like — is not, since
+/// this analysis has no way to know what the call does.
+fn is_side_effect_free(view: &ExpressionView) -> bool {
+    if view.kind == ExpressionKind::Atom {
+        return true;
+    }
+    if view.reader_prefixes.contains(&ReaderPrefix::Quote) {
+        return true;
+    }
+    list_head(view).is_some_and(|head| common_lisp_operator_head_eq(head, "quote"))
+}
+
 /// The node a binding binds: the binding itself when it is a bare name, or its
 /// first child when it is a `(name value)` pair.
 ///
@@ -614,6 +721,54 @@ mod tests {
             .find(|finding| finding.risk == HygieneRisk::ParameterReordering)
             .expect("parameter reordering is reported");
         assert_eq!(finding.subject, "B, A");
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_with_a_side_effect_referenced_twice_is_reported() {
+        let report =
+            report("(defmacro m () (symbol-macrolet ((x (incf y))) (+ x x)))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::MultipleEvaluation)
+            .expect("multiple evaluation is reported");
+        assert_eq!(finding.subject, "X");
+        assert_eq!(finding.occurrences, 2);
+    }
+
+    #[test]
+    fn cl_symbol_macrolet_is_recognised_in_emacs_lisp() {
+        let report = report_in(
+            "(defmacro m () (cl-symbol-macrolet ((x (incf y))) (+ x x)))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.risk == HygieneRisk::MultipleEvaluation
+                    && finding.subject == "X"),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_referenced_once_is_not_reported() {
+        let report = report("(defmacro m () (symbol-macrolet ((x (incf y))) x))");
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_that_is_a_literal_atom_is_not_reported() {
+        let report = report("(defmacro m () (symbol-macrolet ((x 5)) (+ x x)))");
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_that_is_quoted_is_not_reported() {
+        let report =
+            report("(defmacro m () (symbol-macrolet ((x '(1 2 3))) (+ (car x) (car x))))");
+        assert!(report.findings.is_empty(), "{report:?}");
     }
 
     #[test]
