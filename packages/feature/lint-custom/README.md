@@ -2,7 +2,7 @@
 
 Lint rules a project writes for itself, in Lisp, without recompiling anything.
 
-The shipped suite is 169 rules and every one of them took a Rust module, a
+The shipped suite is 170 rules and every one of them took a Rust module, a
 registry line, and a pinned count. That is the right cost for a rule everybody
 gets; it is the wrong cost for "in *this* codebase, `defentity` must always be
 given a `:table`". Rules of that second kind are the majority of what a mature

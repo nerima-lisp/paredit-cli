@@ -151,9 +151,9 @@ impl Finding for HygieneFinding {
 }
 
 /// Binding forms whose second child is a binding list.
-const BINDING_FORMS: [&str; 4] = ["let", "let*", "flet", "labels"];
+pub(crate) const BINDING_FORMS: [&str; 4] = ["let", "let*", "flet", "labels"];
 
-/// Whether `dialect`'s macro system is unhygienic by default and
+/// The dialects whose macro system is unhygienic by default and
 /// template/quasiquote-based — the precondition for variable-capture and
 /// multiple-evaluation analysis to mean anything.
 ///
@@ -164,6 +164,20 @@ const BINDING_FORMS: [&str; 4] = ["let", "let*", "flet", "labels"];
 /// unquotes or capture-prone bindings in a `syntax-rules` template would be
 /// analyzing a mechanism these checks were never written to model, and would
 /// misfire on hygienic-by-construction code.
+///
+/// Exposed for `rule.rs`, which declares the same set as its
+/// [`paredit_core_lint_engine::policy::RuleDialectScope`].
+pub(crate) const HYGIENE_MODELLED_DIALECTS: [Dialect; 8] = [
+    Dialect::CommonLisp,
+    Dialect::EmacsLisp,
+    Dialect::Clojure,
+    Dialect::Janet,
+    Dialect::Hy,
+    Dialect::Carp,
+    Dialect::Fennel,
+    Dialect::Lfe,
+];
+
 const fn dialect_is_hygiene_modelled(dialect: Dialect) -> bool {
     matches!(
         dialect,
@@ -212,6 +226,23 @@ pub fn build_macro_hygiene_report(
         findings,
         vec![("macro_count", json!(macro_count))],
     )
+}
+
+/// Every hygiene risk in one already-identified macro-expander form.
+///
+/// Exposed (rather than kept as the private `analyze`) for `rule.rs`'s
+/// fixable-lint-rule wiring, which needs the same analysis this file's own
+/// `build_macro_hygiene_report` uses but reports only a subset of it through
+/// a different surface.
+#[must_use]
+pub(crate) fn hygiene_findings_in(
+    dialect: Dialect,
+    form: &ExpressionView,
+    name: &str,
+) -> Vec<HygieneFinding> {
+    let mut findings = Vec::new();
+    analyze(dialect, form, name, &mut findings);
+    findings
 }
 
 fn analyze(
@@ -691,7 +722,10 @@ fn find_missing_editor_declaration(
 /// Whether a node is a string literal atom.
 fn is_string_literal(view: &ExpressionView) -> bool {
     view.kind == ExpressionKind::Atom
-        && view.text.as_deref().is_some_and(|text| text.starts_with('"'))
+        && view
+            .text
+            .as_deref()
+            .is_some_and(|text| text.starts_with('"'))
 }
 
 /// The node a binding binds: the binding itself when it is a bare name, or its
@@ -699,7 +733,7 @@ fn is_string_literal(view: &ExpressionView) -> bool {
 ///
 /// Returns the *node* rather than the name so the caller can still ask about
 /// its reader prefixes, which is the only place the unquote survives.
-fn binding_target(binding: &ExpressionView) -> Option<&ExpressionView> {
+pub(crate) fn binding_target(binding: &ExpressionView) -> Option<&ExpressionView> {
     match binding.kind {
         ExpressionKind::Atom => Some(binding),
         ExpressionKind::List => binding.children.first(),
@@ -707,7 +741,7 @@ fn binding_target(binding: &ExpressionView) -> Option<&ExpressionView> {
     }
 }
 
-fn is_unquoted(view: &ExpressionView) -> bool {
+pub(crate) fn is_unquoted(view: &ExpressionView) -> bool {
     view.reader_prefixes.contains(&ReaderPrefix::Unquote)
         || view
             .reader_prefixes
@@ -723,7 +757,7 @@ fn is_unquoted(view: &ExpressionView) -> bool {
 /// Both spellings occur: a backquote before a list becomes a reader prefix,
 /// while a backquote consumed into an atom leaves a leading `` ` `` in the
 /// text.
-fn is_quasiquoted(view: &ExpressionView) -> bool {
+pub(crate) fn is_quasiquoted(view: &ExpressionView) -> bool {
     view.reader_prefixes.contains(&ReaderPrefix::Quasiquote)
         || view
             .text
@@ -731,7 +765,7 @@ fn is_quasiquoted(view: &ExpressionView) -> bool {
             .is_some_and(|text| text.starts_with('`'))
 }
 
-fn walk(view: &ExpressionView, visit: &mut impl FnMut(&ExpressionView)) {
+pub(crate) fn walk(view: &ExpressionView, visit: &mut impl FnMut(&ExpressionView)) {
     visit(view);
     for child in &view.children {
         walk(child, visit);

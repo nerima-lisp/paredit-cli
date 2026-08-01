@@ -303,3 +303,46 @@ fn cli_every_lisp_analysis_report_names_itself_in_its_output() {
             )));
     }
 }
+
+/// `macro-variable-capture` is the one hygiene risk `fix apply` can repair:
+/// it binds the captured name to `(gensym)` outside the template and
+/// unquotes every bare reference to it still inside, so the expansion still
+/// reads and writes the same fresh symbol.
+#[test]
+fn cli_fix_apply_rewrites_a_variable_capture_via_gensym() {
+    // Named to avoid the substring this test checks for: `fresh_temp_dir`
+    // embeds its argument in the directory path, which then shows up in the
+    // JSON under `path` and would make a naive `contains("variable-capture")`
+    // check on the whole report pass for the wrong reason.
+    let dir = fresh_temp_dir("fix-macro-gensym-rewrite");
+    let file = dir.join("m.lisp");
+    fs::write(
+        &file,
+        "(defmacro m (form) `(let ((result ,form)) (list result)))\n",
+    )
+    .expect("write fixture");
+
+    paredit()
+        .args(["fix", "apply", "--rule", "macro-variable-capture"])
+        .arg(&dir)
+        .assert()
+        .success();
+
+    let rewritten = fs::read_to_string(&file).expect("read back");
+    assert!(rewritten.contains("(gensym)"), "{rewritten}");
+    assert!(rewritten.contains(",result"), "{rewritten}");
+    // A bare, no-longer-captured `result` must not remain in the template.
+    assert!(!rewritten.contains("(list result)"), "{rewritten}");
+
+    let report = paredit()
+        .args(["inspect", "macro-hygiene", "--output", "json"])
+        .arg(&file)
+        .output()
+        .expect("run inspect macro-hygiene on the rewritten file");
+    assert!(report.status.success());
+    let stdout = String::from_utf8_lossy(&report.stdout);
+    assert!(
+        !stdout.contains("\"risk\": \"variable-capture\""),
+        "the rewrite must leave no variable-capture finding: {stdout}"
+    );
+}

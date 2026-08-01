@@ -177,7 +177,7 @@ fn every_workspace_member_declares_the_shared_lints() {
 ///
 /// Section 11.5.1: a module that *enumerates or aggregates several features*
 /// can live neither in core (which may not name a feature) nor in any one
-/// feature (which would have to name its siblings). `REGISTRY` naming all 169
+/// feature (which would have to name its siblings). `REGISTRY` naming all 170
 /// lint rules is the canonical case: every rule depends on the engine, so a
 /// registry inside the engine would be a cycle.
 const COMPOSITION_ROOT: &[&str] = &[

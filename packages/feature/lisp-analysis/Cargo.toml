@@ -12,6 +12,7 @@ repository.workspace = true
 [dependencies]
 paredit-core-syntax = { path = "../../core/syntax" }
 paredit-core-cli = { path = "../../core/cli" }
+paredit-core-lint-engine = { path = "../../core/lint-engine" }
 clap = { workspace = true }
 serde_json = { workspace = true }
 
