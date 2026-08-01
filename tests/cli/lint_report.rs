@@ -2796,6 +2796,92 @@ fn cli_lint_a_custom_finding_trips_the_severity_gate() {
         .failure();
 }
 
+// --- FR-E16: `--deny`/`--warn`/`--rule`/`--exclude` — what `lint.deny` /
+// `lint.warn` / `lint.enable` / `lint.disable` become on the command line —
+// also recognise a loaded custom rule by name, not just the shipped
+// catalogue. ---
+
+#[test]
+fn cli_lint_deny_promotes_a_loaded_custom_rule_to_error() {
+    let rules = rule_dir(
+        "lint-custom-deny-promote",
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-deny-promote-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+
+    // The custom rule ships at warning severity by default.
+    let plain = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(plain["findings"][0]["severity"], "warning");
+
+    // `--deny my-custom-rule` promotes it, and that is what turns
+    // `--fail-on error` into a failing exit code.
+    let denied = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--deny", "my-custom-rule", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(denied["findings"][0]["severity"], "error");
+
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--deny", "my-custom-rule", "--fail-on", "error"])
+        .arg(&file)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn cli_lint_exclude_stops_a_loaded_custom_rule_from_being_reported() {
+    let rules = rule_dir(
+        "lint-custom-exclude",
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-exclude-src");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--custom-rules"])
+            .arg(&rules)
+            .args(["--exclude", "my-custom-rule", "--output", "json"])
+            .arg(&file)
+            .assert(),
+    );
+    assert_eq!(value["finding_count"], 0);
+}
+
+/// A name that is neither shipped nor loaded is still rejected — loading a
+/// custom ruleset widens what `--deny` accepts, it does not turn the check
+/// off.
+#[test]
+fn cli_lint_deny_still_rejects_an_unrelated_unknown_name_with_custom_rules_loaded() {
+    let rules = rule_dir(
+        "lint-custom-deny-unknown",
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--custom-rules"])
+        .arg(&rules)
+        .args(["--list-rules", "--deny", "not-a-real-rule"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown lint rule"));
+}
+
 #[test]
 fn cli_lint_deprecate_reports_any_call_to_the_named_operator() {
     let rules = rule_dir(
@@ -2841,10 +2927,63 @@ fn cli_lint_test_rules_passes_a_correct_rule_set() {
         paredit()
             .args(["inspect", "lint", "--test-rules", "--custom-rules"])
             .arg(&rules)
+            .args(["--output", "text"])
             .assert()
             .success(),
     );
     assert!(value.contains("failure_count\t0"), "{value}");
+}
+
+/// `--test-rules` honors `--output json` the same way a scan does: one JSON
+/// object per [`paredit_feature_lint_custom::TestFailure`] rather than the
+/// text mode's flattened tab-separated line.
+#[test]
+fn cli_lint_test_rules_reports_structured_failures_as_json() {
+    let rules = rule_dir(
+        "lint-custom-harness-json",
+        r#"(defrule no-bare-print :pattern (?op ?x) :message "m")
+           (deftest no-bare-print (:no-match "(princ 1)"))"#,
+    );
+    let stdout = paredit()
+        .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+        .arg(&rules)
+        .args(["--output", "json"])
+        .assert()
+        .code(3)
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+    assert_eq!(value["failure_count"], 1, "{value}");
+    let failure = &value["failures"][0];
+    assert_eq!(failure["rule"], "no-bare-print");
+    assert_eq!(failure["clause"], ":no-match");
+    assert_eq!(failure["input"], "(princ 1)");
+    assert_eq!(failure["expected"], "no finding");
+    assert_eq!(failure["actual"], "1 finding(s)");
+}
+
+/// `--test-rules` still defaults to JSON like every other mode, so a
+/// passing rule set with no `--output` flag reports `failure_count: 0` as a
+/// JSON number, not the text mode's tab-separated line.
+#[test]
+fn cli_lint_test_rules_defaults_to_json_output() {
+    let rules = rule_dir(
+        "lint-custom-harness-json-default",
+        r#"(defrule no-bare-print
+             :pattern (print ?x)
+             :message "m")
+           (deftest no-bare-print (:matches "(print 1)"))"#,
+    );
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+            .arg(&rules)
+            .assert()
+            .success(),
+    );
+    assert_eq!(value["failure_count"], 0, "{value}");
+    assert_eq!(value["custom_rule_count"], 1, "{value}");
 }
 
 #[test]
@@ -2911,7 +3050,324 @@ fn cli_lint_list_rules_shows_the_projects_own_rules() {
     assert_eq!(custom[0]["category"], "naming");
 }
 
+/// `--docs` includes a project's own rules in their own section, with the
+/// `deftest` clauses rendered as worked examples straight from the rule file
+/// — not the shipped catalogue's `RULE_DOCS`, which knows nothing about them.
+#[test]
+fn cli_lint_docs_includes_the_projects_own_rules_with_worked_examples() {
+    let rules = rule_dir(
+        "lint-custom-docs",
+        r#"(defrule no-bare-print
+             :category suspicious
+             :severity error
+             :description "print writes to *standard-output* directly"
+             :pattern (print ?x)
+             :message "use (format t ...) rather than print")
+           (deftest no-bare-print
+             (:matches "(print 1)")
+             (:no-match "(princ 1)"))"#,
+    );
+    let docs = String::from_utf8(
+        paredit()
+            .args(["inspect", "lint", "--docs", "--custom-rules"])
+            .arg(&rules)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .expect("UTF-8 docs");
+
+    assert!(docs.contains("# Custom rules"), "{docs}");
+    assert!(docs.contains("### `no-bare-print`"), "{docs}");
+    assert!(
+        docs.contains("use (format t ...) rather than print"),
+        "{docs}"
+    );
+    // The worked examples come from the rule's own `deftest`, not hand-written
+    // prose.
+    assert!(docs.contains("(print 1)"), "{docs}");
+    assert!(docs.contains("(princ 1)"), "{docs}");
+}
+
+/// A project with no custom rules loaded gets no "Custom rules" section at
+/// all, rather than an empty heading.
+#[test]
+fn cli_lint_docs_omits_the_custom_section_with_no_custom_rules() {
+    let docs = String::from_utf8(
+        paredit()
+            .args(["inspect", "lint", "--docs"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .expect("UTF-8 docs");
+    assert!(!docs.contains("# Custom rules"), "{docs}");
+}
+
+/// `--explain` on a custom rule name no longer hard-errors "unknown lint
+/// rule" — it explains the rule using its own metadata, the same way it
+/// already shows up in `--list-rules`/`--docs`.
+#[test]
+fn cli_lint_explain_reports_a_custom_rules_own_metadata() {
+    let rules = rule_dir(
+        "lint-custom-explain",
+        r#"(defrule no-bare-print
+             :category suspicious
+             :severity error
+             :description "print writes to *standard-output* directly"
+             :pattern (print ?x)
+             :message "use (format t ...) rather than print")"#,
+    );
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--explain",
+                "no-bare-print",
+                "--custom-rules",
+            ])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .assert()
+            .success(),
+    );
+    assert_eq!(value["rule"], "no-bare-print");
+    assert_eq!(value["source"], "custom");
+    assert_eq!(value["category"], "suspicious");
+    assert_eq!(value["severity"], "error");
+    assert_eq!(value["fixable"], false);
+    assert_eq!(
+        value["description"],
+        "print writes to *standard-output* directly"
+    );
+    assert_eq!(value["message"], "use (format t ...) rather than print");
+    // No `doc_url` — a custom rule has none, and it should be omitted rather
+    // than reported as an error or a made-up value.
+    assert!(value.get("doc_url").is_none(), "{value}");
+}
+
+/// `--explain` on a name that is neither a shipped rule nor a loaded custom
+/// one still refuses the same way it always did.
+#[test]
+fn cli_lint_explain_still_rejects_an_unknown_rule_with_custom_rules_loaded() {
+    let rules = rule_dir(
+        "lint-custom-explain-unknown",
+        r#"(defrule no-bare-print :pattern (print ?x) :message "m")"#,
+    );
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--explain",
+            "not-a-real-rule",
+            "--custom-rules",
+        ])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown lint rule"));
+}
+
 /// stdout as a `String`, for the modes whose output is not JSON.
 fn json_stdout_or_text(assert: assert_cmd::assert::Assert) -> String {
     String::from_utf8(assert.get_output().stdout.clone()).expect("UTF-8 stdout")
+}
+
+// ---------------------------------------------------------------------------
+// --suggest-severity (FR-E9)
+// ---------------------------------------------------------------------------
+
+/// A currently-`error` rule firing on every scanned file suggests demoting it
+/// to `warning`, and a currently-`warning` rule that never fires at all
+/// suggests promoting it to `error`. `self-assignment` and `manual-incf` are
+/// each real shipped rules at those severities (see `--list-rules`).
+#[test]
+fn cli_lint_suggest_severity_flags_both_directions() {
+    let dir = fresh_temp_dir("lint-suggest-severity");
+    let a = dir.join("a.lisp");
+    let b = dir.join("b.lisp");
+    // self-assignment (error) fires in both files; manual-incf (warning)
+    // never fires anywhere in this workspace.
+    fs::write(&a, "(defun foo (x) (setf x x) (setf x x))\n").expect("write a.lisp");
+    fs::write(&b, "(defun bar (y) (setf y y))\n").expect("write b.lisp");
+
+    let stdout = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--suggest-severity",
+            "--rule",
+            "self-assignment",
+            "--rule",
+            "manual-incf",
+            "--output",
+            "json",
+        ])
+        .arg(&dir)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let report: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+    assert_eq!(report["files_scanned"], 2);
+    assert_eq!(report["suggestion_count"], 2);
+
+    let suggestions = report["suggestions"].as_array().expect("suggestions array");
+    let by_rule = |rule: &str| {
+        suggestions
+            .iter()
+            .find(|entry| entry["rule"] == rule)
+            .unwrap_or_else(|| panic!("no suggestion for {rule}"))
+    };
+
+    let self_assignment = by_rule("self-assignment");
+    assert_eq!(self_assignment["current_severity"], "error");
+    assert_eq!(self_assignment["suggested_severity"], "warning");
+    assert_eq!(self_assignment["finding_count"], 3);
+    assert_eq!(self_assignment["files_with_finding"], 2);
+    assert_eq!(self_assignment["density_bucket"], "very high");
+
+    let manual_incf = by_rule("manual-incf");
+    assert_eq!(manual_incf["current_severity"], "warning");
+    assert_eq!(manual_incf["suggested_severity"], "error");
+    assert_eq!(manual_incf["finding_count"], 0);
+    assert_eq!(manual_incf["density_bucket"], "never");
+}
+
+/// A rule whose severity already matches its firing rate (an `error` rule
+/// that never fires, the ordinary case for a rule that catches real bugs)
+/// gets no suggestion.
+#[test]
+fn cli_lint_suggest_severity_omits_rules_whose_severity_already_fits() {
+    let dir = fresh_temp_dir("lint-suggest-severity-quiet");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun add (a b) (+ a b))\n").expect("write a.lisp");
+
+    let stdout = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--suggest-severity",
+            "--rule",
+            "self-assignment",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let report: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+    assert_eq!(report["suggestion_count"], 0);
+    assert_eq!(report["suggestions"].as_array().unwrap().len(), 0);
+}
+
+/// The text rendering prints the same prose message documented for
+/// `--suggest-severity`, not just a machine-readable JSON shape.
+#[test]
+fn cli_lint_suggest_severity_text_output_is_prose() {
+    let dir = fresh_temp_dir("lint-suggest-severity-text");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun foo (x) (setf x x))\n").expect("write a.lisp");
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--suggest-severity",
+            "--rule",
+            "self-assignment",
+            "--output",
+            "text",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "rule self-assignment: 1 finding(s) across 1 file(s) (very high density) -- consider Warning instead of Error",
+        ));
+}
+
+/// **Critical invariant**: `--suggest-severity` is advisory-only. It must
+/// never write `paredit.toml` (byte-identical before and after), and it must
+/// never change the exit code a subsequent, ordinary `inspect lint` run gets —
+/// whether that run passes or fails its own gate.
+#[test]
+fn cli_lint_suggest_severity_never_writes_config_or_changes_gate_exit_code() {
+    let dir = fresh_temp_dir("lint-suggest-severity-invariant");
+    let file = dir.join("a.lisp");
+    // Fires self-assignment (error), which trips --fail-on-finding.
+    fs::write(&file, "(defun foo (x) (setf x x))\n").expect("write a.lisp");
+
+    let config = dir.join("paredit.toml");
+    let config_contents = "[lint]\npreset = \"recommended\"\n";
+    fs::write(&config, config_contents).expect("write paredit.toml");
+    let config_before = fs::read(&config).expect("read paredit.toml before");
+
+    // A normal run's gate outcome, taken before --suggest-severity ever runs.
+    let exit_code_before = paredit()
+        .args(["inspect", "lint", "--fail-on-finding"])
+        .arg(&file)
+        .assert()
+        .code(3)
+        .get_output()
+        .status
+        .code();
+
+    // --suggest-severity itself must exit 0 regardless of what it finds, and
+    // must not touch paredit.toml.
+    paredit()
+        .args(["inspect", "lint", "--suggest-severity", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    let config_after = fs::read(&config).expect("read paredit.toml after");
+    assert_eq!(
+        config_before, config_after,
+        "--suggest-severity must never mutate paredit.toml"
+    );
+
+    // The same ordinary run, after --suggest-severity, must trip the same
+    // gate the same way.
+    let exit_code_after = paredit()
+        .args(["inspect", "lint", "--fail-on-finding"])
+        .arg(&file)
+        .assert()
+        .code(3)
+        .get_output()
+        .status
+        .code();
+
+    assert_eq!(
+        exit_code_before, exit_code_after,
+        "--suggest-severity must not change a later ordinary run's exit code"
+    );
+}
+
+/// `--suggest-severity` is mutually exclusive with `--stats`, matching the
+/// other single-purpose report modes on this command (`--fix`, `--sarif`,
+/// `--github`, `--list-rules`).
+#[test]
+fn cli_lint_suggest_severity_conflicts_with_stats() {
+    let dir = fresh_temp_dir("lint-suggest-severity-conflict");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list '5)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--suggest-severity", "--stats"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .code(2);
 }

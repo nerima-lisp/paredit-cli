@@ -1,5 +1,5 @@
-//! Terminal color, gated by `--color`/`NO_COLOR`/`CLICOLOR_FORCE` and an
-//! isatty check.
+//! Terminal color, gated by `--color`/`NO_COLOR`/`TERM=dumb`/
+//! `CLICOLOR_FORCE`/`FORCE_COLOR` and an isatty check.
 //!
 //! Every text renderer in this tool already emits plain, script-friendly rows
 //! (tab-separated fields, unified diffs); color is a purely cosmetic layer
@@ -24,8 +24,9 @@ use clap::ValueEnum;
 /// force it on, or force it off.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
 pub enum ColorMode {
-    /// Color if and only if the destination stream is a terminal, `NO_COLOR`
-    /// is unset, and `CLICOLOR_FORCE` has not already decided the question.
+    /// Color if and only if the destination stream is a terminal, neither
+    /// `NO_COLOR` nor `TERM=dumb` has forced it off, and `CLICOLOR_FORCE`/
+    /// `FORCE_COLOR` has not already forced it on.
     #[default]
     Auto,
     Always,
@@ -66,15 +67,36 @@ fn force_requested() -> bool {
     std::env::var_os("CLICOLOR_FORCE").is_some_and(|value| value != "0")
 }
 
+/// `TERM=dumb` is a terminal-capability signal, not a color preference: it
+/// means the terminal has no formatting capability at all. Checked alongside
+/// `no_color_requested()`, at the same "force off" tier, because both
+/// convey "cannot/must not use color" and both outrank `CLICOLOR_FORCE`/
+/// `FORCE_COLOR` below — a deliberate choice, not the only convention in the
+/// wild: some ecosystems (e.g. chalk/`supports-color`) let an explicit
+/// `FORCE_COLOR` win over `TERM=dumb`. This tool keeps `TERM=dumb` and
+/// `NO_COLOR` as the two signals nothing else overrides, matching how
+/// `NO_COLOR` already outranked `CLICOLOR_FORCE` here before `FORCE_COLOR`
+/// existed.
+fn term_is_dumb() -> bool {
+    std::env::var("TERM") == Ok("dumb".to_string())
+}
+
+/// Non-`"0"` means "color even when not a terminal", the modern
+/// <https://force-color.org> equivalent of `CLICOLOR_FORCE`; checked at the
+/// same precedence tier as that convention.
+fn force_color_requested() -> bool {
+    std::env::var_os("FORCE_COLOR").is_some_and(|value| value != "0")
+}
+
 fn resolve(mode: ColorMode, is_tty: bool) -> bool {
     match mode {
         ColorMode::Never => false,
         ColorMode::Always => true,
         ColorMode::Auto => {
-            if no_color_requested() {
+            if no_color_requested() || term_is_dumb() {
                 false
             } else {
-                is_tty || force_requested()
+                is_tty || force_requested() || force_color_requested()
             }
         }
     }
@@ -212,7 +234,33 @@ pub fn colorize_diff(painter: Painter, diff: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unsafe_code)]
+
+    use std::sync::Mutex;
+
     use super::{ColorMode, Painter, colorize_diff, resolve};
+
+    /// `NO_COLOR`/`TERM`/`CLICOLOR_FORCE`/`FORCE_COLOR` are read from the
+    /// real process environment, and cargo runs this file's tests in
+    /// parallel threads within one process. Every test below that mutates
+    /// one of those variables — or that relies on the environment being
+    /// clean of them, like `auto_follows_the_terminal` — takes this lock
+    /// first, so they never observe each other's in-flight state.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Removes every env var `resolve()`'s `Auto` arm consults, so a test
+    /// starts from a known-clean slate regardless of what a previous test
+    /// (or the ambient shell) left behind.
+    fn clear_color_env() {
+        // SAFETY: serialized by `ENV_LOCK`, held by every caller of this
+        // helper for the duration of its test.
+        unsafe {
+            std::env::remove_var("NO_COLOR");
+            std::env::remove_var("TERM");
+            std::env::remove_var("CLICOLOR_FORCE");
+            std::env::remove_var("FORCE_COLOR");
+        }
+    }
 
     #[test]
     fn never_is_off_even_on_a_terminal() {
@@ -226,8 +274,83 @@ mod tests {
 
     #[test]
     fn auto_follows_the_terminal() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        clear_color_env();
+
         assert!(resolve(ColorMode::Auto, true));
         assert!(!resolve(ColorMode::Auto, false));
+    }
+
+    #[test]
+    fn term_dumb_forces_auto_off_even_on_a_terminal() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        clear_color_env();
+        // SAFETY: serialized by `ENV_LOCK`.
+        unsafe {
+            std::env::set_var("TERM", "dumb");
+        }
+
+        assert!(!resolve(ColorMode::Auto, true));
+
+        clear_color_env();
+    }
+
+    #[test]
+    fn term_dumb_wins_over_clicolor_force_and_force_color() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        clear_color_env();
+        // SAFETY: serialized by `ENV_LOCK`.
+        unsafe {
+            std::env::set_var("TERM", "dumb");
+            std::env::set_var("CLICOLOR_FORCE", "1");
+            std::env::set_var("FORCE_COLOR", "1");
+        }
+
+        assert!(!resolve(ColorMode::Auto, false));
+
+        clear_color_env();
+    }
+
+    #[test]
+    fn no_color_still_wins_over_force_color() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        clear_color_env();
+        // SAFETY: serialized by `ENV_LOCK`.
+        unsafe {
+            std::env::set_var("NO_COLOR", "1");
+            std::env::set_var("FORCE_COLOR", "1");
+        }
+
+        assert!(!resolve(ColorMode::Auto, true));
+
+        clear_color_env();
+    }
+
+    #[test]
+    fn force_color_behaves_like_clicolor_force() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        clear_color_env();
+        // SAFETY: serialized by `ENV_LOCK`.
+        unsafe {
+            std::env::set_var("FORCE_COLOR", "1");
+        }
+
+        assert!(
+            resolve(ColorMode::Auto, false),
+            "a non-\"0\" FORCE_COLOR forces color on, even off a terminal"
+        );
+
+        // SAFETY: serialized by `ENV_LOCK`.
+        unsafe {
+            std::env::set_var("FORCE_COLOR", "0");
+        }
+
+        assert!(
+            !resolve(ColorMode::Auto, false),
+            "FORCE_COLOR=0 is not a force request, matching CLICOLOR_FORCE=0"
+        );
+
+        clear_color_env();
     }
 
     #[test]

@@ -151,21 +151,21 @@ CL では unresolved call を保守的に「副作用あり」とみなしてい
 
 ## C. 新しい分析カテゴリ（22 件）
 
-`inspect` の既存 228 種は「論理バグ」「重複」「未使用」「型」「効果」に集中している。
+`inspect` の既存 231 種は「論理バグ」「重複」「未使用」「型」「効果」に集中している。
 まだ触れていない軸。
 
 | # | 候補 |
 | --- | --- |
 | C1 | シークレットスキャン — `defparameter *api-key* "sk-..."` のような埋め込み秘密情報の検出 |
-| C2 | ライセンスヘッダの存在・整合チェック |
+| C2 | ~~ライセンスヘッダの存在・整合チェック~~ — **実装済み**: `inspect license-headers`（`packages/feature/project-inventory`、既存の `inspect licenses` とは別軸） |
 | C3 | ドキュメント文字列カバレッジ（既存の `generate docstring` は生成側、カバレッジ計測側が無い） |
 | C4 | テストとプロダクションコードの対応（`inspect test-map` は既存 — 未テスト関数のリスク順ランキングが無いなら追加） |
 | C5 | Quicklisp/ASDF 依存の既知脆弱性アドバイザリ照合 |
-| C6 | シンボルの export/import 一貫性（`defpackage` の `:export` と実際の外部参照の乖離） |
-| C7 | 循環依存の検出（パッケージ間・ファイル間の import グラフの閉路） |
+| C6 | ~~シンボルの export/import 一貫性~~ — **実装済み**: `inspect api-surface`/`api-diff`/`unused-exports`/`duplicate-exports`/`package-boundaries` |
+| C7 | ~~循環依存の検出~~ — **実装済み**: `inspect package-cycles`/`call-cycles`/`system-cycles`/`class-cycles`/`struct-cycles`（5コマンドに分かれている） |
 | C8 | コメントアウトされたコードの検出・削除提案（`;; (old-code ...)` パターン） |
-| C9 | 数値リテラルのマジックナンバー検出・`defconstant` への抽出提案 |
-| C10 | 命名規則の一貫性検査（`*special*` 記法、`-p`/`p` 述語サフィックス等の方言慣習違反） |
+| C9 | ~~数値リテラルのマジックナンバー検出・`defconstant` への抽出提案~~ — **実装済み**: `inspect magic-numbers`（`packages/feature/semantic-report`） |
+| C10 | ~~命名規則の一貫性検査~~ — **実装済み**: `inspect naming`（レポート）と lint ルール `definition-naming` の両方 |
 | C11 | 巨大 `let`/`cond`/`case` の分割提案（既存 `debt-score`/`hotspots` の一段掘り下げ） |
 | C12 | 副作用を持つトップレベルフォームの実行順序依存性検出（load 順が結果を変える箇所） |
 | C13 | condition/error クラス階層の整合性（`define-condition` の継承関係の妥当性） |
@@ -174,10 +174,10 @@ CL では unresolved call を保守的に「副作用あり」とみなしてい
 | C16 | 同一パッケージ内でのシンボル衝突・シャドーイング（内側の束縛が外側の関数名を隠す等）の検出 |
 | C17 | 一度も再代入されない `defparameter`/`defvar` の「実質定数」検出（`defconstant` 化提案とセット） |
 | C18 | トップレベルフォームの実行順序に依存しない「宣言的」な書き方への準拠度スコア |
-| C19 | `handler-case`/`ignore-errors` が握りつぶすエラー型の広さを検出 — `(error () ...)` のような包括捕捉の危険度スコア |
+| C19 | ~~`handler-case`/`ignore-errors` が握りつぶすエラー型の広さを検出~~ — **実装済み**: lint ルール `handler-case-swallows-error`（`packages/feature/lint-safety`） |
 | C20 | 再帰関数の末尾呼び出し位置の検出と、TCO が保証される方言での最適化可能性の明示 |
-| C21 | `defpackage` の `:use` によるシンボル空間の暗黙的な広がり（名前衝突リスク）の可視化 |
-| C22 | 動的束縛（`special` 変数）のスレッドセーフティ観点でのリスク検出 |
+| C21 | ~~`defpackage` の `:use` によるシンボル空間の暗黙的な広がり（名前衝突リスク）の可視化~~ — **実装済み**: `inspect use-widening`（`packages/feature/package`） |
+| C22 | ~~動的束縛（`special` 変数）のスレッドセーフティ観点でのリスク検出~~ — **実装済み**: lint ルール `global-mutation-in-function`（`packages/feature/lint-safety`） |
 
 ### 深掘り: C4 — 未テスト関数のリスク順ランキング
 

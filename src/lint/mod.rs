@@ -92,20 +92,25 @@ pub fn collect_lint_pass(
     )
 }
 
-/// The rules `filter` selects, over the shipped set.
+/// The rules `filter` selects, over the shipped set — widened by
+/// `custom_rules`, the names a project's own loaded `defrule` files
+/// contributed to this run.
 pub fn resolve_active_rules(
     filter: &RuleFilter<'_>,
+    custom_rules: &[&'static str],
 ) -> std::result::Result<Vec<&'static str>, RuleSelectionError> {
-    policy::resolve_active_rules(CATALOG, filter)
+    policy::resolve_active_rules(CATALOG, filter, custom_rules)
 }
 
-/// Applies one `--deny`/`--warn` selector against the shipped set.
+/// Applies one `--deny`/`--warn` selector against the shipped set, or against
+/// `custom_rules` when the selector names one of them instead.
 pub fn apply_severity_override(
     overrides: &mut SeverityOverrides,
     selector: &str,
     severity: Severity,
+    custom_rules: &[&'static str],
 ) -> std::result::Result<(), RuleSelectionError> {
-    overrides.apply(CATALOG, selector, severity)
+    overrides.apply(CATALOG, selector, severity, custom_rules)
 }
 
 /// The severity `rule` is reported at under `overrides`, over the shipped set.

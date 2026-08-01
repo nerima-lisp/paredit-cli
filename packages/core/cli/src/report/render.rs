@@ -5,7 +5,6 @@ use crate::error::{CliError, CliResult};
 use crate::runtime::Verbosity;
 use crate::shared::terminal_safe;
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
 use std::io::IsTerminal;
 
 use serde_json::{Value, json};
@@ -184,7 +183,7 @@ fn aligned_table_lines(rows: &[Vec<String>], terminal_width: usize) -> Vec<Strin
     let mut widths = vec![0usize; column_count];
     for row in rows {
         for (index, cell) in row.iter().enumerate() {
-            widths[index] = widths[index].max(cell.chars().count());
+            widths[index] = widths[index].max(display_width(cell));
         }
     }
 
@@ -199,8 +198,16 @@ fn aligned_table_lines(rows: &[Vec<String>], terminal_width: usize) -> Vec<Strin
                 if index == last {
                     line.push_str(cell);
                 } else {
-                    write!(line, "{cell:<width$}", width = widths[index])
-                        .expect("writing to a String is infallible");
+                    // `{cell:<width$}` pads by `chars().count()`, which is
+                    // exactly the miscount `display_width` exists to fix, so
+                    // the padding is spelled out by hand: the cell itself,
+                    // then however many single-column spaces make up the
+                    // difference between its display width and the column's.
+                    line.push_str(cell);
+                    let pad = widths[index].saturating_sub(display_width(cell));
+                    for _ in 0..pad {
+                        line.push(' ');
+                    }
                 }
             }
             clip_to_width(&line, terminal_width)
@@ -214,12 +221,62 @@ fn aligned_table_lines(rows: &[Vec<String>], terminal_width: usize) -> Vec<Strin
 /// accounted for, so an unreasonably narrow terminal gets the unclipped line
 /// rather than something even less readable.
 fn clip_to_width(line: &str, width: usize) -> String {
-    let char_count = line.chars().count();
-    if char_count <= width || width < 4 {
+    if display_width(line) <= width || width < 4 {
         return line.to_owned();
     }
-    let kept: String = line.chars().take(width - 1).collect();
+    // Walk whole `char`s and stop before the running display width would
+    // exceed the budget the `…` marker leaves behind (`width - 1`). Deciding
+    // per whole `char` rather than per byte or per fixed char count means a
+    // wide character is either kept in full or dropped in full — it is never
+    // possible to include half of one.
+    let budget = width - 1;
+    let mut kept = String::new();
+    let mut used = 0usize;
+    for ch in line.chars() {
+        let ch_width = display_width_of_char(ch);
+        if used + ch_width > budget {
+            break;
+        }
+        used += ch_width;
+        kept.push(ch);
+    }
     format!("{kept}…")
+}
+
+/// The terminal display width of `s`: 2 columns for a character in the
+/// common East Asian Wide/Fullwidth ranges, 1 for everything else.
+///
+/// This is a hand-rolled subset of UAX #11, not a full implementation — this
+/// workspace has no terminal-width crate dependency by convention (see
+/// `color.rs`'s hand-rolled SGR strings and `terminal.rs`'s hand-rolled ioctl
+/// parsing), and the ranges below cover the scripts this tool's own
+/// `Language::Japanese` runtime option and its diagnostic text actually use:
+/// CJK Unified Ideographs, Hiragana, Katakana, Hangul Syllables, Fullwidth
+/// Forms, and CJK punctuation/symbols.
+///
+/// `pub` rather than private to this module: `src/presentation/tui/render.rs`
+/// (a different crate) has the identical `.chars().count()`-based miscount in
+/// its own `clip()`, and already depends on this crate for
+/// `paredit_core_cli::terminal::width`. Fixing that sibling is out of scope
+/// here — `paredit tui`'s accessibility is tracked separately as H7 in
+/// `docs/src/project/feature-candidates.md` — but there is no reason to make
+/// the fix unreachable for whoever picks that up.
+#[must_use]
+pub fn display_width(s: &str) -> usize {
+    s.chars().map(display_width_of_char).sum()
+}
+
+/// The display width of a single `char`; see [`display_width`].
+const fn display_width_of_char(ch: char) -> usize {
+    let is_wide = matches!(ch,
+        '\u{3000}'..='\u{303F}' // CJK Symbols and Punctuation
+        | '\u{3040}'..='\u{309F}' // Hiragana
+        | '\u{30A0}'..='\u{30FF}' // Katakana
+        | '\u{4E00}'..='\u{9FFF}' // CJK Unified Ideographs
+        | '\u{AC00}'..='\u{D7A3}' // Hangul Syllables
+        | '\u{FF00}'..='\u{FFEF}' // Halfwidth and Fullwidth Forms
+    );
+    if is_wide { 2 } else { 1 }
 }
 
 fn print_json<F: Finding>(
@@ -476,5 +533,81 @@ mod tests {
         // Nothing useful is left of a line clipped to fewer than four
         // columns, so an absurdly narrow terminal gets the line as-is.
         assert_eq!(clip_to_width("still too long", 3), "still too long");
+    }
+
+    #[test]
+    fn display_width_of_ascii_matches_char_count() {
+        assert_eq!(display_width("short"), "short".chars().count());
+        assert_eq!(display_width(""), 0);
+        assert_eq!(display_width("hi there!"), "hi there!".chars().count());
+    }
+
+    #[test]
+    fn display_width_counts_japanese_characters_as_two_columns_each() {
+        // "日本語" is three characters, each occupying two terminal columns.
+        assert_eq!(display_width("日本語"), 6);
+        assert_ne!(display_width("日本語"), "日本語".chars().count());
+    }
+
+    #[test]
+    fn aligned_table_lines_aligns_a_mix_of_ascii_and_japanese_rows() {
+        let rows = vec![
+            vec!["ascii".to_owned(), "a.lisp".to_owned(), "hi".to_owned()],
+            vec!["日本語".to_owned(), "b.lisp".to_owned(), "yo".to_owned()],
+        ];
+        let lines = aligned_table_lines(&rows, 80);
+        assert_eq!(lines.len(), 2);
+        // Both first-column cells are padded to the same *display* width
+        // (6 columns: "ascii" is 5 chars/5 columns, "日本語" is 3
+        // chars/6 columns), plus the two-space separator, so the second
+        // column starts at the same screen position on both lines.
+        assert_eq!(lines[0], "ascii   a.lisp  hi");
+        assert_eq!(lines[1], "日本語  b.lisp  yo");
+    }
+
+    #[test]
+    fn clip_to_width_truncates_japanese_text_without_splitting_a_character() {
+        // Ten 2-column characters (20 columns of display width) clipped to a
+        // width of 11 leaves room for 5 whole characters (10 columns) plus
+        // the `…` marker; a half-rendered character must never appear.
+        let clipped = clip_to_width("日本語日本語日本語日", 11);
+        assert!(clipped.ends_with('…'));
+        assert!(display_width(&clipped) <= 11);
+        // Every char in the clipped output round-trips through `char`
+        // parsing untouched, i.e. nothing was split at the byte level.
+        assert!(
+            clipped
+                .chars()
+                .all(|ch| ch.len_utf8() == ch.to_string().len())
+        );
+    }
+
+    #[test]
+    fn clip_to_width_handles_an_all_wide_char_string_right_at_the_boundary() {
+        // "日本語" is 3 characters at 2 columns each: display width exactly
+        // 6. Landing exactly on the width threshold (not comfortably under
+        // or over it, unlike the 20-vs-11 margin above) is the case an
+        // off-by-one in the `char`-vs-column budget math would most likely
+        // miss.
+        let exact = "日本語";
+        assert_eq!(display_width(exact), 6);
+        assert_eq!(
+            clip_to_width(exact, 6),
+            exact,
+            "a string whose display width exactly equals the target width \
+             must be returned unclipped, not truncated for being one column \
+             over"
+        );
+
+        // One more 2-column character pushes display width to 8, one column
+        // past the same width-6 budget used above. Losing a single column of
+        // budget cannot be paid for by dropping half a wide character, so
+        // the whole trailing character must go, not just enough of it to fit
+        // exactly.
+        let one_over = "日本語日";
+        assert_eq!(display_width(one_over), 8);
+        let clipped = clip_to_width(one_over, 6);
+        assert_eq!(clipped, "日本…");
+        assert!(display_width(&clipped) <= 6);
     }
 }

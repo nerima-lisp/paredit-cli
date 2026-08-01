@@ -1,6 +1,6 @@
 # paredit-feature-semantic-report
 
-Five reports that print what `paredit-core-semantics` already proves.
+Six reports that print what `paredit-core-semantics` already proves.
 
 ## Responsibilities
 
@@ -10,7 +10,7 @@ report the *conclusion* (`this divisor is zero`) and never the evidence. An
 agent that wants to know whether a rewrite is safe has no way to ask "what do
 you actually know about this expression?".
 
-These five reports are that question, one table at a time:
+These six reports are that question, one table at a time:
 
 - **`types`** prints the type table: every binding and expression the layer
   proved a type for, plus the declarations (`declare`, `the`, `declaim`) that
@@ -29,6 +29,11 @@ These five reports are that question, one table at a time:
   looking for the effect sources a Common Lisp body can reach. Many refactor
   safety questions ("may I hoist this?", "may I fold these duplicates?")
   reduce to this one, which is why it is here rather than inside each of them.
+- **`magic-numbers`** prints every numeric literal inside a function or method
+  body that has no name of its own — everything except a small idiomatic set
+  (`0`, `1`, `-1`, `2`) and a `defconstant`/`defparameter`/`defvar`'s own
+  direct value, which already has the name this report would otherwise
+  propose giving it.
 
 ## Boundaries
 

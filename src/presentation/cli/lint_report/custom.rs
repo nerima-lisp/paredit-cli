@@ -30,14 +30,16 @@ use paredit_core_cli::CliResult;
 use crate::lint::report::{
     RULES, Severity, SeverityOverrides, overridden_rule_severity, rule_category, rule_is_fixable,
 };
-use paredit_feature_lint_custom::{CustomFinding, Ruleset, parse_ruleset, run, run_tests};
+use paredit_feature_lint_custom::{
+    CustomFinding, CustomRule, Ruleset, TestFailure, parse_ruleset, run, run_tests,
+};
 
 /// Where a project keeps its own rules when it does not say otherwise.
 pub(super) const DEFAULT_RULE_DIRECTORY: &str = ".paredit/rules";
 
 /// A loaded rule set, with each rule's name interned.
 #[derive(Debug, Default)]
-pub(super) struct CustomRules {
+pub(in crate::presentation::cli) struct CustomRules {
     ruleset: Ruleset,
     /// `name -> (interned name, category, severity, fixable)`.
     meta: BTreeMap<String, CustomMeta>,
@@ -63,14 +65,10 @@ impl CustomRules {
         &self.ruleset
     }
 
-    /// Whether `rule` names one of these rules.
-    #[must_use]
-    pub(super) fn is_rule(&self, rule: &str) -> bool {
-        self.meta.contains_key(rule)
-    }
-
     /// Every rule's interned name, for widening the active list.
-    pub(super) fn names(&self) -> impl Iterator<Item = &'static str> + use<'_> {
+    pub(in crate::presentation::cli) fn names(
+        &self,
+    ) -> impl Iterator<Item = &'static str> + use<'_> {
         self.meta.values().map(|meta| meta.name)
     }
 
@@ -107,10 +105,20 @@ impl CustomRules {
             .collect()
     }
 
+    /// Runs the `deftest` clauses, returning the raw failures.
+    ///
+    /// `--test-rules --output json` renders one JSON object per failure from
+    /// this; [`Self::test`] formats the same failures as the text mode's
+    /// tab-separated line, so the two can never drift apart.
+    #[must_use]
+    pub(super) fn test_failures(&self) -> Vec<TestFailure> {
+        run_tests(&self.ruleset)
+    }
+
     /// Runs the `deftest` clauses, returning one line per failure.
     #[must_use]
     pub(super) fn test(&self) -> Vec<String> {
-        run_tests(&self.ruleset)
+        self.test_failures()
             .into_iter()
             .map(|failure| {
                 format!(
@@ -119,6 +127,14 @@ impl CustomRules {
                 )
             })
             .collect()
+    }
+
+    /// The full custom rule named `name`, for `--explain` and `--docs`, where
+    /// the shipped catalogue's metadata (message, description, note) is
+    /// needed and not just what [`Self::catalog`] projects.
+    #[must_use]
+    pub(super) fn rule(&self, name: &str) -> Option<&CustomRule> {
+        self.ruleset.rules.iter().find(|rule| rule.name == name)
     }
 }
 
@@ -165,7 +181,7 @@ fn read_directory(directory: &Path) -> CliResult<Ruleset> {
 /// the run is otherwise unchanged. A rule file that fails to load fails the
 /// run: a project that has written a rule and sees a green build has been told
 /// the rule passed.
-pub(super) fn load(explicit: Option<&Path>) -> CliResult<CustomRules> {
+pub(in crate::presentation::cli) fn load(explicit: Option<&Path>) -> CliResult<CustomRules> {
     let directory = match explicit {
         Some(path) => path.to_path_buf(),
         None => {
@@ -226,12 +242,13 @@ impl<'a> RuleMetaResolver<'a> {
 
     #[must_use]
     pub(super) fn severity(&self, rule: &str) -> Severity {
-        // A `--deny` naming a custom rule is rejected at argument-parsing time
-        // (the selector is checked against the shipped catalogue), so a custom
-        // rule's own severity is the answer here.
+        // A `--deny`/`--warn` (or `lint.deny`/`lint.warn`) naming a custom rule
+        // is resolved against the run's overrides the same way a shipped rule
+        // is: the override wins when the run recorded one, and the rule's own
+        // declared severity is the answer only when it did not.
         self.custom.meta.get(rule).map_or_else(
             || overridden_rule_severity(self.overrides, rule),
-            |meta| meta.severity,
+            |meta| self.overrides.override_of(rule).unwrap_or(meta.severity),
         )
     }
 
@@ -313,10 +330,38 @@ mod tests {
             &mut overrides,
             "redundant-quote",
             Severity::Error,
+            &[],
         )
         .expect("known rule");
         let resolver = RuleMetaResolver::new(&overrides, &custom);
         assert_eq!(resolver.severity("redundant-quote"), Severity::Error);
+    }
+
+    /// FR-E16: `lint.deny`/`--deny` naming a *custom* rule re-ranks it through
+    /// the resolver exactly the way it re-ranks a shipped one — the whole
+    /// point of extending the four `lint.*` selection keys to recognise a
+    /// loaded ruleset's own names.
+    #[test]
+    fn a_deny_re_ranks_a_custom_rule_through_the_resolver_too() {
+        let custom = loaded(
+            r#"(defrule my-custom-rule :severity warning
+                 :pattern (print ?x) :message "no print")"#,
+        );
+        assert_eq!(
+            RuleMetaResolver::new(&SeverityOverrides::new(), &custom).severity("my-custom-rule"),
+            Severity::Warning
+        );
+
+        let mut overrides = SeverityOverrides::new();
+        crate::lint::report::apply_severity_override(
+            &mut overrides,
+            "my-custom-rule",
+            Severity::Error,
+            &["my-custom-rule"],
+        )
+        .expect("known custom rule");
+        let resolver = RuleMetaResolver::new(&overrides, &custom);
+        assert_eq!(resolver.severity("my-custom-rule"), Severity::Error);
     }
 
     #[test]

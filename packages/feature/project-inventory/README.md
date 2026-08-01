@@ -1,6 +1,6 @@
 # paredit-feature-project-inventory
 
-Ten reports whose subject is the project, not a form in it.
+Eleven reports whose subject is the project, not a form in it.
 
 ## Responsibilities
 
@@ -26,15 +26,20 @@ Ten reports whose subject is the project, not a form in it.
   What this project depends on that it does not define (an SBOM, in effect),
   what licences those carry, and whether a `:serial t` claim matches the
   dependencies the files actually have.
+- **`license-headers`.** Whether each file opens with a comment block that
+  reads as a license notice, and, once every file in the analyzed set has been
+  read, whether that text agrees with what the rest of the set carries. A
+  `LICENSE` at the repository root says nothing about a file copied out of the
+  tree or read in isolation — the header has to live in the file itself.
 - **`blame`.** Last author and date per definition, so any other report's
   finding can be routed to someone.
 
 ## Boundaries
 
 The API, ASDF, and package reports are Common Lisp only and say so.
-`symbol-index`, `test-map`, `unreachable-expressions`, and `blame` are
-dialect-neutral: they read definition shapes, control operators, and git, none
-of which is Common Lisp specific.
+`symbol-index`, `test-map`, `unreachable-expressions`, `license-headers`, and
+`blame` are dialect-neutral: they read definition shapes, control operators,
+comment syntax, and git, none of which is Common Lisp specific.
 
 `blame` shells out to `git log`, and degrades the same way `hotspots` does —
 it reports that git could not answer rather than reporting an empty author.

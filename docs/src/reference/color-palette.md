@@ -7,7 +7,9 @@ of these hues, a reader on a monochrome terminal, and a `grep` in a pipeline
 all see the same information.
 
 Whether color is emitted at all is decided by `--color`, `NO_COLOR`,
-`CLICOLOR_FORCE`, and an isatty check on the destination stream; see
+`TERM=dumb`, `CLICOLOR_FORCE`, `FORCE_COLOR`, and an isatty check on the
+destination stream (`NO_COLOR`/`TERM=dumb` win over `CLICOLOR_FORCE`/
+`FORCE_COLOR` when both are present); see
 [`--color` in the global options](api.md#global-options). This page is about
 *which* colors may be emitted once that decision says yes.
 
@@ -77,3 +79,31 @@ to be answered for it.
 
 The same test checks that this page still lists every code and the function
 that emits it, so the table cannot drift from the source.
+
+## HTML report color
+
+`--output html` is a separate rendering surface from the terminal: it is CSS,
+not SGR escapes, and it is styled by the `HTML_STYLE` constant in
+`packages/core/cli/src/report/interop.rs`. It is a small, fixed palette in its
+own right:
+
+| Hex | CSS class | Used for |
+| --- | --- | --- |
+| `#D55E00` | `.gate.fail` | the gate line when `flat.gate_passed` is false |
+| `#0072B2` | `.gate.pass` | the gate line when `flat.gate_passed` is true |
+
+The same rule as the terminal palette applies here: **color is never the only
+signal**. The gate line always prints the literal word `passed` or `failed`
+next to the colored text, so the distinction survives grayscale printing,
+`prefers-contrast`, or a reader who cannot separate the two hues.
+
+These two hex values are not the terminal palette's red/green — they are
+drawn from the Okabe-Ito colorblind-safe palette (vermillion and blue)
+instead, because unlike the ANSI codes above, a browser renders a CSS hex
+value exactly as pinned, with no user theme remapping it. Red/green is the
+pair that is hardest to tell apart under deuteranopia/protanopia, so this
+surface avoids it where the terminal palette does not need to.
+
+`tests/cli/html_report_palette_contract.rs` reads `interop.rs` as text and
+asserts that `HTML_STYLE` uses exactly these two hex values for `.gate.fail`
+and `.gate.pass`, and that this page documents both.

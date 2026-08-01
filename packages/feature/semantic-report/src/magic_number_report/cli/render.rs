@@ -1,0 +1,17 @@
+use paredit_core_cli::CliResult;
+
+use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
+
+use crate::magic_number_report::usecase::MagicNumberItem;
+use paredit_core_cli::report::render::print_report;
+use paredit_core_cli::report::{FileFindings, ReportPolicy};
+
+pub fn print_magic_number_report(
+    reports: &[FileFindings<MagicNumberItem>],
+    policy: &ReportPolicy,
+    output: ReportFormat,
+    verbosity: Verbosity,
+) -> CliResult<()> {
+    print_report("inspect magic-numbers", reports, policy, output, verbosity)
+}

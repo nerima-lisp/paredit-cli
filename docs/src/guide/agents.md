@@ -30,7 +30,7 @@ paredit mcp --read-only   # …that refuses every command which would write
 The server offers a handful of tools — `paredit_check`, `paredit_outline`,
 `paredit_lint`, `paredit_format`, `paredit_diff`, `paredit_capabilities` — plus
 `paredit_run`, which takes any command's argument vector. **It deliberately does
-not expose one tool per command.** There are 369 of them; that many descriptions
+not expose one tool per command.** There are 372 of them; that many descriptions
 costs thousands of tokens of context before the agent has read a line of code,
 and it makes selection harder rather than easier. The catalog is available as
 the `paredit://capabilities` resource, and `paredit_run` reaches everything in
@@ -93,7 +93,7 @@ Each cell carries one of four statuses:
 `silent` is the one worth reading carefully. Almost every `inspect` command
 exits `0` for every dialect, so a `finding_count` of `0` looks identical
 whether the code is clean or the tool has nothing to say about it. Roughly 155
-of the 369 commands are `silent` outside Common Lisp; treat their output as
+of the 372 commands are `silent` outside Common Lisp; treat their output as
 absent rather than negative.
 
 Each command also reports the `tier` it needs from a dialect — `syntax`
