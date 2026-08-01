@@ -196,7 +196,7 @@ version. The tables are:
 | *(top level)* | `extends` |
 | `[dialect]` | Which dialect to assume, and whether to force it over the extension |
 | `[paths]` | Workspace discovery: exclusions, hidden and generated directories, depth |
-| `[format]` | Indent width, inline width, and block-comment reindenting for `edit format` |
+| `[format]` | Indent width, inline width, block-comment reindenting, trailing-comment alignment, and blank-line normalization for `edit format` |
 | `[lint]` | Preset, rule selection, severity overrides, baseline, gate |
 | `[output]` | Default format, verbosity, token budget, message language |
 

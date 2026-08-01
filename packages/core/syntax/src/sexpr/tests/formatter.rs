@@ -773,6 +773,291 @@ fn formatting_never_drops_comments_and_is_idempotent() {
     );
 }
 
+// --- FR-005: comment-column alignment ---
+
+#[test]
+fn comment_column_off_by_default_uses_a_single_space() {
+    // `with_comment_column` never called: must reproduce the formatter's
+    // original, pre-FR-005 behavior exactly.
+    let input = "(a) ; one\n(bb) ; two";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(Formatter::new(2).format(&tree), "(a) ; one\n\n(bb) ; two\n");
+}
+
+#[test]
+fn comment_column_auto_never_groups_anything_while_blank_lines_stay_at_their_default() {
+    // With `max_blank_lines` unset, `Self::format` always renders exactly one
+    // blank line between top-level forms — the original, preserved behavior
+    // — so no two forms are ever rendered back-to-back. Auto alignment's
+    // runs are defined over back-to-back forms (see
+    // `Formatter::trailing_comment_columns`'s doc comment for why: anything
+    // looser breaks idempotency), so with blank lines left at their default,
+    // every run is exactly one form and every comment keeps its plain
+    // one-space default, even for forms that were adjacent in the source.
+    let input = "(a) ; one\n(bb) ; two";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_comment_column(0).format(&tree),
+        "(a) ; one\n\n(bb) ; two\n",
+        "comment-column alignment needs max_blank_lines set to ever see two \
+         forms rendered back-to-back"
+    );
+}
+
+#[test]
+fn comment_column_auto_aligns_a_run_of_adjacent_commented_forms() {
+    // Both forms carry a trailing comment and, with blank lines capped at 1,
+    // render back-to-back (the source already has none between them): one
+    // run, aligned to one column past the wider of the two, `(bb)` at 4
+    // columns.
+    let input = "(a) ; one\n(bb) ; two";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_comment_column(0)
+            .with_max_blank_lines(1)
+            .format(&tree),
+        "(a)  ; one\n(bb) ; two\n",
+        "both comments must align to column 5, one past `(bb)`'s width"
+    );
+}
+
+#[test]
+fn comment_column_auto_gives_each_run_its_own_independent_alignment() {
+    // Two runs of adjacent commented forms, separated by `(mid)`, which
+    // carries no trailing comment and so breaks the run. Each run must align
+    // to its own widest member, not the document's widest member overall —
+    // otherwise the first (narrower) run would be dragged out to match the
+    // second (wider) one.
+    let input = "(a) ; one\n(bb) ; two\n(mid)\n(ccccccc) ; three\n(d) ; four";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_comment_column(0)
+            .with_max_blank_lines(1)
+            .format(&tree),
+        "(a)  ; one\n(bb) ; two\n(mid)\n(ccccccc) ; three\n(d)       ; four\n",
+        "the first run must align to column 5 (its own widest member, `(bb)`), \
+         not column 10 (the second run's widest member, `(ccccccc)`)"
+    );
+}
+
+#[test]
+fn comment_column_auto_breaks_a_run_on_a_rendered_blank_line() {
+    // Same two commented forms as the basic alignment case, but separated by
+    // a blank line the configured maximum still lets through: that renders
+    // back-to-back forms is exactly what a run requires, and a blank line
+    // between them means they never are, so each keeps its own one-space
+    // default rather than aligning to the pair's shared widest column.
+    let input = "(a) ; one\n\n(bb) ; two";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_comment_column(0)
+            .with_max_blank_lines(1)
+            .format(&tree),
+        "(a) ; one\n\n(bb) ; two\n",
+        "a rendered blank line breaks the run, so neither comment moves"
+    );
+}
+
+#[test]
+fn comment_column_fixed_aligns_every_trailing_comment_uniformly() {
+    // A fixed column is an absolute position: it applies to every trailing
+    // comment in the document, run or no run, blank line or no blank line.
+    let input = "(a) ; one\n\n(bb) ; two";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_comment_column(10).format(&tree),
+        "(a)       ; one\n\n(bb)      ; two\n",
+        "both comments must start at column 10 despite the blank line between them"
+    );
+}
+
+#[test]
+fn comment_column_fixed_falls_back_to_one_space_past_a_form_wider_than_the_column() {
+    // `(abcde)` is already 7 columns wide, past the configured column 3: the
+    // alignment column can only push a comment right, never delete a space
+    // to pull it left onto or past the form's own text.
+    let input = "(abcde) ; note";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_comment_column(3).format(&tree),
+        "(abcde) ; note\n",
+        "a form already past the target column still gets exactly one space"
+    );
+}
+
+#[test]
+fn comment_column_auto_is_idempotent() {
+    // `with_max_blank_lines` alongside `with_comment_column`, both non-default:
+    // exactly the combination `Formatter::trailing_comment_columns`'s doc
+    // comment calls out as the one place FR-005 and FR-006 are not
+    // independent of each other.
+    let input = "(a) ; one\n(bb) ; two\n(mid)\n(ccccccc) ; three\n(d) ; four";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatter = Formatter::new(2)
+        .with_comment_column(0)
+        .with_max_blank_lines(1);
+    let formatted = formatter.format(&tree);
+
+    let reparsed = SyntaxTree::parse(&formatted).expect("formatted output parses again");
+    assert_eq!(
+        formatter.format(&reparsed),
+        formatted,
+        "comment-column alignment must still be idempotent"
+    );
+}
+
+#[test]
+fn comment_column_auto_is_idempotent_with_blank_lines_left_at_their_default() {
+    // The degenerate case of the test above: `max_blank_lines` unset means
+    // every run is a singleton (see
+    // `comment_column_auto_never_groups_anything_while_blank_lines_stay_at_their_default`),
+    // which is trivially stable, but it is still worth locking in given how
+    // easy it would be to reintroduce the raw-source-gap grouping bug this
+    // design specifically avoids.
+    let input = "(a) ; one\n(bb) ; two\n(mid)\n(ccccccc) ; three\n(d) ; four";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatter = Formatter::new(2).with_comment_column(0);
+    let formatted = formatter.format(&tree);
+
+    let reparsed = SyntaxTree::parse(&formatted).expect("formatted output parses again");
+    assert_eq!(
+        formatter.format(&reparsed),
+        formatted,
+        "comment-column alignment must still be idempotent even when every \
+         run degenerates to a single item"
+    );
+}
+
+// --- FR-006: configurable blank-line normalization ---
+
+#[test]
+fn max_blank_lines_unset_collapses_any_source_gap_to_exactly_one_blank_line() {
+    // `with_max_blank_lines` never called: must reproduce the formatter's
+    // original, pre-FR-006 behavior exactly, even when the source has more
+    // than one blank line between forms.
+    let input = "(a)\n\n\n\n(b)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(Formatter::new(2).format(&tree), "(a)\n\n(b)\n");
+}
+
+#[test]
+fn max_blank_lines_preserves_the_source_up_to_the_configured_maximum() {
+    let input = "(a)\n\n\n(b)"; // two blank lines in the source
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_blank_lines(2).format(&tree),
+        "(a)\n\n\n(b)\n",
+        "two blank lines are within the configured maximum, so both are kept"
+    );
+}
+
+#[test]
+fn max_blank_lines_collapses_a_source_gap_wider_than_the_maximum() {
+    let input = "(a)\n\n\n(b)"; // two blank lines in the source
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_blank_lines(1).format(&tree),
+        "(a)\n\n(b)\n",
+        "two blank lines is over the configured maximum of one, so it collapses to one"
+    );
+}
+
+#[test]
+fn max_blank_lines_zero_never_inserts_a_blank_line() {
+    let input = "(a)\n\n\n(b)"; // two blank lines in the source
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_blank_lines(0).format(&tree),
+        "(a)\n(b)\n",
+        "zero means no blank line ever, regardless of what the source had"
+    );
+}
+
+#[test]
+fn max_blank_lines_never_inserts_a_blank_line_the_source_did_not_have() {
+    // The configured maximum is a ceiling, not a target: it must never
+    // manufacture blank lines the source did not already contain.
+    let input = "(a)\n(b)"; // zero blank lines in the source
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_blank_lines(5).format(&tree),
+        "(a)\n(b)\n",
+        "a maximum of five must not inflate a zero-blank-line gap"
+    );
+}
+
+#[test]
+fn max_blank_lines_is_idempotent() {
+    let input = "(a)\n\n\n(b)\n\n(c)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatter = Formatter::new(2).with_max_blank_lines(1);
+    let formatted = formatter.format(&tree);
+
+    let reparsed = SyntaxTree::parse(&formatted).expect("formatted output parses again");
+    assert_eq!(
+        formatter.format(&reparsed),
+        formatted,
+        "blank-line normalization must still be idempotent"
+    );
+}
+
+// --- FR-005/FR-006 interaction: a leading comment must never drift onto the
+// wrong neighboring form when blank lines collapse. ---
+
+#[test]
+fn blank_line_collapse_never_reattaches_a_leading_comment_to_the_form_above_it() {
+    // `; for b` is a leading (own-line) comment of `(b)`, separated from `(a)`
+    // above it by one blank line in the source. Preserving that one blank
+    // line must keep the comment glued to `(b)` — directly above it, with no
+    // blank line of its own — while the configured gap lands *before* the
+    // comment, between it and `(a)`.
+    let input = "(a)\n\n; for b\n(b)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_blank_lines(1).format(&tree),
+        "(a)\n\n; for b\n(b)\n"
+    );
+}
+
+#[test]
+fn blank_line_collapse_to_zero_still_keeps_a_leading_comment_with_its_own_form() {
+    // Same source as above, but every blank line is suppressed. The comment
+    // must still read as belonging to `(b)` — on its own line, immediately
+    // above it — rather than silently becoming a same-line trailing comment
+    // of `(a)` just because the blank line that used to separate them is
+    // gone. Comment attachment is decided once, at parse time, from source
+    // position; it must never depend on how blank lines are later rendered.
+    let input = "(a)\n\n; for b\n(b)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_blank_lines(0).format(&tree),
+        "(a)\n; for b\n(b)\n"
+    );
+}
+
+#[test]
+fn comment_column_and_blank_line_collapse_together_do_not_drift_a_leading_comment() {
+    // FR-005 and FR-006 enabled together, on a document exercising both at
+    // once: `(a)`'s trailing comment must still align only within its own
+    // (single-member) run, and `; for d`, a leading comment of `(d)`
+    // separated from `(cccccc)` by a blank line, must still land directly
+    // above `(d)` even once every blank line is suppressed by
+    // `with_max_blank_lines(0)` — never reattached to `(cccccc)` as if it
+    // were that form's trailing comment.
+    let input = "(a) ; nb\n(cccccc)\n\n; for d\n(d) ; nd";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_comment_column(0)
+            .with_max_blank_lines(0)
+            .format(&tree),
+        "(a) ; nb\n(cccccc)\n; for d\n(d) ; nd\n"
+    );
+}
+
 #[test]
 fn formats_thirty_thousand_nested_lists_without_overflow() {
     const DEPTH: usize = 30_000;

@@ -34,11 +34,19 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
     let diff_stat_only = args.diff_stat;
     let max_width = args.max_width;
     let reindent_block_comments = args.reindent_block_comments;
+    let comment_column = args.comment_column;
+    let max_blank_lines = args.max_blank_lines;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let mut formatter = Formatter::with_dialect(args.indent, dialect)
         .with_reindent_block_comments(reindent_block_comments);
     if let Some(max_width) = max_width {
         formatter = formatter.with_max_width(max_width);
+    }
+    if let Some(comment_column) = comment_column {
+        formatter = formatter.with_comment_column(comment_column);
+    }
+    if let Some(max_blank_lines) = max_blank_lines {
+        formatter = formatter.with_max_blank_lines(max_blank_lines);
     }
     let rendered = formatter.format(&tree);
 
@@ -110,11 +118,19 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
     let indent = args.indent;
     let max_width = args.max_width;
     let reindent_block_comments = args.reindent_block_comments;
+    let comment_column = args.comment_column;
+    let max_blank_lines = args.max_blank_lines;
     let analysis = analyze_files(&files, args.dialect, move |file, dialect, tree, input| {
         let mut formatter = Formatter::with_dialect(indent, dialect)
             .with_reindent_block_comments(reindent_block_comments);
         if let Some(width) = max_width {
             formatter = formatter.with_max_width(width);
+        }
+        if let Some(comment_column) = comment_column {
+            formatter = formatter.with_comment_column(comment_column);
+        }
+        if let Some(max_blank_lines) = max_blank_lines {
+            formatter = formatter.with_max_blank_lines(max_blank_lines);
         }
         let rendered = formatter.format(tree);
         let diff = unified_diff(file, &input.text, &rendered);

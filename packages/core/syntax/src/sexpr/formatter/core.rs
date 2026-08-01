@@ -86,6 +86,99 @@ enum TopLevelItem {
     Comments(Vec<usize>),
 }
 
+/// A [`TopLevelItem`] with every piece of text already rendered, but not yet
+/// joined: [`Formatter::format`] needs every item's rendered width before it
+/// can decide a trailing comment's column (FR-005) or the separator before
+/// the next item (FR-006), so rendering happens in this intermediate form
+/// first and assembly happens once every item is known.
+enum RenderedItem {
+    Form {
+        /// One already-rendered line per leading comment.
+        leading: Vec<String>,
+        /// The form's own rendering — verbatim source slice or freshly
+        /// formatted text. May itself span multiple lines.
+        body: String,
+        /// Display width (via [`UnicodeWidthStr::width`]) of `body`'s last
+        /// line, i.e. the column a same-line trailing comment starts from.
+        body_last_line_width: usize,
+        /// The trailing comment's own rendered text, without the leading
+        /// padding that separates it from `body`.
+        trailing: Option<String>,
+    },
+    Comments(Vec<String>),
+}
+
+impl RenderedItem {
+    /// Whether this item is a form with a same-line trailing comment — the
+    /// only shape [`Formatter::trailing_comment_columns`] ever aligns.
+    const fn has_trailing_comment(&self) -> bool {
+        matches!(
+            self,
+            Self::Form {
+                trailing: Some(_),
+                ..
+            }
+        )
+    }
+
+    /// The column `body` occupies up to, for width comparisons across a run
+    /// of items being aligned together. `0` for a standalone comment run,
+    /// which never enters an alignment group.
+    const fn body_last_line_width(&self) -> usize {
+        match self {
+            Self::Form {
+                body_last_line_width,
+                ..
+            } => *body_last_line_width,
+            Self::Comments(_) => 0,
+        }
+    }
+
+    /// Appends this item's rendering to `output`, padding a trailing comment
+    /// out to `column` when one was assigned.
+    ///
+    /// `column` is `None` whenever comment-column alignment is disabled, or
+    /// this item's trailing comment (if any) sits outside every alignment
+    /// group — in both cases this falls back to the one-space separator that
+    /// is the formatter's behavior with the feature off entirely.
+    fn render(&self, column: Option<usize>, output: &mut String) {
+        match self {
+            Self::Form {
+                leading,
+                body,
+                body_last_line_width,
+                trailing,
+            } => {
+                for line in leading {
+                    output.push_str(line);
+                    output.push('\n');
+                }
+                output.push_str(body);
+                if let Some(comment) = trailing {
+                    // At least one space always separates the form from its
+                    // comment, even when the form's own last line already
+                    // reaches or passes the target column — the alignment
+                    // column is an aspiration, not something that may ever
+                    // delete a space to reach.
+                    let padding = column
+                        .map_or(1, |target| target.saturating_sub(*body_last_line_width))
+                        .max(1);
+                    output.push_str(&" ".repeat(padding));
+                    output.push_str(comment);
+                }
+            }
+            Self::Comments(lines) => {
+                for (position, line) in lines.iter().enumerate() {
+                    if position > 0 {
+                        output.push('\n');
+                    }
+                    output.push_str(line);
+                }
+            }
+        }
+    }
+}
+
 impl Formatter {
     /// Builds a formatter that lays every dialect out with the Common Lisp
     /// operator table.
@@ -105,6 +198,8 @@ impl Formatter {
             dialect,
             max_width: MAX_INLINE_WIDTH,
             reindent_block_comments: false,
+            comment_column: None,
+            max_blank_lines: None,
         }
     }
 
@@ -132,23 +227,233 @@ impl Formatter {
         self
     }
 
+    /// Aligns same-line trailing comments to `column` instead of the
+    /// compiled-in single space.
+    ///
+    /// `0` means auto: each contiguous run of adjacent, trailing-commented
+    /// top-level forms (see [`Self::trailing_comment_columns`] for exactly
+    /// what breaks a run) aligns to one column past its own widest form,
+    /// independently of every other run. Any other value is a fixed column
+    /// every trailing comment in the document aligns to, run or no run — a
+    /// fixed column is an absolute position, so grouping does not apply to
+    /// it. Either way, a form whose own text already reaches or passes the
+    /// target column still gets exactly one space before its comment rather
+    /// than a column violated.
+    ///
+    /// Unset (the default from [`Self::with_dialect`]) reproduces the
+    /// formatter's original behavior exactly: one space, no alignment.
+    #[must_use]
+    pub const fn with_comment_column(mut self, column: usize) -> Self {
+        self.comment_column = Some(column);
+        self
+    }
+
+    /// Preserves up to `max` consecutive blank lines from the source between
+    /// top-level forms, instead of always collapsing to exactly one.
+    ///
+    /// `0` means no blank line is ever inserted between top-level forms,
+    /// regardless of the source. Above the source's actual blank-line count,
+    /// this has no effect — a gap of one blank line stays one blank line
+    /// whether `max` is 1 or 100; only a gap wider than `max` is collapsed
+    /// down to it.
+    ///
+    /// Unset (the default from [`Self::with_dialect`]) reproduces the
+    /// formatter's original behavior exactly: every gap, blank or not,
+    /// becomes exactly one blank line.
+    #[must_use]
+    pub const fn with_max_blank_lines(mut self, max: usize) -> Self {
+        self.max_blank_lines = Some(max);
+        self
+    }
+
     #[must_use]
     pub fn format(&self, tree: &SyntaxTree) -> String {
         let items = self.plan_top_level(tree);
         if items.is_empty() {
             return String::new();
         }
+        let rendered: Vec<RenderedItem> = items
+            .iter()
+            .map(|item| self.render_item(tree, item))
+            .collect();
+        let columns = self.trailing_comment_columns(tree, &items, &rendered);
+
         let mut output = String::new();
-        for (position, item) in items.iter().enumerate() {
+        for (position, item) in rendered.iter().enumerate() {
             if position > 0 {
-                // Top-level items are separated by a single blank line, matching
-                // the canonical style for comment-free documents.
-                output.push_str("\n\n");
+                output.push_str(&self.blank_line_separator(
+                    tree,
+                    &items[position - 1],
+                    &items[position],
+                ));
             }
-            self.render_top_level_item(tree, item, &mut output);
+            item.render(columns[position], &mut output);
         }
         output.push('\n');
         output
+    }
+
+    /// The separator text between two adjacent top-level items: `"\n"` for
+    /// every blank line the result should carry, plus one more `"\n"` to end
+    /// the previous item's own last line.
+    ///
+    /// Disabled ([`Self::max_blank_lines`] unset) reproduces the original
+    /// hardcoded `"\n\n"` — exactly one blank line — regardless of what the
+    /// source had between `prev` and `cur`. Enabled, the source's actual
+    /// blank-line count between them is read back via
+    /// [`Self::blank_lines_between`] and clamped to the configured maximum.
+    fn blank_line_separator(
+        &self,
+        tree: &SyntaxTree,
+        prev: &TopLevelItem,
+        cur: &TopLevelItem,
+    ) -> String {
+        let blank_lines = match self.max_blank_lines {
+            None => 1,
+            Some(max) => Self::blank_lines_between(tree, prev, cur).min(max),
+        };
+        "\n".repeat(blank_lines + 1)
+    }
+
+    /// How many blank lines separate `prev` and `cur` in the source.
+    ///
+    /// The gap between one item's rendered end and the next item's rendered
+    /// start is whitespace only — every non-whitespace byte in it belongs to
+    /// a comment or a node, and both are already accounted for as part of one
+    /// item or the other — so its newline count minus one *is* the blank-line
+    /// count, with no risk of miscounting something that is not whitespace.
+    fn blank_lines_between(tree: &SyntaxTree, prev: &TopLevelItem, cur: &TopLevelItem) -> usize {
+        let prev_end = Self::item_end_offset(tree, prev);
+        let cur_start = Self::item_start_offset(tree, cur);
+        if cur_start <= prev_end {
+            return 0;
+        }
+        tree.source[prev_end..cur_start]
+            .matches('\n')
+            .count()
+            .saturating_sub(1)
+    }
+
+    /// Byte offset one past `item`'s last rendered character in the source:
+    /// its trailing comment's end when it has one, otherwise its last node's.
+    fn item_end_offset(tree: &SyntaxTree, item: &TopLevelItem) -> usize {
+        match item {
+            TopLevelItem::Form {
+                end_node_id,
+                trailing,
+                ..
+            } => trailing.map_or_else(
+                || tree.node(*end_node_id).span.end().get(),
+                |comment| tree.comments[comment].span.end().get(),
+            ),
+            TopLevelItem::Comments(indices) => {
+                let last = *indices.last().expect("comment run is never empty");
+                tree.comments[last].span.end().get()
+            }
+        }
+    }
+
+    /// Byte offset of `item`'s first rendered character in the source: its
+    /// first leading comment's start when it has one, otherwise its node's.
+    fn item_start_offset(tree: &SyntaxTree, item: &TopLevelItem) -> usize {
+        match item {
+            TopLevelItem::Form {
+                node_id, leading, ..
+            } => leading.first().map_or_else(
+                || tree.node(*node_id).span.start().get(),
+                |&comment| tree.comments[comment].span.start().get(),
+            ),
+            TopLevelItem::Comments(indices) => {
+                let first = *indices.first().expect("comment run is never empty");
+                tree.comments[first].span.start().get()
+            }
+        }
+    }
+
+    /// The target column, if any, each item's trailing comment should pad
+    /// out to — `None` everywhere when [`Self::comment_column`] is unset.
+    ///
+    /// A fixed column (`comment_column` other than `0`) applies uniformly to
+    /// every trailing comment in the document: it is an absolute position,
+    /// so adjacency between forms does not matter to it.
+    ///
+    /// Auto (`comment_column` is `0`) instead groups items into runs and
+    /// aligns each run to one column past its own widest form. A run is a
+    /// maximal sequence of consecutive top-level [`TopLevelItem::Form`]
+    /// items that each carry a trailing comment, with no blank line rendered
+    /// between any two adjacent members — the same "contiguous commented
+    /// lines" rule a line-oriented formatter would apply, adapted to this
+    /// formatter's top-level-forms-only data model. A form without a
+    /// trailing comment, or a rendered blank line, ends the run there; the
+    /// next run (if any) starts its own alignment independently.
+    ///
+    /// "Rendered" is deliberate, not the source's raw blank-line count:
+    /// adjacency is decided by calling [`Self::blank_line_separator`] itself
+    /// and checking whether *it* produced a blank line, the same call
+    /// [`Self::format`] makes to build the separator that actually lands in
+    /// the output. Two forms this pass renders back-to-back with no blank
+    /// line between them are a run; anything else is not. Basing it on the
+    /// source's raw gap instead would break idempotency: with
+    /// [`Self::max_blank_lines`] unset, every gap renders as exactly one
+    /// blank line regardless of what the source had (`Self::format`'s
+    /// original, preserved behavior), so a source gap of zero never survives
+    /// a reformat — a run computed from the raw gap would group on the first
+    /// pass and never again. Reusing `blank_line_separator` instead ties the
+    /// two decisions to the same fixed point `blank_line_separator` already
+    /// is (`min(actual, max)` is idempotent, and the unset case is a
+    /// constant), so grouping agrees with itself on every pass. The
+    /// trade-off is explicit: with `max_blank_lines` left unset, forms are
+    /// never rendered back-to-back at all, so auto alignment groups nothing
+    /// until the caller also sets `max_blank_lines` to let some gaps render
+    /// as zero blank lines — the one point where FR-005 and FR-006 are not
+    /// independent of each other.
+    fn trailing_comment_columns(
+        &self,
+        tree: &SyntaxTree,
+        items: &[TopLevelItem],
+        rendered: &[RenderedItem],
+    ) -> Vec<Option<usize>> {
+        let mut columns = vec![None; items.len()];
+        let Some(comment_column) = self.comment_column else {
+            return columns;
+        };
+
+        if comment_column != 0 {
+            for (index, item) in rendered.iter().enumerate() {
+                if item.has_trailing_comment() {
+                    columns[index] = Some(comment_column);
+                }
+            }
+            return columns;
+        }
+
+        let mut index = 0usize;
+        while index < items.len() {
+            if !rendered[index].has_trailing_comment() {
+                index += 1;
+                continue;
+            }
+            let run_start = index;
+            let mut run_end = index;
+            while run_end + 1 < items.len()
+                && rendered[run_end + 1].has_trailing_comment()
+                && self.blank_line_separator(tree, &items[run_end], &items[run_end + 1]) == "\n"
+            {
+                run_end += 1;
+            }
+
+            let widest = (run_start..=run_end)
+                .map(|member| rendered[member].body_last_line_width())
+                .max()
+                .unwrap_or(0);
+            let target = widest.saturating_add(1);
+            for column in &mut columns[run_start..=run_end] {
+                *column = Some(target);
+            }
+            index = run_end + 1;
+        }
+
+        columns
     }
 
     /// Groups root-level forms with the comments that surround them so the
@@ -228,7 +533,12 @@ impl Formatter {
         items
     }
 
-    fn render_top_level_item(&self, tree: &SyntaxTree, item: &TopLevelItem, output: &mut String) {
+    /// Renders one [`TopLevelItem`] into a [`RenderedItem`], without yet
+    /// deciding the padding before a trailing comment or the separator
+    /// before the next item — both need every item's rendering measured
+    /// first, which [`Self::format`] does across the whole document before
+    /// assembling anything.
+    fn render_item(&self, tree: &SyntaxTree, item: &TopLevelItem) -> RenderedItem {
         let comments = &tree.comments;
         match item {
             TopLevelItem::Form {
@@ -238,37 +548,51 @@ impl Formatter {
                 trailing,
                 verbatim,
             } => {
-                for &comment in leading {
-                    output.push_str(&self.render_comment_text(&comments[comment].text, 0));
-                    output.push('\n');
-                }
+                let leading = leading
+                    .iter()
+                    .map(|&comment| self.render_comment_text(&comments[comment].text, 0))
+                    .collect();
+
+                let mut body = String::new();
                 if *verbatim {
                     let start = tree.node(*node_id).span.start().get();
                     let end = tree.node(*end_node_id).span.end().get();
-                    output.push_str(&tree.source[start..end]);
+                    body.push_str(&tree.source[start..end]);
                 } else {
-                    self.format_node(tree, *node_id, 0, output);
+                    self.format_node(tree, *node_id, 0, &mut body);
                 }
-                if let Some(comment) = trailing {
-                    output.push(' ');
-                    output.push_str(&self.render_comment_text(&comments[*comment].text, 0));
+                let body_last_line_width = Self::last_line_width(&body);
+
+                let trailing =
+                    trailing.map(|comment| self.render_comment_text(&comments[comment].text, 0));
+
+                RenderedItem::Form {
+                    leading,
+                    body,
+                    body_last_line_width,
+                    trailing,
                 }
             }
-            TopLevelItem::Comments(indices) => {
-                for (position, &comment) in indices.iter().enumerate() {
-                    if position > 0 {
-                        output.push('\n');
-                    }
-                    output.push_str(&self.render_comment_text(&comments[comment].text, 0));
-                }
-            }
+            TopLevelItem::Comments(indices) => RenderedItem::Comments(
+                indices
+                    .iter()
+                    .map(|&comment| self.render_comment_text(&comments[comment].text, 0))
+                    .collect(),
+            ),
         }
+    }
+
+    /// Display width (via [`UnicodeWidthStr::width`]) of `text`'s last line —
+    /// the column at which a same-line trailing comment would start.
+    fn last_line_width(text: &str) -> usize {
+        let last_line = text.rsplit('\n').next().unwrap_or("");
+        UnicodeWidthStr::width(last_line)
     }
 
     /// Trims a comment's trailing whitespace and, when enabled, realigns a
     /// `#|...|#` block comment's interior lines to `depth`.
     ///
-    /// Every call site in [`Self::render_top_level_item`] is a standalone or
+    /// Every call site in [`Self::render_item`] is a standalone or
     /// trailing comment between top-level forms, so `depth` is always `0`
     /// today; the depth parameter still exists because the transformation
     /// itself has nothing top-level-specific about it.
