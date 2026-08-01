@@ -154,7 +154,7 @@ pub fn build_type_report(file: &SemanticFile) -> TypeReportFile {
     TypeReportFile {
         path: file.path.clone(),
         dialect: file.dialect,
-        dialect_modelled: file.dialect_is_modelled(),
+        dialect_modelled: file.typing_dialect_supported(),
         bindings,
         expressions,
         untyped_binding_count,
@@ -331,6 +331,42 @@ mod tests {
         assert!(!report.dialect_modelled);
         assert!(report.bindings.is_empty());
         assert!(report.expressions.is_empty());
+    }
+
+    /// The typing layer's first real Emacs Lisp assertion: `cl-defstruct`
+    /// slot types and `defcustom`'s `:type` both declare something, and the
+    /// report has to say `dialect_modelled: true` and print it — not fall
+    /// back to the narrowing/constant/effect layers' still-Common-Lisp-only
+    /// `dialect_is_modelled`.
+    #[test]
+    fn an_emacs_lisp_file_is_modelled_and_reports_real_declared_types() {
+        let report = report_of(
+            "(cl-defstruct point (x 0 :type integer)) \
+             (defun f (p) (point-x p)) \
+             (defcustom my-count \"zero\" \"doc\" :type 'integer)",
+            Dialect::EmacsLisp,
+        );
+        assert!(report.dialect_modelled);
+
+        let accessor_call = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "(point-x p)")
+            .unwrap_or_else(|| panic!("no (point-x p) expression in {report:?}"));
+        assert_eq!(accessor_call.ty, Ty::Integer);
+        assert!(!accessor_call.contradictory);
+
+        // The `defcustom`'s `:type integer` disagrees with its own `"zero"`
+        // initial value, so the value expression records the poison meet —
+        // exactly the CL `declare`-vs-value contradiction this report was
+        // built to surface, now for Emacs Lisp too.
+        let contradictory_value = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "\"zero\"")
+            .unwrap_or_else(|| panic!("no \"zero\" expression in {report:?}"));
+        assert_eq!(contradictory_value.ty, Ty::Bottom);
+        assert!(contradictory_value.contradictory);
     }
 
     #[test]

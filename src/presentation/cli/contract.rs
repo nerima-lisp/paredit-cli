@@ -150,14 +150,14 @@ impl SemanticLayer {
 
     /// Whether this layer's own analysis models `dialect`.
     ///
-    /// Every arm reads `== Dialect::CommonLisp` today, matching the single
-    /// `CommonLispSemantics` bucket this enum replaces exactly — this change
-    /// is mechanism-only. Widening a dialect's support for a layer (Emacs
-    /// Lisp typing, Scheme/Racket typing, Emacs Lisp value propagation, Emacs
-    /// Lisp effects, ...) is a single arm edit here.
+    /// Mirrors each layer's own `supports_*`/`dialect_is_modelled` predicate
+    /// exactly, so this matrix cannot drift from the behaviour it reports on.
+    /// Typing is the first to widen (see
+    /// `paredit_core_semantics::semantics::typing::policy::supports_type_inference`);
+    /// the other five stay Common-Lisp-only until their own step lands.
     const fn supports(self, dialect: Dialect) -> bool {
         match self {
-            Self::Typing => matches!(dialect, Dialect::CommonLisp),
+            Self::Typing => matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp),
             Self::Narrowing => matches!(dialect, Dialect::CommonLisp),
             Self::Constants => matches!(dialect, Dialect::CommonLisp),
             Self::ValuePropagation => matches!(dialect, Dialect::CommonLisp),
@@ -1222,18 +1222,30 @@ mod tests {
         }
     }
 
-    /// Locks today's behaviour in place: FR-001 only changes the mechanism,
-    /// not one reported dialect/command pair. Every one of the six layers is
-    /// Common-Lisp-only until steps 2-6 land.
+    /// Pins each layer's dialect support to exactly what FR-001 through
+    /// FR-005 have widened it to, so a future step that flips one arm without
+    /// updating its own tests still trips this one.
     #[test]
-    fn all_six_semantic_layers_are_still_common_lisp_only() {
-        for layer in SEMANTIC_LAYER_VALUES {
+    fn semantic_layers_support_exactly_their_declared_dialects() {
+        let expectations: [(SemanticLayer, &[Dialect]); 6] = [
+            // FR-002/FR-003: Common Lisp, Emacs Lisp, Scheme, Racket typing.
+            (
+                SemanticLayer::Typing,
+                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+            ),
+            (SemanticLayer::Narrowing, &[Dialect::CommonLisp]),
+            (SemanticLayer::Constants, &[Dialect::CommonLisp]),
+            (SemanticLayer::ValuePropagation, &[Dialect::CommonLisp]),
+            (SemanticLayer::Effects, &[Dialect::CommonLisp]),
+            (SemanticLayer::SemanticCoverage, &[Dialect::CommonLisp]),
+        ];
+        for (layer, expected) in expectations {
             for dialect in DIALECTS {
                 let parsed = dialect.parse::<Dialect>().expect("known dialect");
                 assert_eq!(
                     layer.supports(parsed),
-                    parsed == Dialect::CommonLisp,
-                    "{layer:?} / {dialect} drifted from the pre-FR-001 CommonLispSemantics bucket"
+                    expected.contains(&parsed),
+                    "{layer:?} / {dialect}"
                 );
             }
         }

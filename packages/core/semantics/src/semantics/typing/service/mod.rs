@@ -2,6 +2,7 @@
 
 mod calls;
 mod declarations;
+mod emacs_lisp_declarations;
 mod inference;
 mod narrowing;
 

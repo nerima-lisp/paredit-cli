@@ -48,10 +48,24 @@ impl SemanticFile {
     ///
     /// A report must print this rather than an empty finding list: the two
     /// look identical to a consumer, and only one of them means "nothing to
-    /// report here".
+    /// report here". This is the narrowing/constant/value-propagation/effect
+    /// layers' own predicate; the typing layer has widened ahead of them (see
+    /// [`Self::typing_dialect_supported`]) and must not consult this one.
     #[must_use]
     pub fn dialect_is_modelled(&self) -> bool {
         self.dialect == Dialect::CommonLisp
+    }
+
+    /// Whether the typing layer specifically models this file's dialect.
+    ///
+    /// Split from [`Self::dialect_is_modelled`] because the typing layer's own
+    /// gate (`supports_type_inference`) can widen to a dialect ahead of the
+    /// narrowing/constant/value-propagation/effect layers below it — each of
+    /// those still answers only for Common Lisp until its own step lands, and
+    /// must keep consulting `dialect_is_modelled` rather than this predicate.
+    #[must_use]
+    pub const fn typing_dialect_supported(&self) -> bool {
+        paredit_core_semantics::semantics::typing::policy::supports_type_inference(self.dialect)
     }
 }
 
