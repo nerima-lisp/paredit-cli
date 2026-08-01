@@ -174,7 +174,7 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-const _: () = assert!(RULE_COUNT == 169);
+const _: () = assert!(RULE_COUNT == 170);
 const _: () = assert!(fixable_count() == 92);
 const _: () = assert!(warning_count() == 113);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
