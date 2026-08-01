@@ -7,7 +7,9 @@ use paredit_core_syntax::selector::{
     LinePosition, Pattern, RelativeStep, SelectorError, SelectorRequest, SelectorTerm,
     StableSelectorId,
 };
-use paredit_core_syntax::sexpr::{Delimiter, Direction, Path, QuoteStyle, ReaderPrefix};
+use paredit_core_syntax::sexpr::{
+    Delimiter, Direction, Path, QuoteStyle, ReaderPrefix, ReaderPrefixStyle,
+};
 
 #[derive(Debug, Args)]
 pub struct AnalyzeArgs {
@@ -71,6 +73,23 @@ pub struct FormatArgs {
     /// default of collapsing every gap to exactly one blank line.
     #[arg(long, value_name = "COUNT")]
     pub max_blank_lines: Option<usize>,
+    /// Per-symbol indent style override, `SYMBOL=STYLE` (repeatable), taking
+    /// precedence over the built-in style for that symbol. Run `paredit
+    /// config schema` for the accepted STYLE names. A project's
+    /// `paredit.toml` `format.indent-table` is the more common way to set
+    /// this; the flag exists for one-off overrides and scripting.
+    #[arg(long = "indent-table", value_name = "SYMBOL=STYLE")]
+    pub indent_table: Vec<String>,
+    /// Per-style `--max-width` override, `STYLE=WIDTH` (repeatable), keyed
+    /// by the same STYLE vocabulary as --indent-table.
+    #[arg(long = "width-profile", value_name = "STYLE=WIDTH")]
+    pub width_profiles: Vec<String>,
+    /// How reader-macro prefixes (`'x`, `` `x ``, `,x`, `,@x`, `#'x`) print.
+    /// `canonical` only expands the ones with a single portable list
+    /// spelling in the file's dialect (`'x` and, in Common Lisp/Emacs Lisp,
+    /// `#'f`); every other prefix keeps its shorthand regardless.
+    #[arg(long, value_enum, default_value_t = ReaderPrefixStyleArg::Shorthand)]
+    pub quote_style: ReaderPrefixStyleArg,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
     pub write: bool,
@@ -88,6 +107,27 @@ pub struct FormatArgs {
     /// reporting on --file alone.
     #[arg(long, conflicts_with_all = ["write", "diff", "check"])]
     pub diff_stat: bool,
+}
+
+/// A `clap` mirror of [`ReaderPrefixStyle`], keeping the argument parser out
+/// of the syntax package. The `From` below is the only place the two
+/// spellings meet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ReaderPrefixStyleArg {
+    /// The reader prefix: `'x`, `#'f`.
+    Shorthand,
+    /// The list form the reader expands it into, for every prefix that has
+    /// a portable one: `(quote x)`, `(function f)`.
+    Canonical,
+}
+
+impl From<ReaderPrefixStyleArg> for ReaderPrefixStyle {
+    fn from(value: ReaderPrefixStyleArg) -> Self {
+        match value {
+            ReaderPrefixStyleArg::Shorthand => Self::Shorthand,
+            ReaderPrefixStyleArg::Canonical => Self::Canonical,
+        }
+    }
 }
 
 #[derive(Debug, Args)]

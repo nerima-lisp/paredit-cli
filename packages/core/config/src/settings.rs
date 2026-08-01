@@ -400,6 +400,22 @@ fn check_list(
             continue;
         }
 
+        match entry.kind {
+            ValueKind::IndentStyleEntries => {
+                if let Some(finding) = check_indent_style_entry(key, name) {
+                    findings.push(finding);
+                }
+                continue;
+            }
+            ValueKind::WidthProfileEntries => {
+                if let Some(finding) = check_width_profile_entry(key, name) {
+                    findings.push(finding);
+                }
+                continue;
+            }
+            _ => {}
+        }
+
         let Some(vocabulary) = vocabulary else {
             continue;
         };
@@ -417,6 +433,78 @@ fn check_list(
         }
     }
     findings
+}
+
+/// Checks one `format.indent-table` entry: `symbol=style`, `style` in
+/// [`paredit_core_syntax::sexpr::STYLE_NAMES`].
+///
+/// The style vocabulary lives in the syntax package, not behind a
+/// caller-supplied [`Vocabulary`] the way lint rule names are: `config`
+/// already depends on `syntax` directly (see `DIALECT_CHOICES` above), and
+/// unlike the lint registry — which is assembled from whichever feature
+/// packages a build actually links — the style list is intrinsic to the
+/// formatter and identical in every build.
+fn check_indent_style_entry(key: &str, entry: &str) -> Option<Finding> {
+    let Some((symbol, style)) = entry.split_once('=') else {
+        return Some((
+            DiagnosticCode::WrongType,
+            format!("`{key}` entry \"{entry}\" is not written as `symbol=style`"),
+            Some("write it as e.g. \"my-macro=definition\"".to_owned()),
+        ));
+    };
+    if symbol.is_empty() {
+        return Some((
+            DiagnosticCode::EmptyValue,
+            format!("`{key}` entry \"{entry}\" names no symbol before `=`"),
+            None,
+        ));
+    }
+    unknown_style(key, entry, style)
+}
+
+/// Checks one `format.width-profiles` entry: `style=width`, `style` in
+/// [`paredit_core_syntax::sexpr::STYLE_NAMES`] and `width` an integer in the
+/// same range `format.max-inline-width` accepts.
+fn check_width_profile_entry(key: &str, entry: &str) -> Option<Finding> {
+    let Some((style, width)) = entry.split_once('=') else {
+        return Some((
+            DiagnosticCode::WrongType,
+            format!("`{key}` entry \"{entry}\" is not written as `style=width`"),
+            Some("write it as e.g. \"definition=60\"".to_owned()),
+        ));
+    };
+    if let Some(finding) = unknown_style(key, entry, style) {
+        return Some(finding);
+    }
+    match width.parse::<i64>() {
+        Ok(value) if (1..=512).contains(&value) => None,
+        Ok(value) => Some((
+            DiagnosticCode::OutOfRange,
+            format!("`{key}` entry \"{entry}\" is {value}, outside the accepted range 1..=512"),
+            None,
+        )),
+        Err(_) => Some((
+            DiagnosticCode::WrongType,
+            format!("`{key}` entry \"{entry}\" does not have an integer width"),
+            None,
+        )),
+    }
+}
+
+fn unknown_style(key: &str, entry: &str, style: &str) -> Option<Finding> {
+    if paredit_core_syntax::sexpr::STYLE_NAMES.contains(&style) {
+        return None;
+    }
+    Some((
+        DiagnosticCode::NotAChoice,
+        format!(
+            "`{key}` entry \"{entry}\" names \"{style}\", which is not a recognised indent style"
+        ),
+        Some(format!(
+            "accepted styles: {}",
+            paredit_core_syntax::sexpr::STYLE_NAMES.join(", ")
+        )),
+    ))
 }
 
 fn unknown_name(key: &str, name: &str, rules: &[&str], categories_too: bool) -> Finding {
@@ -709,6 +797,148 @@ mod tests {
             settings.origin("format.indent").expect("set").describe(),
             "--indent"
         );
+    }
+
+    // --- FR-008/FR-009: `format.indent-table` / `format.width-profiles` ---
+
+    #[test]
+    fn a_well_formed_indent_table_entry_is_accepted() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.indent-table",
+            &Value::Array(vec![Value::String("my-macro=definition".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert_eq!(
+            settings.list("format.indent-table"),
+            vec!["my-macro=definition"]
+        );
+    }
+
+    /// This is the FR-008 requirement that a style name outside the
+    /// vocabulary is rejected cleanly *at config-resolution time* rather than
+    /// deep inside the formatter: `Settings::apply` runs during
+    /// configuration loading, well before any `Formatter` exists.
+    #[test]
+    fn an_unrecognised_style_name_in_an_indent_table_entry_is_rejected_at_config_resolution_time() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.indent-table",
+            &Value::Array(vec![Value::String("my-macro=not-a-real-style".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, DiagnosticCode::NotAChoice);
+        assert_eq!(diagnostics[0].severity(), Severity::Error);
+        assert!(diagnostics[0].message.contains("not-a-real-style"));
+        // Rejected, not merely warned about: the previous (unset) value
+        // stands, matching `a_rejected_value_leaves_the_previous_one_in_place`.
+        assert!(settings.list("format.indent-table").is_empty());
+    }
+
+    #[test]
+    fn an_indent_table_entry_missing_its_equals_sign_is_rejected() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.indent-table",
+            &Value::Array(vec![Value::String("my-macro".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert_eq!(diagnostics[0].code, DiagnosticCode::WrongType);
+        assert!(diagnostics[0].message.contains("symbol=style"));
+    }
+
+    #[test]
+    fn a_well_formed_width_profile_entry_is_accepted() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.width-profiles",
+            &Value::Array(vec![Value::String("definition=60".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert_eq!(
+            settings.list("format.width-profiles"),
+            vec!["definition=60"]
+        );
+    }
+
+    #[test]
+    fn an_unrecognised_style_name_in_a_width_profile_entry_is_rejected_at_config_resolution_time() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.width-profiles",
+            &Value::Array(vec![Value::String("not-a-real-style=60".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert_eq!(diagnostics[0].code, DiagnosticCode::NotAChoice);
+        assert!(settings.list("format.width-profiles").is_empty());
+    }
+
+    #[test]
+    fn a_width_profile_entry_with_a_non_integer_width_is_rejected() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.width-profiles",
+            &Value::Array(vec![Value::String("definition=wide".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert_eq!(diagnostics[0].code, DiagnosticCode::WrongType);
+    }
+
+    #[test]
+    fn a_width_profile_entry_outside_the_accepted_range_is_rejected() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.width-profiles",
+            &Value::Array(vec![Value::String("definition=99999".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert_eq!(diagnostics[0].code, DiagnosticCode::OutOfRange);
+    }
+
+    #[test]
+    fn a_width_profile_entry_missing_its_equals_sign_is_rejected() {
+        let mut settings = Settings::with_defaults();
+        let diagnostics = settings.apply(
+            "format.width-profiles",
+            &Value::Array(vec![Value::String("definition".to_owned())]),
+            &origin(),
+            None,
+        );
+        assert_eq!(diagnostics[0].code, DiagnosticCode::WrongType);
+        assert!(diagnostics[0].message.contains("style=width"));
+    }
+
+    #[test]
+    fn a_quote_style_choice_is_accepted_and_an_unrecognised_one_is_rejected() {
+        let mut settings = Settings::with_defaults();
+        assert_eq!(settings.text("format.quote-style"), Some("shorthand"));
+
+        let diagnostics = settings.apply(
+            "format.quote-style",
+            &Value::String("canonical".to_owned()),
+            &origin(),
+            None,
+        );
+        assert!(diagnostics.is_empty());
+        assert_eq!(settings.text("format.quote-style"), Some("canonical"));
+
+        let diagnostics = settings.apply(
+            "format.quote-style",
+            &Value::String("expanded".to_owned()),
+            &origin(),
+            None,
+        );
+        assert_eq!(diagnostics[0].code, DiagnosticCode::NotAChoice);
     }
 
     #[test]

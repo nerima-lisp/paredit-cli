@@ -1,8 +1,9 @@
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::styles::ListStyle;
-use super::{Formatter, MAX_INLINE_WIDTH};
+use super::{Formatter, MAX_INLINE_WIDTH, ReaderPrefixStyle};
 use crate::dialect::Dialect;
+use crate::sexpr::quote_edit::canonical_quote_head;
 use crate::sexpr::tree::{Node, NodeKind, SyntaxTree};
 use crate::sexpr::types::Delimiter;
 use crate::sexpr::types::NodeId;
@@ -200,6 +201,9 @@ impl Formatter {
             reindent_block_comments: false,
             comment_column: None,
             max_blank_lines: None,
+            indent_overrides: Vec::new(),
+            width_profiles: Vec::new(),
+            quote_style: ReaderPrefixStyle::Shorthand,
         }
     }
 
@@ -685,17 +689,32 @@ impl Formatter {
         match node.kind {
             NodeKind::Root => (),
             NodeKind::Atom => {
-                output.push_str(node.span.slice(&tree.source));
+                if let Some(heads) = self.canonical_prefix_heads(node) {
+                    self.write_canonical_opens(&heads, output);
+                    let text = node.span.slice(&tree.source);
+                    output.push_str(&text[node.symbol_offset..]);
+                    Self::write_canonical_closes(&heads, output);
+                } else {
+                    output.push_str(node.span.slice(&tree.source));
+                }
             }
             NodeKind::List if node.children.is_empty() => {
                 if self.is_opaque_reader_form(node) {
                     output.push_str(node.span.slice(&tree.source));
                     return;
                 }
-                self.write_reader_prefixes(tree, node, output);
+                let heads = self.canonical_prefix_heads(node);
+                if let Some(heads) = &heads {
+                    self.write_canonical_opens(heads, output);
+                } else {
+                    self.write_reader_prefixes(tree, node, output);
+                }
                 let delimiter = self.list_delimiter(node);
                 output.push(delimiter.open());
                 output.push(delimiter.close());
+                if let Some(heads) = &heads {
+                    Self::write_canonical_closes(heads, output);
+                }
             }
             NodeKind::List => {
                 if let Some(inline) = self.inline_list(tree, node_id) {
@@ -706,9 +725,16 @@ impl Formatter {
                     output.push_str(node.span.slice(&tree.source));
                     return;
                 }
-                self.write_reader_prefixes(tree, node, output);
+                let heads = self.canonical_prefix_heads(node);
+                if let Some(heads) = &heads {
+                    self.write_canonical_opens(heads, output);
+                } else {
+                    self.write_reader_prefixes(tree, node, output);
+                }
                 // A reader conditional is keyed off its prefix, not its head:
                 // the head of `#?(:clj a :cljs b)` is the feature keyword.
+                // (Never true together with `heads`: `#?`/`#?@` never
+                // canonicalize, so `heads` is `None` whenever this fires.)
                 if self.dialect == Dialect::Clojure && Self::is_clojure_reader_conditional(node) {
                     self.format_clojure_reader_conditional(tree, node_id, depth, output);
                     return;
@@ -803,8 +829,48 @@ impl Formatter {
                 } else {
                     self.format_general_list(tree, node_id, depth, output);
                 }
+                if let Some(heads) = &heads {
+                    Self::write_canonical_closes(heads, output);
+                }
             }
         }
+    }
+
+    /// Writes `(head1 (head2 ... (headN ` for a canonical prefix expansion,
+    /// outermost first — the opening half of [`Self::write_canonical_closes`].
+    fn write_canonical_opens(&self, heads: &[&'static str], output: &mut String) {
+        for head in heads {
+            output.push('(');
+            output.push_str(head);
+            output.push(' ');
+        }
+    }
+
+    /// Writes the `)`s closing a canonical prefix expansion
+    /// [`Self::write_canonical_opens`] began.
+    fn write_canonical_closes(heads: &[&'static str], output: &mut String) {
+        for _ in heads {
+            output.push(')');
+        }
+    }
+
+    /// The canonical list-form heads `node`'s reader-prefix stack expands to,
+    /// outermost first, when [`ReaderPrefixStyle::Canonical`] is set and
+    /// every prefix in the stack has a portable list spelling for
+    /// `self.dialect` (see `quote_edit`'s module doc for why quasiquote and
+    /// unquote never do). `None` otherwise — including when the node carries
+    /// no reader prefix at all — in which case the prefix stack keeps its
+    /// shorthand spelling. A stack is canonicalized all together or not at
+    /// all: one mixing a canonicalizable prefix with one that is not (e.g.
+    /// `` '`x ``) is left exactly as written rather than partly rewritten.
+    pub(super) fn canonical_prefix_heads(&self, node: &Node) -> Option<Vec<&'static str>> {
+        if self.quote_style != ReaderPrefixStyle::Canonical || node.reader_prefixes.is_empty() {
+            return None;
+        }
+        node.reader_prefixes
+            .iter()
+            .map(|prefix| canonical_quote_head(self.dialect, *prefix))
+            .collect()
     }
 
     pub(super) fn inline_list(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
@@ -822,7 +888,10 @@ impl Formatter {
             Close(char),
         }
 
-        let max_width = self.max_width;
+        // Resolved once, from `node_id`'s own head — not re-resolved per
+        // descendant, since the whole subtree this call flattens shares one
+        // running [`Bounded`] budget. See `Formatter::effective_max_width`.
+        let max_width = self.effective_max_width(tree, node_id);
         let mut output = Bounded::new();
         let mut actions = vec![Action::Node(node_id)];
 
@@ -835,7 +904,20 @@ impl Formatter {
                     match node.kind {
                         NodeKind::Root => return None,
                         NodeKind::Atom => {
-                            output.push_str(node.span.slice(&tree.source), max_width)?;
+                            if let Some(heads) = self.canonical_prefix_heads(node) {
+                                for head in &heads {
+                                    output.push_char('(', max_width)?;
+                                    output.push_str(head, max_width)?;
+                                    output.push_char(' ', max_width)?;
+                                }
+                                let text = node.span.slice(&tree.source);
+                                output.push_str(&text[node.symbol_offset..], max_width)?;
+                                for _ in &heads {
+                                    output.push_char(')', max_width)?;
+                                }
+                            } else {
+                                output.push_str(node.span.slice(&tree.source), max_width)?;
+                            }
                         }
                         NodeKind::List if self.is_opaque_reader_form(node) => {
                             output.push_str(node.span.slice(&tree.source), max_width)?;
@@ -848,8 +930,24 @@ impl Formatter {
                                 return None;
                             }
 
-                            for span in node.reader_prefix_spans() {
-                                output.push_str(span.slice(&tree.source), max_width)?;
+                            let heads = self.canonical_prefix_heads(node);
+                            if let Some(heads) = &heads {
+                                // Pushed before `Close(delimiter.close())` below,
+                                // so — stack being LIFO — they pop, and print,
+                                // after it: `(quote (children))`, not
+                                // `(quote )(children)`.
+                                for _ in heads {
+                                    actions.push(Action::Close(')'));
+                                }
+                                for head in heads {
+                                    output.push_char('(', max_width)?;
+                                    output.push_str(head, max_width)?;
+                                    output.push_char(' ', max_width)?;
+                                }
+                            } else {
+                                for span in node.reader_prefix_spans() {
+                                    output.push_str(span.slice(&tree.source), max_width)?;
+                                }
                             }
                             let delimiter = self.list_delimiter(node);
                             output.push_char(delimiter.open(), max_width)?;
@@ -867,6 +965,37 @@ impl Formatter {
         }
 
         Some(output.into_text())
+    }
+
+    /// The width budget for deciding whether `node_id` fits on one line: the
+    /// `format.width-profiles` entry for its own head's resolved style, if
+    /// one was configured, else `self.max_width`.
+    ///
+    /// In practice only ever observed for [`ListStyle::General`] (or a style
+    /// [`Formatter::with_indent_overrides`] retargeted onto it): every other
+    /// style already refuses to compact at all, unconditionally, before this
+    /// value is ever read — this same function's `NodeKind::List` match arm,
+    /// two blocks down, bails via `return None` on a non-`General` head
+    /// before checking any width, for the entry node exactly as it does for
+    /// every recursively visited one. `formatter::tests::formatter`'s
+    /// `with_max_width_narrows_the_inline_fit_threshold` documents that same
+    /// restriction for the compiled-in `max_width`. This function still
+    /// resolves every style generically, rather than special-casing
+    /// `General`, so a future phase that teaches another style to compact
+    /// gets a working width profile for free.
+    fn effective_max_width(&self, tree: &SyntaxTree, node_id: NodeId) -> usize {
+        let Some(head) = self.head_text(tree, node_id) else {
+            return self.max_width;
+        };
+        let style = self.style_for_head(head);
+        // Reverse search, matching `Formatter::style_for_head`: per this
+        // struct's `width_profiles` field doc, a later entry for the same
+        // style wins over an earlier one.
+        self.width_profiles
+            .iter()
+            .rev()
+            .find(|(candidate, _)| *candidate == style)
+            .map_or(self.max_width, |(_, width)| *width)
     }
 
     pub(super) fn format_inline_or_node(

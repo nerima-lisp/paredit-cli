@@ -7,6 +7,7 @@ mod comment_alignment_and_blank_lines;
 mod config_and_multi_file;
 mod declaration_forms;
 mod definition_forms;
+mod indent_table_and_quote_style;
 
 fn assert_format_output(fixture_name: &str, file_name: &str, input: &str, expected: &str) {
     let dir = fresh_temp_dir(fixture_name);
