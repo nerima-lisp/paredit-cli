@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::string_case_fold::usecase::StringCaseFoldItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_string_case_fold_report(
     reports: &[FileFindings<StringCaseFoldItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect string-case-fold", reports, policy, output)
+    print_report(
+        "inspect string-case-fold",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

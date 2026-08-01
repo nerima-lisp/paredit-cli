@@ -18,7 +18,7 @@ pub fn if_not_report(args: IfNotReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_if_not_report(&reports, &policy, args.output)?;
+    print_if_not_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

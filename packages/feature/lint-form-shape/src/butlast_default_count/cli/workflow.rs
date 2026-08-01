@@ -20,7 +20,7 @@ pub fn butlast_default_count_report(args: ButlastDefaultCountReportArgs) -> Comm
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_butlast_default_count_report(&reports, &policy, args.output)?;
+    print_butlast_default_count_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

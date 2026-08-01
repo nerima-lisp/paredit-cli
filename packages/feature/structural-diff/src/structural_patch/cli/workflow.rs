@@ -1,5 +1,6 @@
 use paredit_core_cli::CommandResult;
 
+use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::shared::{
     apply_byte_span_edits, read_input_dialect_and_tree, unified_diff, write_file_with_rollback,
 };
@@ -42,7 +43,10 @@ pub fn structural_patch(args: StructuralPatchArgs) -> CommandResult {
     if args.diff {
         print!(
             "{}",
-            unified_diff(&args.apply_to, &target_input.text, &patched)
+            colorize_diff(
+                Painter::stdout(),
+                &unified_diff(&args.apply_to, &target_input.text, &patched)
+            )
         );
         return gate(&plan, &args);
     }

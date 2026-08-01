@@ -2,6 +2,7 @@ use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::shared::{
     apply_byte_span_edits, expand_input_files, read_input_dialect_and_tree, unified_diff,
     write_files_with_rollback,
@@ -80,11 +81,15 @@ pub fn fold_constants(args: FoldConstantsArgs) -> CliResult<()> {
     }
 
     if args.diff {
+        let painter = Painter::stdout();
         for plan in &plans {
             if plan.rewritten != plan.before {
                 print!(
                     "{}",
-                    unified_diff(&plan.path, &plan.before, &plan.rewritten)
+                    colorize_diff(
+                        painter,
+                        &unified_diff(&plan.path, &plan.before, &plan.rewritten)
+                    )
                 );
             }
         }

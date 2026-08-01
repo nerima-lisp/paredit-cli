@@ -20,7 +20,7 @@ pub fn append_list_to_cons_report(args: AppendListToConsReportArgs) -> CommandRe
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_append_list_to_cons_report(&reports, &policy, args.output)?;
+    print_append_list_to_cons_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::accessor_arity::usecase::AccessorArityItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,7 @@ pub fn print_accessor_arity_report(
     reports: &[FileFindings<AccessorArityItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect accessor-arity", reports, policy, output)
+    print_report("inspect accessor-arity", reports, policy, output, verbosity)
 }

@@ -20,7 +20,7 @@ pub fn redundant_start_zero_report(args: RedundantStartZeroReportArgs) -> Comman
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_redundant_start_zero_report(&reports, &policy, args.output)?;
+    print_redundant_start_zero_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

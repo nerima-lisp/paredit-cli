@@ -18,7 +18,7 @@ pub fn de_morgan_report(args: DeMorganReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_de_morgan_report(&reports, &policy, args.output)?;
+    print_de_morgan_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

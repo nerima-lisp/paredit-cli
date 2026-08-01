@@ -153,7 +153,13 @@ pub fn external_diagnostics_report(args: ExternalDiagnosticsReportArgs) -> Comma
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_report("external-diagnostics", &reports, &policy, args.output)?;
+    print_report(
+        "external-diagnostics",
+        &reports,
+        &policy,
+        args.output,
+        args.verbosity,
+    )?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

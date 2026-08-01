@@ -2,6 +2,7 @@
 
 use crate::args::ReportFormat;
 use crate::error::{CliError, CliResult};
+use crate::runtime::Verbosity;
 use crate::shared::terminal_safe;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -22,14 +23,19 @@ use super::{FileFindings, Finding, ReportPolicy};
 /// print per-file structure the interop formats have no place for (the summary
 /// aggregation, the per-file dialect notice). Everything else goes through
 /// [`Flattened`], which is the same findings with the file grouping dissolved.
+///
+/// `verbosity` reaches the text format only. A machine format is asked for by
+/// a consumer that parses all of it, so `--output json` and the interop
+/// formats stay at full detail whatever the dial says.
 pub fn print_report<F: Finding>(
     command: &'static str,
     reports: &[FileFindings<F>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
     match output {
-        ReportFormat::Text => print_text(reports, policy),
+        ReportFormat::Text => print_text(reports, policy, verbosity),
         ReportFormat::Json => print_json(command, reports, policy)?,
         other => {
             let flat = Flattened::new(command, reports, policy);
@@ -55,7 +61,11 @@ pub fn print_report<F: Finding>(
     Ok(())
 }
 
-fn print_text<F: Finding>(reports: &[FileFindings<F>], policy: &ReportPolicy) {
+fn print_text<F: Finding>(
+    reports: &[FileFindings<F>],
+    policy: &ReportPolicy,
+    verbosity: Verbosity,
+) {
     println!("files\t{}", reports.len());
     println!("finding_count\t{}", policy.finding_count);
     for (name, value) in aggregate(reports) {
@@ -65,6 +75,13 @@ fn print_text<F: Finding>(reports: &[FileFindings<F>], policy: &ReportPolicy) {
         println!("policy\t{gate}\tpassed={}", policy.passed);
     }
 
+    // Quiet is the summary block and nothing else: the counts and the gate
+    // above are what a caller who is only checking whether to act needs, and
+    // the per-finding rows below are exactly the part they would discard.
+    if verbosity == Verbosity::Quiet {
+        return;
+    }
+
     // Tab-separated rows are the contract every script and every one of this
     // workspace's `assert_cmd` tests reads — `cargo test` never runs with a
     // terminal on the other end, so that path is unconditionally preserved.
@@ -72,6 +89,10 @@ fn print_text<F: Finding>(reports: &[FileFindings<F>], policy: &ReportPolicy) {
     // instead, built from the exact same rows.
     let human = std::io::stdout().is_terminal();
     let mut finding_rows = Vec::new();
+    // Parallel to `finding_rows`: `aligned_table_lines` needs every row before
+    // it can size a column, so a row's detail lines cannot be printed as they
+    // are produced and are held here to print under their own aligned line.
+    let mut finding_details: Vec<Vec<String>> = Vec::new();
 
     for report in reports {
         if !report.dialect_modelled {
@@ -94,19 +115,55 @@ fn print_text<F: Finding>(reports: &[FileFindings<F>], policy: &ReportPolicy) {
                     .into_iter()
                     .map(|column| terminal_safe(&column).to_string()),
             );
+            let details = if verbosity == Verbosity::Detailed {
+                detail_lines(finding)
+            } else {
+                Vec::new()
+            };
             if human {
                 finding_rows.push(row);
+                finding_details.push(details);
             } else {
                 println!("{}", row.join("\t"));
+                for line in details {
+                    println!("{line}");
+                }
             }
         }
     }
 
     if human {
-        for line in aligned_table_lines(&finding_rows, crate::terminal::width()) {
+        for (line, details) in aligned_table_lines(&finding_rows, crate::terminal::width())
+            .into_iter()
+            .zip(finding_details)
+        {
             println!("{line}");
+            for detail in details {
+                println!("{detail}");
+            }
         }
     }
+}
+
+/// A finding's JSON fields as indented `key\tvalue` lines, the extra context
+/// `--verbosity detailed` adds under the finding's own row.
+///
+/// A string field is unwrapped to its contents rather than printed as the
+/// quoted JSON literal `Value`'s `Display` would give, so it reads like the
+/// text columns beside it; everything else keeps its JSON rendering, which is
+/// already free of anything a terminal would act on.
+fn detail_lines<F: Finding>(finding: &F) -> Vec<String> {
+    finding
+        .json_fields()
+        .into_iter()
+        .map(|(name, value)| {
+            let rendered = match value {
+                Value::String(text) => text,
+                other => other.to_string(),
+            };
+            format!("\t\t{name}\t{}", terminal_safe(&rendered))
+        })
+        .collect()
 }
 
 /// Column-aligns `rows` (padding every column but the last, which is left
@@ -294,6 +351,55 @@ mod tests {
             Vec::new(),
             summary,
         )
+    }
+
+    #[derive(Debug)]
+    struct Annotated(Vec<(&'static str, Value)>);
+
+    impl Finding for Annotated {
+        fn kind(&self) -> &'static str {
+            "annotated"
+        }
+        fn span(&self) -> ByteSpan {
+            ByteSpan::new(ByteOffset::new(0), ByteOffset::new(1))
+        }
+        fn text_columns(&self) -> Vec<String> {
+            Vec::new()
+        }
+        fn json_fields(&self) -> Vec<(&'static str, Value)> {
+            self.0.clone()
+        }
+    }
+
+    #[test]
+    fn detail_lines_indent_each_json_field_and_unwrap_strings() {
+        let finding = Annotated(vec![
+            ("name", json!("foo")),
+            ("depth", json!(3)),
+            ("nested", json!({"a": 1})),
+        ]);
+        assert_eq!(
+            detail_lines(&finding),
+            vec![
+                "\t\tname\tfoo".to_owned(),
+                "\t\tdepth\t3".to_owned(),
+                "\t\tnested\t{\"a\":1}".to_owned(),
+            ]
+        );
+    }
+
+    /// A detail line is emitted straight to a terminal, so a control character
+    /// smuggled through a finding's own JSON must not survive as one.
+    #[test]
+    fn detail_lines_escape_a_terminal_control_sequence() {
+        let finding = Annotated(vec![("name", json!("a\x1b[31mb"))]);
+        let lines = detail_lines(&finding);
+        assert!(!lines[0].contains('\x1b'), "unescaped escape in {lines:?}");
+    }
+
+    #[test]
+    fn a_finding_with_no_json_fields_has_no_detail_lines() {
+        assert!(detail_lines(&Probe).is_empty());
     }
 
     #[test]

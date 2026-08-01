@@ -20,7 +20,7 @@ pub fn unreachable_case_clause_report(args: UnreachableCaseClauseReportArgs) -> 
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_unreachable_case_clause_report(&reports, &policy, args.output)?;
+    print_unreachable_case_clause_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

@@ -20,7 +20,7 @@ pub fn negated_when_unless_report(args: NegatedWhenUnlessReportArgs) -> CommandR
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_negated_when_unless_report(&reports, &policy, args.output)?;
+    print_negated_when_unless_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

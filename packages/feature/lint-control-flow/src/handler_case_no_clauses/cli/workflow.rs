@@ -20,7 +20,7 @@ pub fn handler_case_no_clauses_report(args: HandlerCaseNoClausesReportArgs) -> C
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_handler_case_no_clauses_report(&reports, &policy, args.output)?;
+    print_handler_case_no_clauses_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

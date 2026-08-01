@@ -18,7 +18,7 @@ pub fn coerce_to_t_report(args: CoerceToTReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_coerce_to_t_report(&reports, &policy, args.output)?;
+    print_coerce_to_t_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

@@ -20,7 +20,7 @@ pub fn string_case_fold_report(args: StringCaseFoldReportArgs) -> CommandResult 
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_string_case_fold_report(&reports, &policy, args.output)?;
+    print_string_case_fold_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

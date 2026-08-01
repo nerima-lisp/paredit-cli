@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::license_report::usecase::SystemLicense;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,7 @@ pub fn print_review_report(
     reports: &[FileFindings<SystemLicense>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect licenses", reports, policy, output)
+    print_report("inspect licenses", reports, policy, output, verbosity)
 }

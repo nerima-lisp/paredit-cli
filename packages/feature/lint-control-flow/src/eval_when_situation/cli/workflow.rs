@@ -20,7 +20,7 @@ pub fn eval_when_situation_report(args: EvalWhenSituationReportArgs) -> CommandR
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_eval_when_situation_report(&reports, &policy, args.output)?;
+    print_eval_when_situation_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

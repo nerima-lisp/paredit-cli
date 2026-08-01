@@ -19,7 +19,7 @@ pub fn loop_report(args: LoopReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_unterminated_report(&reports, &policy, args.output)?;
+    print_unterminated_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

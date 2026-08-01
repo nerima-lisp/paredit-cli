@@ -20,7 +20,7 @@ pub fn redundant_eql_test_report(args: RedundantEqlTestReportArgs) -> CommandRes
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_redundant_eql_test_report(&reports, &policy, args.output)?;
+    print_redundant_eql_test_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

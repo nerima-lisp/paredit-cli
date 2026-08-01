@@ -19,7 +19,7 @@ pub fn test_map_report(args: TestMapReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_untested_report(&reports, &policy, args.output)?;
+    print_untested_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

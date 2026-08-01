@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::circular_literal_report::usecase::CircularLiteral;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_label_report(
     reports: &[FileFindings<CircularLiteral>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect circular-literals", reports, policy, output)
+    print_report(
+        "inspect circular-literals",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

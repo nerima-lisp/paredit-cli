@@ -153,6 +153,7 @@ nav:
       - Selecting Forms: reference/selectors.md
       - Choosing Files: reference/workspace-inputs.md
       - Configuration: reference/configuration.md
+      - Terminal Color: reference/color-palette.md
       - Error Codes: reference/errors.md
       - Architecture: reference/architecture.md
       - Compatibility: reference/compatibility.md

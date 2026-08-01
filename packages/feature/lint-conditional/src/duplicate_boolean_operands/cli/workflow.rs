@@ -20,7 +20,7 @@ pub fn duplicate_boolean_operand_report(args: DuplicateBooleanOperandReportArgs)
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_duplicate_boolean_operand_report(&reports, &policy, args.output)?;
+    print_duplicate_boolean_operand_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

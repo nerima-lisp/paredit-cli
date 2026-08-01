@@ -20,7 +20,7 @@ pub fn quoted_case_key_report(args: QuotedCaseKeyReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_quoted_case_key_report(&reports, &policy, args.output)?;
+    print_quoted_case_key_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

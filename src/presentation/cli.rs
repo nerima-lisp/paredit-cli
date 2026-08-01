@@ -132,6 +132,11 @@ struct Cli {
     /// interaction itself.
     #[arg(long, global = true)]
     paginate: bool,
+    /// Add a plain-language line to a text-mode failure, describing the error
+    /// category the way `--output json` already does. Off by default so the
+    /// existing stderr rendering is byte-for-byte unchanged.
+    #[arg(long, global = true)]
+    plain_language: bool,
     /// Permission bits a brand-new file is created with, octal without a
     /// leading 0 (for example 644). Unix only; the built-in default is 600.
     #[arg(long, global = true, value_name = "MODE")]
@@ -200,6 +205,8 @@ pub fn run() -> ExitCode {
         return ExitCode::from(2);
     }
 
+    let plain_language = cli.plain_language;
+
     // The protocol servers own their own exit status, and are therefore taken
     // before dispatch. A session normally ends with the client closing the
     // pipe, and routing that through the `Result` path below would report every
@@ -216,7 +223,7 @@ pub fn run() -> ExitCode {
     let pager = paredit_core_cli::pager::maybe_start();
     let exit_code = match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => report_failure(&error, &invocation),
+        Err(error) => report_failure(&error, &invocation, plain_language),
     };
     #[cfg(unix)]
     if let Some(pager) = pager {
@@ -292,7 +299,11 @@ fn suppress_writes_when_dry(argv: Vec<String>) -> Vec<String> {
 
 /// Prints a failure with its stable code and whatever would get past it, in
 /// the format this invocation was already going to be read in.
-fn report_failure(failure: &CommandFailure, invocation: &[String]) -> ExitCode {
+fn report_failure(
+    failure: &CommandFailure,
+    invocation: &[String],
+    plain_language: bool,
+) -> ExitCode {
     use clap::CommandFactory;
 
     let root = Cli::command();
@@ -327,6 +338,16 @@ fn report_failure(failure: &CommandFailure, invocation: &[String]) -> ExitCode {
             diagnosis.code,
             terminal_safe_error_chain(failure)
         );
+        // Labelled with the category's own identifier rather than a translated
+        // prefix, so the line reads the same way `  try: ...` does and the
+        // reader can match the label against the JSON envelope's `category`.
+        if plain_language {
+            eprintln!(
+                "  {}: {}",
+                painter.cyan(diagnosis.code.category().label()),
+                diagnosis.category_description
+            );
+        }
         // Best-effort: the file may have moved or changed since the failure,
         // in which case there is nothing to point a caret at and this simply
         // prints no excerpt rather than a wrong one.

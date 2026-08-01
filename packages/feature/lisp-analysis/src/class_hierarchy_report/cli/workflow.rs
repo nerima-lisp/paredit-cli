@@ -26,7 +26,7 @@ pub fn class_hierarchy_report(args: ClassHierarchyReportArgs) -> CommandResult {
 
     match args.graph {
         Some(format) => print_graph(&class_hierarchy_drawing(&reports), format),
-        None => print_shadowed_slot_report(&reports, &policy, args.output)?,
+        None => print_shadowed_slot_report(&reports, &policy, args.output, args.verbosity)?,
     }
 
     if !passed {

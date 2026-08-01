@@ -24,7 +24,7 @@ pub fn multiple_value_list_of_values_report(
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_multiple_value_list_of_values_report(&reports, &policy, args.output)?;
+    print_multiple_value_list_of_values_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

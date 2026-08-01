@@ -19,12 +19,13 @@
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+use clap::ValueEnum;
 use paredit_core_syntax::dialect::Dialect;
 
 use crate::color::ColorMode;
 
 /// How much detail a report includes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
 pub enum Verbosity {
     /// Counts, gates, and nothing a consumer can derive from them.
     Quiet,
@@ -305,5 +306,18 @@ mod tests {
         }
         assert_eq!(Verbosity::from_label("loud"), None);
         assert_eq!(Language::from_label("fr"), None);
+    }
+
+    /// `--verbosity <value>` is parsed by clap's derived `ValueEnum`, while
+    /// `paredit.toml` and every gate message go through [`Verbosity::label`].
+    /// Two spellings of the same setting would be a defect no type catches.
+    #[test]
+    fn the_value_enum_spelling_matches_the_label() {
+        for verbosity in [Verbosity::Quiet, Verbosity::Normal, Verbosity::Detailed] {
+            let value = verbosity
+                .to_possible_value()
+                .expect("no variant is skipped from the value enum");
+            assert_eq!(value.get_name(), verbosity.label());
+        }
     }
 }

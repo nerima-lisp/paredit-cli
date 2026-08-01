@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::{Args, ValueEnum};
 
 use paredit_core_cli::args::{DialectArg, ReportFormat};
+use paredit_core_cli::runtime::Verbosity;
 
 /// The version bump a release intends to make.
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -42,4 +43,7 @@ pub struct ApiDiffReportArgs {
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = ReportFormat::Json)]
     pub output: ReportFormat,
+    /// How much detail the report includes.
+    #[arg(long, value_enum, default_value_t = Verbosity::Normal)]
+    pub verbosity: Verbosity,
 }

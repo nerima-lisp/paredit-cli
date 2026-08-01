@@ -18,7 +18,7 @@ pub fn cons_to_list_report(args: ConsToListReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_cons_to_list_report(&reports, &policy, args.output)?;
+    print_cons_to_list_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

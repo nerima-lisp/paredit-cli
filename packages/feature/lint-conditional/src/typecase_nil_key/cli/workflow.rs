@@ -20,7 +20,7 @@ pub fn typecase_nil_key_report(args: TypecaseNilKeyReportArgs) -> CommandResult 
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_typecase_nil_key_report(&reports, &policy, args.output)?;
+    print_typecase_nil_key_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

@@ -21,7 +21,7 @@ pub fn external_system_report(args: ExternalSystemReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_external_report(&reports, &policy, args.output)?;
+    print_external_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

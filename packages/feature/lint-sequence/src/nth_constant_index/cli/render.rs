@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::nth_constant_index::usecase::NthConstantIndexItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_nth_constant_index_report(
     reports: &[FileFindings<NthConstantIndexItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect nth-constant-index", reports, policy, output)
+    print_report(
+        "inspect nth-constant-index",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

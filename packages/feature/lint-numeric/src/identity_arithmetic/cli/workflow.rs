@@ -20,7 +20,7 @@ pub fn identity_arithmetic_report(args: IdentityArithmeticReportArgs) -> Command
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_identity_arithmetic_report(&reports, &policy, args.output)?;
+    print_identity_arithmetic_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

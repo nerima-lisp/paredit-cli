@@ -20,7 +20,7 @@ pub fn nil_comparison_report(args: NilComparisonReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_nil_comparison_report(&reports, &policy, args.output)?;
+    print_nil_comparison_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

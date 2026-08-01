@@ -62,13 +62,14 @@ the `--config`/`--no-config`/`--no-config-env` trio are covered in
 `--max-*` budgets in [Bounding a run](../guide/safety.md#bounding-a-run); and
 `--new-file-mode`/`--refuse-symlinked-ancestors` in
 [Write permissions and symlinked ancestors](../guide/safety.md#write-permissions-and-symlinked-ancestors).
-The remaining two are terminal presentation, not safety, and apply nowhere
+The remaining three are terminal presentation, not safety, and apply nowhere
 else:
 
 | Flag | What it does |
 | --- | --- |
-| `--color <auto\|always\|never>` | Whether text output may use ANSI color. `auto`, the default, colors if and only if the destination stream is a terminal, `NO_COLOR` is unset, and `CLICOLOR_FORCE` has not already decided the question. |
+| `--color <auto\|always\|never>` | Whether text output may use ANSI color. `auto`, the default, colors if and only if the destination stream is a terminal, `NO_COLOR` is unset, and `CLICOLOR_FORCE` has not already decided the question. The hues it may use, and the rule that none of them ever carries a signal alone, are in [Terminal Color](color-palette.md). |
 | `--paginate` | Delegates stdout to `$PAGER` (falling back to `less`) when it is a terminal. Off by default — unlike `--color`, paging changes the interaction itself, so it has to be asked for. |
+| `--plain-language` | Adds one line to a text-mode failure paraphrasing its error category — the same `category_description` the `--output json` envelope has always carried. Off by default, so the existing stderr rendering is byte-for-byte unchanged. |
 
 ## Inspect
 
@@ -310,6 +311,11 @@ Most reports accept `--output json` for machine-readable results. Reports whose
 output is a list of located findings accept the interchange formats as well —
 `sarif`, `junit`, `code-climate`, `csv`, `tsv`, `html`, `markdown`, and
 `github` — see [Report output formats](../guide/integrations.md#report-output-formats).
+The same reports also accept `--verbosity <quiet|normal|detailed>` for
+`--output text`: `quiet` prints only the summary and gate lines, `normal`
+(the default) is unchanged from before this flag existed, and `detailed`
+adds each finding's full field set as indented lines under its row.
+`--output json` always carries full detail regardless of `--verbosity`.
 
 ### Choosing and tuning lint rules
 

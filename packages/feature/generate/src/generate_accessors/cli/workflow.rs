@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use paredit_core_cli::CliResult;
 
+use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_core_cli::shared::{
     apply_byte_span_edits, read_input_dialect_and_tree, resolve_compact_target, unified_diff,
     write_file_with_rollback,
@@ -60,7 +61,13 @@ pub fn generate_accessors(args: GenerateAccessorsArgs) -> CliResult<()> {
             .file
             .clone()
             .unwrap_or_else(|| PathBuf::from("<stdin>"));
-        print!("{}", unified_diff(&path, &input.text, &rewritten));
+        print!(
+            "{}",
+            colorize_diff(
+                Painter::stdout(),
+                &unified_diff(&path, &input.text, &rewritten)
+            )
+        );
         return Ok(());
     }
 

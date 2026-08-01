@@ -21,7 +21,7 @@ pub fn macro_hygiene_report(args: MacroHygieneReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_risk_report(&reports, &policy, args.output)?;
+    print_risk_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

@@ -20,7 +20,7 @@ pub fn funcall_lambda_report(args: FuncallLambdaReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_funcall_lambda_report(&reports, &policy, args.output)?;
+    print_funcall_lambda_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

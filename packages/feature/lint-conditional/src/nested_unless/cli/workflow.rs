@@ -20,7 +20,7 @@ pub fn nested_unless_report(args: NestedUnlessReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_nested_unless_report(&reports, &policy, args.output)?;
+    print_nested_unless_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

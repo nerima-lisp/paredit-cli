@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::malformed_iteration_spec::usecase::MalformedIterationSpecItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_malformed_iteration_spec_report(
     reports: &[FileFindings<MalformedIterationSpecItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect malformed-iteration-spec", reports, policy, output)
+    print_report(
+        "inspect malformed-iteration-spec",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

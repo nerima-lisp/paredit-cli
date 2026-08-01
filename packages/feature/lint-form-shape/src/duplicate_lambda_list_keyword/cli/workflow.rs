@@ -24,7 +24,7 @@ pub fn duplicate_lambda_list_keyword_report(
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_duplicate_lambda_list_keyword_report(&reports, &policy, args.output)?;
+    print_duplicate_lambda_list_keyword_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

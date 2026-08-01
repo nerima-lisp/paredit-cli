@@ -20,7 +20,7 @@ pub fn list_star_to_cons_report(args: ListStarToConsReportArgs) -> CommandResult
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_list_star_to_cons_report(&reports, &policy, args.output)?;
+    print_list_star_to_cons_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

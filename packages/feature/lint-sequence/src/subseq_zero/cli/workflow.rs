@@ -18,7 +18,7 @@ pub fn subseq_zero_report(args: SubseqZeroReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_subseq_zero_report(&reports, &policy, args.output)?;
+    print_subseq_zero_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(
