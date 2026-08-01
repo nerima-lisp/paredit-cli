@@ -5,6 +5,7 @@
 //! is this build going to do, and why".
 
 pub mod args;
+mod custom_conflicts;
 pub mod render;
 pub mod runtime;
 pub mod workflow;
