@@ -1240,6 +1240,54 @@
       "count": 0,
       "description": "a condition-case with no handler clauses, which catches nothing",
       "rule": "elisp-condition-case-without-handler"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a definition whose name or literal value is shaped like an embedded credential",
+      "rule": "embedded-secret"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a let/let*/cond/case-family form carrying more bindings or clauses than a threshold",
+      "rule": "giant-conditional-form"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a define-condition whose direct supertype list names a type and one of that type's own same-file ancestors",
+      "rule": "redundant-condition-supertype"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a comment whose entire body is a balanced s-expression rather than prose",
+      "rule": "commented-out-code"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a top-level form that runs at load time and references a name this file only defines later",
+      "rule": "execution-order-dependency"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a file whose fraction of purely-declarative top-level forms falls below a threshold",
+      "rule": "declarative-style-score"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an inner let binding or lambda-list parameter that reuses the name of a top-level definition in the same file",
+      "rule": "package-level-shadowing"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a function's own name called in tail position of its body, annotated with the target dialect's tail-call guarantee",
+      "rule": "self-recursive-tail-call"
     }
   ],
   "policy": {

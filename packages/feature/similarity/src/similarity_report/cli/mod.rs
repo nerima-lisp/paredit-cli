@@ -1,4 +1,5 @@
 pub mod args;
+pub mod cache;
 pub mod render;
 pub mod types;
 pub mod workflow;

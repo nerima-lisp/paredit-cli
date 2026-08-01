@@ -72,6 +72,7 @@ use paredit_feature_project_inventory::api_surface_report::cli as api_surface_re
 use paredit_feature_project_inventory::blame_report::cli as blame_report;
 use paredit_feature_project_inventory::external_system_report::cli as external_system_report;
 use paredit_feature_project_inventory::keyword_arity_report::cli as keyword_arity_report;
+use paredit_feature_project_inventory::license_header_report::cli as license_header_report;
 use paredit_feature_project_inventory::license_report::cli as license_report;
 use paredit_feature_project_inventory::serial_consistency_report::cli as serial_consistency_report;
 use paredit_feature_project_inventory::symbol_index_report::cli as symbol_index_report;
@@ -85,6 +86,7 @@ use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;
 use paredit_feature_semantic_report::fold_constants::cli as fold_constants;
+use paredit_feature_semantic_report::magic_number_report::cli as magic_number_report;
 use paredit_feature_semantic_report::narrowing_report::cli as narrowing_report;
 use paredit_feature_semantic_report::type_report::cli as type_report;
 use paredit_feature_semantic_report::value_propagation_report::cli as value_propagation_report;
@@ -127,7 +129,8 @@ struct Cli {
     #[arg(long, global = true)]
     progress: bool,
     /// Whether text output may use ANSI color. `auto` follows the
-    /// destination terminal and `NO_COLOR`/`CLICOLOR_FORCE`.
+    /// destination terminal, forced off by `NO_COLOR`/`TERM=dumb`, forced on
+    /// by `CLICOLOR_FORCE`/`FORCE_COLOR` (the off signals win).
     #[arg(long, global = true, value_enum)]
     color: Option<paredit_core_cli::color::ColorMode>,
     /// Delegate stdout to `$PAGER` (falling back to `less`) when it is a
@@ -622,6 +625,7 @@ use paredit_feature_lint_control_flow::prog2_to_progn::cli as prog2_to_progn_rep
 use paredit_feature_lint_control_flow::redundant_body_progn::cli as redundant_body_progn_report;
 use paredit_feature_lint_control_flow::redundant_prog1::cli as redundant_prog1_report;
 use paredit_feature_lint_control_flow::redundant_progn::cli as redundant_progn_report;
+use paredit_feature_lint_control_flow::self_recursive_tail_call::cli as self_recursive_tail_call_report;
 use paredit_feature_lint_control_flow::unwind_protect_no_cleanup::cli as unwind_protect_no_cleanup_report;
 use paredit_feature_lint_form_shape::butlast_default_count::cli as butlast_default_count_report;
 use paredit_feature_lint_form_shape::coerce_to_t::cli as coerce_to_t_report;
@@ -635,6 +639,7 @@ use paredit_feature_lint_form_shape::empty_let::cli as empty_let_report;
 use paredit_feature_lint_form_shape::funcall_lambda::cli as funcall_lambda_report;
 use paredit_feature_lint_form_shape::getf_default_nil::cli as getf_default_nil_report;
 use paredit_feature_lint_form_shape::gethash_default::cli as gethash_default_report;
+use paredit_feature_lint_form_shape::giant_conditional_form::cli as giant_conditional_form_report;
 use paredit_feature_lint_form_shape::lambda_list_keyword_order::cli as lambda_list_keyword_order_report;
 use paredit_feature_lint_form_shape::make_array_default_keyword::cli as make_array_default_keyword_report;
 use paredit_feature_lint_form_shape::make_hash_table_test::cli as make_hash_table_test_report;
@@ -646,6 +651,7 @@ use paredit_feature_lint_form_shape::manual_pushnew::cli as manual_pushnew_repor
 use paredit_feature_lint_form_shape::multiple_value_list_of_values::cli as multiple_value_list_of_values_report;
 use paredit_feature_lint_form_shape::nested_char_case::cli as nested_char_case_report;
 use paredit_feature_lint_form_shape::nested_cxr::cli as nested_cxr_report;
+use paredit_feature_lint_form_shape::package_level_shadowing::cli as package_level_shadowing_report;
 use paredit_feature_lint_form_shape::parse_integer_default_radix::cli as parse_integer_default_radix_report;
 use paredit_feature_lint_form_shape::redundant_apply::cli as redundant_apply_report;
 use paredit_feature_lint_form_shape::redundant_funcall::cli as redundant_funcall_report;
@@ -720,6 +726,7 @@ use paredit_feature_package::system_conflict_report::cli as system_conflict_repo
 use paredit_feature_package::unused_export_report::cli as unused_export_report;
 use paredit_feature_package::unused_nickname_report::cli as unused_nickname_report;
 use paredit_feature_package::unused_package_report::cli as unused_package_report;
+use paredit_feature_package::use_widening_report::cli as use_widening_report;
 use paredit_feature_project_analysis::call_cycle_report::cli as call_cycle_report;
 use paredit_feature_project_analysis::call_graph_report::cli as call_graph_report;
 use paredit_feature_project_analysis::call_report::cli as call_report;

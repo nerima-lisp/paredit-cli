@@ -623,6 +623,200 @@ fn a_disabled_rule_stops_being_reported_by_lint() {
     assert_eq!(after["finding_count"], 0);
 }
 
+// --- FR-E16: `lint.enable`/`lint.disable`/`lint.deny`/`lint.warn` also
+// recognise a project's own loaded custom rules, not just the shipped
+// catalogue. ---
+
+/// A `.paredit/rules/*.lisp` file defining one rule, at the default directory
+/// `custom::load` reads when nothing overrides it.
+fn write_custom_rule(root: &Path, rule: &str) {
+    write(root, ".paredit/rules/house.lisp", rule);
+}
+
+/// The literal scenario FR-E16 exists for: `lint.deny` naming a rule defined
+/// by a loaded `.paredit/rules/*.lisp` file promotes it to error severity, and
+/// that gates the run — observable via exit code — exactly the way naming a
+/// shipped rule already does.
+///
+/// `--fail-on error` is passed as a plain flag rather than through
+/// `paredit.toml`, so the JSON assertion below can run against a command that
+/// is expected to *succeed* (a report is still printed on a failing gate, but
+/// `json_of` asserts success — the exit-code assertion is the separate,
+/// second command).
+#[test]
+fn a_custom_rule_named_in_lint_deny_gates_the_run() {
+    let root = repo("config-effect-lint-deny-custom");
+    write_custom_rule(
+        &root,
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    write(&root, "a.lisp", "(print 1)\n");
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ndeny = [\"my-custom-rule\"]\n",
+    );
+
+    // The custom rule ships at warning severity; `lint.deny` promotes it.
+    let value = json_of(in_repo(&root, &["inspect", "lint", "a.lisp"]));
+    assert_eq!(value["finding_count"], 1);
+    assert_eq!(value["findings"][0]["rule"], "my-custom-rule");
+    assert_eq!(value["findings"][0]["severity"], "error");
+
+    // And that promotion is what turns `--fail-on error` into a failing exit
+    // code — the whole point of extending `lint.deny` to a custom rule.
+    in_repo(&root, &["inspect", "lint", "--fail-on", "error", "a.lisp"])
+        .assert()
+        .failure();
+}
+
+/// Without `lint.deny`, the same custom rule reports at its own (warning)
+/// severity and does not gate an `error`-only run — the control case that
+/// proves the failure above comes from `lint.deny`, not from the custom rule
+/// itself.
+#[test]
+fn without_lint_deny_the_same_custom_rule_does_not_gate_an_error_only_run() {
+    let root = repo("config-effect-lint-deny-custom-control");
+    write_custom_rule(
+        &root,
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    write(&root, "a.lisp", "(print 1)\n");
+
+    let value = json_of(in_repo(&root, &["inspect", "lint", "a.lisp"]));
+    assert_eq!(value["findings"][0]["severity"], "warning");
+
+    in_repo(&root, &["inspect", "lint", "--fail-on", "error", "a.lisp"])
+        .assert()
+        .success();
+}
+
+/// `lint.disable` naming a custom rule works the same way it does for a
+/// shipped one (mirrors `a_disabled_rule_stops_being_reported_by_lint`).
+#[test]
+fn lint_disable_stops_a_custom_rule_from_being_reported() {
+    let root = repo("config-effect-lint-disable-custom");
+    write_custom_rule(
+        &root,
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    write(&root, "a.lisp", "(print 1)\n");
+
+    let before = json_of(in_repo(&root, &["inspect", "lint", "a.lisp"]));
+    assert_eq!(before["finding_count"], 1);
+
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ndisable = [\"my-custom-rule\"]\n",
+    );
+
+    let after = json_of(in_repo(&root, &["inspect", "lint", "a.lisp"]));
+    assert_eq!(after["finding_count"], 0);
+}
+
+/// `lint.enable` naming only a custom rule runs just that rule — a shipped
+/// finding elsewhere in the same file is dropped, matching what `--rule` does
+/// for a shipped name.
+#[test]
+fn lint_enable_can_select_only_a_custom_rule() {
+    let root = repo("config-effect-lint-enable-custom");
+    write_custom_rule(
+        &root,
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    // `(list '5)` also trips the shipped `redundant-quote` rule.
+    write(&root, "a.lisp", "(print 1)\n(list '5)\n");
+
+    let value = json_of(in_repo(&root, &["inspect", "lint", "a.lisp"]));
+    let rules: BTreeSet<&str> = value["findings"]
+        .as_array()
+        .expect("findings")
+        .iter()
+        .map(|finding| finding["rule"].as_str().expect("rule"))
+        .collect();
+    assert!(rules.contains("my-custom-rule"));
+    assert!(rules.contains("redundant-quote"));
+
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\nenable = [\"my-custom-rule\"]\n",
+    );
+
+    let value = json_of(in_repo(&root, &["inspect", "lint", "a.lisp"]));
+    assert_eq!(value["finding_count"], 1);
+    assert_eq!(value["findings"][0]["rule"], "my-custom-rule");
+}
+
+/// A name that matches neither the shipped catalogue nor any loaded custom
+/// rule is still rejected outright by `config check` — FR-E16 widens what is
+/// *accepted*, not what is validated away.
+#[test]
+fn lint_deny_still_rejects_a_name_matching_nothing_loaded() {
+    let root = repo("config-effect-lint-deny-unknown");
+    write_custom_rule(
+        &root,
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ndeny = [\"not-a-real-rule\"]\n",
+    );
+
+    let output = config(&root, &["check"])
+        .assert()
+        .code(3)
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    let finding = diagnostic(&report, "unknown-rule");
+    assert!(
+        finding["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("not-a-real-rule"),
+        "{finding}"
+    );
+}
+
+/// The other half of the same guarantee: naming a *loaded* custom rule in
+/// `lint.deny` is exactly as valid as naming a shipped one — `config check`
+/// reports no error for it.
+#[test]
+fn config_check_accepts_a_loaded_custom_rule_name_in_lint_deny() {
+    let root = repo("config-check-custom-rule-name");
+    write_custom_rule(
+        &root,
+        r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
+    );
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ndeny = [\"my-custom-rule\"]\n",
+    );
+
+    // `config check` reads `.paredit/rules` relative to the process's working
+    // directory, exactly as `inspect lint` itself does — so it must run from
+    // `root`, not merely be pointed at it with `--from`.
+    let output = paredit()
+        .current_dir(&root)
+        .args(["config", "check"])
+        .env_remove("PAREDIT_CONFIG_HOME")
+        .env_remove("XDG_CONFIG_HOME")
+        .env("HOME", root.display().to_string())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert_eq!(report["status"], "ok");
+    assert_eq!(report["error_count"], 0);
+}
+
 /// The rule the whole bridge is built around.
 #[test]
 fn a_flag_still_beats_the_configuration() {

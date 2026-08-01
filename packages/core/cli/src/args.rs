@@ -27,6 +27,11 @@ pub struct FormatArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
     pub file: Option<PathBuf>,
+    /// Additional files or directories, for --diff-stat to aggregate across.
+    /// A directory is expanded via workspace discovery. Every other mode
+    /// still names exactly one file with --file; combine this with --file.
+    #[arg(value_name = "PATH", requires = "diff_stat")]
+    pub paths: Vec<PathBuf>,
     /// Override extension-based dialect detection.
     #[arg(long)]
     pub dialect: Option<DialectArg>,
@@ -37,6 +42,11 @@ pub struct FormatArgs {
     /// falling back to a multi-line layout. Unset keeps the built-in 80.
     #[arg(long, value_name = "COLUMNS")]
     pub max_width: Option<usize>,
+    /// Realign the interior lines of #|...|# block comments to their new
+    /// nesting depth, preserving each comment's own relative indentation.
+    /// Only dialects that read #|...|# as a block comment are affected.
+    #[arg(long)]
+    pub reindent_block_comments: bool,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
     pub write: bool,
@@ -49,7 +59,9 @@ pub struct FormatArgs {
     #[arg(long, conflicts_with_all = ["write", "diff", "diff_stat"])]
     pub check: bool,
     /// Print a JSON count of changed hunks and lines instead of the rewritten
-    /// document or a human-readable diff. Writes nothing.
+    /// document or a human-readable diff. Writes nothing. With one or more
+    /// PATH arguments, aggregates the count across every file instead of
+    /// reporting on --file alone.
     #[arg(long, conflicts_with_all = ["write", "diff", "check"])]
     pub diff_stat: bool,
 }

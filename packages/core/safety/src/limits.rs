@@ -217,6 +217,21 @@ pub fn effective_jobs() -> usize {
     EFFECTIVE_JOBS.get().copied().unwrap_or(0)
 }
 
+/// The worker count in force with the `0` sentinel already resolved.
+///
+/// The sentinel is the whole reason this exists: every fan-out in the tree
+/// wants a concrete count, and each one that decoded `0` for itself was a
+/// place the decoding could drift. This is the only caller of
+/// [`std::thread::available_parallelism`] outside a test, and a machine that
+/// declines to report its parallelism is one worker rather than an error —
+/// a serial run is slow, not wrong.
+#[must_use]
+pub fn effective_jobs_or_available() -> std::num::NonZeroUsize {
+    std::num::NonZeroUsize::new(effective_jobs()).unwrap_or_else(|| {
+        std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN)
+    })
+}
+
 /// Reads the `PAREDIT_MAX_*` environment overrides.
 ///
 /// The environment is how a container states its own budget, and it reaches
@@ -376,8 +391,21 @@ impl fmt::Display for ByteSize {
 mod tests {
     use super::{
         DEFAULT_MAX_FILE_BYTES, DEFAULT_MAX_INPUT_BYTES, DEFAULT_MAX_TOTAL_BYTES, LimitError,
-        ResourceLimitOverrides, ResourceLimits, format_byte_size, parse_byte_size,
+        ResourceLimitOverrides, ResourceLimits, effective_jobs, effective_jobs_or_available,
+        format_byte_size, parse_byte_size,
     };
+
+    /// Six fan-outs decoded the `0` sentinel themselves before this helper
+    /// existed, so the property that matters is that the resolved count
+    /// agrees with the flag whenever the flag named one.
+    #[test]
+    fn the_resolved_worker_count_honours_the_flag_and_is_never_zero() {
+        let resolved = effective_jobs_or_available();
+        match effective_jobs() {
+            0 => assert!(resolved.get() >= 1),
+            requested => assert_eq!(resolved.get(), requested),
+        }
+    }
 
     #[test]
     fn defaults_reproduce_the_previously_compiled_in_constants() {

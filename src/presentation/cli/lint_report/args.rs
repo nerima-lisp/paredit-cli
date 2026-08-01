@@ -158,6 +158,15 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// severity, category, and rule (a lint-debt dashboard).
     #[arg(long, conflicts_with_all = ["list_rules", "sarif", "github", "fix"])]
     pub(in crate::presentation::cli::lint_report) stats: bool,
+    /// Instead of listing findings, suggest a different severity for each
+    /// rule based on how often it fires across the scanned workspace — e.g. a
+    /// currently-`error` rule that fires on nearly every file (too noisy to
+    /// gate a build on), or a currently-`warning` rule that never fires (rare
+    /// enough that a miss would be worth failing over). Advisory only: this
+    /// never writes `paredit.toml`, never changes a rule's declared severity,
+    /// and never affects this run's exit code.
+    #[arg(long, conflicts_with_all = ["list_rules", "sarif", "github", "fix", "stats"])]
+    pub(in crate::presentation::cli::lint_report) suggest_severity: bool,
     /// Instead of scanning, report inline `; paredit:ignore` directives that
     /// silence no finding (stale ignores or typo'd rule names); exit 3 if any.
     #[arg(long, conflicts_with_all = ["list_rules", "sarif", "github", "fix", "stats"])]
@@ -373,6 +382,7 @@ impl LintReportArgs {
             check: mode == FixMode::Check,
             fix_plan: mode == FixMode::Plan,
             stats: false,
+            suggest_severity: false,
             report_unused_suppressions: false,
             report_expired_suppressions: false,
             report_suppressions: false,

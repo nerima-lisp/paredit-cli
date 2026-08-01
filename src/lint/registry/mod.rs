@@ -13,7 +13,7 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-pub const RULE_COUNT: usize = 169;
+pub const RULE_COUNT: usize = 178;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -702,5 +702,41 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_emacs_lisp::condition_case_without_handler::rule::META,
         &paredit_feature_emacs_lisp::condition_case_without_handler::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::embedded_secret::META,
+        &paredit_feature_lint_safety::embedded_secret::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::giant_conditional_form::rule::META,
+        &paredit_feature_lint_form_shape::giant_conditional_form::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::effectively_constant_variable::META,
+        &paredit_feature_lint_convention::effectively_constant_variable::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::redundant_condition_supertype::META,
+        &paredit_feature_lint_convention::redundant_condition_supertype::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_convention::commented_out_code::META,
+        &paredit_feature_lint_convention::commented_out_code::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::execution_order_dependency::META,
+        &paredit_feature_lint_safety::execution_order_dependency::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_safety::declarative_style_score::META,
+        &paredit_feature_lint_safety::declarative_style_score::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::package_level_shadowing::rule::META,
+        &paredit_feature_lint_form_shape::package_level_shadowing::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::self_recursive_tail_call::rule::META,
+        &paredit_feature_lint_control_flow::self_recursive_tail_call::rule::RULE,
     ),
 ];

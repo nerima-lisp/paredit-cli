@@ -110,10 +110,12 @@ impl Request {
     /// A bearer *header* rather than a query parameter or a cookie, and this is
     /// the whole defence against the two attacks a loopback HTTP server faces.
     /// A page in the user's browser can POST to `127.0.0.1` across origins, and
-    /// with a DNS rebind it can read the reply — but it cannot set an
-    /// `Authorization` header without a CORS preflight this server never
-    /// approves. A token in the URL would travel in the browser's own request
-    /// and defeat that.
+    /// with a DNS rebind it becomes same-origin with this server and may set
+    /// any header it likes. What it still cannot do is know the token, which
+    /// is minted per run and printed only to the launching terminal — secrecy
+    /// is what holds, not the browser's cross-origin header rules. A token in
+    /// the URL or a cookie would travel on the browser's own request and hand
+    /// a rebound page exactly what it lacks.
     ///
     /// The comparison is constant-time in the length it shares, so a caller
     /// cannot recover the token a byte at a time from response timing.

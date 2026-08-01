@@ -699,6 +699,11 @@ pub fn html(flat: &Flattened) -> String {
     out
 }
 
+/// `.gate.fail`/`.gate.pass` use the Okabe-Ito colorblind-safe palette
+/// (vermillion `#D55E00` / blue `#0072B2`) rather than red/green: the
+/// `gate`/`code`/`passed`/`failed` text around them always prints regardless
+/// of color, but a plain red/green pair is still hard to tell apart under
+/// deuteranopia/protanopia. See docs/src/reference/color-palette.md.
 const HTML_STYLE: &str = "\
 body{font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin:2rem;color:#111}\
 h1{font-size:1.2rem}h2{font-size:1rem;margin-top:2rem}\
@@ -706,7 +711,7 @@ table{border-collapse:collapse;width:100%}\
 th,td{border-bottom:1px solid #ddd;padding:.35rem .6rem;text-align:left;vertical-align:top}\
 th{background:#f6f6f6}td.n{text-align:right}\
 tr.error td{background:#fff5f5}tr.note td{color:#666}\
-.gate.fail{color:#b00}.gate.pass{color:#070}\
+.gate.fail{color:#D55E00}.gate.pass{color:#0072B2}\
 code{background:#f2f2f2;padding:0 .2em;border-radius:3px}";
 
 /// Escapes text for an XML or HTML text node or double-quoted attribute.

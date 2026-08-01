@@ -156,6 +156,7 @@ nav:
       - Terminal Color: reference/color-palette.md
       - Error Codes: reference/errors.md
       - Architecture: reference/architecture.md
+      - Benchmarks: reference/benchmarks.md
       - Compatibility: reference/compatibility.md
   - Project:
       - Development: project/development.md

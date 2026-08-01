@@ -1,4 +1,7 @@
+use unicode_width::UnicodeWidthStr;
+
 use crate::sexpr::formatter::Formatter;
+use crate::sexpr::formatter::core::Bounded;
 use crate::sexpr::tree::{NodeKind, SyntaxTree};
 use crate::sexpr::types::NodeId;
 
@@ -54,6 +57,12 @@ impl Formatter {
     /// Reader prefixes count against the budget but are not written here,
     /// because [`Formatter::format_node`] has already emitted them by the time
     /// it dispatches on the head's style.
+    ///
+    /// Builds against a running [`Bounded`] width instead of accumulating a
+    /// plain `String` and re-scanning it for its display width at the end —
+    /// the same incremental-width pattern [`Formatter::compact_node`] uses,
+    /// and it lets a form that is already over budget bail out before
+    /// compacting its remaining children.
     pub(in crate::sexpr::formatter) fn compact_form(
         &self,
         tree: &SyntaxTree,
@@ -64,25 +73,28 @@ impl Formatter {
             return Some(node.span.slice(&tree.source).to_owned());
         }
         let delimiter = self.list_delimiter(node);
-        let mut output = String::new();
-        let reader_prefix_len = node
+        let reader_prefix_width = node
             .reader_prefix_spans
             .iter()
-            .map(|span| span.slice(&tree.source).len())
+            .map(|span| UnicodeWidthStr::width(span.slice(&tree.source)))
             .sum::<usize>();
-        output.push(delimiter.open());
-        for (position, child) in node.children.iter().enumerate() {
-            if position > 0 {
-                output.push(' ');
-            }
-            output.push_str(&self.compact_node(tree, *child)?);
-        }
-        output.push(delimiter.close());
         // `self.max_width`, not the compiled-in constant: this was the last
         // width decision `--max-width` did not reach, which left a `defsystem`
         // header inlined up to 80 columns under `--max-width 40` and broken at
-        // 80 under `--max-width 120`.
-        (output.len().saturating_add(reader_prefix_len) <= self.max_width).then_some(output)
+        // 80 under `--max-width 120`. Measured in display columns rather than
+        // bytes for the same reason `compact_node` is: a CJK-heavy option
+        // value is narrower in bytes than it is on screen.
+        let max_width = self.max_width;
+        let mut output = Bounded::with_initial_width(reader_prefix_width);
+        output.push_char(delimiter.open(), max_width)?;
+        for (position, child) in node.children.iter().enumerate() {
+            if position > 0 {
+                output.push_char(' ', max_width)?;
+            }
+            output.push_str(&self.compact_node(tree, *child)?, max_width)?;
+        }
+        output.push_char(delimiter.close(), max_width)?;
+        Some(output.into_text())
     }
 
     pub(in crate::sexpr::formatter) fn format_definition(

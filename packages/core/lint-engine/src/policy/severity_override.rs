@@ -35,18 +35,25 @@ impl SeverityOverrides {
         Self::default()
     }
 
-    /// Applies one `--deny`/`--warn` selector, which names either a rule or a
-    /// category.
+    /// Applies one `--deny`/`--warn` selector, which names either a rule, a
+    /// category, or — when named in `custom_rules` — a project's own loaded
+    /// `defrule` rule.
     ///
-    /// A name that is neither is a hard error rather than a silent no-op: the
-    /// whole point of the flag is to change what fails CI, and a typo that
-    /// quietly changed nothing would leave a build passing for the wrong
-    /// reason.
+    /// A name that is none of those is a hard error rather than a silent
+    /// no-op: the whole point of the flag is to change what fails CI, and a
+    /// typo that quietly changed nothing would leave a build passing for the
+    /// wrong reason.
+    ///
+    /// A custom rule has no category to re-rank alongside it — `matched`
+    /// tracks only the catalogue's categories — so a custom name is checked
+    /// once its own name has already missed both the catalogue's rules and
+    /// categories.
     pub fn apply(
         &mut self,
         catalog: RuleCatalog,
         selector: &str,
         severity: Severity,
+        custom_rules: &[&'static str],
     ) -> Result<(), RuleSelectionError> {
         let mut matched = false;
         for entry in catalog.entries() {
@@ -63,7 +70,15 @@ impl SeverityOverrides {
         if matched {
             return Ok(());
         }
-        let known: Vec<&str> = catalog.names().chain(catalog.categories()).collect();
+        if let Some(name) = custom_rules.iter().copied().find(|name| *name == selector) {
+            self.by_rule.insert(name, severity);
+            return Ok(());
+        }
+        let known: Vec<&str> = catalog
+            .names()
+            .chain(catalog.categories())
+            .chain(custom_rules.iter().copied())
+            .collect();
         Err(RuleSelectionError::UnknownRule {
             suggestion: did_you_mean(known.iter().copied(), selector),
             name: selector.to_owned(),
@@ -78,6 +93,39 @@ impl SeverityOverrides {
             .get(rule)
             .copied()
             .unwrap_or_else(|| catalog.severity_of(rule))
+    }
+
+    /// The severity specifically recorded for `rule` by `--deny`/`--warn`, with
+    /// no catalogue fallback.
+    ///
+    /// Distinct from [`Self::severity_of`], which always answers something: a
+    /// custom rule has no catalogue entry to fall back to, so its own resolver
+    /// needs to ask "was this specifically overridden?" before reaching for
+    /// the rule's own declared severity. (A rule [`Self::seed`] has filled in
+    /// answers `Some` here too — from that call's point of view a seeded
+    /// default *is* the rule's recorded severity, which is exactly what makes
+    /// [`Self::severity_of`] correct for it without a catalogue entry to fall
+    /// back to.)
+    #[must_use]
+    pub fn override_of(&self, rule: &str) -> Option<Severity> {
+        self.by_rule.get(rule).copied()
+    }
+
+    /// Records `rule`'s severity if — and only if — `--deny`/`--warn` has not
+    /// already recorded one for it.
+    ///
+    /// [`Self::severity_of`] falls back to [`RuleCatalog::severity_of`] for a
+    /// rule this map does not mention, and that fallback answers `Error` for
+    /// *any* name the catalogue does not register — the correct read for a
+    /// genuine typo, but the wrong one for a project's own loaded rule, which
+    /// has a real severity of its own that simply is not in this catalogue.
+    /// Seeding that severity here, before any `--deny`/`--warn` is applied,
+    /// gives [`Self::severity_of`] (and therefore the CI gate) the right
+    /// answer without a custom rule ever having to fake a catalogue entry —
+    /// and an explicit `--deny`/`--warn` naming that same rule still wins,
+    /// since [`Self::apply`] inserts unconditionally over whatever is here.
+    pub fn seed(&mut self, rule: &'static str, severity: Severity) {
+        self.by_rule.entry(rule).or_insert(severity);
     }
 
     #[must_use]
@@ -170,7 +218,7 @@ mod tests {
     fn a_rule_selector_promotes_exactly_that_rule() {
         let mut overrides = SeverityOverrides::new();
         overrides
-            .apply(catalog(), "redundant-quote", Severity::Error)
+            .apply(catalog(), "redundant-quote", Severity::Error, &[])
             .expect("known rule");
         assert_eq!(
             overrides.severity_of(catalog(), "redundant-quote"),
@@ -186,7 +234,7 @@ mod tests {
     fn a_category_selector_reaches_every_rule_in_it() {
         let mut overrides = SeverityOverrides::new();
         overrides
-            .apply(catalog(), "suspicious", Severity::Error)
+            .apply(catalog(), "suspicious", Severity::Error, &[])
             .expect("known category");
         assert_eq!(
             overrides.severity_of(catalog(), "redundant-quote"),
@@ -207,10 +255,10 @@ mod tests {
     fn a_later_rule_selector_wins_over_an_earlier_category_one() {
         let mut overrides = SeverityOverrides::new();
         overrides
-            .apply(catalog(), "suspicious", Severity::Error)
+            .apply(catalog(), "suspicious", Severity::Error, &[])
             .expect("known category");
         overrides
-            .apply(catalog(), "redundant-quote", Severity::Warning)
+            .apply(catalog(), "redundant-quote", Severity::Warning, &[])
             .expect("known rule");
         assert_eq!(
             overrides.severity_of(catalog(), "redundant-quote"),
@@ -226,7 +274,7 @@ mod tests {
     fn an_unknown_selector_is_rejected_with_the_valid_names() {
         let mut overrides = SeverityOverrides::new();
         let error = overrides
-            .apply(catalog(), "redundant-quotes", Severity::Error)
+            .apply(catalog(), "redundant-quotes", Severity::Error, &[])
             .expect_err("typo must not pass silently");
         let RuleSelectionError::UnknownRule {
             name,
@@ -246,7 +294,7 @@ mod tests {
     fn entries_report_what_a_run_applied() {
         let mut overrides = SeverityOverrides::new();
         overrides
-            .apply(catalog(), "suspicious", Severity::Error)
+            .apply(catalog(), "suspicious", Severity::Error, &[])
             .expect("known category");
         let listed: Vec<(&str, Severity)> = overrides.entries().collect();
         assert_eq!(
@@ -255,6 +303,96 @@ mod tests {
                 ("nested-progn", Severity::Error),
                 ("redundant-quote", Severity::Error),
             ]
+        );
+    }
+
+    #[test]
+    fn a_selector_naming_a_loaded_custom_rule_promotes_it() {
+        let mut overrides = SeverityOverrides::new();
+        overrides
+            .apply(
+                catalog(),
+                "my-custom-rule",
+                Severity::Error,
+                &["my-custom-rule"],
+            )
+            .expect("known custom rule");
+        // `severity_of` — the catalogue-backed reading — has nothing to fall
+        // back to for a name it does not register, but the override itself is
+        // recorded and answerable directly.
+        assert_eq!(
+            overrides.override_of("my-custom-rule"),
+            Some(Severity::Error)
+        );
+    }
+
+    #[test]
+    fn a_selector_matching_neither_the_catalogue_nor_a_custom_rule_is_still_unknown() {
+        let mut overrides = SeverityOverrides::new();
+        let error = overrides
+            .apply(
+                catalog(),
+                "not-a-real-rule",
+                Severity::Error,
+                &["my-custom-rule"],
+            )
+            .expect_err("typo must not pass silently");
+        let RuleSelectionError::UnknownRule { name, valid, .. } = error else {
+            panic!("expected an unknown-rule error");
+        };
+        assert_eq!(name, "not-a-real-rule");
+        assert!(valid.contains("my-custom-rule"));
+    }
+
+    #[test]
+    fn override_of_answers_none_with_no_override_recorded() {
+        let overrides = SeverityOverrides::new();
+        assert_eq!(overrides.override_of("redundant-quote"), None);
+    }
+
+    #[test]
+    fn seed_gives_severity_of_an_answer_with_no_catalogue_entry() {
+        let mut overrides = SeverityOverrides::new();
+        overrides.seed("my-custom-rule", Severity::Warning);
+        assert_eq!(
+            overrides.severity_of(catalog(), "my-custom-rule"),
+            Severity::Warning
+        );
+    }
+
+    #[test]
+    fn an_explicit_deny_still_wins_over_a_seeded_default() {
+        let mut overrides = SeverityOverrides::new();
+        overrides.seed("my-custom-rule", Severity::Warning);
+        overrides
+            .apply(
+                catalog(),
+                "my-custom-rule",
+                Severity::Error,
+                &["my-custom-rule"],
+            )
+            .expect("known custom rule");
+        assert_eq!(
+            overrides.severity_of(catalog(), "my-custom-rule"),
+            Severity::Error
+        );
+    }
+
+    #[test]
+    fn seeding_after_an_explicit_deny_does_not_overwrite_it() {
+        let mut overrides = SeverityOverrides::new();
+        overrides
+            .apply(
+                catalog(),
+                "my-custom-rule",
+                Severity::Error,
+                &["my-custom-rule"],
+            )
+            .expect("known custom rule");
+        overrides.seed("my-custom-rule", Severity::Warning);
+        assert_eq!(
+            overrides.severity_of(catalog(), "my-custom-rule"),
+            Severity::Error
         );
     }
 }

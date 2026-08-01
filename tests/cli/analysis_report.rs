@@ -240,6 +240,111 @@ fn cli_check_text_reports_every_syntax_error_one_per_line() {
         ));
 }
 
+// ---------------------------------------------------------------------------
+// `inspect check --paredit-config`: a migration aid over `.paredit/rules`,
+// which ordinary discovery never sees because a `.paredit` directory is
+// hidden. It never fails the run on its own — see the flag's own help — so
+// every case below still expects `success()`.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_check_paredit_config_is_silent_with_no_rule_directory() {
+    let dir = fresh_temp_dir("check-paredit-config-absent");
+    let mut cmd = paredit();
+    cmd.current_dir(&dir)
+        .args(["inspect", "check", "--output", "json"])
+        .write_stdin("(defun add (x y) (+ x y))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"paredit_config\": null"));
+}
+
+#[test]
+fn cli_check_paredit_config_reports_a_syntax_error_in_a_rule_file() {
+    let dir = fresh_temp_dir("check-paredit-config-syntax-error");
+    let rules = dir.join(".paredit").join("rules");
+    fs::create_dir_all(&rules).expect("create rule dir");
+    fs::write(rules.join("broken.lisp"), "(defrule r :pattern (f ?x").expect("write broken.lisp");
+
+    let mut cmd = paredit();
+    cmd.current_dir(&dir)
+        .args(["inspect", "check", "--paredit-config"])
+        .write_stdin("(defun add (x y) (+ x y))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("paredit-config:"))
+        .stdout(predicate::str::contains("broken.lisp"))
+        .stdout(predicate::str::contains("unclosed list"))
+        // The syntax problem is in the rule directory, not the checked
+        // input, so the input's own report is still a plain "ok".
+        .stdout(predicate::str::contains("ok\n"));
+}
+
+#[test]
+fn cli_check_paredit_config_flags_a_rule_that_does_not_read_as_a_pattern() {
+    let dir = fresh_temp_dir("check-paredit-config-invalid-pattern");
+    let rules = dir.join(".paredit").join("rules");
+    fs::create_dir_all(&rules).expect("create rule dir");
+    fs::write(
+        rules.join("house.lisp"),
+        r#"(defrule r :pattern (f ?x:bogus) :message "m")"#,
+    )
+    .expect("write house.lisp");
+
+    let mut cmd = paredit();
+    cmd.current_dir(&dir)
+        .args(["inspect", "check", "--paredit-config", "--output", "json"])
+        .write_stdin("(defun add (x y) (+ x y))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("unknown capture kind"));
+}
+
+#[test]
+fn cli_check_paredit_config_nudges_a_non_trailing_ellipsis_pattern() {
+    let dir = fresh_temp_dir("check-paredit-config-non-trailing-ellipsis");
+    let rules = dir.join(".paredit").join("rules");
+    fs::create_dir_all(&rules).expect("create rule dir");
+    fs::write(
+        rules.join("house.lisp"),
+        r#"(defrule old-style :pattern (?a ... ?b) :message "m")"#,
+    )
+    .expect("write house.lisp");
+
+    let mut cmd = paredit();
+    cmd.current_dir(&dir)
+        .args(["inspect", "check", "--paredit-config", "--output", "json"])
+        .write_stdin("(defun add (x y) (+ x y))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("old-style"))
+        .stdout(predicate::str::contains("`?name...`"));
+}
+
+#[test]
+fn cli_check_paredit_config_reports_a_clean_directory_with_no_issues() {
+    let dir = fresh_temp_dir("check-paredit-config-clean");
+    let rules = dir.join(".paredit").join("rules");
+    fs::create_dir_all(&rules).expect("create rule dir");
+    fs::write(
+        rules.join("house.lisp"),
+        r#"(defrule house-style :pattern (print ?x) :message "m")"#,
+    )
+    .expect("write house.lisp");
+
+    let mut cmd = paredit();
+    cmd.current_dir(&dir)
+        .args(["inspect", "check", "--paredit-config", "--output", "json"])
+        .write_stdin("(defun add (x y) (+ x y))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"path\": \".paredit/rules/house.lisp\"",
+        ))
+        .stdout(predicate::str::contains("\"issues\": []"))
+        .stdout(predicate::str::contains("\"syntax_errors\": []"));
+}
+
 #[test]
 fn cli_stats_reports_structural_metrics_as_json() {
     let mut cmd = paredit();

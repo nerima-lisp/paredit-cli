@@ -713,12 +713,52 @@ fn validate_write_inputs<'a>(
     reject_duplicate_write_targets(files.iter().map(|(path, _)| *path))?;
     // Central invariant: paredit never persists an unbalanced document, no
     // matter which command produced the rewrite.
-    for (path, content) in files {
-        SyntaxTree::parse(content).map_err(|_| IoRefusal::NamedRewriteDoesNotReparse {
-            path: path.display().to_string(),
-        })?;
+    let workers = super::worker_count(files.len());
+    match first_unparsable_index(&files, workers) {
+        None => Ok(()),
+        Some(index) => Err(IoRefusal::NamedRewriteDoesNotReparse {
+            path: files[index].0.display().to_string(),
+        }
+        .into()),
     }
-    Ok(())
+}
+
+/// The index of the first member of `files` whose content does not reparse.
+///
+/// "First" is by input order, never by which thread noticed first: the parses
+/// run concurrently but each worker writes only its own pre-indexed slice, and
+/// the verdicts are read back in input order afterwards. A batch with two
+/// unparsable members therefore names the earlier one for every worker count,
+/// which is what the serial `?` this replaces did.
+///
+/// The partitioning is the same one [`super::analyze_files`] uses — contiguous
+/// chunks over `std::thread::scope`, sized by `super::worker_count`, no
+/// work-stealing and so no lock on the hot path. This parse is a pure
+/// correctness guard duplicating work the transform already did, so on a batch
+/// `fix` across hundreds of files it was the one remaining serial parse of
+/// every byte being written.
+fn first_unparsable_index(files: &[(&PathBuf, &String)], workers: usize) -> Option<usize> {
+    if workers <= 1 || files.is_empty() {
+        return files
+            .iter()
+            .position(|(_, content)| SyntaxTree::parse(content).is_err());
+    }
+
+    let mut unparsable = vec![false; files.len()];
+    let per_worker = files.len().div_ceil(workers);
+    std::thread::scope(|scope| {
+        for (chunk_index, slots) in unparsable.chunks_mut(per_worker).enumerate() {
+            let start = chunk_index * per_worker;
+            scope.spawn(move || {
+                for (offset, slot) in slots.iter_mut().enumerate() {
+                    let (_, content) = files[start + offset];
+                    *slot = SyntaxTree::parse(content).is_err();
+                }
+            });
+        }
+    });
+
+    unparsable.iter().position(|failed| *failed)
 }
 
 /// The non-unix write path.
@@ -4459,6 +4499,143 @@ mod tests {
         assert_eq!(fs::read_to_string(&good).expect("read first"), "(a)\n");
         assert_eq!(fs::read_to_string(&bad).expect("read second"), "(b)\n");
         assert_eq!(directory_entry_names(&directory), ["bad.lisp", "good.lisp"]);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    /// The reparse guard names the member that actually failed, at every
+    /// worker count.
+    ///
+    /// The unparsable member sits in the middle of the batch on purpose. A
+    /// chunk-to-index mapping that is off by one, or one that reports the
+    /// index within a worker's slice rather than within the batch, still names
+    /// *a* file and still fails the batch — only a failure that is neither
+    /// first nor last distinguishes the right file from a plausible wrong one.
+    #[test]
+    fn the_reparse_guard_names_the_failing_member_at_every_worker_count() {
+        const BATCH: usize = 16;
+        const FAILING: usize = 9;
+
+        let paths = (0..BATCH)
+            .map(|index| PathBuf::from(format!("member-{index}.lisp")))
+            .collect::<Vec<_>>();
+        let contents = (0..BATCH)
+            .map(|index| {
+                if index == FAILING {
+                    "(unbalanced\n".to_owned()
+                } else {
+                    format!("(form {index})\n")
+                }
+            })
+            .collect::<Vec<_>>();
+        let files = paths.iter().zip(contents.iter()).collect::<Vec<_>>();
+
+        for workers in 1..=BATCH + 1 {
+            assert_eq!(
+                first_unparsable_index(&files, workers),
+                Some(FAILING),
+                "workers = {workers}"
+            );
+        }
+    }
+
+    /// Two unparsable members name the earlier one, at every worker count.
+    ///
+    /// The serial loop this replaced stopped at the first failure, so the
+    /// batch was named after it; whichever worker finishes first must not
+    /// change that.
+    #[test]
+    fn the_reparse_guard_reports_the_earliest_failure_not_the_fastest() {
+        const BATCH: usize = 20;
+        const FAILING: [usize; 2] = [3, 17];
+
+        let paths = (0..BATCH)
+            .map(|index| PathBuf::from(format!("member-{index}.lisp")))
+            .collect::<Vec<_>>();
+        let contents = (0..BATCH)
+            .map(|index| {
+                if FAILING.contains(&index) {
+                    "(unbalanced\n".to_owned()
+                } else {
+                    format!("(form {index})\n")
+                }
+            })
+            .collect::<Vec<_>>();
+        let files = paths.iter().zip(contents.iter()).collect::<Vec<_>>();
+
+        for workers in 1..=BATCH + 1 {
+            assert_eq!(
+                first_unparsable_index(&files, workers),
+                Some(FAILING[0]),
+                "workers = {workers}"
+            );
+        }
+    }
+
+    /// A batch where every member parses reports no failure, at every worker
+    /// count — including the counts that leave a worker with a short final
+    /// chunk or no chunk at all.
+    #[test]
+    fn the_reparse_guard_accepts_a_wholly_parsable_batch() {
+        const BATCH: usize = 13;
+
+        let paths = (0..BATCH)
+            .map(|index| PathBuf::from(format!("member-{index}.lisp")))
+            .collect::<Vec<_>>();
+        let contents = (0..BATCH)
+            .map(|index| format!("(form {index})\n"))
+            .collect::<Vec<_>>();
+        let files = paths.iter().zip(contents.iter()).collect::<Vec<_>>();
+
+        for workers in 1..=BATCH + 4 {
+            assert_eq!(
+                first_unparsable_index(&files, workers),
+                None,
+                "workers = {workers}"
+            );
+        }
+    }
+
+    /// The same attribution through the public entry point: a mid-batch
+    /// unparsable member names itself in the error and no member is written.
+    #[cfg(unix)]
+    #[test]
+    fn a_large_batch_names_the_unparsable_member_and_writes_nothing() {
+        const BATCH: usize = 12;
+        const FAILING: usize = 7;
+
+        let directory = test_directory("batch-unparsable-parallel");
+        let mut targets = Vec::with_capacity(BATCH);
+        for index in 0..BATCH {
+            let path = directory.join(format!("member-{index}.lisp"));
+            fs::write(&path, format!("(old {index})\n")).expect("write target");
+            targets.push(path);
+        }
+
+        let error = write_files_with_rollback(targets.iter().enumerate().map(|(index, path)| {
+            let content = if index == FAILING {
+                "(unbalanced\n".to_owned()
+            } else {
+                format!("(new {index})\n")
+            };
+            (path.clone(), content)
+        }))
+        .expect_err("an unparsable member must fail the batch");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("does not reparse"),
+            "unexpected: {message}"
+        );
+        assert!(
+            message.contains(&targets[FAILING].display().to_string()),
+            "the error must name the failing member, got: {message}"
+        );
+        for (index, path) in targets.iter().enumerate() {
+            assert_eq!(
+                fs::read_to_string(path).expect("read target"),
+                format!("(old {index})\n")
+            );
+        }
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 

@@ -151,7 +151,7 @@ const FAIL_SEVERITIES: &[&str] = &["never", "warning", "error"];
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 29;
+pub const KEY_COUNT: usize = 30;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -225,6 +225,12 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         kind: ValueKind::Integer { min: 1, max: 512 },
         default: DefaultValue::Unset,
         summary: "Widest a form may be and still be printed on one line.",
+    },
+    KeySchema {
+        key: "format.block-comment-reindent",
+        kind: ValueKind::Boolean,
+        default: DefaultValue::Boolean(false),
+        summary: "Realign #|...|# block comment lines to their new nesting depth.",
     },
     // --- [lint] ---
     KeySchema {

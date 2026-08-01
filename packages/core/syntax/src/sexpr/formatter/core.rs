@@ -1,3 +1,5 @@
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
 use super::styles::ListStyle;
 use super::{Formatter, MAX_INLINE_WIDTH};
 use crate::dialect::Dialect;
@@ -6,6 +8,64 @@ use crate::sexpr::types::Delimiter;
 use crate::sexpr::types::NodeId;
 
 const MAX_RECURSIVE_FORMAT_DEPTH: usize = 256;
+
+/// The text accumulated so far, plus its running East-Asian-Width–aware
+/// display width — tracked separately from `text.len()`, which is a byte
+/// count and not a column count for anything outside ASCII.
+///
+/// Shared between [`Formatter::compact_node`] here and
+/// [`Formatter::compact_form`] (in `formatter/lists/definitions.rs`) so both
+/// build their output against a running width instead of re-scanning the
+/// whole accumulated string every time they need to check it fits.
+pub(super) struct Bounded {
+    text: String,
+    width: usize,
+}
+
+impl Bounded {
+    pub(super) const fn new() -> Self {
+        Self {
+            text: String::new(),
+            width: 0,
+        }
+    }
+
+    /// Starts already charged `width` columns against the budget — for a
+    /// caller that writes some text (e.g. reader-prefix spans) outside this
+    /// accumulator but still wants it counted toward `max_width`.
+    pub(super) const fn with_initial_width(width: usize) -> Self {
+        Self {
+            text: String::new(),
+            width,
+        }
+    }
+
+    pub(super) fn push_str(&mut self, value: &str, max_width: usize) -> Option<()> {
+        let new_width = self.width.checked_add(UnicodeWidthStr::width(value))?;
+        if new_width > max_width {
+            return None;
+        }
+        self.text.push_str(value);
+        self.width = new_width;
+        Some(())
+    }
+
+    pub(super) fn push_char(&mut self, value: char, max_width: usize) -> Option<()> {
+        let new_width = self
+            .width
+            .checked_add(UnicodeWidthChar::width(value).unwrap_or(0))?;
+        if new_width > max_width {
+            return None;
+        }
+        self.text.push(value);
+        self.width = new_width;
+        Some(())
+    }
+
+    pub(super) fn into_text(self) -> String {
+        self.text
+    }
+}
 
 /// One planned unit of top-level output: either a form (with the comments that
 /// attach to it) or a run of standalone comments with no following form.
@@ -44,6 +104,7 @@ impl Formatter {
             indent: indent.min(MAX_INLINE_WIDTH),
             dialect,
             max_width: MAX_INLINE_WIDTH,
+            reindent_block_comments: false,
         }
     }
 
@@ -58,6 +119,16 @@ impl Formatter {
     pub fn with_max_width(mut self, max_width: usize) -> Self {
         self.max_width = max_width;
         self.indent = self.indent.min(max_width);
+        self
+    }
+
+    /// Enables realigning `#|...|#` block comment lines to their nesting
+    /// depth. `false` by default: this changes what a block comment's
+    /// interior looks like, not merely where a line breaks, so a caller opts
+    /// in rather than finding their comments rewritten by default.
+    #[must_use]
+    pub const fn with_reindent_block_comments(mut self, reindent: bool) -> Self {
+        self.reindent_block_comments = reindent;
         self
     }
 
@@ -168,7 +239,7 @@ impl Formatter {
                 verbatim,
             } => {
                 for &comment in leading {
-                    output.push_str(comments[comment].text.trim_end());
+                    output.push_str(&self.render_comment_text(&comments[comment].text, 0));
                     output.push('\n');
                 }
                 if *verbatim {
@@ -180,7 +251,7 @@ impl Formatter {
                 }
                 if let Some(comment) = trailing {
                     output.push(' ');
-                    output.push_str(comments[*comment].text.trim_end());
+                    output.push_str(&self.render_comment_text(&comments[*comment].text, 0));
                 }
             }
             TopLevelItem::Comments(indices) => {
@@ -188,10 +259,91 @@ impl Formatter {
                     if position > 0 {
                         output.push('\n');
                     }
-                    output.push_str(comments[comment].text.trim_end());
+                    output.push_str(&self.render_comment_text(&comments[comment].text, 0));
                 }
             }
         }
+    }
+
+    /// Trims a comment's trailing whitespace and, when enabled, realigns a
+    /// `#|...|#` block comment's interior lines to `depth`.
+    ///
+    /// Every call site in [`Self::render_top_level_item`] is a standalone or
+    /// trailing comment between top-level forms, so `depth` is always `0`
+    /// today; the depth parameter still exists because the transformation
+    /// itself has nothing top-level-specific about it.
+    fn render_comment_text(&self, text: &str, depth: usize) -> String {
+        let trimmed = text.trim_end();
+        if self.reindent_block_comments {
+            self.reindent_block_comment(trimmed, depth)
+        } else {
+            trimmed.to_owned()
+        }
+    }
+
+    /// Realigns a `#|...|#` block comment's continuation lines to `depth`,
+    /// preserving each line's indentation *relative to* the others.
+    ///
+    /// The comment's own nested `#|...|#` markers need no special handling:
+    /// the parser already matched them when it produced `text`, so this only
+    /// ever adjusts a leading-whitespace prefix, never comment content.
+    ///
+    /// A line whose transformation this function is not sure of — narrower
+    /// than every other continuation line, which `base` being their minimum
+    /// should make impossible — is left exactly as written rather than
+    /// guessed at.
+    ///
+    /// Each line's leading-whitespace amount is measured in display width
+    /// (via [`UnicodeWidthStr::width`]), not byte length, so a tab and a
+    /// space are weighted consistently with the rest of this file's width
+    /// accounting; a tab's width is its raw `unicode-width` value (1 column),
+    /// not an expansion to the next tab stop.
+    pub(super) fn reindent_block_comment(&self, text: &str, depth: usize) -> String {
+        if !text.starts_with("#|") {
+            return text.to_owned();
+        }
+        let mut lines = text.split('\n');
+        let Some(first) = lines.next() else {
+            return text.to_owned();
+        };
+        let rest: Vec<&str> = lines.collect();
+        if rest.is_empty() {
+            // A single-line block comment has nothing to realign.
+            return text.to_owned();
+        }
+
+        let Some(base) = rest
+            .iter()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| UnicodeWidthStr::width(&line[..line.len() - line.trim_start().len()]))
+            .min()
+        else {
+            // Every continuation line is blank; there is nothing to measure
+            // an indentation against.
+            return text.to_owned();
+        };
+
+        let new_indent = self.indent(depth);
+        let mut result = String::with_capacity(text.len());
+        result.push_str(first);
+        for line in rest {
+            result.push('\n');
+            if line.trim().is_empty() {
+                // Blank interior lines are left exactly as written.
+                result.push_str(line);
+                continue;
+            }
+            let leading_bytes = line.len() - line.trim_start().len();
+            let leading = UnicodeWidthStr::width(&line[..leading_bytes]);
+            if leading < base {
+                result.push_str(line);
+                continue;
+            }
+            result.push_str(&new_indent);
+            result.push_str(&" ".repeat(leading - base));
+            result.push_str(line.trim_start());
+        }
+        result
     }
 
     pub(super) fn format_node(
@@ -340,24 +492,6 @@ impl Formatter {
     }
 
     pub(super) fn compact_node(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
-        fn push_bounded(output: &mut String, value: &str, max_width: usize) -> Option<()> {
-            let new_len = output.len().checked_add(value.len())?;
-            if new_len > max_width {
-                return None;
-            }
-            output.push_str(value);
-            Some(())
-        }
-
-        fn push_char_bounded(output: &mut String, value: char, max_width: usize) -> Option<()> {
-            let new_len = output.len().checked_add(value.len_utf8())?;
-            if new_len > max_width {
-                return None;
-            }
-            output.push(value);
-            Some(())
-        }
-
         enum Action {
             Node(NodeId),
             Separator,
@@ -365,22 +499,22 @@ impl Formatter {
         }
 
         let max_width = self.max_width;
-        let mut output = String::new();
+        let mut output = Bounded::new();
         let mut actions = vec![Action::Node(node_id)];
 
         while let Some(action) = actions.pop() {
             match action {
-                Action::Separator => push_char_bounded(&mut output, ' ', max_width)?,
-                Action::Close(delimiter) => push_char_bounded(&mut output, delimiter, max_width)?,
+                Action::Separator => output.push_char(' ', max_width)?,
+                Action::Close(delimiter) => output.push_char(delimiter, max_width)?,
                 Action::Node(current_id) => {
                     let node = tree.node(current_id);
                     match node.kind {
                         NodeKind::Root => return None,
                         NodeKind::Atom => {
-                            push_bounded(&mut output, node.span.slice(&tree.source), max_width)?;
+                            output.push_str(node.span.slice(&tree.source), max_width)?;
                         }
                         NodeKind::List if self.is_opaque_reader_form(node) => {
-                            push_bounded(&mut output, node.span.slice(&tree.source), max_width)?;
+                            output.push_str(node.span.slice(&tree.source), max_width)?;
                         }
                         NodeKind::List => {
                             if self
@@ -391,10 +525,10 @@ impl Formatter {
                             }
 
                             for span in &node.reader_prefix_spans {
-                                push_bounded(&mut output, span.slice(&tree.source), max_width)?;
+                                output.push_str(span.slice(&tree.source), max_width)?;
                             }
                             let delimiter = self.list_delimiter(node);
-                            push_char_bounded(&mut output, delimiter.open(), max_width)?;
+                            output.push_char(delimiter.open(), max_width)?;
                             actions.push(Action::Close(delimiter.close()));
                             for (position, child) in node.children.iter().enumerate().rev() {
                                 actions.push(Action::Node(*child));
@@ -408,7 +542,7 @@ impl Formatter {
             }
         }
 
-        Some(output)
+        Some(output.into_text())
     }
 
     pub(super) fn format_inline_or_node(

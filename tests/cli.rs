@@ -227,6 +227,8 @@ mod graph_output;
 mod handler_case_no_clauses_report;
 #[path = "cli/help_contract.rs"]
 mod help_contract;
+#[path = "cli/html_report_palette_contract.rs"]
+mod html_report_palette_contract;
 #[path = "cli/identical_if_branch_report.rs"]
 mod identical_if_branch_report;
 #[path = "cli/identity_arithmetic_report.rs"]
@@ -259,10 +261,14 @@ mod lambda_list_keyword_order_report;
 mod last_default_count_report;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/license_header_report.rs"]
+mod license_header_report;
 #[path = "cli/lint_cache.rs"]
 mod lint_cache;
 #[path = "cli/lint_custom_baseline_contract.rs"]
 mod lint_custom_baseline_contract;
+#[path = "cli/lint_envelope_divergence_contract.rs"]
+mod lint_envelope_divergence_contract;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
 #[path = "cli/lint_report_golden.rs"]
@@ -279,6 +285,8 @@ mod literal_place_report;
 mod lsp_server;
 #[path = "cli/macro_constructed_symbols.rs"]
 mod macro_constructed_symbols;
+#[path = "cli/magic_number_report.rs"]
+mod magic_number_report;
 #[path = "cli/make_array_default_keyword_report.rs"]
 mod make_array_default_keyword_report;
 #[path = "cli/make_hash_table_test_report.rs"]
@@ -363,6 +371,8 @@ mod parallel_analysis;
 mod paredit_parity;
 #[path = "cli/parse_integer_default_radix_report.rs"]
 mod parse_integer_default_radix_report;
+#[path = "cli/pattern_grammar_sync_contract.rs"]
+mod pattern_grammar_sync_contract;
 #[path = "cli/plan_steps_contract.rs"]
 mod plan_steps_contract;
 #[path = "cli/prog2_to_progn_report.rs"]
@@ -461,6 +471,8 @@ mod replace_forms;
 mod report_interop;
 #[path = "cli/report_json_key_casing_contract.rs"]
 mod report_json_key_casing_contract;
+#[path = "cli/report_text_structure_contract.rs"]
+mod report_text_structure_contract;
 #[path = "cli/report_verbosity_contract.rs"]
 mod report_verbosity_contract;
 #[path = "cli/resource_budget.rs"]
@@ -567,6 +579,8 @@ mod unused_parameter_report;
 mod unwind_protect_no_cleanup_report;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
+#[path = "cli/use_widening_report.rs"]
+mod use_widening_report;
 #[path = "cli/values_list_of_list_report.rs"]
 mod values_list_of_list_report;
 #[path = "cli/verbose_negation_report.rs"]

@@ -83,27 +83,42 @@ impl<'a> RuleFilter<'a> {
 /// 3. the preset (plus the `experimental` opt-in);
 /// 4. `exclude`, which has the last word.
 ///
-/// Every named rule, category, and tag must be one the catalogue knows — an
-/// unknown name is a hard error rather than a silent no-op, so a typo in CI
-/// fails loudly. The result preserves the catalogue's registration order.
+/// Every named rule, category, and tag must be one the catalogue knows, or be
+/// named in `custom_rules` — an unknown name is still a hard error rather than
+/// a silent no-op, so a typo in CI fails loudly. The result preserves the
+/// catalogue's registration order, with any admitted `custom_rules` appended
+/// after it.
 ///
 /// `only` is deliberately *not* exempt from the preset: `--rule` names a rule
 /// but does not assert it is stable, and a run that silently included an
 /// experimental rule because it was named would make `--preset` untrustworthy.
 /// Naming an experimental rule without `--experimental` therefore resolves to
 /// nothing, which is visible, rather than to a rule the preset excluded.
+///
+/// `custom_rules` — the names a project's own `defrule` files loaded for this
+/// run — have no category, tag, or preset rung: those only classify the
+/// compile-time catalogue. A custom rule answers only to `only` and `exclude`,
+/// resolved the same way a catalogued rule's is: an empty `only` admits every
+/// custom rule, a non-empty one admits just the ones it names, and `exclude`
+/// still has the last word.
 pub fn resolve_active_rules(
     catalog: RuleCatalog,
     filter: &RuleFilter<'_>,
+    custom_rules: &[&'static str],
 ) -> Result<Vec<&'static str>, RuleSelectionError> {
     let rules: Vec<&'static str> = catalog.names().collect();
     let category_names = catalog.categories();
     for name in filter.only.iter().chain(filter.exclude) {
-        if !rules.contains(&name.as_str()) {
+        if !rules.contains(&name.as_str()) && !custom_rules.contains(&name.as_str()) {
+            let valid: Vec<&str> = rules
+                .iter()
+                .copied()
+                .chain(custom_rules.iter().copied())
+                .collect();
             return Err(RuleSelectionError::UnknownRule {
-                suggestion: did_you_mean(rules.iter().copied(), name),
+                suggestion: did_you_mean(valid.iter().copied(), name),
                 name: name.clone(),
-                valid: rules.join(", "),
+                valid: valid.join(", "),
             });
         }
     }
@@ -127,7 +142,7 @@ pub fn resolve_active_rules(
         wanted_tags.push(tag);
     }
 
-    Ok(catalog
+    let mut active: Vec<&'static str> = catalog
         .entries()
         .iter()
         .map(crate::rule::RuleEntry::meta)
@@ -150,7 +165,20 @@ pub fn resolve_active_rules(
                 && !filter.exclude.iter().any(|name| name == rule)
         })
         .map(|meta| meta.name().as_str())
-        .collect())
+        .collect();
+
+    for &name in custom_rules {
+        let included = if !filter.only.is_empty() {
+            filter.only.iter().any(|selected| selected == name)
+        } else {
+            true
+        };
+        if included && !filter.exclude.iter().any(|excluded| excluded == name) {
+            active.push(name);
+        }
+    }
+
+    Ok(active)
 }
 
 #[cfg(test)]
@@ -222,7 +250,7 @@ mod tests {
     }
 
     fn resolve(filter: &RuleFilter<'_>) -> Vec<&'static str> {
-        resolve_active_rules(catalog(), filter).expect("resolve")
+        resolve_active_rules(catalog(), filter, &[]).expect("resolve")
     }
 
     #[test]
@@ -326,7 +354,7 @@ mod tests {
             tags: &tags,
             ..RuleFilter::default()
         };
-        let error = resolve_active_rules(catalog(), &filter).expect_err("typo must not pass");
+        let error = resolve_active_rules(catalog(), &filter, &[]).expect_err("typo must not pass");
         let RuleSelectionError::UnknownTag {
             name,
             valid,
@@ -349,7 +377,8 @@ mod tests {
                 &RuleFilter {
                     only: &only,
                     ..RuleFilter::default()
-                }
+                },
+                &[]
             )
             .is_err()
         );
@@ -360,9 +389,71 @@ mod tests {
                 &RuleFilter {
                     categories: &categories,
                     ..RuleFilter::default()
-                }
+                },
+                &[]
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn a_custom_rule_named_in_only_is_appended_after_the_catalogue() {
+        let only = ["stable-rule".to_owned(), "my-custom-rule".to_owned()];
+        let filter = RuleFilter {
+            only: &only,
+            ..RuleFilter::default()
+        };
+        assert_eq!(
+            resolve_active_rules(catalog(), &filter, &["my-custom-rule"]).expect("resolve"),
+            vec!["stable-rule", "my-custom-rule"]
+        );
+    }
+
+    #[test]
+    fn a_custom_rule_is_active_by_default_with_no_only() {
+        let active = resolve_active_rules(catalog(), &RuleFilter::default(), &["my-custom-rule"])
+            .expect("resolve");
+        assert!(active.contains(&"my-custom-rule"));
+    }
+
+    #[test]
+    fn a_custom_rule_can_be_excluded() {
+        let exclude = ["my-custom-rule".to_owned()];
+        let filter = RuleFilter {
+            exclude: &exclude,
+            ..RuleFilter::default()
+        };
+        let active =
+            resolve_active_rules(catalog(), &filter, &["my-custom-rule"]).expect("resolve");
+        assert!(!active.contains(&"my-custom-rule"));
+    }
+
+    #[test]
+    fn naming_only_a_custom_rule_excludes_the_catalogue() {
+        let only = ["my-custom-rule".to_owned()];
+        let filter = RuleFilter {
+            only: &only,
+            ..RuleFilter::default()
+        };
+        assert_eq!(
+            resolve_active_rules(catalog(), &filter, &["my-custom-rule"]).expect("resolve"),
+            vec!["my-custom-rule"]
+        );
+    }
+
+    #[test]
+    fn a_name_matching_neither_the_catalogue_nor_a_custom_rule_is_still_unknown() {
+        let only = ["not-a-real-rule".to_owned()];
+        let filter = RuleFilter {
+            only: &only,
+            ..RuleFilter::default()
+        };
+        let error = resolve_active_rules(catalog(), &filter, &["my-custom-rule"])
+            .expect_err("typo must not pass");
+        let RuleSelectionError::UnknownRule { name, valid, .. } = error else {
+            panic!("expected an unknown-rule error");
+        };
+        assert_eq!(name, "not-a-real-rule");
+        assert!(valid.contains("my-custom-rule"));
     }
 }

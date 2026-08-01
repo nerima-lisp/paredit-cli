@@ -114,6 +114,21 @@ impl Template {
         Ok(Self { body, holes })
     }
 
+    /// Converts an already-parsed form into a template, without reading text.
+    ///
+    /// The counterpart to [`super::pattern::Pattern::from_view`]: `defrule`'s
+    /// `:fix` clause is a sub-form of a rule file the reader has already
+    /// parsed, and `source` is that file's whole text, which is where `view`'s
+    /// span is measured from.
+    pub fn from_view(view: &ExpressionView, source: &str) -> Result<Self, RewriteError> {
+        let origin = view.span.start().get();
+        let body = source[origin..view.span.end().get()].to_owned();
+        let mut holes = Vec::new();
+        collect_holes(view, origin, &mut holes)?;
+        holes.sort_by_key(|hole| hole.span.start().get());
+        Ok(Self { body, holes })
+    }
+
     /// Every capture name this template substitutes, in first-appearance
     /// order with duplicates removed.
     #[must_use]
@@ -161,7 +176,14 @@ impl Template {
     /// A capture that bound no form — an empty `?rest...` — renders as
     /// nothing, and takes one run of preceding spaces with it, so
     /// `(f ?rest...)` over `(g)` yields `(f)` rather than `(f )`.
-    fn render(&self, source: &str, captures: &[Capture]) -> String {
+    ///
+    /// `pub`: [`plan_rewrite`] is the whole-document planner most callers
+    /// want, but `defrule` reports one finding per match rather than a single
+    /// plan, and still wants this same hazard-free rendering for the finding's
+    /// fix text once it has confirmed (via `plan_rewrite`'s `skipped` list)
+    /// that the match is not one of the hazards this module refuses.
+    #[must_use]
+    pub fn render(&self, source: &str, captures: &[Capture]) -> String {
         let mut out = String::with_capacity(self.body.len());
         let mut cursor = 0usize;
         for hole in &self.holes {

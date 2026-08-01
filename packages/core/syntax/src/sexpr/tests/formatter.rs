@@ -504,6 +504,208 @@ fn preserves_leading_block_comment() {
     assert_eq!(Formatter::new(2).format(&tree), "#| header |#\n(foo)\n");
 }
 
+/// Each of these 30 CJK characters is 3 UTF-8 bytes but a single full-width
+/// display column pair (East Asian Width `Wide`, so 2 columns). Byte-length
+/// accounting would put this string at 96 "columns", past a 70-column
+/// budget; measured the way a terminal actually renders it, it is 66.
+#[test]
+fn measures_inline_width_by_display_columns_not_utf8_bytes() {
+    let cjk = "日".repeat(30);
+    let input = format!("(f \"{cjk}\")");
+    let tree = SyntaxTree::parse(&input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_width(70).format(&tree),
+        format!("{input}\n"),
+        "a CJK string within the display-column budget must stay inline"
+    );
+}
+
+/// The same shape, but the display width itself exceeds the budget, so this
+/// must still wrap — the fix is a different unit of measurement, not "never
+/// wrap wide text".
+#[test]
+fn wraps_when_display_width_itself_exceeds_the_budget() {
+    let cjk = "日".repeat(30);
+    let input = format!("(f \"{cjk}\")");
+    let tree = SyntaxTree::parse(&input).expect("valid");
+    let formatted = Formatter::new(2).with_max_width(50).format(&tree);
+    assert_ne!(formatted, format!("{input}\n"));
+    assert!(formatted.contains('\n'), "{formatted}");
+}
+
+/// Two CJK characters sum to a display width of 4, so `(f "日日")` is
+/// exactly 10 columns wide. `Bounded::push_str`'s `<=` comparison in
+/// `compact_node` (`formatter/core.rs`) must accept a form that lands
+/// exactly on the width budget, not just one strictly under it.
+#[test]
+fn cjk_width_fits_exactly_at_the_max_width_boundary() {
+    let input = "(f \"日日\")";
+    assert_eq!(
+        unicode_width::UnicodeWidthStr::width(input),
+        10,
+        "sanity: input is exactly 10 display columns wide"
+    );
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).with_max_width(10).format(&tree),
+        format!("{input}\n"),
+        "a form landing exactly on the width budget must still fit inline"
+    );
+}
+
+/// The same form one column over the budget must not fit inline: the
+/// boundary is `<=`, not `<`.
+#[test]
+fn cjk_width_one_column_over_the_max_width_boundary_wraps() {
+    let input = "(f \"日日\")";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatted = Formatter::new(2).with_max_width(9).format(&tree);
+    assert_ne!(
+        formatted,
+        format!("{input}\n"),
+        "one column over the budget must not fit inline"
+    );
+    assert!(formatted.contains('\n'), "{formatted}");
+}
+
+#[test]
+fn cjk_width_aware_formatting_is_idempotent() {
+    let input =
+        "(defun 挨拶する (名前) (すごく長い関数の名前を呼び出す名前 名前 \"こんにちは、世界\"))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatter = Formatter::new(2);
+    let formatted = formatter.format(&tree);
+
+    let reparsed = SyntaxTree::parse(&formatted).expect("formatted output parses again");
+    assert_eq!(
+        formatter.format(&reparsed),
+        formatted,
+        "CJK-aware width accounting must still be idempotent"
+    );
+}
+
+#[test]
+fn block_comment_reindent_is_off_by_default() {
+    let input = "   #| Header\n      continuation\n   |#\n(foo)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "#| Header\n      continuation\n   |#\n(foo)\n",
+        "without opting in, a block comment's interior lines are untouched"
+    );
+}
+
+#[test]
+fn block_comment_reindent_realigns_interior_lines_when_enabled() {
+    let input = "   #| Header\n      continuation\n   |#\n(foo)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_reindent_block_comments(true)
+            .format(&tree),
+        "#| Header\n   continuation\n|#\n(foo)\n",
+        "continuation lines keep their indentation relative to each other, \
+         realigned to the comment's new (top-level) depth"
+    );
+}
+
+/// A nested `#|...|#` must reindent without corrupting the inner markers:
+/// only each line's leading whitespace ever moves.
+#[test]
+fn block_comment_reindent_preserves_nested_markers() {
+    let input = concat!(
+        "     #| outer\n",
+        "        #| inner\n",
+        "           deep\n",
+        "        |#\n",
+        "        still outer\n",
+        "     |#\n",
+        "(after)",
+    );
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatted = Formatter::new(2)
+        .with_reindent_block_comments(true)
+        .format(&tree);
+    assert_eq!(
+        formatted,
+        "#| outer\n   #| inner\n      deep\n   |#\n   still outer\n|#\n(after)\n"
+    );
+
+    let reparsed = SyntaxTree::parse(&formatted).expect("reindented output parses again");
+    assert_eq!(
+        Formatter::new(2)
+            .with_reindent_block_comments(true)
+            .format(&reparsed),
+        formatted,
+        "reindenting a block comment must still be idempotent"
+    );
+}
+
+/// Leading-whitespace amounts are measured in display width, not byte
+/// length, so a tab and a run of spaces that occupy the same number of
+/// columns are treated as equally indented: a tab-indented continuation
+/// line realigns to the same column as an equally-wide space-indented one,
+/// and a line indented further keeps exactly that extra offset.
+#[test]
+fn block_comment_reindent_preserves_relative_indentation_across_tabs_and_spaces() {
+    let input = "   #| Header\n   space three\n\t  tab three\n\t\t     tab tab seven\n   |#\n(foo)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_reindent_block_comments(true)
+            .format(&tree),
+        "#| Header\nspace three\ntab three\n    tab tab seven\n|#\n(foo)\n",
+        "a tab-indented line and an equally-wide space-indented line must \
+         land on the same column, and a line indented four columns deeper \
+         must keep exactly that four-column offset"
+    );
+}
+
+/// A blank interior line is left exactly as written rather than padded to
+/// the new depth or collapsed away.
+#[test]
+fn block_comment_reindent_leaves_blank_interior_lines_alone() {
+    let input = "   #| Header\n\n      continuation\n   |#\n(foo)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_reindent_block_comments(true)
+            .format(&tree),
+        "#| Header\n\n   continuation\n|#\n(foo)\n"
+    );
+}
+
+/// A single-line block comment has no interior lines, so the flag changes
+/// nothing about it.
+#[test]
+fn block_comment_reindent_is_a_no_op_for_a_single_line_comment() {
+    let input = "#| header |#\n(foo)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_reindent_block_comments(true)
+            .format(&tree),
+        "#| header |#\n(foo)\n"
+    );
+}
+
+/// Only `CommonLisp`, `Lfe`, `Scheme`, `Racket`, and `Unknown` read `#|...|#`
+/// as a block comment at all (`DialectReaderPolicy::supports_block_comments`);
+/// every other comment kind's text never starts with `#|`, so the flag has
+/// nothing to act on for dialects that lack the syntax.
+#[test]
+fn block_comment_reindent_leaves_other_comment_kinds_untouched() {
+    let input = "(ns app)\n;; a note\n(defn f [] 1)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid Clojure");
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::Clojure)
+            .with_reindent_block_comments(true)
+            .format(&tree),
+        Formatter::with_dialect(2, Dialect::Clojure).format(&tree),
+        "a line comment is never reindented, on or off"
+    );
+}
+
 #[test]
 fn preserves_datum_reader_comment() {
     let input = "#;(ignored form)\n(kept)";

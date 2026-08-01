@@ -56,6 +56,15 @@ pub(super) struct Cache {
     misses: u64,
 }
 
+/// What the cache has done so far, for the two callers that report it:
+/// `paredit/cache` and `GET /metrics`.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct Counters {
+    pub entries: usize,
+    pub hits: u64,
+    pub misses: u64,
+}
+
 impl Cache {
     fn stamp(path: &Path) -> Option<Stamp> {
         let metadata = std::fs::metadata(path).ok()?;
@@ -100,11 +109,20 @@ impl Cache {
         }
     }
 
+    pub(super) fn counters(&self) -> Counters {
+        Counters {
+            entries: self.entries.len(),
+            hits: self.hits,
+            misses: self.misses,
+        }
+    }
+
     fn stats(&self) -> Value {
+        let counters = self.counters();
         json!({
-            "entries": self.entries.len(),
-            "hits": self.hits,
-            "misses": self.misses,
+            "entries": counters.entries,
+            "hits": counters.hits,
+            "misses": counters.misses,
         })
     }
 }
@@ -127,7 +145,7 @@ fn analyze(path: &Path, text: &str, dialect: Dialect) -> Result<Analysis, String
         })
         .collect();
 
-    let active = resolve_active_rules(&RuleFilter::default()).unwrap_or_default();
+    let active = resolve_active_rules(&RuleFilter::default(), &[]).unwrap_or_default();
     let findings = run_lint_pass(
         path,
         dialect,

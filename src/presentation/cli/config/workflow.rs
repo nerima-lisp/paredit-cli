@@ -31,6 +31,34 @@ pub const fn vocabulary() -> Vocabulary<'static> {
     }
 }
 
+/// The shipped catalogue's rule names, widened by whatever custom rules this
+/// invocation would itself load (FR-E16).
+///
+/// `lint.enable`/`lint.disable`/`lint.deny`/`lint.warn` are validated against
+/// this list, not just [`RULES`], so that a `paredit.toml` naming a project's
+/// own `defrule` rule is not rejected before `inspect lint` ever gets a chance
+/// to resolve it against the loaded ruleset.
+///
+/// Best effort and silent on failure: a custom rule directory that does not
+/// exist, or a rule file that does not parse, contributes nothing here rather
+/// than blocking every command's configuration from loading at all —
+/// `inspect lint` reads the same directory itself and is where that failure
+/// belongs. Only `--custom-rules` read directly off the process's own argv is
+/// honored here; a directory relocated *by* `lint.custom-rules` inside the
+/// configuration being validated is not yet known at this point in the
+/// bootstrap and falls back to the default `.paredit/rules`.
+fn rule_names_for_this_invocation() -> Vec<&'static str> {
+    let argv: Vec<String> = std::env::args().collect();
+    let explicit =
+        crate::presentation::cli::argv::long_flag_value(&argv, "custom-rules").map(PathBuf::from);
+
+    let mut names: Vec<&'static str> = vocabulary().rules.to_vec();
+    if let Ok(custom) = crate::presentation::cli::lint_report::custom::load(explicit.as_deref()) {
+        names.extend(custom.names());
+    }
+    names
+}
+
 /// Reads the configuration the way every command should read it.
 ///
 /// One function so that `config check` cannot validate a different set of
@@ -53,11 +81,17 @@ pub fn load(location: &ConfigLocationArgs) -> CliResult<Loaded> {
     options.skip_files |= location.no_config;
     options.skip_environment |= location.no_config_env;
 
+    let rule_names = rule_names_for_this_invocation();
+    let vocabulary = Vocabulary {
+        rules: &rule_names,
+        categories: &CATEGORIES,
+    };
+
     // `core/cli` does not depend on `core/config`, so neither can define the
     // conversion between their error types — the orphan rule, and the right
     // answer anyway: choosing which documented code a configuration failure
     // earns is a composition-root decision, and this is the composition root.
-    paredit_core_config::load::load(&options, Some(vocabulary())).map_err(|error| {
+    paredit_core_config::load::load(&options, Some(vocabulary)).map_err(|error| {
         paredit_core_cli::error::FeatureRefusal::new(
             paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
             &error,

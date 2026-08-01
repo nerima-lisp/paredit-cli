@@ -432,10 +432,7 @@ pub fn build_similarity_pairs_with_omissions(
         );
     }
 
-    let available_workers = thread::available_parallelism()
-        .map(|parallelism| parallelism.get())
-        .unwrap_or(1)
-        .max(1);
+    let available_workers = effective_available_workers();
     let requested_workers = result_bounded_worker_count(
         effective_worker_count(available_workers, possible_pairs),
         collection_limit(options),
@@ -856,6 +853,16 @@ pub fn validate_resource_budgets_for_test(
 ) -> SimilarityAnalysisResult<()> {
     validate_candidate_budget(candidate_count)?;
     validate_comparison_budget(possible_pairs, max_comparisons)
+}
+
+/// The worker ceiling this invocation is allowed, before the pair-count and
+/// workspace clamps narrow it further.
+///
+/// `--jobs` reaches here rather than being read straight off the machine:
+/// a caller that asked for two workers on a 64-core box was previously given
+/// 64, and no flag could say otherwise.
+fn effective_available_workers() -> usize {
+    paredit_core_safety::limits::effective_jobs_or_available().get()
 }
 
 fn effective_worker_count(available_workers: usize, possible_pairs: usize) -> usize {

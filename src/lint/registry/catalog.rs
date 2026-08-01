@@ -174,11 +174,11 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-const _: () = assert!(RULE_COUNT == 169);
+const _: () = assert!(RULE_COUNT == 178);
 const _: () = assert!(fixable_count() == 92);
-const _: () = assert!(warning_count() == 113);
+const _: () = assert!(warning_count() == 121);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
-const _: () = assert!(PEDANTIC_RULES.len() == 4);
+const _: () = assert!(PEDANTIC_RULES.len() == 5);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
     REGISTRY

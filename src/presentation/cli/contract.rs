@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 238] = [
+const INTROSPECTION_COMMANDS: [&str; 244] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -291,6 +291,7 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect unused-packages",
     "inspect unused-exports",
     "inspect unused-nicknames",
+    "inspect use-widening",
     "inspect package-conflicts",
     "inspect redefinitions",
     "inspect undefined-packages",
@@ -303,6 +304,7 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect external-diagnostics",
     "inspect external-systems",
     "inspect licenses",
+    "inspect license-headers",
     "inspect serial-consistency",
     "inspect blame",
     "inspect duplication-ratio",
@@ -329,6 +331,7 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect types",
     "inspect narrowing",
     "inspect constants",
+    "inspect magic-numbers",
     "inspect value-propagation",
     "inspect effects",
     "inspect semantic-coverage",
@@ -383,6 +386,7 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect explicit-nil-return",
     "inspect redundant-progn",
     "inspect redundant-prog1",
+    "inspect self-recursive-tail-call",
     "inspect negated-comparison",
     "inspect negated-if",
     "inspect negated-step-delta",
@@ -405,6 +409,7 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect negated-when-unless",
     "inspect nested-boolean",
     "inspect nested-cxr",
+    "inspect package-level-shadowing",
     "inspect nthcdr-zero",
     "inspect subseq-zero",
     "inspect car-nthcdr",
@@ -442,6 +447,7 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect redundant-count-nil",
     "inspect make-hash-table-test",
     "inspect gethash-default",
+    "inspect giant-conditional-form",
     "inspect typep-predicate",
     "inspect coerce-to-t",
     "inspect redundant-identity-key",
@@ -672,8 +678,10 @@ const SYNTAX_TIER_REPORTS: [&str; 21] = [
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 33] = [
+const SCOPE_TIER_REPORTS: [&str; 36] = [
     "inspect resolve",
+    "inspect giant-conditional-form",
+    "inspect self-recursive-tail-call",
     "inspect test-map",
     "inspect symbol-index",
     "inspect unreachable-expressions",
@@ -697,6 +705,7 @@ const SCOPE_TIER_REPORTS: [&str; 33] = [
     "inspect unused-definitions",
     "inspect unused-parameters",
     "inspect shadowed-bindings",
+    "inspect package-level-shadowing",
     "inspect lets",
     "inspect duplicates",
     "inspect similarity",

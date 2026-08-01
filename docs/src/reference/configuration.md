@@ -1,6 +1,6 @@
 # Configuration
 
-With 165 lint rules and 369 commands, passing every knob as a flag
+With 178 lint rules and 375 commands, passing every knob as a flag
 stopped scaling. `paredit.toml` is the answer: a small, strictly validated file
 that sets the defaults a repository wants, so a command line carries only what
 is unusual about *this* invocation.
@@ -180,7 +180,7 @@ and the dropped keys are named.
 | `--from <DIR>` | — | Resolve discovery from this directory instead of the working one |
 
 The flags exist on the `config` namespace; the variables work everywhere,
-which is why they exist — 369 commands do not each need three more flags.
+which is why they exist — 375 commands do not each need three more flags.
 
 `PAREDIT_NO_CONFIG=1 PAREDIT_NO_CONFIG_ENV=1` is the reproducible-CI
 combination: it pins the run to the built-in defaults plus whatever the command
@@ -196,7 +196,7 @@ version. The tables are:
 | *(top level)* | `extends` |
 | `[dialect]` | Which dialect to assume, and whether to force it over the extension |
 | `[paths]` | Workspace discovery: exclusions, hidden and generated directories, depth |
-| `[format]` | Indent width and inline width for `edit format` |
+| `[format]` | Indent width, inline width, and block-comment reindenting for `edit format` |
 | `[lint]` | Preset, rule selection, severity overrides, baseline, gate |
 | `[output]` | Default format, verbosity, token budget, message language |
 
