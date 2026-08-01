@@ -393,8 +393,8 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     )?;
 
     println!(
-        "Also update the rule-count prose (currently {old_count}) in docs/src/commands.md, \
-         docs/src/architecture.md, docs/src/configuration.md, and the doc comment in \
+        "Also update the rule-count prose (currently {old_count}) in docs/src/reference/api.md, \
+         docs/src/reference/architecture.md, docs/src/reference/configuration.md, and the doc comment in \
          tests/cli/determinism_contract.rs — none of them are test-enforced, so nothing catches \
          a stale number there but a reviewer."
     );

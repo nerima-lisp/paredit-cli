@@ -305,7 +305,7 @@ dialect types) and nothing above it.
    `discover_workspace_files` / `WorkspaceDiscovery` adapter.
 3. Calls the use case and renders the returned `Plan` as text or JSON.
 4. Maps the plan's gate decision to a process exit code (see the
-   [agent interface](agents.md) for the code table).
+   [agent interface](../guide/agents.md) for the code table).
 
 Keeping request conversion, rendering, and gate-to-exit mapping here — and
 everything else in the application and domain layers — is what lets the same
@@ -340,7 +340,7 @@ anything reads it — while the classification stays a type.
 ## How the layers map to the three namespaces
 ## How the layers map to the namespaces
 
-The [command model](commands.md) — `inspect`, `edit`, `refactor`, `query`,
+The [command model](api.md) — `inspect`, `edit`, `refactor`, `query`,
 `fix`, `migrate` — is a presentation-level grouping. Underneath, an `inspect`
 report and a `refactor` plan are both application use cases over the same
 domain `SyntaxTree`; the namespace only reflects whether the command writes
@@ -375,6 +375,6 @@ to prevent.
 
 When a change spans layers, add it from the inside out: model it in the domain,
 orchestrate it in an application use case behind a port, then expose it through
-a presentation adapter. The [development guide](development.md) covers the
+a presentation adapter. The [development guide](../project/development.md) covers the
 verification gate that keeps these boundaries — and the documentation that
 describes them — honest.

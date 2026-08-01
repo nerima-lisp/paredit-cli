@@ -12,7 +12,7 @@ Fennel.
 Full documentation — command reference, safe editing workflows, the agent
 interface, and integration guides — is published at
 <https://nerima-lisp.github.io/paredit-cli/>. The source for that site lives in
-[docs/src/](docs/src/README.md).
+[docs/src/](docs/src/index.md).
 
 ## Commands
 
@@ -65,7 +65,7 @@ nix develop -c cargo install --path . --locked   # from a local checkout
 ```
 
 The current minimum supported Rust version is `1.85`. See the
-[installation guide](https://nerima-lisp.github.io/paredit-cli/installation/)
+[getting started guide](https://nerima-lisp.github.io/paredit-cli/getting-started/)
 for the Cachix binary cache, flake overlay, and commit-pinning for automation.
 
 ## Stability
@@ -74,7 +74,7 @@ for the Cachix binary cache, flake overlay, and commit-pinning for automation.
 flags, exit codes, documented JSON fields, the `paredit_cli` crate-root API,
 and the Nix outputs are stable within the `1.x` series; human-readable text
 output is not a machine contract. The
-[compatibility guide](https://nerima-lisp.github.io/paredit-cli/releases/) lists
+[compatibility guide](https://nerima-lisp.github.io/paredit-cli/reference/compatibility/) lists
 exactly what an upgrade may and may not change.
 
 ## Development
@@ -93,11 +93,11 @@ at the [documentation site](https://nerima-lisp.github.io/paredit-cli/).
 
 ## Community and security
 
-- [Contributing](https://nerima-lisp.github.io/paredit-cli/contributing/)
-- [Code of Conduct](https://nerima-lisp.github.io/paredit-cli/code-of-conduct/)
-- [Support](https://nerima-lisp.github.io/paredit-cli/support/)
-- [Security](https://nerima-lisp.github.io/paredit-cli/security-policy/)
-- [Releasing](https://nerima-lisp.github.io/paredit-cli/releasing/)
+- [Contributing](https://github.com/nerima-lisp/.github/blob/main/CONTRIBUTING.md)
+- [Code of Conduct](https://github.com/nerima-lisp/.github/blob/main/CODE_OF_CONDUCT.md)
+- [Support](https://github.com/nerima-lisp/.github/blob/main/SUPPORT.md)
+- [Security](https://github.com/nerima-lisp/.github/blob/main/SECURITY.md)
+- [Releasing](https://github.com/nerima-lisp/paredit-cli/blob/main/docs/notes/releasing.md)
 
 ## License
 

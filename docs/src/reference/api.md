@@ -33,8 +33,8 @@ rather than on source:
 Four more top-level commands sit outside `inspect`/`edit`/`refactor`
 entirely — long-running or interactive processes rather than one-shot
 reports or edits: `paredit lsp` and `paredit serve` (see
-[Integrations](integrations.md)), `paredit mcp` (see
-[Agent interface](agents.md)), and `paredit tui`, an interactive tree
+[Integrations](../guide/integrations.md)), `paredit mcp` (see
+[Agent interface](../guide/agents.md)), and `paredit tui`, an interactive tree
 browser that prints a `--path` on exit (see
 [Browsing interactively](selectors.md#browsing-interactively-paredit-tui)).
 
@@ -58,10 +58,10 @@ selects.
 
 Every command accepts the same top-level flags. `--dry-run`, `--progress`, and
 the `--config`/`--no-config`/`--no-config-env` trio are covered in
-[Run-wide controls](agents.md#run-wide-controls); `--timeout-ms` and the
-`--max-*` budgets in [Bounding a run](safety.md#bounding-a-run); and
+[Run-wide controls](../guide/agents.md#run-wide-controls); `--timeout-ms` and the
+`--max-*` budgets in [Bounding a run](../guide/safety.md#bounding-a-run); and
 `--new-file-mode`/`--refuse-symlinked-ancestors` in
-[Write permissions and symlinked ancestors](safety.md#write-permissions-and-symlinked-ancestors).
+[Write permissions and symlinked ancestors](../guide/safety.md#write-permissions-and-symlinked-ancestors).
 The remaining two are terminal presentation, not safety, and apply nowhere
 else:
 
@@ -309,7 +309,7 @@ discovery, impact analysis, and preflight checks.
 Most reports accept `--output json` for machine-readable results. Reports whose
 output is a list of located findings accept the interchange formats as well —
 `sarif`, `junit`, `code-climate`, `csv`, `tsv`, `html`, `markdown`, and
-`github` — see [Report output formats](./integrations.md#report-output-formats).
+`github` — see [Report output formats](../guide/integrations.md#report-output-formats).
 
 ### Choosing and tuning lint rules
 
@@ -515,7 +515,7 @@ character edit there is inert.
 ## Refactor
 
 `paredit refactor` contains the reviewable workflow commands and the semantic
-refactorings they gate. See [Refactor workflow](workflows.md) for the
+refactorings they gate. See [Refactor workflow](../guide/workflows.md) for the
 plan/preview/verify/apply lifecycle.
 
 ### Workflow commands

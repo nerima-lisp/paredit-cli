@@ -1,5 +1,5 @@
 //! `cargo xtask` — repository dev-experience tooling, in Rust rather than
-//! the Python scripts under `scripts/` (see `docs/src/development.md`).
+//! the Python scripts under `scripts/` (see `docs/src/project/development.md`).
 //!
 //! Two generators live here today: `new-lint-rule` and `new-command`. Both
 //! scaffold the mechanical, boilerplate-shaped files a new rule or command

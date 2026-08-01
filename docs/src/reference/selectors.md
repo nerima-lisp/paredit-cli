@@ -140,7 +140,7 @@ other dialects do not.
 
 **Beyond one file.** As a *selector*, `--query` names a form in the file
 `--file` points at. The same language is also a command in its own right: see
-[`paredit query`](commands.md#query) for searching a whole workspace
+[`paredit query`](api.md#query) for searching a whole workspace
 (`query find`), counting several patterns side by side (`query count`), and
 rewriting matches through a `--rewrite` template (`query replace`). The
 template writes captures back by name — `--query '(if ?t ?a nil)' --rewrite

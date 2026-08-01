@@ -4,7 +4,7 @@
 //! report-style command in this workspace already uses.
 //!
 //! It does not touch the composition root (`src/presentation/cli/*.rs`,
-//! `tests/cli/dialect_contract.rs`, `docs/src/commands.md`) — see
+//! `tests/cli/dialect_contract.rs`, `docs/src/reference/api.md`) — see
 //! `crate::checklist` for why those are printed instead of edited.
 
 use crate::error::Result;

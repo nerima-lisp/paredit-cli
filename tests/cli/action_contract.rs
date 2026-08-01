@@ -34,7 +34,7 @@ fn composite_action_exposes_lint_format_and_fix_modes() {
 #[test]
 fn documentation_covers_lint_and_format_integration_surfaces() {
     let docs =
-        fs::read_to_string("docs/src/integrations.md").expect("read integrations documentation");
+        fs::read_to_string("docs/src/guide/integrations.md").expect("read integrations documentation");
 
     assert!(
         docs.contains("## GitHub Actions"),
@@ -188,7 +188,7 @@ fn flake_checks_expose_the_org_conformance_aliases() {
 /// What is asserted is therefore the *gates*, not the hosts: whichever way the
 /// jobs are arranged, a run that stops checking the flake or stops auditing
 /// dependencies is a run that has lost its purpose. Darwin coverage is a
-/// deliberate gap — see `docs/src/development.md`.
+/// deliberate gap — see `docs/src/project/development.md`.
 #[test]
 fn ci_runs_the_flake_checks_and_audits_dependencies() {
     let workflow = fs::read_to_string(".github/workflows/ci.yml").expect("read CI workflow");

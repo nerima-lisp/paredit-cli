@@ -174,7 +174,7 @@ ends. `sequence` counts up, so a consumer can tell it missed a line. Progress
 never changes stdout.
 
 **`--no-config` / `--config` / `--no-config-env`** are the configuration
-controls — see [Configuration](configuration.md).
+controls — see [Configuration](../reference/configuration.md).
 
 ## Discovering the gates
 
@@ -416,7 +416,7 @@ renaming one is not.
 
 Command paths, flags, exit codes, and documented JSON fields are covered by
 semantic versioning from `1.0.0` onward — see
-[Releases and compatibility](releases.md) for the full list of what a `1.x`
+[Releases and compatibility](../reference/compatibility.md) for the full list of what a `1.x`
 upgrade may and may not change.
 
 ## Safe editing loop

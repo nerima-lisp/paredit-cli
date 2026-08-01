@@ -330,7 +330,7 @@ fn a_parse_failure_carries_its_offset_and_a_doc_link() {
     assert!(report["error"]["offset"].is_u64(), "{report}");
     assert_eq!(
         report["error"]["doc_url"],
-        "https://nerima-lisp.github.io/paredit-cli/errors/#input.unparsable"
+        "https://nerima-lisp.github.io/paredit-cli/reference/errors/#input.unparsable"
     );
 }
 

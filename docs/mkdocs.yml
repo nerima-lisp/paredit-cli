@@ -22,6 +22,12 @@ use_directory_urls: true
 
 copyright: Copyright &copy; paredit-cli contributors — MIT License
 
+# Also passed as --strict by the flake's mkDocs derivation. Writing it here as
+# well means `mkdocs serve` applies the same gate, so no invocation path
+# silently tolerates a broken link. Use `mkdocs serve --no-strict` while
+# editing.
+strict: true
+
 theme:
   name: material
   language: en
@@ -121,30 +127,38 @@ markdown_extensions:
       permalink: true
       title: On this page
 
+# Every page under docs/src/ must appear here: --strict fails the build on an
+# unlisted page. The five sections and the guide/ reference/ project/ split are
+# fixed by the 2026-08-01 revision of DOCS_STANDARD.md; only index.md,
+# getting-started.md and assets/ stay at the root of docs/src/.
+#
+# `reference/api.md` is the CLI subcommand reference. paredit-cli ships an
+# executable rather than a library, and DOCS_STANDARD.md names this repository
+# explicitly: the mandatory `reference/api.md` holds the subcommand list.
+#
+# The Contributing section is gone. Its community-health pages duplicated the
+# org defaults in nerima-lisp/.github and were deleted; the maintainer release
+# checklist moved to docs/notes/releasing.md, which is outside docs_dir because
+# its reader is a maintainer rather than a user.
 nav:
-  - Home: README.md
-  - Getting Started:
-      - Installation: installation.md
-      - Command Model: commands.md
-      - Selecting Forms: selectors.md
-      - Choosing Files: workspace-inputs.md
-      - Configuration: configuration.md
+  - Home: index.md
+  - Getting Started: getting-started.md
   - Guide:
-      - Refactor Workflow: workflows.md
-      - Safety Reference: safety.md
-      - Agent Interface: agents.md
+      - Refactor Workflow: guide/workflows.md
+      - Safety Reference: guide/safety.md
+      - Agent Interface: guide/agents.md
+      - Integrations: guide/integrations.md
   - Reference:
-      - Architecture: architecture.md
-      - Error Codes: errors.md
-      - Integrations: integrations.md
-      - Releases and Compatibility: releases.md
-      - Release Checklist: releasing.md
+      - API: reference/api.md
+      - Selecting Forms: reference/selectors.md
+      - Choosing Files: reference/workspace-inputs.md
+      - Configuration: reference/configuration.md
+      - Error Codes: reference/errors.md
+      - Architecture: reference/architecture.md
+      - Compatibility: reference/compatibility.md
   - Project:
+      - Development: project/development.md
       - Feature Candidates: project/feature-candidates.md
-  - Contributing:
-      - Development: development.md
-      - Repository Documentation: repository.md
-      - Contributing Guide: contributing.md
-      - Code of Conduct: code-of-conduct.md
-      - Security Policy: security-policy.md
-      - Support: support.md
+
+not_in_nav: |
+  notes/

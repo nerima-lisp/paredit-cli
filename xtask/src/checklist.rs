@@ -4,7 +4,7 @@
 //! `SEMANTIC_COMMANDS` in `src/presentation/cli/contract.rs`, and the eight
 //! matching assertions in `tests/cli/dialect_contract.rs`, are pinned counts:
 //! a command added without updating them is a compile-time or test-time
-//! failure, on purpose (see `docs/src/architecture.md`). A script that edits
+//! failure, on purpose (see `docs/src/reference/architecture.md`). A script that edits
 //! them blind risks the exact failure this project's own memory already
 //! recorded once — a scripted insert silently double-commas `command.rs` or
 //! duplicates a `contract.rs` entry. So this prints the current numbers,
@@ -179,7 +179,7 @@ pub fn print_command_wiring(repo: &Repo, wiring: &CommandWiring<'_>) -> Result<(
          dialects it actually supports is a judgment call, not something to default."
     );
     println!();
-    println!("6. docs/src/commands.md — add a row for `{leaf}` to the relevant table.");
+    println!("6. docs/src/reference/api.md — add a row for `{leaf}` to the relevant table.");
     println!();
 
     Ok(())

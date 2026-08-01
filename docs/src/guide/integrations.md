@@ -212,7 +212,7 @@ Downstream flakes can reuse the gates and the formatter:
   derivation.
 - `lib.<system>.treefmtFormatter` — a treefmt formatter entry covering every
   extension paredit detects a dialect for (see
-  [Selectors](./selectors.md#files-and-stdin)).
+  [Selectors](../reference/selectors.md#files-and-stdin)).
 - `overlays.default` — adds `paredit-cli`, `paredit-lint`, `paredit-format`,
   and `paredit-format-files` to nixpkgs.
 

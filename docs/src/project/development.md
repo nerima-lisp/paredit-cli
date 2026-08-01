@@ -2,7 +2,7 @@
 
 Everything a contributor needs is provided by the Nix flake; no manually
 installed Rust toolchain is required. Before changing code, read the
-[architecture guide](architecture.md) to know which of the four layers
+[architecture guide](../reference/architecture.md) to know which of the four layers
 (`domain`, `application`, `infrastructure`, `presentation`) a change belongs
 in.
 
@@ -52,7 +52,7 @@ shape without the rule registration, for a command outside the lint suite.
 
 Neither generator touches the composition root
 (`src/presentation/cli/{cli,command,dispatch,contract}.rs`,
-`tests/cli/dialect_contract.rs`, `docs/src/commands.md`). Wiring a command in
+`tests/cli/dialect_contract.rs`, `docs/src/reference/api.md`). Wiring a command in
 by hand there is unavoidable — clap needs a real enum variant and match arm to
 add — and a script that edits those files blind has, in this project's own
 history, silently double-commaed `command.rs` or duplicated a
@@ -313,7 +313,7 @@ cargo +1.85 test --locked
 
 ## Releases
 
-The [release and compatibility guide](releases.md) defines the machine-output
+The [release and compatibility guide](../reference/compatibility.md) defines the machine-output
 contract and upgrade expectations. Maintainers should use the
-[release checklist](releasing.md)
+[release checklist](https://github.com/nerima-lisp/paredit-cli/blob/main/docs/notes/releasing.md)
 before publishing.

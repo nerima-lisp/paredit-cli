@@ -104,7 +104,7 @@ default is `600`, so a file this tool creates is not readable by other users
 unless asked to be.
 
 A write already refuses a target whose immediate parent directory is a
-symlink (`refusal.write-target`, [Refusal](errors.md#refusal.write-target)).
+symlink (`refusal.write-target`, [Refusal](../reference/errors.md#refusal.write-target)).
 `--refuse-symlinked-ancestors` extends that further up the path: it also
 refuses when any ancestor *above* the immediate parent climbs through a
 symlink. Off by default, because `/tmp` is a symlink to `/private/tmp` on

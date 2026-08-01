@@ -18,7 +18,7 @@ Stable — changed only in a major release:
   `paredit refactor plan`, and every other leaf command keep their spelling
   and their positional arguments.
 - **Flags.** Long names, value syntax, enum values, and documented defaults.
-- **Exit codes.** The [exit-code table](agents.md#exit-codes) — `0` success,
+- **Exit codes.** The [exit-code table](../guide/agents.md#exit-codes) — `0` success,
   `1` operational failure, `2` usage error, `3` policy gate — keeps its
   meanings.
 - **JSON reports.** For a given top-level `schema_version`, documented fields
@@ -26,7 +26,7 @@ Stable — changed only in a major release:
 - **The Nix interface**: the `default`, `lint`, `format`, and `format-files`
   packages, the `default`, `lint`, and `format` apps, the `default` overlay,
   and the `mkLintCheck` / `mkFormatCheck` / `treefmtFormatter` helpers
-  exported from `lib` — see [Integrations](integrations.md).
+  exported from `lib` — see [Integrations](../guide/integrations.md).
 
 Not stable — may change in any release, including a patch:
 
@@ -98,6 +98,8 @@ Release notes must call out anything that affects automation: new or
 deprecated commands and flags, `schema_version` bumps, exit-code behaviour,
 Nix interface changes, and MSRV increases.
 
-Maintainers follow
-[releasing.md](releasing.md)
-to verify the documentation and Nix checks before tagging.
+Maintainers follow the maintainer-facing release checklist,
+[`docs/notes/releasing.md`](https://github.com/nerima-lisp/paredit-cli/blob/main/docs/notes/releasing.md),
+to verify the documentation and Nix checks before tagging. It lives under
+`docs/notes/` rather than `docs/src/`, because its reader is a maintainer
+rather than a user of the tool.

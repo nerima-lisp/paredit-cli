@@ -10,7 +10,7 @@ fn manifest_version() -> String {
 }
 
 fn releases_guide() -> String {
-    fs::read_to_string("docs/src/releases.md").expect("read docs/src/releases.md")
+    fs::read_to_string("docs/src/reference/compatibility.md").expect("read docs/src/reference/compatibility.md")
 }
 
 fn release_workflow() -> String {
@@ -31,15 +31,15 @@ fn compatibility_guide_covers_the_released_major_series() {
 
     assert!(
         guide.contains("Semantic Versioning"),
-        "docs/src/releases.md must declare that the project follows Semantic Versioning"
+        "docs/src/reference/compatibility.md must declare that the project follows Semantic Versioning"
     );
     assert!(
         guide.contains(&format!("`{major}.x`")),
-        "docs/src/releases.md must state the guarantees for the released `{major}.x` series"
+        "docs/src/reference/compatibility.md must state the guarantees for the released `{major}.x` series"
     );
     assert!(
         major.parse::<u32>().expect("major version is numeric") >= 1,
-        "the stability guarantees in docs/src/releases.md require a 1.0.0 or later release"
+        "the stability guarantees in docs/src/reference/compatibility.md require a 1.0.0 or later release"
     );
 }
 
@@ -55,7 +55,7 @@ fn compatibility_guide_enumerates_every_stable_surface() {
     // halves are checked separately.
     let (stable, unstable) = guide
         .split_once("Not stable —")
-        .expect("docs/src/releases.md must keep its stable/not-stable split");
+        .expect("docs/src/reference/compatibility.md must keep its stable/not-stable split");
 
     for surface in [
         "**Command paths.**",
@@ -66,7 +66,7 @@ fn compatibility_guide_enumerates_every_stable_surface() {
     ] {
         assert!(
             stable.contains(surface),
-            "docs/src/releases.md must keep the stable surface documented: {surface}"
+            "docs/src/reference/compatibility.md must keep the stable surface documented: {surface}"
         );
     }
 
@@ -80,7 +80,7 @@ fn compatibility_guide_enumerates_every_stable_surface() {
     ] {
         assert!(
             unstable.contains(surface),
-            "docs/src/releases.md must keep the explicitly unstable surface documented: {surface}"
+            "docs/src/reference/compatibility.md must keep the explicitly unstable surface documented: {surface}"
         );
     }
 }
@@ -105,10 +105,10 @@ fn documented_schema_version_matches_the_emitted_reports() {
 
     let documented = format!("(currently `{schema_version}`)");
     for (path, text) in [
-        ("docs/src/releases.md", releases_guide()),
+        ("docs/src/reference/compatibility.md", releases_guide()),
         (
-            "docs/src/agents.md",
-            fs::read_to_string("docs/src/agents.md").expect("read docs/src/agents.md"),
+            "docs/src/guide/agents.md",
+            fs::read_to_string("docs/src/guide/agents.md").expect("read docs/src/guide/agents.md"),
         ),
     ] {
         assert!(
@@ -123,24 +123,24 @@ fn documented_schema_version_matches_the_emitted_reports() {
 #[test]
 fn release_checklist_and_compatibility_guide_reference_each_other() {
     let checklist =
-        fs::read_to_string("docs/src/releasing.md").expect("read docs/src/releasing.md");
+        fs::read_to_string("docs/notes/releasing.md").expect("read docs/notes/releasing.md");
 
     assert!(
-        checklist.contains("(releases.md)"),
-        "docs/src/releasing.md must link the release and compatibility guide"
+        checklist.contains("(../src/reference/compatibility.md)"),
+        "docs/notes/releasing.md must link the release and compatibility guide"
     );
     assert!(
         checklist.contains("nix flake check"),
-        "docs/src/releasing.md must run the verification gate before releasing"
+        "docs/notes/releasing.md must run the verification gate before releasing"
     );
     assert!(
         !checklist.contains("cargo publish") && !checklist.contains("crates.io"),
         "paredit-cli is released as a Git tag, not a registry package; \
-         docs/src/releasing.md must not describe a registry publish"
+         docs/notes/releasing.md must not describe a registry publish"
     );
     assert!(
-        releases_guide().contains("(releasing.md)"),
-        "docs/src/releases.md must link the maintainer release checklist"
+        releases_guide().contains("docs/notes/releasing.md)"),
+        "docs/src/reference/compatibility.md must link the maintainer release checklist"
     );
 }
 
@@ -187,11 +187,11 @@ fn release_workflow_creates_an_empty_draft_release() {
 /// the workflow deliberately stops short of publishing.
 #[test]
 fn release_checklist_describes_publishing_the_draft() {
-    let guide = fs::read_to_string("docs/src/releasing.md").expect("read docs/src/releasing.md");
+    let guide = fs::read_to_string("docs/notes/releasing.md").expect("read docs/notes/releasing.md");
 
     assert!(
         guide.contains("--draft=false"),
-        "docs/src/releasing.md must tell the maintainer how to publish the \
+        "docs/notes/releasing.md must tell the maintainer how to publish the \
          draft release the workflow creates"
     );
 }

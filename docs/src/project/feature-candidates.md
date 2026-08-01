@@ -2,7 +2,7 @@
 
 対象: `nerima-lisp/paredit-cli` v1.3.0
 目的: 「次に何を作るか」を選ぶための候補の網羅。採否は未決。
-候補数: **107**（A〜N の 14 セクション）
+候補数: **198**（A〜AC の 29 セクション）
 
 前版（v1.2.1 時点、`git show v1.2.1:FEATURE-CANDIDATES.md` で参照可能。
 当時はリポジトリ直下に置かれていた）は今回すべて破棄し、
@@ -20,7 +20,7 @@ v1.3.0 の実装を `command.rs` / `CHANGELOG.md` で直接確認したところ
 | 前版の主張 | 現状（v1.3.0、実地確認済み） |
 | --- | --- |
 | LSP が無い | `paredit lsp` — 診断・code action・outline・selectionRange・folding・rename 等を持つ LSP 3.17 サーバー |
-| MCP が無い | `paredit mcp` — `--read-only` 付き。ただし `docs/src/integrations.md` に未掲載（→ H1） |
+| MCP が無い | `paredit mcp` — `--read-only` 付き。ただし `docs/src/guide/integrations.md` に未掲載（→ H1） |
 | 設定ファイルが無い | `paredit config {check,show,schema,init}` と 5 層の `paredit.toml`（`extends` 対応） |
 | カスタムルール機構が無い | `.paredit/rules/*.lisp` に `defrule`/`deftest`/`deprecate` を書く機構が実装済み |
 | 構造 diff が無い | `inspect diff` が実装済み |
@@ -36,7 +36,7 @@ v1.3.0 の実装を `command.rs` / `CHANGELOG.md` で直接確認したところ
   型宣言解析は今も CL 専用。`inspect types`/`inspect narrowing` は他方言では常に空を返す（→ A 節）。
 - `watch` という語はコード中に検索一致ゼロ。ファイル監視によるインクリメンタル実行は無い（→ C 節）。
 - WASM ターゲットはゼロヒット（→ D1）。
-- `docs/src/integrations.md` に `mcp` と `tui` のセクションが無い（実装はあるのに）（→ H1）。
+- `docs/src/guide/integrations.md` に `mcp` と `tui` のセクションが無い（実装はあるのに）（→ H1）。
 
 以降は、これらの実地確認を土台にした新規候補。
 
@@ -129,11 +129,11 @@ LSP はプロトコルとして汎用だが、エディタ側の「導入の摩�
 | E6 | JetBrains（IntelliJ 系）向け LSP 統合の設定例 |
 | E7 | エディタ非依存の「保存時に `fix apply --fixable` を走らせる」サンプルフックの配布 |
 | E8 | `--select` の compact grammar を使うエディタ拡張向けのカーソル位置→selector 変換ヘルパー API |
-| E9 | 各エディタパッケージの「対応表」を `docs/src/integrations.md` に追加（現状 LSP と serve のみ記載） |
+| E9 | 各エディタパッケージの「対応表」を `docs/src/guide/integrations.md` に追加（現状 LSP と serve のみ記載） |
 
 ---
 
-## F. 残る structural edit / refactor 変換（12 件）
+## F. 残る structural edit / refactor 変換（16 件）
 
 `paredit.el` パリティ（旧 K 節）は v1.3.0 でほぼ埋まったが、Lisp 方言間の「よくある書き換え」は
 まだ手が回っていないものが残る。
@@ -152,10 +152,14 @@ LSP はプロトコルとして汎用だが、エディタ側の「導入の摩�
 | F10 | let 系束縛からの `defvar`/`defparameter` 抽出（スコープ逸脱している束縛の可視化とセット） |
 | F11 | 条件分岐の網羅性を保ったままの `case`→`cond`（あるいは逆）の変換ガード強化 |
 | F12 | 複数ファイルにまたがる `edit`/`refactor` のトランザクション化 — 現状 `migrate run` のみ部分失敗耐性がある |
+| F13 | `cond` の各節での型絞り込み結果（`narrowing` 層）を使い、後続節で冗長になった型チェックの削除提案 |
+| F14 | 連続する `setf` 呼び出しを `psetf`/`rotatef` にまとめる提案 |
+| F15 | ネストした `if` を `cond` へ段階的に畳み込む変換（F11 の `case`⇄`cond` とは別に、`if` の入れ子解消） |
+| F16 | `let*` の各束縛間に依存が無い箇所を検出し、並列評価可能な `let` へ変換できる部分を提案 |
 
 ---
 
-## G. 新しい分析カテゴリ（14 件）
+## G. 新しい分析カテゴリ（18 件）
 
 `inspect` の既存 228 種は「論理バグ」「重複」「未使用」「型」「効果」に集中している。
 まだ触れていない軸。
@@ -176,6 +180,10 @@ LSP はプロトコルとして汎用だが、エディタ側の「導入の摩�
 | G12 | 副作用を持つトップレベルフォームの実行順序依存性検出（load 順が結果を変える箇所） |
 | G13 | condition/error クラス階層の整合性（`define-condition` の継承関係の妥当性） |
 | G14 | パッケージ間の「循環しないが過度に結合している」度合いの指標化（結合度メトリクス） |
+| G15 | 方言横断で統一算出する循環的複雑度と、既存 G11（巨大 `let`/`cond`/`case`）の相関レポート |
+| G16 | 同一パッケージ内でのシンボル衝突・シャドーイング（内側の束縛が外側の関数名を隠す等）の検出 |
+| G17 | 一度も再代入されない `defparameter`/`defvar` の「実質定数」検出（`defconstant` 化提案とセット） |
+| G18 | トップレベルフォームの実行順序に依存しない「宣言的」な書き方への準拠度スコア |
 
 ---
 
@@ -183,7 +191,7 @@ LSP はプロトコルとして汎用だが、エディタ側の「導入の摩�
 
 | # | 候補 |
 | --- | --- |
-| H1 | `docs/src/integrations.md` に `mcp` と `tui` のセクションを追加（実装済み・未文書化の是正） |
+| H1 | `docs/src/guide/integrations.md` に `mcp` と `tui` のセクションを追加（実装済み・未文書化の是正） |
 | H2 | lint findings のトレンド — 複数コミットの baseline を並べて「増減の推移」を出す `inspect lint-trend` |
 | H3 | 実行時間のプロファイル出力（どのルール/どのファイルが遅いか）— 大規模ワークスペースでの `--profile` |
 | H4 | `paredit.toml` の設定差分を環境間（ローカル/CI）で比較する `config diff` |
@@ -279,3 +287,213 @@ MCP は既に厳選済みサーフェス（7 tools + `paredit_run`）であり�
 | N5 | worktree ベースの並行開発（[[dialect-depth-runs-in-parallel-worktrees]]）を支援する CLI ラッパー |
 | N6 | `docs/src/project/feature-candidates.md` のような棚卸し文書の陳腐化を自動検知する仕組み（実装状況を grep で検証し警告） |
 | N7 | 契約テストの許可リスト（[[feature-dependency-allowlist-contract]] 等）への追加を促す pre-commit ヒント |
+
+---
+
+## O. 未着手の周辺領域（10 件）
+
+A〜N のどのセクションにも収まらない、まだ触れていない切り口。
+
+| # | 候補 |
+| --- | --- |
+| O1 | 新方言の追加検討 — Guile Scheme（GNU拡張構文）、Chez Scheme、Shen、Arc、Gerbil Scheme |
+| O2 | `.paredit/rules/*.lisp` カスタムルールの実行境界（評価かパターン照合のみか）を契約テストで明文化・監査 |
+| O3 | `--output ndjson` — 巨大ワークスペースを1ファイル1行でストリーミング処理するエージェント向け出力 |
+| O4 | `paredit history` — リポジトリ横断で過去に適用した edit/refactor/fix/migrate を一覧し、任意の1操作だけをrevertできる仕組み（現状のundoは直近の `refactor step` に限定） |
+| O5 | `inspect architecture-diagram` — パッケージ依存・呼び出しグラフ・クラス階層を一枚に合成した俯瞰図 |
+| O6 | docstring/コメントの英語以外の言語での一貫性検査（多言語プロジェクト向け） |
+| O7 | `paredit tui` のアクセシビリティ（スクリーンリーダー対応、colorblind-safe テーマ） |
+| O8 | 方言間の慣用形への「移植」支援 — 例: CL の `loop` を Racket の `for`/`for/list` へ書き換え提案 |
+| O9 | `fuzz/` コーパスと lint ルールの相関レポート — どのクラッシュ入力がどのルールで事前に検出できたはずかを `xtask` 経由で集計 |
+| O10 | 新規 lint ルールの段階導入プレビュー — `--preview` で既存コードへの finding 数への影響を導入前に見積もる |
+
+---
+
+## P. GitHub Action / CI 統合の拡張（6 件）
+
+`action.yml` は `mode: lint|format|fix` の3種のみ（`fix` は実際には `format` を
+`--check` 無しで走らせているだけで、`inspect lint --fix` とは別物）。
+`query`/`migrate`/`fix`（lintの書き込み側）を Action から直接使えない。
+
+| # | 候補 |
+| --- | --- |
+| P1 | `action.yml` に `query`/`migrate`/`lint-fix` モードを追加（現状 lint/format/format-fix の3つのみ） |
+| P2 | `refactor plan`/`inspect impact` の結果を PR コメントとして自動投稿し、変更の影響範囲をレビュアーに提示 |
+| P3 | `--since` を PR のベースブランチから自動検出するオプション（現状は明示的な git-ref 指定が前提） |
+| P4 | composite action に加えて `workflow_call` の reusable workflow としての配布 |
+| P5 | GitHub Actions 以外（GitLab CI、CircleCI）向けのテンプレート・使用例の提供 |
+| P6 | pre-commit.com フレームワーク向けの `.pre-commit-hooks.yaml` 配布 |
+
+---
+
+## Q. テスト・カバレッジ連携（6 件）
+
+`inspect test-map` はテストと定義の対応を報告するが、実際の実行結果とは繋がっていない。
+
+| # | 候補 |
+| --- | --- |
+| Q1 | FiveAM/Prove/ERT/`clojure.test` 等の実行結果を `inspect test-map` に統合し、対応表を実測カバレッジにする |
+| Q2 | ミューテーションテスト — 既存の `edit`/`refactor` 変換群を使い、既存テストが検出できない変異を報告する `inspect mutation-coverage` |
+| Q3 | テスト実行時間のプロファイルとフレーク検出（同一テストを複数回実行し結果の揺れを検知） |
+| Q4 | `generate tests` が生成した骨格の充足率トラッキング — TODO のまま放置された生成テストの検出 |
+| Q5 | プロパティベーステストの反例から回帰テストケースを自動生成 |
+| Q6 | カバレッジと `inspect hotspots`/`debt-score` を突き合わせた「テストされていない複雑な箇所」の優先度付け |
+
+---
+
+## R. マクロ作成支援（6 件）
+
+`inspect macro-hygiene`（変数捕捉検出）はあるが、修正提案側・作成支援側はまだ薄い。
+
+| # | 候補 |
+| --- | --- |
+| R1 | `once-only`/gensym パターンの適用漏れに対する自動修正コード生成（検出は既存、修正は無い） |
+| R2 | 意図的な変数捕捉を行う anaphoric マクロのホワイトリスト管理（誤検知の抑制） |
+| R3 | マクロ引数の評価順序・複数回評価バグの検出（`macro-hygiene` の一段深い版） |
+| R4 | `defmacro` 呼び出し箇所を `macroexpand-1` 結果でその場に展開する一時的デバッグ変換 |
+| R5 | `define-compiler-macro` と対応する関数本体の一貫性検証 |
+| R6 | マクロのシグネチャ変更が既存呼び出し箇所を壊すかどうかの後方互換性チェック |
+
+---
+
+## S. VCS/フック連携の深化（5 件）
+
+| # | 候補 |
+| --- | --- |
+| S1 | `paredit install-hooks` — pre-commit/pre-push フックの雛形をワンコマンドで設置 |
+| S2 | `git blame` を使った `refactor plan` のリスクスコアリング（最近変更が集中する箇所ほど慎重に扱う） |
+| S3 | コミットメッセージと変更ファイル種別（lint修正/リファクタ/機能追加）の整合性チェック |
+| S4 | `--since` の拡張 — 直近マージされた PR の差分を自動検出するショートハンド |
+| S5 | リベース・チェリーピック後に `refactor verify` の適用範囲を自動再検証する仕組み |
+
+---
+
+## T. エクスポート形式・相互運用（6 件）
+
+`--output` は sarif/junit/code-climate 等 CI 向けが中心。可視化・他ツール連携向けの形式が薄い。
+
+| # | 候補 |
+| --- | --- |
+| T1 | LSIF（Language Server Index Format）出力 — GitHub Code Navigation 等への取り込み |
+| T2 | ctags/etags 互換出力 — LSP 未対応エディタ向けのフォールバック |
+| T3 | コールグラフ/依存グラフの GraphML/GEXF 出力（Gephi 等の外部可視化ツール向け、現状は dot/mermaid のみ） |
+| T4 | SBOM（CycloneDX/SPDX）生成 — 依存関係の可監査化 |
+| T5 | OpenTelemetry 形式での lint/analysis 実行トレース出力 |
+| T6 | Debug Adapter Protocol（DAP）対応の探索的検討 |
+
+---
+
+## U. オンボーディング・学習支援（5 件）
+
+| # | 候補 |
+| --- | --- |
+| U1 | `paredit learn` — selector/query の文法をインタラクティブに学べるチュートリアルモード |
+| U2 | `paredit doctor` — 処理系検出・設定ファイルの妥当性・キャッシュ状態をワンコマンドで診断 |
+| U3 | `inspect errors --explain <code>` — エラーコード別のよくある原因と対処をコマンドから直接引ける |
+| U4 | 新規参加者向けに `hotspots` ベースで「このリポジトリの複雑な箇所トップ10」ツアーを自動生成 |
+| U5 | サンプル方言ファイル集を使った読み取り専用の「素振り」サンドボックスモード |
+
+---
+
+## V. 利用状況の可視化（プライバシー配慮のオプトイン、4 件）
+
+外部送信ではなくローカル集計のみを前提にした自己観測系。開発優先度を実データから決める。
+
+| # | 候補 |
+| --- | --- |
+| V1 | `paredit stats --usage` — 自分のワークフローでよく使うコマンド/フラグのローカル集計・可視化 |
+| V2 | エラー発生頻度のローカルログ — 次に直すべき UX（頻出する refuse 理由）の特定 |
+| V3 | 大規模ワークスペースでの実行時間ヒートマップ（どのコマンド・どのファイルがボトルネックか） |
+| V4 | オプトインの匿名コマンド利用頻度収集（外部送信は伴わない、ローカルJSON出力のみ） |
+
+---
+
+## W. format / 印字系のさらなる拡張（6 件）
+
+`edit format` は `--indent`/`--max-width`/`--write`/`--diff`/`--check`/`--diff-stat` の6フラグまで
+今回確認できたが、印字ポリシー自体の柔軟性はまだ薄い。
+
+| # | 候補 |
+| --- | --- |
+| W1 | コメント整列 — 行末コメントの列揃えオプション |
+| W2 | フォーム種別ごとの `--max-width` プロファイル（`defun` は80、データリテラルは100、等） |
+| W3 | `lisp-indent-function` 相当のインデントテーブルを `paredit.toml` でプロジェクト単位に上書き |
+| W4 | 空行の正規化ポリシー（連続空行の最大数、トップレベル間の空行数を統一） |
+| W5 | ワークスペース全体の `--diff-stat` 集計（現状は1ファイル単位、複数ファイルの変更行数サマリが無いなら追加） |
+| W6 | 方言固有の慣用フォーマット（例: Clojure の threading マクロのインデント規則）のオプトイン |
+
+---
+
+## X. 方言固有パッケージエコシステムとの連携（5 件）
+
+| # | 候補 |
+| --- | --- |
+| X1 | Quicklisp/Ultralisp ローカルディストの依存整合性チェック |
+| X2 | Leiningen（`project.clj`）/`deps.edn`/`raco pkg` 等パッケージマネージャコマンドとの橋渡し |
+| X3 | Emacs `package-lint`/`checkdoc` 相当ルールの取り込み（既存 Elisp ルールとの重複回避を明示した上で） |
+| X4 | ASDF システムの `:depends-on` バージョン制約とロックファイルの整合性チェック |
+| X5 | Babashka/Clojure CLI のタスク定義（`bb.edn`）からのタスク一覧取得と `inspect workspace` への統合 |
+
+---
+
+## Y. データ用途の S 式検証（4 件）
+
+コードではなく設定・データとして書かれた S 式（コード解析の対象外）への対応。
+
+| # | 候補 |
+| --- | --- |
+| Y1 | Emacs customize データ（`custom-set-variables` ブロック）の構造検証 |
+| Y2 | EDN（`.edn`）データファイルのスキーマ検証（Clojure コードではなくデータとして） |
+| Y3 | Racket のデータ指向 `#lang` 言語への対応拡大（コード用の `#lang racket/base` 以外） |
+| Y4 | `.paredit/rules/*.lisp` 等ツール自身が読む S 式設定ファイルの構文検証を `inspect check` から明示的に呼べるオプション |
+
+---
+
+## Z. 依存関係のライセンス監査（3 件）
+
+G2（自リポジトリのライセンスヘッダ）とは別に、外部依存側のライセンスを見る。
+
+| # | 候補 |
+| --- | --- |
+| Z1 | Quicklisp/ASDF 依存のライセンス一覧化 |
+| Z2 | 自プロジェクトのライセンスと依存ライセンスの互換性マトリクス |
+| Z3 | SPDX 識別子の一貫性チェック（ライセンスヘッダの文言ではなく識別子として） |
+
+---
+
+## AA. 出力全体のアクセシビリティ（4 件）
+
+`paredit tui` のアクセシビリティ（O7）とは別に、通常の text 出力全体を対象にする。
+
+| # | 候補 |
+| --- | --- |
+| AA1 | `NO_COLOR` 環境変数対応が全コマンドで一貫しているかの監査・契約テスト化 |
+| AA2 | 色覚多様性に配慮した診断重要度の配色ガイドライン化 |
+| AA3 | スクリーンリーダー向けの出力構造（見出しの読み上げ順序等）の検証 |
+| AA4 | `--output text` の verbosity レベル調整（quiet/normal/verbose） |
+
+---
+
+## AB. AI 生成コードの品質ゲート（4 件）
+
+paredit-cli は既に MCP 経由でエージェントに使われている前提がある
+（[[mcp-already-curates-agent-surface]]）。生成コード特有の失敗モードに絞った候補。
+
+| # | 候補 |
+| --- | --- |
+| AB1 | 既存 `inspect` 群を束ねた一括採点コマンド（LLM 生成コードのレビュー専用プリセット） |
+| AB2 | 生成コードにありがちなパターン（過剰なコメント、存在しない関数の呼び出し）の検出ルール |
+| AB3 | 生成 → lint → fix → 再 lint のラウンドトリップをワンコマンド化 |
+| AB4 | コミット単位で「この変更が lint 状態をどれだけ悪化/改善させたか」のトレンドレポート |
+
+---
+
+## AC. 実行時プロファイラ連携（3 件）
+
+B 節（ライブ処理系連携）の隣接領域。マクロ展開ではなく実測パフォーマンスの取り込み。
+
+| # | 候補 |
+| --- | --- |
+| AC1 | SBCL の statistical profiler 出力の取り込みと `inspect hotspots` との相関 |
+| AC2 | 実測ホットパスに対する `inspect effects`（純粋性解析）の優先実行 |
+| AC3 | プロファイル駆動のインライン化候補提案 |

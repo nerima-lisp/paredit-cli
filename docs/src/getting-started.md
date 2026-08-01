@@ -1,4 +1,4 @@
-# Installation
+# Getting Started
 
 `paredit` ships as a single binary. Nix is the primary distribution channel;
 Cargo works anywhere a Rust toolchain is available.
@@ -50,7 +50,7 @@ Add the flake and pick the packages or the overlay:
 
 The flake also exports `lib.${system}.mkLintCheck`, `mkFormatCheck`, and
 `treefmtFormatter` for wiring structural checks into another project's
-`nix flake check` — see [Integrations](integrations.md).
+`nix flake check` — see [Integrations](guide/integrations.md).
 
 ## Install with Cargo
 
@@ -94,3 +94,26 @@ paredit inspect capabilities --output json
 paredit --help
 paredit inspect --help
 ```
+
+## Run one task
+
+Check a file's structure, format it, and rename a symbol across it:
+
+```sh
+paredit inspect check --file source.lisp
+paredit edit format --file source.lisp
+paredit refactor rename-symbol --file source.lisp --from old-name --to new-name
+```
+
+`inspect` is read-only. `edit` writes to stdout by default — add `--diff` for a
+unified diff, or `--write` to update the file in place. `refactor` is the
+planned, previewable path for semantic changes; see the
+[refactor workflow](guide/workflows.md).
+
+## Next steps
+
+- [Command Model](reference/api.md) for the full subcommand surface.
+- [Selecting Forms](reference/selectors.md) for tree paths and byte offsets.
+- [Agent Interface](guide/agents.md) for exit codes, JSON output, and
+  `paredit inspect capabilities`.
+- [Development](project/development.md) for the contributor loop.

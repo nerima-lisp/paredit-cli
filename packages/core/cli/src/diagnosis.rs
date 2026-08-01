@@ -299,11 +299,11 @@ impl ErrorCode {
     ///
     /// Built from the label rather than a second table, so a code and its
     /// anchor cannot drift from each other — `tests/cli/errors_doc.rs` checks
-    /// that the anchor this produces actually exists in `docs/src/errors.md`.
+    /// that the anchor this produces actually exists in `docs/src/reference/errors.md`.
     #[must_use]
     pub fn doc_url(self) -> String {
         format!(
-            "https://nerima-lisp.github.io/paredit-cli/errors/#{}",
+            "https://nerima-lisp.github.io/paredit-cli/reference/errors/#{}",
             self.label()
         )
     }
@@ -1271,7 +1271,7 @@ mod tests {
         assert!(json["offset"].is_null());
         assert_eq!(
             json["doc_url"],
-            "https://nerima-lisp.github.io/paredit-cli/errors/#argument.no-input"
+            "https://nerima-lisp.github.io/paredit-cli/reference/errors/#argument.no-input"
         );
     }
 
@@ -1334,19 +1334,19 @@ mod tests {
         assert_eq!(render_caret("é", 1), None);
     }
 
-    /// `doc_url` promises an anchor exists at `docs/src/errors.md`. Checked
+    /// `doc_url` promises an anchor exists at `docs/src/reference/errors.md`. Checked
     /// against the file itself — via `include_str!`, so this runs regardless
     /// of the test binary's working directory — rather than trusted, so a
     /// code added without its documentation section fails here instead of
     /// producing a dead link.
     #[test]
     fn every_error_code_has_a_documented_anchor() {
-        let doc = include_str!("../../../../docs/src/errors.md");
+        let doc = include_str!("../../../../docs/src/reference/errors.md");
         for code in ErrorCode::ALL {
             let anchor = format!("{{ #{} }}", code.label());
             assert!(
                 doc.contains(&anchor),
-                "docs/src/errors.md is missing an anchor for {}: expected `{anchor}`",
+                "docs/src/reference/errors.md is missing an anchor for {}: expected `{anchor}`",
                 code.label()
             );
         }

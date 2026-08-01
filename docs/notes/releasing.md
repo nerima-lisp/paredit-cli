@@ -7,7 +7,7 @@ commit.
 ## Choose the version
 
 `paredit-cli` follows [Semantic Versioning](https://semver.org/), and the
-[release and compatibility guide](releases.md) defines exactly which
+[release and compatibility guide](../src/reference/compatibility.md) defines exactly which
 surfaces are covered. Before picking a number, diff the command catalog of the
 release candidate against the previous tag:
 
@@ -26,7 +26,7 @@ diff -u /tmp/prev.json /tmp/next.json
 - **Patch** — fixes and text-output changes only.
 
 The Rust library API is deliberately absent from that list. It is not a stable
-surface — see [what `1.x` guarantees](releases.md#what-1x-guarantees) — because
+surface — see [what `1.x` guarantees](../src/reference/compatibility.md#what-1x-guarantees) — because
 the crate is `publish = false` and the CLI is the supported interface. A change
 confined to the library, however sweeping, does not on its own force a major
 release.
@@ -43,7 +43,8 @@ release.
    Keep the text to hand — it is pasted in at publish time, in the section
    below.
 4. Update the documentation for anything the release changes, including the
-   `vX.Y.Z` in the install examples in `installation.md` and `releases.md`.
+   `vX.Y.Z` in the install examples in `docs/src/getting-started.md`
+   and `docs/src/reference/compatibility.md`.
 5. Commit as `chore(release): vX.Y.Z`.
 
 `nix flake check` verifies steps 1, 2 and 4: `compatibility_contract` asserts
@@ -90,5 +91,5 @@ README and the MkDocs site describe the released command surface.
    MSRV, or Nix interfaces, call out the migration in the release notes.
 
 The release process does not replace the compatibility rules in the
-[agent interface](agents.md) and the
-[release and compatibility guide](releases.md).
+[agent interface](../src/guide/agents.md) and the
+[release and compatibility guide](../src/reference/compatibility.md).

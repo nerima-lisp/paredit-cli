@@ -92,7 +92,7 @@ pub(crate) fn diagnostics(
                 "code": finding.rule,
                 "codeDescription": {
                     "href": format!(
-                        "https://nerima-lisp.github.io/paredit-cli/commands/#{}",
+                        "https://nerima-lisp.github.io/paredit-cli/reference/api/#{}",
                         finding.rule,
                     ),
                 },
