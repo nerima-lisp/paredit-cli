@@ -280,18 +280,37 @@ fn fix_map(fixes: Vec<RuleFixFor>) -> FixMap {
 
 /// The `--deny`/`--warn` promotions and demotions this run asked for.
 ///
-/// Resolved before any file is read, so a typo'd rule or category name fails
-/// the run rather than quietly changing nothing — the whole point of the flag
-/// is to change what fails CI.
-fn resolve_severity_overrides(args: &LintReportArgs) -> CliResult<SeverityOverrides> {
+/// Resolved after the run's custom rules have loaded (FR-E16), so a
+/// `lint.deny`/`lint.warn` (or `--deny`/`--warn`) naming one of them resolves
+/// against the loaded ruleset rather than only the shipped catalogue. A typo'd
+/// rule or category name — one that matches neither — still fails the run
+/// rather than quietly changing nothing: the whole point of the flag is to
+/// change what fails CI.
+///
+/// Every custom rule's own declared severity is seeded first, before any
+/// selector is applied. Without it, a custom finding's severity for the CI
+/// gate would fall through `SeverityOverrides::severity_of` to the shipped
+/// catalogue's "unknown name" default of `Error` — silently gating an
+/// `--fail-on error` run on a custom rule the project itself shipped at
+/// `warning`. An explicit `--deny`/`--warn` naming that rule is applied
+/// afterward and still wins, since [`SeverityOverrides::apply`] always
+/// inserts over whatever [`SeverityOverrides::seed`] left behind.
+fn resolve_severity_overrides(
+    args: &LintReportArgs,
+    custom: &CustomRules,
+) -> CliResult<SeverityOverrides> {
     let mut overrides = SeverityOverrides::new();
+    for (name, _category, _description, severity, _fixable) in custom.catalog() {
+        overrides.seed(name, severity);
+    }
+    let custom_rules: Vec<&'static str> = custom.names().collect();
     for selector in &args.warn {
-        apply_severity_override(&mut overrides, selector, Severity::Warning)?;
+        apply_severity_override(&mut overrides, selector, Severity::Warning, &custom_rules)?;
     }
     // `--deny` is applied second so it wins a same-selector tie, matching the
     // reading that the stricter flag is the deliberate one.
     for selector in &args.deny {
-        apply_severity_override(&mut overrides, selector, Severity::Error)?;
+        apply_severity_override(&mut overrides, selector, Severity::Error, &custom_rules)?;
     }
     Ok(overrides)
 }
@@ -361,9 +380,17 @@ fn resolve_rule_settings(args: &LintReportArgs) -> CliResult<RuleSettings> {
 }
 
 pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> CommandResult {
+    // Loaded first — and before any file is read — so a rule file that does
+    // not parse fails the run rather than contributing nothing to a green
+    // one, and so the rule selectors resolved next (FR-E16) see the loaded
+    // ruleset's names alongside the shipped catalogue's.
+    let custom = custom::load(args.custom_rules.as_deref())?;
+    let custom_names: Vec<&'static str> = custom.names().collect();
+
     // Resolve the selected rules first so the catalogue-only modes honor the
     // same `--rule`/`--exclude`/`--category`/`--tag`/`--preset` selectors as a
-    // scan. Every name is validated here, before any file is read.
+    // scan. Every name is validated here, before any file is read, against
+    // both the shipped catalogue and the custom rules just loaded.
     let filter = RuleFilter {
         only: &args.rules,
         exclude: &args.exclude,
@@ -372,12 +399,9 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
         preset: args.preset.into(),
         experimental: args.experimental,
     };
-    let active = resolve_active_rules(&filter)?;
-    let overrides = resolve_severity_overrides(&args)?;
+    let active = resolve_active_rules(&filter, &custom_names)?;
+    let overrides = resolve_severity_overrides(&args, &custom)?;
     let settings = resolve_rule_settings(&args)?;
-    // Loaded before any file is read, so a rule file that does not parse fails
-    // the run rather than contributing nothing to a green one.
-    let custom = custom::load(args.custom_rules.as_deref())?;
     let meta = RuleMetaResolver::new(&overrides, &custom);
 
     if args.test_rules {
@@ -406,7 +430,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
                     experimental: args.experimental,
                     ..RuleFilter::default()
                 };
-                resolve_active_rules(&scoped).map(|rules| (preset, rules.len()))
+                resolve_active_rules(&scoped, &[]).map(|rules| (preset, rules.len()))
             })
             .collect::<std::result::Result<Vec<_>, _>>()?;
         return Ok(print_lint_presets(&counts, args.output)?);
@@ -555,7 +579,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
         // filters, which it does.
         let kept: Vec<LintFinding> = file_findings
             .into_iter()
-            .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
+            .filter(|finding| active.contains(&finding.rule))
             .collect();
         let file_ids = assign_finding_ids(&kept, &input.text);
         CliResult::Ok((kept, file_ids))
@@ -589,7 +613,10 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
         }
     }
 
-    let summary = summarize_lint_findings(findings, &active_with_custom(&active, &custom));
+    // `active` already carries the eligible custom rule names alongside the
+    // shipped ones (FR-E16's widened `resolve_active_rules`), so a rule
+    // `lint.disable` excluded is excluded from the checklist here too.
+    let summary = summarize_lint_findings(findings, &active);
     let policy = evaluate_lint_policy(
         &overrides,
         LintPolicyOptions::new(args.fail_on_finding, args.fail_on.map(Severity::from)),
@@ -791,12 +818,12 @@ fn lint_report_sarif(
         )?;
         let mut fixes = fix_map(pass.fixes);
         let findings = merge_custom(pass.findings, custom, file, tree, &input.text);
-        custom_fixes(custom, file, tree, &input.text, &mut fixes);
+        custom_fixes(custom, file, tree, &input.text, active, &mut fixes);
         let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let findings: Vec<LintFinding> = findings
             .into_iter()
-            .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
+            .filter(|finding| active.contains(&finding.rule))
             .collect();
         let ids = assign_finding_ids(&findings, &input.text);
         CliResult::Ok((findings, ids, fixes, input.text.clone()))
@@ -955,7 +982,7 @@ fn lint_report_fix(
 
         for _ in 0..MAX_FIX_PASSES {
             let mut fixes = collect_lint_fixes(file, dialect, &tree, &text, active, settings)?;
-            custom_fixes(custom, file, &tree, &text, &mut fixes);
+            custom_fixes(custom, file, &tree, &text, active, &mut fixes);
             // Re-parse suppressions each pass: line numbers shift as edits land,
             // but the directive comment and its form move together.
             let suppressions = LintSuppressions::parse_in_tree(&text, &tree);
@@ -1171,7 +1198,7 @@ fn lint_report_stats(
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let mut file_had_finding = false;
         for finding in findings {
-            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
+            if !active.contains(&finding.rule) {
                 continue;
             }
             *by_rule.entry(finding.rule).or_insert(0) += 1;
@@ -1376,7 +1403,7 @@ fn lint_report_interop(
         let findings = retain_unsuppressed(findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         for finding in findings {
-            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
+            if !active.contains(&finding.rule) {
                 continue;
             }
             finding_rules.push(finding.rule);
@@ -1477,7 +1504,7 @@ fn lint_report_github(
         CliResult::Ok(
             findings
                 .into_iter()
-                .filter(|finding| active.contains(&finding.rule) || custom.is_rule(finding.rule))
+                .filter(|finding| active.contains(&finding.rule))
                 .map(|finding| {
                     let (line, column) = line_and_column(&input.text, finding.span.start().get());
                     (finding, line, column)
@@ -1666,17 +1693,26 @@ fn merge_custom(
 }
 
 /// Adds the custom rules' rewrites to a file's fix map.
+///
+/// Only for a rule in `active`: `lint.disable`/`--exclude` (FR-E16) excludes a
+/// custom rule's fixes the same way it excludes a shipped rule's — offering a
+/// fix for a rule the run just excluded would be the one output mode where
+/// exclusion did not hold.
 fn custom_fixes(
     custom: &CustomRules,
     _file: &std::path::Path,
     tree: &SyntaxTree,
     text: &str,
+    active: &[&str],
     fixes: &mut FixMap,
 ) {
     if custom.is_empty() {
         return;
     }
     for (rule, finding) in custom.findings(tree, text) {
+        if !active.contains(&rule) {
+            continue;
+        }
         let Some(replacement) = finding.fix else {
             continue;
         };
@@ -1693,17 +1729,6 @@ fn custom_fixes(
             },
         );
     }
-}
-
-/// The active rule list widened by the custom rules.
-///
-/// `summarize_lint_findings` keeps only findings whose rule is in this list and
-/// builds the per-rule checklist from it, so a custom rule that is not here
-/// would be silently dropped after having been computed.
-fn active_with_custom(active: &[&'static str], custom: &CustomRules) -> Vec<&'static str> {
-    let mut widened = active.to_vec();
-    widened.extend(custom.names());
-    widened
 }
 
 /// Runs the `deftest` clauses in the custom rule files.

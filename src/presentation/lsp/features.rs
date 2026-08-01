@@ -63,7 +63,7 @@ pub(crate) fn diagnostics(
         }
     };
 
-    let active = resolve_active_rules(&RuleFilter::default()).unwrap_or_default();
+    let active = resolve_active_rules(&RuleFilter::default(), &[]).unwrap_or_default();
     let Ok(pass) = run_lint_pass(
         path,
         document.dialect,
@@ -273,7 +273,7 @@ pub(crate) fn code_actions(
     let Ok(tree) = SyntaxTree::parse_with_dialect(&document.text, document.dialect) else {
         return Vec::new();
     };
-    let active = resolve_active_rules(&RuleFilter::default()).unwrap_or_default();
+    let active = resolve_active_rules(&RuleFilter::default(), &[]).unwrap_or_default();
     let Ok(pass) = run_lint_pass(
         path,
         document.dialect,
