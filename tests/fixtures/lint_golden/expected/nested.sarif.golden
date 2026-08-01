@@ -3157,6 +3157,24 @@
               "shortDescription": {
                 "text": "a let/let*/cond/case-family form carrying more bindings or clauses than a threshold"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "defvar and defparameter both mean the value may change over the program's lifetime. When nothing in the defining file ever assigns to one again, that possibility is unused here, and defconstant says the same binding more precisely."
+              },
+              "id": "effectively-constant-variable",
+              "properties": {
+                "category": "naming",
+                "fixable": false,
+                "rationale": "defvar and defparameter both mean the value may change over the program's lifetime. When nothing in the defining file ever assigns to one again, that possibility is unused here, and defconstant says the same binding more precisely.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "a defparameter/defvar with an initial value that is never reassigned in the same file"
+              }
             }
           ]
         }

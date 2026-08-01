@@ -4,6 +4,7 @@ pub mod contradictory_optimize;
 pub mod defclass_slot_option;
 pub mod definition_naming;
 pub mod destructive_function_naming;
+pub mod effectively_constant_variable;
 pub mod ignore_declaration_conflict;
 pub mod method_lambda_list_mismatch;
 pub mod missing_docstring;
