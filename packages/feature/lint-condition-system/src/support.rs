@@ -814,7 +814,7 @@ mod tests {
         let mut heads = Vec::new();
         for_each_evaluated_subview_where(
             &parsed.root_view(),
-            |view| !list_head(view).is_some_and(|head| head == "stop"),
+            |view| list_head(view).is_none_or(|head| head != "stop"),
             |view| {
                 if let Some(head) = list_head(view) {
                     heads.push(head.to_owned());
