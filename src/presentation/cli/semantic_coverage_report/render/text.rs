@@ -1,11 +1,14 @@
 use crate::presentation::cli::terminal_safe;
-use crate::semantic_coverage::{SemanticCoveragePolicy, SemanticCoverageReport};
+use crate::semantic_coverage::{
+    DialectCoveragePolicyReport, SemanticCoveragePolicy, SemanticCoverageReport,
+};
 
 use super::percentage;
 
 pub(super) fn print_semantic_coverage_report(
     report: &SemanticCoverageReport,
     policy: &SemanticCoveragePolicy,
+    dialect_policy: &DialectCoveragePolicyReport,
     top: usize,
 ) {
     let variable_bindings = report.total_variable_bindings();
@@ -27,6 +30,14 @@ pub(super) fn print_semantic_coverage_report(
         println!(
             "policy\t--fail-under={threshold:.1}\tpassed={}",
             policy.passed
+        );
+    }
+    for result in dialect_policy.results() {
+        println!(
+            "policy\t--fail-under-dialect={}={:.1}\tpassed={}",
+            result.dialect().label(),
+            result.threshold(),
+            result.passed()
         );
     }
 
