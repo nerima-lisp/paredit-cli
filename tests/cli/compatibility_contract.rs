@@ -10,7 +10,8 @@ fn manifest_version() -> String {
 }
 
 fn releases_guide() -> String {
-    fs::read_to_string("docs/src/reference/compatibility.md").expect("read docs/src/reference/compatibility.md")
+    fs::read_to_string("docs/src/reference/compatibility.md")
+        .expect("read docs/src/reference/compatibility.md")
 }
 
 fn release_workflow() -> String {
@@ -187,7 +188,8 @@ fn release_workflow_creates_an_empty_draft_release() {
 /// the workflow deliberately stops short of publishing.
 #[test]
 fn release_checklist_describes_publishing_the_draft() {
-    let guide = fs::read_to_string("docs/notes/releasing.md").expect("read docs/notes/releasing.md");
+    let guide =
+        fs::read_to_string("docs/notes/releasing.md").expect("read docs/notes/releasing.md");
 
     assert!(
         guide.contains("--draft=false"),

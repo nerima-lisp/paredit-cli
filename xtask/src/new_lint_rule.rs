@@ -411,18 +411,16 @@ fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u
 
     let marker = "pub const RULE_COUNT: usize = ";
     let start = text.find(marker).ok_or_else(|| {
-        crate::error::XtaskError::refused(format!(
-            "`{marker}` not found in {}",
-            path.display()
-        ))
+        crate::error::XtaskError::refused(format!("`{marker}` not found in {}", path.display()))
     })? + marker.len();
     let end = start
-        + text[start..].find(';').ok_or_else(|| {
-            crate::error::XtaskError::refused("no `;` after RULE_COUNT value")
-        })?;
-    let old_count: u32 = text[start..end].trim().parse().map_err(|_| {
-        crate::error::XtaskError::refused("RULE_COUNT value is not a number")
-    })?;
+        + text[start..]
+            .find(';')
+            .ok_or_else(|| crate::error::XtaskError::refused("no `;` after RULE_COUNT value"))?;
+    let old_count: u32 = text[start..end]
+        .trim()
+        .parse()
+        .map_err(|_| crate::error::XtaskError::refused("RULE_COUNT value is not a number"))?;
     let new_count = old_count + 1;
     text.replace_range(start..end, &new_count.to_string());
 
@@ -430,9 +428,9 @@ fn register_in_registry(repo: &Repo, crate_name: &str, snake: &str) -> Result<(u
         "    RuleEntry::new(\n        &{crate_name}::{snake}::rule::META,\n        \
          &{crate_name}::{snake}::rule::RULE,\n    ),\n"
     );
-    let closing = text.rfind("\n];").ok_or_else(|| {
-        crate::error::XtaskError::refused("closing `];` of REGISTRY not found")
-    })?;
+    let closing = text
+        .rfind("\n];")
+        .ok_or_else(|| crate::error::XtaskError::refused("closing `];` of REGISTRY not found"))?;
     text.insert_str(closing + 1, &insertion);
 
     fs::write(&path, &text).map_err(crate::error::XtaskError::io(format!(
@@ -472,9 +470,9 @@ fn bump_assert(text: &str, marker: &str) -> Result<String> {
         .ok_or_else(|| crate::error::XtaskError::refused(format!("`{marker}` not found")))?
         + marker.len();
     let rest = &text[start..];
-    let end_offset = rest.find(')').ok_or_else(|| {
-        crate::error::XtaskError::refused("no closing `)` after assertion value")
-    })?;
+    let end_offset = rest
+        .find(')')
+        .ok_or_else(|| crate::error::XtaskError::refused("no closing `)` after assertion value"))?;
     let old: i64 = rest[..end_offset].trim().parse().map_err(|_| {
         crate::error::XtaskError::refused(format!("`{marker}` value is not a number"))
     })?;

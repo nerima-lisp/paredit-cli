@@ -15,7 +15,8 @@ fn readme_links_to_the_published_documentation() {
 
 #[test]
 fn documentation_contains_command_reference() {
-    let commands = std::fs::read_to_string("docs/src/reference/api.md").expect("read command reference");
+    let commands =
+        std::fs::read_to_string("docs/src/reference/api.md").expect("read command reference");
     assert!(commands.contains("`paredit inspect`"));
     assert!(commands.contains("`paredit edit`"));
     assert!(commands.contains("`paredit refactor`"));

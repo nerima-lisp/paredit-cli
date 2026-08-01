@@ -34,7 +34,8 @@ fn leaf_names(command: &serde_json::Value) -> Vec<String> {
 /// `docs/src/reference/api.md`'s `## <Heading>` sections, each mapped to the text
 /// between it and the next `## ` heading (or end of file).
 fn doc_sections() -> BTreeMap<String, String> {
-    let text = std::fs::read_to_string("docs/src/reference/api.md").expect("read docs/src/reference/api.md");
+    let text = std::fs::read_to_string("docs/src/reference/api.md")
+        .expect("read docs/src/reference/api.md");
 
     let headings: Vec<(usize, &str)> = text
         .lines()
