@@ -1160,7 +1160,7 @@ fn lint_report_write_baseline(
         );
         let findings = retain_unsuppressed(findings, &input.text, &tree);
         for finding in findings {
-            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
+            if !active.contains(&finding.rule) {
                 continue;
             }
             entries.push(BaselineEntry {
@@ -1372,7 +1372,7 @@ fn lint_report_suggest_severity(
         let mut fired_in_file: std::collections::HashSet<&'static str> =
             std::collections::HashSet::new();
         for finding in findings {
-            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
+            if !active.contains(&finding.rule) {
                 continue;
             }
             *finding_counts.entry(finding.rule).or_insert(0) += 1;
@@ -1388,7 +1388,7 @@ fn lint_report_suggest_severity(
     let denominator = files_scanned.max(1) as f64;
 
     let mut suggestions = Vec::new();
-    for rule in active_with_custom(active, custom) {
+    for rule in active.iter().copied() {
         let finding_count = finding_counts.get(rule).copied().unwrap_or(0);
         let current_severity = meta.severity(rule);
         let (bucket, density) = if finding_count == 0 {
