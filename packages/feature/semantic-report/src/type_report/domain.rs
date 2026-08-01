@@ -177,6 +177,19 @@ fn typed_binding(binding: &Binding, declared: Type, inferred: Type, source: &str
 ///
 /// Both must be known: `Unknown` makes no claim, so it cannot contradict one.
 /// `Bottom` on either side is already a contradiction the layer recorded.
+///
+/// Dialect-agnostic by construction, and deliberately so: it is a pure
+/// function of the `Ty` values two sources disagree about, with no gate of
+/// its own. It therefore automatically covers whatever
+/// `typing::service::build_type_table` populates for a dialect — Common
+/// Lisp's `declare`/`check-type` against a propagated value, or Emacs Lisp's
+/// `cl-defstruct`/`defcustom` declarations against theirs — without needing
+/// to be told which dialect it is looking at. Scheme's and Racket's own
+/// declaration sources (`define-record-type` predicates, Typed Racket's `:`
+/// annotations) only ever name a *function's* declared return type, not a
+/// binding's, so nothing yet gives one expression two independently-sourced
+/// claims to disagree with — this function would still catch it the moment
+/// something does.
 fn contradicts(declared: Type, inferred: Type) -> bool {
     match (declared.as_known(), inferred.as_known()) {
         (Some(declared), Some(inferred)) => meet(declared, inferred) == Ty::Bottom,
