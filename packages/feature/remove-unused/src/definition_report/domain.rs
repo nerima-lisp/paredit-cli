@@ -206,15 +206,10 @@ pub fn collect_unused_definition_candidates(
         })
         .collect();
 
-    // `--jobs` governs this fan-out; `0` is that flag's own "as many as the
-    // machine reports", and the only case that still asks the machine.
-    let requested = paredit_core_safety::limits::effective_jobs();
-    let worker_count = if requested == 0 {
-        thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
-    } else {
-        requested
-    }
-    .clamp(1, files.len().max(1));
+    // `--jobs` governs this fan-out.
+    let worker_count = paredit_core_safety::limits::effective_jobs_or_available()
+        .get()
+        .clamp(1, files.len().max(1));
     let mut ordered: Vec<Option<UnusedDefinitionFile>> = (0..files.len()).map(|_| None).collect();
     thread::scope(|scope| -> RemoveUnusedResult<()> {
         let views = &views;

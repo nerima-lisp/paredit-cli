@@ -282,10 +282,12 @@ way each checkout expects.
 
 This is not a general speed-up: parsing dominates a lint run, not walking. It is
 for the case where the walk genuinely dominates — a very large tree scanned
-repeatedly by an editor or an agent. The cache is opt-in for that reason, and
-only `inspect sources` accepts it: a cached entry is a *file list*, not the
-capability-scoped handles the reading commands need. Piping composes without
-weakening anything:
+repeatedly by an editor or an agent. The cache is opt-in for that reason.
+
+The flag lives in the shared workspace input flag set, so every command that
+takes a workspace accepts it. `inspect sources` is the one whose entire answer
+*is* the cached file list, which is what makes it composable — piping hands the
+list on without weakening anything:
 
 ```sh
 paredit inspect sources --cache-dir ~/.cache/paredit --list-files --output text . \

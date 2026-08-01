@@ -16,11 +16,16 @@
 //! answers 401 and reads nothing.
 //!
 //! **A web page can talk to it.** A page in the user's browser can POST to
-//! `127.0.0.1` across origins, and with DNS rebinding it can read the reply.
-//! The bearer *header* is what stops it: a cross-origin request cannot set one
-//! without a CORS preflight, and this server approves none. That is also why
-//! the token is not accepted in the URL or a cookie — both travel on a request
-//! the browser makes by itself.
+//! `127.0.0.1` across origins, and with DNS rebinding it can read the reply —
+//! and once rebound the page is *same-origin* with this server, so it may set
+//! any header it likes with no preflight. What stops it is that it does not
+//! know the token: the value is minted per run and printed only to the
+//! launching terminal's stderr, and no amount of same-origin freedom guesses
+//! it. Secrecy is the defence, not the browser's header rules.
+//!
+//! That is also why the token is not accepted in the URL or a cookie: both
+//! travel on a request the browser makes by itself, which would hand a rebound
+//! page the one thing it lacks.
 //!
 //! Binding off loopback needs `--allow-remote`, which the argument's own help
 //! text says sends the token over the network in clear text.
@@ -214,9 +219,11 @@ fn route(
     metrics: &Mutex<metrics::Metrics>,
     token: &str,
 ) {
-    // Unauthenticated, and deliberately before the route table: a health probe
-    // that answered without a token would be a way to confirm the port is a
-    // paredit server, which is the first step of an attack on it.
+    // Before the 401 gate below only so this route owns its own reply; it
+    // still checks the token inline, because a health probe that answered
+    // without one would confirm the port is a paredit server, which is the
+    // first step of an attack on it. An unauthorised probe therefore falls
+    // through to the same 401 as everything else.
     if request.method == "GET" && request.target == "/health" && request.authorized(token) {
         let _ = write_json(stream, 200, "OK", &json!({ "status": "ok" }));
         return;

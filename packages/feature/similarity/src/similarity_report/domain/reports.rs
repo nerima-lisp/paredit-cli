@@ -860,15 +860,9 @@ pub fn validate_resource_budgets_for_test(
 ///
 /// `--jobs` reaches here rather than being read straight off the machine:
 /// a caller that asked for two workers on a 64-core box was previously given
-/// 64, and no flag could say otherwise. `0` is the flag's own "as many as the
-/// machine reports", so that is the only case that still asks.
+/// 64, and no flag could say otherwise.
 fn effective_available_workers() -> usize {
-    let requested = paredit_core_safety::limits::effective_jobs();
-    if requested == 0 {
-        thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
-    } else {
-        requested
-    }
+    paredit_core_safety::limits::effective_jobs_or_available().get()
 }
 
 fn effective_worker_count(available_workers: usize, possible_pairs: usize) -> usize {

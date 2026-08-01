@@ -270,6 +270,28 @@ A cache directory that cannot be opened is an error, not a silent fallback. A
 run that quietly did not use the cache it was asked to use looks identical to
 one that did, only slower.
 
+Entries are **authenticated as well as addressed**. Content addressing answers
+"is this the same question", not "did this answer come from here", and a cache
+directory restored from a shared CI artifact is input like any other. Each
+entry therefore carries a keyed hash over its own bytes and its key, under a
+32-byte secret minted per cache directory and stored in it as `.secret` (mode
+`0600` on unix). An entry that does not verify — edited, moved onto another
+key's path, or copied in from a different directory — reads as a miss and is
+recomputed, so tampering with a cache can cost a run its speed and never its
+answer. A directory written by a build from before this was true has no secret
+and no tags: it is treated as entirely stale, which costs one recompute.
+
+`inspect similarity --cache-dir <dir>` caches on the same terms, storing the
+whole report rather than per-file findings — it compares every pair of
+candidate forms, so hashing the corpus is a linear pass that buys back a
+quadratic one. Its key covers the tool version, every matching option, and each
+selected file's path, dialect and bytes; `--output` and `--fail-on-duplicates`
+stay outside it, because the stored value is the report and the duplicate gate
+is recomputed from the current run's flag. The entries live in a `similarity/`
+subdirectory and `--clear-cache` removes them. See
+[Reusing a scan](../reference/workspace-inputs.md#reusing-a-scan-cache-dir) for
+the discovery cache these sit alongside.
+
 ## Workspace scope
 
 For workspace operations, start with `paredit inspect workspace` to identify the affected files. Use the workspace planning and preview commands before `paredit refactor workspace-execute`.

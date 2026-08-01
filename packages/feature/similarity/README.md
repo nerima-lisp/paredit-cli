@@ -82,7 +82,7 @@ src/
 ├── similarity_report/
 │   ├── domain/                 scoring, report model, options, classification
 │   ├── usecase/                orchestration behind a source port
-│   └── cli/                    args, workflow, render, types
+│   └── cli/                    args, cache, workflow, render, types
 ├── clone_report/
 │   ├── domain/                 classes, sequences, external, calibration, genealogy
 │   └── cli/                    args, collection, git port, workflow, render
@@ -144,6 +144,20 @@ enumerating every run length up to a file's widest list is exactly what makes
 naive run detection quadratic in that width. Raising it trades a class of
 finding nobody asked for against a cost that grows with the worst file in the
 tree.
+
+### Not paying the quadratic cost twice
+
+The mitigations above make one run affordable. `similarity_report/cli/cache.rs`
+is about the *second* run: with `--cache-dir`, `inspect similarity` stores the
+finished report under a content-addressed key covering the tool version, every
+analysis option, and each selected file's path, dialect and content hash. A hit
+means the identical question was already answered, so there is no invalidation
+logic — hashing the corpus is a linear pass that buys back a quadratic one.
+
+`--output` and `--fail-on-duplicates` are deliberately outside the key; the gate
+is recomputed from the current run's flag. Anything that changes what a report
+*says* must therefore reach the key, or a stale answer becomes reachable. See
+`docs/src/reference/workspace-inputs.md` for the user-facing description.
 
 ### Measuring a change
 

@@ -751,9 +751,8 @@ fn first_unparsable_index(files: &[(&PathBuf, &String)], workers: usize) -> Opti
             let start = chunk_index * per_worker;
             scope.spawn(move || {
                 for (offset, slot) in slots.iter_mut().enumerate() {
-                    if let Some((_, content)) = files.get(start + offset) {
-                        *slot = SyntaxTree::parse(content).is_err();
-                    }
+                    let (_, content) = files[start + offset];
+                    *slot = SyntaxTree::parse(content).is_err();
                 }
             });
         }

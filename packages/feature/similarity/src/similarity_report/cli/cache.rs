@@ -140,14 +140,21 @@ impl SimilarityResultCache {
     /// counters are read from the tree as it is now, and it removes any need
     /// to map a stored dialect label back onto the enum — a mapping that would
     /// silently degrade to `unknown` the day a dialect is added.
+    ///
+    /// `corpus` is the bytes the key was taken over, and every stored span is
+    /// bounded against them. The entry is authenticated, so a span out of range
+    /// should be unreachable; checking anyway costs a comparison and is the
+    /// difference between a bug here and a report quoting whatever follows the
+    /// form in memory.
     #[must_use]
     pub fn get(
         &self,
         key: &str,
         inventory: &SimilarityInventory,
+        corpus: &CorpusSnapshot,
         duplicate_policy: SimilarityDuplicatePolicy,
     ) -> Option<SimilarityReportPlan> {
-        decode_plan(&self.inner.get(key)?, inventory, duplicate_policy)
+        decode_plan(&self.inner.get(key)?, inventory, corpus, duplicate_policy)
     }
 
     /// Records a report. A write that fails is a slow run, not a wrong one.
@@ -156,7 +163,42 @@ impl SimilarityResultCache {
     }
 }
 
-/// A content hash of the corpus, or `None` when it cannot be taken.
+/// The corpus as one run saw it: its content hash, and the bytes that hash was
+/// taken over.
+///
+/// The bytes are kept rather than dropped because the analysis needs the *same*
+/// ones. Reading a file twice — once to compute the key, once to analyse — is a
+/// window in which an editor can save: the entry would then be keyed to the
+/// bytes on the first read while describing the second, and restoring the first
+/// bytes later would serve a report of content that was never analysed under
+/// that key. One read, reused, closes it by construction.
+#[derive(Debug)]
+pub struct CorpusSnapshot {
+    digest: String,
+    contents: HashMap<PathBuf, Vec<u8>>,
+}
+
+impl CorpusSnapshot {
+    /// The content hash, for the cache key.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    /// How long the file at `path` was, or `None` if it is not in the corpus.
+    #[must_use]
+    pub fn length_of(&self, path: &Path) -> Option<usize> {
+        self.contents.get(path).map(Vec::len)
+    }
+
+    /// The bytes, to hand to the analysis instead of a second read.
+    #[must_use]
+    pub fn into_contents(self) -> HashMap<PathBuf, Vec<u8>> {
+        self.contents
+    }
+}
+
+/// A snapshot of the corpus, or `None` when it cannot be taken.
 ///
 /// Reads every selected file through the same loader the analysis uses, so the
 /// bytes hashed are the bytes that would be analysed rather than whatever a
@@ -171,8 +213,9 @@ impl SimilarityResultCache {
 pub fn fingerprint_corpus(
     inventory: &SimilarityInventory,
     load: impl Fn(&DiscoveredSimilarityFile) -> Result<Vec<u8>, String>,
-) -> Option<String> {
+) -> Option<CorpusSnapshot> {
     let mut hasher = blake3::Hasher::new();
+    let mut contents = HashMap::with_capacity(inventory.files.len());
     for file in &inventory.files {
         let bytes = load(file).ok()?;
         // Length-prefixed, so no two different field splits can hash the same:
@@ -186,8 +229,12 @@ pub fn fingerprint_corpus(
             hasher.update(&(field.len() as u64).to_le_bytes());
             hasher.update(field);
         }
+        contents.insert(file.path.clone(), bytes);
     }
-    Some(hasher.finalize().to_hex().to_string())
+    Some(CorpusSnapshot {
+        digest: hasher.finalize().to_hex().to_string(),
+        contents,
+    })
 }
 
 /// Everything other than the corpus that changes what the analysis reports.
@@ -307,6 +354,7 @@ fn encode_form(form: &SimilarityFormReport) -> Value {
 fn decode_plan(
     entry: &Value,
     inventory: &SimilarityInventory,
+    corpus: &CorpusSnapshot,
     duplicate_policy: SimilarityDuplicatePolicy,
 ) -> Option<SimilarityReportPlan> {
     let dialects = inventory
@@ -345,8 +393,8 @@ fn decode_plan(
                 // NaN or a ratio above one must be a miss, not a report.
                 SimilarityRatio::new(decode_f64(&pair["similarity"])?)?,
                 SimilarityScore::new(decode_f64(&pair["score"])?)?,
-                decode_form(&pair["left"], &dialects)?,
-                decode_form(&pair["right"], &dialects)?,
+                decode_form(&pair["left"], &dialects, corpus)?,
+                decode_form(&pair["right"], &dialects, corpus)?,
             ))
         })
         .collect::<Option<Vec<_>>>()?;
@@ -372,7 +420,11 @@ fn decode_plan(
     .ok()
 }
 
-fn decode_form(stored: &Value, dialects: &HashMap<&Path, Dialect>) -> Option<SimilarityFormReport> {
+fn decode_form(
+    stored: &Value,
+    dialects: &HashMap<&Path, Dialect>,
+    corpus: &CorpusSnapshot,
+) -> Option<SimilarityFormReport> {
     let path = PathBuf::from(stored["path"].as_str()?);
     // A stored form whose file is no longer in the corpus cannot be reported
     // under a dialect this run agrees with, so the entry is unusable.
@@ -382,10 +434,18 @@ fn decode_form(stored: &Value, dialects: &HashMap<&Path, Dialect>) -> Option<Sim
         .iter()
         .map(|index| usize::try_from(index.as_u64()?).ok())
         .collect::<Option<Vec<_>>>()?;
-    let span = ByteSpan::new(
+    // `try_new` rather than `new`: an entry is input, and an inverted span
+    // would reach a report as a silently empty one. The upper bound is against
+    // the bytes the key was taken over, so a span that a caller resolves back
+    // to source cannot run off the end of the file it names.
+    let end = usize::try_from(stored["end"].as_u64()?).ok()?;
+    if end > corpus.length_of(path.as_path())? {
+        return None;
+    }
+    let span = ByteSpan::try_new(
         ByteOffset::new(usize::try_from(stored["start"].as_u64()?).ok()?),
-        ByteOffset::new(usize::try_from(stored["end"].as_u64()?).ok()?),
-    );
+        ByteOffset::new(end),
+    )?;
     let head = match &stored["head"] {
         Value::Null => None,
         value => Some(FormHead::new(value.as_str()?)),
@@ -413,11 +473,12 @@ fn decode_stage(label: &str) -> Option<SimilarityProcessingStage> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::collections::HashMap;
+    use std::path::{Path, PathBuf};
 
     use serde_json::{Value, json};
 
-    use super::{decode_f64, discriminator, encode_f64, fingerprint_corpus};
+    use super::{decode_f64, decode_form, discriminator, encode_f64, fingerprint_corpus};
     use crate::similarity_report::domain::{SimilarityOverlapPolicy, SimilarityReportOptions};
     use crate::similarity_report::usecase::{
         DiscoveredSimilarityFile, SimilarityDuplicatePolicy, SimilarityErrorPolicy,
@@ -489,11 +550,19 @@ mod tests {
         }
     }
 
+    /// The snapshot's hash alone, for the tests that are about the hash.
+    fn digest(
+        inventory: &SimilarityInventory,
+        load: impl Fn(&DiscoveredSimilarityFile) -> Result<Vec<u8>, String>,
+    ) -> Option<String> {
+        fingerprint_corpus(inventory, load).map(|corpus| corpus.digest().to_owned())
+    }
+
     #[test]
     fn one_changed_byte_is_a_different_corpus() {
         let inventory = inventory(&["a.lisp"]);
-        let first = fingerprint_corpus(&inventory, |_| Ok(b"(defun f ())".to_vec()));
-        let second = fingerprint_corpus(&inventory, |_| Ok(b"(defun g ())".to_vec()));
+        let first = digest(&inventory, |_| Ok(b"(defun f ())".to_vec()));
+        let second = digest(&inventory, |_| Ok(b"(defun g ())".to_vec()));
 
         assert!(first.is_some());
         assert_ne!(first, second);
@@ -504,20 +573,20 @@ mod tests {
     #[test]
     fn adjacent_corpus_fields_cannot_be_confused_for_one_another() {
         assert_ne!(
-            fingerprint_corpus(&inventory(&["ab"]), |_| Ok(b"c".to_vec())),
-            fingerprint_corpus(&inventory(&["a"]), |_| Ok(b"bc".to_vec()))
+            digest(&inventory(&["ab"]), |_| Ok(b"c".to_vec())),
+            digest(&inventory(&["a"]), |_| Ok(b"bc".to_vec()))
         );
     }
 
     #[test]
     fn a_reordered_corpus_is_a_different_corpus() {
         assert_ne!(
-            fingerprint_corpus(&inventory(&["a.lisp", "b.lisp"]), |file| Ok(file
+            digest(&inventory(&["a.lisp", "b.lisp"]), |file| Ok(file
                 .path
                 .to_string_lossy()
                 .as_bytes()
                 .to_vec())),
-            fingerprint_corpus(&inventory(&["b.lisp", "a.lisp"]), |file| Ok(file
+            digest(&inventory(&["b.lisp", "a.lisp"]), |file| Ok(file
                 .path
                 .to_string_lossy()
                 .as_bytes()
@@ -530,8 +599,63 @@ mod tests {
     #[test]
     fn an_unreadable_file_has_no_fingerprint() {
         assert_eq!(
-            fingerprint_corpus(&inventory(&["a.lisp"]), |_| Err("denied".to_owned())),
+            digest(&inventory(&["a.lisp"]), |_| Err("denied".to_owned())),
             None
+        );
+    }
+
+    /// The bytes the key was taken over are the bytes the analysis gets, so a
+    /// file that changes between the two reads cannot be keyed to one state and
+    /// described from another.
+    #[test]
+    fn the_snapshot_keeps_the_bytes_it_hashed() {
+        let corpus = fingerprint_corpus(&inventory(&["a.lisp", "b.lisp"]), |file| {
+            Ok(file.path.to_string_lossy().as_bytes().to_vec())
+        })
+        .expect("every file loaded");
+
+        assert_eq!(corpus.length_of(Path::new("a.lisp")), Some(6));
+        assert_eq!(corpus.length_of(Path::new("nowhere.lisp")), None);
+        assert_eq!(
+            corpus.into_contents().remove(Path::new("b.lisp")),
+            Some(b"b.lisp".to_vec())
+        );
+    }
+
+    /// A span is validated against the file it names rather than trusted. The
+    /// entry is authenticated, so this is the second line rather than the
+    /// first, but an inverted span reaches a report as a silently empty one and
+    /// an over-long one is a slice past the end of the text.
+    #[test]
+    fn a_span_outside_its_file_is_a_miss() {
+        let corpus = fingerprint_corpus(&inventory(&["a.lisp"]), |_| Ok(b"(defun f ())".to_vec()))
+            .expect("the file loaded");
+        let path = PathBuf::from("a.lisp");
+        let dialects = HashMap::from([(path.as_path(), Dialect::CommonLisp)]);
+        let form = |start: u64, end: u64| {
+            json!({
+                "path": "a.lisp",
+                "form_path": [0],
+                "start": start,
+                "end": end,
+                "node_count": 3,
+                "head": "defun",
+                "text": "(defun f ())",
+            })
+        };
+
+        assert!(decode_form(&form(0, 12), &dialects, &corpus).is_some());
+        assert!(
+            decode_form(&form(0, 13), &dialects, &corpus).is_none(),
+            "a span past the end of the file must not decode"
+        );
+        assert!(
+            decode_form(&form(8, 3), &dialects, &corpus).is_none(),
+            "an inverted span must not decode"
+        );
+        assert!(
+            decode_form(&form(0, u64::MAX), &dialects, &corpus).is_none(),
+            "an unbounded span must not decode"
         );
     }
 

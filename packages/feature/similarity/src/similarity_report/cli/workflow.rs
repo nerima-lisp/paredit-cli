@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+
 use paredit_core_cli::CommandResult;
 
 use crate::similarity_report::usecase::{
@@ -52,6 +55,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> CommandResult {
         from_list: resolved.from_list,
         discovery: None,
         inventory: None,
+        loaded: HashMap::new(),
     };
 
     let (plan, cache_outcome) = match args.input.cache_dir.as_deref() {
@@ -99,16 +103,19 @@ fn reuse_or_build(
     cache: &SimilarityResultCache,
 ) -> paredit_core_cli::CliResult<(SimilarityReportPlan, Option<ResultCacheOutcome>)> {
     let inventory = source.discover(&request)?;
-    let Some(fingerprint) = fingerprint_corpus(&inventory, |file| source.load(file)) else {
+    let Some(corpus) = fingerprint_corpus(&inventory, |file| source.load(file)) else {
         // A file the corpus cannot read at all. Reported by the analysis under
         // the error policy, but not cached: see `fingerprint_corpus`.
         return Ok((build_similarity_report(source, request)?, None));
     };
 
-    let key = cache.key(&request, &fingerprint);
-    if let Some(plan) = cache.get(&key, &inventory, request.duplicate_policy) {
+    let key = cache.key(&request, corpus.digest());
+    if let Some(plan) = cache.get(&key, &inventory, &corpus, request.duplicate_policy) {
         return Ok((plan, Some(ResultCacheOutcome::Hit)));
     }
+    // The analysis runs on the bytes the key was taken over, never on a second
+    // read of the same paths: see [`CorpusSnapshot`].
+    source.reuse(corpus.into_contents());
     let plan = build_similarity_report(source, request)?;
     cache.put(&key, &plan);
     Ok((plan, Some(ResultCacheOutcome::Missing)))
@@ -128,7 +135,25 @@ struct CliSimilarityReportSource {
     /// analysis, and the analysis asks for it again. Recomputing would mean
     /// walking the tree twice per run, and — worse — deciding the cache key
     /// against one walk while analysing the results of another.
-    inventory: Option<SimilarityInventory>,
+    ///
+    /// Paired with the request it was built from so the memo can assert it is
+    /// still answering the question it was asked.
+    inventory: Option<(SimilarityReportRequest, SimilarityInventory)>,
+    /// The bytes the cache key was taken over, when there is a cache.
+    ///
+    /// The same argument as `inventory`, one level down: a second read of the
+    /// same path can return different bytes, and analysing those under a key
+    /// computed from the first read is how a cache comes to hold a report of
+    /// content it never saw. Filled while `&mut`, before the analysis, and only
+    /// read afterwards — the workers run under `thread::scope` against `&self`.
+    loaded: HashMap<PathBuf, Vec<u8>>,
+}
+
+impl CliSimilarityReportSource {
+    /// Hands the analysis the bytes already read for the fingerprint.
+    fn reuse(&mut self, contents: HashMap<PathBuf, Vec<u8>>) {
+        self.loaded = contents;
+    }
 }
 
 impl SimilarityReportSourcePort for CliSimilarityReportSource {
@@ -138,7 +163,12 @@ impl SimilarityReportSourcePort for CliSimilarityReportSource {
         &mut self,
         request: &SimilarityReportRequest,
     ) -> Result<SimilarityInventory, Self::Error> {
-        if let Some(inventory) = self.inventory.clone() {
+        if let Some((memoised, inventory)) = self.inventory.clone() {
+            debug_assert!(
+                &memoised == request,
+                "discover() memoises on its first call; a second call with a different request \
+                 would silently answer the first one's question"
+            );
             return Ok(inventory);
         }
         // `--dialect` forces every file to be parsed with one dialect, so an
@@ -164,11 +194,14 @@ impl SimilarityReportSourcePort for CliSimilarityReportSource {
             skipped_excluded_count: discovery.skipped_excluded_count(),
         };
         self.discovery = Some(discovery);
-        self.inventory = Some(inventory.clone());
+        self.inventory = Some((request.clone(), inventory.clone()));
         Ok(inventory)
     }
 
     fn load(&self, file: &DiscoveredSimilarityFile) -> Result<Vec<u8>, String> {
+        if let Some(bytes) = self.loaded.get(&file.path) {
+            return Ok(bytes.clone());
+        }
         let discovery = self
             .discovery
             .as_ref()

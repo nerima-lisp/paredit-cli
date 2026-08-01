@@ -189,10 +189,11 @@ fn json_report(
             })
         }).collect::<Vec<_>>(),
     });
-    if let Some(object) = document.as_object_mut() {
-        if let Some(outcome) = cache {
-            object.insert("cache".to_owned(), outcome.as_str().into());
-        }
+    if let Some(outcome) = cache {
+        document
+            .as_object_mut()
+            .expect("the document above is an object literal")
+            .insert("cache".to_owned(), outcome.as_str().into());
     }
     document
 }

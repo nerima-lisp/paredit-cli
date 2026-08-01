@@ -267,14 +267,22 @@ fn the_similarity_corpus_is_large_enough_to_spawn_workers() {
 /// A source-level contract rather than a behavioural one for that exact
 /// reason: worker count is deliberately unobservable in the report, so the
 /// only thing that can catch the next site that forgets is the shape of the
-/// call. Asking the machine is still allowed — it is what `--jobs 0` means —
-/// but only in a file that read the flag first.
+/// call.
+///
+/// Six sites each decoded the `0` sentinel for themselves, and one already
+/// spelled it differently from the other five. They now share
+/// [`paredit_core_safety::limits::effective_jobs_or_available`], so the
+/// contract is the stronger one: exactly one file in the tree may ask the
+/// machine, and it is the file that reads the flag first.
 #[test]
 fn every_worker_count_is_derived_from_the_jobs_flag() {
     const MACHINE: &str = "thread::available_parallelism(";
     const FLAG: &str = "effective_jobs()";
+    const HELPER: &str = "effective_jobs_or_available()";
+    const DECODER: &str = "packages/core/safety/src/limits.rs";
 
-    let mut checked = 0usize;
+    let mut asks_machine = Vec::new();
+    let mut through_helper = 0usize;
     let mut stack = vec![PathBuf::from("packages"), PathBuf::from("src")];
     while let Some(path) = stack.pop() {
         if path.is_dir() {
@@ -290,20 +298,24 @@ fn every_worker_count_is_derived_from_the_jobs_flag() {
             continue;
         }
         let source = fs::read_to_string(&path).expect("read source file");
-        if !source.contains(MACHINE) {
-            continue;
+        if source.contains(HELPER) {
+            through_helper += 1;
         }
-        checked += 1;
-        assert!(
-            source.contains(FLAG),
-            "{} calls {MACHINE}..) without reading {FLAG}, so --jobs cannot bound it",
-            path.display()
-        );
+        if source.contains(MACHINE) {
+            asks_machine.push(path.display().to_string().replace('\\', "/"));
+        }
     }
 
+    assert_eq!(
+        asks_machine,
+        [DECODER],
+        "the {MACHINE}..) call belongs only in {DECODER}, where {FLAG} is read first; \
+         every other fan-out sizes itself with {HELPER}"
+    );
+    // The helper is defined in the decoder and called from the six fan-outs.
     assert!(
-        checked >= 6,
-        "only {checked} worker-count sites found; the walk is wrong"
+        through_helper >= 7,
+        "only {through_helper} files reference {HELPER}; the walk is wrong"
     );
 }
 

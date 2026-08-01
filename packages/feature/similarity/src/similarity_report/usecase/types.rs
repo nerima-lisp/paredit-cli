@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::similarity_report::domain::{SimilarityReport, SimilarityReportOptions};
 use paredit_core_syntax::dialect::Dialect;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SimilarityReportRequest {
     pub roots: Vec<PathBuf>,
     pub include_unknown: bool,
@@ -58,11 +58,9 @@ pub trait SimilarityReportSourcePort: Sync {
     fn load(&self, file: &DiscoveredSimilarityFile) -> Result<Vec<u8>, String>;
 
     /// `--jobs` is what a caller sets to bound this run's worker count, and it
-    /// only reaches here if this default reads it. `0` is the flag's "as many
-    /// as the machine reports", which is the only case that asks the machine.
+    /// only reaches here if this default reads it.
     fn available_parallelism(&self) -> NonZeroUsize {
-        NonZeroUsize::new(paredit_core_safety::limits::effective_jobs())
-            .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN))
+        paredit_core_safety::limits::effective_jobs_or_available()
     }
 }
 

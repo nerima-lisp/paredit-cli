@@ -1,7 +1,7 @@
 use std::fs;
 
 use predicates::prelude::*;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use super::{fresh_temp_dir, paredit};
 
@@ -1042,5 +1042,168 @@ fn cli_similarity_treats_an_unreadable_entry_as_a_miss() {
         without_cache_field(recomputed),
         without_cache_field(fresh),
         "a corrupt entry must produce the same report, not a broken one"
+    );
+}
+
+/// The one entry a run over the corpus stores.
+fn sole_entry(cache: &std::path::Path) -> std::path::PathBuf {
+    let mut found = Vec::new();
+    for shard in fs::read_dir(cache.join("similarity")).unwrap() {
+        let shard = shard.unwrap().path();
+        // The signing key is a file at this level, not a shard.
+        if shard.is_dir() {
+            for entry in fs::read_dir(&shard).unwrap() {
+                found.push(entry.unwrap().path());
+            }
+        }
+    }
+    assert_eq!(found.len(), 1, "the run must have stored exactly one entry");
+    found.pop().unwrap()
+}
+
+/// Rewrites a stored answer, leaving its authenticator exactly as written.
+///
+/// This is what an attacker with write access to the cache directory can
+/// actually do: they hold the entry but not the secret that signed it, and
+/// re-signing is what they cannot do.
+fn forge_entry(path: &std::path::Path, edit: impl FnOnce(&mut Value)) {
+    let stored = fs::read_to_string(path).unwrap();
+    let (tag, payload) = stored
+        .split_once('\n')
+        .expect("an entry is tag then answer");
+    let mut entry: Value = serde_json::from_str(payload).unwrap();
+    edit(&mut entry);
+    fs::write(
+        path,
+        format!("{tag}\n{}", serde_json::to_string(&entry).unwrap()),
+    )
+    .unwrap();
+}
+
+/// A corpus of two files that are one duplicate pair.
+fn duplicate_corpus(label: &str) -> std::path::PathBuf {
+    let dir = fresh_temp_dir(label);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("a.lisp"), "(foo a b)\n").unwrap();
+    fs::write(dir.join("b.lisp"), "(foo x y)\n").unwrap();
+    dir
+}
+
+/// The attack the authentication exists for.
+///
+/// A `--cache-dir` restored from a shared CI artifact is attacker-controlled
+/// input. Before entries carried a tag, zeroing the stored counts turned a
+/// failing `--fail-on-duplicates` into a passing one — a CI gate defeated by
+/// editing a JSON file. The forged entry no longer verifies, so it costs a
+/// recompute and the gate still fails.
+#[test]
+fn cli_similarity_a_forged_entry_cannot_pass_the_duplicate_gate() {
+    let dir = duplicate_corpus("similarity-cache-gate-forgery");
+    let cache = fresh_temp_dir("similarity-cache-gate-forgery-store");
+    let gate = || {
+        paredit()
+            .args([
+                "inspect",
+                "similarity",
+                "--threshold",
+                "0.8",
+                "--fail-on-duplicates",
+            ])
+            .arg("--cache-dir")
+            .arg(&cache)
+            .arg(&dir)
+            .output()
+            .unwrap()
+    };
+
+    assert!(!gate().status.success(), "the corpus is a duplicate pair");
+    let warm = gate();
+    assert!(!warm.status.success());
+    assert!(
+        String::from_utf8_lossy(&warm.stdout).contains("\"cache\": \"hit\""),
+        "the second run must be served from the cache, or the forgery below \
+         would be testing nothing"
+    );
+
+    forge_entry(&sole_entry(&cache), |entry| {
+        entry["summary"]["matched_pairs"] = json!(0);
+        entry["summary"]["suppressed_pairs"] = json!(0);
+        entry["summary"]["reported_pairs"] = json!(0);
+        entry["pairs"] = json!([]);
+    });
+
+    let forged = gate();
+    assert!(
+        !forged.status.success(),
+        "a forged entry must not turn a failing gate into a passing one"
+    );
+    let report: Value = serde_json::from_slice(&forged.stdout).unwrap();
+    assert_eq!(
+        report["cache"], "missing",
+        "the forgery must read as a miss"
+    );
+    assert_eq!(report["pair_count"], 1);
+}
+
+/// The other half of the same attack: a pair's `text` is printed verbatim and
+/// attributed to a real source path, so an accepted forgery puts
+/// attacker-chosen content into a report about code the attacker never touched.
+#[test]
+fn cli_similarity_a_forged_entry_cannot_inject_report_text() {
+    let dir = duplicate_corpus("similarity-cache-text-forgery");
+    let cache = fresh_temp_dir("similarity-cache-text-forgery-store");
+    let fabricated = "(defun TOTALLY-FABRICATED (evil) (delete-everything))";
+
+    let honest = similarity_run(&dir, Some(&cache), &["--output", "json"]);
+    assert_eq!(honest["cache"], "missing");
+    assert_eq!(
+        similarity_run(&dir, Some(&cache), &["--output", "json"])["cache"],
+        "hit"
+    );
+
+    forge_entry(&sole_entry(&cache), |entry| {
+        entry["pairs"][0]["left"]["text"] = json!(fabricated);
+    });
+
+    let recomputed = similarity_run(&dir, Some(&cache), &["--output", "json"]);
+    assert_eq!(recomputed["cache"], "missing");
+    assert!(
+        !recomputed.to_string().contains("TOTALLY-FABRICATED"),
+        "a forged entry must not put its own text into the report: {recomputed}"
+    );
+    assert_eq!(
+        without_cache_field(recomputed),
+        without_cache_field(honest),
+        "the recomputed report must be the honest one"
+    );
+}
+
+/// A cache directory written before entries were authenticated has no tags. It
+/// is stale rather than trusted: one extra recompute, then caching resumes.
+#[test]
+fn cli_similarity_an_unauthenticated_entry_is_stale() {
+    let dir = similarity_corpus("similarity-cache-legacy");
+    let cache = fresh_temp_dir("similarity-cache-legacy-store");
+
+    let fresh = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(fresh["cache"], "missing");
+
+    // Strip the tag line, leaving exactly what the previous format wrote.
+    let entry = sole_entry(&cache);
+    let stored = fs::read_to_string(&entry).unwrap();
+    let (_, payload) = stored.split_once('\n').unwrap();
+    fs::write(&entry, payload).unwrap();
+
+    let recomputed = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(recomputed["cache"], "missing");
+    assert_eq!(
+        without_cache_field(recomputed),
+        without_cache_field(fresh),
+        "an unauthenticated entry must be recomputed, not served"
+    );
+    assert_eq!(
+        similarity_run(&dir, Some(&cache), &[])["cache"],
+        "hit",
+        "caching must resume after the one stale round"
     );
 }

@@ -54,8 +54,8 @@ paredit serve listening on http://127.0.0.1:54321
 token: 9f3c…
 ```
 
-Every request is a JSON-RPC 2.0 POST to `/` carrying
-`Authorization: Bearer <token>`.
+Analysis calls are JSON-RPC 2.0 POSTs to `/`. Every request — those and the two
+`GET` routes below alike — carries `Authorization: Bearer <token>`.
 
 | Method | Params | Answers |
 | --- | --- | --- |
@@ -65,6 +65,31 @@ Every request is a JSON-RPC 2.0 POST to `/` carrying
 | `paredit/lint` | `path` | The findings alone |
 | `paredit/invalidate` | `path?` | Drops one cached file, or all of them |
 | `paredit/cache` | — | Entries, hits, misses |
+
+`GET /health` answers `{"status":"ok"}`.
+
+**Scraping it: `GET /metrics`.** Prometheus text exposition format 0.0.4, served
+as `text/plain; version=0.0.4; charset=utf-8`:
+
+| Metric | Type | Counts |
+| --- | --- | --- |
+| `paredit_serve_requests_total` | counter | Requests answered since startup, including refused ones |
+| `paredit_serve_request_duration_seconds_total` | counter | Time spent answering them |
+| `paredit_serve_cache_hits_total` | counter | File analyses answered from the cache |
+| `paredit_serve_cache_misses_total` | counter | File analyses that had to read and parse the file |
+| `paredit_serve_cache_entries` | gauge | Files currently held in the cache |
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:54321/metrics
+```
+
+The scrape needs the token like every other route, and an unauthenticated one
+gets a 401 indistinguishable from any other refusal: an endpoint that answered
+without it would confirm the port is a `paredit` server and say how much of the
+repository the process has read. The cache counters are the same ones
+`paredit/cache` reports, so a panic mid-analysis resets them along with the
+cache — Prometheus reads a counter going backwards as a restart, and `rate()`
+handles it.
 
 **Why run it.** A CLI invocation reads and parses a file every time. Over a
 repository and a loop that parse is the dominant cost and it is entirely
@@ -76,9 +101,12 @@ that preserves both is the case `paredit/invalidate` exists for.
 **Why the token.** A long-lived HTTP server on a developer's machine faces two
 attacks, and the token in a *header* answers both. Every local process can reach
 a loopback port, and this server reads files. And a page in the user's browser
-can POST to `127.0.0.1` across origins — but it cannot set an `Authorization`
-header without a CORS preflight this server never approves, which is why the
-token is not accepted in the URL or a cookie. Binding off loopback needs
+can POST to `127.0.0.1` across origins — and after a DNS rebind it is
+same-origin with the server, so it may set any header it likes. What it does not
+have is the token, which is minted per run and printed only to the launching
+terminal; that secrecy is the defence, not the browser's cross-origin header
+rules. It is also why the token is not accepted in the URL or a cookie: both
+travel on a request the browser makes by itself. Binding off loopback needs
 `--allow-remote`; prefer an SSH tunnel.
 
 `--token <TOKEN>` pins the bearer token instead of minting one at startup, for
