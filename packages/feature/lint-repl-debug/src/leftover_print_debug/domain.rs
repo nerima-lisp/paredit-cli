@@ -21,9 +21,7 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 use paredit_core_syntax::view_query::{list_head, symbol_in};
 
-use crate::support::{
-    EvaluatedCandidate, OperatorScope, RemovalSafety, compute_evaluated_candidates,
-};
+use crate::support::{EvaluatedCandidate, OperatorScope, RemovalSafety, compute_evaluated_forms};
 
 /// The debug-print head symbols this rule recognizes for `dialect`, or `&[]`
 /// for a dialect it does not model at all.
@@ -139,16 +137,16 @@ pub fn collect_leftover_print_debug(
     if heads_for(dialect).is_empty() {
         return Ok((0, Vec::new()));
     }
-    let candidates = compute_evaluated_candidates(&tree.root_view());
+    let forms = compute_evaluated_forms(&tree.root_view());
     let mut violations = Vec::new();
     examine(
-        &candidates,
+        &forms.candidates,
         &OperatorScope::standalone(dialect, tree),
         dialect,
         path,
         &mut violations,
     );
-    Ok((candidates.len(), violations))
+    Ok((forms.scanned_form_count, violations))
 }
 
 #[must_use]

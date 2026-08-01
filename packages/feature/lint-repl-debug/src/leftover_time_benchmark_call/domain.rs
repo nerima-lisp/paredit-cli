@@ -37,7 +37,7 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 use paredit_core_syntax::view_query::{list_head, symbol_is};
 
-use crate::support::{EvaluatedCandidate, OperatorScope, compute_evaluated_candidates};
+use crate::support::{EvaluatedCandidate, OperatorScope, compute_evaluated_forms};
 
 #[derive(Debug, Clone)]
 pub struct LeftoverTimeBenchmarkCallItem {
@@ -119,15 +119,15 @@ pub fn collect_leftover_time_benchmark_call(
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }
-    let candidates = compute_evaluated_candidates(&tree.root_view());
+    let forms = compute_evaluated_forms(&tree.root_view());
     let mut violations = Vec::new();
     examine(
-        &candidates,
+        &forms.candidates,
         &OperatorScope::standalone(dialect, tree),
         path,
         &mut violations,
     );
-    Ok((candidates.len(), violations))
+    Ok((forms.scanned_form_count, violations))
 }
 
 #[must_use]

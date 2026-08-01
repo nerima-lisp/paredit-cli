@@ -108,7 +108,7 @@ use paredit_core_syntax::sexpr::reader::atom_symbol_span;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SyntaxTree,
 };
-use paredit_core_syntax::view_query::{is_paren_list, list_head};
+use paredit_core_syntax::view_query::{is_paren_list, list_head, symbol_in};
 
 /// Whether a matched call's head names the dialect's own operator, or
 /// something this file binds under the same name.
@@ -434,8 +434,94 @@ fn shallow_child(view: &ExpressionView) -> ExpressionView {
     }
 }
 
-/// Every call-shaped node in `root` reachable as evaluated code, computed
-/// fresh every time.
+/// The union of every head symbol any of the seven sharing rules can match,
+/// across every dialect — the filter that keeps the shared walk allocation-
+/// free on a file with nothing to find.
+///
+/// # Why this exists
+///
+/// Without it, [`compute_evaluated_forms`] built an [`EvaluatedCandidate`]
+/// for *every* call site in the file, and each one heap-allocates several
+/// times (a [`shallow_clone`] copies `reader_prefixes`, `text`, and a
+/// `children` vec whose every element copies its own two again). The seven
+/// independent walks this shared walk replaced allocated *nothing* on a clean
+/// file — each compared the head against its own small static table, missed,
+/// and moved on. `scripts/bench-compare.sh`'s `clean/forms/*` benchmarks are
+/// exactly that zero-findings case, so they measured the difference directly:
+/// CI reported +17.3%/+17.2%, *worse* than the +13.8%/+10.8% the unification
+/// was meant to fix. The single walk was a real saving spent several times
+/// over on allocation.
+///
+/// Filtering here restores the allocation-free clean path — no candidate is
+/// constructed at all unless its head could match something — while keeping
+/// the one-walk-instead-of-seven win. Each rule still runs its own precise
+/// head match against its own table on the (now tiny) candidate list, so no
+/// rule's behavior changes.
+///
+/// # Why one cross-dialect union rather than a dialect-selected one
+///
+/// This is deliberately a superset: it merges every dialect's spellings
+/// rather than selecting per dialect. A dialect-selected filter would be
+/// marginally tighter, but it would have to exactly reproduce each rule's own
+/// dialect gating to stay correct — and those gates do not all live in the
+/// same place (the standalone `collect_*` entry points gate on dialect, while
+/// the aggregate lint path's `examine` does not). Over-including a head is
+/// free (the owning rule's own match rejects it); under-including one would
+/// silently stop a rule from ever firing. `single_source_of_truth` below is
+/// the drift guard: it fails if any rule's table ever grows a head this
+/// union does not cover.
+const CANDIDATE_HEADS: &[&str] = &[
+    // `leftover-print-debug`, merged across every dialect its `heads_for`
+    // models (Common Lisp, Emacs Lisp, Clojure, Scheme, Racket, Janet,
+    // Fennel, Hy).
+    "princ",
+    "print",
+    "prin1",
+    "pprint",
+    "message",
+    "println",
+    "prn",
+    "display",
+    "displayln",
+    "pp",
+    // The six fixed-table rules.
+    "trace",
+    "untrace",
+    "break",
+    "inspect",
+    "describe",
+    "format",
+    "step",
+    "time",
+];
+
+/// Whether `head` could match any of the seven sharing rules, using the same
+/// package-qualifier-stripping, case-insensitive comparison the rules
+/// themselves use — so `cl:print` and `PRINT` pass the filter exactly as
+/// `print` does.
+fn is_candidate_head(head: &str) -> bool {
+    symbol_in(head, CANDIDATE_HEADS)
+}
+
+/// The result of one shared walk: the candidates worth examining, and the
+/// scanned-form denominator the standalone `inspect <rule>` commands report.
+///
+/// The two are deliberately separate. `candidates` is filtered down to heads
+/// that could match ([`CANDIDATE_HEADS`]), but `scanned_form_count` counts
+/// *every* node the walk visits, atoms included — which is what each rule's
+/// `collect_*` reported before the walk was shared, and what its
+/// `scanned_form_count` JSON/text field has always meant. Deriving the
+/// denominator from `candidates.len()` instead would silently redefine a
+/// published output field.
+#[derive(Debug, Clone)]
+pub struct EvaluatedForms {
+    pub candidates: Vec<EvaluatedCandidate>,
+    pub scanned_form_count: usize,
+}
+
+/// Every call-shaped node in `root` reachable as evaluated code whose head
+/// could match one of the seven sharing rules, plus the total number of nodes
+/// walked.
 ///
 /// A caller with a [`RuleContext`] should prefer [`evaluated_candidates`],
 /// which computes this at most once per file no matter how many of the seven
@@ -444,10 +530,23 @@ fn shallow_child(view: &ExpressionView) -> ExpressionView {
 /// `RuleContext` — and so nothing to share a walk with in the first place;
 /// each standalone command already only walks once per invocation.
 #[must_use]
-pub fn compute_evaluated_candidates(root: &ExpressionView) -> Vec<EvaluatedCandidate> {
+pub fn compute_evaluated_forms(root: &ExpressionView) -> EvaluatedForms {
     let mut candidates = Vec::new();
+    let mut scanned_form_count = 0;
     walk_evaluated_forms(root, |view, position| {
-        if !is_paren_list(view) || list_head(view).is_none() {
+        // Counted for every visited node, before any filtering: this is the
+        // published denominator, not a count of what survived the filter.
+        scanned_form_count += 1;
+        if !is_paren_list(view) {
+            return;
+        }
+        // `is_candidate_head` runs before anything is built, so a call site
+        // no rule could match costs one comparison against a small static
+        // table and allocates nothing at all.
+        let Some(head) = list_head(view) else {
+            return;
+        };
+        if !is_candidate_head(head) {
             return;
         }
         let removal_span_value = matches!(position.safety, RemovalSafety::Safe)
@@ -460,10 +559,13 @@ pub fn compute_evaluated_candidates(root: &ExpressionView) -> Vec<EvaluatedCandi
             head_symbol_span,
         });
     });
-    candidates
+    EvaluatedForms {
+        candidates,
+        scanned_form_count,
+    }
 }
 
-/// [`compute_evaluated_candidates`], computed at most once per file: the
+/// [`compute_evaluated_forms`]'s candidates, computed at most once per file: the
 /// first of the seven sharing rules whose `check()` runs for this file does
 /// the walk, cached in `context`'s own [`RuleContext::scratch_cache`], and
 /// the other six read the same result back rather than walking again.
@@ -483,21 +585,32 @@ pub fn compute_evaluated_candidates(root: &ExpressionView) -> Vec<EvaluatedCandi
 /// address or a re-linted-in-place file can alias across two *different*
 /// files or passes — there is no key to get wrong.
 ///
-/// The sharing itself was not the whole fix, though — see
-/// [`EvaluatedCandidate`]'s doc for the deep-clone mistake a first version of
-/// this cache made and how [`shallow_clone`] corrected it. With that
-/// correction, a local `cargo bench --bench lint_report -- clean/forms`
-/// stash-based A/B (seven-independent-walks working tree vs. this one,
-/// otherwise identical, same machine, back-to-back) measured
-/// `clean/forms/64` at -22.8% and `clean/forms/1024` at -38.8% — a real
-/// improvement over the seven-walk baseline, not just a recovery from the
-/// deep-clone regression above it.
+/// The sharing itself was not the whole fix, though. Two later corrections
+/// were needed, both caught by CI rather than by local benchmarking (this
+/// project's dev sandbox reports wildly unstable bench numbers under parallel
+/// load, so only CI's `bench-compare` job can settle a question like this):
+///
+/// 1. A first version stored each candidate with a plain `.clone()`, which
+///    for an [`ExpressionView`] is a *whole-subtree* deep copy. See
+///    [`EvaluatedCandidate`]'s doc and [`shallow_clone`].
+/// 2. Even shallow, cloning at *every* call site still allocated far more
+///    than the seven allocation-free walks it replaced — CI measured
+///    +17.3%/+17.2%, worse than before the unification. See
+///    [`CANDIDATE_HEADS`], the head-union filter that fixed it.
+///
+/// With both corrections the clean path allocates nothing: no candidate is
+/// constructed unless its head could match a rule, so a file with nothing to
+/// find pays one walk and one static-table comparison per call site, instead
+/// of seven walks (before) or one walk plus an allocation per call site
+/// (the regressing version).
 #[must_use]
 pub fn evaluated_candidates<'a>(
     context: &'a RuleContext<'a>,
     root: &ExpressionView,
-) -> &'a Vec<EvaluatedCandidate> {
-    context.scratch_cache(|| compute_evaluated_candidates(root))
+) -> &'a [EvaluatedCandidate] {
+    &context
+        .scratch_cache(|| compute_evaluated_forms(root))
+        .candidates
 }
 
 fn visit_children<'a>(
@@ -976,54 +1089,149 @@ mod tests {
     }
 
     #[test]
-    fn compute_evaluated_candidates_matches_walk_evaluated_forms() {
-        // The same shape `heads_with_safety` exercises, but through the
-        // candidate list: every paren-list-with-head node the raw walk
-        // visits shows up exactly once, with the same head and safety.
-        let input = "(defun f (x) (foo x) (bar x))";
+    fn compute_evaluated_forms_matches_walk_evaluated_forms() {
+        // The candidate list must agree with the raw walk on every node it
+        // keeps: same head, same safety, same order — just restricted to
+        // heads a rule could match.
+        let input = "(defun f (x) (print x) (time x))";
         let root = root(input);
-        let candidates = compute_evaluated_candidates(&root);
-        let via_candidates: Vec<(String, RemovalSafety)> = candidates
+        let forms = compute_evaluated_forms(&root);
+        let via_candidates: Vec<(String, RemovalSafety)> = forms
+            .candidates
             .iter()
             .filter_map(|c| list_head(&c.view).map(|h| (h.to_owned(), c.safety)))
             .collect();
-        assert_eq!(via_candidates, heads_with_safety(input));
+        let via_walk: Vec<(String, RemovalSafety)> = heads_with_safety(input)
+            .into_iter()
+            .filter(|(head, _)| is_candidate_head(head))
+            .collect();
+        assert_eq!(via_candidates, via_walk);
+        assert_eq!(
+            via_candidates,
+            vec![
+                ("print".to_owned(), RemovalSafety::Safe),
+                ("time".to_owned(), RemovalSafety::ReportOnly),
+            ]
+        );
     }
 
     #[test]
-    fn compute_evaluated_candidates_precomputes_removal_span_only_when_safe() {
-        let input = "(defun f (x) (foo x) (bar x))";
+    fn compute_evaluated_forms_skips_heads_no_rule_can_match() {
+        // The allocation-free clean path: a file whose call sites are all
+        // ordinary code yields no candidates at all, however many calls it
+        // has. This is what `clean/forms/*` measures.
+        let root = root("(defun f (a b) \"doc\" (+ a (* b 2)))");
+        let forms = compute_evaluated_forms(&root);
+        assert!(
+            forms.candidates.is_empty(),
+            "no candidate should be built for heads no rule can match, got {:?}",
+            forms
+                .candidates
+                .iter()
+                .map(|c| list_head(&c.view))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            forms.scanned_form_count > 0,
+            "the denominator still counts every walked node"
+        );
+    }
+
+    #[test]
+    fn compute_evaluated_forms_counts_every_walked_node_not_just_candidates() {
+        // `scanned_form_count` is a published output field of the standalone
+        // `inspect <rule>` commands and means "nodes walked", which is far
+        // more than the number of candidates kept.
+        let input = "(defun f (x) (print x) (time x))";
         let root = root(input);
-        let candidates = compute_evaluated_candidates(&root);
-        let foo = candidates
-            .iter()
-            .find(|c| list_head(&c.view) == Some("foo"))
-            .expect("foo candidate");
-        assert_eq!(foo.safety, RemovalSafety::Safe);
-        let span = foo.removal_span.expect("safe candidate has a removal span");
-        assert_eq!(&input[span.start().get()..span.end().get()], "(foo x) ");
-
-        let bar = candidates
-            .iter()
-            .find(|c| list_head(&c.view) == Some("bar"))
-            .expect("bar candidate");
-        assert_eq!(bar.safety, RemovalSafety::ReportOnly);
-        assert!(bar.removal_span.is_none());
+        let forms = compute_evaluated_forms(&root);
+        let walked = {
+            let mut n = 0;
+            walk_evaluated_forms(&root, |_, _| n += 1);
+            n
+        };
+        assert_eq!(forms.scanned_form_count, walked);
+        assert!(
+            forms.scanned_form_count > forms.candidates.len(),
+            "the denominator must not collapse to the candidate count"
+        );
     }
 
     #[test]
-    fn compute_evaluated_candidates_excludes_quoted_and_binding_positions() {
+    fn compute_evaluated_forms_excludes_quoted_and_binding_positions() {
         // The same false-positive traps `heads_with_safety`'s own tests cover
         // — a quoted shape, and a lambda-list parameter sharing a target
-        // head's name — must not appear as candidates at all.
-        let root = root("(defun process (step x) '(step (foo)))");
-        let candidates = compute_evaluated_candidates(&root);
+        // head's name — must not appear as candidates at all. Both names here
+        // are real candidate heads, so the filter cannot be what hides them.
+        let root = root("(defun process (step x) '(step (print)))");
+        let forms = compute_evaluated_forms(&root);
         assert!(
-            !candidates
+            !forms
+                .candidates
                 .iter()
                 .any(|c| list_head(&c.view) == Some("step"))
         );
-        assert!(!candidates.iter().any(|c| list_head(&c.view) == Some("foo")));
+        assert!(
+            !forms
+                .candidates
+                .iter()
+                .any(|c| list_head(&c.view) == Some("print"))
+        );
+    }
+
+    #[test]
+    fn candidate_heads_covers_every_rules_own_table() {
+        // The drift guard for `CANDIDATE_HEADS`. A rule that grows a head the
+        // union does not cover would silently stop firing in the shared path,
+        // with no other test failing — so this asserts the union is a
+        // superset of every rule's own table, for every dialect.
+        for dialect in Dialect::ALL {
+            for head in crate::leftover_print_debug::domain::heads_for(dialect) {
+                assert!(
+                    is_candidate_head(head),
+                    "leftover-print-debug head {head:?} ({dialect:?}) is missing from CANDIDATE_HEADS"
+                );
+            }
+        }
+        for head in crate::leftover_trace_call::domain::HEADS {
+            assert!(
+                is_candidate_head(head),
+                "leftover-trace-call head {head:?} is missing from CANDIDATE_HEADS"
+            );
+        }
+        for head in crate::leftover_inspect_call::domain::HEADS {
+            assert!(
+                is_candidate_head(head),
+                "leftover-inspect-call head {head:?} is missing from CANDIDATE_HEADS"
+            );
+        }
+        // The four single-head rules match a literal rather than a table, so
+        // there is nothing to import; these mirror the `symbol_is` calls in
+        // each rule's `examine`.
+        for (head, rule) in [
+            ("break", "leftover-break-call"),
+            ("format", "leftover-format-debug-marker"),
+            ("step", "leftover-step-call"),
+            ("time", "leftover-time-benchmark-call"),
+        ] {
+            assert!(
+                is_candidate_head(head),
+                "{rule} head {head:?} is missing from CANDIDATE_HEADS"
+            );
+        }
+    }
+
+    #[test]
+    fn is_candidate_head_ignores_case_and_package_qualifiers() {
+        // The filter must accept everything the rules' own `symbol_is` /
+        // `symbol_in` would, or it would drop a real finding before any rule
+        // saw it.
+        assert!(is_candidate_head("print"));
+        assert!(is_candidate_head("PRINT"));
+        assert!(is_candidate_head("cl:print"));
+        assert!(is_candidate_head("cl::print"));
+        assert!(!is_candidate_head("printer"));
+        assert!(!is_candidate_head("foo"));
     }
 
     #[test]
@@ -1031,12 +1239,13 @@ mod tests {
         use paredit_core_lint_engine::engine::RuleContext;
         use std::path::Path;
 
-        let input = "(defun f (x) (foo x) (bar x))";
+        let input = "(defun f (x) (print x) (time x))";
         let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
         let context = RuleContext::new(Path::new("test.lisp"), Dialect::CommonLisp, &tree, input);
         let root = tree.root_view();
 
         let first = evaluated_candidates(&context, &root);
+        assert!(!first.is_empty(), "the fixture must produce candidates");
         let first_ptr = first.as_ptr();
         let second = evaluated_candidates(&context, &root);
         assert_eq!(

@@ -16,11 +16,9 @@ use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 use paredit_core_syntax::view_query::{list_head, symbol_in};
 
-use crate::support::{
-    EvaluatedCandidate, OperatorScope, RemovalSafety, compute_evaluated_candidates,
-};
+use crate::support::{EvaluatedCandidate, OperatorScope, RemovalSafety, compute_evaluated_forms};
 
-const HEADS: [&str; 2] = ["trace", "untrace"];
+pub(crate) const HEADS: [&str; 2] = ["trace", "untrace"];
 
 #[derive(Debug, Clone)]
 pub struct LeftoverTraceCallItem {
@@ -101,15 +99,15 @@ pub fn collect_leftover_trace_call(
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok((0, Vec::new()));
     }
-    let candidates = compute_evaluated_candidates(&tree.root_view());
+    let forms = compute_evaluated_forms(&tree.root_view());
     let mut violations = Vec::new();
     examine(
-        &candidates,
+        &forms.candidates,
         &OperatorScope::standalone(dialect, tree),
         path,
         &mut violations,
     );
-    Ok((candidates.len(), violations))
+    Ok((forms.scanned_form_count, violations))
 }
 
 #[must_use]
