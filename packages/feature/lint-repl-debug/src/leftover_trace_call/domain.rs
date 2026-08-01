@@ -13,10 +13,12 @@ use std::path::{Path, PathBuf};
 use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
-use paredit_core_syntax::view_query::{is_paren_list, list_head, symbol_in};
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::view_query::{list_head, symbol_in};
 
-use crate::support::{OperatorScope, RemovalSafety, removal_span, walk_evaluated_forms};
+use crate::support::{
+    EvaluatedCandidate, OperatorScope, RemovalSafety, compute_evaluated_candidates,
+};
 
 const HEADS: [&str; 2] = ["trace", "untrace"];
 
@@ -61,33 +63,34 @@ pub struct LeftoverTraceCallPolicy {
 }
 
 pub fn examine(
-    root: &ExpressionView,
+    candidates: &[EvaluatedCandidate],
     scope: &OperatorScope<'_>,
     path: &Path,
-    scanned_form_count: &mut usize,
     violations: &mut Vec<LeftoverTraceCallItem>,
 ) {
-    walk_evaluated_forms(root, |view, position| {
-        *scanned_form_count += 1;
-        if !is_paren_list(view) {
-            return;
-        }
-        let Some(head) = list_head(view) else {
-            return;
+    for candidate in candidates {
+        let Some(head) = list_head(&candidate.view) else {
+            continue;
         };
         if !symbol_in(head, &HEADS) {
-            return;
+            continue;
         }
-        let fix_span = (matches!(position.safety, RemovalSafety::Safe)
-            && !scope.head_is_locally_bound(view))
-        .then(|| removal_span(position, view.span));
+        let locally_bound = candidate
+            .head_symbol_span
+            .is_some_and(|span| scope.symbol_span_is_locally_bound(span));
+        let fix_span =
+            (matches!(candidate.safety, RemovalSafety::Safe) && !locally_bound).then(|| {
+                candidate
+                    .removal_span
+                    .expect("Safe candidate carries a removal span")
+            });
         violations.push(LeftoverTraceCallItem {
             path: path.to_path_buf(),
-            span: view.span,
+            span: candidate.view.span,
             head: head.to_owned(),
             fix_span,
         });
-    });
+    }
 }
 
 pub fn collect_leftover_trace_call(
@@ -98,16 +101,15 @@ pub fn collect_leftover_trace_call(
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         return Ok((0, Vec::new()));
     }
-    let mut scanned_form_count = 0;
+    let candidates = compute_evaluated_candidates(&tree.root_view());
     let mut violations = Vec::new();
     examine(
-        &tree.root_view(),
+        &candidates,
         &OperatorScope::standalone(dialect, tree),
         path,
-        &mut scanned_form_count,
         &mut violations,
     );
-    Ok((scanned_form_count, violations))
+    Ok((candidates.len(), violations))
 }
 
 #[must_use]

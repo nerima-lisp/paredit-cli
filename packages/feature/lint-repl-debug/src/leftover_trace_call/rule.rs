@@ -7,7 +7,7 @@
 use paredit_core_lint_engine::LintResult;
 
 use crate::leftover_trace_call::domain::examine;
-use crate::support::OperatorScope;
+use crate::support::{OperatorScope, evaluated_candidates};
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{
     Fixability, HeadFilter, RuleCategory, RuleFix, RuleMeta, Severity,
@@ -45,16 +45,10 @@ impl LintRule for Rule {
         view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
-        let mut scanned_form_count = 0;
+        let candidates = evaluated_candidates(context, view);
         let mut items = Vec::new();
         let scope = OperatorScope::shared(context);
-        examine(
-            view,
-            &scope,
-            context.path(),
-            &mut scanned_form_count,
-            &mut items,
-        );
+        examine(candidates, &scope, context.path(), &mut items);
         for item in items {
             let message = format!("{} is a leftover debugging statement", item.head);
             match item.fix_span {

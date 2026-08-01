@@ -22,9 +22,11 @@ use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
-use paredit_core_syntax::view_query::{atom_text, is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::view_query::{atom_text, list_head, symbol_is};
 
-use crate::support::{OperatorScope, RemovalSafety, removal_span, walk_evaluated_forms};
+use crate::support::{
+    EvaluatedCandidate, OperatorScope, RemovalSafety, compute_evaluated_candidates,
+};
 
 const MARKERS: [&str; 2] = ["DEBUG", "DBG"];
 
@@ -110,47 +112,49 @@ pub struct LeftoverFormatDebugMarkerPolicy {
 }
 
 pub fn examine(
-    root: &ExpressionView,
+    candidates: &[EvaluatedCandidate],
     scope: &OperatorScope<'_>,
     path: &Path,
-    scanned_form_count: &mut usize,
     violations: &mut Vec<LeftoverFormatDebugMarkerItem>,
 ) {
-    walk_evaluated_forms(root, |view, position| {
-        *scanned_form_count += 1;
-        if !is_paren_list(view) {
-            return;
-        }
+    for candidate in candidates {
+        let view = &candidate.view;
         let Some(head) = list_head(view) else {
-            return;
+            continue;
         };
         if !symbol_is(head, "format") {
-            return;
+            continue;
         }
         let Some(destination) = view.children.get(1) else {
-            return;
+            continue;
         };
         if !is_standard_output_destination(destination) {
-            return;
+            continue;
         }
         let Some(control) = view.children.get(2) else {
-            return;
+            continue;
         };
         let Some(text) = control_string_text(control) else {
-            return;
+            continue;
         };
         if !contains_debug_marker(text) {
-            return;
+            continue;
         }
-        let fix_span = (matches!(position.safety, RemovalSafety::Safe)
-            && !scope.head_is_locally_bound(view))
-        .then(|| removal_span(position, view.span));
+        let locally_bound = candidate
+            .head_symbol_span
+            .is_some_and(|span| scope.symbol_span_is_locally_bound(span));
+        let fix_span =
+            (matches!(candidate.safety, RemovalSafety::Safe) && !locally_bound).then(|| {
+                candidate
+                    .removal_span
+                    .expect("Safe candidate carries a removal span")
+            });
         violations.push(LeftoverFormatDebugMarkerItem {
             path: path.to_path_buf(),
             span: view.span,
             fix_span,
         });
-    });
+    }
 }
 
 pub fn collect_leftover_format_debug_marker(
@@ -161,16 +165,15 @@ pub fn collect_leftover_format_debug_marker(
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }
-    let mut scanned_form_count = 0;
+    let candidates = compute_evaluated_candidates(&tree.root_view());
     let mut violations = Vec::new();
     examine(
-        &tree.root_view(),
+        &candidates,
         &OperatorScope::standalone(dialect, tree),
         path,
-        &mut scanned_form_count,
         &mut violations,
     );
-    Ok((scanned_form_count, violations))
+    Ok((candidates.len(), violations))
 }
 
 #[must_use]

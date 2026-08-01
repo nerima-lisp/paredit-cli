@@ -108,7 +108,7 @@ use paredit_core_syntax::sexpr::reader::atom_symbol_span;
 use paredit_core_syntax::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SyntaxTree,
 };
-use paredit_core_syntax::view_query::list_head;
+use paredit_core_syntax::view_query::{is_paren_list, list_head};
 
 /// Whether a matched call's head names the dialect's own operator, or
 /// something this file binds under the same name.
@@ -177,12 +177,22 @@ impl<'a> OperatorScope<'a> {
     /// is free, which for these rules means it is the dialect's own operator.
     #[must_use]
     pub fn head_is_locally_bound(&self, call: &ExpressionView) -> bool {
-        let Some(head) = call.children.first() else {
-            return false;
-        };
-        let Some(span) = atom_symbol_span(head) else {
-            return false;
-        };
+        match call.children.first().and_then(atom_symbol_span) {
+            Some(span) => self.symbol_span_is_locally_bound(span),
+            None => false,
+        }
+    }
+
+    /// [`OperatorScope::head_is_locally_bound`], for a caller that already
+    /// has the head atom's own symbol span — [`EvaluatedCandidate::head_symbol_span`],
+    /// precomputed once per node by the shared walk rather than re-derived
+    /// from a live view on every rule's own check. The resolution itself
+    /// (and the binding-table build it may trigger on first use) still only
+    /// happens here, when a rule actually calls this — never during the
+    /// shared walk, which must stay ignorant of the binding table entirely
+    /// so an unrelated candidate can never force it.
+    #[must_use]
+    pub fn symbol_span_is_locally_bound(&self, span: ByteSpan) -> bool {
         self.table().resolve(NodeKey::atom(span)).is_some()
     }
 }
@@ -331,6 +341,163 @@ pub fn walk_evaluated_forms<'a>(
     mut on_node: impl FnMut(&'a ExpressionView, FormPosition<'a>),
 ) {
     visit_children(&root.children, 0, BodyContext::TopLevel, &mut on_node);
+}
+
+/// One call-shaped node (`(head ...)`) reachable as evaluated code, with
+/// everything any of the seven rules that share this walk need already
+/// worked out — so the walk itself runs at most once per file (see
+/// [`evaluated_candidates`]), and each rule's own `check()` only filters and
+/// reads.
+///
+/// Fully owned (an [`ExpressionView`] *shallow clone*, not a borrow into the
+/// tree that produced it) rather than a reference, and deliberately so: that
+/// is what lets [`evaluated_candidates`] hand the whole `Vec` to
+/// [`RuleContext::scratch_cache`], whose slot has no borrowed-data escape
+/// hatch (a `'static` bound).
+///
+/// "Shallow" is load-bearing. [`ExpressionView::clone`] is recursive — it
+/// copies a node's *entire* subtree, grandchildren and all. None of the
+/// seven rules ever reads past a candidate's immediate children (confirmed
+/// by grep across every `leftover_*::domain` module: the deepest access is
+/// `view.children.get(1)` / `.get(2)` read as atoms, never
+/// `.children[1].children`), so [`shallow_clone`] copies exactly one level —
+/// the matched node's own fields plus its immediate children's own fields —
+/// and replaces every grandchild with an empty `children` vec. A first
+/// attempt at this cache used a plain recursive `.clone()` here and
+/// benchmarked *worse* than the seven-independent-walks baseline it was
+/// meant to fix (+53%/+11% on `clean/forms/64`/`clean/forms/1024`, measured
+/// locally): a `(defun clean-fn-N (a b) "doc" (+ a (* b 2)))`-shaped
+/// benchmark fixture has no findings for any of these rules, so the entire
+/// per-candidate cost *is* the clone, and cloning every evaluated call's
+/// whole subtree — not just the ones a rule's head match cares about — cost
+/// far more than the seven redundant walks it replaced. Shallow cloning
+/// fixed that: see `evaluated_candidates`'s doc for the corrected
+/// measurement.
+#[derive(Debug, Clone)]
+pub struct EvaluatedCandidate {
+    /// The matched node, one level deep: every rule already reads
+    /// `list_head`, `.children` (as `.get(1)`/`.get(2)`/`[1]`, never
+    /// deeper), `.reader_prefixes`, and atom `.text` off a view exactly like
+    /// this one, so nothing downstream has to change shape to use a cached
+    /// candidate instead of a live one — it only has to stay shallow.
+    pub view: ExpressionView,
+    pub safety: RemovalSafety,
+    /// Precomputed once, during the one shared walk, while sibling context
+    /// was still available. `None` exactly when `safety` is
+    /// [`RemovalSafety::ReportOnly`].
+    pub removal_span: Option<ByteSpan>,
+    /// The head atom's own symbol span (past reader prefixes) — see
+    /// [`OperatorScope::symbol_span_is_locally_bound`]. Precomputed for the
+    /// same sibling-context reason as `removal_span`, but deliberately *not*
+    /// resolved against the binding table here: that stays each rule's own
+    /// job, gated behind its own head match, so a candidate no rule cares
+    /// about can never force the (still expensive, still lazy) binding-table
+    /// build. The shared walk stays wholly ignorant of the binding table.
+    pub head_symbol_span: Option<ByteSpan>,
+}
+
+/// A one-level-deep copy of `view`: its own fields verbatim, and each
+/// immediate child's own fields verbatim but with *that* child's `children`
+/// replaced by an empty `Vec` — a grandchild is never materialized.
+///
+/// Every field [`ExpressionView`] has is `pub`, so this is a plain field-by-
+/// field construction, not a workaround for anything private. It exists
+/// because [`ExpressionView`]'s own [`Clone`] impl is whole-subtree-deep by
+/// design (it backs real tree edits elsewhere, which need every descendant),
+/// and reusing it here would silently reintroduce the O(subtree size)
+/// per-candidate cost this module's doc comment measures and rejects.
+fn shallow_clone(view: &ExpressionView) -> ExpressionView {
+    ExpressionView {
+        kind: view.kind,
+        delimiter: view.delimiter,
+        reader_prefixes: view.reader_prefixes.clone(),
+        span: view.span,
+        content_span: view.content_span,
+        text: view.text.clone(),
+        children: view.children.iter().map(shallow_child).collect(),
+        symbol_offset: view.symbol_offset,
+    }
+}
+
+/// One immediate child within [`shallow_clone`]: same fields as the node
+/// itself, but `children` forced empty since nothing reads a grandchild.
+fn shallow_child(view: &ExpressionView) -> ExpressionView {
+    ExpressionView {
+        kind: view.kind,
+        delimiter: view.delimiter,
+        reader_prefixes: view.reader_prefixes.clone(),
+        span: view.span,
+        content_span: view.content_span,
+        text: view.text.clone(),
+        children: Vec::new(),
+        symbol_offset: view.symbol_offset,
+    }
+}
+
+/// Every call-shaped node in `root` reachable as evaluated code, computed
+/// fresh every time.
+///
+/// A caller with a [`RuleContext`] should prefer [`evaluated_candidates`],
+/// which computes this at most once per file no matter how many of the seven
+/// sharing rules ask. This is for the standalone `inspect <rule>` commands,
+/// which build their own [`OperatorScope::standalone`] and have no
+/// `RuleContext` — and so nothing to share a walk with in the first place;
+/// each standalone command already only walks once per invocation.
+#[must_use]
+pub fn compute_evaluated_candidates(root: &ExpressionView) -> Vec<EvaluatedCandidate> {
+    let mut candidates = Vec::new();
+    walk_evaluated_forms(root, |view, position| {
+        if !is_paren_list(view) || list_head(view).is_none() {
+            return;
+        }
+        let removal_span_value = matches!(position.safety, RemovalSafety::Safe)
+            .then(|| removal_span(position, view.span));
+        let head_symbol_span = view.children.first().and_then(atom_symbol_span);
+        candidates.push(EvaluatedCandidate {
+            view: shallow_clone(view),
+            safety: position.safety,
+            removal_span: removal_span_value,
+            head_symbol_span,
+        });
+    });
+    candidates
+}
+
+/// [`compute_evaluated_candidates`], computed at most once per file: the
+/// first of the seven sharing rules whose `check()` runs for this file does
+/// the walk, cached in `context`'s own [`RuleContext::scratch_cache`], and
+/// the other six read the same result back rather than walking again.
+///
+/// This is the fix for a real, twice-CI-caught regression. Before it, each
+/// of the seven rules ran its own independent full tree walk — seven
+/// redundant O(n) passes over every file, clean or not — and
+/// `scripts/bench-compare.sh`'s `clean/forms/*` benchmarks (a file with
+/// nothing to flag, so the walk is the *entire* per-file cost these rules
+/// add) measured it at +10.8%/+13.8%, over the 10% gate.
+///
+/// Sharing across seven otherwise-independent `LintRule::check()` calls is
+/// safe here specifically because of what [`RuleContext::scratch_cache`]'s
+/// own doc explains: a `RuleContext` is constructed fresh once per file's
+/// pass and never reused or looked up by identity, so unlike a thread-local
+/// or global cache keyed by a pointer or a path — both of which a stack
+/// address or a re-linted-in-place file can alias across two *different*
+/// files or passes — there is no key to get wrong.
+///
+/// The sharing itself was not the whole fix, though — see
+/// [`EvaluatedCandidate`]'s doc for the deep-clone mistake a first version of
+/// this cache made and how [`shallow_clone`] corrected it. With that
+/// correction, a local `cargo bench --bench lint_report -- clean/forms`
+/// stash-based A/B (seven-independent-walks working tree vs. this one,
+/// otherwise identical, same machine, back-to-back) measured
+/// `clean/forms/64` at -22.8% and `clean/forms/1024` at -38.8% — a real
+/// improvement over the seven-walk baseline, not just a recovery from the
+/// deep-clone regression above it.
+#[must_use]
+pub fn evaluated_candidates<'a>(
+    context: &'a RuleContext<'a>,
+    root: &ExpressionView,
+) -> &'a Vec<EvaluatedCandidate> {
+    context.scratch_cache(|| compute_evaluated_candidates(root))
 }
 
 fn visit_children<'a>(
@@ -806,5 +973,81 @@ mod tests {
         });
         let span = span.expect("bar visited");
         assert_eq!(&input[span.start().get()..span.end().get()], " (bar)");
+    }
+
+    #[test]
+    fn compute_evaluated_candidates_matches_walk_evaluated_forms() {
+        // The same shape `heads_with_safety` exercises, but through the
+        // candidate list: every paren-list-with-head node the raw walk
+        // visits shows up exactly once, with the same head and safety.
+        let input = "(defun f (x) (foo x) (bar x))";
+        let root = root(input);
+        let candidates = compute_evaluated_candidates(&root);
+        let via_candidates: Vec<(String, RemovalSafety)> = candidates
+            .iter()
+            .filter_map(|c| list_head(&c.view).map(|h| (h.to_owned(), c.safety)))
+            .collect();
+        assert_eq!(via_candidates, heads_with_safety(input));
+    }
+
+    #[test]
+    fn compute_evaluated_candidates_precomputes_removal_span_only_when_safe() {
+        let input = "(defun f (x) (foo x) (bar x))";
+        let root = root(input);
+        let candidates = compute_evaluated_candidates(&root);
+        let foo = candidates
+            .iter()
+            .find(|c| list_head(&c.view) == Some("foo"))
+            .expect("foo candidate");
+        assert_eq!(foo.safety, RemovalSafety::Safe);
+        let span = foo.removal_span.expect("safe candidate has a removal span");
+        assert_eq!(&input[span.start().get()..span.end().get()], "(foo x) ");
+
+        let bar = candidates
+            .iter()
+            .find(|c| list_head(&c.view) == Some("bar"))
+            .expect("bar candidate");
+        assert_eq!(bar.safety, RemovalSafety::ReportOnly);
+        assert!(bar.removal_span.is_none());
+    }
+
+    #[test]
+    fn compute_evaluated_candidates_excludes_quoted_and_binding_positions() {
+        // The same false-positive traps `heads_with_safety`'s own tests cover
+        // — a quoted shape, and a lambda-list parameter sharing a target
+        // head's name — must not appear as candidates at all.
+        let root = root("(defun process (step x) '(step (foo)))");
+        let candidates = compute_evaluated_candidates(&root);
+        assert!(
+            !candidates
+                .iter()
+                .any(|c| list_head(&c.view) == Some("step"))
+        );
+        assert!(!candidates.iter().any(|c| list_head(&c.view) == Some("foo")));
+    }
+
+    #[test]
+    fn evaluated_candidates_computes_once_and_is_reused_across_calls() {
+        use paredit_core_lint_engine::engine::RuleContext;
+        use std::path::Path;
+
+        let input = "(defun f (x) (foo x) (bar x))";
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
+        let context = RuleContext::new(Path::new("test.lisp"), Dialect::CommonLisp, &tree, input);
+        let root = tree.root_view();
+
+        let first = evaluated_candidates(&context, &root);
+        let first_ptr = first.as_ptr();
+        let second = evaluated_candidates(&context, &root);
+        assert_eq!(
+            first.len(),
+            second.len(),
+            "both calls see the same candidate list"
+        );
+        assert_eq!(
+            first_ptr,
+            second.as_ptr(),
+            "the second call reused the cached allocation rather than recomputing"
+        );
     }
 }

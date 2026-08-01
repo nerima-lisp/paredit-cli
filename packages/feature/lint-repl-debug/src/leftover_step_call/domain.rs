@@ -26,10 +26,10 @@ use std::path::{Path, PathBuf};
 use paredit_core_lint_engine::LintResult;
 
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
-use paredit_core_syntax::view_query::{is_paren_list, list_head, symbol_is};
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
+use paredit_core_syntax::view_query::{list_head, symbol_is};
 
-use crate::support::{OperatorScope, walk_evaluated_forms};
+use crate::support::{EvaluatedCandidate, OperatorScope, compute_evaluated_candidates};
 
 #[derive(Debug, Clone)]
 pub struct LeftoverStepCallItem {
@@ -74,33 +74,32 @@ pub struct LeftoverStepCallPolicy {
 }
 
 pub fn examine(
-    root: &ExpressionView,
+    candidates: &[EvaluatedCandidate],
     scope: &OperatorScope<'_>,
     path: &Path,
-    scanned_form_count: &mut usize,
     violations: &mut Vec<LeftoverStepCallItem>,
 ) {
-    walk_evaluated_forms(root, |view, _position| {
-        *scanned_form_count += 1;
-        if !is_paren_list(view) {
-            return;
-        }
+    for candidate in candidates {
+        let view = &candidate.view;
         let Some(head) = list_head(view) else {
-            return;
+            continue;
         };
         if !symbol_is(head, "step") {
-            return;
+            continue;
         }
         if view.children.len() != 2 {
-            return;
+            continue;
         }
-        let form_span = (!scope.head_is_locally_bound(view)).then(|| view.children[1].span);
+        let locally_bound = candidate
+            .head_symbol_span
+            .is_some_and(|span| scope.symbol_span_is_locally_bound(span));
+        let form_span = (!locally_bound).then(|| view.children[1].span);
         violations.push(LeftoverStepCallItem {
             path: path.to_path_buf(),
             span: view.span,
             form_span,
         });
-    });
+    }
 }
 
 pub fn collect_leftover_step_call(
@@ -111,16 +110,15 @@ pub fn collect_leftover_step_call(
     if dialect != Dialect::CommonLisp {
         return Ok((0, Vec::new()));
     }
-    let mut scanned_form_count = 0;
+    let candidates = compute_evaluated_candidates(&tree.root_view());
     let mut violations = Vec::new();
     examine(
-        &tree.root_view(),
+        &candidates,
         &OperatorScope::standalone(dialect, tree),
         path,
-        &mut scanned_form_count,
         &mut violations,
     );
-    Ok((scanned_form_count, violations))
+    Ok((candidates.len(), violations))
 }
 
 #[must_use]
