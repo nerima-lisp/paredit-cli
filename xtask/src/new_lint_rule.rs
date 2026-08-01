@@ -221,14 +221,14 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
 
     // Absent a seed, this generates exactly what it always has:
     // `Suspicious`/`Warning`, no extra doc notes, no extra tests.
-    let category_ident = options
-        .seed
-        .as_ref()
-        .map_or_else(|| "Suspicious".to_owned(), |seed| format!("{:?}", seed.rule.category));
-    let severity_ident = options
-        .seed
-        .as_ref()
-        .map_or_else(|| "Warning".to_owned(), |seed| format!("{:?}", seed.rule.severity));
+    let category_ident = options.seed.as_ref().map_or_else(
+        || "Suspicious".to_owned(),
+        |seed| format!("{:?}", seed.rule.category),
+    );
+    let severity_ident = options.seed.as_ref().map_or_else(
+        || "Warning".to_owned(),
+        |seed| format!("{:?}", seed.rule.severity),
+    );
     // `catalog.rs` only tracks a `warning_count()` (see `bump_catalog_counts`
     // below) — an `Error`-severity seed must not bump it, or the pinned
     // assertion goes stale the moment this scaffold is generated.
@@ -581,8 +581,14 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
              Severity::{severity_ident}, {} `:matches`/{} `:no-match` deftest case(s) \
              turned into TODO-marked unit tests in `domain.rs`{}.",
             seed.spec,
-            seed.tests.iter().map(|test| test.matches.len()).sum::<usize>(),
-            seed.tests.iter().map(|test| test.no_match.len()).sum::<usize>(),
+            seed.tests
+                .iter()
+                .map(|test| test.matches.len())
+                .sum::<usize>(),
+            seed.tests
+                .iter()
+                .map(|test| test.no_match.len())
+                .sum::<usize>(),
             if seed.tests.iter().any(|test| !test.fixes.is_empty()) {
                 "; its `:fix` case(s) are listed as a comment only — this scaffold has no fix \
                  support yet"
@@ -866,8 +872,7 @@ mod tests {
         assert!(domain_rs.contains(r#"let source = "(defentity user :table \"users\")";"#));
         assert!(domain_rs.contains(&format!(
             "{:?} -> {:?}",
-            "(defentity user)",
-            "(defentity user :table \"TODO\")"
+            "(defentity user)", "(defentity user :table \"TODO\")"
         )));
 
         // `Severity::Error` must not bump `warning_count()` — only RULE_COUNT.
@@ -879,8 +884,8 @@ mod tests {
 
     #[test]
     fn a_seed_spec_without_a_hash_is_a_clear_refusal() {
-        let error = CustomRuleSeed::load("rules.lisp")
-            .expect_err("a spec with no `#name` must be refused");
+        let error =
+            CustomRuleSeed::load("rules.lisp").expect_err("a spec with no `#name` must be refused");
         assert!(error.to_string().contains("<path>#<name>"));
     }
 
