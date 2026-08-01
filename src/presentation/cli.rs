@@ -619,6 +619,7 @@ use paredit_feature_lint_control_flow::prog2_to_progn::cli as prog2_to_progn_rep
 use paredit_feature_lint_control_flow::redundant_body_progn::cli as redundant_body_progn_report;
 use paredit_feature_lint_control_flow::redundant_prog1::cli as redundant_prog1_report;
 use paredit_feature_lint_control_flow::redundant_progn::cli as redundant_progn_report;
+use paredit_feature_lint_control_flow::self_recursive_tail_call::cli as self_recursive_tail_call_report;
 use paredit_feature_lint_control_flow::unwind_protect_no_cleanup::cli as unwind_protect_no_cleanup_report;
 use paredit_feature_lint_form_shape::butlast_default_count::cli as butlast_default_count_report;
 use paredit_feature_lint_form_shape::coerce_to_t::cli as coerce_to_t_report;

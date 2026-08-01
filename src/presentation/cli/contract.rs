@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 238] = [
+const INTROSPECTION_COMMANDS: [&str; 239] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -383,6 +383,7 @@ const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect explicit-nil-return",
     "inspect redundant-progn",
     "inspect redundant-prog1",
+    "inspect self-recursive-tail-call",
     "inspect negated-comparison",
     "inspect negated-if",
     "inspect negated-step-delta",
@@ -666,9 +667,10 @@ const SYNTAX_TIER_REPORTS: [&str; 19] = [
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 35] = [
+const SCOPE_TIER_REPORTS: [&str; 36] = [
     "inspect resolve",
     "inspect giant-conditional-form",
+    "inspect self-recursive-tail-call",
     "inspect test-map",
     "inspect symbol-index",
     "inspect unreachable-expressions",

@@ -296,6 +296,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::RedundantProg1(args) => {
                 redundant_prog1_report::workflow::redundant_prog1_report(args)?;
             }
+            command::InspectCommand::SelfRecursiveTailCall(args) => {
+                self_recursive_tail_call_report::workflow::self_recursive_tail_call_report(args)?;
+            }
             command::InspectCommand::NegatedWhenUnless(args) => {
                 negated_when_unless_report::workflow::negated_when_unless_report(args)?;
             }

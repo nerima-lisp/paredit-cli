@@ -10,6 +10,7 @@ pub mod prog2_to_progn;
 pub mod redundant_body_progn;
 pub mod redundant_prog1;
 pub mod redundant_progn;
+pub mod self_recursive_tail_call;
 pub mod unwind_protect_no_cleanup;
 
 // The root's REGISTRY names each rule's META and RULE across this crate

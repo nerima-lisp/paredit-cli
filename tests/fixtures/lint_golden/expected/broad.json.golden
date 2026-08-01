@@ -2829,6 +2829,12 @@
       "count": 0,
       "description": "an inner let binding or lambda-list parameter that reuses the name of a top-level definition in the same file",
       "rule": "package-level-shadowing"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a function's own name called in tail position of its body, annotated with the target dialect's tail-call guarantee",
+      "rule": "self-recursive-tail-call"
     }
   ],
   "policy": {

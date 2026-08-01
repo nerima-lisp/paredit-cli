@@ -64,20 +64,21 @@ use super::{
     redundant_start_zero_report, redundant_the_report, refactor, refactor_step,
     remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
     resolve_report, restart_report, self_assignment_report, self_comparison_report,
-    semantic_coverage_report, serial_consistency_report, setf_arity_report,
-    setq_non_variable_report, sharp_quoted_lambda_report, sign_comparison_report, signature_report,
-    similarity_report, single_arg_comparison_report, single_clause_cond_report,
-    single_operand_arithmetic_report, single_operand_boolean_report, single_operand_list_op_report,
-    single_value_bind_report, source_report, split_let, split_let_star, step_zero_report,
-    string_case_fold_report, struct_cycle_report, structural_diff, structural_patch,
-    subseq_zero_report, symbol_index_report, system_conflict_report, system_cycle_report,
-    t_comparison_report, test_map_report, the_arity_report, thread_expression, todo_report,
-    type_report, typecase_nil_key_report, typep_predicate_report, undefined_package_report,
-    unreachable_case_clause_report, unreachable_cond_clause_report, unreachable_expression_report,
-    unthread_expression, unused_export_report, unused_local_callable_report,
-    unused_nickname_report, unused_package_report, unwind_protect_no_cleanup_report, unwrap_call,
-    value_propagation_report, values_list_of_list_report, verbose_negation_report,
-    workspace_report, writability_report, zero_divisor_report,
+    self_recursive_tail_call_report, semantic_coverage_report, serial_consistency_report,
+    setf_arity_report, setq_non_variable_report, sharp_quoted_lambda_report,
+    sign_comparison_report, signature_report, similarity_report, single_arg_comparison_report,
+    single_clause_cond_report, single_operand_arithmetic_report, single_operand_boolean_report,
+    single_operand_list_op_report, single_value_bind_report, source_report, split_let,
+    split_let_star, step_zero_report, string_case_fold_report, struct_cycle_report,
+    structural_diff, structural_patch, subseq_zero_report, symbol_index_report,
+    system_conflict_report, system_cycle_report, t_comparison_report, test_map_report,
+    the_arity_report, thread_expression, todo_report, type_report, typecase_nil_key_report,
+    typep_predicate_report, undefined_package_report, unreachable_case_clause_report,
+    unreachable_cond_clause_report, unreachable_expression_report, unthread_expression,
+    unused_export_report, unused_local_callable_report, unused_nickname_report,
+    unused_package_report, unwind_protect_no_cleanup_report, unwrap_call, value_propagation_report,
+    values_list_of_list_report, verbose_negation_report, workspace_report, writability_report,
+    zero_divisor_report,
 };
 use clap::Subcommand;
 
@@ -306,6 +307,8 @@ pub(super) enum InspectCommand {
     RedundantProgn(redundant_progn_report::args::RedundantPrognReportArgs),
     /// Report a prog1 wrapping a single form, which is just that form ((prog1 x) is x).
     RedundantProg1(redundant_prog1_report::args::RedundantProg1ReportArgs),
+    /// Report a function's own name called in tail position of its body, annotated with the target dialect's tail-call guarantee.
+    SelfRecursiveTailCall(self_recursive_tail_call_report::args::SelfRecursiveTailCallReportArgs),
     /// Report when/unless forms whose test is a (not X)/(null X) negation (flip the macro instead).
     NegatedWhenUnless(negated_when_unless_report::args::NegatedWhenUnlessReportArgs),
     /// Report negated two-arg numeric comparisons ((not (= a b)) is (/= a b)).

@@ -13,7 +13,7 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-pub const RULE_COUNT: usize = 177;
+pub const RULE_COUNT: usize = 178;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -734,5 +734,9 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_form_shape::package_level_shadowing::rule::META,
         &paredit_feature_lint_form_shape::package_level_shadowing::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_control_flow::self_recursive_tail_call::rule::META,
+        &paredit_feature_lint_control_flow::self_recursive_tail_call::rule::RULE,
     ),
 ];

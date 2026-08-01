@@ -2571,6 +2571,22 @@
               "shortDescription": {
                 "text": "an inner let binding or lambda-list parameter that reuses the name of a top-level definition in the same file"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "A self-recursive call in tail position is a loop written as a function call, and whether that is safe is a fact about the dialect, not the code. Scheme, Racket, LFE, and Fennel guarantee a proper tail call here; Emacs Lisp, Hy, and Clojure do not; Common Lisp leaves it to the implementation."
+              },
+              "id": "self-recursive-tail-call",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A self-recursive call in tail position is a loop written as a function call, and whether that is safe is a fact about the dialect, not the code. Scheme, Racket, LFE, and Fennel guarantee a proper tail call here; Emacs Lisp, Hy, and Clojure do not; Common Lisp leaves it to the implementation.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a function's own name called in tail position of its body, annotated with the target dialect's tail-call guarantee"
+              }
             }
           ]
         }
