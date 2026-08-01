@@ -12,13 +12,14 @@ use crate::presentation::cli::lint_report::args::{EmitFormat, LintReportArgs};
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
 use crate::presentation::cli::lint_report::render::{
-    FindingIds, LintFileFix, LintFix, LintFixPlanEntry, LintReplacement, LintSarifResult,
-    LintStats, LintSuppressionRemoval, LintTiming, print_custom_lint_explanation, print_lint_docs,
-    print_lint_expired_suppressions, print_lint_explanation, print_lint_fix_plan,
-    print_lint_fix_report, print_lint_github_annotation, print_lint_presets, print_lint_report,
-    print_lint_rule_catalog, print_lint_sarif, print_lint_stats, print_lint_suppression_inventory,
-    print_lint_suppression_removal, print_lint_tags, print_lint_timings,
-    print_lint_unused_suppressions,
+    DensityBucket, FindingIds, LintFileFix, LintFix, LintFixPlanEntry, LintReplacement,
+    LintSarifResult, LintStats, LintSuppressionRemoval, LintTiming, SeverityDensitySuggestion,
+    print_custom_lint_explanation, print_lint_docs, print_lint_expired_suppressions,
+    print_lint_explanation, print_lint_fix_plan, print_lint_fix_report,
+    print_lint_github_annotation, print_lint_presets, print_lint_report, print_lint_rule_catalog,
+    print_lint_sarif, print_lint_stats, print_lint_suggest_severity,
+    print_lint_suppression_inventory, print_lint_suppression_removal, print_lint_tags,
+    print_lint_timings, print_lint_unused_suppressions,
 };
 use paredit_core_cli::report::FindingSeverity;
 use paredit_core_cli::report::interop::{self, Flattened, Row};
@@ -459,6 +460,12 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
 
     if args.stats {
         return Ok(lint_report_stats(&args, &files, &active, &meta, &custom)?);
+    }
+
+    if args.suggest_severity {
+        return Ok(lint_report_suggest_severity(
+            &args, &files, &active, &meta, &custom,
+        )?);
     }
 
     if args.remove_unused_suppressions {
@@ -1241,6 +1248,148 @@ fn lint_report_stats(
         by_rule,
     };
     print_lint_stats(&stats, args.output)
+}
+
+/// The findings-per-file cutoffs a rule's density is sorted into, in findings
+/// per file scanned. Round order-of-magnitude numbers rather than a tuned
+/// model: `--suggest-severity` is advisory, and a threshold a reader cannot
+/// sanity-check in their head would undercut that.
+const VERY_HIGH_DENSITY: f64 = 1.0;
+const HIGH_DENSITY: f64 = 0.1;
+const MODERATE_DENSITY: f64 = 0.01;
+const LOW_DENSITY: f64 = 0.001;
+
+/// Sorts a positive density into its [`DensityBucket`]. Only called with
+/// `finding_count > 0`; a rule with no findings is [`DensityBucket::Never`],
+/// decided by the caller before density is even computed (dividing by
+/// `files_scanned` would still work, but "never fired" is the more honest
+/// thing to print than "very low density").
+fn density_bucket(density: f64) -> DensityBucket {
+    if density >= VERY_HIGH_DENSITY {
+        DensityBucket::VeryHigh
+    } else if density >= HIGH_DENSITY {
+        DensityBucket::High
+    } else if density >= MODERATE_DENSITY {
+        DensityBucket::Moderate
+    } else if density >= LOW_DENSITY {
+        DensityBucket::Low
+    } else {
+        DensityBucket::VeryLow
+    }
+}
+
+/// The severity a rule's firing rate suggests instead of its current one, or
+/// `None` when the two agree (the common case — most rules need no
+/// suggestion).
+///
+/// Only two directions are ever suggested, deliberately:
+/// - An `Error` rule firing at `High` or `VeryHigh` density is too noisy to be
+///   gating a build on likely/certain bugs; consider `Warning`.
+/// - A `Warning` rule that never fired across the whole scanned workspace is
+///   either dead weight or, if it ever does fire, rare enough that missing it
+///   would be worth failing over; consider `Error`.
+///
+/// A `Warning` firing constantly, or an `Error` that never fires, is each
+/// rule's expected shape and gets no suggestion.
+const fn suggested_severity(
+    current: Severity,
+    finding_count: usize,
+    bucket: DensityBucket,
+) -> Option<Severity> {
+    match (current, finding_count, bucket) {
+        (Severity::Error, count, DensityBucket::VeryHigh | DensityBucket::High) if count > 0 => {
+            Some(Severity::Warning)
+        }
+        (Severity::Warning, 0, DensityBucket::Never) => Some(Severity::Error),
+        _ => None,
+    }
+}
+
+/// Runs a normal lint scan and, for every rule that fired at least once,
+/// computes its findings-per-file density across the scanned workspace (see
+/// [`SeverityDensitySuggestion::density`]); for every rule that never fired,
+/// notes that too. Reports only the rules whose density disagrees with their
+/// current severity — see [`suggested_severity`] for the two directions this
+/// ever recommends.
+///
+/// **Advisory only.** This reuses the same finding-collection machinery
+/// (`collect_lint_findings`, suppressions, `--baseline`) as `--stats`, on data
+/// already computed for a scan; it never re-derives severities, never writes
+/// `paredit.toml`, and always returns `Ok` regardless of what it finds — a
+/// `--suggest-severity` run cannot fail a build the way `--fail-on`/`--fix
+/// --check` can, because a suggestion is not a policy.
+fn lint_report_suggest_severity(
+    args: &LintReportArgs,
+    files: &[std::path::PathBuf],
+    active: &[&'static str],
+    meta: &RuleMetaResolver<'_>,
+    custom: &CustomRules,
+) -> CliResult<()> {
+    let baseline = load_baseline(args)?;
+    let mut finding_counts: std::collections::BTreeMap<&'static str, usize> =
+        std::collections::BTreeMap::new();
+    let mut files_with_finding: std::collections::BTreeMap<&'static str, usize> =
+        std::collections::BTreeMap::new();
+
+    for file in files {
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
+        let findings = merge_custom(
+            collect_lint_findings(file, dialect, &tree)?,
+            custom,
+            file,
+            &tree,
+            &input.text,
+        );
+        let findings = retain_unsuppressed(findings, &input.text, &tree);
+        let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
+        let mut fired_in_file: std::collections::HashSet<&'static str> =
+            std::collections::HashSet::new();
+        for finding in findings {
+            if !active.contains(&finding.rule) && !custom.is_rule(finding.rule) {
+                continue;
+            }
+            *finding_counts.entry(finding.rule).or_insert(0) += 1;
+            fired_in_file.insert(finding.rule);
+        }
+        for rule in fired_in_file {
+            *files_with_finding.entry(rule).or_insert(0) += 1;
+        }
+    }
+
+    let files_scanned = files.len();
+    #[allow(clippy::cast_precision_loss)]
+    let denominator = files_scanned.max(1) as f64;
+
+    let mut suggestions = Vec::new();
+    for rule in active_with_custom(active, custom) {
+        let finding_count = finding_counts.get(rule).copied().unwrap_or(0);
+        let current_severity = meta.severity(rule);
+        let (bucket, density) = if finding_count == 0 {
+            (DensityBucket::Never, 0.0)
+        } else {
+            #[allow(clippy::cast_precision_loss)]
+            let density = finding_count as f64 / denominator;
+            (density_bucket(density), density)
+        };
+        let Some(suggested) = suggested_severity(current_severity, finding_count, bucket) else {
+            continue;
+        };
+        suggestions.push(SeverityDensitySuggestion {
+            rule,
+            category: meta.category(rule),
+            current_severity,
+            suggested_severity: suggested,
+            finding_count,
+            files_with_finding: files_with_finding.get(rule).copied().unwrap_or(0),
+            files_scanned,
+            density,
+            bucket,
+        });
+    }
+    // Deterministic regardless of finding order: alphabetical by rule.
+    suggestions.sort_by_key(|entry| entry.rule);
+
+    print_lint_suggest_severity(&suggestions, files_scanned, args.output)
 }
 
 /// Reports every inline `; paredit:ignore` directive that silences no finding
