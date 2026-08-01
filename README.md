@@ -85,8 +85,10 @@ cargo test
 nix flake check
 ```
 
-Pull requests run every `nix flake check` output, one CI job per check, so the
-gate costs the slowest check rather than the sum of all of them. A typed Rust library API behind the CLI
+Pull requests run a fast-path subset of `nix flake check`'s outputs, one CI job
+per check, so the gate costs the slowest check rather than the sum of all of
+them — the fat-LTO release build is deferred to `main` and pushes to `main`
+run every output. A typed Rust library API behind the CLI
 is documented in [`src/lib.rs`](src/lib.rs); build it locally with
 `cargo doc --no-deps --open`. The rendered command reference and guides live
 at the [documentation site](https://nerima-lisp.github.io/paredit-cli/).

@@ -117,6 +117,21 @@
               CARGO_PROFILE = "dev";
             }
           );
+
+          # PR-only fast path: thin-LTO, consumed solely by
+          # treefmt-pr-check/lint-format-integration-pr-check, which need a
+          # *working* paredit binary to run its formatter/lint plugin, not the
+          # binary that ships. `package` keeps building depsRelease under fat
+          # LTO, unaffected by this.
+          depsPrCheck = craneLib.buildDepsOnly (
+            commonCrateArgs
+            // {
+              pname = "paredit-cli-pr-check";
+              CARGO_PROFILE = "pr-check";
+              doCheck = false;
+              cargoCheckExtraArgs = "";
+            }
+          );
         in
         {
           package = craneLib.buildPackage (
@@ -134,6 +149,17 @@
                 license = lib.licenses.mit;
                 mainProgram = "paredit";
               };
+            }
+          );
+
+          # Same source, thin-LTO: see depsPrCheck above.
+          packagePrCheck = craneLib.buildPackage (
+            commonCrateArgs
+            // {
+              pname = "paredit-cli-pr-check";
+              cargoArtifacts = depsPrCheck;
+              CARGO_PROFILE = "pr-check";
+              doCheck = false;
             }
           );
 
@@ -177,6 +203,7 @@
       cargoFor = lib.genAttrs systems (system: mkCargoSet pkgsFor.${system});
 
       mkParedit = pkgs: (mkCargoSet pkgs).package;
+      mkParateditPrCheck = pkgs: (mkCargoSet pkgs).packagePrCheck;
 
       mkDocs =
         pkgs:
@@ -207,12 +234,16 @@
           };
         };
 
-      mkLint =
-        pkgs:
+      # `paredit` is threaded through explicitly (rather than each caller
+      # hardcoding `mkParedit pkgs`) so the PR-only fast-path checks can
+      # supply `mkParateditPrCheck pkgs` instead without duplicating the
+      # script body.
+      mkLintFor =
+        pkgs: paredit:
         pkgs.writeShellApplication {
           name = "paredit-lint";
           runtimeInputs = [
-            (mkParedit pkgs)
+            paredit
             pkgs.jq
           ];
           meta.description = "Fail when discovered Lisp sources contain structural parse errors";
@@ -233,13 +264,15 @@
             [ "$errors" -eq 0 ]
           '';
         };
+      mkLint = pkgs: mkLintFor pkgs (mkParedit pkgs);
+      mkLintPrCheck = pkgs: mkLintFor pkgs (mkParateditPrCheck pkgs);
 
-      mkFormat =
-        pkgs:
+      mkFormatFor =
+        pkgs: paredit:
         pkgs.writeShellApplication {
           name = "paredit-format";
           runtimeInputs = [
-            (mkParedit pkgs)
+            paredit
             pkgs.jq
           ];
           meta.description = "Rewrite discovered Lisp sources into canonical paredit edit format";
@@ -288,6 +321,8 @@
             fi
           '';
         };
+      mkFormat = pkgs: mkFormatFor pkgs (mkParedit pkgs);
+      mkFormatPrCheck = pkgs: mkFormatFor pkgs (mkParateditPrCheck pkgs);
 
       # Mirrors Dialect::from_extension in src/domain/dialect/mod.rs; keep the
       # two in sync so the Nix helpers cover every file paredit can parse.
@@ -318,11 +353,11 @@
         "*.fnl"
       ];
 
-      mkFormatFiles =
-        pkgs:
+      mkFormatFilesFor =
+        pkgs: paredit:
         pkgs.writeShellApplication {
           name = "paredit-format-files";
-          runtimeInputs = [ (mkParedit pkgs) ];
+          runtimeInputs = [ paredit ];
           meta.description = "treefmt-style formatter: rewrite each argument file in place";
           text = ''
             # treefmt-style formatter: rewrite each argument file in place.
@@ -335,14 +370,16 @@
             done
           '';
         };
+      mkFormatFiles = pkgs: mkFormatFilesFor pkgs (mkParedit pkgs);
+      mkFormatFilesPrCheck = pkgs: mkFormatFilesFor pkgs (mkParateditPrCheck pkgs);
 
-      mkTreefmtModule = pkgs: {
+      mkTreefmtModuleFor = pkgs: formatFiles: {
         projectRootFile = "flake.nix";
         programs.rustfmt.enable = true;
         programs.rustfmt.edition = "2024";
         programs.nixfmt.enable = true;
         settings.formatter.paredit = {
-          command = lib.getExe (mkFormatFiles pkgs);
+          command = lib.getExe formatFiles;
           includes = lispIncludes;
           # Test fixtures are byte-exact parser inputs; formatting them would
           # change the spans the tests assert on.
@@ -357,9 +394,16 @@
           ];
         };
       };
+      mkTreefmtModule = pkgs: mkTreefmtModuleFor pkgs (mkFormatFiles pkgs);
+      mkTreefmtModulePrCheck = pkgs: mkTreefmtModuleFor pkgs (mkFormatFilesPrCheck pkgs);
 
       treefmtFor = lib.genAttrs systems (
         system: treefmt-nix.lib.evalModule pkgsFor.${system} (mkTreefmtModule pkgsFor.${system})
+      );
+      # PR-only fast path: same treefmt config, thin-LTO paredit formatter
+      # binary. See mkParateditPrCheck / [profile.pr-check] in Cargo.toml.
+      treefmtPrCheckFor = lib.genAttrs systems (
+        system: treefmt-nix.lib.evalModule pkgsFor.${system} (mkTreefmtModulePrCheck pkgsFor.${system})
       );
 
       # The checks that actually build something, without the conformance
@@ -374,9 +418,46 @@
         let
           pkgs = pkgsFor.${system};
           cargoChecks = cargoFor.${system};
+          # Shared body for lint-format-integration and its PR-only
+          # thin-LTO sibling: only which paredit-lint/paredit-format
+          # binaries are on PATH differs between the two.
+          mkLintFormatIntegrationCheck =
+            name: lintPkg: formatPkg:
+            pkgs.runCommand name
+              {
+                nativeBuildInputs = [
+                  lintPkg
+                  formatPkg
+                ];
+              }
+              ''
+                mkdir demo
+                printf '(defun ok (x)\n  (+ x 1))\n' > demo/good.lisp
+
+                paredit-lint demo
+
+                printf '(defun broken (' > demo/bad.lisp
+                if paredit-lint demo; then
+                  echo "expected paredit-lint to fail on demo/bad.lisp" >&2
+                  exit 1
+                fi
+                rm demo/bad.lisp
+
+                printf '(defun messy (x)\n(+ x\n1))\n' > demo/messy.lisp
+                if paredit-format --check demo; then
+                  echo "expected paredit-format --check to fail on demo/messy.lisp" >&2
+                  exit 1
+                fi
+                paredit-format demo
+                paredit-format --check demo
+
+                touch $out
+              '';
         in
         {
           treefmt = treefmtFor.${system}.config.build.check self;
+          # PR-only fast path: same treefmt config, thin-LTO paredit binary.
+          treefmt-pr-check = treefmtPrCheckFor.${system}.config.build.check self;
           actionlint =
             pkgs.runCommand "paredit-cli-actionlint"
               {
@@ -413,36 +494,12 @@
                 touch $out
               '';
           lint-format-integration =
-            pkgs.runCommand "paredit-cli-lint-format-integration"
-              {
-                nativeBuildInputs = [
-                  (mkLint pkgs)
-                  (mkFormat pkgs)
-                ];
-              }
-              ''
-                mkdir demo
-                printf '(defun ok (x)\n  (+ x 1))\n' > demo/good.lisp
-
-                paredit-lint demo
-
-                printf '(defun broken (' > demo/bad.lisp
-                if paredit-lint demo; then
-                  echo "expected paredit-lint to fail on demo/bad.lisp" >&2
-                  exit 1
-                fi
-                rm demo/bad.lisp
-
-                printf '(defun messy (x)\n(+ x\n1))\n' > demo/messy.lisp
-                if paredit-format --check demo; then
-                  echo "expected paredit-format --check to fail on demo/messy.lisp" >&2
-                  exit 1
-                fi
-                paredit-format demo
-                paredit-format --check demo
-
-                touch $out
-              '';
+            mkLintFormatIntegrationCheck "paredit-cli-lint-format-integration" (mkLint pkgs)
+              (mkFormat pkgs);
+          # PR-only fast path: same behavioural check, thin-LTO binaries.
+          lint-format-integration-pr-check =
+            mkLintFormatIntegrationCheck "paredit-cli-lint-format-integration-pr-check" (mkLintPrCheck pkgs)
+              (mkFormatPrCheck pkgs);
           inherit (cargoChecks) clippy nextest msrv;
           package = self.packages.${system}.default;
         };

@@ -69,6 +69,20 @@ codegen-units = 4
 [profile.dev]
 debug = "line-tables-only"
 
+# PR-only fast path for the `treefmt-pr-check` and
+# `lint-format-integration-pr-check` Nix checks (see flake.nix): they need a
+# *working* paredit binary to run its formatter/lint plugin, not the exact
+# binary that ships. `package` (main/release) keeps building under
+# `[profile.release]`'s fat LTO unchanged; this profile never touches it.
+# Measured on this workspace at four cores (matching a GitHub runner):
+# thin-LTO/4 cold full-workspace release build took 160s, against fat-LTO's
+# ~14min in CI — see [profile.bench] above for the same settings' cost on the
+# smaller Criterion targets.
+[profile.pr-check]
+inherits = "release"
+lto = "thin"
+codegen-units = 4
+
 [dependencies]
 # Extracted core packages (Phase 1 onwards).
 paredit-core-syntax = { path = "packages/core/syntax" }

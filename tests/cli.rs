@@ -51,6 +51,8 @@ mod change_summary;
 mod char_case_fold_report;
 #[path = "cli/char_op_string_report.rs"]
 mod char_op_string_report;
+#[path = "cli/ci_pr_wallclock_contract.rs"]
+mod ci_pr_wallclock_contract;
 #[path = "cli/class_cycle_report.rs"]
 mod class_cycle_report;
 #[path = "cli/clone_report.rs"]
