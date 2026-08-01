@@ -29,11 +29,13 @@
 
 use paredit_core_lint_engine::model::{RuleCategory, Severity};
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ExpressionView, SyntaxTree};
+use paredit_core_syntax::selector::error::{PatternError, RewriteError};
+use paredit_core_syntax::selector::pattern::Rest;
+use paredit_core_syntax::sexpr::{Delimiter, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::{atom_text, list_head, symbol_in, symbol_is};
 use thiserror::Error;
 
-use crate::pattern::{Pattern, from_view, variables};
+use crate::pattern::{Pattern, Template, fix_from_view, from_view};
 
 /// What can be wrong with a rule file.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -58,6 +60,20 @@ pub enum RulesetError {
     #[error("custom rule {rule:?}'s :fix names ?{variable}, which its :pattern does not bind")]
     UnboundFixVariable { rule: String, variable: String },
 
+    #[error("custom rule {rule:?}'s :pattern is not a valid pattern: {source}")]
+    InvalidPattern {
+        rule: String,
+        #[source]
+        source: PatternError,
+    },
+
+    #[error("custom rule {rule:?}'s :fix is not a valid rewrite template: {source}")]
+    InvalidFix {
+        rule: String,
+        #[source]
+        source: RewriteError,
+    },
+
     #[error("custom rule name {name:?} collides with a shipped rule")]
     NameCollision { name: String },
 
@@ -75,7 +91,7 @@ pub struct CustomRule {
     pub message: String,
     pub pattern: Pattern,
     /// The rewrite, when the rule declares one.
-    pub fix: Option<Pattern>,
+    pub fix: Option<Template>,
     /// The `-- reason` a deprecation carried, for the message. Empty for a
     /// `defrule`.
     pub note: String,
@@ -220,7 +236,7 @@ fn severity_of(rule: &str, form: &ExpressionView) -> Result<Severity, RulesetErr
 }
 
 /// Reads one `(defrule …)`.
-fn read_defrule(form: &ExpressionView) -> Result<CustomRule, RulesetError> {
+fn read_defrule(form: &ExpressionView, text: &str) -> Result<CustomRule, RulesetError> {
     let name = form
         .children
         .get(1)
@@ -234,7 +250,10 @@ fn read_defrule(form: &ExpressionView) -> Result<CustomRule, RulesetError> {
         rule: name.clone(),
         option: ":pattern",
     })?;
-    let pattern = from_view(pattern_view);
+    let pattern = from_view(pattern_view).map_err(|source| RulesetError::InvalidPattern {
+        rule: name.clone(),
+        source,
+    })?;
 
     let message = option(form, ":message")
         .and_then(option_text)
@@ -243,14 +262,22 @@ fn read_defrule(form: &ExpressionView) -> Result<CustomRule, RulesetError> {
             option: ":message",
         })?;
 
-    let fix = option(form, ":fix").map(from_view);
+    let fix = option(form, ":fix")
+        .map(|view| fix_from_view(view, text))
+        .transpose()
+        .map_err(|source| RulesetError::InvalidFix {
+            rule: name.clone(),
+            source,
+        })?;
     if let Some(fix) = &fix {
-        let bound = variables(&pattern);
+        let bound = pattern.capture_names();
         // A fix naming something the pattern never binds would render as the
-        // literal `?x` and write it into the file. Rejecting it here is the
+        // literal `?x` and write it into the file (or, for `?_`, ask to
+        // substitute a capture `:pattern`'s own anonymous `?_` never binds —
+        // see `pattern`'s module documentation). Rejecting it here is the
         // difference between a rule file that fails to load and a rule file
         // that corrupts source.
-        for variable in variables(fix) {
+        for variable in fix.capture_names() {
             if !bound.contains(&variable) {
                 return Err(RulesetError::UnboundFixVariable {
                     rule: name.clone(),
@@ -296,9 +323,14 @@ fn read_deprecate(form: &ExpressionView) -> Result<CustomRule, RulesetError> {
 
     // `(name ...)`: any call to the deprecated operator, whatever its arity.
     let pattern = Pattern::List {
-        delimiter: paredit_core_syntax::sexpr::Delimiter::Paren,
-        items: vec![Pattern::Literal(name.clone())],
-        ellipsis: true,
+        delimiter: Delimiter::Paren,
+        prefixes: Vec::new(),
+        before: vec![Pattern::Atom {
+            text: name.clone(),
+            prefixes: Vec::new(),
+        }],
+        rest: Some(Rest { capture: None }),
+        after: Vec::new(),
     };
 
     let mut message = format!("{name} is deprecated");
@@ -379,7 +411,7 @@ pub fn parse_ruleset(path: &str, text: &str) -> Result<Ruleset, RulesetError> {
             continue;
         };
         if symbol_is(head, "defrule") {
-            ruleset.rules.push(read_defrule(form)?);
+            ruleset.rules.push(read_defrule(form, text)?);
         } else if symbol_is(head, "deprecate") {
             ruleset.rules.push(read_deprecate(form)?);
         } else if symbol_in(head, &["deftest"]) {
@@ -501,7 +533,10 @@ mod tests {
         assert!(rule.fix.is_none());
         assert!(matches!(
             &rule.pattern,
-            Pattern::List { ellipsis: true, .. }
+            Pattern::List {
+                rest: Some(Rest { capture: None }),
+                ..
+            }
         ));
     }
 
