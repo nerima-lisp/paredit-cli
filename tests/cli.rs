@@ -539,6 +539,8 @@ mod source_report;
 mod split_file;
 #[path = "cli/split_let_star.rs"]
 mod split_let_star;
+#[path = "cli/stdio_protocol.rs"]
+mod stdio_protocol;
 #[path = "cli/step_zero_report.rs"]
 mod step_zero_report;
 #[path = "cli/string_case_fold_report.rs"]
@@ -609,21 +611,43 @@ fn paredit() -> Command {
 }
 
 fn cli_proptest_config(cases: u32) -> ProptestConfig {
-    let mut config = ProptestConfig::with_cases(cases);
+    let mut config = ProptestConfig::with_cases(proptest_cases(cases));
     config.failure_persistence = Some(Box::new(FileFailurePersistence::Off));
     config
 }
 
-/// Bounds the case count like [`cli_proptest_config`] while keeping proptest's
-/// default source-parallel failure persistence.
+/// Preserve each property's small local budget while allowing CI to widen it.
+///
+/// `ProptestConfig::with_cases` intentionally overrides `PROPTEST_CASES`, so
+/// the explicit integration-test budgets would otherwise ignore CI's wider
+/// search. The maximum means an accidental low environment value cannot weaken
+/// a property's documented local coverage.
+fn proptest_cases(local_cases: u32) -> u32 {
+    std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .map_or(local_cases, |configured_cases| {
+            local_cases.max(configured_cases)
+        })
+}
+
+/// Bounds the case count like [`cli_proptest_config`] while replaying and
+/// recording failures in the supplied regression file.
 ///
 /// [`cli_proptest_config`] pins persistence to [`FileFailurePersistence::Off`],
-/// which resolves to no path at all: a `*.proptest-regressions` file sitting
-/// next to the test is then never loaded, so recorded shrinks stop being
-/// replayed without any warning. Properties that have committed seeds must use
-/// this variant instead, so those seeds keep running ahead of novel cases.
-fn cli_proptest_config_replaying_recorded_failures(cases: u32) -> ProptestConfig {
-    ProptestConfig::with_cases(cases)
+/// so committed shrinking examples must opt into persistence explicitly.
+/// `SourceParallel` is unsuitable for this integration-test tree because it
+/// emits a warning while searching for a `lib.rs` or `main.rs` anchor that
+/// does not exist. An explicit path keeps the replay location deterministic.
+fn cli_proptest_config_replaying_recorded_failures(
+    cases: u32,
+    regression_file: &'static str,
+) -> ProptestConfig {
+    ProptestConfig {
+        cases: proptest_cases(cases),
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(regression_file))),
+        ..ProptestConfig::default()
+    }
 }
 
 fn stable_manifest_hash(text: &str) -> String {

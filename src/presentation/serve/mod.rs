@@ -37,6 +37,7 @@ mod service;
 use std::io::BufReader;
 use std::net::{IpAddr, TcpListener, TcpStream};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
@@ -145,24 +146,41 @@ const fn is_loopback(address: IpAddr) -> bool {
 /// either: two allocations in one process routinely land on the same address.
 ///
 /// The clock-and-pid derivation survives only as the fallback for a platform
-/// with no random device, where it is still better than a constant, and where
-/// the header requirement is doing the load-bearing work against a browser
-/// regardless.
+/// with no random device. A process-local sequence prevents two fallback
+/// calls in the same clock tick from minting the same token.
 fn mint_token(address: &str) -> String {
+    mint_token_with(
+        address,
+        |bytes| {
+            // `read_exact`, never `fs::read`. `/dev/urandom` is a character
+            // device with no end, so a read-to-EOF never returns — it fills
+            // memory until the process dies.
+            std::fs::File::open("/dev/urandom")
+                .and_then(|mut device| std::io::Read::read_exact(&mut device, bytes))
+        },
+        || {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_nanos())
+        },
+    )
+}
+
+fn mint_token_with(
+    address: &str,
+    read_random: impl FnOnce(&mut [u8; 32]) -> std::io::Result<()>,
+    fallback_nanos: impl FnOnce() -> u128,
+) -> String {
     let mut hasher = blake3::Hasher::new();
-    // `read_exact`, never `fs::read`. `/dev/urandom` is a character device with
-    // no end, so a read-to-EOF never returns — it fills memory until the
-    // process dies.
     let mut bytes = [0_u8; 32];
-    let random = std::fs::File::open("/dev/urandom")
-        .and_then(|mut device| std::io::Read::read_exact(&mut device, &mut bytes));
-    match random {
+    match read_random(&mut bytes) {
         Ok(()) => hasher.update(&bytes),
         Err(_) => {
-            let nanos = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |since| since.as_nanos());
-            hasher.update(&nanos.to_le_bytes())
+            let nanos = fallback_nanos();
+            static FALLBACK_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+            let sequence = FALLBACK_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            hasher.update(&nanos.to_le_bytes());
+            hasher.update(&sequence.to_le_bytes())
         }
     };
     hasher.update(address.as_bytes());
@@ -359,6 +377,10 @@ mod tests {
         text.push_str(&format!("Content-Length: {}\r\n\r\n", body.len()));
         text.push_str(body);
 
+        request_raw(address, &text)
+    }
+
+    fn request_raw(address: SocketAddr, text: &str) -> (u16, String, String) {
         let mut stream = TcpStream::connect(address).expect("connect");
         stream
             .write_all(text.as_bytes())
@@ -379,6 +401,100 @@ mod tests {
             .split_once("\r\n\r\n")
             .expect("a header block and a body");
         (status, head.to_owned(), body.to_owned())
+    }
+
+    /// HTTP and JSON-RPC failures deliberately differ: malformed HTTP is a
+    /// 400, while a valid POST carrying a JSON-RPC error remains a 200 reply.
+    #[test]
+    fn http_and_json_rpc_wire_contracts_hold_over_raw_connections() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind a loopback port");
+        let address = listener.local_addr().expect("the bound address");
+        let token = "wire-contract-token";
+        let server = std::thread::spawn(move || {
+            let cache = Arc::new(Mutex::new(service::Cache::default()));
+            let metrics = Mutex::new(metrics::Metrics::default());
+            for _ in 0..10 {
+                let Ok((stream, _)) = listener.accept() else {
+                    return;
+                };
+                handle(&stream, &cache, &metrics, token);
+            }
+        });
+
+        let health = request(address, "GET /health HTTP/1.1", Some(token), "");
+        assert_eq!(health.0, 200, "{}", health.2);
+        assert_eq!(
+            serde_json::from_str::<Value>(&health.2).expect("health JSON")["status"],
+            "ok"
+        );
+
+        assert_eq!(
+            request(address, "DELETE / HTTP/1.1", Some(token), "").0,
+            405
+        );
+        assert_eq!(request(address, "POST / HTTP/1.1", None, "{}").0, 401);
+        assert_eq!(
+            request(
+                address,
+                "POST / HTTP/1.1",
+                Some("wire-contract-tokeo"),
+                "{}"
+            )
+            .0,
+            401,
+            "a same-length token differing by one byte must be rejected"
+        );
+        assert_eq!(
+            request_raw(address, "POST / HTTP/1.1 extra\r\n\r\n").0,
+            400,
+            "a request line has exactly three elements"
+        );
+        assert_eq!(
+            request_raw(address, "POST / HTTP/1.1\r\nContent-Length: nope\r\n\r\n").0,
+            400
+        );
+
+        let parse_error = request(address, "POST / HTTP/1.1", Some(token), "not JSON");
+        assert_eq!(parse_error.0, 200);
+        let parse_error: Value = serde_json::from_str(&parse_error.2).expect("parse error JSON");
+        assert_eq!(parse_error["id"], Value::Null);
+        assert_eq!(parse_error["error"]["code"], error_codes::PARSE_ERROR);
+
+        let invalid = request(
+            address,
+            "POST / HTTP/1.1",
+            Some(token),
+            r#"{"jsonrpc":"2.0","id":7}"#,
+        );
+        assert_eq!(invalid.0, 200);
+        let invalid: Value = serde_json::from_str(&invalid.2).expect("invalid request JSON");
+        assert_eq!(invalid["id"], Value::Null);
+        assert_eq!(invalid["error"]["code"], error_codes::INVALID_REQUEST);
+
+        let missing = request(
+            address,
+            "POST / HTTP/1.1",
+            Some(token),
+            r#"{"jsonrpc":"2.0","id":"call-8","method":"paredit/missing"}"#,
+        );
+        assert_eq!(missing.0, 200);
+        let missing: Value = serde_json::from_str(&missing.2).expect("method error JSON");
+        assert_eq!(missing["id"], "call-8");
+        assert_eq!(missing["error"]["code"], error_codes::METHOD_NOT_FOUND);
+
+        let notification = request(
+            address,
+            "POST / HTTP/1.1",
+            Some(token),
+            r#"{"jsonrpc":"2.0","method":"paredit/version"}"#,
+        );
+        assert_eq!(notification.0, 204);
+        assert!(
+            notification.2.is_empty(),
+            "notifications have no response body"
+        );
+
+        server.join().expect("the server thread");
     }
 
     /// The scrape has to parse as Prometheus text, and it has to be as closed
@@ -467,6 +583,37 @@ mod tests {
             tokens.len(),
             "the same address and process id must still mint distinct tokens"
         );
+    }
+
+    #[test]
+    fn a_minted_token_uses_os_randomness_when_available() {
+        let token = mint_token_with(
+            "127.0.0.1:9000",
+            |bytes| {
+                bytes.fill(0xa5);
+                Ok(())
+            },
+            || panic!("the fallback clock must not be consulted"),
+        );
+
+        assert_eq!(token.len(), 32);
+        assert!(token.chars().all(|character| character.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn a_failed_os_random_read_never_reuses_a_token_in_the_same_clock_tick() {
+        let first = mint_token_with(
+            "127.0.0.1:9000",
+            |_| Err(std::io::Error::other("unavailable")),
+            || 42,
+        );
+        let second = mint_token_with(
+            "127.0.0.1:9000",
+            |_| Err(std::io::Error::other("unavailable")),
+            || 42,
+        );
+
+        assert_ne!(first, second, "fallback tokens must include unique entropy");
     }
 
     #[test]

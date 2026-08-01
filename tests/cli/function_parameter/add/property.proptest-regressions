@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc 6dcf32a8cbe73d9ab55fa1dd2c7ac41de305dcbbcb831599a3632a011926374e # shrinks to name = "d1r", a = "y", b = "cs19612", c = "fn6", first = "2765", second = "-13", third = "72"
 cc ab0b926c4ed0a2c8dc19a7bc45030ca53b954e2c613038f91d76fc07a3abe8fa # shrinks to name = "s6z1bx", a = "yyu5r3l", b = "wj3p547su", c = "nwty", first = "6259", second = "-2", third = "3"
+cc e7fea8e68044be7dc820a560c854bc9a0263710aa641f9aad5bc8999a2aedcba # shrinks to name = "exsgx6781", a = "gkeju1", b = "zzm9ngst", c = "vr1x", first = "-000", second = "-2491", third = "48"

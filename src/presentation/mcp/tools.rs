@@ -174,6 +174,18 @@ pub(super) const TOOLS: &[Tool] = &[
 /// would have written".
 pub(super) const WRITING_FLAGS: &[&str] = &["--write", "--fix", "--apply", "--in-place"];
 
+const VALUE_FLAGS: &[&str] = &[
+    "--color",
+    "--new-file-mode",
+    "--encoding",
+    "--timeout-ms",
+    "--max-input-bytes",
+    "--max-file-bytes",
+    "--max-total-bytes",
+    "--max-files",
+    "--jobs",
+];
+
 /// The command paths that write without any flag saying so.
 ///
 /// A flag list was the whole gate until the `fix` namespace existed, and it
@@ -215,6 +227,9 @@ pub(super) fn argv_for(tool: &Tool, arguments: &Value) -> Result<Vec<String>, St
             let args = arguments["args"]
                 .as_array()
                 .ok_or_else(|| "args must be an array of strings".to_owned())?;
+            if args.is_empty() {
+                return Err("args must not be empty".to_owned());
+            }
             for arg in args {
                 argv.push(
                     arg.as_str()
@@ -274,14 +289,40 @@ pub(super) fn writes(argv: &[String]) -> bool {
     WRITING_COMMANDS.iter().any(|path| leads_with(argv, path))
 }
 
-/// Whether `argv`'s leading non-flag words are exactly `path`.
+/// Whether `argv` begins with `path`, allowing global flags before or within it.
 ///
 /// The leading words, not any words: `paredit inspect lint --explain fix` has
 /// `fix` in it and writes nothing.
 fn leads_with(argv: &[String], path: &[&str]) -> bool {
-    let mut words = argv.iter().filter(|arg| !arg.starts_with('-'));
-    path.iter()
-        .all(|expected| words.next().is_some_and(|actual| actual == expected))
+    let mut args = argv.iter();
+
+    path.iter().all(|expected| {
+        loop {
+            let Some(argument) = args.next() else {
+                return false;
+            };
+
+            if argument == expected {
+                return true;
+            }
+
+            if !argument.starts_with('-') {
+                return false;
+            }
+
+            if value_flag(argument) && args.next().is_none() {
+                return false;
+            }
+        }
+    })
+}
+
+fn value_flag(argument: &str) -> bool {
+    let (flag, has_inline_value) = argument
+        .split_once('=')
+        .map_or((argument, false), |(flag, _)| (flag, true));
+
+    !has_inline_value && VALUE_FLAGS.contains(&flag)
 }
 
 /// What running a command produced.
@@ -289,6 +330,10 @@ pub(super) struct Output {
     pub stdout: String,
     pub stderr: String,
     pub code: i32,
+}
+
+fn lossy_text(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
 }
 
 /// Runs `paredit` with `argv`, as a subprocess of this binary.
@@ -300,8 +345,8 @@ pub(super) fn run(argv: &[String]) -> Result<Output, String> {
         .output()
         .map_err(|error| format!("cannot run paredit: {error}"))?;
     Ok(Output {
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        stdout: lossy_text(&output.stdout),
+        stderr: lossy_text(&output.stderr),
         // A signal leaves no code. Reporting -1 rather than 0 keeps a killed
         // command from reading as a successful one.
         code: output.status.code().unwrap_or(-1),
@@ -414,6 +459,57 @@ mod tests {
     }
 
     #[test]
+    fn argv_for_rejects_invalid_or_empty_run_arguments() {
+        let tool = find("paredit_run").expect("the run tool");
+        for arguments in [
+            json!({}),
+            json!({ "args": null }),
+            json!({ "args": [] }),
+            json!({ "args": ["inspect", 1] }),
+        ] {
+            let error = argv_for(tool, &arguments).expect_err("invalid args must be refused");
+            assert!(error.contains("args"), "{arguments}: {error}");
+        }
+    }
+
+    #[test]
+    fn argv_for_lint_preserves_paths_and_rejects_invalid_boundaries() {
+        let tool = find("paredit_lint").expect("the lint tool");
+        let argv = argv_for(tool, &json!({ "paths": ["z.lisp", "a.lisp"] })).expect("builds");
+        assert_eq!(&argv[4..], ["z.lisp", "a.lisp"]);
+
+        for arguments in [
+            json!({}),
+            json!({ "paths": null }),
+            json!({ "paths": [] }),
+            json!({ "paths": ["a.lisp", false] }),
+        ] {
+            let error = argv_for(tool, &arguments).expect_err("invalid paths must be refused");
+            assert!(error.contains("paths"), "{arguments}: {error}");
+        }
+    }
+
+    #[test]
+    fn argv_for_diff_keeps_old_and_new_in_the_declared_order() {
+        let tool = find("paredit_diff").expect("the diff tool");
+        let argv =
+            argv_for(tool, &json!({ "old": "before.lisp", "new": "after.lisp" })).expect("builds");
+        assert_eq!(&argv[4..], ["before.lisp", "after.lisp"]);
+
+        for arguments in [
+            json!({}),
+            json!({ "old": null, "new": "after.lisp" }),
+            json!({ "old": "before.lisp", "new": 1 }),
+        ] {
+            let error = argv_for(tool, &arguments).expect_err("invalid paths must be refused");
+            assert!(
+                error.contains("old") || error.contains("new"),
+                "{arguments}: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn a_one_file_call_appends_the_path_after_the_fixed_flags() {
         let tool = find("paredit_outline").expect("the outline tool");
         let argv = argv_for(tool, &json!({ "path": "src/a.lisp" })).expect("builds");
@@ -440,6 +536,39 @@ mod tests {
         assert!(!writes(&["inspect".into(), "outline".into()]));
     }
 
+    #[test]
+    fn writes_recognises_only_complete_writing_command_paths_with_mixed_flags() {
+        assert!(writes(&["fix".into(), "apply".into()]));
+        assert!(writes(&[
+            "--encoding".into(),
+            "utf-8".into(),
+            "fix".into(),
+            "apply".into()
+        ]));
+        assert!(writes(&[
+            "refactor".into(),
+            "--dry-run".into(),
+            "create-checkpoint".into(),
+        ]));
+        assert!(writes(&[
+            "--progress".into(),
+            "config".into(),
+            "init".into(),
+        ]));
+
+        for argv in [
+            &["apply", "fix"][..],
+            &["fix"][..],
+            &["fix", "apply-now"][..],
+            &["refactor", "delete-checkpoints"][..],
+            &["inspect", "lint", "--explain", "fix", "apply"][..],
+            &["edit", "format", "--write-to"][..],
+        ] {
+            let argv = argv.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>();
+            assert!(!writes(&argv), "{argv:?} must not be treated as a write");
+        }
+    }
+
     /// Exit code 3 is a policy gate reporting what it found. A model told that
     /// was an error retries a command that worked.
     #[test]
@@ -464,6 +593,78 @@ mod tests {
             false,
         );
         assert_eq!(broken["isError"], true);
+    }
+
+    #[test]
+    fn call_result_classifies_exit_codes_and_keeps_write_state() {
+        for (code, expected_error, expected_gate, writes) in [
+            (0, false, false, false),
+            (1, true, false, true),
+            (2, true, false, false),
+            (
+                paredit_core_cli::gate::GATE_FAILURE_EXIT_CODE,
+                false,
+                true,
+                true,
+            ),
+        ] {
+            let result = call_result(
+                &Output {
+                    stdout: String::new(),
+                    stderr: String::new(),
+                    code,
+                },
+                writes,
+            );
+            assert_eq!(result["isError"], expected_error, "exit code {code}");
+            assert_eq!(
+                result["structuredContent"],
+                json!({
+                    "exit_code": code,
+                    "gate_failed": expected_gate,
+                    "writes": writes,
+                }),
+                "exit code {code}"
+            );
+        }
+    }
+
+    #[test]
+    fn call_result_uses_one_text_content_for_every_stream_combination() {
+        for (stdout, stderr, expected_text) in [
+            ("", "", ""),
+            ("stdout", "", "stdout"),
+            ("", "stderr", "stderr"),
+            ("stdout", "stderr", "stdout\nstderr"),
+        ] {
+            let result = call_result(
+                &Output {
+                    stdout: stdout.to_owned(),
+                    stderr: stderr.to_owned(),
+                    code: 0,
+                },
+                false,
+            );
+            assert_eq!(
+                result["content"],
+                json!([{ "type": "text", "text": expected_text }]),
+                "stdout={stdout:?}, stderr={stderr:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_utf8_from_both_streams_is_reported_as_text() {
+        let output = Output {
+            stdout: lossy_text(b"stdout\x80"),
+            stderr: lossy_text(b"stderr\xff"),
+            code: 1,
+        };
+        let result = call_result(&output, false);
+        assert_eq!(
+            result["content"][0]["text"],
+            "stdout\u{fffd}\nstderr\u{fffd}"
+        );
     }
 
     /// `writes` is threaded straight through from the caller into

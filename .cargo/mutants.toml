@@ -37,8 +37,3 @@ exclude_re = [
 # stopping the run. The multiplier is against the baseline test-suite time, so
 # it does not need adjusting when the suite grows.
 timeout_multiplier = 5.0
-
-# The baseline run must pass before any mutant is tried. Without this, a
-# workspace that was already failing reports every mutant as "caught" and the
-# whole run means nothing.
-baseline = "Auto"

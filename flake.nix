@@ -181,6 +181,10 @@
               cargoArtifacts = depsDev;
               CARGO_PROFILE = "dev";
               cargoExtraArgs = "--locked";
+              # Explicit property budgets ignore Proptest's default
+              # environment handling. This reaches the Nix sandbox and the
+              # helpers retain their smaller local budgets outside CI.
+              PROPTEST_CASES = "256";
               doInstallCargoArtifacts = false;
             }
           );

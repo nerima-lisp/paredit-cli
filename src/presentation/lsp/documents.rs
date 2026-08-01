@@ -121,7 +121,12 @@ impl Document {
 
     /// The LSP position of a byte offset.
     pub(crate) fn position_of(&self, offset: usize, encoding: PositionEncoding) -> (usize, usize) {
-        let offset = offset.min(self.text.len());
+        let mut offset = offset.min(self.text.len());
+        // A byte within a UTF-8 sequence has no LSP position; use the start
+        // of that scalar rather than losing the whole prefix of the line.
+        while !self.text.is_char_boundary(offset) {
+            offset -= 1;
+        }
         // `partition_point` gives the first line starting after the offset, so
         // one less is the line the offset is on.
         let line = self
@@ -171,7 +176,9 @@ impl Documents {
 
     pub(crate) fn change(&mut self, uri: &str, text: String, version: i64) {
         if let Some(document) = self.open.get_mut(uri) {
-            document.replace(text, version);
+            if version > document.version {
+                document.replace(text, version);
+            }
         }
     }
 
@@ -298,6 +305,46 @@ mod tests {
         }
     }
 
+    #[test]
+    fn positions_inside_utf8_scalars_clamp_to_the_preceding_boundary() {
+        let document = document("\u{3042}\u{1f388}x\n");
+
+        for offset in [1, 2] {
+            assert_eq!(
+                document.position_of(offset, PositionEncoding::Utf8),
+                (0, 0),
+                "Japanese character byte {offset}"
+            );
+        }
+        for offset in [4, 5, 6] {
+            assert_eq!(
+                document.position_of(offset, PositionEncoding::Utf8),
+                (0, 3),
+                "emoji byte {offset}"
+            );
+            assert_eq!(
+                document.position_of(offset, PositionEncoding::Utf16),
+                (0, 1),
+                "emoji byte {offset}"
+            );
+        }
+    }
+
+    #[test]
+    fn positions_inside_encoded_scalars_clamp_to_the_following_boundary() {
+        let document = document("\u{3042}\u{1f388}x\n");
+
+        assert_eq!(document.offset_of(0, 1, PositionEncoding::Utf8), 3);
+        for character in [4, 5, 6] {
+            assert_eq!(
+                document.offset_of(0, character, PositionEncoding::Utf8),
+                7,
+                "emoji byte unit {character}"
+            );
+        }
+        assert_eq!(document.offset_of(0, 2, PositionEncoding::Utf16), 7);
+    }
+
     /// Clients do send positions past the end of a line, and a stale one after
     /// a change they have not acknowledged. Neither is worth refusing over.
     #[test]
@@ -339,5 +386,52 @@ mod tests {
             documents.get("file:///tmp/a.el").expect("open").dialect,
             Dialect::EmacsLisp
         );
+    }
+
+    #[test]
+    fn opening_the_same_uri_replaces_its_document() {
+        let mut documents = Documents::default();
+        let uri = "file:///tmp/a.lisp";
+
+        documents.open(uri.to_owned(), "(first)".to_owned(), 1);
+        documents.open(uri.to_owned(), "(second)\n(next)".to_owned(), 7);
+
+        let document = documents.get(uri).expect("reopened document");
+        assert_eq!(document.text, "(second)\n(next)");
+        assert_eq!(document.version, 7);
+        assert_eq!(document.offset_of(1, 0, PositionEncoding::Utf16), 9);
+        assert_eq!(documents.uris(), vec![uri.to_owned()]);
+    }
+
+    #[test]
+    fn changes_require_an_open_document_and_a_newer_version() {
+        let mut documents = Documents::default();
+        let uri = "file:///tmp/a.lisp";
+
+        documents.change(uri, "(unknown)".to_owned(), 1);
+        assert!(documents.get(uri).is_none());
+
+        documents.open(uri.to_owned(), "(initial)".to_owned(), 3);
+        documents.change(uri, "(current)".to_owned(), 4);
+        documents.change(uri, "(duplicate)".to_owned(), 4);
+        documents.change(uri, "(stale)".to_owned(), 2);
+
+        let document = documents.get(uri).expect("open document");
+        assert_eq!(document.text, "(current)");
+        assert_eq!(document.version, 4);
+    }
+
+    #[test]
+    fn closing_a_document_removes_it_and_later_changes_do_not_restore_it() {
+        let mut documents = Documents::default();
+        let uri = "file:///tmp/a.lisp";
+
+        documents.open(uri.to_owned(), "(open)".to_owned(), 1);
+        documents.close(uri);
+        documents.close(uri);
+        documents.change(uri, "(changed)".to_owned(), 2);
+
+        assert!(documents.get(uri).is_none());
+        assert!(documents.uris().is_empty());
     }
 }

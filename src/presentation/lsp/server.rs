@@ -229,17 +229,22 @@ impl Server {
         let Ok((document, tree)) = self.parsed(params) else {
             return Outcome::Reply(Value::Null);
         };
-        let ranges = params["positions"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default()
-            .iter()
-            .map(|position| {
-                let offset = self.offset(document, position);
-                let chain = features::selection_chain(&tree, offset);
-                features::selection_range_value(document, &chain, self.encoding)
-            })
-            .collect::<Vec<_>>();
+        let Some(positions) = params["positions"].as_array() else {
+            return Outcome::Fail(ResponseError::invalid_params("positions must be an array"));
+        };
+        let mut ranges = Vec::with_capacity(positions.len());
+        for position in positions {
+            let offset = match self.offset(document, position) {
+                Ok(offset) => offset,
+                Err(error) => return Outcome::Fail(error),
+            };
+            let chain = features::selection_chain(&tree, offset);
+            ranges.push(features::selection_range_value(
+                document,
+                &chain,
+                self.encoding,
+            ));
+        }
         Outcome::Reply(Value::Array(ranges))
     }
 
@@ -258,7 +263,10 @@ impl Server {
         let Ok((document, tree)) = self.parsed(params) else {
             return Outcome::Reply(Value::Null);
         };
-        let offset = self.offset(document, &params["position"]);
+        let offset = match self.offset(document, &params["position"]) {
+            Ok(offset) => offset,
+            Err(error) => return Outcome::Fail(error),
+        };
         let index = tree.atom_occurrence_index();
         let Some(selected) = index
             .occurrences()
@@ -306,7 +314,10 @@ impl Server {
         let Ok((document, tree)) = self.parsed(params) else {
             return Outcome::Reply(Value::Null);
         };
-        let offset = self.offset(document, &params["position"]);
+        let offset = match self.offset(document, &params["position"]) {
+            Ok(offset) => offset,
+            Err(error) => return Outcome::Fail(error),
+        };
         let index = tree.atom_occurrence_index();
         index
             .occurrences()
@@ -334,7 +345,10 @@ impl Server {
             Err(error) => return Outcome::Fail(error),
         };
         let uri = text_document_uri(params);
-        let offset = self.offset(document, &params["position"]);
+        let offset = match self.offset(document, &params["position"]) {
+            Ok(offset) => offset,
+            Err(error) => return Outcome::Fail(error),
+        };
         let Some(new_name) = params["newName"].as_str() else {
             return Outcome::Fail(ResponseError::invalid_params("newName is required"));
         };
@@ -383,10 +397,15 @@ impl Server {
         };
         let uri = text_document_uri(params);
         let path = path_from_uri(&uri).unwrap_or_else(|| PathBuf::from(UNTITLED));
-        let selected = ByteSpan::new(
-            ByteOffset::new(self.offset(document, &params["range"]["start"])),
-            ByteOffset::new(self.offset(document, &params["range"]["end"])),
-        );
+        let start = match self.offset(document, &params["range"]["start"]) {
+            Ok(offset) => offset,
+            Err(error) => return Outcome::Fail(error),
+        };
+        let end = match self.offset(document, &params["range"]["end"]) {
+            Ok(offset) => offset,
+            Err(error) => return Outcome::Fail(error),
+        };
+        let selected = ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end));
         Outcome::Reply(Value::Array(features::code_actions(
             document,
             &path,
@@ -396,10 +415,24 @@ impl Server {
         )))
     }
 
-    fn offset(&self, document: &super::documents::Document, position: &Value) -> usize {
-        let line = position["line"].as_u64().unwrap_or(0) as usize;
-        let character = position["character"].as_u64().unwrap_or(0) as usize;
-        document.offset_of(line, character, self.encoding)
+    fn offset(
+        &self,
+        document: &super::documents::Document,
+        position: &Value,
+    ) -> Result<usize, ResponseError> {
+        let line = position["line"]
+            .as_u64()
+            .and_then(|line| usize::try_from(line).ok())
+            .ok_or_else(|| {
+                ResponseError::invalid_params("position.line must be a non-negative integer")
+            })?;
+        let character = position["character"]
+            .as_u64()
+            .and_then(|character| usize::try_from(character).ok())
+            .ok_or_else(|| {
+                ResponseError::invalid_params("position.character must be a non-negative integer")
+            })?;
+        Ok(document.offset_of(line, character, self.encoding))
     }
 
     #[cfg(test)]
@@ -607,6 +640,56 @@ mod tests {
         assert_eq!(first["range"]["start"]["character"], 16);
         assert_eq!(first["parent"]["range"]["start"]["character"], 13);
         assert_eq!(first["parent"]["parent"]["range"]["start"]["character"], 0);
+    }
+
+    #[test]
+    fn malformed_positions_and_ranges_are_invalid_params() {
+        let (mut server, _) = opened("(defun target () target)\n");
+        let cases = [
+            (
+                "textDocument/selectionRange",
+                json!({ "textDocument": { "uri": DOCUMENT } }),
+            ),
+            (
+                "textDocument/documentHighlight",
+                json!({ "textDocument": { "uri": DOCUMENT } }),
+            ),
+            (
+                "textDocument/prepareRename",
+                json!({
+                    "textDocument": { "uri": DOCUMENT },
+                    "position": { "line": 0 },
+                }),
+            ),
+            (
+                "textDocument/rename",
+                json!({
+                    "textDocument": { "uri": DOCUMENT },
+                    "position": { "line": 0, "character": "0" },
+                    "newName": "renamed",
+                }),
+            ),
+            (
+                "textDocument/codeAction",
+                json!({
+                    "textDocument": { "uri": DOCUMENT },
+                    "range": {
+                        "start": { "line": 0, "character": 0 },
+                        "end": { "line": 0 },
+                    },
+                    "context": { "diagnostics": [] },
+                }),
+            ),
+        ];
+
+        for (method, params) in cases {
+            let error = error_of(&mut server, method, params);
+            assert_eq!(
+                error.code,
+                error_codes::INVALID_PARAMS,
+                "{method}: {error:?}"
+            );
+        }
     }
 
     #[test]

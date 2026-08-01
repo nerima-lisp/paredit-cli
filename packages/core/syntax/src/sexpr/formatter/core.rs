@@ -523,8 +523,10 @@ impl Formatter {
             if cursor < order.len() {
                 let comment = &comments[order[cursor]];
                 let comment_start = comment.span.start().get();
-                let same_line =
-                    comment_start >= end && !tree.source[end..comment_start].contains('\n');
+                let comment_line_start = tree.source[..comment_start]
+                    .rfind('\n')
+                    .map_or(0, |newline| newline + 1);
+                let same_line = comment_start >= end && comment_line_start < end;
                 if !comment.own_line && same_line {
                     if let TopLevelItem::Form { trailing, .. } = &mut items[item_index] {
                         *trailing = Some(order[cursor]);

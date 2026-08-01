@@ -188,8 +188,13 @@ pub(super) fn dispatch(cache: &mut Cache, method: &str, params: &Value) -> Outco
         "paredit/outline" => project(cache, params, |analysis| json!(analysis.outline)),
         "paredit/lint" => project(cache, params, |analysis| json!(analysis.findings)),
         "paredit/invalidate" => {
-            let path = params["path"].as_str().map(PathBuf::from);
-            let cleared = cache.invalidate(path.as_deref());
+            let cleared = match params.get("path") {
+                None => cache.invalidate(None),
+                Some(Value::String(path)) => cache.invalidate(Some(Path::new(path))),
+                Some(_) => {
+                    return Outcome::Fail(ResponseError::invalid_params("path must be a string"));
+                }
+            };
             Outcome::Reply(json!({ "cleared": cleared }))
         }
         "paredit/cache" => Outcome::Reply(cache.stats()),
@@ -253,14 +258,37 @@ fn project(cache: &mut Cache, params: &Value, pick: fn(&Analysis) -> Value) -> O
 mod tests {
     use super::*;
     use std::io::Write as _;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
-    fn temp_file(name: &str, source: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("paredit-serve-{name}"));
-        std::fs::create_dir_all(&dir).expect("create temp dir");
-        let path = dir.join("core.lisp");
-        let mut file = std::fs::File::create(&path).expect("create fixture");
-        file.write_all(source.as_bytes()).expect("write fixture");
-        path
+    struct TempFile {
+        dir: PathBuf,
+        path: PathBuf,
+    }
+
+    impl TempFile {
+        fn new(source: &str) -> Self {
+            static COUNTER: AtomicU32 = AtomicU32::new(0);
+            let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let dir = std::env::temp_dir().join(format!(
+                "paredit-serve-test-{}-{unique}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).expect("create temp dir");
+            let path = dir.join("core.lisp");
+            let mut file = std::fs::File::create(&path).expect("create fixture");
+            file.write_all(source.as_bytes()).expect("write fixture");
+            Self { dir, path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
     }
 
     fn reply(outcome: Outcome) -> Value {
@@ -274,8 +302,8 @@ mod tests {
     /// does no work.
     #[test]
     fn a_second_call_for_an_unchanged_file_is_a_cache_hit() {
-        let path = temp_file("hit", "(defun f (x) (if (not x) 1 2))\n");
-        let params = json!({ "path": path.display().to_string() });
+        let fixture = TempFile::new("(defun f (x) (if (not x) 1 2))\n");
+        let params = json!({ "path": fixture.path().display().to_string() });
         let mut cache = Cache::default();
 
         reply(dispatch(&mut cache, "paredit/analyze", &params));
@@ -291,8 +319,8 @@ mod tests {
     /// file in a way the stamp cannot see needs a way to say so.
     #[test]
     fn invalidation_forces_the_next_call_to_re_read() {
-        let path = temp_file("invalidate", "(defun f () 1)\n");
-        let params = json!({ "path": path.display().to_string() });
+        let fixture = TempFile::new("(defun f () 1)\n");
+        let params = json!({ "path": fixture.path().display().to_string() });
         let mut cache = Cache::default();
 
         reply(dispatch(&mut cache, "paredit/analyze", &params));
@@ -305,15 +333,86 @@ mod tests {
         assert_eq!(stats["hits"], 0, "{stats}");
     }
 
+    #[test]
+    fn invalidate_targets_one_entry_then_clears_all_when_path_is_omitted() {
+        let first = TempFile::new("(defun first () 1)\n");
+        let second = TempFile::new("(defun second () 2)\n");
+        let first_params = json!({ "path": first.path().display().to_string() });
+        let second_params = json!({ "path": second.path().display().to_string() });
+        let mut cache = Cache::default();
+
+        reply(dispatch(&mut cache, "paredit/analyze", &first_params));
+        reply(dispatch(&mut cache, "paredit/analyze", &first_params));
+        reply(dispatch(&mut cache, "paredit/analyze", &second_params));
+
+        let targeted = reply(dispatch(&mut cache, "paredit/invalidate", &first_params));
+        assert_eq!(targeted["cleared"], 1);
+        let after_targeted = reply(dispatch(&mut cache, "paredit/cache", &json!({})));
+        assert_eq!(after_targeted["entries"], 1, "{after_targeted}");
+        assert_eq!(after_targeted["hits"], 1, "{after_targeted}");
+        assert_eq!(after_targeted["misses"], 2, "{after_targeted}");
+
+        let all = reply(dispatch(&mut cache, "paredit/invalidate", &json!({})));
+        assert_eq!(all["cleared"], 1);
+        let after_all = reply(dispatch(&mut cache, "paredit/cache", &json!({})));
+        assert_eq!(after_all["entries"], 0, "{after_all}");
+        assert_eq!(after_all["hits"], 1, "{after_all}");
+        assert_eq!(after_all["misses"], 2, "{after_all}");
+    }
+
+    #[test]
+    fn invalidating_a_path_that_is_not_cached_reports_zero_without_touching_others() {
+        let fixture = TempFile::new("(defun f () 1)\n");
+        let params = json!({ "path": fixture.path().display().to_string() });
+        let mut cache = Cache::default();
+
+        reply(dispatch(&mut cache, "paredit/analyze", &params));
+        let absent = reply(dispatch(
+            &mut cache,
+            "paredit/invalidate",
+            &json!({ "path": "/nonexistent/paredit/cache-entry.lisp" }),
+        ));
+
+        assert_eq!(absent["cleared"], 0);
+        let stats = reply(dispatch(&mut cache, "paredit/cache", &json!({})));
+        assert_eq!(stats["entries"], 1, "{stats}");
+        assert_eq!(stats["hits"], 0, "{stats}");
+        assert_eq!(stats["misses"], 1, "{stats}");
+    }
+
+    #[test]
+    fn invalidate_rejects_explicitly_non_string_paths_without_clearing_the_cache() {
+        let fixture = TempFile::new("(defun f () 1)\n");
+        let params = json!({ "path": fixture.path().display().to_string() });
+        let mut cache = Cache::default();
+        reply(dispatch(&mut cache, "paredit/analyze", &params));
+
+        for invalid_path in [Value::Null, json!(42), json!(["core.lisp"])] {
+            match dispatch(
+                &mut cache,
+                "paredit/invalidate",
+                &json!({ "path": invalid_path }),
+            ) {
+                Outcome::Fail(error) => assert_eq!(error.code, error_codes::INVALID_PARAMS),
+                other => panic!("expected invalid parameters, got {other:?}"),
+            }
+        }
+
+        let stats = reply(dispatch(&mut cache, "paredit/cache", &json!({})));
+        assert_eq!(stats["entries"], 1, "{stats}");
+        assert_eq!(stats["hits"], 0, "{stats}");
+        assert_eq!(stats["misses"], 1, "{stats}");
+    }
+
     /// "It does not parse, and here is why" is the answer to the question that
     /// was asked, not a failure of the call.
     #[test]
     fn an_unparseable_file_analyzes_to_a_reported_failure() {
-        let path = temp_file("unparseable", "(defun f (x)\n");
+        let fixture = TempFile::new("(defun f (x)\n");
         let result = reply(dispatch(
             &mut Cache::default(),
             "paredit/analyze",
-            &json!({ "path": path.display().to_string() }),
+            &json!({ "path": fixture.path().display().to_string() }),
         ));
         assert_eq!(result["parsed"], false);
         assert!(

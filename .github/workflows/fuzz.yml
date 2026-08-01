@@ -1,0 +1,39 @@
+name: Scheduled fuzzing
+
+on:
+  # Each target runs for a fixed minute, so keep fuzzing out of PR latency.
+  schedule:
+    - cron: "30 4 * * 1" # 04:30 UTC every Monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [parse, edit_at_offset, format_idempotence]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Fuzz for 60 seconds
+        working-directory: fuzz
+        run: |
+          nix shell nixpkgs#cargo-fuzz nixpkgs#rustup --command bash -euo pipefail -c '
+            rustup toolchain install nightly --profile minimal
+            cargo +nightly fuzz run "${{ matrix.target }}" -- -max_total_time=60
+          '

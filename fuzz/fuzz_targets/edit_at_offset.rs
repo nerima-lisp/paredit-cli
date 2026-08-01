@@ -5,31 +5,54 @@
 //! character, inside a string literal, or past the end of the document, and an
 //! agent computing offsets from a diff will eventually supply all three.
 //!
-//! The first byte of the input chooses the offset, so the fuzzer can steer the
-//! selection as well as the document — with the offset derived from the length
-//! instead, almost every sample would select the same node.
+//! The first two bytes choose the dialect and an offset boundary, so the fuzzer
+//! can steer both selection inputs as well as the document.
 
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use paredit_core_syntax::sexpr::{Edit, SyntaxTree};
+use paredit_core_syntax::{
+    dialect::Dialect,
+    sexpr::{Edit, SyntaxTree},
+};
+
+const DIALECTS: [Dialect; 10] = [
+    Dialect::CommonLisp,
+    Dialect::EmacsLisp,
+    Dialect::Lfe,
+    Dialect::Scheme,
+    Dialect::Racket,
+    Dialect::Clojure,
+    Dialect::Hy,
+    Dialect::Carp,
+    Dialect::Janet,
+    Dialect::Fennel,
+];
 
 fuzz_target!(|data: &[u8]| {
-    let Some((&offset_seed, rest)) = data.split_first() else {
+    let Some((&dialect_seed, data)) = data.split_first() else {
         return;
     };
-    let Ok(source) = std::str::from_utf8(rest) else {
+    let Some((&offset_seed, source_bytes)) = data.split_first() else {
         return;
     };
-    let Ok(tree) = SyntaxTree::parse(source) else {
+    let Ok(source) = std::str::from_utf8(source_bytes) else {
+        return;
+    };
+    let dialect = DIALECTS[usize::from(dialect_seed) % DIALECTS.len()];
+    let Ok(tree) = SyntaxTree::parse_with_dialect(source, dialect) else {
         return;
     };
 
-    // Spread the seed over the whole document rather than the first 256 bytes.
-    let offset = if source.is_empty() {
-        0
-    } else {
-        usize::from(offset_seed) * source.len() / 256
+    let len = source.len();
+    let offset = match offset_seed % 6 {
+        0 => 0,
+        1 => len.saturating_sub(1),
+        2 => len,
+        3 => len.saturating_add(1),
+        4 => usize::MAX,
+        // Keep coverage over ordinary positions as well as the raw boundaries.
+        _ => len.saturating_mul(usize::from(offset_seed)) / 256,
     };
     let Ok(selection) = tree.select_at(offset) else {
         return;

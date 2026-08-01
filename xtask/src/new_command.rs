@@ -79,10 +79,11 @@ pub fn run(repo: &Repo, options: &NewCommandOptions) -> Result<()> {
              mod tests {{\n\
              \x20   use super::*;\n\n\
              \x20   #[test]\n\
-             \x20   fn todo_replace_with_a_real_assertion() {{\n\
-             \x20       let tree = SyntaxTree::parse_with_dialect(\"()\", Dialect::CommonLisp).expect(\"parse\");\n\
-             \x20       let items = analyze(Path::new(\"test.lisp\"), Dialect::CommonLisp, &tree).expect(\"analyze\");\n\
-             \x20       assert!(items.is_empty(), \"TODO: this stub never finds anything yet\");\n\
+             \x20   fn summarize_preserves_analyzed_items() {{\n\
+             \x20       let path = std::path::PathBuf::from(\"test.lisp\");\n\
+             \x20       let summary = summarize(vec![{pascal}Item {{ path: path.clone() }}]);\n\
+             \x20       assert_eq!(summary.items.len(), 1);\n\
+             \x20       assert_eq!(summary.items[0].path, path);\n\
              \x20   }}\n\
              }}\n"
         ),

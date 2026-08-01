@@ -1257,6 +1257,22 @@ mod tests {
         assert!(policy.passed);
     }
 
+    #[test]
+    fn a_threshold_at_the_fractional_resolved_rate_passes_but_one_just_above_fails() {
+        let coverage = SemanticCoverageReport {
+            files: vec![report("(let ((x 1)) x)"), report("(let ((x (read))) x)")],
+            errors: Vec::new(),
+        };
+
+        let exact = SemanticCoveragePolicy::evaluate(Some(50.0), &coverage);
+        assert_eq!(exact.resolved_percent, 50.0);
+        assert!(exact.passed, "the threshold comparison is inclusive");
+
+        let above = SemanticCoveragePolicy::evaluate(Some(50.000_001), &coverage);
+        assert!(!above.passed);
+        assert!(above.message.is_some());
+    }
+
     /// An armed threshold over zero measured bindings fails rather than
     /// trivially passing at a fabricated 100% — an empty corpus almost always
     /// means a misconfiguration (a typo'd path, a glob matching nothing), and
@@ -1281,11 +1297,45 @@ mod tests {
     }
 
     #[test]
+    fn even_a_zero_threshold_fails_over_zero_measured_bindings() {
+        let report = SemanticCoverageReport::default();
+        let policy = SemanticCoveragePolicy::evaluate(Some(0.0), &report);
+        assert_eq!(policy.resolved_percent, 100.0);
+        assert!(!policy.passed);
+        assert!(policy.message.is_some());
+    }
+
+    #[test]
     fn a_dialect_threshold_rejects_an_out_of_range_percentage() {
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, 0.0).is_ok());
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, 100.0).is_ok());
         assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, -1.0).is_err());
         assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, 100.1).is_err());
         assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, f64::NAN).is_err());
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, f64::INFINITY).is_err());
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, f64::NEG_INFINITY).is_err());
         assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, 50.0).is_ok());
+    }
+
+    #[test]
+    fn non_resolution_reason_uses_the_first_disqualifying_fact() {
+        let reassigned_and_opaque = report("(let ((x 1)) (setq x 2) (some-unknown-macro x) x)");
+        assert_eq!(reassigned_and_opaque.non_resolution().reassigned(), 1);
+        assert_eq!(reassigned_and_opaque.non_resolution().opaque_scope(), 0);
+
+        let opaque_and_special =
+            report("(let ((x 1)) (declare (special x)) (some-unknown-macro x) x)");
+        assert_eq!(opaque_and_special.non_resolution().opaque_scope(), 1);
+        assert_eq!(opaque_and_special.non_resolution().special(), 0);
+
+        let special_without_initializer = report("(let (x) (declare (special x)) x)");
+        assert_eq!(special_without_initializer.non_resolution().special(), 1);
+        assert_eq!(
+            special_without_initializer
+                .non_resolution()
+                .no_initial_form(),
+            0
+        );
     }
 
     /// (a) A per-dialect threshold at or below that dialect's own resolved

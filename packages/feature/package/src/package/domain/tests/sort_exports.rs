@@ -18,8 +18,10 @@ fn sorts_package_exports_without_moving_other_options() {
     assert_eq!(plan.exports.len(), 1);
     assert_eq!(plan.exports[0].old_symbols, ["#:z", "#:a", "#:m"]);
     assert_eq!(plan.exports[0].new_symbols, ["#:a", "#:m", "#:z"]);
-    assert!(plan.rewritten.contains("(:export #:a #:m #:z)"));
-    assert!(plan.rewritten.contains("(:import-from #:x #:y)"));
+    assert_eq!(
+        plan.rewritten,
+        "(defpackage #:demo\n  (:use #:cl)\n  (:export #:a #:m #:z)\n  (:import-from #:x #:y))\n"
+    );
     SyntaxTree::parse(&plan.rewritten).unwrap();
 }
 

@@ -433,8 +433,10 @@ mod tests {
                (deftest r (:matches "(princ 1)"))"#,
         );
         let failures = custom.test();
-        assert_eq!(failures.len(), 1);
-        assert!(failures[0].starts_with("r\t:matches\t"));
+        assert_eq!(
+            failures,
+            vec!["r\t:matches\t(princ 1)\texpected a finding\tgot none"]
+        );
     }
 
     #[test]

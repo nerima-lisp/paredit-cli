@@ -13,7 +13,7 @@ fn generated_form_report_input(depth: usize) -> String {
     input
 }
 
-fn assert_form_report_property(input: String) -> Result<(), TestCaseError> {
+fn assert_form_report_property(input: String, depth: usize) -> Result<(), TestCaseError> {
     let output = paredit()
         .args([
             "inspect",
@@ -40,9 +40,9 @@ fn assert_form_report_property(input: String) -> Result<(), TestCaseError> {
     prop_assert_eq!(report["span"]["start"].as_u64(), Some(0));
     prop_assert_eq!(report["head"].as_str(), Some("defun"));
     prop_assert_eq!(report["definitionLike"].as_bool(), Some(true));
-    prop_assert!(report["atomCount"].as_u64().unwrap_or_default() >= 4);
-    prop_assert!(report["listCount"].as_u64().unwrap_or_default() >= 2);
-    prop_assert!(report["maxDepth"].as_u64().unwrap_or_default() >= 2);
+    prop_assert_eq!(report["atomCount"].as_u64(), Some((4 + 2 * depth) as u64));
+    prop_assert_eq!(report["listCount"].as_u64(), Some((depth + 2) as u64));
+    prop_assert_eq!(report["maxDepth"].as_u64(), Some((depth + 1) as u64));
     Ok(())
 }
 
@@ -51,7 +51,7 @@ proptest! {
 
     #[test]
     fn cli_form_report_preserves_agent_schema_for_generated_forms(depth in 1usize..8) {
-        assert_form_report_property(generated_form_report_input(depth))?;
+        assert_form_report_property(generated_form_report_input(depth), depth)?;
     }
 
 }
