@@ -33,8 +33,8 @@ fn composite_action_exposes_lint_format_and_fix_modes() {
 
 #[test]
 fn documentation_covers_lint_and_format_integration_surfaces() {
-    let docs =
-        fs::read_to_string("docs/src/guide/integrations.md").expect("read integrations documentation");
+    let docs = fs::read_to_string("docs/src/guide/integrations.md")
+        .expect("read integrations documentation");
 
     assert!(
         docs.contains("## GitHub Actions"),
