@@ -542,6 +542,12 @@ fn find_symbol_macrolet_multiple_evaluation(
             return;
         }
 
+        // Every binding asks the same question of the same body, so the body
+        // is counted once for the whole form; counting per binding made this
+        // O(bindings x body). Deferred rather than eager so a form whose
+        // expansions are all side-effect-free still walks nothing.
+        let mut body_symbols: Option<BTreeMap<String, usize>> = None;
+
         for binding in inner
             .children
             .get(1)
@@ -559,17 +565,8 @@ fn find_symbol_macrolet_multiple_evaluation(
             }
             let folded = name.to_ascii_uppercase();
 
-            let mut occurrences = 0usize;
-            for scoped_body in inner.children.iter().skip(2) {
-                walk(scoped_body, &mut |node| {
-                    if node.kind == ExpressionKind::Atom
-                        && atom_symbol_text(node)
-                            .is_some_and(|text| text.to_ascii_uppercase() == folded)
-                    {
-                        occurrences += 1;
-                    }
-                });
-            }
+            let counts = body_symbols.get_or_insert_with(|| scoped_symbol_counts(inner));
+            let occurrences = counts.get(&folded).copied().unwrap_or(0);
             if occurrences < 2 {
                 continue;
             }
@@ -585,6 +582,23 @@ fn find_symbol_macrolet_multiple_evaluation(
             });
         }
     });
+}
+
+/// How many times each symbol appears in `form`'s body — everything after
+/// the head and the binding list — folded the way the reader folds it.
+fn scoped_symbol_counts(form: &ExpressionView) -> BTreeMap<String, usize> {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for scoped_body in form.children.iter().skip(2) {
+        walk(scoped_body, &mut |node| {
+            if node.kind != ExpressionKind::Atom {
+                return;
+            }
+            if let Some(text) = atom_symbol_text(node) {
+                *counts.entry(text.to_ascii_uppercase()).or_default() += 1;
+            }
+        });
+    }
+    counts
 }
 
 /// Whether a form's evaluation is guaranteed to have no side effect: a
