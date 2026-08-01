@@ -152,9 +152,10 @@ impl SemanticLayer {
     ///
     /// Mirrors each layer's own `supports_*`/`dialect_is_modelled` predicate
     /// exactly, so this matrix cannot drift from the behaviour it reports on.
-    /// Typing is the first to widen (see
-    /// `paredit_core_semantics::semantics::typing::policy::supports_type_inference`);
-    /// the other five stay Common-Lisp-only until their own step lands.
+    /// Typing and value propagation/constants have widened (see
+    /// `paredit_core_semantics::semantics::typing::policy::supports_type_inference`
+    /// and `...::value::policy::supports_value_propagation`); narrowing and
+    /// effects stay Common-Lisp-only until their own step lands.
     const fn supports(self, dialect: Dialect) -> bool {
         match self {
             Self::Typing => matches!(
@@ -162,8 +163,9 @@ impl SemanticLayer {
                 Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Racket
             ),
             Self::Narrowing => matches!(dialect, Dialect::CommonLisp),
-            Self::Constants => matches!(dialect, Dialect::CommonLisp),
-            Self::ValuePropagation => matches!(dialect, Dialect::CommonLisp),
+            Self::Constants | Self::ValuePropagation => {
+                matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp)
+            }
             Self::Effects => matches!(dialect, Dialect::CommonLisp),
             Self::SemanticCoverage => matches!(dialect, Dialect::CommonLisp),
         }
@@ -1242,8 +1244,15 @@ mod tests {
                 ],
             ),
             (SemanticLayer::Narrowing, &[Dialect::CommonLisp]),
-            (SemanticLayer::Constants, &[Dialect::CommonLisp]),
-            (SemanticLayer::ValuePropagation, &[Dialect::CommonLisp]),
+            // FR-004: Common Lisp, Emacs Lisp constant folding/propagation.
+            (
+                SemanticLayer::Constants,
+                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+            ),
+            (
+                SemanticLayer::ValuePropagation,
+                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+            ),
             (SemanticLayer::Effects, &[Dialect::CommonLisp]),
             (SemanticLayer::SemanticCoverage, &[Dialect::CommonLisp]),
         ];

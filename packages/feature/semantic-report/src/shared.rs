@@ -48,9 +48,11 @@ impl SemanticFile {
     ///
     /// A report must print this rather than an empty finding list: the two
     /// look identical to a consumer, and only one of them means "nothing to
-    /// report here". This is the narrowing/constant/value-propagation/effect
-    /// layers' own predicate; the typing layer has widened ahead of them (see
-    /// [`Self::typing_dialect_supported`]) and must not consult this one.
+    /// report here". This is the narrowing/effect layers' own predicate —
+    /// the two still not widened past Common Lisp; typing and value
+    /// propagation have each widened ahead of it (see
+    /// [`Self::typing_dialect_supported`], [`Self::value_dialect_supported`])
+    /// and must not consult this one.
     #[must_use]
     pub fn dialect_is_modelled(&self) -> bool {
         self.dialect == Dialect::CommonLisp
@@ -60,12 +62,25 @@ impl SemanticFile {
     ///
     /// Split from [`Self::dialect_is_modelled`] because the typing layer's own
     /// gate (`supports_type_inference`) can widen to a dialect ahead of the
-    /// narrowing/constant/value-propagation/effect layers below it — each of
-    /// those still answers only for Common Lisp until its own step lands, and
-    /// must keep consulting `dialect_is_modelled` rather than this predicate.
+    /// narrowing/effect layers below it — each of those still answers only
+    /// for Common Lisp until its own step lands, and must keep consulting
+    /// `dialect_is_modelled` rather than this predicate.
     #[must_use]
     pub const fn typing_dialect_supported(&self) -> bool {
         paredit_core_semantics::semantics::typing::policy::supports_type_inference(self.dialect)
+    }
+
+    /// Whether the value layer (constant folding and propagation)
+    /// specifically models this file's dialect.
+    ///
+    /// Split from [`Self::dialect_is_modelled`] the same way
+    /// [`Self::typing_dialect_supported`] is: the value layer's own gate
+    /// (`supports_value_propagation`) has widened to Emacs Lisp ahead of the
+    /// narrowing/effect layers, which must keep consulting
+    /// `dialect_is_modelled`.
+    #[must_use]
+    pub const fn value_dialect_supported(&self) -> bool {
+        paredit_core_semantics::semantics::value::policy::supports_value_propagation(self.dialect)
     }
 }
 

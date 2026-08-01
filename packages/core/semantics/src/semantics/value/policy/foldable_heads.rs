@@ -84,7 +84,12 @@ const COMMON_LISP_OPERATIONS: [(&str, FoldableOperation); 21] = [
     ("null", FoldableOperation::Not),
 ];
 
-const COMMON_LISP_CONTROL: [(&str, FoldableControlForm); 5] = [
+/// `if`/`when`/`unless`/`and`/`or`, spelled and behaving identically in
+/// Common Lisp and Emacs Lisp — both are Lisp-1s with `nil` as the one false
+/// value and the same short-circuit `and`/`or` — so one table serves both,
+/// compared case-sensitively for Emacs Lisp and case-insensitively for
+/// Common Lisp the same way [`foldable_operation`] does.
+const SHARED_CONTROL_FORMS: [(&str, FoldableControlForm); 5] = [
     ("if", FoldableControlForm::If),
     ("when", FoldableControlForm::When),
     ("unless", FoldableControlForm::Unless),
@@ -92,32 +97,72 @@ const COMMON_LISP_CONTROL: [(&str, FoldableControlForm); 5] = [
     ("or", FoldableControlForm::Or),
 ];
 
+/// Emacs Lisp's own arithmetic and comparison primitives that fold
+/// identically to their Common Lisp counterparts above.
+///
+/// Deliberately a subset, not a copy: `plusp`, `minusp`, `evenp`, and `oddp`
+/// are Common Lisp names Emacs Lisp does not have without the `cl-` prefix
+/// (`cl-plusp`, …), and this layer only ever compares the bare head text —
+/// guessing that a file loaded `cl-lib`'s old unprefixed compatibility
+/// aliases would be exactly the kind of probably-pure guess the module doc
+/// above rules out.
+const EMACS_LISP_OPERATIONS: [(&str, FoldableOperation); 17] = [
+    ("+", FoldableOperation::Add),
+    ("-", FoldableOperation::Subtract),
+    ("*", FoldableOperation::Multiply),
+    ("/", FoldableOperation::Divide),
+    ("1+", FoldableOperation::Increment),
+    ("1-", FoldableOperation::Decrement),
+    ("min", FoldableOperation::Min),
+    ("max", FoldableOperation::Max),
+    ("abs", FoldableOperation::Abs),
+    ("=", FoldableOperation::NumericEqual),
+    ("<", FoldableOperation::Less),
+    (">", FoldableOperation::Greater),
+    ("<=", FoldableOperation::LessOrEqual),
+    (">=", FoldableOperation::GreaterOrEqual),
+    ("zerop", FoldableOperation::Zerop),
+    ("not", FoldableOperation::Not),
+    ("null", FoldableOperation::Not),
+];
+
 /// The pure operation `head` names, if `dialect` has one.
 ///
-/// Only Common Lisp for now. Other dialects reach this layer through the same
-/// skeleton but with an empty table, so they yield `Unknown` everywhere rather
-/// than borrowing CLHS semantics that may not hold.
+/// Common Lisp and Emacs Lisp only. Other dialects reach this layer through
+/// the same skeleton but with an empty table, so they yield `Unknown`
+/// everywhere rather than borrowing semantics that may not hold.
 #[must_use]
 pub fn foldable_operation(dialect: Dialect, head: &str) -> Option<FoldableOperation> {
-    if dialect != Dialect::CommonLisp {
-        return None;
+    match dialect {
+        Dialect::CommonLisp => COMMON_LISP_OPERATIONS
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(head))
+            .map(|(_, operation)| *operation),
+        // Emacs Lisp reads symbols case-sensitively: folding `ZEROP` and
+        // `zerop` together the Common Lisp way would treat two distinct
+        // symbols as one operator.
+        Dialect::EmacsLisp => EMACS_LISP_OPERATIONS
+            .iter()
+            .find(|(name, _)| *name == head)
+            .map(|(_, operation)| *operation),
+        _ => None,
     }
-    COMMON_LISP_OPERATIONS
-        .iter()
-        .find(|(name, _)| name.eq_ignore_ascii_case(head))
-        .map(|(_, operation)| *operation)
 }
 
 /// The branching form `head` names, if `dialect` has one.
 #[must_use]
 pub fn foldable_control_form(dialect: Dialect, head: &str) -> Option<FoldableControlForm> {
-    if dialect != Dialect::CommonLisp {
-        return None;
+    match dialect {
+        Dialect::CommonLisp => SHARED_CONTROL_FORMS
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(head))
+            .map(|(_, form)| *form),
+        Dialect::EmacsLisp => SHARED_CONTROL_FORMS
+            .iter()
+            .find(|(name, _)| *name == head)
+            .map(|(_, form)| *form),
+        _ => None,
     }
-    COMMON_LISP_CONTROL
-        .iter()
-        .find(|(name, _)| name.eq_ignore_ascii_case(head))
-        .map(|(_, form)| *form)
 }
 
 #[cfg(test)]
@@ -159,5 +204,40 @@ mod tests {
     fn other_dialects_fold_nothing() {
         assert_eq!(foldable_operation(Dialect::Scheme, "+"), None);
         assert_eq!(foldable_control_form(Dialect::Clojure, "if"), None);
+    }
+
+    #[test]
+    fn emacs_lisp_folds_its_own_arithmetic_and_control_forms() {
+        assert_eq!(
+            foldable_operation(Dialect::EmacsLisp, "+"),
+            Some(FoldableOperation::Add)
+        );
+        assert_eq!(
+            foldable_operation(Dialect::EmacsLisp, "zerop"),
+            Some(FoldableOperation::Zerop)
+        );
+        assert_eq!(
+            foldable_control_form(Dialect::EmacsLisp, "when"),
+            Some(FoldableControlForm::When)
+        );
+    }
+
+    #[test]
+    fn emacs_lisp_lookup_is_case_sensitive() {
+        // Emacs Lisp has no reader-level case folding: `ZEROP` and `zerop`
+        // are two different symbols, unlike Common Lisp's `ZEROP`/`zerop`.
+        assert_eq!(foldable_operation(Dialect::EmacsLisp, "ZEROP"), None);
+        assert_eq!(foldable_control_form(Dialect::EmacsLisp, "IF"), None);
+    }
+
+    #[test]
+    fn emacs_lisp_does_not_borrow_common_lisps_unprefixed_cl_lib_predicates() {
+        for head in ["plusp", "minusp", "evenp", "oddp"] {
+            assert_eq!(
+                foldable_operation(Dialect::EmacsLisp, head),
+                None,
+                "{head} is only `cl-{head}` in Emacs Lisp"
+            );
+        }
     }
 }

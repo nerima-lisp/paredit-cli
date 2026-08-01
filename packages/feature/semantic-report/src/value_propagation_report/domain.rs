@@ -169,7 +169,7 @@ pub fn build_value_propagation_report(file: &SemanticFile) -> ValuePropagationRe
     ValuePropagationReportFile {
         path: file.path.clone(),
         dialect: file.dialect,
-        dialect_modelled: file.dialect_is_modelled(),
+        dialect_modelled: file.value_dialect_supported(),
         propagated,
         blocked,
     }
@@ -299,6 +299,38 @@ mod tests {
         let report = report_of("(let [x 1] x)", Dialect::Clojure);
         assert!(!report.dialect_modelled);
         assert!(report.propagated.is_empty());
+    }
+
+    #[test]
+    fn an_emacs_lisp_file_is_modelled_and_propagates_a_literal_binding() {
+        // `let` binds dynamically without a `lexical-binding: t` header, and
+        // a dynamic binding is not propagatable.
+        let report = report_of(
+            ";;; -*- lexical-binding: t -*-\n(defun f () (let ((x 1)) x))",
+            Dialect::EmacsLisp,
+        );
+        assert!(report.dialect_modelled);
+        let x = report
+            .propagated
+            .iter()
+            .find(|binding| binding.name == "x")
+            .unwrap_or_else(|| panic!("x propagates: {report:?}"));
+        assert_eq!(x.value, "1");
+    }
+
+    /// A binding initialized from a poisoned (twice-defined) Emacs Lisp
+    /// constant blocks the same way a binding initialized from any other
+    /// non-constant call would — the poison must not silently read as a
+    /// known value.
+    #[test]
+    fn a_binding_initialized_from_a_poisoned_emacs_lisp_constant_is_blocked() {
+        let report = report_of(
+            ";;; -*- lexical-binding: t -*-\n\
+             (defconst my-limit 10)(defconst my-limit 20)\
+             (defun f () (let ((x my-limit)) x))",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(reason(&report, "x"), BlockedReason::InitialFormNotConstant);
     }
 
     #[test]

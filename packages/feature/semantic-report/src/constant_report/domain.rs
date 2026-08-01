@@ -173,7 +173,7 @@ pub fn build_constant_report(file: &SemanticFile) -> ConstantReportFile {
     ConstantReportFile {
         path: file.path.clone(),
         dialect: file.dialect,
-        dialect_modelled: file.dialect_is_modelled(),
+        dialect_modelled: file.value_dialect_supported(),
         foldable,
         constants,
     }
@@ -333,6 +333,56 @@ mod tests {
         let report = report_of("(+ 1 2)", Dialect::Clojure);
         assert!(!report.dialect_modelled);
         assert!(report.foldable.is_empty());
+    }
+
+    #[test]
+    fn an_emacs_lisp_file_is_modelled_and_folds_its_own_arithmetic() {
+        let report = report_of("(defun f () (+ 1 2))", Dialect::EmacsLisp);
+        assert!(report.dialect_modelled);
+        assert_eq!(report.foldable.len(), 1, "{report:?}");
+        assert_eq!(report.foldable[0].value, "3");
+    }
+
+    #[test]
+    fn an_emacs_lisp_defconst_is_reported_with_its_value() {
+        let report = report_of("(defconst my-limit 10)", Dialect::EmacsLisp);
+        assert_eq!(
+            report.constants,
+            vec![FileConstant {
+                name: "my-limit".to_owned(),
+                value: "10".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_defcustom_is_reported_with_its_initial_value() {
+        let report = report_of(
+            "(defcustom my-limit 10 \"doc\" :type 'integer)",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(
+            report.constants,
+            vec![FileConstant {
+                name: "my-limit".to_owned(),
+                value: "10".to_owned(),
+            }]
+        );
+    }
+
+    /// A second Emacs Lisp definition of the same name poisons it, exactly
+    /// the way a second Common Lisp `defconstant` does — it must not be
+    /// silently dropped, or the first definition would look uniquely correct.
+    #[test]
+    fn a_redefined_emacs_lisp_constant_is_poisoned_not_dropped() {
+        let report = report_of(
+            "(defconst my-limit 10)(defcustom my-limit 20 \"doc\")",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report.constants.is_empty(),
+            "a poisoned constant must not be reported: {report:?}"
+        );
     }
 
     #[test]

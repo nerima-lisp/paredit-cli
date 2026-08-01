@@ -16,6 +16,7 @@ use paredit_core_syntax::view_query::list_head;
 use crate::semantics::binding::{BindingId, BindingKind, BindingTable};
 
 use super::super::model::{ValueTable, ValueTableBuilder};
+use super::super::policy::supports_value_propagation;
 use super::folding::evaluate_constant;
 
 /// How many times to re-scan before giving up on learning anything new.
@@ -32,8 +33,8 @@ const MAX_ROUNDS: usize = 8;
 
 /// Builds the value table for one file, on top of its binding table.
 ///
-/// Only Common Lisp is analysed. Another dialect gets an empty table rather
-/// than one built from borrowed CLHS semantics.
+/// Common Lisp and Emacs Lisp are analysed; every other dialect gets an
+/// empty table rather than one built from borrowed semantics.
 #[must_use]
 pub fn build_value_table(
     dialect: Dialect,
@@ -61,7 +62,7 @@ pub fn build_value_table_in_project(
     project: Option<&ProjectConstants<'_>>,
 ) -> ValueTable {
     let mut builder = ValueTableBuilder::new();
-    if dialect != Dialect::CommonLisp {
+    if !supports_value_propagation(dialect) {
         return builder.finish();
     }
 
@@ -211,11 +212,28 @@ fn propagate_in(
     learned
 }
 
-/// Records the file's `defconstant`s.
+/// Whether `head` names the dialect's own file-level constant form:
+/// `defconstant` for Common Lisp, `defconst`/`defcustom` for Emacs Lisp.
+///
+/// `defcustom` sits beside `defconst` deliberately: both declare a name and
+/// an initial-value expression at the same child position, and a user option
+/// is exactly as constant as any other name until something reassigns it —
+/// which is the same provability question a plain `defconst` answers, and
+/// [`crate::semantics::binding`] already excludes a reassigned name from
+/// [`propagation_targets`] the same way it does for `defconstant`.
+fn is_constant_definition_head(dialect: Dialect, head: &str) -> bool {
+    match dialect {
+        Dialect::CommonLisp => common_lisp_operator_head_eq(head, "defconstant"),
+        Dialect::EmacsLisp => matches!(head, "defconst" | "defcustom"),
+        _ => false,
+    }
+}
+
+/// Records the file's dialect-appropriate file-level constants.
 ///
 /// A definition whose value is not provably constant poisons the name instead
-/// of being skipped: leaving it merely absent would let a *second*
-/// `defconstant` of the same name look like the only one and be trusted.
+/// of being skipped: leaving it merely absent would let a *second* definition
+/// of the same name look like the only one and be trusted.
 fn collect_constants(
     dialect: Dialect,
     roots: &[ExpressionView],
@@ -227,14 +245,14 @@ fn collect_constants(
         let Some(head) = list_head(root) else {
             continue;
         };
-        if !common_lisp_operator_head_eq(head, "defconstant") {
+        if !is_constant_definition_head(dialect, head) {
             continue;
         }
         let Some(name) = root
             .children
             .get(1)
             .and_then(atom_symbol_text)
-            .and_then(super::folding::constant_key)
+            .and_then(|text| super::folding::constant_key(dialect, text))
         else {
             continue;
         };
@@ -269,9 +287,13 @@ mod tests {
     }
 
     fn analyze(input: &str) -> Analysis {
-        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
-        let bindings = build_binding_table(Dialect::CommonLisp, &tree, input);
-        let values = build_value_table(Dialect::CommonLisp, &tree, &bindings);
+        analyze_as(input, Dialect::CommonLisp)
+    }
+
+    fn analyze_as(input: &str, dialect: Dialect) -> Analysis {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse");
+        let bindings = build_binding_table(dialect, &tree, input);
+        let values = build_value_table(dialect, &tree, &bindings);
         Analysis {
             tree,
             bindings,
@@ -411,6 +433,83 @@ mod tests {
                 .values
                 .constant_value(&SymbolName::new("+LIMIT+").expect("symbol")),
             None
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_defconst_resolves() {
+        let analysis = analyze_as("(defconst my-limit 10)", Dialect::EmacsLisp);
+        assert_eq!(
+            analysis
+                .values
+                .constant_value(&SymbolName::new("my-limit").expect("symbol")),
+            Some(&PropagatableValue::Integer(10))
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_defcustom_resolves_its_initial_value() {
+        let analysis = analyze_as(
+            "(defcustom my-limit 10 \"doc\" :type 'integer)",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(
+            analysis
+                .values
+                .constant_value(&SymbolName::new("my-limit").expect("symbol")),
+            Some(&PropagatableValue::Integer(10))
+        );
+    }
+
+    #[test]
+    fn emacs_lisp_constant_lookup_is_case_sensitive() {
+        // Unlike Common Lisp, `my-limit` and `MY-LIMIT` are two different
+        // Emacs Lisp symbols, so the raw spelling is the key.
+        let analysis = analyze_as("(defconst my-limit 10)", Dialect::EmacsLisp);
+        assert_eq!(
+            analysis
+                .values
+                .constant_value(&SymbolName::new("MY-LIMIT").expect("symbol")),
+            None
+        );
+    }
+
+    #[test]
+    fn two_emacs_lisp_definitions_of_one_name_resolve_to_nothing() {
+        let analysis = analyze_as(
+            "(defconst my-limit 10)(defcustom my-limit 20 \"doc\")",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(
+            analysis
+                .values
+                .constant_value(&SymbolName::new("my-limit").expect("symbol")),
+            None
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_constant_with_an_unprovable_value_resolves_to_nothing() {
+        let analysis = analyze_as("(defconst my-limit (some-call))", Dialect::EmacsLisp);
+        assert_eq!(
+            analysis
+                .values
+                .constant_value(&SymbolName::new("my-limit").expect("symbol")),
+            None
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_constant_is_visible_through_a_lexical_binding() {
+        // `let` binds dynamically without a `lexical-binding: t` header, and
+        // a dynamic binding is not propagatable — see `Binding::is_propagatable`.
+        let analysis = analyze_as(
+            ";;; -*- lexical-binding: t -*-\n(defconst my-limit 10)(let ((n my-limit)) (list n))",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(
+            value_at_last_use(&analysis, "n"),
+            Value::Known(LiteralValue::Integer(10))
         );
     }
 
