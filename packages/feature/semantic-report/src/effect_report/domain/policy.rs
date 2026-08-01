@@ -1,16 +1,31 @@
-//! Which Common Lisp operators do something observable, and which provably do
-//! not.
+//! Which operators do something observable, and which provably do not.
 //!
-//! Two tables, and the gap between them is the point. A head on neither list is
-//! *unknown*, not pure — it may be a macro, and a macro can expand into
-//! anything. Defaulting the unknown case to pure would make this report claim
-//! safety it cannot prove, which is the one failure mode that matters: a caller
-//! uses this to decide whether a rewrite is legal.
+//! Two tables per dialect, and the gap between them is the point. A head on
+//! neither list is *unknown*, not pure — it may be a macro, and a macro can
+//! expand into anything. Defaulting the unknown case to pure would make this
+//! report claim safety it cannot prove, which is the one failure mode that
+//! matters: a caller uses this to decide whether a rewrite is legal.
 //!
-//! The pure list is therefore deliberately short and grows only by evidence.
-//! The effectful list may be over-inclusive without harm — a false "effectful"
-//! costs a refactor that would have been safe, a false "pure" costs
-//! correctness.
+//! The pure lists are therefore deliberately short and grow only by evidence.
+//! The effectful lists may be over-inclusive without harm — a false
+//! "effectful" costs a refactor that would have been safe, a false "pure"
+//! costs correctness.
+//!
+//! Common Lisp's tables are the original ones, and most of their entries
+//! (`setq`, `print`, `push`, `sort`, `error`, `read`, …) are also valid Emacs
+//! Lisp symbols with the same effect meaning, so Emacs Lisp falls through to
+//! them once its own smaller, case-sensitive tables have had first say. That
+//! order matters for `format`: Common Lisp's `format` writes to a stream
+//! unless its destination is `nil`, which this table cannot see — [`head_effect`]
+//! only ever sees the head symbol, not its arguments, so it is classified
+//! effectful the same way `write`/`print` already are, and the
+//! argument-sensitivity is a documented limitation rather than something this
+//! layer attempts to resolve by inspecting arguments. Emacs Lisp's `format`
+//! has no destination parameter at all — it always returns a string — so it
+//! must be looked up in Emacs Lisp's own table *before* falling through to
+//! Common Lisp's, or it would inherit the wrong verdict.
+
+use paredit_core_syntax::dialect::Dialect;
 
 /// What one operator does, when this table knows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,7 +42,7 @@ pub enum HeadEffect {
 ///
 /// Grouped by why, because the groups have different reasons to be trusted and
 /// different reasons to grow.
-const EFFECTFUL: [&str; 100] = [
+const EFFECTFUL: [&str; 101] = [
     // Assignment and place mutation.
     "set",
     "setq",
@@ -83,6 +98,15 @@ const EFFECTFUL: [&str; 100] = [
     "princ",
     "prin1",
     "pprint",
+    // `(format destination control-string args…)` writes to `destination`
+    // whenever it is non-nil — a stream, `t` for `*standard-output*` — and
+    // only returns a string when it is nil. This table is symbol-only, so
+    // the nil-destination case cannot be told apart from the rest; treating
+    // `format` as unconditionally effectful matches the other output
+    // primitives below rather than risking a false "pure" on the common
+    // case. See the module doc for Emacs Lisp's different, always-pure
+    // `format`.
+    "format",
     "write",
     "write-line",
     "write-string",
@@ -281,13 +305,67 @@ const PURE: [&str; 126] = [
     "char-downcase",
 ];
 
-/// What this table knows about `head`, or `None` when it knows nothing.
+/// Emacs Lisp operators that observably do something, and that Common Lisp's
+/// own table above does not already name — buffer and window mutation,
+/// hooks, and property-list access, none of which have a Common Lisp
+/// counterpart in [`EFFECTFUL`].
+const EMACS_LISP_EFFECTFUL: [&str; 14] = [
+    "message",
+    "insert",
+    "insert-char",
+    "delete-region",
+    "erase-buffer",
+    "kill-region",
+    "kill-buffer",
+    "goto-char",
+    "set-buffer",
+    "put",
+    "run-hooks",
+    "run-hook-with-args",
+    "add-hook",
+    "remove-hook",
+];
+
+/// Emacs Lisp operators whose result depends only on their arguments, that
+/// are not also valid Common Lisp function names.
 ///
-/// Case-insensitive, because the Common Lisp reader folds symbols: `SETF` and
-/// `setf` are the same operator, and a case-sensitive table would silently
-/// classify half of a shouting codebase as unknown.
+/// `format` is here rather than in [`PURE`] deliberately: Emacs Lisp's
+/// `format` has no destination parameter and always returns a string, unlike
+/// Common Lisp's — see the module doc. The rest are `TYPE-p` predicates on
+/// their own argument: an object's membership in one of these types cannot
+/// change without the object itself changing, so — unlike, say, `point` or
+/// `buffer-name`, which read mutable state the argument list does not name —
+/// they satisfy this table's "depends only on its arguments" bar.
+const EMACS_LISP_PURE: [&str; 8] = [
+    "format", "bufferp", "markerp", "framep", "windowp", "overlayp", "processp", "keymapp",
+];
+
+/// What this table knows about `head` in `dialect`, or `None` when it knows
+/// nothing.
+///
+/// Common Lisp's own tables are consulted case-insensitively, because the
+/// reader folds symbols: `SETF` and `setf` are the same operator, and a
+/// case-sensitive table would silently classify half of a shouting codebase
+/// as unknown. Emacs Lisp reads symbols case-sensitively and consults its own
+/// tables first — `EMACS_LISP_EFFECTFUL`/`EMACS_LISP_PURE` override Common
+/// Lisp's answer for a head that means something different in the two
+/// dialects (`format`), then falls through to Common Lisp's tables for the
+/// large shared vocabulary neither dialect's table repeats.
 #[must_use]
-pub fn head_effect(head: &str) -> Option<HeadEffect> {
+pub fn head_effect(dialect: Dialect, head: &str) -> Option<HeadEffect> {
+    if dialect == Dialect::EmacsLisp {
+        if EMACS_LISP_EFFECTFUL.contains(&head) {
+            return Some(HeadEffect::Effectful);
+        }
+        if EMACS_LISP_PURE.contains(&head) {
+            return Some(HeadEffect::Pure);
+        }
+        if EFFECTFUL.contains(&head) {
+            return Some(HeadEffect::Effectful);
+        }
+        return PURE.contains(&head).then_some(HeadEffect::Pure);
+    }
+
     if EFFECTFUL
         .iter()
         .any(|known| known.eq_ignore_ascii_case(head))
@@ -305,41 +383,124 @@ mod tests {
 
     #[test]
     fn assignment_is_effectful() {
-        assert_eq!(head_effect("setf"), Some(HeadEffect::Effectful));
-        assert_eq!(head_effect("SETQ"), Some(HeadEffect::Effectful));
+        assert_eq!(
+            head_effect(Dialect::CommonLisp, "setf"),
+            Some(HeadEffect::Effectful)
+        );
+        assert_eq!(
+            head_effect(Dialect::CommonLisp, "SETQ"),
+            Some(HeadEffect::Effectful)
+        );
     }
 
     #[test]
     fn arithmetic_is_pure() {
-        assert_eq!(head_effect("+"), Some(HeadEffect::Pure));
-        assert_eq!(head_effect("CAR"), Some(HeadEffect::Pure));
+        assert_eq!(
+            head_effect(Dialect::CommonLisp, "+"),
+            Some(HeadEffect::Pure)
+        );
+        assert_eq!(
+            head_effect(Dialect::CommonLisp, "CAR"),
+            Some(HeadEffect::Pure)
+        );
     }
 
     #[test]
     fn an_unregistered_head_is_unknown_rather_than_pure() {
-        assert_eq!(head_effect("my-macro"), None);
+        assert_eq!(head_effect(Dialect::CommonLisp, "my-macro"), None);
     }
 
     #[test]
     fn a_destructive_operation_is_effectful_even_though_it_returns_a_value() {
         for head in ["nreverse", "nconc", "sort", "delete"] {
-            assert_eq!(head_effect(head), Some(HeadEffect::Effectful), "{head}");
+            assert_eq!(
+                head_effect(Dialect::CommonLisp, head),
+                Some(HeadEffect::Effectful),
+                "{head}"
+            );
+        }
+    }
+
+    /// The bug this step fixes: `format` was on neither table, so a call
+    /// that writes to a stream — the common case, any non-nil destination —
+    /// was reported as `unknown` rather than `effectful`.
+    #[test]
+    fn common_lisp_format_is_effectful() {
+        assert_eq!(
+            head_effect(Dialect::CommonLisp, "format"),
+            Some(HeadEffect::Effectful)
+        );
+    }
+
+    /// Emacs Lisp's `format` has no destination parameter at all — it always
+    /// returns a string — so it must not inherit Common Lisp's verdict.
+    #[test]
+    fn emacs_lisp_format_is_pure() {
+        assert_eq!(
+            head_effect(Dialect::EmacsLisp, "format"),
+            Some(HeadEffect::Pure)
+        );
+    }
+
+    #[test]
+    fn emacs_lisp_shares_most_of_common_lisps_vocabulary() {
+        for head in ["setq", "print", "push", "sort", "error", "read"] {
+            assert_eq!(
+                head_effect(Dialect::EmacsLisp, head),
+                head_effect(Dialect::CommonLisp, head),
+                "{head}"
+            );
         }
     }
 
     #[test]
-    fn the_two_tables_do_not_overlap() {
+    fn emacs_lisp_lookup_is_case_sensitive() {
+        assert_eq!(head_effect(Dialect::EmacsLisp, "SETQ"), None);
+    }
+
+    #[test]
+    fn emacs_lisp_has_its_own_buffer_and_hook_primitives() {
+        for head in ["message", "insert", "add-hook"] {
+            assert_eq!(
+                head_effect(Dialect::EmacsLisp, head),
+                Some(HeadEffect::Effectful),
+                "{head}"
+            );
+        }
+    }
+
+    #[test]
+    fn emacs_lisp_type_predicates_absent_from_common_lisp_are_pure() {
+        assert_eq!(
+            head_effect(Dialect::EmacsLisp, "bufferp"),
+            Some(HeadEffect::Pure)
+        );
+    }
+
+    #[test]
+    fn the_tables_do_not_overlap_within_a_dialect() {
         for head in EFFECTFUL {
             assert!(
                 !PURE.iter().any(|pure| pure.eq_ignore_ascii_case(head)),
-                "{head} is in both tables"
+                "{head} is in both Common Lisp tables"
+            );
+        }
+        for head in EMACS_LISP_EFFECTFUL {
+            assert!(
+                !EMACS_LISP_PURE.contains(&head),
+                "{head} is in both Emacs Lisp tables"
             );
         }
     }
 
     #[test]
     fn neither_table_repeats_an_entry() {
-        for table in [EFFECTFUL.as_slice(), PURE.as_slice()] {
+        for table in [
+            EFFECTFUL.as_slice(),
+            PURE.as_slice(),
+            EMACS_LISP_EFFECTFUL.as_slice(),
+            EMACS_LISP_PURE.as_slice(),
+        ] {
             let mut sorted = table.to_vec();
             sorted.sort_unstable();
             let count = sorted.len();

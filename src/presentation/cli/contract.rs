@@ -155,7 +155,8 @@ impl SemanticLayer {
     /// Typing and value propagation/constants have widened (see
     /// `paredit_core_semantics::semantics::typing::policy::supports_type_inference`
     /// and `...::value::policy::supports_value_propagation`); narrowing and
-    /// effects stay Common-Lisp-only until their own step lands.
+    /// narrowing and semantic-coverage stay Common-Lisp-only until their own
+    /// step lands.
     const fn supports(self, dialect: Dialect) -> bool {
         match self {
             Self::Typing => matches!(
@@ -163,10 +164,9 @@ impl SemanticLayer {
                 Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Racket
             ),
             Self::Narrowing => matches!(dialect, Dialect::CommonLisp),
-            Self::Constants | Self::ValuePropagation => {
+            Self::Constants | Self::ValuePropagation | Self::Effects => {
                 matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp)
             }
-            Self::Effects => matches!(dialect, Dialect::CommonLisp),
             Self::SemanticCoverage => matches!(dialect, Dialect::CommonLisp),
         }
     }
@@ -1253,7 +1253,11 @@ mod tests {
                 SemanticLayer::ValuePropagation,
                 &[Dialect::CommonLisp, Dialect::EmacsLisp],
             ),
-            (SemanticLayer::Effects, &[Dialect::CommonLisp]),
+            // FR-005: Common Lisp, Emacs Lisp effects.
+            (
+                SemanticLayer::Effects,
+                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+            ),
             (SemanticLayer::SemanticCoverage, &[Dialect::CommonLisp]),
         ];
         for (layer, expected) in expectations {

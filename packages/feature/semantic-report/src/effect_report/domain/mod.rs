@@ -134,8 +134,8 @@ pub fn build_effect_report(file: &SemanticFile) -> EffectReportFile {
     let mut defined = BTreeSet::new();
     for form in &root.children {
         if let Some((name, head, shape)) = definition_of(form, file.dialect) {
-            defined.insert(fold(&name));
-            order.push((fold(&name), name, head, shape, form));
+            defined.insert(fold(file.dialect, &name));
+            order.push((fold(file.dialect, &name), name, head, shape, form));
         }
     }
 
@@ -146,7 +146,7 @@ pub fn build_effect_report(file: &SemanticFile) -> EffectReportFile {
         // stable choice.
         locals
             .entry(key.clone())
-            .or_insert_with(|| local_verdict(form, *shape, &defined));
+            .or_insert_with(|| local_verdict(file.dialect, form, *shape, &defined));
     }
 
     let resolved = resolve_effects(&locals);
@@ -174,7 +174,7 @@ pub fn build_effect_report(file: &SemanticFile) -> EffectReportFile {
     EffectReportFile {
         path: file.path.clone(),
         dialect: file.dialect,
-        dialect_modelled: file.dialect_is_modelled(),
+        dialect_modelled: file.effect_dialect_supported(),
         definitions,
     }
 }
@@ -226,6 +226,7 @@ fn resolve_effects(
 /// body evaluates, and a fixed skip count gets that wrong for every form whose
 /// shape differs from `defun`'s.
 fn local_verdict(
+    dialect: Dialect,
     form: &ExpressionView,
     shape: DefinitionShape,
     defined: &BTreeSet<String>,
@@ -235,7 +236,14 @@ fn local_verdict(
     let mut calls = BTreeSet::new();
 
     for body_form in shape.body_forms(form) {
-        walk(body_form, defined, &mut purity, &mut cause, &mut calls);
+        walk(
+            dialect,
+            body_form,
+            defined,
+            &mut purity,
+            &mut cause,
+            &mut calls,
+        );
     }
 
     LocalVerdict {
@@ -246,6 +254,7 @@ fn local_verdict(
 }
 
 fn walk(
+    dialect: Dialect,
     view: &ExpressionView,
     defined: &BTreeSet<String>,
     purity: &mut Purity,
@@ -253,7 +262,7 @@ fn walk(
     calls: &mut BTreeSet<String>,
 ) {
     if let Some(head) = list_head(view) {
-        match head_effect(head) {
+        match head_effect(dialect, head) {
             Some(HeadEffect::Effectful) => {
                 if *purity != Purity::Effectful {
                     *cause = Some(head.to_owned());
@@ -262,7 +271,7 @@ fn walk(
             }
             Some(HeadEffect::Pure) => {}
             None => {
-                let key = fold(head);
+                let key = fold(dialect, head);
                 if defined.contains(&key) {
                     // A call to a sibling. Its verdict is not known yet, so it
                     // is deferred to the fixpoint rather than guessed at.
@@ -278,7 +287,7 @@ fn walk(
     }
 
     for child in &view.children {
-        walk(child, defined, purity, cause, calls);
+        walk(dialect, child, defined, purity, cause, calls);
     }
 }
 
@@ -293,9 +302,21 @@ fn definition_of(
     Some((name.to_owned(), head.to_owned(), shape))
 }
 
-/// The key two spellings of one Common Lisp symbol share.
-fn fold(name: &str) -> String {
-    name.to_ascii_uppercase()
+/// The key two spellings of one same-file definition's name share.
+///
+/// Common Lisp's reader folds a symbol's case, so `f` and `F` name the same
+/// thing there and must map to one key. Emacs Lisp reads case-sensitively —
+/// `f` and `F` are two different symbols — so folding its names the Common
+/// Lisp way would wrongly conflate two distinct definitions (or a definition
+/// with an unrelated call of the same letters, different case) into one
+/// verdict, silently discarding whichever body lost the `or_insert_with`
+/// race in [`build_effect_report`].
+fn fold(dialect: Dialect, name: &str) -> String {
+    if dialect == Dialect::CommonLisp {
+        name.to_ascii_uppercase()
+    } else {
+        name.to_owned()
+    }
 }
 
 #[cfg(test)]
@@ -399,6 +420,55 @@ mod tests {
         sorted.sort_unstable();
         assert_eq!(starts, sorted);
         assert_eq!(starts.len(), 3);
+    }
+
+    #[test]
+    fn an_emacs_lisp_file_is_modelled_and_reports_real_purity_findings() {
+        let report = report_of("(defun add (a b) (+ a b))", Dialect::EmacsLisp);
+        assert!(report.dialect_modelled);
+        assert_eq!(definition(&report, "add").purity, Purity::Pure);
+    }
+
+    #[test]
+    fn an_emacs_lisp_buffer_primitive_is_effectful() {
+        let report = report_of("(defun greet () (message \"hi\"))", Dialect::EmacsLisp);
+        let greet = definition(&report, "greet");
+        assert_eq!(greet.purity, Purity::Effectful);
+        assert_eq!(greet.cause.as_deref(), Some("message"));
+    }
+
+    #[test]
+    fn an_emacs_lisp_effect_propagates_from_a_callee_to_its_caller() {
+        let report = report_of(
+            "(defun inner () (message \"hi\"))\n(defun outer () (inner))",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(definition(&report, "outer").purity, Purity::Effectful);
+    }
+
+    /// The fix for the case-folding bug this step also found: without a
+    /// dialect-aware `fold`, `my-func` and `MY-FUNC` would be conflated into
+    /// one same-file definition key, silently discarding one of the two
+    /// bodies. Emacs Lisp reads symbols case-sensitively, so they are two
+    /// distinct definitions and must get independent verdicts.
+    #[test]
+    fn emacs_lisp_same_file_lookup_is_case_sensitive() {
+        let report = report_of(
+            "(defun my-func () (message \"hi\"))\n(defun MY-FUNC () 1)",
+            Dialect::EmacsLisp,
+        );
+        // `definition()` matches case-insensitively, which is exactly wrong
+        // for this test, so the two are told apart by exact name here.
+        assert_eq!(report.definitions.len(), 2, "{:?}", report.definitions);
+        let exact = |name: &str| {
+            report
+                .definitions
+                .iter()
+                .find(|definition| definition.name == name)
+                .unwrap_or_else(|| panic!("{name} is reported: {:?}", report.definitions))
+        };
+        assert_eq!(exact("my-func").purity, Purity::Effectful);
+        assert_eq!(exact("MY-FUNC").purity, Purity::Pure);
     }
 
     #[test]
