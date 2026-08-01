@@ -278,3 +278,34 @@ fn cli_mcp_reports_a_failed_gate_as_a_result_rather_than_a_tool_error() {
     assert_eq!(result["structuredContent"]["gate_failed"], true);
     assert_eq!(result["structuredContent"]["exit_code"], 3);
 }
+
+/// `writes` in `structuredContent` is what lets a client learn, after the
+/// fact, whether the specific command a `paredit_run` call spelled out
+/// actually wrote a file — the fixed tools each have a static answer, but
+/// `paredit_run` carries any argument vector, so its answer varies call to
+/// call and has to be reported per call rather than assumed from the tool.
+#[test]
+fn cli_mcp_reports_whether_the_call_actually_wrote() {
+    let file = fixture("mcp-writes-flag", "(defun f (x) (if x 1 2))\n");
+    let responses = session(
+        &[],
+        &[
+            initialize(),
+            call(
+                2,
+                "paredit_check",
+                serde_json::json!({ "path": file.display().to_string() }),
+            ),
+            call(
+                3,
+                "paredit_run",
+                serde_json::json!({
+                    "args": ["edit", "format", "--file", file.display().to_string(), "--write"],
+                }),
+            ),
+        ],
+    );
+
+    assert_eq!(reply(&responses, 2)["structuredContent"]["writes"], false);
+    assert_eq!(reply(&responses, 3)["structuredContent"]["writes"], true);
+}

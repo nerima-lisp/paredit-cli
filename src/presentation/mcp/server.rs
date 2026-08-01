@@ -138,7 +138,7 @@ impl Server {
         }
 
         match tools::run(&argv) {
-            Ok(output) => Outcome::Reply(tools::call_result(&output)),
+            Ok(output) => Outcome::Reply(tools::call_result(&output, tools::writes(&argv))),
             Err(detail) => Outcome::Fail(ResponseError::new(error_codes::INTERNAL_ERROR, detail)),
         }
     }
