@@ -95,6 +95,21 @@ fn fix_apply_diff_previews_without_writing() {
     );
 }
 
+/// `--diff` previews a different payload than `--compact` prints a headline
+/// for, and `--diff` makes no write at all — so, like its sibling
+/// `--group-by-impact-area`, `--compact` must be refused alongside `--diff`
+/// rather than silently doing nothing while `--diff`'s early return wins.
+#[test]
+fn fix_apply_compact_and_diff_are_refused_together() {
+    let dir = workspace("fix-apply-compact-diff");
+    paredit()
+        .args(["fix", "apply", "--compact", "--diff"])
+        .arg(&dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
 /// The whole reason `fix list` exists: `--list-rules` answers "is this rule
 /// fixable" as a column over 170-odd rows, and a caller about to run a fixer
 /// is asking which rows those are.
@@ -197,6 +212,29 @@ fn fix_apply_reports_headline_and_compact_text_output() {
             "headline\t1 modified definition.\n",
         ))
         .stdout(predicate::str::contains("fixes_applied\t"));
+}
+
+/// FR-006b, continued: `--compact` only changes what gets *printed* — the
+/// tests above pin the headline text, but none of them read the file back,
+/// so a bug that made `--compact` skip or truncate the write itself could
+/// still slip through with a green headline assertion.
+#[test]
+fn fix_apply_compact_writes_the_file_correctly() {
+    let dir = workspace("fix-apply-compact-write");
+    paredit()
+        .args(["fix", "apply", "--compact"])
+        .arg(&dir)
+        .arg("--output")
+        .arg("text")
+        .assert()
+        .success()
+        .stdout("1 modified definition.\n");
+
+    assert_eq!(
+        fs::read_to_string(dir.join("a.lisp")).expect("read back"),
+        "(defun foo (x)\n  (incf x)\n  (print x))\n",
+        "--compact must not change what actually gets written, only what gets printed"
+    );
 }
 
 /// FR-006b, continued: `inspect lint --fix` reaches the exact same rendering

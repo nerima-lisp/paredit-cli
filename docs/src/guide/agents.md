@@ -36,14 +36,35 @@ and it makes selection harder rather than easier. The catalog is available as
 the `paredit://capabilities` resource, and `paredit_run` reaches everything in
 it.
 
-Three things worth knowing:
+Every call's result carries a `structuredContent` object alongside its text:
+
+```json
+{
+  "content": [{ "type": "text", "text": "..." }],
+  "isError": false,
+  "structuredContent": {
+    "exit_code": 0,
+    "gate_failed": false,
+    "writes": true
+  }
+}
+```
+
+Four things worth knowing:
 
 - **`--read-only` is a promise, not a report.** A command carrying `--write`,
-  `--fix`, or `--apply` is refused before the process starts.
+  `--fix`, or `--apply` is refused before the process starts, and so is one
+  whose write is baked into its own name, like `fix apply` or `refactor
+  create-checkpoint`.
 - **Exit code 3 is a result, not an error.** A `--fail-on-*` gate reporting
   what it found comes back with `isError: false` and
   `structuredContent.gate_failed: true`, so an agent does not retry a command
   that worked.
+- **`structuredContent.writes` says whether *this* call asked for a write.**
+  The seven fixed tools each have a static answer, but `paredit_run` carries
+  any argument vector, so its answer varies call to call — this is the same
+  check `--read-only` gates on, reported after the fact for the one tool
+  whose write-or-not is not knowable from its name alone.
 - **Each call re-executes the binary**, so a tool's behaviour is byte-identical
   to the same command typed at a shell.
 
@@ -202,6 +223,49 @@ There are three kinds, and the spelling tells you which:
 The field is **absent**, not empty, on a command with no gate, so "cannot fail
 on a policy" and "we did not look" stay distinguishable. A contract test
 enforces the convention, so a gate that does not follow it cannot ship.
+
+## Discovering what a command can write and how it can fail
+
+Every invocable command (a leaf, not a namespace like `inspect` or `edit`)
+also carries `writes` and `possible_error_codes` in `inspect capabilities`:
+
+```json
+{
+  "name": "create-checkpoint",
+  "writes": true,
+  "possible_error_codes": [
+    "argument.flag-combination",
+    "argument.no-input",
+    "environment.io",
+    "input.dialect-unsupported",
+    "refusal.write-target",
+    "..."
+  ]
+}
+```
+
+`writes` is `true` when the command is capable of modifying a file under some
+argument combination — a `--write`/`--fix`/`--apply`/`--in-place` flag, or a
+command whose name is itself the write, such as `fix apply` or `refactor
+create-checkpoint`. It mirrors the same check `paredit mcp --read-only` gates
+on (see below), so a `false` here is a promise the MCP server keeps too. It is
+`false` on a command that can still touch disk outside this promise — the
+kill ring (`--to-ring`) and archive extraction (`--extract-to`) are not
+counted.
+
+`possible_error_codes` is a superset of the [error codes](#error-identity-and-repairs)
+this command can realistically exit with, gathered from its own argument
+shape rather than a proof of completeness: absence of a code here means no
+known signal predicts it, not that it is provably unreachable. Use it to know
+ahead of a call which `category`/`repairs` branches are worth handling for
+this specific command, rather than the full 44-code table every command could
+theoretically need.
+
+Both fields are present on every schema version (1, 2, and 3) — unlike
+`dialect_contract`, which only versions 2 and beyond carry, they are
+additive-only leaf properties and do not change the shape of an existing
+collection, so there is no older document shape a schema revision has to keep
+validating around them.
 
 ## Determinism
 

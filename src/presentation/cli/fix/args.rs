@@ -37,7 +37,7 @@ pub(in crate::presentation::cli) struct FixApplyArgs {
     pub(in crate::presentation::cli) selection: FixSelectionArgs,
     /// In text mode, print only the one-line change headline instead of the
     /// full field-by-field report.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "diff")]
     pub(in crate::presentation::cli) compact: bool,
     /// Write changed files one impact-area (declared package) group at a
     /// time instead of all at once, continuing to the next group when one

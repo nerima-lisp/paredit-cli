@@ -1517,4 +1517,16 @@ mod tests {
         assert!(!explanation.contains("## Refusal"));
         assert!(explanation.contains("no selection in it will help"));
     }
+
+    /// `explanation_section` itself, not `ErrorCode::explanation`: every real
+    /// `ErrorCode` has an anchor in `errors.md` (`every_code_has_a_unique_label`
+    /// and `every_error_code_has_a_nonempty_explanation` above make sure of
+    /// that), so the "label not found" branch is unreachable through any real
+    /// code today. It is still part of the function's contract, so it gets
+    /// its own direct test rather than staying an untested `?`.
+    #[test]
+    fn explanation_section_returns_none_when_the_label_has_no_heading() {
+        let doc = "### `input.not-utf8` { #input.not-utf8 }\nsome body\n";
+        assert_eq!(explanation_section(doc, "no.such.label"), None);
+    }
 }

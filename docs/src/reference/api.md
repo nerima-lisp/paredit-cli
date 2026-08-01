@@ -573,7 +573,7 @@ plan/preview/verify/apply lifecycle.
 | `preview` | Preview exact refactoring rewrites without modifying files. |
 | `check` | Validate a refactor preview manifest without writing files. |
 | `status` | Summarize a preview manifest into agent-safe next actions. |
-| `apply` | Apply a previously generated preview manifest with hash guards. `--undo-out` records a reverse-edit journal; `--verify-command` runs a check afterwards and restores every written file when it fails. |
+| `apply` | Apply a previously generated preview manifest with hash guards. `--undo-out` records a reverse-edit journal; `--verify-command` runs a check afterwards and restores every written file when it fails. `--compact` prints only the one-line change headline instead of the full field-by-field report. `--group-by-impact-area` (requires `--write`) writes changed files one impact-area (declared package) group at a time instead of all at once, continuing to the next group when one group's write fails. |
 | `undo` | Restore the pre-refactor content recorded by `apply --undo-out`. Refuses unless every file is still byte-for-byte what the write produced, so a journal cannot be applied twice or over an intervening edit. |
 | `diff` | Render a verified diff from a preview manifest without writing files. |
 | `step` | Walk a preview manifest one edit at a time, taking only the steps you accept. `refactor apply` is all-or-nothing, which is right for applying and wrong for reviewing: a reader who disagrees with one of forty edits would otherwise have to discard the manifest. Steps are numbered in source order and each carries its line, the text it replaces, and the source line it sits on. `--accept`/`--skip` take a selector (`all`, `3`, `1,4`, `2-5`); `--interactive` reads one `y`/`n`/`a`/`q` decision per step from stdin. `--diff` previews, `--write` applies, `--fail-on-partial` gates a script that took a subset by accident. Both hash guards still apply, and a subset that would not parse is refused before anything is written. |
@@ -751,6 +751,25 @@ Unlike every other writing command here, `fix apply` writes in place with **no
 exactly is what makes the two spellings the same bytes. Use `--diff` to
 preview, `fix check` to gate, and the global `--dry-run` to refuse the write.
 
+`fix apply` also takes two flags only it makes sense for, mirroring
+`refactor apply`'s own `--compact`/`--group-by-impact-area`: `--compact`
+prints only the one-line change headline instead of the full field-by-field
+report, and `--group-by-impact-area` writes changed files one impact-area
+(declared package) group at a time instead of all at once, continuing to the
+next group when one group's write fails. Neither is available on `check`,
+`plan`, or `list`, which never write. `--compact` conflicts with `--diff`,
+since `--diff` writes nothing for `--compact` to summarize.
+
+In JSON, `fix apply` (and `refactor apply`) always carry a `headline` field
+— the same one-line summary `--compact` prints on its own — and an
+`impact_area_groups` array, populated only under `--group-by-impact-area`,
+with one entry per group naming the group (`group`), how many files it
+covers (`file_count`), whether its write succeeded (`written`), and the
+failure reason when it did not. `fix plan` and `fix apply` also carry
+`next_commands` (see
+[What to run next](../guide/agents.md#what-to-run-next)) when their contents
+justify one — a plan with fixes available points at `fix apply`.
+
 All four take the rule-selection flags (`--rule`, `--category`, `--exclude`,
 `--tag`, `--preset`, `--experimental`, `--custom-rules`) and
 `--no-destructive-fixes`. The flags that shape a *report* rather than a fix
@@ -760,6 +779,8 @@ run — `--emit`, `--baseline`, `--stats`, `--timings`, `--fail-on` — stay on
 ```sh
 paredit fix list
 paredit fix apply --diff src/
+paredit fix apply --compact src/
+paredit fix apply --group-by-impact-area src/
 paredit fix apply --rule redundant-progn --no-destructive-fixes src/
 paredit fix check src/          # exit 3 when fixable lint is outstanding
 ```

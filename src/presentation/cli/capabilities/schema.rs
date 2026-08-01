@@ -17,6 +17,23 @@
 //! permissive schema covering all three would validate a version 1 document
 //! carrying a version 3 field, which is exactly the drift the catalog's
 //! version number exists to catch.
+//!
+//! `command.writes` and `command.possible_error_codes` are the one
+//! deliberate exception to that discipline: both are populated on every
+//! command regardless of `schema_version`, and their `$defs` entry (in
+//! [`definitions`]) is not gated behind a `version >= N` check the way
+//! `dialectContract` is. That is safe rather than an oversight, because the
+//! two things a version number has to protect against don't apply to them:
+//! they are additive-only leaf properties on a node that already exists in
+//! every version (unlike `dialect_contract`, which changes the *shape* of
+//! the document by adding a whole new top-level collection), and no version
+//! ever populated the catalog without them, so there is no older document
+//! shape a schema revision could be asked to keep validating. Widening a
+//! schema in place is exactly the drift this module otherwise refuses to
+//! allow — the fields are exempted here, not the discipline.
+//! `cli_capabilities_schema_pins_writes_and_error_codes_as_intentionally_unversioned`
+//! in `tests/cli/capabilities_schema.rs` pins this as a tested contract
+//! rather than a comment that can go stale.
 
 use serde_json::{Value, json};
 

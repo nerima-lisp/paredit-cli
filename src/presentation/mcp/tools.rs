@@ -183,10 +183,25 @@ pub(super) const WRITING_FLAGS: &[&str] = &["--write", "--fix", "--apply", "--in
 /// carries none of the four flags above. Under `--read-only` it therefore ran,
 /// and wrote.
 ///
+/// `refactor create-checkpoint` and `refactor delete-checkpoint` write and
+/// delete a checkpoint file the same way, and `config init` writes
+/// `paredit.toml` unconditionally unless `--dry-run` is given — none of the
+/// three carry a flag from [`WRITING_FLAGS`] either. This list is the
+/// command-path-sequence counterpart of
+/// [`crate::presentation::cli::capabilities::classify`]'s
+/// `WRITE_VERB_COMMANDS`, which independently names all four; the two lists
+/// are checked against each other by a contract test so they cannot diverge
+/// silently again.
+///
 /// Matched as a subcommand *sequence* at the front of the argument vector
 /// rather than by asking "is this word anywhere in argv": `--rule apply` must
 /// not be mistaken for `fix apply`, and neither must a file named `fix`.
-const WRITING_COMMANDS: &[&[&str]] = &[&["fix", "apply"]];
+const WRITING_COMMANDS: &[&[&str]] = &[
+    &["fix", "apply"],
+    &["refactor", "create-checkpoint"],
+    &["refactor", "delete-checkpoint"],
+    &["config", "init"],
+];
 
 pub(super) fn find(name: &str) -> Option<&'static Tool> {
     TOOLS.iter().find(|tool| tool.name == name)
