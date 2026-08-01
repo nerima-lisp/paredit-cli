@@ -557,6 +557,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::UnusedNicknames(args) => {
                 unused_nickname_report::workflow::unused_nickname_report(args)?;
             }
+            command::InspectCommand::UseWidening(args) => {
+                use_widening_report::workflow::use_widening_report(args)?;
+            }
             command::InspectCommand::UndefinedPackages(args) => {
                 undefined_package_report::workflow::undefined_package_report(args)?;
             }
@@ -583,6 +586,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             }
             command::InspectCommand::Licenses(args) => {
                 license_report::workflow::license_report(args)?;
+            }
+            command::InspectCommand::LicenseHeaders(args) => {
+                license_header_report::workflow::license_header_report(args)?;
             }
             command::InspectCommand::SerialConsistency(args) => {
                 serial_consistency_report::workflow::serial_consistency_report(args)?;
@@ -662,6 +668,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             }
             command::InspectCommand::Constants(args) => {
                 constant_report::workflow::constant_report(args)?;
+            }
+            command::InspectCommand::MagicNumbers(args) => {
+                magic_number_report::workflow::magic_number_report(args)?;
             }
             command::InspectCommand::ValuePropagation(args) => {
                 value_propagation_report::workflow::value_propagation_report(args)?;

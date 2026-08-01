@@ -11,6 +11,7 @@ pub mod system_conflict_report;
 pub mod unused_export_report;
 pub mod unused_nickname_report;
 pub mod unused_package_report;
+pub mod use_widening_report;
 
 // The contract with the composition root (section 4.2): each slice that
 // owns a subcommand publishes its `clap` argument type and the function
@@ -28,6 +29,7 @@ pub use system_conflict_report::cli::{SystemConflictReportArgs, system_conflict_
 pub use unused_export_report::cli::{UnusedExportReportArgs, unused_export_report};
 pub use unused_nickname_report::cli::{UnusedNicknameReportArgs, unused_nickname_report};
 pub use unused_package_report::cli::{UnusedPackageReportArgs, unused_package_report};
+pub use use_widening_report::cli::{UseWideningReportArgs, use_widening_report};
 
 pub use error::{
     DefpackageSelectionError, DefpackageShapeError, PackageRefactorError, PackageRefactorResult,
