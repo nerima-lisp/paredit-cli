@@ -2329,6 +2329,18 @@
               }
             },
             {
+              "id": "macro-variable-capture",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defmacro template binds a literal name that is not obviously a gensym"
+              }
+            },
+            {
               "id": "elisp-missing-lexical-binding",
               "properties": {
                 "category": "suspicious",

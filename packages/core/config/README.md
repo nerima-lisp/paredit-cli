@@ -4,7 +4,7 @@ Layered `paredit.toml` configuration with per-key file and line provenance.
 
 ## Responsibilities
 
-With 169 lint rules and roughly 275 commands, passing every knob as a flag
+With 170 lint rules and roughly 275 commands, passing every knob as a flag
 stopped scaling. This package is the answer, and it owns four things:
 
 - **A strict TOML subset.** Tables, dotted keys, strings, integers, booleans,

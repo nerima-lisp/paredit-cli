@@ -969,6 +969,12 @@
     {
       "category": "suspicious",
       "count": 0,
+      "description": "a defmacro template binds a literal name that is not obviously a gensym",
+      "rule": "macro-variable-capture"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
       "description": "an Emacs Lisp file whose first line does not set lexical-binding",
       "rule": "elisp-missing-lexical-binding"
     },

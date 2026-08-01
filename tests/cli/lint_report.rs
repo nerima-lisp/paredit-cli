@@ -291,7 +291,7 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"rule_count\": 173"))
+        .stdout(predicate::str::contains("\"rule_count\": 174"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -962,7 +962,7 @@ fn cli_lint_list_rules_marks_severity() {
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
     // The default preset is `recommended`, which holds back the four
     // `pedantic` rules; `--preset all` is what lists the whole suite.
-    assert_eq!(warnings, 116);
+    assert_eq!(warnings, 117);
 }
 
 #[test]

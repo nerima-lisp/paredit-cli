@@ -1085,6 +1085,7 @@ version = "1.3.0"
 dependencies = [
  "clap",
  "paredit-core-cli",
+ "paredit-core-lint-engine",
  "paredit-core-syntax",
  "serde_json",
 ]

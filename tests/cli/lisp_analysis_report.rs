@@ -243,9 +243,16 @@ fn cli_restarts_reports_a_restart_nothing_invokes() {
 /// must be labelled rather than silently reported as clean.
 #[test]
 fn cli_every_lisp_analysis_report_labels_a_dialect_it_does_not_model() {
+    // Scheme rather than Clojure: `inspect macro-hygiene` now models Clojure's
+    // `defmacro` (it is unhygienic-by-default and template-based, just like
+    // Common Lisp's), so a Clojure fixture would no longer be unmodelled by
+    // every report in `COMMANDS`. Scheme's `define-syntax`/`syntax-rules` is
+    // hygienic by language guarantee and stays out of that report too, and
+    // every other report here is Common Lisp only, so Scheme is still
+    // unmodelled by all thirteen.
     let dir = fresh_temp_dir("inspect-lisp-analysis-unmodelled");
-    let file = dir.join("core.clj");
-    fs::write(&file, "(defn f [x] (loop [y x] (recur y)))\n").expect("write clojure fixture");
+    let file = dir.join("core.scm");
+    fs::write(&file, "(define (f x) (let loop ((y x)) (loop y)))\n").expect("write scheme fixture");
 
     for command in COMMANDS {
         paredit()
@@ -295,4 +302,62 @@ fn cli_every_lisp_analysis_report_names_itself_in_its_output() {
                 "\"report\": \"inspect {command}\""
             )));
     }
+}
+
+/// `macro-variable-capture` reports a capture but never rewrites one. An
+/// automatic gensym rewrite was implemented and reverted: it could corrupt a
+/// working macro, so the rule is registered `ReportOnly` and `--fix` must
+/// leave the file exactly as written.
+#[test]
+fn cli_variable_capture_is_reported_but_not_auto_fixed() {
+    // Named to avoid the substring this test checks for: `fresh_temp_dir`
+    // embeds its argument in the directory path, which then shows up in the
+    // JSON under `path` and would make a naive `contains("variable-capture")`
+    // check on the whole report pass for the wrong reason.
+    let dir = fresh_temp_dir("macro-gensym-report-only");
+    let file = dir.join("m.lisp");
+    let source = "(defmacro m (form) `(let ((result ,form)) (list result)))\n";
+    fs::write(&file, source).expect("write fixture");
+
+    let reported = paredit()
+        .args(["inspect", "lint", "--rule", "macro-variable-capture"])
+        .arg(&file)
+        .output()
+        .expect("run inspect lint");
+    let stdout = String::from_utf8_lossy(&reported.stdout);
+    assert!(
+        stdout.contains("variable capture"),
+        "the capture must still be reported: {stdout}"
+    );
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--rule",
+            "macro-variable-capture",
+            "--fix",
+        ])
+        .arg(&file)
+        .output()
+        .expect("run inspect lint --fix");
+    assert_eq!(
+        fs::read_to_string(&file).expect("read back"),
+        source,
+        "a report-only rule must not rewrite the file"
+    );
+
+    let catalog = paredit()
+        .args(["inspect", "lint", "--list-rules", "--output", "json"])
+        .output()
+        .expect("run inspect lint --list-rules");
+    let rules: serde_json::Value =
+        serde_json::from_slice(&catalog.stdout).expect("--list-rules JSON is valid");
+    let entry = rules["rules"]
+        .as_array()
+        .expect("rules array")
+        .iter()
+        .find(|rule| rule["rule"] == "macro-variable-capture")
+        .expect("macro-variable-capture present");
+    assert_eq!(entry["fixable"], false);
 }

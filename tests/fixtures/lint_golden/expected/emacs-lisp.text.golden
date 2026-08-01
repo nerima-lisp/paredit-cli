@@ -155,6 +155,7 @@ rule	ignore-declaration-conflict	0
 rule	contradictory-optimize	0
 rule	defclass-slot-option	0
 rule	method-lambda-list-mismatch	0
+rule	macro-variable-capture	0
 rule	elisp-missing-lexical-binding	1
 rule	elisp-unreachable-lexical-binding	1
 rule	elisp-autoload-cookie-without-form	2

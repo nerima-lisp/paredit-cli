@@ -23,6 +23,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
+use paredit_core_syntax::definition::is_macro_expander_definition;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
 use paredit_core_syntax::sexpr::{
@@ -38,8 +39,50 @@ use paredit_core_cli::report::{FileFindings, Finding};
 pub enum HygieneRisk {
     /// The template binds a literal name that is not obviously a gensym.
     VariableCapture,
-    /// The template unquotes one parameter more than once.
+    /// A form that re-evaluates on every reference is referenced more than
+    /// once.
+    ///
+    /// Two unrelated shapes report this: a template that unquotes one
+    /// parameter more than once, and a `symbol-macrolet`/`cl-symbol-macrolet`
+    /// binding whose expansion form is not provably side-effect-free (not a
+    /// literal atom or a quoted form — a function call, `incf`, and the
+    /// like) but is referenced by name more than once in its body. Both are
+    /// the same failure by another name: a name that looks like an ordinary
+    /// binding actually re-runs a computation at every use, and a reader
+    /// counting names cannot tell that apart from an ordinary reference
+    /// without knowing which names are like this. Kept as one variant rather
+    /// than two because the remedy is identical in both cases — bind the
+    /// form's value once — and a caller filtering findings by risk should
+    /// not have to know there are two shapes of it.
     MultipleEvaluation,
+    /// The template unquotes two or more distinct parameters in an order
+    /// that differs from their left-to-right position in the lambda list.
+    ///
+    /// `` `(list ,b ,a) `` for `(m (a b) ...)` evaluates `b`'s argument form
+    /// before `a`'s, even though the call site reads `a` before `b`. When
+    /// either argument form has a side effect — the overwhelmingly common
+    /// reason to notice evaluation order at all — the caller's own left-to-
+    /// right expectation is silently violated.
+    ParameterReordering,
+    /// The template nests three or more levels of quasiquote.
+    ///
+    /// Each backquote inside another backquote's template changes what an
+    /// unquote there needs — the innermost unquote cancels one level, an
+    /// unquote-unquote cancels two, and so on — which is already hard to
+    /// track correctly by the second level. A third makes it easy to get an
+    /// escape wrong in a way that only shows up when the macro that builds
+    /// the macro is itself expanded.
+    DeepQuasiquoteNesting,
+    /// Emacs Lisp only: the macro's body does not open with a
+    /// `(declare (indent ...))` and/or `(declare (debug ...))` form.
+    ///
+    /// Neither is required by the language, but their absence is a gap in
+    /// the macro's editor integration rather than in the macro itself: with
+    /// no `indent` declaration, `M-x indent-region` falls back to indenting
+    /// every call to this macro as if it were an ordinary function call, and
+    /// with no `debug` declaration, Edebug cannot step through the
+    /// arguments a call to it actually evaluates.
+    MissingEditorDeclaration,
 }
 
 impl HygieneRisk {
@@ -48,6 +91,9 @@ impl HygieneRisk {
         match self {
             Self::VariableCapture => "variable-capture",
             Self::MultipleEvaluation => "multiple-evaluation",
+            Self::ParameterReordering => "parameter-reordering",
+            Self::DeepQuasiquoteNesting => "deep-quasiquote-nesting",
+            Self::MissingEditorDeclaration => "missing-editor-declaration",
         }
     }
 }
@@ -58,10 +104,17 @@ pub struct HygieneFinding {
     pub risk: HygieneRisk,
     /// The macro the template belongs to.
     pub macro_name: String,
-    /// The captured binding name, or the multiply-evaluated parameter.
+    /// The captured binding name, the multiply-evaluated parameter, or —
+    /// for [`HygieneRisk::ParameterReordering`] — every out-of-order
+    /// parameter, comma-joined in the order the template unquotes them.
+    /// Empty for [`HygieneRisk::DeepQuasiquoteNesting`]: the whole template
+    /// is at fault there, not any one name in it.
     pub subject: String,
     /// How many times the parameter is unquoted, for
-    /// [`HygieneRisk::MultipleEvaluation`]. `0` for a capture.
+    /// [`HygieneRisk::MultipleEvaluation`]; how many parameters are
+    /// out-of-order, for [`HygieneRisk::ParameterReordering`]; the nesting
+    /// depth itself, for [`HygieneRisk::DeepQuasiquoteNesting`]. `0` for a
+    /// capture.
     pub occurrences: usize,
     /// The remedy, named rather than left to the reader.
     pub remedy: &'static str,
@@ -98,7 +151,46 @@ impl Finding for HygieneFinding {
 }
 
 /// Binding forms whose second child is a binding list.
-const BINDING_FORMS: [&str; 4] = ["let", "let*", "flet", "labels"];
+pub(crate) const BINDING_FORMS: [&str; 4] = ["let", "let*", "flet", "labels"];
+
+/// The dialects whose macro system is unhygienic by default and
+/// template/quasiquote-based — the precondition for variable-capture and
+/// multiple-evaluation analysis to mean anything.
+///
+/// Scheme and Racket are the deliberate exclusions. `is_macro_expander_definition`
+/// recognizes their `define-syntax` as a macro-expander form too (useful for
+/// rename and navigation), but `syntax-rules` hygiene is a language guarantee
+/// there, not a discipline the programmer must enforce by hand: counting
+/// unquotes or capture-prone bindings in a `syntax-rules` template would be
+/// analyzing a mechanism these checks were never written to model, and would
+/// misfire on hygienic-by-construction code.
+///
+/// Exposed for `rule.rs`, which declares the same set as its
+/// [`paredit_core_lint_engine::policy::RuleDialectScope`].
+pub(crate) const HYGIENE_MODELLED_DIALECTS: [Dialect; 8] = [
+    Dialect::CommonLisp,
+    Dialect::EmacsLisp,
+    Dialect::Clojure,
+    Dialect::Janet,
+    Dialect::Hy,
+    Dialect::Carp,
+    Dialect::Fennel,
+    Dialect::Lfe,
+];
+
+const fn dialect_is_hygiene_modelled(dialect: Dialect) -> bool {
+    matches!(
+        dialect,
+        Dialect::CommonLisp
+            | Dialect::EmacsLisp
+            | Dialect::Clojure
+            | Dialect::Janet
+            | Dialect::Hy
+            | Dialect::Carp
+            | Dialect::Fennel
+            | Dialect::Lfe
+    )
+}
 
 #[must_use]
 pub fn build_macro_hygiene_report(
@@ -106,7 +198,7 @@ pub fn build_macro_hygiene_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> FileFindings<HygieneFinding> {
-    let modelled = dialect == Dialect::CommonLisp;
+    let modelled = dialect_is_hygiene_modelled(dialect);
     let mut findings = Vec::new();
     let mut macro_count = 0;
 
@@ -115,14 +207,14 @@ pub fn build_macro_hygiene_report(
             let Some(head) = list_head(form) else {
                 continue;
             };
-            if !common_lisp_operator_head_eq(head, "defmacro") {
+            if !is_macro_expander_definition(dialect, head) {
                 continue;
             }
             let Some(name) = form.children.get(1).and_then(atom_symbol_text) else {
                 continue;
             };
             macro_count += 1;
-            analyze(form, name, &mut findings);
+            analyze(dialect, form, name, &mut findings);
         }
     }
 
@@ -136,7 +228,29 @@ pub fn build_macro_hygiene_report(
     )
 }
 
-fn analyze(form: &ExpressionView, name: &str, findings: &mut Vec<HygieneFinding>) {
+/// Every hygiene risk in one already-identified macro-expander form.
+///
+/// Exposed (rather than kept as the private `analyze`) for `rule.rs`'s
+/// fixable-lint-rule wiring, which needs the same analysis this file's own
+/// `build_macro_hygiene_report` uses but reports only a subset of it through
+/// a different surface.
+#[must_use]
+pub(crate) fn hygiene_findings_in(
+    dialect: Dialect,
+    form: &ExpressionView,
+    name: &str,
+) -> Vec<HygieneFinding> {
+    let mut findings = Vec::new();
+    analyze(dialect, form, name, &mut findings);
+    findings
+}
+
+fn analyze(
+    dialect: Dialect,
+    form: &ExpressionView,
+    name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
     let parameters = form
         .children
         .get(2)
@@ -146,12 +260,17 @@ fn analyze(form: &ExpressionView, name: &str, findings: &mut Vec<HygieneFinding>
     // Names bound by the macro's own body outside the template — the usual
     // `(let ((var (gensym))) ...)` prelude — are safe by construction, because
     // whatever they hold at expansion time is a fresh symbol.
-    let gensym_bound = gensym_bindings(form);
+    let gensym_bound = gensym_bindings(dialect, form);
 
     for body in form.children.iter().skip(3) {
         find_captures(body, name, &gensym_bound, findings);
         find_multiple_evaluation(body, name, &parameters, findings);
+        find_parameter_reordering(body, name, &parameters, findings);
+        find_symbol_macrolet_multiple_evaluation(body, name, findings);
+        find_deep_quasiquote_nesting(body, name, findings);
     }
+
+    find_missing_editor_declaration(dialect, form, name, findings);
 }
 
 /// The required and `&body`/`&rest` parameter names of a macro lambda list.
@@ -165,12 +284,20 @@ fn parameter_names(lambda_list: &ExpressionView) -> Vec<String> {
         .collect()
 }
 
+/// The Common Lisp gensym idioms, recognised in every modelled dialect.
+const GENSYM_GENERATORS: [&str; 4] = ["gensym", "gentemp", "make-symbol", "copy-symbol"];
+
+/// Emacs Lisp's own gensym idiom. `cl-gensym` is the `cl-lib` equivalent of
+/// Common Lisp's `gensym`; `make-symbol` is already in [`GENSYM_GENERATORS`]
+/// and is the idiom real Elisp macros reach for even without `cl-lib`.
+const EMACS_LISP_GENSYM_GENERATOR: &str = "cl-gensym";
+
 /// Names the macro body binds to a freshly generated symbol.
 ///
 /// Recognised by the initial form's head rather than by the name's spelling:
 /// `g!foo` is a convention and `(gensym)` is a proof, and only one of those is
 /// something to build a report on.
-fn gensym_bindings(form: &ExpressionView) -> BTreeMap<String, ()> {
+fn gensym_bindings(dialect: Dialect, form: &ExpressionView) -> BTreeMap<String, ()> {
     let mut bound = BTreeMap::new();
     walk(form, &mut |view| {
         let Some(head) = list_head(view) else { return };
@@ -194,9 +321,11 @@ fn gensym_bindings(form: &ExpressionView) -> BTreeMap<String, ()> {
                 .get(1)
                 .and_then(list_head)
                 .is_some_and(|head| {
-                    ["gensym", "gentemp", "make-symbol", "copy-symbol"]
+                    GENSYM_GENERATORS
                         .iter()
                         .any(|generator| common_lisp_operator_head_eq(head, generator))
+                        || (dialect == Dialect::EmacsLisp
+                            && common_lisp_operator_head_eq(head, EMACS_LISP_GENSYM_GENERATOR))
                 });
             if generated {
                 bound.insert(name.to_ascii_uppercase(), ());
@@ -313,12 +442,312 @@ fn find_multiple_evaluation(
     }
 }
 
+/// Reports a template that unquotes two or more distinct parameters in an
+/// order that differs from their left-to-right position in the lambda list.
+///
+/// Only the first unquote of each distinct parameter fixes that parameter's
+/// place in the template's order — a parameter [`find_multiple_evaluation`]
+/// already flags as unquoted more than once does not need flagging twice
+/// here for the same reason. A single parameter, however many times it
+/// repeats, is trivially "in order" with itself, so at least two distinct
+/// parameters must appear before an order even exists to compare.
+fn find_parameter_reordering(
+    view: &ExpressionView,
+    macro_name: &str,
+    parameters: &[String],
+    findings: &mut Vec<HygieneFinding>,
+) {
+    if !is_quasiquoted(view) {
+        for child in &view.children {
+            find_parameter_reordering(child, macro_name, parameters, findings);
+        }
+        return;
+    }
+
+    let mut template_order: Vec<String> = Vec::new();
+    walk(view, &mut |inner| {
+        if inner.kind != ExpressionKind::Atom {
+            return;
+        }
+        if !inner.reader_prefixes.contains(&ReaderPrefix::Unquote) {
+            return;
+        }
+        let Some(name) = atom_symbol_text(inner) else {
+            return;
+        };
+        let folded = name.to_ascii_uppercase();
+        if parameters.contains(&folded) && !template_order.contains(&folded) {
+            template_order.push(folded);
+        }
+    });
+
+    if template_order.len() < 2 {
+        return;
+    }
+
+    // The lambda list's own order, restricted to the parameters the
+    // template actually unquotes: this is what "in order" means here, since
+    // a parameter the template never mentions has nothing to be out of
+    // order with.
+    let lambda_list_order: Vec<&String> = parameters
+        .iter()
+        .filter(|parameter| template_order.contains(parameter))
+        .collect();
+
+    if template_order.iter().collect::<Vec<_>>() == lambda_list_order {
+        return;
+    }
+
+    findings.push(HygieneFinding {
+        risk: HygieneRisk::ParameterReordering,
+        macro_name: macro_name.to_ascii_uppercase(),
+        subject: template_order.join(", "),
+        occurrences: template_order.len(),
+        remedy: "the template evaluates these argument forms in a different order than the \
+                 call site writes them; reorder the template or bind each argument in the \
+                 call's own order before using it",
+        span: view.span,
+    });
+}
+
+/// `symbol-macrolet`/`cl-symbol-macrolet`'s special-form name.
+///
+/// These are not in [`BINDING_FORMS`]: a `let` binding evaluates its value
+/// once and binds a name to the result, while a `symbol-macrolet` binding
+/// substitutes a fresh copy of the expansion form at every reference — a
+/// `let`'s capture risk does not apply to it, and a different risk does.
+const SYMBOL_MACROLET_FORMS: [&str; 2] = ["symbol-macrolet", "cl-symbol-macrolet"];
+
+/// Reports a `symbol-macrolet` expansion form that is not provably
+/// side-effect-free and is referenced more than once in the form's body.
+///
+/// Every reference substitutes another copy of the expansion form, so
+/// `(symbol-macrolet ((x (incf y))) (+ x x))` runs `(incf y)` twice — the
+/// same failure [`find_multiple_evaluation`] reports for a template that
+/// unquotes one macro parameter twice, just reached through a different
+/// binding form. Not gated on being inside a quasiquoted template: a
+/// `symbol-macrolet` in the macro's own generating code is exactly as live a
+/// risk as one written into the template it returns.
+fn find_symbol_macrolet_multiple_evaluation(
+    view: &ExpressionView,
+    macro_name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
+    walk(view, &mut |inner| {
+        let Some(head) = list_head(inner) else { return };
+        if !SYMBOL_MACROLET_FORMS
+            .iter()
+            .any(|form_name| common_lisp_operator_head_eq(head, form_name))
+        {
+            return;
+        }
+
+        // Every binding asks the same question of the same body, so the body
+        // is counted once for the whole form; counting per binding made this
+        // O(bindings x body). Deferred rather than eager so a form whose
+        // expansions are all side-effect-free still walks nothing.
+        let mut body_symbols: Option<BTreeMap<String, usize>> = None;
+
+        for binding in inner
+            .children
+            .get(1)
+            .map(|list| list.children.as_slice())
+            .unwrap_or_default()
+        {
+            let Some(name) = binding.children.first().and_then(atom_symbol_text) else {
+                continue;
+            };
+            let Some(expansion) = binding.children.get(1) else {
+                continue;
+            };
+            if is_side_effect_free(expansion) {
+                continue;
+            }
+            let folded = name.to_ascii_uppercase();
+
+            let counts = body_symbols.get_or_insert_with(|| scoped_symbol_counts(inner));
+            let occurrences = counts.get(&folded).copied().unwrap_or(0);
+            if occurrences < 2 {
+                continue;
+            }
+
+            findings.push(HygieneFinding {
+                risk: HygieneRisk::MultipleEvaluation,
+                macro_name: macro_name.to_ascii_uppercase(),
+                subject: folded,
+                occurrences,
+                remedy: "this symbol-macrolet expansion is not side-effect-free; bind its value \
+                         once instead of letting each reference re-evaluate it",
+                span: binding.span,
+            });
+        }
+    });
+}
+
+/// How many times each symbol appears in `form`'s body — everything after
+/// the head and the binding list — folded the way the reader folds it.
+fn scoped_symbol_counts(form: &ExpressionView) -> BTreeMap<String, usize> {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for scoped_body in form.children.iter().skip(2) {
+        walk(scoped_body, &mut |node| {
+            if node.kind != ExpressionKind::Atom {
+                return;
+            }
+            if let Some(text) = atom_symbol_text(node) {
+                *counts.entry(text.to_ascii_uppercase()).or_default() += 1;
+            }
+        });
+    }
+    counts
+}
+
+/// Whether a form's evaluation is guaranteed to have no side effect: a
+/// literal atom (a self-evaluating value or a variable reference — neither
+/// calls anything), or a quoted form (`quote` never evaluates its argument).
+/// Anything else — a function call, `incf`, and the like — is not, since
+/// this analysis has no way to know what the call does.
+fn is_side_effect_free(view: &ExpressionView) -> bool {
+    if view.kind == ExpressionKind::Atom {
+        return true;
+    }
+    if view.reader_prefixes.contains(&ReaderPrefix::Quote) {
+        return true;
+    }
+    list_head(view).is_some_and(|head| common_lisp_operator_head_eq(head, "quote"))
+}
+
+/// Reports a template that nests three or more levels of quasiquote.
+///
+/// Unlike the other checks in this file, this one does not stop recursing
+/// once it finds the outermost quasiquote of a template: [`quasiquote_depth`]
+/// already measures the deepest nesting anywhere under a node in one pass, so
+/// there is nothing further inside that same template worth a second,
+/// separate report.
+fn find_deep_quasiquote_nesting(
+    view: &ExpressionView,
+    macro_name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
+    if !is_quasiquoted(view) {
+        for child in &view.children {
+            find_deep_quasiquote_nesting(child, macro_name, findings);
+        }
+        return;
+    }
+
+    let depth = quasiquote_depth(view);
+    if depth < 3 {
+        return;
+    }
+
+    findings.push(HygieneFinding {
+        risk: HygieneRisk::DeepQuasiquoteNesting,
+        macro_name: macro_name.to_ascii_uppercase(),
+        subject: String::new(),
+        occurrences: depth,
+        remedy: "three or more nested backquote levels are hard to reason about and easy to get \
+                 an escape wrong in; consider splitting this into helper macros or functions to \
+                 reduce the nesting",
+        span: view.span,
+    });
+}
+
+/// The deepest quasiquote nesting reachable from `view`, counting `view`'s
+/// own backquote(s) (a node can carry more than one, when several backquotes
+/// appear contiguously with nothing between them) plus whatever is nested
+/// inside it.
+fn quasiquote_depth(view: &ExpressionView) -> usize {
+    let own = if view.reader_prefixes.contains(&ReaderPrefix::Quasiquote) {
+        view.reader_prefixes
+            .iter()
+            .filter(|prefix| **prefix == ReaderPrefix::Quasiquote)
+            .count()
+    } else if view
+        .text
+        .as_deref()
+        .is_some_and(|text| text.starts_with('`'))
+    {
+        1
+    } else {
+        0
+    };
+    let deepest_child = view
+        .children
+        .iter()
+        .map(quasiquote_depth)
+        .max()
+        .unwrap_or(0);
+    own + deepest_child
+}
+
+/// Emacs Lisp only: reports a macro whose body does not open with a
+/// `(declare (indent ...))` and/or `(declare (debug ...))` form.
+///
+/// A leading docstring is skipped, since `(declare ...)` conventionally
+/// follows it rather than the arglist directly — `(defmacro m (x) "doc"
+/// (declare (indent 1)) ...)` is the ordinary shape a documented macro
+/// takes, not a missing declaration.
+fn find_missing_editor_declaration(
+    dialect: Dialect,
+    form: &ExpressionView,
+    macro_name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
+    if dialect != Dialect::EmacsLisp {
+        return;
+    }
+
+    let first_body_index = match form.children.get(3) {
+        Some(child) if is_string_literal(child) => 4,
+        _ => 3,
+    };
+
+    let has_declaration = form
+        .children
+        .get(first_body_index)
+        .and_then(|first_body| {
+            let head = list_head(first_body)?;
+            common_lisp_operator_head_eq(head, "declare").then_some(first_body)
+        })
+        .is_some_and(|declare_form| {
+            declare_form.children.iter().skip(1).any(|clause| {
+                list_head(clause).is_some_and(|clause_head| {
+                    common_lisp_operator_head_eq(clause_head, "indent")
+                        || common_lisp_operator_head_eq(clause_head, "debug")
+                })
+            })
+        });
+
+    if has_declaration {
+        return;
+    }
+
+    findings.push(HygieneFinding {
+        risk: HygieneRisk::MissingEditorDeclaration,
+        macro_name: macro_name.to_ascii_uppercase(),
+        subject: String::new(),
+        occurrences: 0,
+        remedy: "add a leading (declare (indent ...)) and/or (declare (debug ...)) form so \
+                 Emacs indents and Edebug instruments calls to this macro correctly",
+        span: form.span,
+    });
+}
+
+/// Whether a node is a string literal atom.
+fn is_string_literal(view: &ExpressionView) -> bool {
+    view.kind == ExpressionKind::Atom
+        && view
+            .text
+            .as_deref()
+            .is_some_and(|text| text.starts_with('"'))
+}
+
 /// The node a binding binds: the binding itself when it is a bare name, or its
 /// first child when it is a `(name value)` pair.
 ///
 /// Returns the *node* rather than the name so the caller can still ask about
 /// its reader prefixes, which is the only place the unquote survives.
-fn binding_target(binding: &ExpressionView) -> Option<&ExpressionView> {
+pub(crate) fn binding_target(binding: &ExpressionView) -> Option<&ExpressionView> {
     match binding.kind {
         ExpressionKind::Atom => Some(binding),
         ExpressionKind::List => binding.children.first(),
@@ -326,7 +755,7 @@ fn binding_target(binding: &ExpressionView) -> Option<&ExpressionView> {
     }
 }
 
-fn is_unquoted(view: &ExpressionView) -> bool {
+pub(crate) fn is_unquoted(view: &ExpressionView) -> bool {
     view.reader_prefixes.contains(&ReaderPrefix::Unquote)
         || view
             .reader_prefixes
@@ -342,7 +771,7 @@ fn is_unquoted(view: &ExpressionView) -> bool {
 /// Both spellings occur: a backquote before a list becomes a reader prefix,
 /// while a backquote consumed into an atom leaves a leading `` ` `` in the
 /// text.
-fn is_quasiquoted(view: &ExpressionView) -> bool {
+pub(crate) fn is_quasiquoted(view: &ExpressionView) -> bool {
     view.reader_prefixes.contains(&ReaderPrefix::Quasiquote)
         || view
             .text
@@ -350,7 +779,7 @@ fn is_quasiquoted(view: &ExpressionView) -> bool {
             .is_some_and(|text| text.starts_with('`'))
 }
 
-fn walk(view: &ExpressionView, visit: &mut impl FnMut(&ExpressionView)) {
+pub(crate) fn walk(view: &ExpressionView, visit: &mut impl FnMut(&ExpressionView)) {
     visit(view);
     for child in &view.children {
         walk(child, visit);
@@ -362,8 +791,12 @@ mod tests {
     use super::*;
 
     fn report(source: &str) -> FileFindings<HygieneFinding> {
-        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
-        build_macro_hygiene_report(Path::new("t.lisp"), Dialect::CommonLisp, &tree)
+        report_in(source, Dialect::CommonLisp)
+    }
+
+    fn report_in(source: &str, dialect: Dialect) -> FileFindings<HygieneFinding> {
+        let tree = SyntaxTree::parse_with_dialect(source, dialect).expect("parse");
+        build_macro_hygiene_report(Path::new("t.lisp"), dialect, &tree)
     }
 
     #[test]
@@ -431,6 +864,161 @@ mod tests {
     }
 
     #[test]
+    fn two_parameters_unquoted_out_of_lambda_list_order_is_a_reordering_risk() {
+        let report = report("(defmacro m (a b) `(list ,b ,a))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::ParameterReordering)
+            .expect("parameter reordering is reported");
+        assert_eq!(finding.subject, "B, A");
+        assert_eq!(finding.occurrences, 2);
+    }
+
+    #[test]
+    fn two_parameters_unquoted_in_lambda_list_order_is_not_reported() {
+        let report = report("(defmacro m (a b) `(list ,a ,b))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::ParameterReordering),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn three_parameters_partially_reordered_still_report() {
+        // `a` and `c` stay in order; `b` jumps ahead of both.
+        let report = report("(defmacro m (a b c) `(list ,b ,a ,c))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::ParameterReordering)
+            .expect("parameter reordering is reported");
+        assert_eq!(finding.subject, "B, A, C");
+    }
+
+    #[test]
+    fn a_single_parameter_repeated_is_not_a_reordering_risk() {
+        // Only one distinct parameter, however many times it repeats, has no
+        // order to be out of; this stays a multiple-evaluation finding only.
+        let report = report("(defmacro m (x) `(if (> ,x 0) ,x 0))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::ParameterReordering),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn a_parameter_the_template_never_mentions_does_not_block_reordering() {
+        // `a` and `b` are reordered; `c` is never unquoted at all and so has
+        // no bearing on whether `a`/`b`'s order is a violation.
+        let report = report("(defmacro m (a b c) `(list ,b ,a))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::ParameterReordering)
+            .expect("parameter reordering is reported");
+        assert_eq!(finding.subject, "B, A");
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_with_a_side_effect_referenced_twice_is_reported() {
+        let report = report("(defmacro m () (symbol-macrolet ((x (incf y))) (+ x x)))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::MultipleEvaluation)
+            .expect("multiple evaluation is reported");
+        assert_eq!(finding.subject, "X");
+        assert_eq!(finding.occurrences, 2);
+    }
+
+    #[test]
+    fn cl_symbol_macrolet_is_recognised_in_emacs_lisp() {
+        let report = report_in(
+            "(defmacro m () (cl-symbol-macrolet ((x (incf y))) (+ x x)))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.risk == HygieneRisk::MultipleEvaluation
+                    && finding.subject == "X"),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_referenced_once_is_not_reported() {
+        let report = report("(defmacro m () (symbol-macrolet ((x (incf y))) x))");
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_that_is_a_literal_atom_is_not_reported() {
+        let report = report("(defmacro m () (symbol-macrolet ((x 5)) (+ x x)))");
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn a_symbol_macrolet_expansion_that_is_quoted_is_not_reported() {
+        let report = report("(defmacro m () (symbol-macrolet ((x '(1 2 3))) (+ (car x) (car x))))");
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn three_nested_backquote_levels_is_reported() {
+        let report = report("(defmacro m () ```(a))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::DeepQuasiquoteNesting)
+            .expect("deep quasiquote nesting is reported");
+        assert_eq!(finding.occurrences, 3);
+    }
+
+    #[test]
+    fn separately_nested_backquotes_across_a_list_boundary_still_count() {
+        let report = report("(defmacro m () `(a `(b `(c))))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::DeepQuasiquoteNesting)
+            .expect("deep quasiquote nesting is reported");
+        assert_eq!(finding.occurrences, 3);
+    }
+
+    #[test]
+    fn two_nested_backquote_levels_is_not_reported() {
+        let report = report("(defmacro m () ``(a))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::DeepQuasiquoteNesting),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn a_single_quasiquote_is_not_reported() {
+        let report = report("(defmacro m (x) `(list ,x))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::DeepQuasiquoteNesting),
+            "{report:?}"
+        );
+    }
+
+    #[test]
     fn a_binding_outside_a_template_is_the_macros_own_and_is_not_reported() {
         let report = report("(defmacro m (form) (let ((result form)) `(list ,result)))");
         assert!(report.findings.is_empty(), "{report:?}");
@@ -449,11 +1037,229 @@ mod tests {
     }
 
     #[test]
-    fn an_unmodelled_dialect_says_so_rather_than_reporting_nothing() {
-        let tree =
-            SyntaxTree::parse_with_dialect("(defmacro m [x] x)", Dialect::Clojure).expect("parse");
-        let report = build_macro_hygiene_report(Path::new("t.clj"), Dialect::Clojure, &tree);
-        assert!(!report.dialect_modelled);
-        assert!(report.findings.is_empty());
+    fn clojure_is_now_a_modelled_dialect() {
+        // Clojure's `defmacro` is unhygienic by default and template-based,
+        // just like Common Lisp's, so it is modelled rather than reported as
+        // unknown territory.
+        let report = report_in("(defmacro m [x] x)", Dialect::Clojure);
+        assert!(report.dialect_modelled);
+        assert_eq!(report.summary, vec![("macro_count", json!(1))]);
+    }
+
+    #[test]
+    fn scheme_and_racket_say_so_rather_than_reporting_nothing() {
+        // `define-syntax`/`syntax-rules` hygiene is a language guarantee in
+        // both dialects, so unquote-counting and capture-checking do not
+        // apply here even though `is_macro_expander_definition` recognizes
+        // the form for other purposes (rename, navigation).
+        for dialect in [Dialect::Scheme, Dialect::Racket] {
+            let source = "(define-syntax m (syntax-rules () ((_ x) (let ((result x)) result))))";
+            let tree = SyntaxTree::parse_with_dialect(source, dialect).expect("parse");
+            let report = build_macro_hygiene_report(Path::new("t.scm"), dialect, &tree);
+            assert!(!report.dialect_modelled, "{dialect:?}");
+            assert!(report.findings.is_empty(), "{dialect:?}");
+        }
+    }
+
+    /// Every dialect whose macro system is now modelled reports the same
+    /// literal-binding-in-a-template capture that Common Lisp always has.
+    /// The fixtures below deliberately use Common Lisp's paired `let`
+    /// binding shape in every dialect: none of these dialects has an
+    /// operator table of its own in this crate for their *native* binding
+    /// vector shape (Clojure/Janet/Fennel's `[name val]`), so a fixture using
+    /// that shape would exercise nothing this analyzer looks at.
+    #[test]
+    fn a_literal_binding_in_a_template_is_a_capture_risk_in_every_modelled_dialect() {
+        for (dialect, source) in [
+            (
+                Dialect::EmacsLisp,
+                "(defmacro m (form) `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Clojure,
+                "(defmacro m [form] `(let ((result ~form)) (list result)))",
+            ),
+            (
+                Dialect::Janet,
+                "(defmacro m [form] ~(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Hy,
+                "(defmacro m [form] `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Carp,
+                "(defmacro m [form] `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Fennel,
+                "(macro m [form] `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Lfe,
+                "(defmacro m (form) `(let ((result ,form)) (list result)))",
+            ),
+        ] {
+            let report = report_in(source, dialect);
+            // Filtered to `VariableCapture` rather than asserting the whole
+            // findings list is exactly one: Emacs Lisp also reports
+            // `MissingEditorDeclaration` for a macro with no leading
+            // `declare`, which every fixture here has, and that is a
+            // separate concern from this test.
+            let captures: Vec<_> = report
+                .findings
+                .iter()
+                .filter(|finding| finding.risk == HygieneRisk::VariableCapture)
+                .collect();
+            assert_eq!(captures.len(), 1, "{dialect:?}: {report:?}");
+            assert_eq!(captures[0].subject, "RESULT", "{dialect:?}");
+        }
+    }
+
+    /// The same fixtures, with the binding name unquoted (the gensym-at-the-
+    /// use-site idiom), report nothing in every modelled dialect.
+    #[test]
+    fn an_unquoted_binding_name_is_not_a_capture_risk_in_every_modelled_dialect() {
+        for (dialect, source) in [
+            (
+                Dialect::EmacsLisp,
+                "(defmacro m (var form) `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Clojure,
+                "(defmacro m [var form] `(let ((~var ~form)) ~var))",
+            ),
+            (
+                Dialect::Janet,
+                "(defmacro m [var form] ~(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Hy,
+                "(defmacro m [var form] `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Carp,
+                "(defmacro m [var form] `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Fennel,
+                "(macro m [var form] `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Lfe,
+                "(defmacro m (var form) `(let ((,var ,form)) ,var))",
+            ),
+        ] {
+            let report = report_in(source, dialect);
+            assert!(
+                report
+                    .findings
+                    .iter()
+                    .all(|finding| finding.risk != HygieneRisk::VariableCapture),
+                "{dialect:?}: {report:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn cl_gensym_bound_name_is_not_a_capture_risk_in_emacs_lisp() {
+        let report = report_in(
+            "(defmacro m (form) (declare (indent 1)) (let ((result (cl-gensym))) `(let ((,result ,form)) (list ,result))))",
+            Dialect::EmacsLisp,
+        );
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn make_symbol_bound_name_is_not_a_capture_risk_in_emacs_lisp() {
+        let report = report_in(
+            "(defmacro m (form) (declare (indent 1)) (let ((result (make-symbol \"result\"))) `(let ((,result ,form)) (list ,result))))",
+            Dialect::EmacsLisp,
+        );
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn cl_gensym_is_not_recognised_outside_emacs_lisp() {
+        // `cl-gensym` is an Emacs Lisp `cl-lib` idiom. A binding to it in any
+        // other dialect is not a proof of freshness there, so it must still
+        // be reported as a capture risk.
+        let report = report(
+            "(defmacro m (form) (let ((result (cl-gensym))) `(let ((result ,form)) (list result))))",
+        );
+        assert_eq!(report.findings.len(), 1, "{report:?}");
+        assert_eq!(report.findings[0].risk, HygieneRisk::VariableCapture);
+    }
+
+    #[test]
+    fn an_emacs_lisp_macro_with_no_leading_declare_is_reported() {
+        let report = report_in("(defmacro m (x) (list 'progn x))", Dialect::EmacsLisp);
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.risk == HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_macro_with_a_leading_indent_declare_is_not_reported() {
+        let report = report_in(
+            "(defmacro m (x) (declare (indent 1)) (list 'progn x))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_macro_with_a_leading_debug_declare_is_not_reported() {
+        let report = report_in(
+            "(defmacro m (x) (declare (debug t)) (list 'progn x))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn an_emacs_lisp_macros_declare_may_follow_a_docstring() {
+        let report = report_in(
+            "(defmacro m (x) \"Docstring.\" (declare (indent 1)) (list 'progn x))",
+            Dialect::EmacsLisp,
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn the_missing_editor_declaration_check_does_not_apply_outside_emacs_lisp() {
+        // Common Lisp `defmacro` has no `(declare (indent ...))`/`(declare
+        // (debug ...))` convention at all, so a Common Lisp macro missing
+        // one is not a gap to report.
+        let report = report("(defmacro m (x) (list 'progn x))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::MissingEditorDeclaration),
+            "{report:?}"
+        );
     }
 }
