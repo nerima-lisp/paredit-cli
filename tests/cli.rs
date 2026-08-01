@@ -25,6 +25,8 @@ mod append_nil_report;
 mod architecture_contract;
 #[path = "cli/basic_edit_write.rs"]
 mod basic_edit_write;
+#[path = "cli/bench_cache_contract.rs"]
+mod bench_cache_contract;
 #[path = "cli/binds_constant_report.rs"]
 mod binds_constant_report;
 #[path = "cli/butlast_default_count_report.rs"]

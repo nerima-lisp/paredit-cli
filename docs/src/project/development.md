@@ -330,6 +330,13 @@ script exports the same two settings as `CARGO_PROFILE_BENCH_*`, so a baseline
 predating this profile is still built to match rather than being measured under
 the old one and reported as a difference in the code.
 
+CI also caches both builds' dependency and target directories across runs (see
+`.github/workflows/ci.yml`'s `benchmark` job), since this job runs plain
+`cargo bench` rather than a crane/Nix derivation and so never reaches Cachix
+otherwise. That mostly avoids the double-build cost above on a repeat push to
+the same PR; the job only runs on `pull_request`, never on `push`, so a brand
+new PR's first run is still a full cold build.
+
 ### Mutation testing
 
 ```sh

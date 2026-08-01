@@ -167,10 +167,76 @@ jobs:
         with:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      # Computed once, ahead of both the baseline cache key below and the
+      # comparison step at the bottom, so the two never drift: keying the
+      # cache on anything other than the exact commit bench-compare.sh
+      # resolves and checks out would make most pushes miss even when the
+      # real baseline has not moved (e.g. `github.event.pull_request.base.sha`
+      # is the base branch's current tip, which advances on every merge to
+      # it, while the merge base only moves if this PR rebases onto that).
+      - name: Resolve the merge base
+        id: merge-base
+        run: echo "sha=$(git merge-base HEAD "origin/${{ github.base_ref }}")" >>"$GITHUB_OUTPUT"
+      # bench-compare.sh runs plain `cargo bench`, not a crane/Nix derivation,
+      # so none of this job's compiles ever reach Cachix. Without these three
+      # caches every PR cold-compiles the ~181 locked dependencies twice
+      # (once for the working tree, once for the merge-base baseline) -
+      # measured at 12m35s wall-clock with a cold cache.
+      #
+      # This job only runs `if: github.event_name == 'pull_request'` (never on
+      # `push`), so no run ever seeds these caches from the default branch the
+      # way GitHub's cache scoping would otherwise let a PR benefit from on
+      # its very first push. A brand-new PR's first run is therefore still a
+      # full cold build; what these caches buy is every *subsequent* push to
+      # that same PR (fixups, review feedback, rebases) - undocumented value,
+      # but real, since repeat pushes to one PR are the common case here, not
+      # the exception.
+      #
+      # `restore-keys` deliberately falls back to the closest prior cache
+      # rather than requiring an exact key match: a partial hit still lets
+      # cargo's own incremental fingerprinting skip whatever did not change,
+      # which is strictly better than a guaranteed-cold rebuild, and it is
+      # `cargo bench`'s own build (not a cached benchmark *result*) that runs
+      # against whichever revision is checked out, so a fuzzy cache hit
+      # cannot produce a wrong comparison, only a slower one on a miss.
+      - name: Cache cargo registry
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/src
+            ~/.cargo/git/db
+          key: cargo-registry-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            cargo-registry-
+      # The working tree's own build - default `CARGO_TARGET_DIR`, i.e.
+      # `target/` under the checkout `bench-compare.sh` already runs from.
+      - name: Cache working-tree bench build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: target
+          key: bench-target-workingtree-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            bench-target-workingtree-
+      # The merge-base baseline's build. Its `CARGO_TARGET_DIR` lives outside
+      # the ephemeral worktree bench-compare.sh checks the baseline out into
+      # (see scripts/bench-compare.sh) precisely so it is not deleted by that
+      # worktree's own cleanup and survives here for this cache to persist.
+      # Keyed on the same resolved merge base the comparison step below
+      # actually checks out, so this hits exactly whenever a repeat push to
+      # this PR has not rebased onto a newer commit of the base branch.
+      - name: Cache baseline bench build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: /tmp/paredit-bench-baseline-target
+          key: bench-target-baseline-${{ steps.merge-base.outputs.sha }}
+          restore-keys: |
+            bench-target-baseline-
       - name: Compare this branch against its merge base
         run: |
           set -uo pipefail
-          base="$(git merge-base HEAD "origin/${{ github.base_ref }}")"
+          base="${{ steps.merge-base.outputs.sha }}"
           echo "merge base: $base"
           REPORT="$RUNNER_TEMP/bench-report.md" nix develop --command ./scripts/bench-compare.sh "$base"
           status=$?
