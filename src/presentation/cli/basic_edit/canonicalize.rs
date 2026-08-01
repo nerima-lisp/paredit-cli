@@ -23,6 +23,23 @@
 //! quoted list's internal order, which is the author's choice and not
 //! necessarily alist/plist data to re-sort, is never disturbed.
 //!
+//! # Why a commented file is refused outright
+//!
+//! `SyntaxTree` keeps comments out of the node tree entirely — they are
+//! recorded separately, by byte span, precisely so structural rewrites do
+//! not have to reason about them (see `SyntaxTree`'s own doc comment). That
+//! is exactly the problem for a command that reorders entries: reprinting a
+//! plist or alist by walking `ExpressionView` nodes has no notion of "the
+//! comment trailing the third entry", so it cannot carry that comment to
+//! wherever the entry sorts to. Rather than risk misattributing a comment to
+//! the wrong entry — a subtler, harder-to-notice corruption than dropping it
+//! outright — `workflow::canonicalize` refuses the whole operation before
+//! this module is ever reached, whenever the tree carries any comment at
+//! all. This is coarser than strictly necessary (a comment far from any
+//! data-shaped list still triggers it), but matches this codebase's settled
+//! posture: a write command that cannot confidently preserve something
+//! refuses rather than silently dropping it.
+//!
 //! # Why shape detection is duplicated rather than imported
 //!
 //! `paredit-feature-data-report`'s `data_check_report::domain` has the same

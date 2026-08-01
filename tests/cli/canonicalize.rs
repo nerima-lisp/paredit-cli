@@ -9,6 +9,143 @@
 
 use super::*;
 
+/// Corruption class 6: a comment must never be silently dropped. This
+/// command reorders and reflows entries, and has no way to keep a comment
+/// attached to the entry it belongs to, so — rather than lose it — the whole
+/// operation is refused up front whenever the tree carries any comment at
+/// all, on both the `--write` and the stdout-only path.
+#[test]
+fn a_leading_standalone_comment_is_refused_rather_than_dropped_on_write() {
+    let dir = fresh_temp_dir("canonicalize-comment-leading-write");
+    let file = dir.join("data.lisp");
+    let source = ";; keep this comment\n(:b 2 :a 1)\n";
+    fs::write(&file, source).expect("write fixture");
+
+    paredit()
+        .args(["edit", "canonicalize", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("containing a comment"));
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read untouched fixture"),
+        source
+    );
+}
+
+#[test]
+fn a_leading_standalone_comment_is_refused_on_the_stdout_only_path() {
+    paredit()
+        .args(["edit", "canonicalize"])
+        .write_stdin(";; keep this comment\n(:b 2 :a 1)\n")
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("containing a comment"));
+}
+
+#[test]
+fn an_inline_trailing_comment_is_refused_rather_than_dropped_on_write() {
+    let dir = fresh_temp_dir("canonicalize-comment-trailing-write");
+    let file = dir.join("data.lisp");
+    let source = "(:b 2 ; trailing note on b\n :a 1)\n";
+    fs::write(&file, source).expect("write fixture");
+
+    paredit()
+        .args(["edit", "canonicalize", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("containing a comment"));
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read untouched fixture"),
+        source
+    );
+}
+
+#[test]
+fn an_inline_trailing_comment_is_refused_on_the_stdout_only_path() {
+    paredit()
+        .args(["edit", "canonicalize"])
+        .write_stdin("(:b 2 ; trailing note on b\n :a 1)\n")
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("containing a comment"));
+}
+
+/// Corruption class 7: a quasiquoted subtree is a reader-prefixed value like
+/// `'quoted` — its own internal order (and its unquote/unquote-splicing
+/// forms) is the author's choice, not alist/plist data to re-sort, and it
+/// must be copied whole rather than descended into. The plist *around* it is
+/// still reordered.
+#[test]
+fn a_quasiquoted_forms_internal_order_is_left_alone_while_siblings_sort() {
+    let source = "(:z 3 :y \"y\" :a `(:z 1 ,x))";
+    let expected = "(:a `(:z 1 ,x) :y \"y\" :z 3)\n";
+
+    let dir = fresh_temp_dir("canonicalize-quasiquote");
+    let file = dir.join("data.lisp");
+    fs::write(&file, source).expect("write fixture");
+
+    paredit()
+        .args(["edit", "canonicalize", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read canonicalized fixture"),
+        expected
+    );
+}
+
+#[test]
+fn a_quasiquoted_forms_unquote_splicing_is_left_alone_while_siblings_sort() {
+    let source = "(:z 3 :y \"y\" :a `(:z 1 ,@xs))";
+    let expected = "(:a `(:z 1 ,@xs) :y \"y\" :z 3)\n";
+
+    let dir = fresh_temp_dir("canonicalize-quasiquote-splicing");
+    let file = dir.join("data.lisp");
+    fs::write(&file, source).expect("write fixture");
+
+    paredit()
+        .args(["edit", "canonicalize", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read canonicalized fixture"),
+        expected
+    );
+}
+
+/// Corruption class 8: malformed source on a write path must fail cleanly —
+/// no panic, a non-zero exit, a clear error, and the file left completely
+/// untouched — rather than doing anything undefined.
+#[test]
+fn unbalanced_parens_are_refused_cleanly_and_the_file_is_left_untouched() {
+    let dir = fresh_temp_dir("canonicalize-unbalanced");
+    let file = dir.join("data.lisp");
+    let source = "(:a 1";
+    fs::write(&file, source).expect("write fixture");
+
+    paredit()
+        .args(["edit", "canonicalize", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unclosed list"));
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read untouched fixture"),
+        source
+    );
+}
+
 #[test]
 fn a_plist_is_sorted_and_rewhitespaced_when_written() {
     let dir = fresh_temp_dir("canonicalize-plist");
