@@ -2,6 +2,7 @@
 
 pub mod error;
 pub mod refactor;
+pub mod refactor_checkpoint;
 pub mod refactor_step;
 
 // The contract with the composition root (section 4.2): each slice that
@@ -17,4 +18,8 @@ pub use refactor::cli::{VerifyRefactorArgs, verify_refactor};
 pub use refactor::cli::{WorkspaceRefactorExecuteArgs, workspace_refactor_execute};
 pub use refactor::cli::{WorkspaceRefactorPlanArgs, workspace_refactor_plan};
 pub use refactor::cli::{WorkspaceRefactorPreviewArgs, workspace_refactor_preview};
+pub use refactor_checkpoint::cli::{CreateCheckpointArgs, create_checkpoint};
+pub use refactor_checkpoint::cli::{DeleteCheckpointArgs, delete_checkpoint};
+pub use refactor_checkpoint::cli::{ListCheckpointsArgs, list_checkpoints};
+pub use refactor_checkpoint::cli::{RestoreCheckpointArgs, restore_checkpoint};
 pub use refactor_step::cli::{RefactorStepArgs, refactor_step};

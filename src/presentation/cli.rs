@@ -793,6 +793,7 @@ use paredit_feature_project_analysis::undefined_package_report::cli as undefined
 use paredit_feature_project_analysis::unused_local_callable_report::cli as unused_local_callable_report;
 use paredit_feature_project_analysis::workspace_report::cli as workspace_report;
 use paredit_feature_refactor_workflow::refactor::cli as refactor;
+use paredit_feature_refactor_workflow::refactor_checkpoint::cli as refactor_checkpoint;
 use paredit_feature_refactor_workflow::refactor_step::cli as refactor_step;
 use paredit_feature_remove_unused::definition_movement::cli as definition_movement;
 use paredit_feature_remove_unused::definition_removal::cli as definition_removal;

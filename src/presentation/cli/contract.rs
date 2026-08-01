@@ -554,8 +554,12 @@ const STRUCTURAL_COMMANDS: [&str; 33] = [
     "migrate run",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 83] = [
+const SEMANTIC_COMMANDS: [&str; 87] = [
     "refactor step",
+    "refactor create-checkpoint",
+    "refactor list-checkpoints",
+    "refactor restore-checkpoint",
+    "refactor delete-checkpoint",
     "refactor patch",
     "refactor plan",
     "refactor verify",
@@ -719,8 +723,12 @@ const SCOPE_TIER_REPORTS: [&str; 36] = [
 
 /// Refactor plumbing that moves whole forms or drives the manifest workflow.
 /// None of it reads an operator name, so it is complete for every dialect.
-const SYNTAX_TIER_REFACTORS: [&str; 17] = [
+const SYNTAX_TIER_REFACTORS: [&str; 21] = [
     "refactor step",
+    "refactor create-checkpoint",
+    "refactor list-checkpoints",
+    "refactor restore-checkpoint",
+    "refactor delete-checkpoint",
     "refactor patch",
     "refactor plan",
     "refactor verify",

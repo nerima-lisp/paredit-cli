@@ -782,6 +782,18 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::RefactorCommand::Step(args) => {
                 refactor_step::workflow::refactor_step(args)?;
             }
+            command::RefactorCommand::CreateCheckpoint(args) => {
+                refactor_checkpoint::workflow::create_checkpoint(args)?;
+            }
+            command::RefactorCommand::ListCheckpoints(args) => {
+                refactor_checkpoint::workflow::list_checkpoints(args)?;
+            }
+            command::RefactorCommand::RestoreCheckpoint(args) => {
+                refactor_checkpoint::workflow::restore_checkpoint(args)?;
+            }
+            command::RefactorCommand::DeleteCheckpoint(args) => {
+                refactor_checkpoint::workflow::delete_checkpoint(args)?;
+            }
             command::RefactorCommand::WorkspacePlan(args) => {
                 refactor::workflow::workspace_refactor_plan(args)?;
             }

@@ -62,9 +62,9 @@ use super::{
     redundant_from_end_nil_report, redundant_funcall_report, redundant_identity_key_report,
     redundant_identity_report, redundant_if_nil_report, redundant_let_star_report,
     redundant_prog1_report, redundant_progn_report, redundant_quote_report,
-    redundant_start_zero_report, redundant_the_report, refactor, refactor_step,
-    remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
-    resolve_report, restart_report, self_assignment_report, self_comparison_report,
+    redundant_start_zero_report, redundant_the_report, refactor, refactor_checkpoint,
+    refactor_step, remove_unused_binding, remove_unused_control, rename, rename_control,
+    replace_forms, resolve_report, restart_report, self_assignment_report, self_comparison_report,
     self_recursive_tail_call_report, semantic_coverage_report, serial_consistency_report,
     setf_arity_report, setq_non_variable_report, sharp_quoted_lambda_report,
     sign_comparison_report, signature_report, similarity_report, single_arg_comparison_report,
@@ -694,6 +694,15 @@ pub(super) enum RefactorCommand {
     /// Walk a preview manifest one edit at a time, taking only the steps you
     /// accept.
     Step(refactor_step::args::RefactorStepArgs),
+    /// Record the current content of files as a named checkpoint.
+    CreateCheckpoint(refactor_checkpoint::args::CreateCheckpointArgs),
+    /// List every registered checkpoint.
+    ListCheckpoints(refactor_checkpoint::args::ListCheckpointsArgs),
+    /// Report whether a checkpoint can be restored, and with `--write`,
+    /// confirm it still holds.
+    RestoreCheckpoint(refactor_checkpoint::args::RestoreCheckpointArgs),
+    /// Remove a checkpoint from the registry.
+    DeleteCheckpoint(refactor_checkpoint::args::DeleteCheckpointArgs),
     /// Discover Lisp sources under roots and build a gated refactor plan.
     WorkspacePlan(refactor::args::WorkspaceRefactorPlanArgs),
     /// Discover Lisp sources under roots and preview exact refactoring rewrites.

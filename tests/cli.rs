@@ -445,6 +445,8 @@ mod redundant_quote_report;
 mod redundant_start_zero_report;
 #[path = "cli/redundant_the_report.rs"]
 mod redundant_the_report;
+#[path = "cli/refactor_checkpoint.rs"]
+mod refactor_checkpoint;
 #[path = "cli/refactor_entrypoint_contract.rs"]
 mod refactor_entrypoint_contract;
 #[path = "cli/refactor_manifest/mod.rs"]
