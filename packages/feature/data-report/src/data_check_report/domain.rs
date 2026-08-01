@@ -41,10 +41,11 @@ pub enum DataFormat {
     PareditConfig,
     /// Emacs's `.dir-locals.el`: an alist of `(mode-or-nil . variable-alist)`.
     DirLocals,
-    /// A Racket data file (`.rktd`) or a `.rkt`/extensionless file whose
-    /// `#lang` names something other than `racket`/`racket/base`. Phase 1
-    /// gives it no rule of its own beyond baseline — the value is routing
-    /// these files into the report at all.
+    /// A Racket data file: `.rktd` by extension. `#lang` alone cannot signal
+    /// this — every named language is still executable Racket — so `.rktd`
+    /// is the only unambiguous marker. Phase 1 gives it no rule of its own
+    /// beyond baseline — the value is routing these files into the report at
+    /// all.
     RacketData,
 }
 
@@ -222,20 +223,18 @@ fn is_paredit_config_path(path: &Path) -> bool {
         .any(|pair| pair[0] == ".paredit" && matches!(pair[1], "rules" | "migrations"))
 }
 
-/// Whether `path`/`source` is a Racket data file: `.rktd` by extension, or a
-/// `.rkt`/extensionless file whose `#lang` names something other than
-/// `racket`/`racket/base`.
-fn is_racket_data(path: &Path, dialect: Dialect, source: &str) -> bool {
-    let has_rktd_extension = path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("rktd"));
-    if has_rktd_extension {
-        return true;
-    }
+/// Whether `path` is a Racket data file: `.rktd` by extension.
+///
+/// `#lang` alone cannot tell code from data: `typed/racket`, `racket/gui`,
+/// and every other named language are still executable Racket, so branching
+/// on "anything other than `racket`/`racket/base`" would misclassify code as
+/// data. `.rktd` is the one unambiguous signal this format currently has.
+fn is_racket_data(path: &Path, dialect: Dialect, _source: &str) -> bool {
     dialect == Dialect::Racket
-        && Dialect::lang_directive(source)
-            .is_some_and(|lang| lang != "racket" && lang != "racket/base")
+        && path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("rktd"))
 }
 
 /// Whether `path` has the `.edn` extension.
@@ -1042,9 +1041,12 @@ mod tests {
         }
 
         #[test]
-        fn a_rkt_file_with_a_non_racket_lang_directive_is_racket_data() {
+        fn a_rkt_file_with_a_non_racket_lang_directive_is_still_baseline() {
+            // `typed/racket` is executable code, not data, even though its
+            // `#lang` name differs from plain `racket`/`racket/base` -- only
+            // the `.rktd` extension signals data.
             let format = detect("board.rkt", Dialect::Racket, "#lang typed/racket\n(1 2 3)");
-            assert_eq!(format, DataFormat::RacketData);
+            assert_eq!(format, DataFormat::Baseline);
         }
 
         #[test]
