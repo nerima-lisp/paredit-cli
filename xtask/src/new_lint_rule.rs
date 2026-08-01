@@ -899,7 +899,8 @@ mod tests {
             .expect("temporary fixture has a file name")
             .to_string_lossy();
         let hash_path = fixture_path.with_file_name(format!("seed#path-{file_name}"));
-        fs::rename(&fixture_path, &hash_path).expect("rename fixture to a valid path containing `#`");
+        fs::rename(&fixture_path, &hash_path)
+            .expect("rename fixture to a valid path containing `#`");
 
         let spec = format!("{}#entity-needs-table", hash_path.display());
         let seed = CustomRuleSeed::load(&spec).expect("the final `#` separates path from rule name");
