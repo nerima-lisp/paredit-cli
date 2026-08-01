@@ -26,7 +26,7 @@ use crate::semantics::value::{LiteralValue, ValueTable, evaluate_constant};
 use super::super::model::{Ty, Type, TypeTable, TypeTableBuilder, meet};
 use super::super::policy::supports_type_inference;
 use super::narrowing::{self, Narrowing};
-use super::{calls, declarations};
+use super::{calls, declarations, emacs_lisp_declarations, scheme_declarations};
 
 /// Everything a call into any source needs, bundled once rather than threaded
 /// argument by argument.
@@ -54,11 +54,21 @@ pub fn build_type_table(
         return builder.finish();
     }
 
-    // File-level `ftype` declarations first: a call earlier in the file may
-    // be to a function `declaim`ed later, and narrowing a binding is
-    // meet-based and so order-independent, but a name-keyed lookup table like
-    // this one is not — it has to exist before any call consults it.
-    let declared_returns = declarations::collect_declared_returns(dialect, tree);
+    // File-level declared-return tables first: a call earlier in the file may
+    // be to a function declared later, and narrowing a binding is meet-based
+    // and so order-independent, but a name-keyed lookup table like this one
+    // is not — it has to exist before any call consults it. Each dialect
+    // reads its own declaration syntax: Common Lisp's `declaim`/`proclaim`
+    // `ftype`, Emacs Lisp's `cl-defstruct` slots, Scheme's/Racket's
+    // `define-record-type` predicates and Racket's own Typed Racket `:`
+    // function annotations.
+    let declared_returns = match dialect {
+        Dialect::EmacsLisp => emacs_lisp_declarations::collect_declared_returns(tree),
+        Dialect::Scheme | Dialect::Racket => {
+            scheme_declarations::collect_declared_returns(dialect, tree)
+        }
+        _ => declarations::collect_declared_returns(dialect, tree),
+    };
     let ctx = Ctx {
         dialect,
         bindings,
@@ -168,22 +178,46 @@ fn infer_list(
         return record(builder, view, folded);
     };
 
-    if is_common_lisp_declaration_form(head) {
-        // `declare`/`declaim`/`proclaim` evaluate nothing: their contents are
-        // decl-specs, not expressions, so nothing underneath is walked.
-        declarations::narrow_declared_bindings(view, ctx.bindings, builder);
-        return record(builder, view, folded);
-    }
-    if common_lisp_operator_head_eq(head, "check-type") {
-        declarations::narrow_check_type(view, ctx.bindings, builder);
-        return record(builder, view, folded);
-    }
-    if common_lisp_operator_head_eq(head, "the") {
-        let asserted = the_asserted_type(view);
-        if let Some(form) = view.children.get(2) {
-            infer_view(ctx, narrowing, form, builder);
+    // `declare`/`check-type`/`the` are Common Lisp's own declaration and
+    // assertion forms. Emacs Lisp's `(declare …)` shares the head spelling
+    // but declares unrelated metadata (`indent`, `debug`, …) rather than a
+    // type — and it has neither `check-type` nor `the` at all — so these
+    // three stay scoped to Common Lisp even though `supports_type_inference`
+    // now also covers Emacs Lisp.
+    if ctx.dialect == Dialect::CommonLisp {
+        if is_common_lisp_declaration_form(head) {
+            // `declare`/`declaim`/`proclaim` evaluate nothing: their contents
+            // are decl-specs, not expressions, so nothing underneath is
+            // walked.
+            declarations::narrow_declared_bindings(view, ctx.bindings, builder);
+            return record(builder, view, folded);
         }
-        return record(builder, view, combine(asserted, folded));
+        if common_lisp_operator_head_eq(head, "check-type") {
+            declarations::narrow_check_type(view, ctx.bindings, builder);
+            return record(builder, view, folded);
+        }
+        if common_lisp_operator_head_eq(head, "the") {
+            let asserted = the_asserted_type(view);
+            if let Some(form) = view.children.get(2) {
+                infer_view(ctx, narrowing, form, builder);
+            }
+            return record(builder, view, combine(asserted, folded));
+        }
+    }
+    if ctx.dialect == Dialect::EmacsLisp && head == "defcustom" {
+        // Mirrors `the`, narrowing one form rather than a binding: a
+        // `defcustom` name has no `BindingId` this layer's narrowing can
+        // attach to (see `emacs_lisp_declarations`'s module doc), so the
+        // `:type` option instead narrows the initial-value expression
+        // directly.
+        let asserted = emacs_lisp_declarations::defcustom_declared_type(view);
+        if let Some(value) = view.children.get(2) {
+            let inferred = infer_view(ctx, narrowing, value, builder).as_known();
+            if let Some(ty) = combine(asserted, inferred) {
+                record(builder, value, Some(ty));
+            }
+        }
+        return record(builder, view, folded);
     }
     if let Some(form) = narrowing::classify(head) {
         let merged = narrowing::infer(ctx, narrowing, form, view, builder);
@@ -256,10 +290,14 @@ mod tests {
     }
 
     fn analyze(input: &str) -> Analysis {
-        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("parse");
-        let bindings = build_binding_table(Dialect::CommonLisp, &tree, input);
-        let values = build_value_table(Dialect::CommonLisp, &tree, &bindings);
-        let types = build_type_table(Dialect::CommonLisp, &tree, &bindings, &values);
+        analyze_as(input, Dialect::CommonLisp)
+    }
+
+    fn analyze_as(input: &str, dialect: Dialect) -> Analysis {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse");
+        let bindings = build_binding_table(dialect, &tree, input);
+        let values = build_value_table(dialect, &tree, &bindings);
+        let types = build_type_table(dialect, &tree, &bindings, &values);
         Analysis {
             tree,
             source: input.to_owned(),
@@ -454,5 +492,81 @@ mod tests {
             type_of(&analysis, "(typecase x (string x) (integer x))"),
             Type::Known(Ty::Top)
         );
+    }
+
+    #[test]
+    fn emacs_lisp_is_no_longer_an_empty_table() {
+        let analysis = analyze_as(
+            "(defcustom my-count 0 \"doc\" :type 'integer)",
+            Dialect::EmacsLisp,
+        );
+        assert!(analysis.types.expression_count() > 0);
+    }
+
+    #[test]
+    fn a_cl_defstruct_accessor_return_type_is_known_at_the_call_site() {
+        let analysis = analyze_as(
+            "(cl-defstruct point (x 0 :type integer)) (defun f (p) (point-x p))",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(type_of(&analysis, "(point-x p)"), Type::Known(Ty::Integer));
+    }
+
+    #[test]
+    fn a_defcustom_type_narrows_an_otherwise_unknown_initial_value() {
+        let analysis = analyze_as(
+            "(defun compute () 1) (defcustom my-count (compute) \"doc\" :type 'integer)",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(type_of(&analysis, "(compute)"), Type::Known(Ty::Integer));
+    }
+
+    #[test]
+    fn a_defcustom_type_contradicting_a_known_literal_meets_at_the_bottom_type() {
+        let analysis = analyze_as(
+            "(defcustom my-count \"zero\" \"doc\" :type 'integer)",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(type_of(&analysis, "\"zero\""), Type::Known(Ty::Bottom));
+    }
+
+    #[test]
+    fn emacs_lisp_declare_is_not_read_as_a_common_lisp_type_declaration() {
+        // Emacs Lisp's own `(declare (indent 1))` shares Common Lisp's
+        // `declare` head spelling but declares indentation metadata, not a
+        // type — `indent` must not be mistaken for a decl-spec head.
+        let analysis = analyze_as(
+            "(defmacro m (x) (declare (indent 1)) x)",
+            Dialect::EmacsLisp,
+        );
+        assert_eq!(type_of(&analysis, "(declare (indent 1))"), Type::Unknown);
+    }
+
+    #[test]
+    fn common_lisp_the_and_check_type_still_work_after_the_dialect_split() {
+        let analysis = analyze("(defun f (x) (check-type x integer) (the integer x))");
+        assert_eq!(
+            type_of(&analysis, "(the integer x)"),
+            Type::Known(Ty::Integer)
+        );
+    }
+
+    #[test]
+    fn a_scheme_record_predicate_return_type_is_known_at_the_call_site() {
+        let analysis = analyze_as(
+            "(define-record-type point (make-point x y) point? (x point-x)) \
+             (define (f p) (point? p))",
+            Dialect::Scheme,
+        );
+        assert_eq!(type_of(&analysis, "(point? p)"), Type::Known(Ty::Boolean));
+    }
+
+    #[test]
+    fn a_typed_racket_annotation_return_type_is_known_at_the_call_site() {
+        let analysis = analyze_as(
+            "(: convert (-> Integer String)) (define (f x) (convert x))",
+            Dialect::Racket,
+        );
+        assert_eq!(type_of(&analysis, "(convert x)"), Type::Known(Ty::String));
     }
 }

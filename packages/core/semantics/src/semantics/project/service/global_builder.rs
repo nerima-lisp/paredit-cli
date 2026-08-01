@@ -95,7 +95,10 @@ fn record_constant(
     // reads a symbol. Looking one up by the spelling at the definition site
     // would miss a file that writes `+LIMIT+` where the table holds `+limit+`
     // folded — and, worse, would only miss it sometimes.
-    let Some(name) = constant_key(text) else {
+    //
+    // `build_global_table` is Common Lisp only (see its own gate above this
+    // module's call chain), so the key is always folded the Common Lisp way.
+    let Some(name) = constant_key(Dialect::CommonLisp, text) else {
         return;
     };
     if let Some(value) = file.values.constant_value(&name) {

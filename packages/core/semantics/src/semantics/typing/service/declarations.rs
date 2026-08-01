@@ -134,6 +134,13 @@ fn resolve_declared_name(bindings: &BindingTable, name: &str, at: ByteSpan) -> O
 /// Only the unambiguous three-element `(function (arg-types…) RETURN)` shape
 /// is modelled; a `function` type-specifier with no return type, or a
 /// compound return type, is skipped rather than guessed at.
+///
+/// The dialect gate below is load-bearing, not defensive filler: Emacs Lisp
+/// also has type inference now (see `policy::supports_type_inference`), but
+/// `declaim`/`proclaim` `ftype` is Common Lisp's own declaration syntax, so
+/// this stays scoped to `Dialect::CommonLisp` rather than widening alongside
+/// the central gate. Emacs Lisp's own declared-return source is
+/// `emacs_lisp_declarations::collect_declared_returns`.
 pub(super) fn collect_declared_returns(dialect: Dialect, tree: &SyntaxTree) -> HashMap<String, Ty> {
     let mut table = HashMap::new();
     if dialect != Dialect::CommonLisp {

@@ -70,8 +70,10 @@ fn evaluate_atom(
     bindings: &BindingTable,
     values: &ValueTable,
 ) -> Value {
-    literal_value(dialect, view)
-        .map_or_else(|| resolve_reference(view, bindings, values), Value::Known)
+    literal_value(dialect, view).map_or_else(
+        || resolve_reference(dialect, view, bindings, values),
+        Value::Known,
+    )
 }
 
 /// The value of a symbol occurrence, resolved by *position* rather than by
@@ -81,8 +83,14 @@ fn evaluate_atom(
 /// binding table knows which one an occurrence means — a name lookup would
 /// substitute the wrong value under shadowing. The name-keyed fallback is
 /// reached only when position resolution fails, which is the case for a
-/// file-level `defconstant` that no binding form introduced.
-fn resolve_reference(view: &ExpressionView, bindings: &BindingTable, values: &ValueTable) -> Value {
+/// file-level constant (`defconstant`, Emacs Lisp's `defconst`/`defcustom`)
+/// that no binding form introduced.
+fn resolve_reference(
+    dialect: Dialect,
+    view: &ExpressionView,
+    bindings: &BindingTable,
+    values: &ValueTable,
+) -> Value {
     let Some(span) = atom_symbol_span(view) else {
         return Value::Unknown;
     };
@@ -94,25 +102,30 @@ fn resolve_reference(view: &ExpressionView, bindings: &BindingTable, values: &Va
     }
 
     atom_symbol_text(view)
-        .and_then(constant_key)
+        .and_then(|text| constant_key(dialect, text))
         .and_then(|name| values.constant_value(&name).cloned())
         .map_or(Value::Unknown, |value| Value::Known(value.into()))
 }
 
 /// The key a file-level constant is stored and looked up under.
 ///
-/// Folded the way the reader folds a symbol, so `+limit+` and `+LIMIT+` are
-/// one constant — they name the same symbol, and keying on the raw spelling
-/// made a reference in the other case fail to resolve. It is also what lets a
-/// constant arriving from the project table, whose names are already folded,
-/// be found by a reference written in any case.
+/// Common Lisp folds the way the reader folds a symbol, so `+limit+` and
+/// `+LIMIT+` are one constant — they name the same symbol, and keying on the
+/// raw spelling made a reference in the other case fail to resolve. It is
+/// also what lets a constant arriving from the project table, whose names are
+/// already folded, be found by a reference written in any case.
 ///
-/// Only Common Lisp populates the constant map at all, so folding here cannot
-/// affect a dialect whose symbols are case-sensitive: their map is empty and
-/// every lookup misses either way.
+/// Every other dialect that populates the constant map reads symbols
+/// case-sensitively and has no package qualifiers to strip, so the raw
+/// spelling *is* the key — folding it the Common Lisp way would fold two
+/// distinct Emacs Lisp symbols together, or fail to match a constant against
+/// its own defining occurrence.
 #[must_use]
-pub fn constant_key(text: &str) -> Option<SymbolName> {
-    SymbolName::new(common_lisp_symbol_reference_needle(text)).ok()
+pub fn constant_key(dialect: Dialect, text: &str) -> Option<SymbolName> {
+    match dialect {
+        Dialect::CommonLisp => SymbolName::new(common_lisp_symbol_reference_needle(text)).ok(),
+        _ => SymbolName::new(text).ok(),
+    }
 }
 
 fn evaluate_list(

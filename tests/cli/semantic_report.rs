@@ -75,6 +75,95 @@ fn cli_types_passes_the_gate_when_no_declaration_contradicts_inference() {
         .stdout(predicate::str::contains("\"contradiction_count\": 0"));
 }
 
+/// Contradiction detection (`contradicts()`, and a bare `Ty::Bottom` on an
+/// expression) is a pure function of the `Ty` values two sources disagree
+/// about — it carries no dialect gate of its own, so it automatically covers
+/// whatever `--dialect` populates the type table for. Emacs Lisp's
+/// `defcustom` `:type` is the source that can disagree with its own initial
+/// value (see `emacs_lisp_declarations`), the same way Common Lisp's
+/// `declare` disagrees with a propagated value above.
+#[test]
+fn cli_types_pairs_an_emacs_lisp_defcustom_type_against_its_value() {
+    let dir = fresh_temp_dir("inspect-types-elisp");
+    let file = dir.join("core.el");
+    fs::write(
+        &file,
+        "(defcustom my-count \"zero\" \"doc\" :type 'integer)\n",
+    )
+    .expect("write elisp fixture");
+
+    paredit()
+        .args(["inspect", "types", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"))
+        .stdout(predicate::str::contains("\"contradictory\": true"));
+}
+
+#[test]
+fn cli_types_fail_on_contradiction_trips_gate_for_emacs_lisp() {
+    let dir = fresh_temp_dir("inspect-types-elisp-gate");
+    let file = dir.join("core.el");
+    fs::write(
+        &file,
+        "(defcustom my-count \"zero\" \"doc\" :type 'integer)\n",
+    )
+    .expect("write elisp fixture");
+
+    paredit()
+        .args(["inspect", "types", "--fail-on-contradiction"])
+        .arg(&file)
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("type-report policy failed"));
+}
+
+/// Scheme's and Racket's own declaration sources (`define-record-type`
+/// predicates, Racket's Typed Racket `:` annotations — see
+/// `scheme_declarations`) name only a function's return type, never a
+/// binding's, so nothing yet gives one expression two independently-sourced
+/// claims to disagree with each other. `dialect_modelled: true` and a real,
+/// non-empty declared type is still the property worth pinning: the
+/// contradiction machinery is reachable and simply has nothing to report on
+/// correctly-typed code, which is the "clean bill of health" this whole
+/// family exists to tell apart from "not measured".
+#[test]
+fn cli_types_models_scheme_and_racket_without_a_false_positive_contradiction() {
+    let dir = fresh_temp_dir("inspect-types-scheme-racket");
+
+    let scheme = dir.join("core.scm");
+    fs::write(
+        &scheme,
+        "(define-record-type point (make-point x y) point? (x point-x))\n\
+         (define (f p) (point? p))\n",
+    )
+    .expect("write scheme fixture");
+    paredit()
+        .args(["inspect", "types", "--output", "json"])
+        .arg(&scheme)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"))
+        .stdout(predicate::str::contains("\"type\": \"boolean\""))
+        .stdout(predicate::str::contains("\"contradiction_count\": 0"));
+
+    let racket = dir.join("core.rkt");
+    fs::write(
+        &racket,
+        "(: convert (-> Integer String))\n(define (f x) (convert x))\n",
+    )
+    .expect("write racket fixture");
+    paredit()
+        .args(["inspect", "types", "--output", "json"])
+        .arg(&racket)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"))
+        .stdout(predicate::str::contains("\"type\": \"string\""))
+        .stdout(predicate::str::contains("\"contradiction_count\": 0"));
+}
+
 #[test]
 fn cli_narrowing_names_the_binding_the_branch_proves_something_about() {
     paredit()

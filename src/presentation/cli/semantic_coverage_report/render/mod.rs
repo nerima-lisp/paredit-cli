@@ -1,7 +1,9 @@
 use paredit_core_cli::CliResult;
 
 use crate::presentation::cli::OutputFormat;
-use crate::semantic_coverage::{SemanticCoveragePolicy, SemanticCoverageReport};
+use crate::semantic_coverage::{
+    DialectCoveragePolicyReport, SemanticCoveragePolicy, SemanticCoverageReport,
+};
 
 mod json;
 mod text;
@@ -9,12 +11,17 @@ mod text;
 pub(in crate::presentation::cli) fn print_semantic_coverage_report(
     report: &SemanticCoverageReport,
     policy: &SemanticCoveragePolicy,
+    dialect_policy: &DialectCoveragePolicyReport,
     top: usize,
     output: OutputFormat,
 ) -> CliResult<()> {
     match output {
-        OutputFormat::Text => text::print_semantic_coverage_report(report, policy, top),
-        OutputFormat::Json => json::print_semantic_coverage_report(report, policy, top)?,
+        OutputFormat::Text => {
+            text::print_semantic_coverage_report(report, policy, dialect_policy, top);
+        }
+        OutputFormat::Json => {
+            json::print_semantic_coverage_report(report, policy, dialect_policy, top)?;
+        }
     }
 
     Ok(())

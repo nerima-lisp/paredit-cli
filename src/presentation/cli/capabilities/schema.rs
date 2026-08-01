@@ -216,7 +216,7 @@ fn dialect_contract_schema(version: u8) -> Value {
     });
 
     if version >= 3 {
-        for key in ["tiers", "dialect_depth"] {
+        for key in ["tiers", "semantic_layers", "dialect_depth"] {
             schema["required"]
                 .as_array_mut()
                 .expect("required array")
@@ -229,6 +229,16 @@ fn dialect_contract_schema(version: u8) -> Value {
                 "What a command needs from a dialect before its analysis means \
                  anything, from the balanced-parens tree up to the Common Lisp \
                  package and operator model.",
+        });
+        schema["properties"]["semantic_layers"] = json!({
+            "type": "array",
+            "items": { "enum": semantic_layer_values() },
+            "description":
+                "The semantic layers the `common-lisp-semantics` tier's six \
+                 introspection commands (types, narrowing, constants, \
+                 value-propagation, effects, semantic-coverage) are actually \
+                 built from. Each names the field a command with that layer \
+                 carries in `commands[].layer`.",
         });
         schema["properties"]["dialect_depth"] = json!({
             "type": "array",
@@ -305,9 +315,31 @@ fn command_support_schema(version: u8) -> Value {
         schema["properties"]["tier"] = json!({
             "enum": ["syntax", "scope", "common-lisp-family", "common-lisp-semantics"],
         });
+        // Optional, not required: only the six `common-lisp-semantics`-tier
+        // introspection commands (types, narrowing, constants,
+        // value-propagation, effects, semantic-coverage) carry a layer. Every
+        // other command's dialect support is fully named by its tier alone.
+        schema["properties"]["layer"] = json!({
+            "enum": semantic_layer_values(),
+            "description":
+                "Which semantic layer actually decided this command's dialect \
+                 support, for the commands whose tier is \
+                 `common-lisp-semantics`. Absent for every other command.",
+        });
     }
 
     schema
+}
+
+fn semantic_layer_values() -> Value {
+    json!([
+        "typing",
+        "narrowing",
+        "constants",
+        "value-propagation",
+        "effects",
+        "semantic-coverage",
+    ])
 }
 
 #[cfg(test)]

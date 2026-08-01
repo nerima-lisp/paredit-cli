@@ -89,14 +89,114 @@ impl CapabilityTier {
             }
             Self::CommonLispSemantics => dialect == Dialect::CommonLisp,
         };
-        if satisfied {
-            SupportStatus::Supported
-        } else if matches!(category, CommandCategory::Introspection) {
-            SupportStatus::Silent
-        } else {
-            SupportStatus::Unsupported
+        resolve_support_status(satisfied, category)
+    }
+}
+
+/// Turns "does this dialect satisfy what the command needs" into the status
+/// vocabulary, given how the command's category presents an unmet need.
+///
+/// Shared between [`CapabilityTier::status`] and the semantic-layer
+/// predicates below so the two mechanisms cannot disagree about how a
+/// refactor's outright refusal differs from a report's silence.
+const fn resolve_support_status(satisfied: bool, category: CommandCategory) -> SupportStatus {
+    if satisfied {
+        SupportStatus::Supported
+    } else if matches!(category, CommandCategory::Introspection) {
+        SupportStatus::Silent
+    } else {
+        SupportStatus::Unsupported
+    }
+}
+
+/// The semantic layers the `CommonLispSemantics` tier's introspection
+/// commands are actually built from.
+///
+/// Before this enum existed, all six of these commands resolved dialect
+/// support through the single `CommonLispSemantics` bucket, which could only
+/// ever say "Common Lisp or nothing" — there was no way for, say, the typing
+/// layer to support Emacs Lisp while narrowing stayed Common-Lisp-only. Each
+/// layer now owns its own predicate in [`SemanticLayer::supports`], so a
+/// change to one dialect's support for one layer (widening
+/// `supports_type_inference` for Emacs Lisp, for instance) is a one-line edit
+/// here rather than a restructuring of the tier/allowlist machinery above.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SemanticLayer {
+    /// `inspect types`.
+    Typing,
+    /// `inspect narrowing`.
+    Narrowing,
+    /// `inspect constants`.
+    Constants,
+    /// `inspect value-propagation`.
+    ValuePropagation,
+    /// `inspect effects`.
+    Effects,
+    /// `inspect semantic-coverage`.
+    SemanticCoverage,
+}
+
+impl SemanticLayer {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Typing => "typing",
+            Self::Narrowing => "narrowing",
+            Self::Constants => "constants",
+            Self::ValuePropagation => "value-propagation",
+            Self::Effects => "effects",
+            Self::SemanticCoverage => "semantic-coverage",
         }
     }
+
+    /// Whether this layer's own analysis models `dialect`.
+    ///
+    /// Mirrors each layer's own `supports_*`/`dialect_is_modelled` predicate
+    /// exactly, so this matrix cannot drift from the behaviour it reports on.
+    /// Typing and value propagation/constants have widened (see
+    /// `paredit_core_semantics::semantics::typing::policy::supports_type_inference`
+    /// and `...::value::policy::supports_value_propagation`); narrowing and
+    /// narrowing and semantic-coverage stay Common-Lisp-only until their own
+    /// step lands.
+    const fn supports(self, dialect: Dialect) -> bool {
+        match self {
+            Self::Typing => matches!(
+                dialect,
+                Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Racket
+            ),
+            Self::Narrowing => matches!(dialect, Dialect::CommonLisp),
+            Self::Constants | Self::ValuePropagation | Self::Effects => {
+                matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp)
+            }
+            Self::SemanticCoverage => matches!(dialect, Dialect::CommonLisp),
+        }
+    }
+}
+
+const SEMANTIC_LAYER_VALUES: [SemanticLayer; 6] = [
+    SemanticLayer::Typing,
+    SemanticLayer::Narrowing,
+    SemanticLayer::Constants,
+    SemanticLayer::ValuePropagation,
+    SemanticLayer::Effects,
+    SemanticLayer::SemanticCoverage,
+];
+
+/// The six `CommonLispSemantics`-tier introspection commands, paired with the
+/// layer whose predicate actually decides their dialect support.
+const INTROSPECTION_SEMANTIC_LAYERS: [(&str, SemanticLayer); 6] = [
+    ("inspect types", SemanticLayer::Typing),
+    ("inspect narrowing", SemanticLayer::Narrowing),
+    ("inspect constants", SemanticLayer::Constants),
+    ("inspect value-propagation", SemanticLayer::ValuePropagation),
+    ("inspect effects", SemanticLayer::Effects),
+    ("inspect semantic-coverage", SemanticLayer::SemanticCoverage),
+];
+
+fn introspection_semantic_layer(command_path: &str) -> Option<SemanticLayer> {
+    INTROSPECTION_SEMANTIC_LAYERS
+        .iter()
+        .find(|(path, _)| *path == command_path)
+        .map(|(_, layer)| *layer)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -748,7 +848,14 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         // claiming it would refuse.
         Some(false) if matches!(category, CommandCategory::Introspection) => SupportStatus::Silent,
         Some(false) => SupportStatus::Unsupported,
-        None => capability_tier(command_path, category).status(dialect, category),
+        // The six `CommonLispSemantics`-tier introspection commands answer
+        // through their own semantic layer's predicate rather than the flat
+        // tier check, so widening one layer's dialect support never touches
+        // the others.
+        None => match introspection_semantic_layer(command_path) {
+            Some(layer) => resolve_support_status(layer.supports(dialect), category),
+            None => capability_tier(command_path, category).status(dialect, category),
+        },
     }
 }
 
@@ -791,6 +898,9 @@ pub(super) fn dialect_contract_report(schema_version: u8) -> Value {
                 if schema_version >= 3 {
                     report["tier"] =
                         Value::String(capability_tier(path, *category).as_str().to_owned());
+                    if let Some(layer) = introspection_semantic_layer(path) {
+                        report["layer"] = Value::String(layer.as_str().to_owned());
+                    }
                 }
                 report
             })
@@ -814,6 +924,7 @@ pub(super) fn dialect_contract_report(schema_version: u8) -> Value {
     });
     if schema_version >= 3 {
         report["tiers"] = json!(TIER_VALUES.map(CapabilityTier::as_str));
+        report["semantic_layers"] = json!(SEMANTIC_LAYER_VALUES.map(SemanticLayer::as_str));
         report["dialect_depth"] = dialect_depth_report();
     }
     report
@@ -1088,5 +1199,106 @@ mod tests {
                 status == SupportStatus::Supported
             );
         }
+    }
+
+    /// Each of the six `common-lisp-semantics`-tier introspection commands
+    /// resolves through its own [`SemanticLayer`], not the flat tier bucket —
+    /// this is the mechanism FR-001 introduced so steps 2-6 can each widen one
+    /// layer's dialect support without touching `capability_tier` or its
+    /// allowlist arrays again.
+    #[test]
+    fn introspection_semantic_commands_resolve_through_their_own_layer() {
+        for (path, layer) in INTROSPECTION_SEMANTIC_LAYERS {
+            assert_eq!(
+                capability_tier(path, CommandCategory::Introspection),
+                CapabilityTier::CommonLispSemantics,
+                "{path} is expected to sit in the common-lisp-semantics tier"
+            );
+            for dialect in DIALECTS {
+                let parsed = dialect.parse::<Dialect>().expect("known dialect");
+                let expected =
+                    resolve_support_status(layer.supports(parsed), CommandCategory::Introspection);
+                assert_eq!(
+                    support_status(path, dialect),
+                    expected,
+                    "{path} / {dialect} should follow its {layer:?} layer"
+                );
+            }
+        }
+    }
+
+    /// Pins each layer's dialect support to exactly what FR-001 through
+    /// FR-005 have widened it to, so a future step that flips one arm without
+    /// updating its own tests still trips this one.
+    #[test]
+    fn semantic_layers_support_exactly_their_declared_dialects() {
+        let expectations: [(SemanticLayer, &[Dialect]); 6] = [
+            // FR-002/FR-003: Common Lisp, Emacs Lisp, Scheme, Racket typing.
+            (
+                SemanticLayer::Typing,
+                &[
+                    Dialect::CommonLisp,
+                    Dialect::EmacsLisp,
+                    Dialect::Scheme,
+                    Dialect::Racket,
+                ],
+            ),
+            (SemanticLayer::Narrowing, &[Dialect::CommonLisp]),
+            // FR-004: Common Lisp, Emacs Lisp constant folding/propagation.
+            (
+                SemanticLayer::Constants,
+                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+            ),
+            (
+                SemanticLayer::ValuePropagation,
+                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+            ),
+            // FR-005: Common Lisp, Emacs Lisp effects.
+            (
+                SemanticLayer::Effects,
+                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+            ),
+            (SemanticLayer::SemanticCoverage, &[Dialect::CommonLisp]),
+        ];
+        for (layer, expected) in expectations {
+            for dialect in DIALECTS {
+                let parsed = dialect.parse::<Dialect>().expect("known dialect");
+                assert_eq!(
+                    layer.supports(parsed),
+                    expected.contains(&parsed),
+                    "{layer:?} / {dialect}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dialect_contract_report_names_the_layer_behind_each_semantic_command() {
+        let report = dialect_contract_report(3);
+        let commands = report["commands"].as_array().expect("commands");
+        let layered_paths: std::collections::BTreeSet<&str> = INTROSPECTION_SEMANTIC_LAYERS
+            .iter()
+            .map(|(path, _)| *path)
+            .collect();
+
+        for command in commands {
+            let path = command["path"].as_str().expect("path");
+            if layered_paths.contains(path) {
+                let expected = introspection_semantic_layer(path)
+                    .expect("layered path")
+                    .as_str();
+                assert_eq!(command["layer"], expected, "{path}");
+            } else {
+                assert!(
+                    command.get("layer").is_none(),
+                    "{path} should carry no layer"
+                );
+            }
+        }
+
+        let semantic_layers = report["semantic_layers"]
+            .as_array()
+            .expect("semantic_layers");
+        assert_eq!(semantic_layers.len(), SEMANTIC_LAYER_VALUES.len());
     }
 }

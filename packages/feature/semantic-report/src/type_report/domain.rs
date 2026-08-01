@@ -154,7 +154,7 @@ pub fn build_type_report(file: &SemanticFile) -> TypeReportFile {
     TypeReportFile {
         path: file.path.clone(),
         dialect: file.dialect,
-        dialect_modelled: file.dialect_is_modelled(),
+        dialect_modelled: file.typing_dialect_supported(),
         bindings,
         expressions,
         untyped_binding_count,
@@ -177,6 +177,19 @@ fn typed_binding(binding: &Binding, declared: Type, inferred: Type, source: &str
 ///
 /// Both must be known: `Unknown` makes no claim, so it cannot contradict one.
 /// `Bottom` on either side is already a contradiction the layer recorded.
+///
+/// Dialect-agnostic by construction, and deliberately so: it is a pure
+/// function of the `Ty` values two sources disagree about, with no gate of
+/// its own. It therefore automatically covers whatever
+/// `typing::service::build_type_table` populates for a dialect — Common
+/// Lisp's `declare`/`check-type` against a propagated value, or Emacs Lisp's
+/// `cl-defstruct`/`defcustom` declarations against theirs — without needing
+/// to be told which dialect it is looking at. Scheme's and Racket's own
+/// declaration sources (`define-record-type` predicates, Typed Racket's `:`
+/// annotations) only ever name a *function's* declared return type, not a
+/// binding's, so nothing yet gives one expression two independently-sourced
+/// claims to disagree with — this function would still catch it the moment
+/// something does.
 fn contradicts(declared: Type, inferred: Type) -> bool {
     match (declared.as_known(), inferred.as_known()) {
         (Some(declared), Some(inferred)) => meet(declared, inferred) == Ty::Bottom,
@@ -331,6 +344,79 @@ mod tests {
         assert!(!report.dialect_modelled);
         assert!(report.bindings.is_empty());
         assert!(report.expressions.is_empty());
+    }
+
+    /// The typing layer's first real Emacs Lisp assertion: `cl-defstruct`
+    /// slot types and `defcustom`'s `:type` both declare something, and the
+    /// report has to say `dialect_modelled: true` and print it — not fall
+    /// back to the narrowing/constant/effect layers' still-Common-Lisp-only
+    /// `dialect_is_modelled`.
+    #[test]
+    fn an_emacs_lisp_file_is_modelled_and_reports_real_declared_types() {
+        let report = report_of(
+            "(cl-defstruct point (x 0 :type integer)) \
+             (defun f (p) (point-x p)) \
+             (defcustom my-count \"zero\" \"doc\" :type 'integer)",
+            Dialect::EmacsLisp,
+        );
+        assert!(report.dialect_modelled);
+
+        let accessor_call = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "(point-x p)")
+            .unwrap_or_else(|| panic!("no (point-x p) expression in {report:?}"));
+        assert_eq!(accessor_call.ty, Ty::Integer);
+        assert!(!accessor_call.contradictory);
+
+        // The `defcustom`'s `:type integer` disagrees with its own `"zero"`
+        // initial value, so the value expression records the poison meet —
+        // exactly the CL `declare`-vs-value contradiction this report was
+        // built to surface, now for Emacs Lisp too.
+        let contradictory_value = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "\"zero\"")
+            .unwrap_or_else(|| panic!("no \"zero\" expression in {report:?}"));
+        assert_eq!(contradictory_value.ty, Ty::Bottom);
+        assert!(contradictory_value.contradictory);
+    }
+
+    /// Scheme's `define-record-type` predicate is the one thing this layer
+    /// declares for Scheme: it always answers a boolean, by construction.
+    #[test]
+    fn a_scheme_file_is_modelled_and_reports_a_record_predicates_return_type() {
+        let report = report_of(
+            "(define-record-type point (make-point x y) point? (x point-x)) \
+             (define (f p) (point? p))",
+            Dialect::Scheme,
+        );
+        assert!(report.dialect_modelled);
+        let predicate_call = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "(point? p)")
+            .unwrap_or_else(|| panic!("no (point? p) expression in {report:?}"));
+        assert_eq!(predicate_call.ty, Ty::Boolean);
+        assert!(!predicate_call.contradictory);
+    }
+
+    /// Racket gets both Scheme's `define-record-type` predicate and its own
+    /// Typed Racket `(: name (-> …))` function annotation.
+    #[test]
+    fn a_racket_file_is_modelled_and_reports_a_typed_racket_annotations_return_type() {
+        let report = report_of(
+            "(: convert (-> Integer String)) (define (f x) (convert x))",
+            Dialect::Racket,
+        );
+        assert!(report.dialect_modelled);
+        let call = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "(convert x)")
+            .unwrap_or_else(|| panic!("no (convert x) expression in {report:?}"));
+        assert_eq!(call.ty, Ty::String);
+        assert!(!call.contradictory);
     }
 
     #[test]

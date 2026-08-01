@@ -48,10 +48,54 @@ impl SemanticFile {
     ///
     /// A report must print this rather than an empty finding list: the two
     /// look identical to a consumer, and only one of them means "nothing to
-    /// report here".
+    /// report here". This is `narrowing_report`'s own predicate — the last
+    /// of the six introspection layers still not widened past Common Lisp;
+    /// typing, value propagation, and effects have each widened ahead of it
+    /// (see [`Self::typing_dialect_supported`],
+    /// [`Self::value_dialect_supported`], [`Self::effect_dialect_supported`])
+    /// and must not consult this one.
     #[must_use]
     pub fn dialect_is_modelled(&self) -> bool {
         self.dialect == Dialect::CommonLisp
+    }
+
+    /// Whether the typing layer specifically models this file's dialect.
+    ///
+    /// Split from [`Self::dialect_is_modelled`] because the typing layer's own
+    /// gate (`supports_type_inference`) can widen to a dialect ahead of
+    /// `narrowing_report` below it, which still answers only for Common Lisp
+    /// until its own step lands and must keep consulting
+    /// `dialect_is_modelled` rather than this predicate.
+    #[must_use]
+    pub const fn typing_dialect_supported(&self) -> bool {
+        paredit_core_semantics::semantics::typing::policy::supports_type_inference(self.dialect)
+    }
+
+    /// Whether the value layer (constant folding and propagation)
+    /// specifically models this file's dialect.
+    ///
+    /// Split from [`Self::dialect_is_modelled`] the same way
+    /// [`Self::typing_dialect_supported`] is: the value layer's own gate
+    /// (`supports_value_propagation`) has widened to Emacs Lisp ahead of
+    /// `narrowing_report`, which must keep consulting `dialect_is_modelled`.
+    #[must_use]
+    pub const fn value_dialect_supported(&self) -> bool {
+        paredit_core_semantics::semantics::value::policy::supports_value_propagation(self.dialect)
+    }
+
+    /// Whether `effect_report` specifically models this file's dialect.
+    ///
+    /// Split from [`Self::dialect_is_modelled`] for the same reason as
+    /// [`Self::typing_dialect_supported`]: unlike the typing and value
+    /// layers, `effect_report`'s own analysis
+    /// (`effect_report::domain::policy::head_effect`) carries no dialect gate
+    /// of its own — it already computes a verdict for every dialect
+    /// unconditionally — so this predicate is what decides whether that
+    /// verdict is trustworthy enough to print, not what decides whether the
+    /// analysis runs.
+    #[must_use]
+    pub const fn effect_dialect_supported(&self) -> bool {
+        matches!(self.dialect, Dialect::CommonLisp | Dialect::EmacsLisp)
     }
 }
 

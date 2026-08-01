@@ -321,12 +321,18 @@ fn fixture_source(dialect: &str) -> (&'static str, String) {
 /// Each entry is the command and the arguments that select something in the
 /// fixture, so a claim of `supported` is checked by running the command rather
 /// than by trusting the table that produced it.
-const SAMPLED_COMMANDS: [(&str, &[&str]); 11] = [
+const SAMPLED_COMMANDS: [(&str, &[&str]); 12] = [
     ("inspect outline", &[]),
     ("inspect definitions", &[]),
     ("inspect lint", &[]),
     ("inspect redundant-progn", &[]),
     ("inspect packages", &[]),
+    // The `common-lisp-semantics` tier's introspection family, whose dialect
+    // support is now decided per semantic layer (see `contract.rs`'s
+    // `SemanticLayer`) rather than by one flat bucket. Sampling one of the
+    // six catches a layer widening one dialect's support without updating
+    // this file, which the rest of this test would otherwise miss entirely.
+    ("inspect types", &[]),
     ("edit select", &["--path", "0"]),
     ("refactor convert-let-to-let-star", &["--path", "0.3"]),
     ("refactor convert-labels-to-flet", &["--path", "0"]),
