@@ -3091,3 +3091,197 @@ fn cli_lint_explain_still_rejects_an_unknown_rule_with_custom_rules_loaded() {
 fn json_stdout_or_text(assert: assert_cmd::assert::Assert) -> String {
     String::from_utf8(assert.get_output().stdout.clone()).expect("UTF-8 stdout")
 }
+
+// ---------------------------------------------------------------------------
+// --suggest-severity (FR-E9)
+// ---------------------------------------------------------------------------
+
+/// A currently-`error` rule firing on every scanned file suggests demoting it
+/// to `warning`, and a currently-`warning` rule that never fires at all
+/// suggests promoting it to `error`. `self-assignment` and `manual-incf` are
+/// each real shipped rules at those severities (see `--list-rules`).
+#[test]
+fn cli_lint_suggest_severity_flags_both_directions() {
+    let dir = fresh_temp_dir("lint-suggest-severity");
+    let a = dir.join("a.lisp");
+    let b = dir.join("b.lisp");
+    // self-assignment (error) fires in both files; manual-incf (warning)
+    // never fires anywhere in this workspace.
+    fs::write(&a, "(defun foo (x) (setf x x) (setf x x))\n").expect("write a.lisp");
+    fs::write(&b, "(defun bar (y) (setf y y))\n").expect("write b.lisp");
+
+    let stdout = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--suggest-severity",
+            "--rule",
+            "self-assignment",
+            "--rule",
+            "manual-incf",
+            "--output",
+            "json",
+        ])
+        .arg(&dir)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let report: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+    assert_eq!(report["files_scanned"], 2);
+    assert_eq!(report["suggestion_count"], 2);
+
+    let suggestions = report["suggestions"].as_array().expect("suggestions array");
+    let by_rule = |rule: &str| {
+        suggestions
+            .iter()
+            .find(|entry| entry["rule"] == rule)
+            .unwrap_or_else(|| panic!("no suggestion for {rule}"))
+    };
+
+    let self_assignment = by_rule("self-assignment");
+    assert_eq!(self_assignment["current_severity"], "error");
+    assert_eq!(self_assignment["suggested_severity"], "warning");
+    assert_eq!(self_assignment["finding_count"], 3);
+    assert_eq!(self_assignment["files_with_finding"], 2);
+    assert_eq!(self_assignment["density_bucket"], "very high");
+
+    let manual_incf = by_rule("manual-incf");
+    assert_eq!(manual_incf["current_severity"], "warning");
+    assert_eq!(manual_incf["suggested_severity"], "error");
+    assert_eq!(manual_incf["finding_count"], 0);
+    assert_eq!(manual_incf["density_bucket"], "never");
+}
+
+/// A rule whose severity already matches its firing rate (an `error` rule
+/// that never fires, the ordinary case for a rule that catches real bugs)
+/// gets no suggestion.
+#[test]
+fn cli_lint_suggest_severity_omits_rules_whose_severity_already_fits() {
+    let dir = fresh_temp_dir("lint-suggest-severity-quiet");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun add (a b) (+ a b))\n").expect("write a.lisp");
+
+    let stdout = paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--suggest-severity",
+            "--rule",
+            "self-assignment",
+            "--output",
+            "json",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let report: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+    assert_eq!(report["suggestion_count"], 0);
+    assert_eq!(report["suggestions"].as_array().unwrap().len(), 0);
+}
+
+/// The text rendering prints the same prose message documented for
+/// `--suggest-severity`, not just a machine-readable JSON shape.
+#[test]
+fn cli_lint_suggest_severity_text_output_is_prose() {
+    let dir = fresh_temp_dir("lint-suggest-severity-text");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun foo (x) (setf x x))\n").expect("write a.lisp");
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--suggest-severity",
+            "--rule",
+            "self-assignment",
+            "--output",
+            "text",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "rule self-assignment: 1 finding(s) across 1 file(s) (very high density) -- consider Warning instead of Error",
+        ));
+}
+
+/// **Critical invariant**: `--suggest-severity` is advisory-only. It must
+/// never write `paredit.toml` (byte-identical before and after), and it must
+/// never change the exit code a subsequent, ordinary `inspect lint` run gets —
+/// whether that run passes or fails its own gate.
+#[test]
+fn cli_lint_suggest_severity_never_writes_config_or_changes_gate_exit_code() {
+    let dir = fresh_temp_dir("lint-suggest-severity-invariant");
+    let file = dir.join("a.lisp");
+    // Fires self-assignment (error), which trips --fail-on-finding.
+    fs::write(&file, "(defun foo (x) (setf x x))\n").expect("write a.lisp");
+
+    let config = dir.join("paredit.toml");
+    let config_contents = "[lint]\npreset = \"recommended\"\n";
+    fs::write(&config, config_contents).expect("write paredit.toml");
+    let config_before = fs::read(&config).expect("read paredit.toml before");
+
+    // A normal run's gate outcome, taken before --suggest-severity ever runs.
+    let exit_code_before = paredit()
+        .args(["inspect", "lint", "--fail-on-finding"])
+        .arg(&file)
+        .assert()
+        .code(3)
+        .get_output()
+        .status
+        .code();
+
+    // --suggest-severity itself must exit 0 regardless of what it finds, and
+    // must not touch paredit.toml.
+    paredit()
+        .args(["inspect", "lint", "--suggest-severity", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success();
+
+    let config_after = fs::read(&config).expect("read paredit.toml after");
+    assert_eq!(
+        config_before, config_after,
+        "--suggest-severity must never mutate paredit.toml"
+    );
+
+    // The same ordinary run, after --suggest-severity, must trip the same
+    // gate the same way.
+    let exit_code_after = paredit()
+        .args(["inspect", "lint", "--fail-on-finding"])
+        .arg(&file)
+        .assert()
+        .code(3)
+        .get_output()
+        .status
+        .code();
+
+    assert_eq!(
+        exit_code_before, exit_code_after,
+        "--suggest-severity must not change a later ordinary run's exit code"
+    );
+}
+
+/// `--suggest-severity` is mutually exclusive with `--stats`, matching the
+/// other single-purpose report modes on this command (`--fix`, `--sarif`,
+/// `--github`, `--list-rules`).
+#[test]
+fn cli_lint_suggest_severity_conflicts_with_stats() {
+    let dir = fresh_temp_dir("lint-suggest-severity-conflict");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(list '5)\n").expect("write a.lisp");
+
+    paredit()
+        .args(["inspect", "lint", "--suggest-severity", "--stats"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .code(2);
+}

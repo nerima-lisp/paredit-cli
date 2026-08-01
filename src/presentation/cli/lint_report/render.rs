@@ -786,6 +786,148 @@ pub(super) fn print_lint_stats(stats: &LintStats, output: OutputFormat) -> CliRe
     Ok(())
 }
 
+/// How often a rule fired relative to the scanned workspace, for
+/// `--suggest-severity`. Bucketed at round order-of-magnitude cutoffs rather
+/// than a continuous score, because this is advisory guidance a human reads
+/// and judges, not a scored model with a claim to precision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DensityBucket {
+    /// One or more findings per file scanned, on average.
+    VeryHigh,
+    /// At least one finding per ten files.
+    High,
+    /// At least one finding per hundred files.
+    Moderate,
+    /// At least one finding per thousand files.
+    Low,
+    /// Fired, but on fewer than one file in a thousand.
+    VeryLow,
+    /// Fired on none of the scanned files.
+    Never,
+}
+
+impl DensityBucket {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::VeryHigh => "very high",
+            Self::High => "high",
+            Self::Moderate => "moderate",
+            Self::Low => "low",
+            Self::VeryLow => "very low",
+            Self::Never => "never",
+        }
+    }
+}
+
+/// The title-case spelling of a severity, for a prose suggestion sentence
+/// (`rule_severity(rule).as_str()` is lowercase, matching `--fail-on`'s
+/// vocabulary instead).
+const fn severity_title(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Error => "Error",
+        Severity::Warning => "Warning",
+    }
+}
+
+/// One rule's severity suggestion for `--suggest-severity`: how often it fired
+/// across the scanned workspace, and — only when its density and current
+/// severity disagree — the severity its firing rate suggests instead.
+pub(super) struct SeverityDensitySuggestion {
+    pub rule: &'static str,
+    pub category: Option<&'static str>,
+    pub current_severity: Severity,
+    pub suggested_severity: Severity,
+    pub finding_count: usize,
+    /// Distinct files this rule fired on at least once.
+    pub files_with_finding: usize,
+    /// Total files scanned this run (the density's denominator).
+    pub files_scanned: usize,
+    /// `finding_count / files_scanned`: findings per file across the whole
+    /// scanned workspace. Chosen over findings-per-KLOC because it needs no
+    /// line count, reads as "roughly 1 in every N files" without translation,
+    /// and is not skewed by a handful of unusually long files the way a
+    /// per-line rate would be.
+    pub density: f64,
+    pub bucket: DensityBucket,
+}
+
+impl SeverityDensitySuggestion {
+    /// The one-line, human-readable suggestion, shared by the text and JSON
+    /// renderings so a caller reading either sees the same reasoning spelled
+    /// out.
+    fn message(&self) -> String {
+        if self.finding_count == 0 {
+            format!(
+                "rule {}: 0 findings across {} files scanned (never fired) -- consider {} instead of {}",
+                self.rule,
+                self.files_scanned,
+                severity_title(self.suggested_severity),
+                severity_title(self.current_severity),
+            )
+        } else {
+            format!(
+                "rule {}: {} finding(s) across {} file(s) ({} density) -- consider {} instead of {}",
+                self.rule,
+                self.finding_count,
+                self.files_with_finding,
+                self.bucket.as_str(),
+                severity_title(self.suggested_severity),
+                severity_title(self.current_severity),
+            )
+        }
+    }
+}
+
+/// Prints the `--suggest-severity` report: one line per rule whose firing
+/// rate disagrees with its currently declared severity, in each case naming
+/// the severity the density suggests instead. Advisory only — see
+/// [`SeverityDensitySuggestion`] for the formula and
+/// [`crate::presentation::cli::lint_report::workflow::lint_report_suggest_severity`]
+/// for why this can never affect a gate: it computes from findings already
+/// collected for a normal scan and never touches `paredit.toml`.
+pub(super) fn print_lint_suggest_severity(
+    suggestions: &[SeverityDensitySuggestion],
+    files_scanned: usize,
+    output: OutputFormat,
+) -> CliResult<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("files_scanned\t{files_scanned}");
+            println!("suggestion_count\t{}", suggestions.len());
+            for entry in suggestions {
+                println!("{}", safe_text!(entry.message()));
+            }
+        }
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "schema_version": 1,
+                    "files_scanned": files_scanned,
+                    "suggestion_count": suggestions.len(),
+                    "suggestions": suggestions
+                        .iter()
+                        .map(|entry| json!({
+                            "rule": entry.rule,
+                            "category": entry.category,
+                            "current_severity": entry.current_severity.as_str(),
+                            "suggested_severity": entry.suggested_severity.as_str(),
+                            "finding_count": entry.finding_count,
+                            "files_with_finding": entry.files_with_finding,
+                            "files_scanned": entry.files_scanned,
+                            "density": entry.density,
+                            "density_bucket": entry.bucket.as_str(),
+                            "message": entry.message(),
+                        }))
+                        .collect::<Vec<_>>(),
+                }))?
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Reports inline `; paredit:ignore` directives that silenced no finding, so a
 /// stale ignore or a typo'd rule name can be removed. `entries` pairs each
 /// file path with one unused directive.
