@@ -110,6 +110,9 @@ impl Walk<'_> {
                 None => false,
             },
             operator if operator.is_defun_like() => self.definition(view, scope, head, operator),
+            operator if operator.is_method_definition() => {
+                self.method_definition(view, scope, head)
+            }
             _ => false,
         }
     }
@@ -442,6 +445,82 @@ impl Walk<'_> {
             }
             None => self.body(body_forms, scope),
         }
+        true
+    }
+
+    /// `defmethod` and `cl-defmethod` (as a Common Lisp form in its own
+    /// right — not the Emacs Lisp handling in `emacs_lisp.rs`, which is an
+    /// independent binder for a different dialect).
+    ///
+    /// Unlike `definition`, this does not fold into `is_defun_like`: a
+    /// method's required parameters may each carry a specializer —
+    /// `(obj my-type)` — and only the parameter name is a binding.
+    /// `definition_shape` already finds the lambda list past any method
+    /// qualifier (`:before`/`:after`/`:around`), so only the specializer
+    /// split is this function's own concern.
+    fn method_definition(&mut self, view: &ExpressionView, scope: ScopeId, head: &str) -> bool {
+        let Some(shape) = definition_shape(self.dialect, view, head) else {
+            return false;
+        };
+        let body_forms = shape.body_forms(view);
+
+        match shape.lambda_list(view) {
+            Some(parameter_form) => {
+                self.common_lisp_method_scope(parameter_form, body_forms, scope, view, head);
+            }
+            None => self.body(body_forms, scope),
+        }
+        true
+    }
+
+    /// A `defmethod` arglist, whose required parameters may be specialized.
+    ///
+    /// `(defmethod handle ((obj my-type) arg) …)` binds `obj` and `arg`.
+    /// `my-type` names the class the method dispatches on — it is read,
+    /// never evaluated, and never bound, matching how `refactor rename-at`
+    /// already treats the same shape. An `eql` specializer such as
+    /// `(x (eql :foo))` has no symbol in specializer position, so it needs
+    /// no special case: skipping the second element skips the whole list.
+    ///
+    /// Only the required section differs from an ordinary lambda list. Once
+    /// `&optional`, `&rest`, or `&key` appears, specializers are no longer
+    /// permitted and the rest of the list is handed to the same per-spec
+    /// walk an ordinary lambda list uses.
+    fn common_lisp_method_scope(
+        &mut self,
+        parameter_form: &ExpressionView,
+        body_forms: &[ExpressionView],
+        scope: ScopeId,
+        target: &ExpressionView,
+        head: &str,
+    ) -> bool {
+        if parameter_form.kind != ExpressionKind::List {
+            return false;
+        }
+
+        let specialized_end = parameter_form
+            .children
+            .iter()
+            .position(|child| head_text(child).is_some_and(|text| text.starts_with('&')))
+            .unwrap_or(parameter_form.children.len());
+
+        let depth = self.stack.depth();
+        let inner = self.builder.open_scope(scope, target.span);
+
+        for parameter in &parameter_form.children[..specialized_end] {
+            // `(obj my-type)` — the name is the first element; `obj` alone is
+            // an unspecialized parameter.
+            let bound =
+                bare_name(parameter).or_else(|| parameter.children.first().and_then(bare_name));
+            if let Some(bound) = bound {
+                self.declare(target, inner, head, &bound, BindingKind::Variable, None);
+            }
+        }
+
+        self.declare_lambda_list_from(parameter_form, inner, target, head, specialized_end);
+
+        self.body(body_forms, inner);
+        self.stack.rewind(depth);
         true
     }
 

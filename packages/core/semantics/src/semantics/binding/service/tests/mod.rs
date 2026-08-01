@@ -7,6 +7,7 @@ use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 use super::build_binding_table;
 
 mod assignments;
+mod common_lisp_defmethod;
 mod differential;
 mod emacs_lisp;
 mod opacity;
