@@ -22,7 +22,7 @@ pub fn lambda_list_keyword_order_report(args: LambdaListKeywordOrderReportArgs) 
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_lambda_list_keyword_order_report(&reports, &policy, args.output)?;
+    print_lambda_list_keyword_order_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

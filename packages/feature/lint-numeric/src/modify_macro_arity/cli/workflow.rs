@@ -20,7 +20,7 @@ pub fn modify_macro_arity_report(args: ModifyMacroArityReportArgs) -> CommandRes
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_modify_macro_arity_report(&reports, &policy, args.output)?;
+    print_modify_macro_arity_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

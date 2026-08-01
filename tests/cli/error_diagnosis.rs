@@ -23,6 +23,11 @@ fn code_of(report: &serde_json::Value) -> &str {
     report["error"]["code"].as_str().expect("code")
 }
 
+fn stderr_of(command: &mut Command) -> String {
+    let stderr = command.assert().failure().get_output().stderr.clone();
+    String::from_utf8(stderr).expect("UTF-8")
+}
+
 #[test]
 fn an_unreachable_path_is_named_and_answered() {
     let file = lisp("diagnosis-path");
@@ -136,6 +141,39 @@ fn a_write_without_a_file_says_which_flag_is_missing() {
         "{text}"
     );
     assert!(text.contains("--file"), "{text}");
+}
+
+/// The JSON envelope has always carried `category_description`; text mode
+/// gets the same paraphrase only when asked for, so the default rendering is
+/// byte-for-byte what it was before the flag existed.
+#[test]
+fn plain_language_adds_the_category_description_to_a_text_failure() {
+    let file = lisp("diagnosis-plain-language");
+    // `edit raise` has no `--output`, so text is the only format it prints.
+    let selection = ["edit", "raise", "--path", "0", "--file"];
+
+    let default = stderr_of(paredit().args(selection).arg(&file));
+    assert!(
+        default.starts_with("Error [input.shape-refused]:"),
+        "{default}"
+    );
+    assert!(
+        !default.contains("the input is not what the operation needs"),
+        "{default}"
+    );
+
+    let explained = stderr_of(paredit().arg("--plain-language").args(selection).arg(&file));
+    assert!(
+        explained.contains("\n  input: the input is not what the operation needs\n"),
+        "{explained}"
+    );
+
+    // One line added, none removed or reworded.
+    let remainder: Vec<&str> = explained
+        .lines()
+        .filter(|line| !line.starts_with("  input: "))
+        .collect();
+    assert_eq!(remainder, default.lines().collect::<Vec<_>>());
 }
 
 /// A tripped gate is not a malfunction: it exits 3, and its category says so.

@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::generic_dispatch_report::usecase::GenericFinding;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_defect_report(
     reports: &[FileFindings<GenericFinding>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect generic-dispatch", reports, policy, output)
+    print_report(
+        "inspect generic-dispatch",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

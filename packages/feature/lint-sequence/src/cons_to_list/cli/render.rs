@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::cons_to_list::usecase::ConsToListItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,7 @@ pub fn print_cons_to_list_report(
     reports: &[FileFindings<ConsToListItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect cons-to-list", reports, policy, output)
+    print_report("inspect cons-to-list", reports, policy, output, verbosity)
 }

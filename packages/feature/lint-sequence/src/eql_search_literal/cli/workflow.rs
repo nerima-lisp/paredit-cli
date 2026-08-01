@@ -20,7 +20,7 @@ pub fn eql_search_literal_report(args: EqlSearchLiteralReportArgs) -> CommandRes
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_eql_search_literal_report(&reports, &policy, args.output)?;
+    print_eql_search_literal_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

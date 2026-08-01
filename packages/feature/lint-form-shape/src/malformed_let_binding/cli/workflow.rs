@@ -20,7 +20,7 @@ pub fn malformed_let_binding_report(args: MalformedLetBindingReportArgs) -> Comm
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_malformed_let_binding_report(&reports, &policy, args.output)?;
+    print_malformed_let_binding_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

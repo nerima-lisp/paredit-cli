@@ -20,7 +20,7 @@ pub fn verbose_negation_report(args: VerboseNegationReportArgs) -> CommandResult
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_verbose_negation_report(&reports, &policy, args.output)?;
+    print_verbose_negation_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

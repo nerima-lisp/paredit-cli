@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::Args;
 
 use paredit_core_cli::args::{DialectArg, ReportFormat};
+use paredit_core_cli::runtime::Verbosity;
 
 #[derive(Debug, Args)]
 pub struct HotspotReportArgs {
@@ -21,4 +22,7 @@ pub struct HotspotReportArgs {
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = ReportFormat::Json)]
     pub output: ReportFormat,
+    /// How much detail the report includes.
+    #[arg(long, value_enum, default_value_t = Verbosity::Normal)]
+    pub verbosity: Verbosity,
 }

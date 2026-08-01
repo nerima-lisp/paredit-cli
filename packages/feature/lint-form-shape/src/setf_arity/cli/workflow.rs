@@ -18,7 +18,7 @@ pub fn setf_arity_report(args: SetfArityReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_setf_arity_report(&reports, &policy, args.output)?;
+    print_setf_arity_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

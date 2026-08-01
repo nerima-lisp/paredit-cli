@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::macro_hygiene_report::usecase::HygieneFinding;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,7 @@ pub fn print_risk_report(
     reports: &[FileFindings<HygieneFinding>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect macro-hygiene", reports, policy, output)
+    print_report("inspect macro-hygiene", reports, policy, output, verbosity)
 }

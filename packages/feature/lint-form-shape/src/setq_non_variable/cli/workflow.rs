@@ -20,7 +20,7 @@ pub fn setq_non_variable_report(args: SetqNonVariableReportArgs) -> CommandResul
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_setq_non_variable_report(&reports, &policy, args.output)?;
+    print_setq_non_variable_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

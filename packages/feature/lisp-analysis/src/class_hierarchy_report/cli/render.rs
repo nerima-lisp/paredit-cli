@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::class_hierarchy_report::usecase::ClassFinding;
 use paredit_core_cli::report::graph::{EdgeStyle, Graph, NodeShape};
@@ -65,6 +66,13 @@ pub fn print_shadowed_slot_report(
     reports: &[FileFindings<ClassFinding>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect class-hierarchy", reports, policy, output)
+    print_report(
+        "inspect class-hierarchy",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

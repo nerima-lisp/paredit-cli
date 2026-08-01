@@ -21,7 +21,7 @@ pub fn read_time_eval_report(args: ReadTimeEvalReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_read_eval_report(&reports, &policy, args.output)?;
+    print_read_eval_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

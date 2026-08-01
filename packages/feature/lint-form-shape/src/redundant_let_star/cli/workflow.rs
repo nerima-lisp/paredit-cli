@@ -20,7 +20,7 @@ pub fn redundant_let_star_report(args: RedundantLetStarReportArgs) -> CommandRes
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_redundant_let_star_report(&reports, &policy, args.output)?;
+    print_redundant_let_star_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

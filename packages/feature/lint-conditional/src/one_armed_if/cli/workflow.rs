@@ -18,7 +18,7 @@ pub fn one_armed_if_report(args: OneArmedIfReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_one_armed_if_report(&reports, &policy, args.output)?;
+    print_one_armed_if_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

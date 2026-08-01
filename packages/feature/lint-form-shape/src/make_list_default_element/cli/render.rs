@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::make_list_default_element::usecase::MakeListDefaultElementItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_make_list_default_element_report(
     reports: &[FileFindings<MakeListDefaultElementItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect make-list-default-element", reports, policy, output)
+    print_report(
+        "inspect make-list-default-element",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

@@ -5,6 +5,7 @@ use super::args::AddIgnoreDeclarationArgs;
 use crate::presentation::cli::shared::{
     expand_input_files, read_input_dialect_and_tree, unified_diff, write_files_with_rollback,
 };
+use paredit_core_cli::color::{Painter, colorize_diff};
 use paredit_feature_function_parameter::unused_parameter_report::domain::{
     IgnoreDeclarationPlan, plan_ignore_declarations,
 };
@@ -30,9 +31,13 @@ pub(in crate::presentation::cli) fn add_ignore_declaration(
     }
 
     if args.diff {
+        let painter = Painter::stdout();
         for (before, plan) in &plans {
             if plan.rewritten != *before {
-                print!("{}", unified_diff(&plan.path, before, &plan.rewritten));
+                print!(
+                    "{}",
+                    colorize_diff(painter, &unified_diff(&plan.path, before, &plan.rewritten))
+                );
             }
         }
     } else {

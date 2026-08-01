@@ -22,7 +22,7 @@ pub fn make_list_default_element_report(args: MakeListDefaultElementReportArgs) 
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_make_list_default_element_report(&reports, &policy, args.output)?;
+    print_make_list_default_element_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

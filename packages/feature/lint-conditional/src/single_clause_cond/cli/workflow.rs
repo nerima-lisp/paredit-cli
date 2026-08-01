@@ -20,7 +20,7 @@ pub fn single_clause_cond_report(args: SingleClauseCondReportArgs) -> CommandRes
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_single_clause_cond_report(&reports, &policy, args.output)?;
+    print_single_clause_cond_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

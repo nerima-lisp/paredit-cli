@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::unreachable_cond_clause::usecase::UnreachableCondClauseItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_unreachable_cond_clause_report(
     reports: &[FileFindings<UnreachableCondClauseItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect unreachable-cond-clause", reports, policy, output)
+    print_report(
+        "inspect unreachable-cond-clause",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

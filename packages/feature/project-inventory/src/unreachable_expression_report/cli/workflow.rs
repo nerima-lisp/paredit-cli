@@ -21,7 +21,7 @@ pub fn unreachable_expression_report(args: UnreachableExpressionReportArgs) -> C
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_unreachable_report(&reports, &policy, args.output)?;
+    print_unreachable_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

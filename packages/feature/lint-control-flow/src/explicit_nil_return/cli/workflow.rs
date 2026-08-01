@@ -20,7 +20,7 @@ pub fn explicit_nil_return_report(args: ExplicitNilReturnReportArgs) -> CommandR
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_explicit_nil_return_report(&reports, &policy, args.output)?;
+    print_explicit_nil_return_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

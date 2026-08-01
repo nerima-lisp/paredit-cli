@@ -21,7 +21,7 @@ pub fn format_directive_report(args: FormatDirectiveReportArgs) -> CommandResult
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_mismatch_report(&reports, &policy, args.output)?;
+    print_mismatch_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

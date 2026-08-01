@@ -20,7 +20,7 @@ pub fn nth_constant_index_report(args: NthConstantIndexReportArgs) -> CommandRes
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_nth_constant_index_report(&reports, &policy, args.output)?;
+    print_nth_constant_index_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

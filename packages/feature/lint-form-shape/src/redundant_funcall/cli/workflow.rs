@@ -20,7 +20,7 @@ pub fn redundant_funcall_report(args: RedundantFuncallReportArgs) -> CommandResu
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_redundant_funcall_report(&reports, &policy, args.output)?;
+    print_redundant_funcall_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

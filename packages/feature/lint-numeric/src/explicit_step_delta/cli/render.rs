@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::explicit_step_delta::usecase::ExplicitStepDeltaItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,13 @@ pub fn print_explicit_step_delta_report(
     reports: &[FileFindings<ExplicitStepDeltaItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect explicit-step-delta", reports, policy, output)
+    print_report(
+        "inspect explicit-step-delta",
+        reports,
+        policy,
+        output,
+        verbosity,
+    )
 }

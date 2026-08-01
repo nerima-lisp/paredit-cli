@@ -22,7 +22,7 @@ pub fn make_array_default_keyword_report(args: MakeArrayDefaultKeywordReportArgs
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_make_array_default_keyword_report(&reports, &policy, args.output)?;
+    print_make_array_default_keyword_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

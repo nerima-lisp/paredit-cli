@@ -24,7 +24,7 @@ pub fn parse_integer_default_radix_report(
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_parse_integer_default_radix_report(&reports, &policy, args.output)?;
+    print_parse_integer_default_radix_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

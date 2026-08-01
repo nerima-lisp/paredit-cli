@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::redundant_boolean_identity::usecase::RedundantBooleanIdentityItem;
 use paredit_core_cli::report::render::print_report;
@@ -10,11 +11,13 @@ pub fn print_redundant_boolean_identity_report(
     reports: &[FileFindings<RedundantBooleanIdentityItem>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
     print_report(
         "inspect redundant-boolean-identity",
         reports,
         policy,
         output,
+        verbosity,
     )
 }

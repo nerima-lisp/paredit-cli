@@ -20,7 +20,7 @@ pub fn binds_constant_report(args: BindsConstantReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_binds_constant_report(&reports, &policy, args.output)?;
+    print_binds_constant_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

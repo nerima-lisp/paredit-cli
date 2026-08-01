@@ -20,7 +20,7 @@ pub fn sign_comparison_report(args: SignComparisonReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_sign_comparison_report(&reports, &policy, args.output)?;
+    print_sign_comparison_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

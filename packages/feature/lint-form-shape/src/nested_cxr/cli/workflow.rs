@@ -18,7 +18,7 @@ pub fn nested_cxr_report(args: NestedCxrReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_nested_cxr_report(&reports, &policy, args.output)?;
+    print_nested_cxr_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

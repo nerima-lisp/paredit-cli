@@ -18,7 +18,7 @@ pub fn nested_when_report(args: NestedWhenReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_nested_when_report(&reports, &policy, args.output)?;
+    print_nested_when_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

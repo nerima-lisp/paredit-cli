@@ -20,7 +20,7 @@ pub fn one_step_arithmetic_report(args: OneStepArithmeticReportArgs) -> CommandR
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_one_step_arithmetic_report(&reports, &policy, args.output)?;
+    print_one_step_arithmetic_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

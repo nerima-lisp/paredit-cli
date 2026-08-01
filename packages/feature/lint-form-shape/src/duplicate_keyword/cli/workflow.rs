@@ -20,7 +20,7 @@ pub fn duplicate_keyword_report(args: DuplicateKeywordReportArgs) -> CommandResu
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_duplicate_keyword_report(&reports, &policy, args.output)?;
+    print_duplicate_keyword_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

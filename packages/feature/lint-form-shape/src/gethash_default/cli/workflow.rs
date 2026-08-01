@@ -20,7 +20,7 @@ pub fn gethash_default_report(args: GethashDefaultReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_gethash_default_report(&reports, &policy, args.output)?;
+    print_gethash_default_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

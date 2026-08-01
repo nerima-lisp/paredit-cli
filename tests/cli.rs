@@ -61,6 +61,10 @@ mod code_char_char_code_report;
 mod code_metrics_report;
 #[path = "cli/coerce_to_t_report.rs"]
 mod coerce_to_t_report;
+#[path = "cli/color_consistency_contract.rs"]
+mod color_consistency_contract;
+#[path = "cli/color_palette_contract.rs"]
+mod color_palette_contract;
 #[path = "cli/commands_doc_sync_contract.rs"]
 mod commands_doc_sync_contract;
 #[path = "cli/compatibility_contract.rs"]
@@ -447,6 +451,10 @@ mod repair_unclosed_lists;
 mod replace_forms;
 #[path = "cli/report_interop.rs"]
 mod report_interop;
+#[path = "cli/report_json_key_casing_contract.rs"]
+mod report_json_key_casing_contract;
+#[path = "cli/report_verbosity_contract.rs"]
+mod report_verbosity_contract;
 #[path = "cli/resource_budget.rs"]
 mod resource_budget;
 #[path = "cli/round_trip_property.rs"]

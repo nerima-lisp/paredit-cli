@@ -20,7 +20,7 @@ pub fn typep_predicate_report(args: TypepPredicateReportArgs) -> CommandResult {
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_typep_predicate_report(&reports, &policy, args.output)?;
+    print_typep_predicate_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

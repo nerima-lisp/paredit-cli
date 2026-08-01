@@ -450,6 +450,10 @@ pub struct Diagnosis {
     pub code: ErrorCode,
     /// The message chain, outermost first, as the human rendering shows it.
     pub message: String,
+    /// [`Category::describe`] for this code's category, resolved once here so
+    /// the JSON envelope and the text rendering cannot paraphrase the same
+    /// failure two different ways.
+    pub category_description: &'static str,
     pub repairs: Vec<Repair>,
     /// The byte position the failure names, when it names one.
     ///
@@ -467,7 +471,7 @@ impl Diagnosis {
         json!({
             "code": self.code.label(),
             "category": self.code.category().label(),
-            "category_description": self.code.category().describe(),
+            "category_description": self.category_description,
             "retryable": self.code.category().retryable(),
             "exit_code": self.code.exit_code(),
             // Escaped for the same reason a `Repair`'s strings are: this one
@@ -491,6 +495,7 @@ pub fn diagnose(failure: &CommandFailure, context: &Context) -> Diagnosis {
     Diagnosis {
         repairs: repairs(code, context),
         offset: extract_offset(failure),
+        category_description: code.category().describe(),
         code,
         message,
     }

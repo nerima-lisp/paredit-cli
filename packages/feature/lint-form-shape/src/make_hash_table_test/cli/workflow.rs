@@ -20,7 +20,7 @@ pub fn make_hash_table_test_report(args: MakeHashTableTestReportArgs) -> Command
     let passed = policy.passed;
     let message = policy.violations.join("; ");
 
-    print_make_hash_table_test_report(&reports, &policy, args.output)?;
+    print_make_hash_table_test_report(&reports, &policy, args.output, args.verbosity)?;
 
     if !passed {
         return Err(paredit_core_cli::gate::gate_failure(format!(

@@ -1,6 +1,7 @@
 use paredit_core_cli::CliResult;
 
 use paredit_core_cli::args::ReportFormat;
+use paredit_core_cli::runtime::Verbosity;
 
 use crate::readtable_case_report::usecase::CaseSensitiveSymbol;
 use paredit_core_cli::report::render::print_report;
@@ -10,6 +11,7 @@ pub fn print_fragile_report(
     reports: &[FileFindings<CaseSensitiveSymbol>],
     policy: &ReportPolicy,
     output: ReportFormat,
+    verbosity: Verbosity,
 ) -> CliResult<()> {
-    print_report("inspect readtable-case", reports, policy, output)
+    print_report("inspect readtable-case", reports, policy, output, verbosity)
 }
