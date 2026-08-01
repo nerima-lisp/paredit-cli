@@ -20,6 +20,10 @@ use crate::toml::Value;
 pub enum Layer {
     /// Built into [`schema::SCHEMA`].
     Default,
+    /// A discovered `.editorconfig`, folded onto the `format.*` keys it maps
+    /// onto (see `crate::editorconfig`). Beneath every `paredit.toml` layer
+    /// on purpose: `paredit.toml` always wins on a key both files set.
+    EditorConfig,
     /// The user's own configuration directory.
     User,
     /// Beside the nearest ancestor `.git`.
@@ -40,6 +44,7 @@ impl Layer {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Default => "default",
+            Self::EditorConfig => "editorconfig",
             Self::User => "user",
             Self::Repository => "repository",
             Self::Directory => "directory",

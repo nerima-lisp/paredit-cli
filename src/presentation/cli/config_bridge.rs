@@ -164,6 +164,34 @@ const BINDINGS: &[Binding] = &[
         omit_when: None,
     },
     Binding {
+        key: "format.numeric-literal-case",
+        flag: "numeric-literal-case",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "format.align-clause-values",
+        flag: "align-clause-values",
+        shape: Shape::Switch,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "format.insert-final-newline",
+        flag: "insert-final-newline",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "format.trim-trailing-whitespace",
+        flag: "trim-trailing-whitespace",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
         key: "paths.include-hidden",
         flag: "include-hidden",
         shape: Shape::Switch,
@@ -459,6 +487,17 @@ impl Binding {
             (Shape::Switch, _) => None,
             (Shape::Value, Value::String(text)) => Some(vec![text.clone()]),
             (Shape::Value, Value::Integer(number)) => Some(vec![number.to_string()]),
+            // A `Shape::Value` binding onto a `Boolean` key is a flag that
+            // takes an explicit `true`/`false` value rather than being a
+            // bare presence switch — the shape `--insert-final-newline` and
+            // `--trim-trailing-whitespace` need, since their *default* is
+            // `true` and `Shape::Switch` can only ever turn something on, not
+            // off. `Value::Boolean`'s own `Display` (used elsewhere for the
+            // same reason, e.g. this struct's `omit_when` comparison below)
+            // already renders exactly `"true"`/`"false"`, which is what
+            // `bool`'s `clap` value parser (derived from `FromStr`) expects
+            // back.
+            (Shape::Value, Value::Boolean(flag)) => Some(vec![flag.to_string()]),
             (Shape::Repeated, Value::Array(items)) if !items.is_empty() => Some(
                 items
                     .iter()

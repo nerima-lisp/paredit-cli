@@ -8,7 +8,7 @@ use paredit_core_syntax::selector::{
     StableSelectorId,
 };
 use paredit_core_syntax::sexpr::{
-    Delimiter, Direction, Path, QuoteStyle, ReaderPrefix, ReaderPrefixStyle,
+    Delimiter, Direction, NumericLiteralCase, Path, QuoteStyle, ReaderPrefix, ReaderPrefixStyle,
 };
 
 #[derive(Debug, Args)]
@@ -41,7 +41,9 @@ pub struct FormatArgs {
     #[arg(long, default_value_t = 2)]
     pub indent: usize,
     /// Width, in columns, one inline (non-wrapped) line may reach before
-    /// falling back to a multi-line layout. Unset keeps the built-in 80.
+    /// falling back to a multi-line layout. Unset auto-detects the
+    /// terminal's width at an interactive stdout (plain output, no --write/
+    /// --check/--diff-stat), and falls back to the built-in 80 otherwise.
     #[arg(long, value_name = "COLUMNS")]
     pub max_width: Option<usize>,
     /// Realign the interior lines of #|...|# block comments to their new
@@ -90,6 +92,32 @@ pub struct FormatArgs {
     /// `#'f`); every other prefix keeps its shorthand regardless.
     #[arg(long, value_enum, default_value_t = ReaderPrefixStyleArg::Shorthand)]
     pub quote_style: ReaderPrefixStyleArg,
+    /// Letter case for a numeric literal's radix prefix (#x/#o/#b/#NNr) and
+    /// float exponent marker. `preserve` (the default) leaves every literal
+    /// exactly as written.
+    #[arg(long, value_enum, default_value_t = NumericLiteralCaseArg::Preserve)]
+    pub numeric_literal_case: NumericLiteralCaseArg,
+    /// Pad every let-style binding's value to one column past the widest
+    /// name in its run, e.g. `(let ((short-name  1) (longer-name 2)) ...)`.
+    /// A binding that does not fit the name/value shape (a bare symbol with
+    /// no value, or one whose name does not compact to one line) breaks the
+    /// run rather than being force-aligned with its neighbours.
+    #[arg(long)]
+    pub align_clause_values: bool,
+    /// Whether the rendered document ends in exactly one trailing newline.
+    /// A project's `format.insert-final-newline` (frequently set by a
+    /// discovered `.editorconfig`'s own `insert_final_newline`) is the more
+    /// common way to set this; the flag exists for one-off overrides and
+    /// scripting.
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
+    pub insert_final_newline: bool,
+    /// Whether a standalone or trailing comment has its own trailing
+    /// whitespace trimmed. A project's `format.trim-trailing-whitespace`
+    /// (frequently set by a discovered `.editorconfig`'s own
+    /// `trim_trailing_whitespace`) is the more common way to set this; the
+    /// flag exists for one-off overrides and scripting.
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
+    pub trim_trailing_whitespace: bool,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
     pub write: bool,
@@ -126,6 +154,28 @@ impl From<ReaderPrefixStyleArg> for ReaderPrefixStyle {
         match value {
             ReaderPrefixStyleArg::Shorthand => Self::Shorthand,
             ReaderPrefixStyleArg::Canonical => Self::Canonical,
+        }
+    }
+}
+
+/// A `clap` mirror of [`NumericLiteralCase`], keeping the argument parser out
+/// of the syntax package. The `From` below is the only place the two
+/// spellings meet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum NumericLiteralCaseArg {
+    /// Byte-identical to source: `#x1f`, `#X1F`, `1.0d0`, `1.0E10` all stay
+    /// exactly as written.
+    Preserve,
+    Lower,
+    Upper,
+}
+
+impl From<NumericLiteralCaseArg> for NumericLiteralCase {
+    fn from(value: NumericLiteralCaseArg) -> Self {
+        match value {
+            NumericLiteralCaseArg::Preserve => Self::Preserve,
+            NumericLiteralCaseArg::Lower => Self::Lower,
+            NumericLiteralCaseArg::Upper => Self::Upper,
         }
     }
 }

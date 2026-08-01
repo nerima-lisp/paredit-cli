@@ -1,7 +1,7 @@
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::styles::ListStyle;
-use super::{Formatter, MAX_INLINE_WIDTH, ReaderPrefixStyle};
+use super::{Formatter, MAX_INLINE_WIDTH, NumericLiteralCase, ReaderPrefixStyle};
 use crate::dialect::Dialect;
 use crate::sexpr::quote_edit::canonical_quote_head;
 use crate::sexpr::tree::{Node, NodeKind, SyntaxTree};
@@ -204,6 +204,10 @@ impl Formatter {
             indent_overrides: Vec::new(),
             width_profiles: Vec::new(),
             quote_style: ReaderPrefixStyle::Shorthand,
+            numeric_literal_case: NumericLiteralCase::Preserve,
+            align_clause_values: false,
+            insert_final_newline: true,
+            trim_trailing_whitespace: true,
         }
     }
 
@@ -293,7 +297,9 @@ impl Formatter {
             }
             item.render(columns[position], &mut output);
         }
-        output.push('\n');
+        if self.insert_final_newline {
+            output.push('\n');
+        }
         output
     }
 
@@ -600,8 +606,21 @@ impl Formatter {
     /// trailing comment between top-level forms, so `depth` is always `0`
     /// today; the depth parameter still exists because the transformation
     /// itself has nothing top-level-specific about it.
+    ///
+    /// Trailing whitespace is trimmed unless [`Self::trim_trailing_whitespace`]
+    /// is off — this is the one span outside a string literal's own text
+    /// where the formatter ever had trailing whitespace of its own to trim,
+    /// since every other span is either laid out fresh (never carries stray
+    /// trailing whitespace to begin with) or copied verbatim from source for
+    /// an unrelated reason (an opaque reader form, or a top-level item kept
+    /// exactly as written because it carries an interior comment) and stays
+    /// untouched either way.
     fn render_comment_text(&self, text: &str, depth: usize) -> String {
-        let trimmed = text.trim_end();
+        let trimmed = if self.trim_trailing_whitespace {
+            text.trim_end()
+        } else {
+            text
+        };
         if self.reindent_block_comments {
             self.reindent_block_comment(trimmed, depth)
         } else {
@@ -688,14 +707,42 @@ impl Formatter {
         }
         match node.kind {
             NodeKind::Root => (),
+            // An atom's own text — after any embedded reader-prefix chars
+            // `node.symbol_offset` skips — is always copied from source
+            // (through `numeric_literal_text`'s no-op-unless-numeric
+            // recasing, its only transformation) rather than re-derived.
+            // This is a deliberate contract, not an oversight: Lisp readers
+            // give string-literal whitespace exact semantics (CLHS 2.4.6 —
+            // the characters between the quotes are the string's value,
+            // verbatim), so a multiline string's interior indentation must
+            // never be reindented the way surrounding code is. Because a
+            // string atom's `span` covers its opening and closing `"` and
+            // everything between them, and every other atom kind (a symbol,
+            // a number, a character literal) is just as safe to copy
+            // verbatim, this single code path handles the string-literal
+            // contract for free rather than needing its own case.
             NodeKind::Atom => {
                 if let Some(heads) = self.canonical_prefix_heads(node) {
                     self.write_canonical_opens(&heads, output);
                     let text = node.span.slice(&tree.source);
-                    output.push_str(&text[node.symbol_offset as usize..]);
+                    let content = self.numeric_literal_text(&text[node.symbol_offset as usize..]);
+                    output.push_str(&content);
                     Self::write_canonical_closes(&heads, output);
-                } else {
+                } else if self.numeric_literal_case == NumericLiteralCase::Preserve {
+                    // No reader prefix to canonicalize and no case recasing to
+                    // apply: copy the atom's whole span verbatim in one push,
+                    // same as before numeric-literal-case existed. Splitting
+                    // this into a symbol_offset-relative slice plus a
+                    // numeric_literal_text call on every atom regardless of
+                    // whether the feature is in use was a real, benchmarked
+                    // regression (~13% on `clean/forms/*`) — Preserve is the
+                    // default, so this fast path is the common case.
                     output.push_str(node.span.slice(&tree.source));
+                } else {
+                    let text = node.span.slice(&tree.source);
+                    output.push_str(&text[..node.symbol_offset as usize]);
+                    output
+                        .push_str(&self.numeric_literal_text(&text[node.symbol_offset as usize..]));
                 }
             }
             NodeKind::List if node.children.is_empty() => {
@@ -905,18 +952,32 @@ impl Formatter {
                         NodeKind::Root => return None,
                         NodeKind::Atom => {
                             if let Some(heads) = self.canonical_prefix_heads(node) {
+                                let text = node.span.slice(&tree.source);
+                                let content =
+                                    self.numeric_literal_text(&text[node.symbol_offset as usize..]);
                                 for head in &heads {
                                     output.push_char('(', max_width)?;
                                     output.push_str(head, max_width)?;
                                     output.push_char(' ', max_width)?;
                                 }
-                                let text = node.span.slice(&tree.source);
-                                output.push_str(&text[node.symbol_offset as usize..], max_width)?;
+                                output.push_str(&content, max_width)?;
                                 for _ in &heads {
                                     output.push_char(')', max_width)?;
                                 }
-                            } else {
+                            } else if self.numeric_literal_case == NumericLiteralCase::Preserve {
+                                // See the matching fast path in `format_node`:
+                                // skip the symbol_offset split and
+                                // numeric_literal_text call entirely when
+                                // there's nothing for either to do.
                                 output.push_str(node.span.slice(&tree.source), max_width)?;
+                            } else {
+                                let text = node.span.slice(&tree.source);
+                                output.push_str(&text[..node.symbol_offset as usize], max_width)?;
+                                output.push_str(
+                                    &self
+                                        .numeric_literal_text(&text[node.symbol_offset as usize..]),
+                                    max_width,
+                                )?;
                             }
                         }
                         NodeKind::List if self.is_opaque_reader_form(node) => {
@@ -1044,6 +1105,15 @@ impl Formatter {
                 .reader_prefixes()
                 .iter()
                 .any(|prefix| prefix.is_opaque_reader_form())
+    }
+
+    /// `text` (an atom's content, past any embedded reader-prefix chars) with
+    /// its numeric-literal marker recased per [`Self::numeric_literal_case`],
+    /// or borrowed unchanged when `text` is not a numeric literal this
+    /// formatter's dialect recognises. See `formatter::numeric_literal` for
+    /// the grammar and the dialect gating.
+    fn numeric_literal_text<'a>(&self, text: &'a str) -> std::borrow::Cow<'a, str> {
+        super::numeric_literal::numeric_literal_text(text, self.dialect, self.numeric_literal_case)
     }
 
     pub(super) fn indent(&self, depth: usize) -> String {

@@ -26,7 +26,9 @@ pub use edit::Edit;
 pub use error::{
     PathError, SelectionError, SexprError, SexprResult, SpanError, StructureError, SymbolError,
 };
-pub use formatter::{Formatter, ReaderPrefixStyle, STYLE_NAMES, UnknownStyleName};
+pub use formatter::{
+    Formatter, NumericLiteralCase, ReaderPrefixStyle, STYLE_NAMES, UnknownStyleName,
+};
 pub use navigation::{ContextKind, Direction, SourceContext};
 pub use parser::ParseError;
 pub use quote_edit::QuoteStyle;

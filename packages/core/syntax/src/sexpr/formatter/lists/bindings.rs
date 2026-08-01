@@ -28,6 +28,7 @@ impl Formatter {
                         *child,
                         depth + 1,
                         self.continuation_column(depth, head.len().saturating_add(3)),
+                        self.align_clause_values,
                         output,
                     );
                 }

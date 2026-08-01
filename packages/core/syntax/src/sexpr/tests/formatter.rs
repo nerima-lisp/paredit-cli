@@ -1807,3 +1807,274 @@ fn quote_style_is_a_no_op_when_unset() {
         Formatter::new(2).format(&tree)
     );
 }
+
+// --- FR-011: multiline string literals are never reindented ---
+
+/// The regression this phase exists to pin down as an explicit contract: a
+/// multiline string's interior whitespace (leading spaces on a continuation
+/// line, a trailing space, a tab) survives byte-for-byte even though the
+/// surrounding code — deliberately misindented in the input — gets
+/// reindented around it.
+#[test]
+fn multiline_string_literal_content_is_never_reindented() {
+    let input = "(defun f ()\n   \"line one\n   line two (kept)\t\n line three \"\n     (g 1))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = Formatter::new(2).format(&tree);
+    assert_eq!(
+        output,
+        "(defun f ()\n  \"line one\n   line two (kept)\t\n line three \"\n  (g 1))\n"
+    );
+    // The surrounding code was in fact reindented (2 spaces, not the input's
+    // 3/5), which is what proves the string's own interior was *not* — the
+    // two are the same rewrite, so if the formatter reindented everything
+    // uniformly this assertion pair would not be able to tell them apart.
+    assert!(output.contains("\n  \"line one\n"));
+    assert!(output.contains("\n   line two (kept)\t\n"));
+    assert!(output.contains("\n line three \"\n"));
+}
+
+#[test]
+fn a_multiline_string_survives_reformatting_even_when_it_would_overflow_max_width() {
+    let input =
+        "(f \"a very long line that is well past forty columns wide\nand a second line   \")";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = Formatter::new(2).with_max_width(40).format(&tree);
+    assert!(
+        output.contains(
+            "a very long line that is well past forty columns wide\nand a second line   "
+        )
+    );
+}
+
+// --- FR-012: `format.numeric-literal-case` ---
+
+#[test]
+fn numeric_literal_case_is_a_no_op_when_unset() {
+    let input = "(list #x1F #o17 #b1010 1.0d0 1.0E10)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    assert_eq!(
+        Formatter::with_dialect(2, Dialect::CommonLisp).format(&tree),
+        "(list #x1F #o17 #b1010 1.0d0 1.0E10)\n"
+    );
+}
+
+#[test]
+fn numeric_literal_case_lowercases_radix_and_exponent_markers() {
+    use crate::sexpr::NumericLiteralCase;
+
+    let input = "(list #X1f #O17 #B1010 1.0D0 1.0E10)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_numeric_literal_case(NumericLiteralCase::Lower)
+        .format(&tree);
+    assert_eq!(output, "(list #x1f #o17 #b1010 1.0d0 1.0e10)\n");
+}
+
+#[test]
+fn numeric_literal_case_uppercases_radix_and_exponent_markers() {
+    use crate::sexpr::NumericLiteralCase;
+
+    let input = "(list #x1f #o17 #b1010 1.0d0 1.0e10)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_numeric_literal_case(NumericLiteralCase::Upper)
+        .format(&tree);
+    assert_eq!(output, "(list #X1f #O17 #B1010 1.0D0 1.0E10)\n");
+}
+
+#[test]
+fn numeric_literal_case_never_touches_a_non_numeric_lookalike_symbol() {
+    use crate::sexpr::NumericLiteralCase;
+
+    let input = "(list x1e5 e10 not-a-number)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_numeric_literal_case(NumericLiteralCase::Upper)
+        .format(&tree);
+    assert_eq!(output, "(list x1e5 e10 not-a-number)\n");
+}
+
+#[test]
+fn numeric_literal_case_is_idempotent() {
+    use crate::sexpr::NumericLiteralCase;
+
+    let input = "(list #X1f #O17 1.0D0)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let formatter = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_numeric_literal_case(NumericLiteralCase::Lower);
+    let once = formatter.format(&tree);
+    let reparsed = SyntaxTree::parse_with_dialect(&once, Dialect::CommonLisp).expect("reparses");
+    let twice = formatter.format(&reparsed);
+    assert_eq!(once, twice);
+}
+
+#[test]
+fn canonical_quote_style_and_numeric_literal_case_compose_in_format_node() {
+    use crate::sexpr::NumericLiteralCase;
+
+    // `format_node`'s Atom arm (multi-line/general rendering, exercised here
+    // via a `defun` body — a definition-style head always breaks onto
+    // multiple lines regardless of width, see
+    // `with_max_width_narrows_the_inline_fit_threshold`'s own comment, so
+    // this never routes through `compact_node`). `content` (the
+    // numeric-literal-recased text) is computed once and then either wrapped
+    // in canonical-prefix heads or emitted directly; this pins that both
+    // happen together rather than one silently winning over the other.
+    let input = "(defun f () '#x1a)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .with_numeric_literal_case(NumericLiteralCase::Upper)
+        .format(&tree);
+    assert_eq!(
+        output, "(defun f ()\n  (quote #X1a))\n",
+        "canonical quote wrapper and upper-cased radix marker (digit `a` untouched) must both apply"
+    );
+}
+
+#[test]
+fn canonical_quote_style_and_numeric_literal_case_compose_in_compact_node() {
+    use crate::sexpr::NumericLiteralCase;
+
+    // `compact_node`'s Atom arm (inline/compact rendering) — `list` is
+    // `ListStyle::General`, the one shape `compact_node` will inline at all,
+    // and the whole form comfortably fits the compiled-in 80-column default.
+    let input = "(list '#x1a)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .with_numeric_literal_case(NumericLiteralCase::Upper)
+        .format(&tree);
+    assert_eq!(
+        output, "(list (quote #X1a))\n",
+        "canonical quote wrapper and upper-cased radix marker (digit `a` untouched) must both apply"
+    );
+}
+
+// --- FR-013: `format.align-clause-values` ---
+
+#[test]
+fn align_clause_values_is_a_no_op_when_unset() {
+    let input = "(let ((short-name 1) (longer-name 2)) (list short-name longer-name))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(let ((short-name 1)\n      (longer-name 2))\n  (list short-name longer-name))\n"
+    );
+}
+
+#[test]
+fn align_clause_values_pads_every_value_to_one_past_the_widest_name() {
+    let input = "(let ((short-name 1) (longer-name 2)) (list short-name longer-name))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = Formatter::new(2)
+        .with_align_clause_values(true)
+        .format(&tree);
+    assert_eq!(
+        output,
+        "(let ((short-name  1)\n      (longer-name 2))\n  (list short-name longer-name))\n"
+    );
+}
+
+#[test]
+fn align_clause_values_applies_to_clojure_binding_vectors_too() {
+    let input = "(let [short-name 1 longer-name 2] (list short-name longer-name))";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::Clojure)
+        .with_align_clause_values(true)
+        .format(&tree);
+    assert_eq!(
+        output,
+        "(let [short-name  1\n      longer-name 2]\n  (list short-name longer-name))\n"
+    );
+}
+
+#[test]
+fn align_clause_values_breaks_the_run_at_a_binding_that_does_not_fit_the_shape() {
+    // The middle binding is a bare symbol (no value), which is not a shape
+    // alignment applies to: it must not be force-aligned with its
+    // neighbours, and it must not pull them into aligning around it either.
+    let input = "(let ((a 1) b (ccc 2)) (list a b ccc))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = Formatter::new(2)
+        .with_align_clause_values(true)
+        .format(&tree);
+    assert_eq!(
+        output,
+        "(let ((a 1)\n      b\n      (ccc 2))\n  (list a b ccc))\n"
+    );
+}
+
+#[test]
+fn align_clause_values_never_touches_do_or_prog_var_clauses() {
+    // `do`'s var-list allows a third "step" element, which a two-column
+    // name/value layout does not fit — FR-013 explicitly scopes alignment to
+    // `let`-style bindings and leaves `do`/`prog` alone regardless of the
+    // option.
+    let input = "(do ((i 0 (1+ i)) (longer-name 1)) ((= i 3)) (print i))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let with_alignment_on = Formatter::new(2)
+        .with_align_clause_values(true)
+        .format(&tree);
+    let with_alignment_off = Formatter::new(2).format(&tree);
+    assert_eq!(with_alignment_on, with_alignment_off);
+}
+
+#[test]
+fn align_clause_values_is_idempotent() {
+    let input = "(let ((a 1) (bb 2) (ccc 3)) (list a bb ccc))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatter = Formatter::new(2).with_align_clause_values(true);
+    let once = formatter.format(&tree);
+    let reparsed = SyntaxTree::parse(&once).expect("reparses");
+    let twice = formatter.format(&reparsed);
+    assert_eq!(once, twice);
+}
+
+// --- FR-015: `format.insert-final-newline` / `format.trim-trailing-whitespace` ---
+
+#[test]
+fn insert_final_newline_true_is_a_no_op() {
+    let input = "(f 1)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_insert_final_newline(true)
+            .format(&tree),
+        Formatter::new(2).format(&tree)
+    );
+}
+
+#[test]
+fn insert_final_newline_false_omits_the_trailing_newline() {
+    let input = "(f 1)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = Formatter::new(2)
+        .with_insert_final_newline(false)
+        .format(&tree);
+    assert_eq!(output, "(f 1)");
+}
+
+#[test]
+fn trim_trailing_whitespace_true_is_a_no_op() {
+    let input = "(f 1) ; comment with trailing space   \n(g 2)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2)
+            .with_trim_trailing_whitespace(true)
+            .format(&tree),
+        Formatter::new(2).format(&tree)
+    );
+}
+
+#[test]
+fn trim_trailing_whitespace_false_keeps_a_comments_trailing_spaces() {
+    let input = "(f 1) ; comment with trailing space   \n(g 2)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let trimmed = Formatter::new(2).format(&tree);
+    let untrimmed = Formatter::new(2)
+        .with_trim_trailing_whitespace(false)
+        .format(&tree);
+    assert!(!trimmed.contains("space   \n"));
+    assert!(untrimmed.contains("space   \n"));
+}

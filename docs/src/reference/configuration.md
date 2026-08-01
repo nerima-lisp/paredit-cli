@@ -31,6 +31,20 @@ replaces the repository's list; it does not add to it. A list assembled from
 three files is a list nobody can predict, and `paredit config show` would have
 no single line to point at.
 
+## `.editorconfig`
+
+A discovered `.editorconfig` fills the four `[format]` keys its properties map
+onto — `indent_size` → `format.indent`, `max_line_length` →
+`format.max-inline-width`, `insert_final_newline` →
+`format.insert-final-newline`, `trim_trailing_whitespace` →
+`format.trim-trailing-whitespace` — beneath every `paredit.toml` layer:
+`paredit.toml` always wins on a key both files set, and an `.editorconfig`
+only fills a key `paredit.toml` leaves unset. Only a `[*]`/`[**]` section (or
+a property written before any section at all) is read; a narrower glob
+(`[*.py]`) is skipped, since which file a command will run against is not yet
+known at configuration-load time. A project with no `.editorconfig` behaves
+exactly as it did before this existed.
+
 ## Getting started
 
 ```sh
@@ -197,7 +211,7 @@ version. The tables are:
 | `[dialect]` | Which dialect to assume, and whether to force it over the extension |
 | `[paths]` | Workspace discovery: exclusions, hidden and generated directories, depth |
 | `[cache]` | Where workspace discovery caches its results between runs |
-| `[format]` | Indent width, inline width, block-comment reindenting, trailing-comment alignment, blank-line normalization, per-symbol indent styles, per-style width profiles, and reader-prefix printing for `edit format` |
+| `[format]` | Indent width, inline width, block-comment reindenting, trailing-comment alignment, blank-line normalization, per-symbol indent styles, per-style width profiles, reader-prefix printing, numeric-literal letter case, let-binding value alignment, and final-newline/trailing-whitespace toggles for `edit format` |
 | `[lint]` | Preset, rule selection, severity overrides, baseline, gate |
 | `[output]` | Default format, verbosity, token budget, message language |
 
