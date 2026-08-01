@@ -101,6 +101,8 @@ mod convert_let_to_let_star;
 mod convert_sequential_binding;
 #[path = "cli/crate_metadata_contract.rs"]
 mod crate_metadata_contract;
+#[path = "cli/data_check_report.rs"]
+mod data_check_report;
 #[path = "cli/de_morgan_report.rs"]
 mod de_morgan_report;
 #[path = "cli/dead_boolean_operand_report.rs"]
@@ -247,6 +249,8 @@ mod inline_literal_constant;
 mod inline_local_function;
 #[path = "cli/inline_symbol_macro.rs"]
 mod inline_symbol_macro;
+#[path = "cli/kill_ring_report.rs"]
+mod kill_ring_report;
 #[path = "cli/lambda_list_keyword_order_report.rs"]
 mod lambda_list_keyword_order_report;
 #[path = "cli/last_default_count_report.rs"]

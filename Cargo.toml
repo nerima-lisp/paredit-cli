@@ -116,6 +116,7 @@ paredit-feature-emacs-lisp = { path = "packages/feature/emacs-lisp" }
 paredit-feature-conditional-conversion = { path = "packages/feature/conditional-conversion" }
 paredit-feature-external-check = { path = "packages/feature/external-check" }
 paredit-feature-generate = { path = "packages/feature/generate" }
+paredit-feature-data-report = { path = "packages/feature/data-report" }
 blake3 = "1.8"
 cap-std = "4.0"
 clap = { version = "4.6", features = ["derive"] }

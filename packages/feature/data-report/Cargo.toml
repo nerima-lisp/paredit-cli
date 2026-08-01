@@ -1,0 +1,21 @@
+[package]
+name = "paredit-feature-data-report"
+description = "Schema-free structural sanity checks for S-expression data files: duplicate alist/plist keys, odd-length plists, and mismatched tuple arity"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-cli = { path = "../../core/cli" }
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`.
+[lints]
+workspace = true

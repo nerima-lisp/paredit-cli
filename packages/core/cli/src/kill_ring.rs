@@ -30,7 +30,13 @@ const RING_PATH_VARIABLE: &str = "PAREDIT_KILL_RING";
 
 /// The on-disk schema version, so a future shape change is detectable rather
 /// than silently misread as an empty ring.
-const SCHEMA_VERSION: u64 = 1;
+///
+/// `pub` so a caller that wants to *diagnose* a ring file — rather than only
+/// read or write one — can compare what is on disk against what this build
+/// writes. `read_ring` itself never reads this field back; a ring's own
+/// `schema_version` disagreeing with it is exactly the case `read_ring`
+/// cannot tell apart from an empty ring today (see `inspect kill-ring`).
+pub const SCHEMA_VERSION: u64 = 1;
 
 /// One killed or copied form, with where it came from.
 #[derive(Debug, Clone, PartialEq, Eq)]

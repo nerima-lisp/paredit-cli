@@ -678,6 +678,12 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::Writability(args) => {
                 writability_report::workflow::writability(args)?;
             }
+            command::InspectCommand::DataCheck(args) => {
+                data_check_report::workflow::data_check_report(args)?;
+            }
+            command::InspectCommand::KillRing(args) => {
+                kill_ring_report::workflow::kill_ring(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
