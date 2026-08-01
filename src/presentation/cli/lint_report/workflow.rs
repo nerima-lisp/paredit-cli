@@ -11,10 +11,13 @@ use crate::lint::report::{
 use crate::presentation::cli::lint_report::args::{EmitFormat, LintReportArgs};
 use crate::presentation::cli::lint_report::baseline::{BaselineEntry, LintBaseline};
 use crate::presentation::cli::lint_report::custom::{self, CustomRules, RuleMetaResolver};
+use crate::presentation::cli::lint_report::next_commands::{
+    fix_apply_next_commands, fix_plan_next_commands,
+};
 use crate::presentation::cli::lint_report::render::{
-    CustomLintTiming, DensityBucket, FindingIds, LintFileFix, LintFix, LintFixPlanEntry,
-    LintReplacement, LintSarifResult, LintStats, LintSuppressionRemoval, LintTiming,
-    SeverityDensitySuggestion, print_custom_lint_explanation, print_lint_docs,
+    CustomLintTiming, DensityBucket, FindingIds, LintFileFix, LintFix, LintFixGroupResult,
+    LintFixPlanEntry, LintReplacement, LintSarifResult, LintStats, LintSuppressionRemoval,
+    LintTiming, SeverityDensitySuggestion, print_custom_lint_explanation, print_lint_docs,
     print_lint_expired_suppressions, print_lint_explanation, print_lint_fix_plan,
     print_lint_fix_report, print_lint_github_annotation, print_lint_presets, print_lint_report,
     print_lint_rule_catalog, print_lint_sarif, print_lint_stats, print_lint_suggest_severity,
@@ -24,11 +27,22 @@ use crate::presentation::cli::lint_report::render::{
 use paredit_core_cli::report::FindingSeverity;
 use paredit_core_cli::report::interop::{self, Flattened, Row};
 use paredit_core_syntax::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
+use paredit_feature_change_summary::change_summary::domain::{ChangeSummary, summarise};
+use paredit_feature_change_summary::change_summary::prose;
+use paredit_feature_project_analysis::impact_report::usecase::collect_impact_definitions;
 
 use crate::presentation::cli::shared::{
     FileFailure, analyze_files, apply_byte_span_edits, expand_input_files,
-    read_input_dialect_and_tree, stable_text_hash, unified_diff, write_file_with_rollback,
+    note_partial_file_failures, read_input_dialect_and_tree, stable_text_hash, total_file_failure,
+    unified_diff, write_file_with_rollback, write_files_with_rollback,
 };
+
+/// The group key for a file with no `in-package` of its own.
+///
+/// Same spelling as `refactor apply --group-by-impact-area`'s
+/// `NO_PACKAGE_GROUP`: both commands group by declared package, and a file
+/// with none should read the same way from either report.
+const NO_PACKAGE_GROUP: &str = "<no-package>";
 
 /// The 1-based line and byte-based column of a byte offset in `text`.
 fn line_and_column(text: &str, offset: usize) -> (usize, usize) {
@@ -1015,7 +1029,8 @@ fn lint_report_fix_plan(
         }
     }
 
-    print_lint_fix_plan(&entries, args.output)?;
+    let next_commands = fix_plan_next_commands(entries.len(), files);
+    print_lint_fix_plan(&entries, &next_commands, args.output)?;
     Ok(())
 }
 
@@ -1059,11 +1074,38 @@ fn lint_report_fix(
     let mut file_fixes = Vec::new();
     let mut fixes_applied = 0;
     let mut fix_conflicts = 0;
+    // How many destructive-tagged fixes `--no-destructive-fixes` left on the
+    // table, across every file — a snapshot of the *converged* text's own
+    // remaining fixes, not a per-pass tally, so it names exactly what this
+    // run deliberately did not apply.
+    let mut fix_skipped_destructive = 0;
+    // Fed straight from the before/after text this loop already reads and
+    // rewrites — never a second diff, mirroring `refactor apply`'s headline.
+    // A file whose text does not compare (rare: `summarise` re-parses both
+    // sides, and the rewrite already had to reparse to be adopted at all) is
+    // silently left out of the headline rather than guessed at.
+    let mut change_summaries: Vec<ChangeSummary> = Vec::new();
+    // Deferred writes for `--group-by-impact-area`: every file this run would
+    // otherwise have written immediately, paired with its declared-package
+    // group key. Empty, and never consulted, on every other run.
+    let mut deferred_writes: Vec<(std::path::PathBuf, String, String)> = Vec::new();
 
     for file in files {
         let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         let mut text = input.text.clone();
         let mut tree = tree;
+        // The group key is the file's own declared package, read from its
+        // content before any fix touches it — the same "declared package as
+        // impact-area" policy `refactor apply --group-by-impact-area`
+        // established, so the two commands group files the same way.
+        let group_key = if args.group_by_impact_area {
+            collect_impact_definitions(&tree, dialect)
+                .ok()
+                .and_then(|(package, _definitions)| package)
+                .unwrap_or_else(|| NO_PACKAGE_GROUP.to_owned())
+        } else {
+            String::new()
+        };
         let mut per_rule: std::collections::BTreeMap<&'static str, usize> =
             std::collections::BTreeMap::new();
         let mut applied = 0;
@@ -1071,6 +1113,11 @@ fn lint_report_fix(
         // shadowed one is not lost — the next pass re-offers it once the outer
         // form has been rewritten — so this measures contention, not backlog.
         let mut conflicts = 0;
+        // How many destructive-tagged fixes were still on the table on the
+        // *last* pass this loop ran. Overwritten every pass rather than
+        // accumulated, so it reflects the converged text's own remaining
+        // fixes and not a sum across every pass that ever saw one.
+        let mut skipped_destructive = 0;
 
         for _ in 0..MAX_FIX_PASSES {
             let mut fixes = collect_lint_fixes(file, dialect, &tree, &text, active, settings)?;
@@ -1085,7 +1132,9 @@ fn lint_report_fix(
                 });
             }
             if args.no_destructive_fixes {
+                let before = fixes.len();
                 fixes.retain(|(rule, _, _), _| !rule_tags(rule).contains(RuleTag::Destructive));
+                skipped_destructive = before - fixes.len();
             }
             if fixes.is_empty() {
                 break;
@@ -1149,6 +1198,7 @@ fn lint_report_fix(
             }
         }
         fix_conflicts += conflicts;
+        fix_skipped_destructive += skipped_destructive;
 
         if applied > 0 && text != input.text {
             if args.diff {
@@ -1162,7 +1212,14 @@ fn lint_report_fix(
                     )
                 );
             } else if !args.check {
-                write_file_with_rollback(file.clone(), text)?;
+                if let Some(summary) = summarise(&input.text, &text, dialect) {
+                    change_summaries.push(summary);
+                }
+                if args.group_by_impact_area {
+                    deferred_writes.push((file.clone(), text.clone(), group_key));
+                } else {
+                    write_file_with_rollback(file.clone(), text)?;
+                }
             }
             fixes_applied += applied;
             file_fixes.push(LintFileFix {
@@ -1198,12 +1255,231 @@ fn lint_report_fix(
         return Ok(());
     }
 
+    // Only ever non-empty with `--group-by-impact-area`; every other run
+    // reports no groups, mirroring `refactor apply`. Reached only when
+    // neither `--check` nor `--diff` returned early above, so every deferred
+    // write here really is one this run means to make.
+    let mut impact_area_groups: Vec<LintFixGroupResult> = Vec::new();
+    if args.group_by_impact_area {
+        let mut file_failures: Vec<FileFailure> = Vec::new();
+        let mut any_written = false;
+        for (group, members) in group_writes_by_key(deferred_writes) {
+            let file_count = members.len();
+            // Each group is its own all-or-nothing transaction — the same
+            // atomicity `write_files_with_rollback` already gives a single
+            // `--fix` run without grouping. Grouping changes how many
+            // transactions there are, not what one transaction does: a group
+            // that fails is left exactly as it was before this run, and the
+            // groups that already wrote stay written rather than being
+            // rolled back over a *later* group's failure, since undoing a
+            // successful group to punish an unrelated one is the
+            // all-or-nothing behavior this flag exists to opt out of.
+            match write_files_with_rollback(members.clone()) {
+                Ok(()) => {
+                    any_written = true;
+                    impact_area_groups.push(LintFixGroupResult {
+                        group,
+                        file_count,
+                        written: true,
+                        failure: None,
+                    });
+                }
+                Err(error) => {
+                    let message = paredit_core_cli::error::error_chain(&error);
+                    for (path, _content) in &members {
+                        file_failures.push(FileFailure {
+                            file: path.clone(),
+                            message: message.clone(),
+                        });
+                    }
+                    impact_area_groups.push(LintFixGroupResult {
+                        group,
+                        file_count,
+                        written: false,
+                        failure: Some(message),
+                    });
+                }
+            }
+        }
+
+        // The same total-failure threshold `migrate run` and `refactor apply
+        // --group-by-impact-area` use: only when nothing at all survived does
+        // this refuse outright, since a run with even one written group has a
+        // partial result worth reporting.
+        if !any_written && !file_failures.is_empty() {
+            return Err(total_file_failure(file_failures).into());
+        }
+        note_partial_file_failures(&file_failures);
+    }
+
+    let headline = build_fix_headline(&change_summaries, file_fixes.len());
+    let next_commands = fix_apply_next_commands(fix_skipped_destructive, files);
+
     Ok(print_lint_fix_report(
         &file_fixes,
         fixes_applied,
         fix_conflicts,
+        &headline,
+        &impact_area_groups,
+        &next_commands,
+        args.compact,
         args.output,
     )?)
+}
+
+/// Partitions `writes` by their own group key, in first-seen group order.
+///
+/// First-seen rather than sorted: `files` lists the run's inputs in an order
+/// the caller chose (or `expand_input_files` discovered them in), and
+/// preserving it is what makes "continues to the next group if one fails"
+/// mean something predictable rather than an alphabetical accident. Mirrors
+/// `refactor apply --group-by-impact-area`'s `group_indexes_by_key`.
+fn group_writes_by_key(
+    writes: Vec<(std::path::PathBuf, String, String)>,
+) -> Vec<(String, Vec<(std::path::PathBuf, String)>)> {
+    let mut groups: Vec<(String, Vec<(std::path::PathBuf, String)>)> = Vec::new();
+    for (path, content, key) in writes {
+        match groups.iter_mut().find(|(existing, _)| *existing == key) {
+            Some((_, members)) => members.push((path, content)),
+            None => groups.push((key, vec![(path, content)])),
+        }
+    }
+    groups
+}
+
+/// The one-line "N added, M renamed ... definitions." for every file this fix
+/// run changed, combined.
+///
+/// Mirrors `refactor apply`'s `build_apply_headline`: never a second
+/// summarizer, only a concatenation of what `summarise` (the same comparison
+/// `inspect change` uses) already found per file, handed to `prose::headline`
+/// unmodified.
+fn build_fix_headline(change_summaries: &[ChangeSummary], changed_file_count: usize) -> String {
+    if changed_file_count == 0 {
+        return prose::headline(&ChangeSummary {
+            changes: Vec::new(),
+            identical: true,
+            formatting_only: false,
+            before_definitions: 0,
+            after_definitions: 0,
+        });
+    }
+    if change_summaries.is_empty() {
+        // Every changed file's before/after text failed to compare (rare: the
+        // rewrite already had to reparse to be adopted at all, so this is the
+        // before side). Silence here would read as "nothing changed", which
+        // is false.
+        return format!(
+            "{changed_file_count} file(s) changed; no per-definition summary was available."
+        );
+    }
+    let merged = ChangeSummary {
+        changes: change_summaries
+            .iter()
+            .flat_map(|summary| summary.changes.clone())
+            .collect(),
+        identical: false,
+        formatting_only: change_summaries
+            .iter()
+            .all(|summary| summary.changes.is_empty()),
+        before_definitions: change_summaries
+            .iter()
+            .map(|summary| summary.before_definitions)
+            .sum(),
+        after_definitions: change_summaries
+            .iter()
+            .map(|summary| summary.after_definitions)
+            .sum(),
+    };
+    prose::headline(&merged)
+}
+
+#[cfg(test)]
+mod fix_group_tests {
+    use super::*;
+
+    #[test]
+    fn writes_are_partitioned_by_key_in_first_seen_group_order() {
+        let writes = vec![
+            (
+                std::path::PathBuf::from("a.lisp"),
+                "(a)".to_owned(),
+                "app".to_owned(),
+            ),
+            (
+                std::path::PathBuf::from("u.lisp"),
+                "(u)".to_owned(),
+                "util".to_owned(),
+            ),
+            (
+                std::path::PathBuf::from("b.lisp"),
+                "(b)".to_owned(),
+                "app".to_owned(),
+            ),
+        ];
+        let groups = group_writes_by_key(writes);
+        assert_eq!(
+            groups
+                .iter()
+                .map(|(key, _)| key.clone())
+                .collect::<Vec<_>>(),
+            vec!["app".to_owned(), "util".to_owned()]
+        );
+        assert_eq!(groups[0].1.len(), 2);
+        assert_eq!(groups[1].1.len(), 1);
+    }
+
+    #[test]
+    fn an_empty_write_list_produces_no_groups() {
+        assert!(group_writes_by_key(Vec::new()).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod fix_headline_tests {
+    use super::*;
+    use paredit_core_syntax::dialect::Dialect;
+
+    #[test]
+    fn no_changed_files_reports_no_change() {
+        assert_eq!(
+            build_fix_headline(&[], 0),
+            "No change: the two versions are identical."
+        );
+    }
+
+    #[test]
+    fn changed_files_with_no_comparable_summary_says_so_rather_than_nothing() {
+        let headline = build_fix_headline(&[], 2);
+        assert!(headline.contains('2'), "{headline}");
+        assert!(!headline.contains("identical"), "{headline}");
+    }
+
+    #[test]
+    fn one_file_s_summary_passes_straight_through() {
+        let summary = summarise(
+            "(defun old-name (x) x)\n",
+            "(defun new-name (x) x)\n",
+            Dialect::CommonLisp,
+        )
+        .expect("parses");
+        let headline = build_fix_headline(&[summary], 1);
+        assert_eq!(headline, "1 renamed definition.");
+    }
+
+    #[test]
+    fn several_files_combine_into_one_headline() {
+        let a = summarise(
+            "(defun f (x) x)\n",
+            "(defun f (x) x)\n(defun g (y) y)\n",
+            Dialect::CommonLisp,
+        )
+        .expect("parses");
+        let b = summarise("(defun h (z) z)\n", "", Dialect::CommonLisp).expect("parses");
+        let headline = build_fix_headline(&[a, b], 2);
+        assert!(headline.contains("added"), "{headline}");
+        assert!(headline.contains("removed"), "{headline}");
+    }
 }
 
 /// Writes the current findings (for the active rules plus any custom rules,

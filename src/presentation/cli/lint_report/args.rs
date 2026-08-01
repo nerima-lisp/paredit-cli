@@ -253,6 +253,18 @@ pub(in crate::presentation::cli) struct LintReportArgs {
     /// can change runtime behaviour rather than only spelling.
     #[arg(long, requires = "fix")]
     pub(in crate::presentation::cli::lint_report) no_destructive_fixes: bool,
+    /// With --fix, in text mode, print only the one-line change headline
+    /// instead of the full field-by-field report. Meaningless without a write
+    /// (--check makes no write, and --diff previews a different payload), so
+    /// both are refused rather than silently ignored.
+    #[arg(long, requires = "fix", conflicts_with_all = ["check", "diff"])]
+    pub(in crate::presentation::cli::lint_report) compact: bool,
+    /// With --fix, write changed files one impact-area (declared package)
+    /// group at a time instead of all at once, continuing to the next group
+    /// when one group's write fails. Same refusal as --compact and for the
+    /// same reason: with nothing written there is nothing to group.
+    #[arg(long, requires = "fix", conflicts_with_all = ["check", "diff"])]
+    pub(in crate::presentation::cli::lint_report) group_by_impact_area: bool,
     /// Load the project's own pattern rules from this directory instead of
     /// the default `.paredit/rules`.
     #[arg(long, value_name = "DIR")]
@@ -365,6 +377,8 @@ impl LintReportArgs {
     pub(in crate::presentation::cli) fn for_fix(
         selection: FixSelectionArgs,
         mode: FixMode,
+        compact: bool,
+        group_by_impact_area: bool,
     ) -> Self {
         Self {
             files: selection.files,
@@ -402,6 +416,12 @@ impl LintReportArgs {
             rule_args: Vec::new(),
             timings: false,
             no_destructive_fixes: selection.no_destructive_fixes,
+            // Apply-only, the same way `check`/`fix_plan` above are gated on
+            // `mode`: `fix check` and `fix plan` share this struct's
+            // construction but neither one writes, so neither carries a
+            // headline or a grouped write to report.
+            compact: compact && mode == FixMode::Apply,
+            group_by_impact_area: group_by_impact_area && mode == FixMode::Apply,
             custom_rules: selection.custom_rules,
             test_rules: false,
             require_suppression_reason: false,

@@ -1508,5 +1508,11 @@
       }
     }
   ],
+  "next_commands": [
+    {
+      "command": "paredit fix apply broad.lisp --output json",
+      "why": "88 fixable finding(s) found; this applies them."
+    }
+  ],
   "schema_version": 1
 }
