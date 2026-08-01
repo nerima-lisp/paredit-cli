@@ -30,13 +30,14 @@ pub mod resolve;
 pub mod rewrite;
 pub mod stable_id;
 
-pub use error::{PatternError, RewriteError, SelectorError, SelectorResult};
+pub use error::{AmbiguousCandidate, PatternError, RewriteError, SelectorError, SelectorResult};
 pub use line_index::{LineIndex, LinePosition};
 pub use matcher::{Capture, PatternMatch, match_all};
 pub use normalize::normalized_form_text;
 pub use pattern::{CaptureKind, Pattern};
 pub use resolve::{
-    RangeExtent, RelativeStep, SelectorRequest, SelectorTarget, SelectorTerm, resolve, target_text,
+    MAX_AMBIGUOUS_CANDIDATES, RangeExtent, RelativeStep, SelectorRequest, SelectorTarget,
+    SelectorTerm, ambiguous_candidates, resolve, target_text,
 };
 pub use rewrite::{
     Replacement, RewriteAllowances, RewritePlan, SkipReason, SkippedMatch, Template, apply_plan,

@@ -183,6 +183,8 @@ mod error_diagnosis;
 mod eval_when_situation_report;
 #[path = "cli/exhaustive_case_otherwise_report.rs"]
 mod exhaustive_case_otherwise_report;
+#[path = "cli/explain_error.rs"]
+mod explain_error;
 #[path = "cli/explicit_nil_return_report.rs"]
 mod explicit_nil_return_report;
 #[path = "cli/explicit_step_delta_report.rs"]

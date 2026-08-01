@@ -62,7 +62,7 @@ the `--config`/`--no-config`/`--no-config-env` trio are covered in
 `--max-*` budgets in [Bounding a run](../guide/safety.md#bounding-a-run); and
 `--new-file-mode`/`--refuse-symlinked-ancestors` in
 [Write permissions and symlinked ancestors](../guide/safety.md#write-permissions-and-symlinked-ancestors).
-The remaining three are terminal presentation, not safety, and apply nowhere
+The remaining four are terminal presentation, not safety, and apply nowhere
 else:
 
 | Flag | What it does |
@@ -70,6 +70,7 @@ else:
 | `--color <auto\|always\|never>` | Whether text output may use ANSI color. `auto`, the default, colors if and only if the destination stream is a terminal, `NO_COLOR` and `TERM=dumb` are both unset, and `CLICOLOR_FORCE`/`FORCE_COLOR` have not already decided the question in the other direction (the off signals win over the on signals). The hues it may use, and the rule that none of them ever carries a signal alone, are in [Terminal Color](color-palette.md). |
 | `--paginate` | Delegates stdout to `$PAGER` (falling back to `less`) when it is a terminal. Off by default — unlike `--color`, paging changes the interaction itself, so it has to be asked for. |
 | `--plain-language` | Adds one line to a text-mode failure paraphrasing its error category — the same `category_description` the `--output json` envelope has always carried. Off by default, so the existing stderr rendering is byte-for-byte unchanged. |
+| `--explain-error` | On a failure, prints the full [Error Codes](errors.md) section for that code inline — the same text `doc_url` links to, extracted from the same markdown embedded in the binary at compile time. No network access. Named `--explain-error` rather than `--explain` because `inspect lint --explain <RULE>` and `migrate explain` already claim that spelling for unrelated things. |
 
 ## Inspect
 

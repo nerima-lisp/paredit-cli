@@ -14,7 +14,22 @@
 
 use thiserror::Error;
 
+use super::line_index::LinePosition;
 use crate::sexpr::SexprError;
+
+/// A brief, position-anchored description of one form an ambiguous selector
+/// matched, carried by [`SelectorError::Ambiguous`] so a caller can see what
+/// was actually found without a second `inspect resolve` round trip.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AmbiguousCandidate {
+    /// The path this specific match resolves to, so a follow-up `--path` can
+    /// pick it out exactly.
+    pub path: String,
+    pub start: LinePosition,
+    pub end: LinePosition,
+    /// A single-line, length-bounded rendering of the matched source.
+    pub preview: String,
+}
 
 /// A `--query` pattern that is not a well-formed pattern.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -108,7 +123,14 @@ pub enum SelectorError {
         "{selector} matches {count} forms; pass --all to act on every match, \
          or narrow the selector (see `paredit inspect resolve`)"
     )]
-    Ambiguous { selector: String, count: usize },
+    Ambiguous {
+        selector: String,
+        count: usize,
+        /// The matches themselves, bounded to
+        /// [`crate::selector::resolve::MAX_AMBIGUOUS_CANDIDATES`] — `count`
+        /// still carries the true total when there were more.
+        candidates: Vec<AmbiguousCandidate>,
+    },
 
     #[error("--capture {name} is not bound by this pattern; it binds {bound}")]
     UnknownCapture { name: String, bound: String },

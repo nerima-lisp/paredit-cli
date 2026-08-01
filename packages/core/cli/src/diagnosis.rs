@@ -21,7 +21,7 @@
 use std::fmt;
 
 use paredit_core_edit::EditRefusal;
-use paredit_core_syntax::selector::error::SelectorError;
+use paredit_core_syntax::selector::error::{AmbiguousCandidate, SelectorError};
 use paredit_core_syntax::sexpr::{
     PathError, SelectionError, SexprError, SpanError, StructureError, SymbolError,
 };
@@ -308,6 +308,18 @@ impl ErrorCode {
         )
     }
 
+    /// The body of this code's own section in `docs/src/reference/errors.md`
+    /// — what `--explain-error` prints, and what `doc_url` links to.
+    ///
+    /// `None` only if the anchor is missing, which
+    /// `every_error_code_has_a_documented_anchor` already refuses to let
+    /// happen; a caller may still treat that as "nothing to add" rather than
+    /// unwrap it, since printing an explanation is always optional.
+    #[must_use]
+    pub fn explanation(self) -> Option<&'static str> {
+        explanation_section(errors_markdown(), self.label())
+    }
+
     /// Every code, so a contract test can check the table is total and the
     /// labels unique.
     pub const ALL: [Self; 44] = [
@@ -362,6 +374,31 @@ impl fmt::Display for ErrorCode {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.label())
     }
+}
+
+/// The embedded copy of `docs/src/reference/errors.md`.
+///
+/// One `include_str!` call site, used both by [`ErrorCode::explanation`] at
+/// run time and by `every_error_code_has_a_documented_anchor` in the test
+/// below — so `--explain-error` and the contract test that guarantees its
+/// anchors exist read literally the same bytes, embedded in the binary at
+/// compile time rather than fetched over the network.
+const fn errors_markdown() -> &'static str {
+    include_str!("../../../../docs/src/reference/errors.md")
+}
+
+/// The body of `label`'s own `### \`label\` { #label }` section: everything
+/// up to the next `##`-or-deeper heading, or the end of the file.
+///
+/// `None` when the anchor itself is not in `doc`, which for a code in
+/// [`ErrorCode::ALL`] the contract test below already refuses to allow.
+fn explanation_section<'a>(doc: &'a str, label: &str) -> Option<&'a str> {
+    let heading = format!("### `{label}` {{ #{label} }}");
+    let start = doc.find(&heading)?;
+    let body_start = start + heading.len();
+    let body = &doc[body_start..];
+    let body_end = body.find("\n##").unwrap_or(body.len());
+    Some(body[..body_end].trim())
 }
 
 /// One thing that would plausibly get past this failure.
@@ -463,6 +500,13 @@ pub struct Diagnosis {
     /// variant. A caller holding the source text can render a caret under it;
     /// [`render_caret`] does exactly that for the CLI's own stderr output.
     pub offset: Option<usize>,
+    /// The forms `SelectorError::Ambiguous` actually matched, carried
+    /// straight through from the selector layer. Empty for every other code.
+    ///
+    /// Lets the JSON envelope answer "what did it match" inline, without a
+    /// second `inspect resolve --output json` round trip — see
+    /// `paredit_core_syntax::selector::MAX_AMBIGUOUS_CANDIDATES` for the cap.
+    pub candidates: Vec<AmbiguousCandidate>,
 }
 
 impl Diagnosis {
@@ -480,8 +524,23 @@ impl Diagnosis {
             "repairs": self.repairs.iter().map(Repair::to_json).collect::<Vec<_>>(),
             "offset": self.offset,
             "doc_url": self.code.doc_url(),
+            "candidates": self.candidates.iter().map(candidate_json).collect::<Vec<_>>(),
         })
     }
+}
+
+/// One [`AmbiguousCandidate`], rendered the way `resolve_report` renders a
+/// match — `path`, `start`/`end` line:column, `preview` — so a caller reading
+/// both does not have to learn two shapes for the same idea.
+fn candidate_json(candidate: &AmbiguousCandidate) -> Json {
+    json!({
+        "path": candidate.path,
+        "start": { "line": candidate.start.line(), "column": candidate.start.column() },
+        "end": { "line": candidate.end.line(), "column": candidate.end.column() },
+        // Escaped for the same reason `message` is: source text the caller
+        // did not choose.
+        "preview": crate::shared::terminal_safe(&candidate.preview).to_string(),
+    })
 }
 
 /// Classifies a failure and works out what would get past it.
@@ -495,9 +554,21 @@ pub fn diagnose(failure: &CommandFailure, context: &Context) -> Diagnosis {
     Diagnosis {
         repairs: repairs(code, context),
         offset: extract_offset(failure),
+        candidates: extract_candidates(failure),
         category_description: code.category().describe(),
         code,
         message,
+    }
+}
+
+/// The candidates `failure` carries, when it is a
+/// [`SelectorError::Ambiguous`] and nothing else.
+fn extract_candidates(failure: &CommandFailure) -> Vec<AmbiguousCandidate> {
+    match failure {
+        CommandFailure::Error(CliError::Selector(SelectorError::Ambiguous {
+            candidates, ..
+        })) => candidates.clone(),
+        _ => Vec::new(),
     }
 }
 
@@ -1005,8 +1076,12 @@ fn repairs(code: ErrorCode, context: &Context) -> Vec<Repair> {
                 .with_command(context.command("inspect resolve --output json")),
         ],
 
+        // The matches are already inline — see `Diagnosis::candidates` — so
+        // `inspect resolve` is kept only as a fallback: it is exhaustive
+        // (`candidates` is capped) and supports `--all` for a bulk pass.
         ErrorCode::SelectionAmbiguous => vec![
             Repair::new("change-selection", Message::RepairNarrowSelector),
+            Repair::new("re-read", Message::RepairCandidatesInline),
             Repair::new("inspect-first", Message::RepairShowMatches)
                 .with_command(context.command("inspect resolve --output json")),
         ],
@@ -1041,6 +1116,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
+    use paredit_core_syntax::selector::LinePosition;
     use paredit_core_syntax::sexpr::ParseError;
 
     fn context() -> Context {
@@ -1278,6 +1354,48 @@ mod tests {
             json["doc_url"],
             "https://nerima-lisp.github.io/paredit-cli/reference/errors/#argument.no-input"
         );
+        assert!(
+            json["candidates"]
+                .as_array()
+                .expect("candidates")
+                .is_empty()
+        );
+    }
+
+    /// `SelectorError::Ambiguous` is the one variant that carries its own
+    /// matches — see FR-002 — and the JSON envelope has to pass them through
+    /// rather than dropping them the way it drops every other variant's
+    /// fields once classified.
+    #[test]
+    fn an_ambiguous_selector_carries_its_candidates_inline() {
+        let diagnosis = diagnose_of(CliError::from(SelectorError::Ambiguous {
+            selector: "--name f".to_owned(),
+            count: 2,
+            candidates: vec![
+                AmbiguousCandidate {
+                    path: "0".to_owned(),
+                    start: LinePosition::new(1, 1).unwrap(),
+                    end: LinePosition::new(1, 13).unwrap(),
+                    preview: "(defun f ())".to_owned(),
+                },
+                AmbiguousCandidate {
+                    path: "1".to_owned(),
+                    start: LinePosition::new(2, 1).unwrap(),
+                    end: LinePosition::new(2, 13).unwrap(),
+                    preview: "(defun f (x))".to_owned(),
+                },
+            ],
+        }));
+        assert_eq!(diagnosis.code, ErrorCode::SelectionAmbiguous);
+        let json = diagnosis.to_json();
+        let candidates = json["candidates"].as_array().expect("candidates");
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0]["path"], "0");
+        assert_eq!(candidates[0]["start"]["line"], 1);
+        assert_eq!(candidates[0]["start"]["column"], 1);
+        assert_eq!(candidates[0]["preview"], "(defun f ())");
+        assert_eq!(candidates[1]["path"], "1");
+        assert_eq!(candidates[1]["preview"], "(defun f (x))");
     }
 
     /// A parse failure always names a position: every `ParseError` variant
@@ -1346,7 +1464,7 @@ mod tests {
     /// producing a dead link.
     #[test]
     fn every_error_code_has_a_documented_anchor() {
-        let doc = include_str!("../../../../docs/src/reference/errors.md");
+        let doc = errors_markdown();
         for code in ErrorCode::ALL {
             let anchor = format!("{{ #{} }}", code.label());
             assert!(
@@ -1355,5 +1473,48 @@ mod tests {
                 code.label()
             );
         }
+    }
+
+    /// The other half of the same promise: not just that the anchor exists,
+    /// but that `--explain-error` can actually extract a non-empty body for
+    /// every code, and that the extraction stops before the next heading
+    /// rather than running on into it.
+    #[test]
+    fn every_error_code_has_a_nonempty_explanation() {
+        for code in ErrorCode::ALL {
+            let explanation = code.explanation();
+            assert!(
+                explanation.is_some(),
+                "{}: no explanation extracted",
+                code.label()
+            );
+            let body = explanation.unwrap();
+            assert!(!body.is_empty(), "{}: empty explanation", code.label());
+            assert!(
+                !body.contains("\n##"),
+                "{}: explanation ran past its section boundary",
+                code.label()
+            );
+        }
+    }
+
+    #[test]
+    fn an_explanation_is_exactly_its_sections_prose() {
+        assert_eq!(
+            ErrorCode::SelectionAmbiguous.explanation(),
+            Some(
+                "A selector matched more than one form, and the command needs exactly one.\n\
+                 Pass `--all` to act on every match, or narrow the selector."
+            )
+        );
+    }
+
+    #[test]
+    fn a_section_stops_before_the_next_top_level_heading() {
+        // `input.dialect-unsupported` is the last code before a `## Refusal`
+        // heading, so this exercises the `##` boundary as well as `###`.
+        let explanation = ErrorCode::InputDialectUnsupported.explanation().unwrap();
+        assert!(!explanation.contains("## Refusal"));
+        assert!(explanation.contains("no selection in it will help"));
     }
 }
