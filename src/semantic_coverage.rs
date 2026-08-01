@@ -566,6 +566,174 @@ impl SemanticCoveragePolicy {
     }
 }
 
+/// One `--fail-under-dialect DIALECT=PERCENT` request, already validated.
+///
+/// Private fields behind a fallible constructor rather than public settable
+/// ones: `percent` alone can be "inconsistent" (negative, `NaN`, above 100),
+/// and rejecting that once here means every caller — the CLI parser and any
+/// future one — gets the same rejection instead of re-deriving it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DialectCoverageThreshold {
+    dialect: Dialect,
+    percent: f64,
+}
+
+impl DialectCoverageThreshold {
+    /// Rejects a percentage that could never describe a resolution rate.
+    pub fn new(dialect: Dialect, percent: f64) -> Result<Self, String> {
+        if !percent.is_finite() || !(0.0..=100.0).contains(&percent) {
+            return Err(format!(
+                "--fail-under-dialect percentage must be a number between 0 and 100, got {percent}"
+            ));
+        }
+        Ok(Self { dialect, percent })
+    }
+
+    #[must_use]
+    pub const fn dialect(&self) -> Dialect {
+        self.dialect
+    }
+
+    #[must_use]
+    pub const fn percent(&self) -> f64 {
+        self.percent
+    }
+}
+
+/// The outcome of gating one dialect's resolution rate against a
+/// [`DialectCoverageThreshold`].
+///
+/// Mirrors [`SemanticCoveragePolicy`], scoped to one dialect via
+/// [`SemanticCoverageReport::by_dialect`] instead of the corpus-wide totals.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DialectCoveragePolicyResult {
+    dialect: Dialect,
+    threshold: f64,
+    resolved_percent: f64,
+    passed: bool,
+    message: Option<String>,
+}
+
+impl DialectCoveragePolicyResult {
+    #[must_use]
+    pub const fn dialect(&self) -> Dialect {
+        self.dialect
+    }
+
+    #[must_use]
+    pub const fn threshold(&self) -> f64 {
+        self.threshold
+    }
+
+    #[must_use]
+    pub const fn resolved_percent(&self) -> f64 {
+        self.resolved_percent
+    }
+
+    #[must_use]
+    pub const fn passed(&self) -> bool {
+        self.passed
+    }
+
+    #[must_use]
+    pub fn message(&self) -> Option<&str> {
+        self.message.as_deref()
+    }
+
+    /// Evaluates one dialect threshold against the report's per-dialect
+    /// totals.
+    ///
+    /// Mirrors [`SemanticCoveragePolicy::evaluate`]'s empty-corpus handling
+    /// exactly, just scoped to one dialect: a dialect
+    /// [`SemanticCoverageReport::by_dialect`] omits entirely (zero
+    /// discovered files) and a dialect with files but zero measured variable
+    /// bindings both fail loudly rather than trivially passing at a
+    /// fabricated 100%. An armed per-dialect threshold over nothing measured
+    /// is the same misconfiguration signal the corpus-wide gate already
+    /// treats as a loud failure, not a silent skip.
+    #[must_use]
+    pub fn evaluate(threshold: DialectCoverageThreshold, report: &SemanticCoverageReport) -> Self {
+        let dialect = threshold.dialect();
+        let percent_threshold = threshold.percent();
+        let totals = report
+            .by_dialect()
+            .into_iter()
+            .find_map(|(found, totals)| (found == dialect).then_some(totals))
+            .unwrap_or_default();
+
+        let resolved_percent = if totals.variable_bindings == 0 {
+            100.0
+        } else {
+            (totals.resolved_bindings as f64 / totals.variable_bindings as f64) * 100.0
+        };
+
+        let (passed, message) = if totals.variable_bindings == 0 {
+            (
+                false,
+                Some(format!(
+                    "no {} variable bindings were measured; --fail-under-dialect cannot \
+                     evaluate an empty corpus for this dialect",
+                    dialect.label()
+                )),
+            )
+        } else {
+            let passed = resolved_percent >= percent_threshold;
+            let message = (!passed).then(|| {
+                format!(
+                    "resolved {}/{} variable bindings ({resolved_percent:.1}%) for {}, below \
+                     the --fail-under-dialect threshold of {percent_threshold:.1}%",
+                    totals.resolved_bindings,
+                    totals.variable_bindings,
+                    dialect.label(),
+                )
+            });
+            (passed, message)
+        };
+
+        Self {
+            dialect,
+            threshold: percent_threshold,
+            resolved_percent,
+            passed,
+            message,
+        }
+    }
+}
+
+/// Every `--fail-under-dialect` result for one run, in the order the caller
+/// supplied the thresholds.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DialectCoveragePolicyReport {
+    results: Vec<DialectCoveragePolicyResult>,
+}
+
+impl DialectCoveragePolicyReport {
+    #[must_use]
+    pub fn evaluate(
+        thresholds: &[DialectCoverageThreshold],
+        report: &SemanticCoverageReport,
+    ) -> Self {
+        Self {
+            results: thresholds
+                .iter()
+                .map(|threshold| DialectCoveragePolicyResult::evaluate(*threshold, report))
+                .collect(),
+        }
+    }
+
+    #[must_use]
+    pub fn results(&self) -> &[DialectCoveragePolicyResult] {
+        &self.results
+    }
+
+    /// Whether every supplied dialect threshold passed. Vacuously true when
+    /// no per-dialect thresholds were requested.
+    #[must_use]
+    pub fn passed(&self) -> bool {
+        self.results.iter().all(DialectCoveragePolicyResult::passed)
+    }
+}
+
 pub fn build_semantic_coverage_report(
     source: &mut impl SemanticCoverageSourcePort,
     request: SemanticCoverageRequest,
@@ -1110,5 +1278,105 @@ mod tests {
         let policy = SemanticCoveragePolicy::evaluate(None, &report);
         assert!(policy.passed);
         assert!(policy.message.is_none());
+    }
+
+    #[test]
+    fn a_dialect_threshold_rejects_an_out_of_range_percentage() {
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, -1.0).is_err());
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, 100.1).is_err());
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, f64::NAN).is_err());
+        assert!(DialectCoverageThreshold::new(Dialect::CommonLisp, 50.0).is_ok());
+    }
+
+    /// (a) A per-dialect threshold at or below that dialect's own resolved
+    /// rate passes, the same as the corpus-wide gate.
+    #[test]
+    fn a_dialect_threshold_at_or_below_the_resolved_rate_passes() {
+        let file = report("(let ((x 1)) x)");
+        let coverage = SemanticCoverageReport {
+            files: vec![file],
+            errors: Vec::new(),
+        };
+        let threshold = DialectCoverageThreshold::new(Dialect::CommonLisp, 90.0)
+            .expect("90 is a valid percentage");
+        let result = DialectCoveragePolicyResult::evaluate(threshold, &coverage);
+        assert!(result.passed());
+        assert!(result.message().is_none());
+    }
+
+    /// (b) A per-dialect threshold above that dialect's own resolved rate
+    /// fails, with a message naming the dialect.
+    #[test]
+    fn a_dialect_threshold_above_the_resolved_rate_fails_with_a_message() {
+        let file = report("(let ((x (read))) x)");
+        let coverage = SemanticCoverageReport {
+            files: vec![file],
+            errors: Vec::new(),
+        };
+        let threshold = DialectCoverageThreshold::new(Dialect::CommonLisp, 50.0)
+            .expect("50 is a valid percentage");
+        let result = DialectCoveragePolicyResult::evaluate(threshold, &coverage);
+        assert!(!result.passed());
+        let message = result.message().expect("a failing gate explains itself");
+        assert!(message.contains("common-lisp"));
+    }
+
+    /// (c) A dialect the corpus never discovered any files for fails loudly
+    /// the same way an empty corpus does for `--fail-under`: `by_dialect`
+    /// omits the row entirely, and that must not read as "measured and
+    /// found nothing to resolve" — the same misconfiguration signal (a
+    /// typo'd dialect, a corpus that simply has none of that dialect yet)
+    /// the corpus-wide gate already refuses to pass silently.
+    #[test]
+    fn a_dialect_threshold_over_zero_discovered_files_fails_rather_than_passing_trivially() {
+        let file = report("(let ((x 1)) x)");
+        let coverage = SemanticCoverageReport {
+            files: vec![file],
+            errors: Vec::new(),
+        };
+        let threshold = DialectCoverageThreshold::new(Dialect::EmacsLisp, 50.0)
+            .expect("50 is a valid percentage");
+        let result = DialectCoveragePolicyResult::evaluate(threshold, &coverage);
+        assert!(!result.passed());
+        assert!(result.message().is_some());
+    }
+
+    /// (d) Global and per-dialect thresholds combine with AND semantics: the
+    /// corpus-wide rate can clear `--fail-under` while one dialect's own
+    /// rate still misses its `--fail-under-dialect` floor, and the overall
+    /// gate — as the CLI workflow combines the two — must still fail.
+    #[test]
+    fn a_passing_global_threshold_and_a_failing_dialect_threshold_together_fail_overall() {
+        let mut source = FakeSource::default()
+            .with_file("a.lisp", "(let ((x 1)) x)")
+            .with_file("a.el", "(let ((x 1)) x)");
+        let coverage = build_semantic_coverage_report(
+            &mut source,
+            SemanticCoverageRequest {
+                paths: vec![PathBuf::from("a.lisp"), PathBuf::from("a.el")],
+                ..Default::default()
+            },
+        )
+        .expect("workflow succeeds");
+
+        // 2 variable bindings total (one per file), 1 resolved (common-lisp
+        // only) = exactly 50%.
+        let global = SemanticCoveragePolicy::evaluate(Some(50.0), &coverage);
+        assert!(global.passed, "corpus-wide rate is exactly 50%");
+
+        let threshold = DialectCoverageThreshold::new(Dialect::EmacsLisp, 50.0)
+            .expect("50 is a valid percentage");
+        let dialect_policy = DialectCoveragePolicyReport::evaluate(&[threshold], &coverage);
+        assert!(
+            !dialect_policy.passed(),
+            "emacs-lisp resolves nothing, so its own rate is 0%"
+        );
+
+        let overall_passed = global.passed && dialect_policy.passed();
+        assert!(
+            !overall_passed,
+            "a failing per-dialect threshold must fail the run even when the \
+             corpus-wide threshold passes"
+        );
     }
 }

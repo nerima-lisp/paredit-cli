@@ -5,9 +5,9 @@ use crate::presentation::cli::semantic_coverage_report::args::SemanticCoverageRe
 use crate::presentation::cli::semantic_coverage_report::render::print_semantic_coverage_report;
 use crate::presentation::cli::shared::expand_input_files;
 use crate::semantic_coverage::{
-    DiscoveredSemanticCoverageFile, SemanticCoverageInventory, SemanticCoveragePolicy,
-    SemanticCoverageRequest, SemanticCoverageSourcePort, SemanticCoverageWorkflowError,
-    build_semantic_coverage_report,
+    DialectCoveragePolicyReport, DiscoveredSemanticCoverageFile, SemanticCoverageInventory,
+    SemanticCoveragePolicy, SemanticCoverageRequest, SemanticCoverageSourcePort,
+    SemanticCoverageWorkflowError, build_semantic_coverage_report,
 };
 
 /// Reads files this command already expanded from directories, so discovery
@@ -58,15 +58,26 @@ pub(in crate::presentation::cli) fn semantic_coverage_report(
     .map_err(|SemanticCoverageWorkflowError::Source(source)| *source)?;
 
     let policy = SemanticCoveragePolicy::evaluate(args.fail_under, &report);
-    let policy_passed = policy.passed;
-    let policy_message = policy.message.clone();
+    let dialect_policy = DialectCoveragePolicyReport::evaluate(&args.fail_under_dialect, &report);
+    // AND semantics: `--fail-under` and any number of `--fail-under-dialect`
+    // flags are independent gates the caller asked to be held to
+    // simultaneously, so the run fails if any one of them does, not only
+    // when all of them do.
+    let policy_passed = policy.passed && dialect_policy.passed();
 
-    print_semantic_coverage_report(&report, &policy, args.top, args.output)?;
+    print_semantic_coverage_report(&report, &policy, &dialect_policy, args.top, args.output)?;
 
     if !policy_passed {
+        let mut messages: Vec<String> = policy.message.clone().into_iter().collect();
+        messages.extend(
+            dialect_policy
+                .results()
+                .iter()
+                .filter_map(|result| result.message().map(str::to_owned)),
+        );
         return Err(gate::gate_failure(format!(
             "inspect semantic-coverage policy failed: {}",
-            policy_message.unwrap_or_default()
+            messages.join("; ")
         )));
     }
 

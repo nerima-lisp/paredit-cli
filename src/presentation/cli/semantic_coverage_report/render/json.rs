@@ -1,13 +1,16 @@
 use paredit_core_cli::CliResult;
 use serde_json::json;
 
-use crate::semantic_coverage::{SemanticCoveragePolicy, SemanticCoverageReport};
+use crate::semantic_coverage::{
+    DialectCoveragePolicyReport, SemanticCoveragePolicy, SemanticCoverageReport,
+};
 
 use super::percentage;
 
 pub(super) fn print_semantic_coverage_report(
     report: &SemanticCoverageReport,
     policy: &SemanticCoveragePolicy,
+    dialect_policy: &DialectCoveragePolicyReport,
     top: usize,
 ) -> CliResult<()> {
     let variable_bindings = report.total_variable_bindings();
@@ -30,6 +33,20 @@ pub(super) fn print_semantic_coverage_report(
                 "list_expressions": totals.list_expressions,
                 "known_list_expressions": totals.known_list_expressions,
                 "known_percent": percentage(totals.known_list_expressions, totals.list_expressions),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let dialect_policies = dialect_policy
+        .results()
+        .iter()
+        .map(|result| {
+            json!({
+                "dialect": result.dialect().label(),
+                "fail_under_dialect": result.threshold(),
+                "resolved_percent": result.resolved_percent(),
+                "passed": result.passed(),
+                "message": result.message(),
             })
         })
         .collect::<Vec<_>>();
@@ -117,6 +134,7 @@ pub(super) fn print_semantic_coverage_report(
             "passed": policy.passed,
             "message": policy.message,
         },
+        "dialect_policies": dialect_policies,
     });
 
     println!("{}", serde_json::to_string_pretty(&payload)?);
