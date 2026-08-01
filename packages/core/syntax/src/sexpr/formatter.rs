@@ -23,4 +23,8 @@ pub struct Formatter {
     /// back to a multi-line layout. [`MAX_INLINE_WIDTH`] unless overridden
     /// with [`Formatter::with_max_width`].
     max_width: usize,
+    /// Realign `#|...|#` block comment lines to their nesting depth. `false`
+    /// unless overridden with [`Formatter::with_reindent_block_comments`]: a
+    /// formatting *policy* rather than a bug fix, so it stays opt-in.
+    reindent_block_comments: bool,
 }

@@ -13,6 +13,10 @@ repository.workspace = true
 # No anyhow. Section 9.2 finished here: every fallible entry point returns a
 # thiserror enum, so a caller matches on a variant instead of a message.
 thiserror.workspace = true
+# East-Asian-Width–aware display-column counting for the formatter's inline-
+# width budget. `no_std`-compatible and dependency-free itself, unlike anyhow;
+# the "no anyhow" line above is about error handling, not a ban on every dep.
+unicode-width.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

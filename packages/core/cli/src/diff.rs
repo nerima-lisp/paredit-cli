@@ -80,6 +80,38 @@ pub fn diff_stat(diff: &str) -> DiffStat {
     stat
 }
 
+/// The running total `edit format --diff-stat` reports across more than one
+/// file: every per-file [`DiffStat`], plus how many of the files it came from
+/// actually changed.
+///
+/// A separate type from [`DiffStat`] rather than one more field bolted onto
+/// it: a single file has no "how many files changed" to report, and giving it
+/// one anyway would be a count that is always 0 or 1 and never worth printing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AggregateDiffStat {
+    pub files_scanned: usize,
+    pub files_changed: usize,
+    pub hunks: usize,
+    pub added_lines: usize,
+    pub removed_lines: usize,
+}
+
+impl AggregateDiffStat {
+    /// Sums one [`DiffStat`] and whether its file changed, per file.
+    #[must_use]
+    pub fn of(entries: impl IntoIterator<Item = (bool, DiffStat)>) -> Self {
+        let mut totals = Self::default();
+        for (changed, stat) in entries {
+            totals.files_scanned = totals.files_scanned.saturating_add(1);
+            totals.files_changed = totals.files_changed.saturating_add(usize::from(changed));
+            totals.hunks = totals.hunks.saturating_add(stat.hunks);
+            totals.added_lines = totals.added_lines.saturating_add(stat.added_lines);
+            totals.removed_lines = totals.removed_lines.saturating_add(stat.removed_lines);
+        }
+        totals
+    }
+}
+
 fn unified_diff_with_limits(
     path: &FsPath,
     before: &str,
@@ -596,8 +628,9 @@ fn minimal_omission(max_output_bytes: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        DiffLimits, MAX_DISPLAY_PATH_BYTES, bounded_display_path, diff_stat, escaped_diff_line_len,
-        push_escaped_diff_line, unified_diff, unified_diff_with_limits,
+        AggregateDiffStat, DiffLimits, DiffStat, MAX_DISPLAY_PATH_BYTES, bounded_display_path,
+        diff_stat, escaped_diff_line_len, push_escaped_diff_line, unified_diff,
+        unified_diff_with_limits,
     };
     use std::path::Path;
 
@@ -664,6 +697,48 @@ mod tests {
         let stat = diff_stat(&diff);
         assert_eq!(stat.added_lines, 1);
         assert_eq!(stat.removed_lines, 1);
+    }
+
+    #[test]
+    fn aggregate_diff_stat_sums_hunks_and_lines_and_counts_changed_files() {
+        let entries = [
+            (
+                true,
+                DiffStat {
+                    hunks: 1,
+                    added_lines: 2,
+                    removed_lines: 1,
+                },
+            ),
+            (false, DiffStat::default()),
+            (
+                true,
+                DiffStat {
+                    hunks: 3,
+                    added_lines: 1,
+                    removed_lines: 4,
+                },
+            ),
+        ];
+        let totals = AggregateDiffStat::of(entries);
+        assert_eq!(
+            totals,
+            AggregateDiffStat {
+                files_scanned: 3,
+                files_changed: 2,
+                hunks: 4,
+                added_lines: 3,
+                removed_lines: 5,
+            }
+        );
+    }
+
+    #[test]
+    fn aggregate_diff_stat_of_no_files_is_all_zero() {
+        assert_eq!(
+            AggregateDiffStat::of(std::iter::empty()),
+            AggregateDiffStat::default()
+        );
     }
 
     #[test]

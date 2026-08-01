@@ -12,19 +12,31 @@ use paredit_core_syntax::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTr
 use std::path::Path;
 
 use crate::presentation::cli::shared::{
-    diff_stat, edit_target, edit_target_with, emit_document, read_input_and_dialect,
-    read_input_dialect_and_tree, resolve_compact, resolve_one, resolve_targets, unified_diff,
+    AggregateDiffStat, DiffStat, analyze_files, diff_stat, edit_target, edit_target_with,
+    emit_document, expand_input_files, note_partial_file_failures, read_input_and_dialect,
+    read_input_dialect_and_tree, resolve_compact, resolve_one, resolve_targets, total_file_failure,
+    unified_diff,
 };
 use paredit_core_cli::error::ArgumentError;
 use paredit_core_cli::kill_ring::{KillRingEntry, read_ring, ring_path, write_ring};
 use paredit_core_syntax::selector::target_text;
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
+    // `--diff-stat` is the one mode more than one file can drive; every other
+    // mode (plain output, `--write`, `--diff`, `--check`) still names exactly
+    // one file, or stdin, through `--file`. `paths` requires `--diff-stat`
+    // already, at the argument parser.
+    if !args.paths.is_empty() {
+        return format_diff_stat_many(args);
+    }
+
     let check = args.check;
     let diff_stat_only = args.diff_stat;
     let max_width = args.max_width;
+    let reindent_block_comments = args.reindent_block_comments;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    let mut formatter = Formatter::with_dialect(args.indent, dialect);
+    let mut formatter = Formatter::with_dialect(args.indent, dialect)
+        .with_reindent_block_comments(reindent_block_comments);
     if let Some(max_width) = max_width {
         formatter = formatter.with_max_width(max_width);
     }
@@ -70,6 +82,83 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
     }
 
     emit_document(&input, dialect, args.write, args.diff, rendered)
+}
+
+/// One file's `--diff-stat` result, computed while aggregating over more than
+/// one file.
+struct FileDiffStat {
+    path: String,
+    changed: bool,
+    stat: DiffStat,
+}
+
+/// `edit format --diff-stat` over `--file` (if given) and every `PATH`,
+/// aggregated into one summary alongside each file's own stat.
+///
+/// Routed through [`analyze_files`], the same per-file, partial-failure-
+/// resilient infrastructure `migrate run` and the multi-file reports use: a
+/// file that will not parse is reported and excluded, not a reason to fail a
+/// run over every other file too. Directories among `PATH` are expanded via
+/// workspace discovery first, through [`expand_input_files`] — the same
+/// expansion every other command that accepts a directory uses.
+fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
+    let mut inputs = Vec::with_capacity(args.paths.len().saturating_add(1));
+    inputs.extend(args.file.clone());
+    inputs.extend(args.paths.clone());
+    let files = expand_input_files(&inputs, args.dialect)?;
+
+    let indent = args.indent;
+    let max_width = args.max_width;
+    let reindent_block_comments = args.reindent_block_comments;
+    let analysis = analyze_files(&files, args.dialect, move |file, dialect, tree, input| {
+        let mut formatter = Formatter::with_dialect(indent, dialect)
+            .with_reindent_block_comments(reindent_block_comments);
+        if let Some(width) = max_width {
+            formatter = formatter.with_max_width(width);
+        }
+        let rendered = formatter.format(tree);
+        let diff = unified_diff(file, &input.text, &rendered);
+        let stat = diff_stat(&diff);
+        CliResult::Ok(FileDiffStat {
+            path: file.display().to_string(),
+            changed: !diff.is_empty(),
+            stat,
+        })
+    });
+    if analysis.is_total_failure() {
+        return Err(total_file_failure(analysis.failed).into());
+    }
+    note_partial_file_failures(&analysis.failed);
+
+    let totals = AggregateDiffStat::of(
+        analysis
+            .succeeded
+            .iter()
+            .map(|entry| (entry.changed, entry.stat)),
+    );
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
+            "files": analysis
+                .succeeded
+                .iter()
+                .map(|entry| json!({
+                    "path": entry.path,
+                    "changed": entry.changed,
+                    "hunks": entry.stat.hunks,
+                    "added_lines": entry.stat.added_lines,
+                    "removed_lines": entry.stat.removed_lines,
+                }))
+                .collect::<Vec<_>>(),
+            "total_files": totals.files_scanned,
+            "files_changed": totals.files_changed,
+            "hunks": totals.hunks,
+            "added_lines": totals.added_lines,
+            "removed_lines": totals.removed_lines,
+        }))?
+    );
+    Ok(())
 }
 
 pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> CliResult<()> {
