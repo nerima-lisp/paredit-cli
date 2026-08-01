@@ -100,6 +100,7 @@
 
 use std::cell::OnceCell;
 
+use paredit_core_lint_engine::engine::RuleContext;
 use paredit_core_semantics::semantics::NodeKey;
 use paredit_core_semantics::semantics::binding::{BindingTable, build_binding_table};
 use paredit_core_syntax::dialect::Dialect;
@@ -113,14 +114,24 @@ use paredit_core_syntax::view_query::list_head;
 /// something this file binds under the same name.
 ///
 /// Two variants because the two callers of a rule's `examine` reach the
-/// binding table differently. Under the lint suite every rule shares one
-/// table per file, already built by the time a whole-tree rule runs; a
-/// standalone `inspect leftover-…` command has no such run and builds its
-/// own — on first use, so a file with nothing to flag still pays nothing.
+/// binding table differently, but both defer the (expensive, whole-file)
+/// build until [`head_is_locally_bound`] is first actually called — which
+/// only happens once `examine` has already found a genuine syntactic
+/// candidate. A file with nothing to flag must not pay for a binding table at
+/// all: `Shared` holding `&RuleContext` rather than an already-fetched
+/// `&BindingTable` is exactly what makes that true, since
+/// [`RuleContext::binding_table`] is itself `OnceCell`-backed and building it
+/// is what a naive "resolve it before scanning" construction would have
+/// forced unconditionally on every file the lint suite touches, clean or not
+/// — this shape shipped once, regressed `clean/forms/*` in the benchmark
+/// suite by ~49%, and is the reason this doc paragraph exists.
+///
+/// [`head_is_locally_bound`]: OperatorScope::head_is_locally_bound
 #[derive(Debug)]
 pub enum OperatorScope<'a> {
-    /// The lint suite's per-file table, shared with every other rule.
-    Shared(&'a BindingTable),
+    /// The lint suite's per-file context, shared with every other rule;
+    /// `.binding_table()` is called only on first actual use.
+    Shared(&'a RuleContext<'a>),
     /// A standalone command's own table, built on first use.
     Standalone {
         dialect: Dialect,
@@ -131,8 +142,8 @@ pub enum OperatorScope<'a> {
 
 impl<'a> OperatorScope<'a> {
     #[must_use]
-    pub const fn shared(table: &'a BindingTable) -> Self {
-        Self::Shared(table)
+    pub const fn shared(context: &'a RuleContext<'a>) -> Self {
+        Self::Shared(context)
     }
 
     #[must_use]
@@ -146,7 +157,7 @@ impl<'a> OperatorScope<'a> {
 
     fn table(&self) -> &BindingTable {
         match self {
-            Self::Shared(table) => table,
+            Self::Shared(context) => context.binding_table(),
             Self::Standalone {
                 dialect,
                 tree,

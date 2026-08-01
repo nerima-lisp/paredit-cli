@@ -41,7 +41,7 @@ impl LintRule for Rule {
     ) -> LintResult<()> {
         let mut scanned_form_count = 0;
         let mut items = Vec::new();
-        let scope = OperatorScope::shared(context.binding_table());
+        let scope = OperatorScope::shared(context);
         examine(
             view,
             &scope,
