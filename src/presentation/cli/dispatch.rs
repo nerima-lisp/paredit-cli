@@ -696,11 +696,20 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::Writability(args) => {
                 writability_report::workflow::writability(args)?;
             }
+            command::InspectCommand::DataCheck(args) => {
+                data_check_report::workflow::data_check_report(args)?;
+            }
+            command::InspectCommand::KillRing(args) => {
+                kill_ring_report::workflow::kill_ring(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
             command::EditCommand::RepairUnclosedLists(args) => {
                 basic_edit::workflow::repair_unclosed_lists(args)?;
+            }
+            command::EditCommand::Canonicalize(args) => {
+                basic_edit::workflow::canonicalize(args)?;
             }
             command::EditCommand::Select(args) => basic_edit::workflow::select(args)?,
             command::EditCommand::Replace(args) => basic_edit::workflow::replace(args)?,
@@ -976,6 +985,7 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
         },
         Command::Fix { command } => fix::fix(command)?,
         Command::Migrate { command } => migrate(command)?,
+        Command::Schema { command } => schema(command)?,
         Command::Config { command } => match command {
             command::ConfigCommand::Check(args) => config::workflow::check(args)?,
             command::ConfigCommand::Show(args) => config::workflow::show(args)?,

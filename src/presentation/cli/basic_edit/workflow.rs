@@ -2,10 +2,10 @@ use paredit_core_cli::CliResult;
 use serde_json::json;
 
 use crate::presentation::cli::args::{
-    CompactSelectorArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, KillRingArgs,
-    NavigateArgs, NewlineArgs, NormalizeQuotesArgs, OutputFormat, RaiseArgs, ReindentArgs,
-    RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
-    YankPlacement,
+    CanonicalizeArgs, CompactSelectorArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs,
+    KillArgs, KillRingArgs, NavigateArgs, NewlineArgs, NormalizeQuotesArgs, OutputFormat,
+    RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs,
+    WrapArgs, YankArgs, YankPlacement,
 };
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTree};
@@ -193,6 +193,67 @@ pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> C
         .into());
     }
     emit_document(&input, dialect, args.write, args.diff, repaired)
+}
+
+/// Sorts an alist- or plist-shaped data file's keys and flattens its
+/// whitespace to a single space between elements, refusing a file that has
+/// no confidently alist- or plist-shaped list anywhere in it.
+///
+/// Routed through the same [`emit_document`] every other `edit` command
+/// writes through, so it inherits the same reparse guard, the same rollback,
+/// and the same CRLF restoration `edit format` already relies on — this
+/// command's own write-safety concern is narrower than "does it reparse", so
+/// `canonicalize::same_data` is checked first and refuses before
+/// `emit_document` is ever reached.
+///
+/// A file carrying any comment is refused outright, before either the
+/// stdout or the `--write` path is reached. `SyntaxTree` keeps comments
+/// outside the node tree entirely (see its own doc comment), so
+/// `canonicalize_document`'s `render` — which walks `ExpressionView` nodes —
+/// and `same_data`'s leaf-token equivalence check are both structurally
+/// blind to them: a comment is neither a node `render` can copy forward nor
+/// a leaf `same_data` can notice went missing. Rather than teach a
+/// key-reordering rewrite how to keep an inline trailing comment attached to
+/// the entry it followed — the same problem the formatter does not have,
+/// because it never reorders anything — this command refuses instead, the
+/// same "when in doubt, refuse" posture every other write command in this
+/// namespace already takes.
+pub(in crate::presentation::cli) fn canonicalize(args: CanonicalizeArgs) -> CliResult<()> {
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
+    if tree.comments().next().is_some() {
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            "refusing to canonicalize a file containing a comment: this command reorders and \
+             reflows entries but has no way to keep a comment attached to the entry it \
+             belongs to, so rewriting would silently drop it",
+        )
+        .into());
+    }
+    let Some(rendered) = super::canonicalize::canonicalize_document(&input.text, &tree) else {
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+            "no alist- or plist-shaped list found; refusing to canonicalize a file that is not \
+             confidently data",
+        )
+        .into());
+    };
+
+    let reparsed = SyntaxTree::parse_with_dialect(&rendered, dialect).map_err(|_| {
+        paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+            "refusing to write: the canonicalized document does not reparse",
+        )
+    })?;
+    if !super::canonicalize::same_data(&input.text, &tree, &rendered, &reparsed) {
+        return Err(paredit_core_cli::error::FeatureRefusal::message(
+            paredit_core_cli::diagnosis::ErrorCode::RefusalRewriteDoesNotReparse,
+            "refusing to write: the canonicalized document does not carry the same keys and \
+             values as the input",
+        )
+        .into());
+    }
+
+    emit_document(&input, dialect, args.write, args.diff, rendered)
 }
 
 /// Prints the selected source text.

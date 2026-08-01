@@ -23,6 +23,7 @@ paredit refactor <workflow> [args] # plan, preview, verify, and apply changes
 paredit query <find|count|replace> # search and rewrite by S-expression pattern
 paredit fix <apply|check|plan|list> # apply the lint auto-fixes
 paredit migrate <list|explain|run> # run a named, dialect-scoped codemod recipe
+paredit schema check <file> --schema <file> # validate Lisp data against a defschema
 paredit config <command>           # inspect and validate the layered paredit.toml
 paredit generate <generator> [args] # generate new source: defpackage, defsystem, tests, ...
 paredit lsp                        # Language Server Protocol server over stdio

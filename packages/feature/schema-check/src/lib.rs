@@ -1,0 +1,12 @@
+#![doc = include_str!("../README.md")]
+
+pub mod cli;
+pub mod domain;
+pub mod dsl;
+pub mod error;
+pub mod usecase;
+
+// The contract with the composition root (section 4.2): the slice publishes
+// its `clap` argument type and the function that runs it. command.rs and
+// dispatch.rs need these two names and no more.
+pub use cli::{SchemaCommand, schema};

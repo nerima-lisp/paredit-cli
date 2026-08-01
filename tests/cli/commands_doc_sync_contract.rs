@@ -67,7 +67,7 @@ fn every_inspect_edit_refactor_config_leaf_has_a_commands_md_row() {
     // docs/src/reference/architecture.md on why protocol servers bypass this dispatch),
     // and `completions` has no per-shell table to keep a row in sync with.
     let documented_namespaces = [
-        "inspect", "edit", "refactor", "query", "fix", "migrate", "config",
+        "inspect", "edit", "refactor", "query", "fix", "migrate", "schema", "config",
     ];
 
     let mut missing = Vec::new();

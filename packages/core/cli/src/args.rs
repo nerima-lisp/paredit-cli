@@ -106,6 +106,22 @@ pub struct RepairArgs {
     pub diff: bool,
 }
 
+#[derive(Debug, Args)]
+pub struct CanonicalizeArgs {
+    /// Input file. Reads stdin when omitted.
+    #[arg(short, long)]
+    pub file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    pub dialect: Option<DialectArg>,
+    /// Write the canonicalized document back to --file instead of stdout.
+    #[arg(long)]
+    pub write: bool,
+    /// Print a unified diff against the input instead of the canonicalized document.
+    #[arg(long)]
+    pub diff: bool,
+}
+
 /// Every way of naming the form a command acts on.
 ///
 /// Flattened into [`TargetArgs`], [`ReplaceArgs`] and the report commands, so

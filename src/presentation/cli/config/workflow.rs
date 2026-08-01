@@ -15,6 +15,7 @@ use crate::lint::registry::catalog::{CATEGORIES, RULES};
 use super::args::{
     ConfigCheckArgs, ConfigInitArgs, ConfigLocationArgs, ConfigSchemaArgs, ConfigShowArgs,
 };
+use super::custom_conflicts;
 use super::render;
 
 /// The rule and category names this build registers.
@@ -100,7 +101,13 @@ pub fn load(location: &ConfigLocationArgs) -> CliResult<Loaded> {
 }
 
 pub fn check(args: ConfigCheckArgs) -> CommandResult {
-    let loaded = load(&args.location)?;
+    let mut loaded = load(&args.location)?;
+    // `check_conflicts` inside `paredit-core-config` cannot see a custom
+    // rule's own `:severity` — that would mean a core package depending on a
+    // feature package — so the cross-check between `lint.warn`/`lint.deny`
+    // and what `.paredit/rules/*.lisp` itself declares happens here instead.
+    let custom_rule_conflicts = custom_conflicts::conflicts(&loaded);
+    loaded.diagnostics.extend(custom_rule_conflicts);
     render::print_check(&loaded, args.output)?;
 
     if loaded.has_errors() && !args.no_fail {

@@ -1,12 +1,12 @@
 use super::fix::FixCommand;
-use super::{MigrateCommand, query_count, query_find, query_replace};
+use super::{MigrateCommand, SchemaCommand, query_count, query_find, query_replace};
 use super::{
     accessor_arity_report, add_ignore_declaration, analysis_report, api_diff_report,
     api_surface_report, append_list_to_cons_report, append_nil_report,
     args::{
-        AnalyzeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs, NavigateArgs,
-        NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs, ReplaceArgs,
-        TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
+        AnalyzeArgs, CanonicalizeArgs, CopyArgs, CursorArgs, EditTargetArgs, FormatArgs, KillArgs,
+        NavigateArgs, NewlineArgs, NormalizeQuotesArgs, RaiseArgs, ReindentArgs, RepairArgs,
+        ReplaceArgs, TargetArgs, TransposeArgs, UnwrapPrefixArgs, WrapArgs, YankArgs,
     },
     binds_constant_report, blame_report, butlast_default_count_report, call_cycle_report,
     call_graph_report, call_report, capabilities, car_nthcdr_report, car_reverse_report,
@@ -17,13 +17,13 @@ use super::{
     constant_when_test_report, context_report, convert_cond_to_if, convert_flet_to_labels,
     convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
     convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
-    convert_unless_to_if, convert_when_to_if, de_morgan_report, dead_boolean_operand_report,
-    debt_score_report, definition_movement, definition_removal, definition_report,
-    defpackage_quoted_report, dependency_report, destructive_literal_report, docstring_report,
-    double_reverse_report, duplicate_boolean_operand_report, duplicate_case_key_report,
-    duplicate_cond_test_report, duplicate_keyword_report, duplicate_lambda_list_keyword_report,
-    duplicate_let_binding_report, duplicate_parameter_report, duplicate_report,
-    duplicate_setf_place_report, duplication_ratio_report, effect_report,
+    convert_unless_to_if, convert_when_to_if, data_check_report, de_morgan_report,
+    dead_boolean_operand_report, debt_score_report, definition_movement, definition_removal,
+    definition_report, defpackage_quoted_report, dependency_report, destructive_literal_report,
+    docstring_report, double_reverse_report, duplicate_boolean_operand_report,
+    duplicate_case_key_report, duplicate_cond_test_report, duplicate_keyword_report,
+    duplicate_lambda_list_keyword_report, duplicate_let_binding_report, duplicate_parameter_report,
+    duplicate_report, duplicate_setf_place_report, duplication_ratio_report, effect_report,
     eliminate_empty_binding_form, emacs_lisp_file_report, empty_body_report, empty_let_report,
     eq_char_comparison_report, eq_number_comparison_report, eql_list_comparison_report,
     eql_search_literal_report, eql_string_comparison_report, equality_arity_report,
@@ -38,7 +38,7 @@ use super::{
     identical_if_branch_report, identity_arithmetic_report, if_arity_report, if_not_report,
     if_to_or_report, if_to_unless_report, impact_report, indentation_report, inline_function,
     inline_lambda, inline_let, inline_literal_constant, inline_local_function, inline_symbol_macro,
-    introduce_let, keyword_arity_report, lambda_list_keyword_order_report,
+    introduce_let, keyword_arity_report, kill_ring_report, lambda_list_keyword_order_report,
     last_default_count_report, let_report, license_header_report, license_report,
     line_metrics_report, lint_report, list_star_nil_report, list_star_to_cons_report,
     literal_place_report, loop_report, macro_expansion_report, macro_hygiene_report,
@@ -582,6 +582,11 @@ pub(super) enum InspectCommand {
     ContextAt(context_report::args::ContextAtArgs),
     /// Report whether a write to --file would succeed, without writing anything.
     Writability(writability_report::args::WritabilityReportArgs),
+    /// Report schema-free structural sanity issues in an S-expression data file:
+    /// duplicate alist/plist keys, an odd-length plist, and mismatched tuple arity.
+    DataCheck(data_check_report::args::DataCheckReportArgs),
+    /// Diagnose the kill ring file, and with --repair-reset discard a corrupted one.
+    KillRing(kill_ring_report::args::KillRingReportArgs),
 }
 
 /// Single-document structural editing commands. These print rewritten source
@@ -596,6 +601,8 @@ pub(super) enum EditCommand {
     Format(FormatArgs),
     /// Append required closing delimiters only when input has unclosed lists.
     RepairUnclosedLists(RepairArgs),
+    /// Sort an alist- or plist-shaped data file's keys and flatten its whitespace to a single space between elements.
+    Canonicalize(CanonicalizeArgs),
     /// Print the S-expression selected by --path or --at.
     Select(TargetArgs),
     /// Replace the selected S-expression with replacement text.
@@ -924,6 +931,12 @@ pub(super) enum Command {
     Migrate {
         #[command(subcommand)]
         command: MigrateCommand,
+    },
+    /// Validate a Lisp data file against a small, dependency-light schema
+    /// language of its own, `defschema` — never evaluating either.
+    Schema {
+        #[command(subcommand)]
+        command: SchemaCommand,
     },
     /// Inspect, validate, and scaffold the layered paredit.toml configuration.
     Config {

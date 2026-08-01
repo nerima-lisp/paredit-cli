@@ -224,6 +224,122 @@ fn a_registered_rule_name_is_accepted() {
     assert_eq!(report["status"], "ok");
 }
 
+/// A custom rule's own `:severity` disagreeing with the `paredit.toml` list
+/// that also names it is a conflict, reported the same way as `lint.deny`
+/// and `lint.warn` overlapping.
+#[test]
+fn check_reports_a_custom_rule_whose_severity_disagrees_with_lint_warn() {
+    let root = repo("config-custom-severity-conflict");
+    write(
+        &root,
+        ".paredit/rules/house.lisp",
+        "(defrule house-style :severity error :pattern (print ?x) :message \"no print\")\n",
+    );
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ncustom-rules = \".paredit/rules\"\nwarn = [\"house-style\"]\n",
+    );
+
+    let output = config(&root, &["check"])
+        .assert()
+        .code(3)
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+
+    assert_eq!(report["status"], "error");
+    let found = diagnostic(&report, "conflict");
+    assert_eq!(found["key"], "lint.warn");
+    assert!(
+        found["message"]
+            .as_str()
+            .expect("message")
+            .contains("house-style"),
+        "{found}"
+    );
+}
+
+/// The same rule, agreeing with `lint.deny` this time, is not a conflict.
+///
+/// `lint.deny`/`lint.warn` are separately validated against the *shipped*
+/// rule catalogue (`check_list` in `paredit-core-config`'s `settings.rs`),
+/// which has no notion of a custom rule's name — that gate is unrelated to
+/// this cross-check and out of scope here, so `"house-style"` still earns an
+/// `unknown-rule` diagnostic of its own. What this test asserts is narrower
+/// and exactly what Part A owns: no `conflict` diagnostic, because the
+/// severities agree.
+#[test]
+fn check_reports_no_conflict_when_a_custom_rules_severity_agrees_with_lint_deny() {
+    let root = repo("config-custom-severity-ok");
+    write(
+        &root,
+        ".paredit/rules/house.lisp",
+        "(defrule house-style :severity error :pattern (print ?x) :message \"no print\")\n",
+    );
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ncustom-rules = \".paredit/rules\"\ndeny = [\"house-style\"]\n",
+    );
+
+    let output = config(&root, &["check"])
+        .assert()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert!(find_diagnostic(&report, "conflict").is_none(), "{report}");
+}
+
+/// A rule this cross-check never heard of, because it names neither list, is
+/// not an error just for existing.
+#[test]
+fn check_does_not_flag_a_custom_rule_that_neither_list_names() {
+    let root = repo("config-custom-severity-unreferenced");
+    write(
+        &root,
+        ".paredit/rules/house.lisp",
+        "(defrule house-style :severity error :pattern (print ?x) :message \"no print\")\n",
+    );
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ncustom-rules = \".paredit/rules\"\n",
+    );
+
+    let report = json_of(config(&root, &["check"]));
+    assert_eq!(report["status"], "ok");
+    assert!(find_diagnostic(&report, "conflict").is_none(), "{report}");
+}
+
+/// A rule file `config check` cannot parse must not take the whole command
+/// down with it, and must not be treated as agreeing or conflicting with
+/// anything — it contributes no `conflict` diagnostic either way.
+#[test]
+fn check_survives_a_malformed_custom_rule_file() {
+    let root = repo("config-custom-severity-malformed");
+    write(
+        &root,
+        ".paredit/rules/broken.lisp",
+        "(defrule (((( broken\n",
+    );
+    write(
+        &root,
+        "paredit.toml",
+        "[lint]\ncustom-rules = \".paredit/rules\"\nwarn = [\"house-style\"]\n",
+    );
+
+    let output = config(&root, &["check"])
+        .assert()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    assert!(find_diagnostic(&report, "conflict").is_none(), "{report}");
+}
+
 #[test]
 fn a_syntax_error_names_the_file_and_line_and_refuses_to_load() {
     let root = repo("config-syntax");
@@ -447,12 +563,15 @@ fn setting<'a>(report: &'a serde_json::Value, key: &str) -> &'a serde_json::Valu
 }
 
 fn diagnostic<'a>(report: &'a serde_json::Value, code: &str) -> &'a serde_json::Value {
+    find_diagnostic(report, code).unwrap_or_else(|| panic!("no {code} diagnostic in {report}"))
+}
+
+fn find_diagnostic<'a>(report: &'a serde_json::Value, code: &str) -> Option<&'a serde_json::Value> {
     report["diagnostics"]
         .as_array()
         .expect("diagnostics")
         .iter()
         .find(|entry| entry["code"] == code)
-        .unwrap_or_else(|| panic!("no {code} diagnostic in {report}"))
 }
 
 // --- The configuration taking effect, rather than merely being reported. ---

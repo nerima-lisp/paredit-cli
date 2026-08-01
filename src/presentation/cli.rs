@@ -14,6 +14,7 @@ mod config;
 mod config_bridge;
 mod contract;
 mod dependency_report;
+mod kill_ring_report;
 
 // Phase 2 facade (section 4.1). args/shared/gate - and shared's io, diff and
 // macos_acl submodules - now live in `paredit-core-cli`. `contract` stays here:
@@ -32,6 +33,7 @@ use paredit_feature_code_metrics::hotspot_report::cli as hotspot_report;
 use paredit_feature_code_metrics::indentation_report::cli as indentation_report;
 use paredit_feature_code_metrics::line_metrics_report::cli as line_metrics_report;
 use paredit_feature_code_metrics::todo_report::cli as todo_report;
+use paredit_feature_data_report::data_check_report::cli as data_check_report;
 use paredit_feature_external_check::external_diagnostics_report::cli as external_diagnostics_report;
 use paredit_feature_extract::extract_constant::cli as extract_constant;
 use paredit_feature_extract::extract_function::cli as extract_function;
@@ -79,6 +81,7 @@ use paredit_feature_project_inventory::unreachable_expression_report::cli as unr
 use paredit_feature_query::count_report::cli as query_count;
 use paredit_feature_query::find_report::cli as query_find;
 use paredit_feature_query::replace::cli as query_replace;
+use paredit_feature_schema_check::{SchemaCommand, schema};
 use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;

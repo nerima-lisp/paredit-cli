@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 242] = [
+const INTROSPECTION_COMMANDS: [&str; 244] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -482,6 +482,8 @@ const INTROSPECTION_COMMANDS: [&str; 242] = [
     "inspect redundant-divisor",
     "inspect context-at",
     "inspect writability",
+    "inspect data-check",
+    "inspect kill-ring",
     // The `query` namespace's read-only leaves. Pattern matching needs the
     // balanced-parens tree and the dialect's reader, and nothing above them,
     // so both sit at the syntax tier below.
@@ -502,7 +504,11 @@ const INTROSPECTION_COMMANDS: [&str; 242] = [
     "migrate explain",
 ];
 
-const FORMAT_COMMANDS: [&str; 2] = ["edit format", "edit repair-unclosed-lists"];
+const FORMAT_COMMANDS: [&str; 3] = [
+    "edit format",
+    "edit repair-unclosed-lists",
+    "edit canonicalize",
+];
 
 const STRUCTURAL_COMMANDS: [&str; 33] = [
     "edit select",
@@ -642,7 +648,7 @@ const SEMANTIC_COMMANDS: [&str; 83] = [
 /// more, yet it answers for Emacs Lisp alone — its own gate says so, the same
 /// way `refactor rename-at` sits at the scope tier and is gated to three
 /// dialects.
-const SYNTAX_TIER_REPORTS: [&str; 19] = [
+const SYNTAX_TIER_REPORTS: [&str; 21] = [
     "inspect context-at",
     "inspect diff",
     "inspect elisp-file",
@@ -657,6 +663,8 @@ const SYNTAX_TIER_REPORTS: [&str; 19] = [
     "inspect workspace",
     "inspect sources",
     "inspect writability",
+    "inspect data-check",
+    "inspect kill-ring",
     "query find",
     "query count",
     // The three catalogue commands read no source at all: `fix list` prints

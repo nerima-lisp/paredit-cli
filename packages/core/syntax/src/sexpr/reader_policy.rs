@@ -392,6 +392,21 @@ impl DialectReaderPolicy {
                 })
                 .or(Some(ReaderMacro::UnsupportedDispatch { width: 1 })),
             b'#' if next == Some(b'#') => None,
+            // `#=(form)` is Clojure's read-time-eval dispatch, the analogue
+            // of Common Lisp's `#.`: it reads and evaluates exactly one form
+            // at read time. Giving it its own two-byte-dispatch arm, rather
+            // than leaving it to fall into the generic tagged-literal case
+            // below, matters for more than symmetry with `#.` — the tagged-
+            // literal scanner treats every non-boundary byte after the `=`
+            // as part of the tag name, so `#=foo` with no space would read
+            // as the single-character tag `=foo` applied to the *next* form
+            // rather than as `#=` applied to `foo`. `=` is not a symbol
+            // constituent in Clojure, so `#=foo` unambiguously means
+            // "evaluate `foo`" and this arm reads it that way.
+            b'#' if next == Some(b'=') => Some(ReaderMacro::MultiDatum {
+                width: 2,
+                payload_forms: 1,
+            }),
             b'#' => self
                 .clojure_tagged_literal_width(bytes, pos)
                 .map(|width| ReaderMacro::MultiDatum {

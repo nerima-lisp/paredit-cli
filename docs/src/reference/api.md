@@ -128,6 +128,8 @@ discovery, impact analysis, and preflight checks.
 | `undefined-packages` | Report in-package forms naming a package no analyzed defpackage declares. |
 | `context-at` | Report what kind of text sits at a byte offset — code, a string, a comment, a list delimiter, reader sugar, or the whitespace between forms — together with the enclosing list, the nesting depth, and the stack of open delimiters. The question to ask *before* a character edit rather than after a refused one: `edit delete-forward` and `edit newline` decline every offset this reports as carrying structure, and `--fail-on-structural` turns that into an exit code. |
 | `writability` | Report whether a write to `--file` would succeed — right now, without writing anything — by staging a same-size placeholder exactly as a real write would (so a full disk fails this the same way it would fail the real write) and discarding it instead of publishing it. `--file` need not exist yet. The answer `--dry-run` cannot give: `--dry-run` refuses every write unconditionally and says nothing about whether it would have worked. |
+| `data-check` | Report schema-free structural sanity issues in an S-expression *data* file: a plist or alist with the same key spelled twice (the later value silently overrides the earlier one), a plist with a trailing keyword and no value, and a top-level list of same-shaped tuples with one entry whose arity does not match its siblings. No schema is read or required — each check fires only on a shape the file's own repetition already implies, conservatively, so a real mismatch is worth trusting. These baseline checks always run; `--format` (auto-detected per file, or overridden explicitly) adds convention-specific checks on top: Emacs `custom-set-variables` entry shape, EDN's ban on code-only Clojure reader macros, `.dir-locals.el`'s alist-of-alist shape (plus a presence-only flag for an `eval` key), and routing `.rktd` Racket data files into this report at all (`#lang` alone cannot mark a Racket file as data, since every named language, `typed/racket` included, is still executable code). `.paredit/rules`/`.paredit/migrations` are deliberately not a format here — `inspect check --paredit-config` already validates them, with checks (`RulesetError`s, cross-file collision detection) this shape-only report could not add to. |
+| `kill-ring` | Diagnose the kill ring file `edit kill`/`edit copy --to-ring`/`edit yank` share, without touching it: invalid JSON, a shape missing the `entries` array or `schema_version` field, or a `schema_version` this build does not recognise are each reported by name, alongside a well-formed ring's entry count. A missing file is not corruption — that is `edit yank`'s own "empty ring" convention. `--repair-reset` discards a corrupted ring and writes a fresh empty one in its place; it never touches a missing or well-formed ring, and never runs unless passed explicitly. |
 | `api-surface` | Report every exported symbol with the signature its export commits to — the defining category, the required and maximum arity, and the lambda list as written. `defpackage`'s `:export` is a list of names; what a caller relies on is those names *plus their shapes*, and that pairing exists nowhere in the source. An export nothing defines is reported rather than dropped: that is usually a rename that missed one side. |
 | `api-diff` | Compare the current API against a `--baseline` `api-surface` snapshot and answer the SemVer question mechanically. Breaking: an export removed, a minimum arity raised, a maximum lowered, or a defining category changed. Compatible: an export added or a range widened. `--intended-bump` fails the run when the diff requires a larger bump than the release claims. |
 | `test-map` | Pair definitions with the tests that name them, by the `test-x` / `x-test` / `x-tests` conventions, and report both sides that have no counterpart — untested definitions and tests nobody can tell what they cover. A list of tests and a list of definitions are each easy to get; neither answers the question. |
@@ -493,6 +495,7 @@ Mutating commands also accept:
 | --- | --- |
 | `format` | Print a canonical, indentation-based rendering. |
 | `repair-unclosed-lists` | Append matching delimiters for parser-detected unclosed lists; refuse all other parse errors. |
+| `canonicalize` | Sort an alist- or plist-shaped data file's keys and flatten its whitespace to a single space between elements. Refuses a file with no confidently alist- or plist-shaped list anywhere in it, and never reorders or rewrites inside a reader-prefixed subtree (`#+feature (...)`, a quoted or quasiquoted form) — this is deliberately not `format`, which renders code; a data file is not read as nested code blocks. |
 | `select` | Print the S-expression selected by `--path` or `--at`. |
 | `replace` | Replace the selected S-expression with replacement text. |
 | `kill` | Remove the selected S-expression. `--to-ring` pushes it onto the kill ring first. |
@@ -814,6 +817,45 @@ same reasons, and reports them the same way — the quote guard most of all, sin
 `nil-conditionals` over a file holding `'(a (if x y nil))` would otherwise
 rewrite a data literal.
 
+## Schema
+
+`paredit schema check` validates one S-expression data file (an *instance*)
+against a small schema language of its own, `defschema`, written as ordinary
+Lisp forms rather than an embedded foreign syntax:
+
+```lisp
+(defschema config
+  (fields
+    (:name (:type string))
+    (:port (:type integer :min 1 :max 65535))
+    (:mode (:type string :one-of ("dev" "staging" "prod")))
+    (:label (:type string :matches "^[a-z][a-z0-9-]*$" :optional t))))
+```
+
+| Command | Purpose | Its own flags |
+| --- | --- | --- |
+| `check` | Validate an instance file against a `defschema` schema. | `--schema <FILE>` names the schema file. `--schema-name <NAME>` picks which `defschema` to validate against when the file defines more than one; optional when it defines exactly one. `--fail-on-violation` exits 3 if the instance has any finding. |
+
+Nothing here is ever evaluated, on either side of the check. `:type` accepts
+exactly five names (`string`, `integer`, `boolean`, `symbol`, `list`), and a
+refinement is one of exactly four (`:min`/`:max` on `integer`, `:one-of`/
+`:matches` on `string`), each meaningful only for the type it was written
+for — an unrecognized `:type` or refinement is a parse error, never code
+this tool tries to run. `:matches` is a small hand-rolled glob (`*` = any
+run of characters, `?` = one character), **not a regular expression**.
+
+An instance may be alist-shaped (`((key . value) ...)`) or plist-shaped
+(`(:key value ...)`); both validate identically. A field present in the
+instance but not declared by the schema is reported too, as `unknown-field`,
+at a lower severity than a genuine type or refinement violation. A field is
+required unless it carries `:optional t`.
+
+```sh
+paredit schema check instance.lisp --schema .paredit/schemas/config.lisp
+paredit schema check instance.lisp --schema schemas.lisp --schema-name config
+paredit schema check instance.lisp --schema schemas.lisp --output text --fail-on-violation
+```
+
 ## Config
 
 `paredit config` reads `paredit.toml`, never source. It answers what this build
@@ -823,7 +865,7 @@ order, and `extends`.
 
 | Command | Purpose |
 | --- | --- |
-| `check` | Validate every discovered file and exit 3 if any key is unusable. |
+| `check` | Validate every discovered file and exit 3 if any key is unusable. Also flags when a custom rule under `lint.custom-rules` declares its own `:severity` that disagrees with what `lint.warn`/`lint.deny` implies for that rule's name. |
 | `show` | Print the effective configuration with the file and line that set each key. |
 | `schema` | Print every recognised key with its type, default, and environment variable. |
 | `init` | Write a documented starter `paredit.toml` generated from the schema. |

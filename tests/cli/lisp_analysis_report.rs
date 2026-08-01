@@ -241,6 +241,12 @@ fn cli_restarts_reports_a_restart_nothing_invokes() {
 
 /// An empty finding list is ambiguous, so a dialect outside a report's reach
 /// must be labelled rather than silently reported as clean.
+///
+/// Scheme rather than Clojure: `read-time-eval` models Clojure's `#=` now
+/// (see `cli_read_time_eval_models_a_clojure_read_eval_dispatch_too` below),
+/// so a Clojure fixture would no longer be unmodelled for every command in
+/// `COMMANDS`. Scheme has no construct any of these thirteen reports know
+/// about, so it stays a fixture all thirteen agree is out of reach.
 #[test]
 fn cli_every_lisp_analysis_report_labels_a_dialect_it_does_not_model() {
     // Scheme rather than Clojure: `inspect macro-hygiene` now models Clojure's
@@ -262,6 +268,48 @@ fn cli_every_lisp_analysis_report_labels_a_dialect_it_does_not_model() {
             .success()
             .stdout(predicate::str::contains("\"dialect_modelled\": false"));
     }
+}
+
+/// `read-time-eval` is the one report in this module that models more than
+/// Common Lisp: a Clojure `#=` dispatch is risk-classified the same way a
+/// Common Lisp `#.` is, and a `.dir-locals.el` `eval:` key is risk-classified
+/// too, even though neither is a Common Lisp construct.
+#[test]
+fn cli_read_time_eval_models_a_clojure_read_eval_dispatch_too() {
+    let dir = fresh_temp_dir("inspect-read-time-eval-clojure");
+    let file = dir.join("core.clj");
+    fs::write(&file, "(def x #=(System/currentTimeMillis))\n").expect("write clojure fixture");
+
+    paredit()
+        .args(["inspect", "read-time-eval", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"))
+        .stdout(predicate::str::contains("\"risk\": \"live\""))
+        .stdout(predicate::str::contains(
+            "\"head\": \"System/currentTimeMillis\"",
+        ));
+}
+
+/// A `.dir-locals.el` `eval:` key is risk-classified the same way as a
+/// reader-dispatch read-time-eval, even though detecting it is a known-key
+/// lookup rather than a reader dispatch.
+#[test]
+fn cli_read_time_eval_models_a_dir_locals_eval_key_too() {
+    let dir = fresh_temp_dir("inspect-read-time-eval-dir-locals");
+    let file = dir.join(".dir-locals.el");
+    fs::write(&file, "((nil . ((eval . (delete-file \"x\")))))\n")
+        .expect("write dir-locals fixture");
+
+    paredit()
+        .args(["inspect", "read-time-eval", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect_modelled\": true"))
+        .stdout(predicate::str::contains("\"risk\": \"live\""))
+        .stdout(predicate::str::contains("\"head\": \"delete-file\""));
 }
 
 /// Byte-identical output for byte-identical input. Several of these analyses
