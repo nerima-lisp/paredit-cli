@@ -692,7 +692,7 @@ impl Formatter {
                 if let Some(heads) = self.canonical_prefix_heads(node) {
                     self.write_canonical_opens(&heads, output);
                     let text = node.span.slice(&tree.source);
-                    output.push_str(&text[node.symbol_offset..]);
+                    output.push_str(&text[node.symbol_offset as usize..]);
                     Self::write_canonical_closes(&heads, output);
                 } else {
                     output.push_str(node.span.slice(&tree.source));
@@ -864,10 +864,10 @@ impl Formatter {
     /// all: one mixing a canonicalizable prefix with one that is not (e.g.
     /// `` '`x ``) is left exactly as written rather than partly rewritten.
     pub(super) fn canonical_prefix_heads(&self, node: &Node) -> Option<Vec<&'static str>> {
-        if self.quote_style != ReaderPrefixStyle::Canonical || node.reader_prefixes.is_empty() {
+        if self.quote_style != ReaderPrefixStyle::Canonical || node.reader_prefixes().is_empty() {
             return None;
         }
-        node.reader_prefixes
+        node.reader_prefixes()
             .iter()
             .map(|prefix| canonical_quote_head(self.dialect, *prefix))
             .collect()
@@ -911,7 +911,7 @@ impl Formatter {
                                     output.push_char(' ', max_width)?;
                                 }
                                 let text = node.span.slice(&tree.source);
-                                output.push_str(&text[node.symbol_offset..], max_width)?;
+                                output.push_str(&text[node.symbol_offset as usize..], max_width)?;
                                 for _ in &heads {
                                     output.push_char(')', max_width)?;
                                 }
