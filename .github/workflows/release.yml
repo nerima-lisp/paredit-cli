@@ -66,10 +66,11 @@ jobs:
       # neither under "Latest release" nor in the default output of
       # `gh release list`, so an unfinished release never reaches downstream.
       #
-      # `generate_release_notes` is deliberately left off. Generated notes are a
-      # list of commit titles and PR numbers, and RELEASE_STANDARD.md requires
-      # the notes to be selected by "does a user of this package have to change
-      # their own code" — a judgement no generator can make.
+      # This action's auto-generated-notes input is deliberately left off.
+      # Generated notes are a list of commit titles and PR numbers, and
+      # RELEASE_STANDARD.md requires the notes to be selected by "does a user
+      # of this package have to change their own code" — a judgement no
+      # generator can make.
       #
       # Every `uses:` in this org references a 40-character SHA, never a mutable
       # tag. Re-resolve before bumping, and do not copy a SHA you have not
