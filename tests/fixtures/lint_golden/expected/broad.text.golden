@@ -185,6 +185,27 @@ rule	leftover-time-benchmark-call	0
 rule	leftover-step-call	0
 rule	commented-repl-transcript	0
 rule	leftover-format-debug-marker	0
+rule	around-method-missing-call-next-method	0
+rule	defclass-required-slot-no-initform-or-initarg	0
+rule	defclass-slot-shadowing	0
+rule	duplicate-defmethod-signature	0
+rule	generic-function-no-methods	0
+rule	method-qualifier-typo	0
+rule	print-object-without-print-unreadable-object	0
+rule	slot-value-bypasses-accessor	0
+rule	cerror-missing-continue-format	0
+rule	define-condition-empty-superclass-list	0
+rule	define-condition-missing-report-for-error-type	0
+rule	handler-bind-handler-returns-bare-value	0
+rule	ignore-errors-wraps-non-error-signal	0
+rule	restart-case-clause-without-report	0
+rule	signal-on-error-condition-returns-silently	0
+rule	dolist-result-form-references-loop-variable	0
+rule	dotimes-bound-mutation-has-no-effect	0
+rule	loop-clause-order-violation	0
+rule	loop-for-across-statically-known-list	0
+rule	loop-into-accumulator-kind-conflict	0
+rule	loop-unreachable-finally-clause	0
 finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself	self-assignment/5f1a5b802aa99b47/0
 finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead	duplicate-setf-places/8104810ed815b9fd/0
 finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count	setf-arity/b0a5b422aad6d4d2/0

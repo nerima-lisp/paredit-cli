@@ -2926,6 +2926,132 @@
       "count": 0,
       "description": "a (format t ...) whose control string carries a DEBUG/DBG marker",
       "rule": "leftover-format-debug-marker"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "an :around method whose body never calls call-next-method",
+      "rule": "around-method-missing-call-next-method"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a slot with no :initform and no :initarg that a method in the file reads",
+      "rule": "defclass-required-slot-no-initform-or-initarg"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a subclass slot that silently shadows a same-file superclass slot",
+      "rule": "defclass-slot-shadowing"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "two defmethods with the same name, qualifiers and specializers",
+      "rule": "duplicate-defmethod-signature"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a defgeneric no defmethod in the file ever specializes",
+      "rule": "generic-function-no-methods"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a defmethod qualifier outside :before, :after and :around",
+      "rule": "method-qualifier-typo"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a print-object method that writes to the stream directly",
+      "rule": "print-object-without-print-unreadable-object"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a slot-value read of a slot the file declares an accessor for",
+      "rule": "slot-value-bypasses-accessor"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a cerror whose continue-format-control is missing or nil, defeating continuability",
+      "rule": "cerror-missing-continue-format"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a define-condition with an empty () supertype list, which defaults to condition, not error",
+      "rule": "define-condition-empty-superclass-list"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "an error subtype with no :report option and no same-file superclass supplying one",
+      "rule": "define-condition-missing-report-for-error-type"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a handler-bind handler ending in a bare value, which handler-bind discards",
+      "rule": "handler-bind-handler-returns-bare-value"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "an ignore-errors around a signal of a same-file non-error condition it cannot catch",
+      "rule": "ignore-errors-wraps-non-error-signal"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a restart-case clause with no :report option",
+      "rule": "restart-case-clause-without-report"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a signal of a same-file error subtype, which returns nil instead of entering the debugger",
+      "rule": "signal-on-error-condition-returns-silently"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a dolist result form reading the loop variable, which the spec binds to nil there",
+      "rule": "dolist-result-form-references-loop-variable"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "assigning the dotimes count variable inside the body, which cannot change the iteration count",
+      "rule": "dotimes-bound-mutation-has-no-effect"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a loop variable clause after a main clause, or a named clause that is not first",
+      "rule": "loop-clause-order-violation"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "a loop for-across clause over a value that is provably a list, not a vector",
+      "rule": "loop-for-across-statically-known-list"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "two loop accumulation clauses building incompatible kinds into the same into variable",
+      "rule": "loop-into-accumulator-kind-conflict"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a loop epilogue form after a finally clause that already returns",
+      "rule": "loop-unreachable-finally-clause"
     }
   ],
   "policy": {

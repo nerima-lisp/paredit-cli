@@ -248,7 +248,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 252] = [
+const INTROSPECTION_COMMANDS: [&str; 273] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -512,6 +512,30 @@ const INTROSPECTION_COMMANDS: [&str; 252] = [
     "inspect leftover-step-call",
     "inspect commented-repl-transcript",
     "inspect leftover-format-debug-marker",
+    // CLOS classes, generic functions and methods (`lint-object-system`).
+    "inspect around-method-missing-call-next-method",
+    "inspect defclass-required-slot-no-initform-or-initarg",
+    "inspect defclass-slot-shadowing",
+    "inspect duplicate-defmethod-signature",
+    "inspect generic-function-no-methods",
+    "inspect method-qualifier-typo",
+    "inspect print-object-without-print-unreadable-object",
+    "inspect slot-value-bypasses-accessor",
+    // Condition system: signalling, handling and restarts (`lint-condition-system`).
+    "inspect cerror-missing-continue-format",
+    "inspect define-condition-empty-superclass-list",
+    "inspect define-condition-missing-report-for-error-type",
+    "inspect handler-bind-handler-returns-bare-value",
+    "inspect ignore-errors-wraps-non-error-signal",
+    "inspect restart-case-clause-without-report",
+    "inspect signal-on-error-condition-returns-silently",
+    // Iteration forms: `loop`, `do`, `dotimes`, `dolist` (`lint-iteration-flow`).
+    "inspect dolist-result-form-references-loop-variable",
+    "inspect dotimes-bound-mutation-has-no-effect",
+    "inspect loop-clause-order-violation",
+    "inspect loop-for-across-statically-known-list",
+    "inspect loop-into-accumulator-kind-conflict",
+    "inspect loop-unreachable-finally-clause",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [

@@ -2769,6 +2769,258 @@
               "shortDescription": {
                 "text": "a (format t ...) whose control string carries a DEBUG/DBG marker"
               }
+            },
+            {
+              "id": "around-method-missing-call-next-method",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an :around method whose body never calls call-next-method"
+              }
+            },
+            {
+              "id": "defclass-required-slot-no-initform-or-initarg",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a slot with no :initform and no :initarg that a method in the file reads"
+              }
+            },
+            {
+              "id": "defclass-slot-shadowing",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a subclass slot that silently shadows a same-file superclass slot"
+              }
+            },
+            {
+              "id": "duplicate-defmethod-signature",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "two defmethods with the same name, qualifiers and specializers"
+              }
+            },
+            {
+              "id": "generic-function-no-methods",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defgeneric no defmethod in the file ever specializes"
+              }
+            },
+            {
+              "id": "method-qualifier-typo",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defmethod qualifier outside :before, :after and :around"
+              }
+            },
+            {
+              "id": "print-object-without-print-unreadable-object",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a print-object method that writes to the stream directly"
+              }
+            },
+            {
+              "id": "slot-value-bypasses-accessor",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a slot-value read of a slot the file declares an accessor for"
+              }
+            },
+            {
+              "id": "cerror-missing-continue-format",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a cerror whose continue-format-control is missing or nil, defeating continuability"
+              }
+            },
+            {
+              "id": "define-condition-empty-superclass-list",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a define-condition with an empty () supertype list, which defaults to condition, not error"
+              }
+            },
+            {
+              "id": "define-condition-missing-report-for-error-type",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an error subtype with no :report option and no same-file superclass supplying one"
+              }
+            },
+            {
+              "id": "handler-bind-handler-returns-bare-value",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a handler-bind handler ending in a bare value, which handler-bind discards"
+              }
+            },
+            {
+              "id": "ignore-errors-wraps-non-error-signal",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an ignore-errors around a signal of a same-file non-error condition it cannot catch"
+              }
+            },
+            {
+              "id": "restart-case-clause-without-report",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a restart-case clause with no :report option"
+              }
+            },
+            {
+              "id": "signal-on-error-condition-returns-silently",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a signal of a same-file error subtype, which returns nil instead of entering the debugger"
+              }
+            },
+            {
+              "id": "dolist-result-form-references-loop-variable",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a dolist result form reading the loop variable, which the spec binds to nil there"
+              }
+            },
+            {
+              "id": "dotimes-bound-mutation-has-no-effect",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "assigning the dotimes count variable inside the body, which cannot change the iteration count"
+              }
+            },
+            {
+              "id": "loop-clause-order-violation",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop variable clause after a main clause, or a named clause that is not first"
+              }
+            },
+            {
+              "id": "loop-for-across-statically-known-list",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop for-across clause over a value that is provably a list, not a vector"
+              }
+            },
+            {
+              "id": "loop-into-accumulator-kind-conflict",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "two loop accumulation clauses building incompatible kinds into the same into variable"
+              }
+            },
+            {
+              "id": "loop-unreachable-finally-clause",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop epilogue form after a finally clause that already returns"
+              }
             }
           ]
         }
