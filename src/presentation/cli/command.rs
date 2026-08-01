@@ -1,5 +1,5 @@
 use super::fix::FixCommand;
-use super::{MigrateCommand, query_count, query_find, query_replace};
+use super::{MigrateCommand, SchemaCommand, query_count, query_find, query_replace};
 use super::{
     accessor_arity_report, add_ignore_declaration, analysis_report, api_diff_report,
     api_surface_report, append_list_to_cons_report, append_nil_report,
@@ -914,6 +914,12 @@ pub(super) enum Command {
     Migrate {
         #[command(subcommand)]
         command: MigrateCommand,
+    },
+    /// Validate a Lisp data file against a small, dependency-light schema
+    /// language of its own, `defschema` — never evaluating either.
+    Schema {
+        #[command(subcommand)]
+        command: SchemaCommand,
     },
     /// Inspect, validate, and scaffold the layered paredit.toml configuration.
     Config {

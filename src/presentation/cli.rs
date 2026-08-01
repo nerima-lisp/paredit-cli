@@ -80,6 +80,7 @@ use paredit_feature_project_inventory::unreachable_expression_report::cli as unr
 use paredit_feature_query::count_report::cli as query_count;
 use paredit_feature_query::find_report::cli as query_find;
 use paredit_feature_query::replace::cli as query_replace;
+use paredit_feature_schema_check::{SchemaCommand, schema};
 use paredit_feature_selector::resolve_report::cli as resolve_report;
 use paredit_feature_semantic_report::constant_report::cli as constant_report;
 use paredit_feature_semantic_report::effect_report::cli as effect_report;

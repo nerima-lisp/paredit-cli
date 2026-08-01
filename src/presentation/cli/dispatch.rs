@@ -964,6 +964,7 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
         },
         Command::Fix { command } => fix::fix(command)?,
         Command::Migrate { command } => migrate(command)?,
+        Command::Schema { command } => schema(command)?,
         Command::Config { command } => match command {
             command::ConfigCommand::Check(args) => config::workflow::check(args)?,
             command::ConfigCommand::Show(args) => config::workflow::show(args)?,

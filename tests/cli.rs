@@ -467,6 +467,8 @@ mod resource_budget;
 mod round_trip_property;
 #[path = "cli/run_controls.rs"]
 mod run_controls;
+#[path = "cli/schema_namespace.rs"]
+mod schema_namespace;
 #[path = "cli/selector.rs"]
 mod selector;
 #[path = "cli/self_assignment_report.rs"]

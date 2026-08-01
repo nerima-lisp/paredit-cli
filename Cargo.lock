@@ -693,6 +693,7 @@ dependencies = [
  "paredit-feature-refactor-workflow",
  "paredit-feature-remove-unused",
  "paredit-feature-rename",
+ "paredit-feature-schema-check",
  "paredit-feature-selector",
  "paredit-feature-semantic-report",
  "paredit-feature-similarity",
@@ -1210,6 +1211,17 @@ dependencies = [
  "paredit-core-syntax",
  "paredit-core-workspace",
  "proptest",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-schema-check"
+version = "1.3.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-syntax",
  "serde_json",
  "thiserror",
 ]

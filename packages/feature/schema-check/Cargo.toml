@@ -1,0 +1,22 @@
+[package]
+name = "paredit-feature-schema-check"
+description = "The schema namespace: a small, dependency-light S-expression schema language and instance validator"
+readme = "README.md"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+paredit-core-syntax = { path = "../../core/syntax" }
+paredit-core-cli = { path = "../../core/cli" }
+clap.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# Mandatory: without it this package silently opts out of the workspace lint
+# table, including `unsafe_code = "deny"`, with no error at all.
+[lints]
+workspace = true

@@ -780,6 +780,44 @@ same reasons, and reports them the same way — the quote guard most of all, sin
 `nil-conditionals` over a file holding `'(a (if x y nil))` would otherwise
 rewrite a data literal.
 
+## Schema
+
+`paredit schema check` validates one S-expression data file (an *instance*)
+against a small schema language of its own, `defschema`, written as ordinary
+Lisp forms rather than an embedded foreign syntax:
+
+```lisp
+(defschema config
+  (fields
+    (:name (:type string))
+    (:port (:type integer :min 1 :max 65535))
+    (:mode (:type string :one-of ("dev" "staging" "prod")))
+    (:label (:type string :matches "^[a-z][a-z0-9-]*$" :optional t))))
+```
+
+| Command | Purpose | Its own flags |
+| --- | --- | --- |
+| `check` | Validate an instance file against a `defschema` schema. | `--schema <FILE>` names the schema file. `--schema-name <NAME>` picks which `defschema` to validate against when the file defines more than one; optional when it defines exactly one. `--fail-on-violation` exits 3 if the instance has any finding. |
+
+Nothing here is ever evaluated, on either side of the check. `:type` accepts
+exactly five names (`string`, `integer`, `boolean`, `symbol`, `list`), and a
+refinement is one of exactly four (`:min`/`:max` on `integer`, `:one-of`/
+`:matches` on `string`), each meaningful only for the type it was written
+for — an unrecognized `:type` or refinement is a parse error, never code
+this tool tries to run. `:matches` is a small hand-rolled glob (`*` = any
+run of characters, `?` = one character), **not a regular expression**.
+
+An instance may be alist-shaped (`((key . value) ...)`) or plist-shaped
+(`(:key value ...)`); both validate identically. A field present in the
+instance but not declared by the schema is reported too, as `unknown-field`,
+at a lower severity than a genuine type or refinement violation.
+
+```sh
+paredit schema check instance.lisp --schema .paredit/schemas/config.lisp
+paredit schema check instance.lisp --schema schemas.lisp --schema-name config
+paredit schema check instance.lisp --schema schemas.lisp --output text --fail-on-violation
+```
+
 ## Config
 
 `paredit config` reads `paredit.toml`, never source. It answers what this build

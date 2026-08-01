@@ -49,7 +49,12 @@ fn clap_contract_leaf_paths(report: &serde_json::Value) -> BTreeSet<String> {
         // The namespaces the dialect contract covers. `config`, `generate`,
         // `completions` and the protocol servers are outside it: none of them
         // analyses a source file, so "which dialects does this answer for" is
-        // not a question they have.
+        // not a question they have. `schema` is outside it for the same
+        // reason as `config`: `schema check` validates an instance file
+        // against a caller-authored schema, which is a question about the
+        // data's shape, not about a Lisp dialect's operator vocabulary — the
+        // grammar it reads is this tool's own `defschema`, read identically
+        // whatever the instance file's extension says.
         if !matches!(
             name,
             "inspect" | "edit" | "refactor" | "query" | "fix" | "migrate"
