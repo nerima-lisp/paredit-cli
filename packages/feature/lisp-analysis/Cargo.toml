@@ -1,6 +1,6 @@
 [package]
 name = "paredit-feature-lisp-analysis"
-description = "Reports for the parts of Common Lisp that live outside the evaluator: reader syntax, the loop grammar, format control strings, CLOS dispatch, and the condition system"
+description = "Reports for the parts of Common Lisp that live outside the evaluator: reader syntax, the loop grammar, format control strings, CLOS dispatch, and the condition system; macro-hygiene alone also answers for the seven other unhygienic template-macro dialects"
 readme = "README.md"
 publish = false
 version.workspace = true

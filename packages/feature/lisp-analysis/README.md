@@ -1,6 +1,8 @@
 # paredit-feature-lisp-analysis
 
-Fifteen reports about the parts of Common Lisp that are not ordinary forms.
+Fifteen reports about the parts of Common Lisp that are not ordinary forms —
+and, for `macro-hygiene` alone, about the seven other Lisps whose macros fail
+the same way.
 
 ## Responsibilities
 
@@ -29,14 +31,25 @@ S-expression-shaped analysis sees nothing at all:
   CLOS declaration was written twice, which needs the same reading of a
   `defmethod` specializer list and a `defclass` slot specifier.
 - **Macros.** `macro-expansion` simulates a `defmacro` template against its own
-  call sites; `macro-hygiene` reports the two ways a template goes wrong —
-  capturing a caller's variable, and evaluating a caller's form more than once.
+  call sites; `macro-hygiene` reports the ways a template betrays its caller —
+  capturing a caller's variable, evaluating a caller's form more than once,
+  evaluating its parameters in an order the call site does not write, and
+  nesting quasiquotes past the depth a reader can track — plus, for Emacs
+  Lisp, a macro that declares nothing about how an editor should indent or
+  step through it.
 - **Conditions.** `restarts` pairs `restart-case` establishments against
   `invoke-restart` uses, and reports each side that has no counterpart.
 
 ## Boundaries
 
-Common Lisp only. Every report says so in its output rather than returning an
+Common Lisp only, with one exception: `macro-hygiene` also answers for Emacs
+Lisp, Clojure, Janet, Hy, Carp, Fennel, and LFE — the dialects whose macros are
+template-based and unhygienic by default, which is the precondition for its
+checks to mean anything. Scheme and Racket are excluded on purpose: their
+`syntax-rules` makes hygiene a language guarantee rather than a discipline the
+programmer enforces by hand.
+
+Every report names a dialect it does not answer for rather than returning an
 empty finding list, which a consumer cannot distinguish from a clean file.
 
 Nothing here evaluates. `macro-expansion` substitutes into a template and stops
