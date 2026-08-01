@@ -2332,7 +2332,7 @@
               "id": "macro-variable-capture",
               "properties": {
                 "category": "suspicious",
-                "fixable": true,
+                "fixable": false,
                 "severity": "warning",
                 "tags": []
               },

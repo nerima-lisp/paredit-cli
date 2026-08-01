@@ -304,45 +304,60 @@ fn cli_every_lisp_analysis_report_names_itself_in_its_output() {
     }
 }
 
-/// `macro-variable-capture` is the one hygiene risk `fix apply` can repair:
-/// it binds the captured name to `(gensym)` outside the template and
-/// unquotes every bare reference to it still inside, so the expansion still
-/// reads and writes the same fresh symbol.
+/// `macro-variable-capture` reports a capture but never rewrites one. An
+/// automatic gensym rewrite was implemented and reverted: it could corrupt a
+/// working macro, so the rule is registered `ReportOnly` and `--fix` must
+/// leave the file exactly as written.
 #[test]
-fn cli_fix_apply_rewrites_a_variable_capture_via_gensym() {
+fn cli_variable_capture_is_reported_but_not_auto_fixed() {
     // Named to avoid the substring this test checks for: `fresh_temp_dir`
     // embeds its argument in the directory path, which then shows up in the
     // JSON under `path` and would make a naive `contains("variable-capture")`
     // check on the whole report pass for the wrong reason.
-    let dir = fresh_temp_dir("fix-macro-gensym-rewrite");
+    let dir = fresh_temp_dir("macro-gensym-report-only");
     let file = dir.join("m.lisp");
-    fs::write(
-        &file,
-        "(defmacro m (form) `(let ((result ,form)) (list result)))\n",
-    )
-    .expect("write fixture");
+    let source = "(defmacro m (form) `(let ((result ,form)) (list result)))\n";
+    fs::write(&file, source).expect("write fixture");
 
-    paredit()
-        .args(["fix", "apply", "--rule", "macro-variable-capture"])
-        .arg(&dir)
-        .assert()
-        .success();
-
-    let rewritten = fs::read_to_string(&file).expect("read back");
-    assert!(rewritten.contains("(gensym)"), "{rewritten}");
-    assert!(rewritten.contains(",result"), "{rewritten}");
-    // A bare, no-longer-captured `result` must not remain in the template.
-    assert!(!rewritten.contains("(list result)"), "{rewritten}");
-
-    let report = paredit()
-        .args(["inspect", "macro-hygiene", "--output", "json"])
+    let reported = paredit()
+        .args(["inspect", "lint", "--rule", "macro-variable-capture"])
         .arg(&file)
         .output()
-        .expect("run inspect macro-hygiene on the rewritten file");
-    assert!(report.status.success());
-    let stdout = String::from_utf8_lossy(&report.stdout);
+        .expect("run inspect lint");
+    let stdout = String::from_utf8_lossy(&reported.stdout);
     assert!(
-        !stdout.contains("\"risk\": \"variable-capture\""),
-        "the rewrite must leave no variable-capture finding: {stdout}"
+        stdout.contains("variable capture"),
+        "the capture must still be reported: {stdout}"
     );
+
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--rule",
+            "macro-variable-capture",
+            "--fix",
+        ])
+        .arg(&file)
+        .output()
+        .expect("run inspect lint --fix");
+    assert_eq!(
+        fs::read_to_string(&file).expect("read back"),
+        source,
+        "a report-only rule must not rewrite the file"
+    );
+
+    let catalog = paredit()
+        .args(["inspect", "lint", "--list-rules", "--output", "json"])
+        .output()
+        .expect("run inspect lint --list-rules");
+    let rules: serde_json::Value =
+        serde_json::from_slice(&catalog.stdout).expect("--list-rules JSON is valid");
+    let entry = rules["rules"]
+        .as_array()
+        .expect("rules array")
+        .iter()
+        .find(|rule| rule["rule"] == "macro-variable-capture")
+        .expect("macro-variable-capture present");
+    assert_eq!(entry["fixable"], false);
 }
