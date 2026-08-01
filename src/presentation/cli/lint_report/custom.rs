@@ -91,12 +91,16 @@ impl CustomRules {
 
     /// Every custom finding in one parsed file, as `(rule, span, message,
     /// fix)`, with the rule name interned so it can join a `LintFinding`.
+    ///
+    /// `dialect` is the file being linted's own dialect — see
+    /// [`paredit_feature_lint_custom::pass::run`] for why matching uses it
+    /// rather than always reading Common Lisp.
     pub(super) fn findings(
         &self,
         tree: &paredit_core_syntax::sexpr::SyntaxTree,
-        source: &str,
+        dialect: paredit_core_syntax::dialect::Dialect,
     ) -> Vec<(&'static str, CustomFinding)> {
-        run(&self.ruleset, tree, source)
+        run(&self.ruleset, tree, dialect)
             .into_iter()
             .filter_map(|finding| {
                 let name = self.meta.get(&finding.rule)?.name;
@@ -369,7 +373,7 @@ mod tests {
         let custom = loaded(r#"(defrule no-print :pattern (print ?x) :message "m")"#);
         let source = "(print 1)";
         let tree = paredit_core_syntax::sexpr::SyntaxTree::parse(source).expect("parse");
-        let found = custom.findings(&tree, source);
+        let found = custom.findings(&tree, paredit_core_syntax::dialect::Dialect::CommonLisp);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].0, "no-print");
         assert_eq!(found[0].1.message, "m");
