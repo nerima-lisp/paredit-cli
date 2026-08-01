@@ -2148,6 +2148,7 @@ mod tests {
             "(length (copy-list ucx))\n", // unnecessary-copy
             "(nreverse (copy-list cbd))\n", // copy-before-destructive
             "(code-char 65)\n",        // ascii-code-char
+            "(defmacro mvc (fx) `(let ((cv ,fx)) (list cv)))\n", // macro-variable-capture
             "(if a b c d)\n",          // if-arity — NOT fixable
         );
         // The Emacs Lisp half. Its rules declare `Dialect::EmacsLisp` only, so
