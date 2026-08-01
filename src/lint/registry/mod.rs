@@ -13,7 +13,9 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-pub const RULE_COUNT: usize = 183;
+// 179 (pre-rebase base) + 4 (PR #79: macro-hygiene's four new enforcement
+// rules) + 8 (this branch's `lint-repl-debug` package) = 191.
+pub const RULE_COUNT: usize = 191;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -763,5 +765,37 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_control_flow::self_recursive_tail_call::rule::META,
         &paredit_feature_lint_control_flow::self_recursive_tail_call::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::leftover_print_debug::rule::META,
+        &paredit_feature_lint_repl_debug::leftover_print_debug::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::leftover_trace_call::rule::META,
+        &paredit_feature_lint_repl_debug::leftover_trace_call::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::leftover_break_call::rule::META,
+        &paredit_feature_lint_repl_debug::leftover_break_call::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::leftover_inspect_call::rule::META,
+        &paredit_feature_lint_repl_debug::leftover_inspect_call::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::leftover_time_benchmark_call::rule::META,
+        &paredit_feature_lint_repl_debug::leftover_time_benchmark_call::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::leftover_step_call::rule::META,
+        &paredit_feature_lint_repl_debug::leftover_step_call::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::commented_repl_transcript::rule::META,
+        &paredit_feature_lint_repl_debug::commented_repl_transcript::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_repl_debug::leftover_format_debug_marker::rule::META,
+        &paredit_feature_lint_repl_debug::leftover_format_debug_marker::rule::RULE,
     ),
 ];

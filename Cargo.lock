@@ -681,6 +681,7 @@ dependencies = [
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-performance",
  "paredit-feature-lint-portability",
+ "paredit-feature-lint-repl-debug",
  "paredit-feature-lint-safety",
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
@@ -1051,6 +1052,20 @@ version = "1.3.0"
 dependencies = [
  "paredit-core-lint-engine",
  "paredit-core-syntax",
+]
+
+[[package]]
+name = "paredit-feature-lint-repl-debug"
+version = "1.3.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-semantics",
+ "paredit-core-syntax",
+ "proptest",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

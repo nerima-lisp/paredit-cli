@@ -4,6 +4,7 @@ use paredit_core_syntax::dialect::{Dialect, SemanticOperation};
 use paredit_feature_emacs_lisp::file_report::usecase::supports_emacs_lisp_file_report_dialect;
 use paredit_feature_inline::inline_function::domain::supports_inline_function_dialect;
 use paredit_feature_inline::inline_let::domain::supports_inline_let_dialect;
+use paredit_feature_lint_repl_debug::leftover_print_debug::domain::heads_for as leftover_print_debug_heads_for;
 use paredit_feature_rename::rename::domain::supports_rename_at_dialect;
 
 pub(super) const DIALECTS: [&str; 10] = [
@@ -247,7 +248,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 244] = [
+const INTROSPECTION_COMMANDS: [&str; 252] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -502,6 +503,15 @@ const INTROSPECTION_COMMANDS: [&str; 244] = [
     // catalogue and no source file.
     "migrate list",
     "migrate explain",
+    // Section D (2026-08-01 batch): leftover REPL-debugging artifacts.
+    "inspect leftover-print-debug",
+    "inspect leftover-trace-call",
+    "inspect leftover-break-call",
+    "inspect leftover-inspect-call",
+    "inspect leftover-time-benchmark-call",
+    "inspect leftover-step-call",
+    "inspect commented-repl-transcript",
+    "inspect leftover-format-debug-marker",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [
@@ -861,6 +871,16 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "refactor inline-function" => Some(supports_inline_function_dialect(dialect)),
         "refactor inline-let" => Some(supports_inline_let_dialect(dialect)),
         "inspect elisp-file" => Some(supports_emacs_lisp_file_report_dialect(dialect)),
+        // The only two of this batch's eight rules whose scope is not plain
+        // `CommonLispSemantics`. `leftover-print-debug` reuses its own
+        // `heads_for` directly, so this matrix cannot drift from what the
+        // rule actually recognizes; `leftover-trace-call`'s CL+Elisp scope
+        // has no existing tier to reuse (`CommonLispFamily` is wired for
+        // `Semantic`-category commands only), so it is stated inline.
+        "inspect leftover-print-debug" => Some(!leftover_print_debug_heads_for(dialect).is_empty()),
+        "inspect leftover-trace-call" => {
+            Some(matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp))
+        }
         _ => None,
     };
     match gated {

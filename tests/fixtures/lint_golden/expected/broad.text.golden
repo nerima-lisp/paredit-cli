@@ -1,4 +1,4 @@
-finding_count	138
+finding_count	139
 rule	self-assignment	1
 rule	duplicate-setf-places	1
 rule	setf-arity	1
@@ -177,6 +177,14 @@ rule	execution-order-dependency	0
 rule	declarative-style-score	1
 rule	package-level-shadowing	0
 rule	self-recursive-tail-call	0
+rule	leftover-print-debug	1
+rule	leftover-trace-call	0
+rule	leftover-break-call	0
+rule	leftover-inspect-call	0
+rule	leftover-time-benchmark-call	0
+rule	leftover-step-call	0
+rule	commented-repl-transcript	0
+rule	leftover-format-debug-marker	0
 finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself	self-assignment/5f1a5b802aa99b47/0
 finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead	duplicate-setf-places/8104810ed815b9fd/0
 finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count	setf-arity/b0a5b422aad6d4d2/0
@@ -315,3 +323,4 @@ finding	make-array-default-keyword	warning	suspicious	fixable=true	broad.lisp	52
 finding	nested-char-case	warning	suspicious	fixable=true	broad.lisp	5313	the outer char case op dominates; the inner one is dead work	nested-char-case/e5d63774dec3163c/0
 finding	list-star-nil	warning	suspicious	fixable=true	broad.lisp	5384	list* with a nil tail is a spelled-out list; (list* a b nil) is (list a b)	list-star-nil/3d15900073a4c4e4/0
 finding	declarative-style-score	warning	suspicious	fixable=false	broad.lisp	0	this file's declarative-style score is 10% (134 top-level forms), below the 80% threshold	declarative-style-score/82af518277a40447/0
+finding	leftover-print-debug	warning	suspicious	fixable=true	broad.lisp	8864	print is a leftover debug-print call	leftover-print-debug/8410f5d691961e8d/0

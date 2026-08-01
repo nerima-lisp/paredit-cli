@@ -1,6 +1,6 @@
 # Configuration
 
-With 183 lint rules and 375 commands, passing every knob as a flag
+With 191 lint rules and 375 commands, passing every knob as a flag
 stopped scaling. `paredit.toml` is the answer: a small, strictly validated file
 that sets the defaults a repository wants, so a command line carries only what
 is unusual about *this* invocation.
