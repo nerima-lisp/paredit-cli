@@ -1251,3 +1251,98 @@ fn config_show_resolves_a_configured_cache_dir_relative_to_its_file() {
         "expected a path under nested/, got {value}"
     );
 }
+
+// --- FR-007: `macro-hygiene.fail-on-risk` sets the gate `inspect
+// macro-hygiene --fail-on-risk` arms, so CI can enforce it from the file
+// rather than from every command line. ---
+
+/// A macro whose template binds `result` around an interpolated form: the
+/// expansion can capture, which is what `inspect macro-hygiene` reports.
+const CAPTURING_MACRO: &str = "(defmacro plain-macro (form)\n  \
+                               `(let ((result ,form))\n     \
+                               (list result result)))\n";
+
+/// The whole point of the key: no flag on the command line, and the run is
+/// gated anyway.
+#[test]
+fn a_configured_macro_hygiene_gate_fails_the_run_with_no_flag_typed() {
+    let root = repo("config-effect-macro-hygiene-gate");
+    write(&root, "a.lisp", CAPTURING_MACRO);
+    write(
+        &root,
+        "paredit.toml",
+        "[macro-hygiene]\nfail-on-risk = true\n",
+    );
+
+    in_repo(&root, &["inspect", "macro-hygiene", "a.lisp"])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "inspect macro-hygiene policy failed",
+        ));
+}
+
+/// The control case that proves the failure above comes from the
+/// configuration and not from the fixture: the same file, no key, exits zero.
+#[test]
+fn without_the_key_the_same_hygiene_risk_does_not_gate_the_run() {
+    let root = repo("config-effect-macro-hygiene-control");
+    write(&root, "a.lisp", CAPTURING_MACRO);
+
+    let report = json_of(in_repo(&root, &["inspect", "macro-hygiene", "a.lisp"]));
+    assert!(
+        report["files"][0]["findings"]
+            .as_array()
+            .is_some_and(|findings| !findings.is_empty()),
+        "the fixture must still carry a hygiene risk: {report}"
+    );
+}
+
+/// `false` written out is the built-in default, and neither injects anything.
+#[test]
+fn the_macro_hygiene_gate_written_false_leaves_the_run_passing() {
+    let root = repo("config-effect-macro-hygiene-false");
+    write(&root, "a.lisp", CAPTURING_MACRO);
+    write(
+        &root,
+        "paredit.toml",
+        "[macro-hygiene]\nfail-on-risk = false\n",
+    );
+
+    in_repo(&root, &["inspect", "macro-hygiene", "a.lisp"])
+        .assert()
+        .success();
+}
+
+/// The environment variable is derived from the key name, so it works without
+/// being declared anywhere — the same way `PAREDIT_CACHE_DIR` does.
+#[test]
+fn the_derived_environment_variable_arms_the_macro_hygiene_gate_too() {
+    let root = repo("config-effect-macro-hygiene-env");
+    write(&root, "a.lisp", CAPTURING_MACRO);
+
+    let mut command = in_repo(&root, &["inspect", "macro-hygiene", "a.lisp"]);
+    command.env("PAREDIT_MACRO_HYGIENE_FAIL_ON_RISK", "true");
+    command.assert().code(3);
+}
+
+/// `config show` proves the key is a first-class schema key with provenance,
+/// independent of any command's behaviour.
+#[test]
+fn config_show_reports_the_macro_hygiene_gate_and_where_it_was_set() {
+    let root = repo("config-show-macro-hygiene");
+    write(
+        &root,
+        "paredit.toml",
+        "[macro-hygiene]\nfail-on-risk = true\n",
+    );
+
+    let report = json_of(config(
+        &root,
+        &["show", "--key", "macro-hygiene.fail-on-risk"],
+    ));
+    let entry = setting(&report, "macro-hygiene.fail-on-risk");
+
+    assert_eq!(entry["value"], true);
+    assert_eq!(entry["origin"]["layer"], "repository");
+}

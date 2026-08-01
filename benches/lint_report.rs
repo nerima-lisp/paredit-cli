@@ -21,6 +21,15 @@ const FORM_COUNTS: [usize; 2] = [64, 1024];
 /// `tests/fixtures/lint_golden/broad.lisp` (the golden fixture that pins one
 /// form per `inspect lint` rule, all 134 of them). Cycling through this list
 /// keeps every synthetic document dense with findings regardless of size.
+///
+/// The two macro-definition forms at the end are the exception: they are
+/// written here rather than lifted, because `broad.lisp` contains no macro
+/// definition at all. That gap was load-bearing — a whole rule *family* keys
+/// off `defmacro`-shaped heads, and with no such form in the fixture
+/// `scripts/bench-compare.sh` reported the branch that added the five
+/// `inspect macro-hygiene` rules as clean, while a macro-dense corpus measured
+/// +77% wall clock. A rule whose head never appears here is a rule this
+/// benchmark cannot see.
 const DENSE_FORMS: &[&str] = &[
     "(list '5)",
     "(progn only)",
@@ -156,6 +165,13 @@ const DENSE_FORMS: &[&str] = &[
     "(make-instance 'c :x 1 :x 2)",
     "(defpackage :app (:export 'foo))",
     "(incf counter 0)",
+    // Macro hygiene. `benchcapture` triggers three of the four Common-Lisp-
+    // applicable rules at once — it binds the literal name `result` inside the
+    // template (capture), unquotes `a` twice (multiple evaluation), and
+    // unquotes `b` before `a` (parameter reordering) — and `benchdeep`
+    // triggers the fourth.
+    "(defmacro benchcapture (a b) `(let ((result ,b)) (list ,a ,a result)))",
+    "(defmacro benchdeep (x) `(outer `(middle `(inner ,x))))",
 ];
 
 #[derive(Clone, Copy)]

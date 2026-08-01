@@ -13,7 +13,7 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-pub const RULE_COUNT: usize = 179;
+pub const RULE_COUNT: usize = 183;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -665,12 +665,30 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
         &paredit_feature_lint_convention::method_lambda_list_mismatch::META,
         &paredit_feature_lint_convention::method_lambda_list_mismatch::RULE,
     ),
-    // Macro hygiene. Declares its own multi-dialect scope rather than the
-    // default Common-Lisp-only one, so it also runs over Emacs Lisp, Clojure,
+    // Macro hygiene: one rule per risk `inspect macro-hygiene` detects, so
+    // that each can be denied, failed on, suppressed and baselined on its own.
+    // All but the last declare their own multi-dialect scope rather than the
+    // default Common-Lisp-only one, so they also run over Emacs Lisp, Clojure,
     // Janet, Hy, Carp, Fennel and LFE.
     RuleEntry::new(
-        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::META,
-        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::RULE,
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::variable_capture::META,
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::variable_capture::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::multiple_evaluation::META,
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::multiple_evaluation::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::parameter_reordering::META,
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::parameter_reordering::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::deep_quasiquote::META,
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::deep_quasiquote::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::missing_declare::META,
+        &paredit_feature_lisp_analysis::macro_hygiene_report::rule::missing_declare::RULE,
     ),
     // Emacs Lisp. Every rule below declares `Dialect::EmacsLisp` only, so a
     // Common Lisp run skips them before walking anything.

@@ -196,7 +196,7 @@ const NUMERIC_LITERAL_CASES: &[&str] = &["preserve", "lower", "upper"];
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 40;
+pub const KEY_COUNT: usize = 41;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -428,6 +428,15 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         summary: "Silence every lint finding under these paths, relative to the file that sets \
                   them, as generated code or vendored dependencies cannot carry an inline ignore.",
     },
+    // --- [macro-hygiene] ---
+    KeySchema {
+        key: "macro-hygiene.fail-on-risk",
+        kind: ValueKind::Boolean,
+        default: DefaultValue::Boolean(false),
+        summary: "Make `inspect macro-hygiene` exit non-zero when it reports any of its five \
+                  hygiene risks, gating that one command as a whole; `inspect lint` with \
+                  `lint.deny`/`lint.fail-on` is the per-rule gate.",
+    },
     // --- [output] ---
     KeySchema {
         key: "output.format",
@@ -566,6 +575,18 @@ mod tests {
         assert_eq!(entry.kind, ValueKind::Text);
         assert_eq!(entry.default, DefaultValue::Unset);
         assert!(PATH_KEYS.contains(&"cache.dir"));
+    }
+
+    /// FR-007: `macro-hygiene.fail-on-risk` is the configured spelling of
+    /// `inspect macro-hygiene --fail-on-risk`. It is a boolean whose default is
+    /// the flag's own absence, so a project that never mentions it keeps
+    /// today's behaviour, and its variable is the key shouted like every other.
+    #[test]
+    fn macro_hygiene_fail_on_risk_is_a_boolean_gate_defaulting_to_off() {
+        let entry = lookup("macro-hygiene.fail-on-risk").expect("declared");
+        assert_eq!(entry.env_var(), "PAREDIT_MACRO_HYGIENE_FAIL_ON_RISK");
+        assert_eq!(entry.kind, ValueKind::Boolean);
+        assert_eq!(entry.default, DefaultValue::Boolean(false));
     }
 
     /// A default has to be a value the key's own type would accept, or the

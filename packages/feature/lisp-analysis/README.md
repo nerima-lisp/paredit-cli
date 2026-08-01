@@ -36,7 +36,13 @@ S-expression-shaped analysis sees nothing at all:
   evaluating its parameters in an order the call site does not write, and
   nesting quasiquotes past the depth a reader can track — plus, for Emacs
   Lisp, a macro that declares nothing about how an editor should indent or
-  step through it.
+  step through it. `--fail-on-risk` (or `macro-hygiene.fail-on-risk`) turns
+  that report into a gate, all-or-nothing over all five risks. Each risk is
+  also exported as its own lint rule — `macro-variable-capture`,
+  `macro-multiple-evaluation`, `macro-parameter-reordering`,
+  `macro-deep-quasiquote-nesting` and `elisp-macro-missing-declare`, the only
+  lint rules this package owns — so `inspect lint` can deny, fail on, suppress
+  and baseline them one at a time over the same detection.
 - **Conditions.** `restarts` pairs `restart-case` establishments against
   `invoke-restart` uses, and reports each side that has no counterpart.
 

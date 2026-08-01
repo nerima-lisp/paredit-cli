@@ -1,6 +1,19 @@
 {
-  "finding_count": 10,
+  "finding_count": 11,
   "findings": [
+    {
+      "category": "malformed",
+      "fixable": false,
+      "id": "elisp-macro-missing-declare/3f509c1d426873fb/0",
+      "message": "missing editor declaration: macro `fixture-macro` is defined without one; add a leading (declare (indent ...)) and/or (declare (debug ...)) form so Emacs indents and Edebug instruments calls to this macro correctly",
+      "path": "emacs-lisp.el",
+      "rule": "elisp-macro-missing-declare",
+      "severity": "warning",
+      "span": {
+        "end": 436,
+        "start": 344
+      }
+    },
     {
       "category": "suspicious",
       "fixable": false,
@@ -1075,6 +1088,30 @@
       "count": 0,
       "description": "a defmacro template binds a literal name that is not obviously a gensym",
       "rule": "macro-variable-capture"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a macro expansion runs one form more than once: an argument form unquoted twice, or a symbol-macrolet expansion referenced twice",
+      "rule": "macro-multiple-evaluation"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a macro template unquotes its parameters in an order the lambda list does not",
+      "rule": "macro-parameter-reordering"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a macro template nests three or more quasiquote levels",
+      "rule": "macro-deep-quasiquote-nesting"
+    },
+    {
+      "category": "malformed",
+      "count": 1,
+      "description": "an Emacs Lisp macro with no leading (declare (indent ...)) or (declare (debug ...))",
+      "rule": "elisp-macro-missing-declare"
     },
     {
       "category": "suspicious",

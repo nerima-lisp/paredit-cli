@@ -13,7 +13,7 @@ pub struct MacroHygieneReportArgs {
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
     pub dialect: Option<DialectArg>,
-    /// Exit with failure when a macro template can capture a variable or evaluate an argument twice.
+    /// Exit with failure when any of the five hygiene risks is reported, not just one of them.
     #[arg(long)]
     pub fail_on_risk: bool,
     /// Output format for agent consumption.

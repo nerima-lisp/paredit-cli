@@ -152,7 +152,7 @@ discovery, impact analysis, and preflight checks.
 | `todo` | Report `TODO`/`FIXME`/`XXX`/`HACK`/`BUG` markers with the top-level definition each one sits inside and any `TODO(name):` attribution. Comments are kept as trivia beside the tree rather than as nodes in it, so this is the only report that can see one. |
 | `line-metrics` | Report line length, file length, and lines per definition against thresholds the caller sets (`--max-line-length`, `--max-file-lines`, `--max-definition-lines`). Distinct from `complexity`, which measures how hard a definition is to reason about; this measures how hard a file is to navigate. Width is counted in characters, not bytes. |
 | `macro-expansion` | Report what each same-file `defmacro` expands its own call sites into. Template substitution only — it does not evaluate, does not expand nested macros, and reports every call it declined with the reason (a computed expansion, an `&key`/destructuring lambda list, or an argument-count mismatch). |
-| `macro-hygiene` | Report the two ways a macro template betrays its caller: binding a literal name inside a quasiquoted template (variable capture, since Common Lisp macros are unhygienic), and unquoting one parameter more than once (multiple evaluation of the caller's argument form). A name bound to `(gensym)` outside the template is recognised and not reported. |
+| `macro-hygiene` | Report the five ways a macro template betrays its caller: binding a literal name inside a quasiquoted template (variable capture, since these macros are unhygienic), unquoting one parameter more than once or referencing a non-side-effect-free `symbol-macrolet` expansion more than once (multiple evaluation of the caller's form), unquoting parameters in an order the lambda list does not write (parameter reordering), nesting quasiquotes three or more levels deep, and — Emacs Lisp only — a macro with no leading `(declare (indent …))`/`(declare (debug …))`. A name bound to `(gensym)` outside the template is recognised and not reported. Also covers Emacs Lisp, Clojure, Janet, Hy, Carp, Fennel and LFE; Scheme and Racket are excluded because `syntax-rules` makes hygiene a language guarantee. `--fail-on-risk` exits 3 if *any* of the five is reported — it is all-or-nothing, and per-risk gating is `inspect lint`'s job, since each of the five also ships as its own lint rule. |
 | `loop` | Report each `loop`'s clause structure: the variables `for`/`as`/`with` bind, what it accumulates and into what, which clauses can end it, and whether anything can. `loop` has a grammar rather than an S-expression shape, so nothing else in this tool can see inside one. |
 | `format-directives` | Report `format`-family calls with a literal control string, counting the arguments the directives consume against the arguments the call supplies. Iteration (`~{…~}`), conditionals (`~[…~]`), and `~?` make the count indeterminate rather than wrong, and an indeterminate call never counts as a mismatch. |
 | `read-conditionals` | Report every `#+`/`#-`, the feature expression it tests, the individual features that expression names, and the code it guards. Also counts features named exactly once in a file, which is usually a misspelling of one named everywhere else. |
@@ -328,7 +328,7 @@ adds each finding's full field set as indented lines under its row.
 
 ### Choosing and tuning lint rules
 
-With 179 rules, `inspect lint` needs more than an on/off switch per rule. The
+With 183 rules, `inspect lint` needs more than an on/off switch per rule. The
 flags below are about the rule *set* rather than about any one rule, and all of
 them work with `--list-rules` as well as with a scan — so a run can be
 inspected before it is made.
@@ -353,7 +353,7 @@ key for baselines and suppression tooling.
 
 ### Rules a project writes for itself
 
-The 166 shipped rules are the ones everybody gets. A rule like "in *this*
+The 183 shipped rules are the ones everybody gets. A rule like "in *this*
 codebase, `defentity` must always be given a `:table`" is the majority of what
 a mature project wants and none of what a linter can ship, so a project writes
 those itself, in Lisp, in `.paredit/rules/*.lisp`:

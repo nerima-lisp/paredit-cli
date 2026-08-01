@@ -12,6 +12,32 @@
                   "uri": "emacs-lisp.el"
                 },
                 "region": {
+                  "byteLength": 92,
+                  "byteOffset": 344,
+                  "startColumn": 1,
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "missing editor declaration: macro `fixture-macro` is defined without one; add a leading (declare (indent ...)) and/or (declare (debug ...)) form so Emacs indents and Edebug instruments calls to this macro correctly"
+          },
+          "partialFingerprints": {
+            "pareditFindingId": "elisp-macro-missing-declare/3f509c1d426873fb/0",
+            "primaryLocationLineHash": "fnv1a64:3c77b70fc81ae1c9:0"
+          },
+          "ruleId": "elisp-macro-missing-declare"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "emacs-lisp.el"
+                },
+                "region": {
                   "byteLength": 59,
                   "byteOffset": 0,
                   "startColumn": 1,
@@ -2338,6 +2364,54 @@
               },
               "shortDescription": {
                 "text": "a defmacro template binds a literal name that is not obviously a gensym"
+              }
+            },
+            {
+              "id": "macro-multiple-evaluation",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macro expansion runs one form more than once: an argument form unquoted twice, or a symbol-macrolet expansion referenced twice"
+              }
+            },
+            {
+              "id": "macro-parameter-reordering",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macro template unquotes its parameters in an order the lambda list does not"
+              }
+            },
+            {
+              "id": "macro-deep-quasiquote-nesting",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macro template nests three or more quasiquote levels"
+              }
+            },
+            {
+              "id": "elisp-macro-missing-declare",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an Emacs Lisp macro with no leading (declare (indent ...)) or (declare (debug ...))"
               }
             },
             {

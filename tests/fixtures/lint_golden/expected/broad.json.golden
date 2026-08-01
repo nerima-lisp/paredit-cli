@@ -2743,6 +2743,30 @@
     {
       "category": "suspicious",
       "count": 0,
+      "description": "a macro expansion runs one form more than once: an argument form unquoted twice, or a symbol-macrolet expansion referenced twice",
+      "rule": "macro-multiple-evaluation"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a macro template unquotes its parameters in an order the lambda list does not",
+      "rule": "macro-parameter-reordering"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a macro template nests three or more quasiquote levels",
+      "rule": "macro-deep-quasiquote-nesting"
+    },
+    {
+      "category": "malformed",
+      "count": 0,
+      "description": "an Emacs Lisp macro with no leading (declare (indent ...)) or (declare (debug ...))",
+      "rule": "elisp-macro-missing-declare"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
       "description": "an Emacs Lisp file whose first line does not set lexical-binding",
       "rule": "elisp-missing-lexical-binding"
     },
