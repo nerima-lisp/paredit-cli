@@ -364,6 +364,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::NestedCxr(args) => {
                 nested_cxr_report::workflow::nested_cxr_report(args)?;
             }
+            command::InspectCommand::PackageLevelShadowing(args) => {
+                package_level_shadowing_report::workflow::package_level_shadowing_report(args)?;
+            }
             command::InspectCommand::NthcdrZero(args) => {
                 nthcdr_zero_report::workflow::nthcdr_zero_report(args)?;
             }

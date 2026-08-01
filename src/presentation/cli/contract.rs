@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 237] = [
+const INTROSPECTION_COMMANDS: [&str; 238] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -405,6 +405,7 @@ const INTROSPECTION_COMMANDS: [&str; 237] = [
     "inspect negated-when-unless",
     "inspect nested-boolean",
     "inspect nested-cxr",
+    "inspect package-level-shadowing",
     "inspect nthcdr-zero",
     "inspect subseq-zero",
     "inspect car-nthcdr",
@@ -665,7 +666,7 @@ const SYNTAX_TIER_REPORTS: [&str; 19] = [
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 34] = [
+const SCOPE_TIER_REPORTS: [&str; 35] = [
     "inspect resolve",
     "inspect giant-conditional-form",
     "inspect test-map",
@@ -691,6 +692,7 @@ const SCOPE_TIER_REPORTS: [&str; 34] = [
     "inspect unused-definitions",
     "inspect unused-parameters",
     "inspect shadowed-bindings",
+    "inspect package-level-shadowing",
     "inspect lets",
     "inspect duplicates",
     "inspect similarity",

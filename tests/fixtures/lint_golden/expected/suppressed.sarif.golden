@@ -2347,6 +2347,22 @@
               "shortDescription": {
                 "text": "a file whose fraction of purely-declarative top-level forms falls below a threshold"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "A local named the same as a top-level function or special variable makes the outer one unreachable for the rest of that binding's scope. `inspect shadowed-bindings` already covers shadowing between nested lexical scopes; this is the wider case, an inner binding reaching all the way out to a top-level name."
+              },
+              "id": "package-level-shadowing",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A local named the same as a top-level function or special variable makes the outer one unreachable for the rest of that binding's scope. `inspect shadowed-bindings` already covers shadowing between nested lexical scopes; this is the wider case, an inner binding reaching all the way out to a top-level name.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an inner let binding or lambda-list parameter that reuses the name of a top-level definition in the same file"
+              }
             }
           ]
         }

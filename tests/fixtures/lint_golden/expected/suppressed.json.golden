@@ -1055,6 +1055,12 @@
       "count": 1,
       "description": "a file whose fraction of purely-declarative top-level forms falls below a threshold",
       "rule": "declarative-style-score"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an inner let binding or lambda-list parameter that reuses the name of a top-level definition in the same file",
+      "rule": "package-level-shadowing"
     }
   ],
   "policy": {

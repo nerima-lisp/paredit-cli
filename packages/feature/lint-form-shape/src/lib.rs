@@ -24,6 +24,7 @@ pub mod manual_pushnew;
 pub mod multiple_value_list_of_values;
 pub mod nested_char_case;
 pub mod nested_cxr;
+pub mod package_level_shadowing;
 pub mod parse_integer_default_radix;
 pub mod redundant_apply;
 pub mod redundant_funcall;

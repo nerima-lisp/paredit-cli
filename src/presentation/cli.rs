@@ -644,6 +644,7 @@ use paredit_feature_lint_form_shape::manual_pushnew::cli as manual_pushnew_repor
 use paredit_feature_lint_form_shape::multiple_value_list_of_values::cli as multiple_value_list_of_values_report;
 use paredit_feature_lint_form_shape::nested_char_case::cli as nested_char_case_report;
 use paredit_feature_lint_form_shape::nested_cxr::cli as nested_cxr_report;
+use paredit_feature_lint_form_shape::package_level_shadowing::cli as package_level_shadowing_report;
 use paredit_feature_lint_form_shape::parse_integer_default_radix::cli as parse_integer_default_radix_report;
 use paredit_feature_lint_form_shape::redundant_apply::cli as redundant_apply_report;
 use paredit_feature_lint_form_shape::redundant_funcall::cli as redundant_funcall_report;
