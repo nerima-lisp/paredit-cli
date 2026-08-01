@@ -294,7 +294,7 @@ fn every_worker_count_is_derived_from_the_jobs_flag() {
             );
             continue;
         }
-        if !path.extension().is_some_and(|ext| ext == "rs") {
+        if path.extension().is_none_or(|ext| ext != "rs") {
             continue;
         }
         let source = fs::read_to_string(&path).expect("read source file");
