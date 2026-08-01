@@ -1135,6 +1135,12 @@
       "count": 0,
       "description": "a let/let*/cond/case-family form carrying more bindings or clauses than a threshold",
       "rule": "giant-conditional-form"
+    },
+    {
+      "category": "conditions",
+      "count": 0,
+      "description": "a define-condition whose direct supertype list names a type and one of that type's own same-file ancestors",
+      "rule": "redundant-condition-supertype"
     }
   ],
   "policy": {

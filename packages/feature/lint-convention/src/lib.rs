@@ -8,6 +8,7 @@ pub mod effectively_constant_variable;
 pub mod ignore_declaration_conflict;
 pub mod method_lambda_list_mismatch;
 pub mod missing_docstring;
+pub mod redundant_condition_supertype;
 
 // One module per rule: these rules have no standalone `inspect <rule>` command,
 // so the domain/usecase/cli split the older lint packages use would be

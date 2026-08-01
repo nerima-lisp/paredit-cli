@@ -7986,6 +7986,22 @@
               "shortDescription": {
                 "text": "a defparameter/defvar with an initial value that is never reassigned in the same file"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "Listing a type and one of its own ancestors as direct supertypes of the same condition contributes nothing the more specific type did not already contribute; it usually means the author was not sure what the more specific type already inherits."
+              },
+              "id": "redundant-condition-supertype",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "Listing a type and one of its own ancestors as direct supertypes of the same condition contributes nothing the more specific type did not already contribute; it usually means the author was not sure what the more specific type already inherits.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a define-condition whose direct supertype list names a type and one of that type's own same-file ancestors"
+              }
             }
           ]
         }

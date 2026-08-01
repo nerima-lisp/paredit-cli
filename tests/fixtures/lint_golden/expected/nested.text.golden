@@ -166,6 +166,7 @@ rule	elisp-interactive-in-macro	0
 rule	elisp-condition-case-without-handler	0
 rule	embedded-secret	0
 rule	giant-conditional-form	0
+rule	redundant-condition-supertype	0
 finding	redundant-quote	warning	suspicious	fixable=true	nested.lisp	840	quoting number 5 is redundant	redundant-quote/07bb8307b4864109/0
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	268	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/9715182cb9f63314/0
 finding	redundant-progn	warning	suspicious	fixable=true	nested.lisp	833	redundant progn: progn wraps a single form; it is equivalent to that form	redundant-progn/8d949e5fcf0552a8/0
