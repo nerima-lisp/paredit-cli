@@ -145,6 +145,69 @@ fn repair_reset_on_an_already_valid_ring_does_not_rewrite_it() {
 }
 
 #[test]
+fn default_text_output_reports_a_valid_ring() {
+    // `--output` is not passed at all here: `OutputFormat::Text` is the
+    // command's default (unlike most other `inspect` reports, which default
+    // to JSON), and none of this file's other tests exercise that fallback.
+    let dir = fresh_temp_dir("kill-ring-default-output-valid");
+    let ring = dir.join("kill-ring.json");
+    fs::write(
+        &ring,
+        serde_json::json!({
+            "schema_version": 1,
+            "entries": [
+                { "text": "(a)", "origin": null },
+                { "text": "(b)", "origin": "f.lisp" },
+            ],
+        })
+        .to_string(),
+    )
+    .expect("write fixture ring");
+
+    paredit()
+        .args(["inspect", "kill-ring", "--ring"])
+        .arg(&ring)
+        .assert()
+        .success()
+        .stdout(format!("kill ring {} ok: 2 entries\n", ring.display()));
+}
+
+#[test]
+fn default_text_output_reports_a_missing_ring() {
+    let dir = fresh_temp_dir("kill-ring-default-output-missing");
+    let ring = dir.join("does-not-exist.json");
+
+    paredit()
+        .args(["inspect", "kill-ring", "--ring"])
+        .arg(&ring)
+        .assert()
+        .success()
+        .stdout(format!("kill ring {} ok: 0 entries\n", ring.display()));
+}
+
+#[test]
+fn default_text_output_reports_a_corrupted_ring() {
+    let dir = fresh_temp_dir("kill-ring-default-output-corrupted");
+    let ring = dir.join("kill-ring.json");
+    // Valid JSON, but missing the `entries`/`schema_version` shape a kill
+    // ring needs: `Corruption::MissingShape`, whose message is a fixed
+    // string (unlike `InvalidJson`, whose detail comes from `serde_json`'s
+    // own error formatting and is not worth pinning exactly here).
+    fs::write(&ring, r#"{"foo": 1}"#).expect("write fixture");
+
+    paredit()
+        .args(["inspect", "kill-ring", "--ring"])
+        .arg(&ring)
+        .assert()
+        .code(1)
+        .stdout(format!(
+            "kill ring {} corrupted: valid JSON, but missing the `entries` array or \
+             `schema_version` field a kill ring needs\n",
+            ring.display()
+        ));
+}
+
+#[test]
 fn a_schema_version_mismatch_is_reported_by_name() {
     let dir = fresh_temp_dir("kill-ring-schema-mismatch");
     let ring = dir.join("kill-ring.json");

@@ -250,3 +250,50 @@ fn an_explicit_baseline_format_suppresses_the_emacs_customize_detector() {
     let report: serde_json::Value = serde_json::from_slice(&output).expect("data-check is JSON");
     assert_eq!(report["finding_count"], 0, "{report}");
 }
+
+#[test]
+fn unparseable_source_is_refused_cleanly_and_prints_no_garbage_json() {
+    // Unlike every other fixture in this file, this source cannot be parsed
+    // at all: a missing closing paren. `build_data_check_report`'s own unit
+    // tests (in `packages/feature/data-report/src/data_check_report/domain.rs`)
+    // only ever feed it a tree that already parsed, so this is the first
+    // place a genuine parse failure reaches `inspect data-check`. Matches
+    // the convention `edit canonicalize` and `inspect check` already use for
+    // the same situation: non-zero exit, `unclosed list` named on stderr,
+    // nothing written to stdout at all (the structured error envelope goes
+    // to stderr too, even under `--output json` — see `report_failure` in
+    // `src/presentation/cli.rs`).
+    let dir = fresh_temp_dir("data-check-unparseable");
+    let file = dir.join("data.lisp");
+    fs::write(&file, "(:a 1").expect("write fixture");
+
+    paredit()
+        .args(["inspect", "data-check", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("unclosed list"));
+}
+
+#[test]
+fn an_empty_file_reports_nothing_and_does_not_error() {
+    // A 0-byte file parses cleanly to an empty document (no forms at all),
+    // the same "nothing here to flag" outcome the code-file fixture above
+    // gets, not a distinct empty-input case.
+    let dir = fresh_temp_dir("data-check-empty-file");
+    let file = dir.join("empty.lisp");
+    fs::write(&file, "").expect("write empty fixture");
+
+    let output = paredit()
+        .args(["inspect", "data-check", "--output", "json"])
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("data-check is JSON");
+    assert_eq!(report["finding_count"], 0, "{report}");
+    assert_eq!(report["files"][0]["findings"], serde_json::json!([]));
+}
