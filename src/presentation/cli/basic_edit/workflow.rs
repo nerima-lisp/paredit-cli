@@ -35,17 +35,17 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
     let check = args.check;
     let diff_stat_only = args.diff_stat;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    let formatter = build_formatter(
-        args.indent,
+    let formatter = build_formatter(FormatOptions {
+        indent: args.indent,
         dialect,
-        args.max_width,
-        args.reindent_block_comments,
-        args.comment_column,
-        args.max_blank_lines,
-        &args.indent_table,
-        &args.width_profiles,
-        args.quote_style.into(),
-    )?;
+        max_width: args.max_width,
+        reindent_block_comments: args.reindent_block_comments,
+        comment_column: args.comment_column,
+        max_blank_lines: args.max_blank_lines,
+        indent_table: &args.indent_table,
+        width_profiles: &args.width_profiles,
+        quote_style: args.quote_style.into(),
+    })?;
     let rendered = formatter.format(&tree);
 
     if check {
@@ -122,17 +122,17 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
     let width_profiles = args.width_profiles.clone();
     let quote_style: ReaderPrefixStyle = args.quote_style.into();
     let analysis = analyze_files(&files, args.dialect, move |file, dialect, tree, input| {
-        let formatter = build_formatter(
+        let formatter = build_formatter(FormatOptions {
             indent,
             dialect,
             max_width,
             reindent_block_comments,
             comment_column,
             max_blank_lines,
-            &indent_table,
-            &width_profiles,
+            indent_table: &indent_table,
+            width_profiles: &width_profiles,
             quote_style,
-        )?;
+        })?;
         let rendered = formatter.format(tree);
         let diff = unified_diff(file, &input.text, &rendered);
         let stat = diff_stat(&diff);
@@ -178,6 +178,20 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
     Ok(())
 }
 
+/// Every width/style knob `FormatArgs` and `format_diff_stat_many` share,
+/// bundled so [`build_formatter`] takes one argument instead of nine.
+struct FormatOptions<'a> {
+    indent: usize,
+    dialect: Dialect,
+    max_width: Option<usize>,
+    reindent_block_comments: bool,
+    comment_column: Option<usize>,
+    max_blank_lines: Option<usize>,
+    indent_table: &'a [String],
+    width_profiles: &'a [String],
+    quote_style: ReaderPrefixStyle,
+}
+
 /// Builds the [`Formatter`] `edit format` renders with, threading through
 /// every width/style knob `FormatArgs` and `format_diff_stat_many` share.
 ///
@@ -189,17 +203,18 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
 /// `paredit.toml` already passed this same shape and vocabulary check in
 /// `packages/core/config`'s schema validation, so in practice this only ever
 /// rejects a flag typed directly on the command line.
-fn build_formatter(
-    indent: usize,
-    dialect: Dialect,
-    max_width: Option<usize>,
-    reindent_block_comments: bool,
-    comment_column: Option<usize>,
-    max_blank_lines: Option<usize>,
-    indent_table: &[String],
-    width_profiles: &[String],
-    quote_style: ReaderPrefixStyle,
-) -> CliResult<Formatter> {
+fn build_formatter(options: FormatOptions<'_>) -> CliResult<Formatter> {
+    let FormatOptions {
+        indent,
+        dialect,
+        max_width,
+        reindent_block_comments,
+        comment_column,
+        max_blank_lines,
+        indent_table,
+        width_profiles,
+        quote_style,
+    } = options;
     let mut formatter = Formatter::with_dialect(indent, dialect)
         .with_reindent_block_comments(reindent_block_comments);
     if let Some(max_width) = max_width {
