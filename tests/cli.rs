@@ -223,6 +223,8 @@ mod graph_output;
 mod handler_case_no_clauses_report;
 #[path = "cli/help_contract.rs"]
 mod help_contract;
+#[path = "cli/html_report_palette_contract.rs"]
+mod html_report_palette_contract;
 #[path = "cli/identical_if_branch_report.rs"]
 mod identical_if_branch_report;
 #[path = "cli/identity_arithmetic_report.rs"]
@@ -257,6 +259,8 @@ mod let_refactor;
 mod lint_cache;
 #[path = "cli/lint_custom_baseline_contract.rs"]
 mod lint_custom_baseline_contract;
+#[path = "cli/lint_envelope_divergence_contract.rs"]
+mod lint_envelope_divergence_contract;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
 #[path = "cli/lint_report_golden.rs"]
@@ -455,6 +459,8 @@ mod replace_forms;
 mod report_interop;
 #[path = "cli/report_json_key_casing_contract.rs"]
 mod report_json_key_casing_contract;
+#[path = "cli/report_text_structure_contract.rs"]
+mod report_text_structure_contract;
 #[path = "cli/report_verbosity_contract.rs"]
 mod report_verbosity_contract;
 #[path = "cli/resource_budget.rs"]

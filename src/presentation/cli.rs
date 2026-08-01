@@ -124,7 +124,8 @@ struct Cli {
     #[arg(long, global = true)]
     progress: bool,
     /// Whether text output may use ANSI color. `auto` follows the
-    /// destination terminal and `NO_COLOR`/`CLICOLOR_FORCE`.
+    /// destination terminal, forced off by `NO_COLOR`/`TERM=dumb`, forced on
+    /// by `CLICOLOR_FORCE`/`FORCE_COLOR` (the off signals win).
     #[arg(long, global = true, value_enum)]
     color: Option<paredit_core_cli::color::ColorMode>,
     /// Delegate stdout to `$PAGER` (falling back to `less`) when it is a
