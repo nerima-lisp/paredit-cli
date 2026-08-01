@@ -188,38 +188,6 @@ fn a_dot_dir_locals_el_file_is_auto_detected_and_flags_an_eval_key() {
 }
 
 #[test]
-fn a_paredit_rules_directory_file_is_auto_detected_and_flags_a_parse_failure() {
-    let dir = fresh_temp_dir("data-check-paredit-config-auto");
-    let rules_dir = dir.join(".paredit").join("rules");
-    fs::create_dir_all(&rules_dir).expect("create rules dir");
-    // Extensionless on purpose: an extension of `.lisp` would already select
-    // `Dialect::CommonLisp` for the initial read, and this fixture would
-    // then fail to parse *before* ever reaching the format detector below —
-    // there would be no tree to hand it. Extensionless resolves to
-    // `Dialect::Unknown`'s permissive legacy reader for that initial read,
-    // which accepts `#{` (as a `HashLiteral`-prefixed brace list) where the
-    // strict Common Lisp reader `lint-custom` actually parses these files
-    // with does not; that gap is exactly what this check surfaces.
-    let file = rules_dir.join("broken-rule");
-    fs::write(&file, "#{1 2}\n").expect("write fixture");
-
-    let output = paredit()
-        .args(["inspect", "data-check", "--output", "json"])
-        .arg(&file)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let report: serde_json::Value = serde_json::from_slice(&output).expect("data-check is JSON");
-    assert_eq!(report["finding_count"], 1, "{report}");
-    let kind = report["files"][0]["findings"][0]["kind"]
-        .as_str()
-        .expect("finding kind");
-    assert_eq!(kind, "paredit-config-parse-error");
-}
-
-#[test]
 fn an_explicit_format_overrides_auto_detection() {
     let dir = fresh_temp_dir("data-check-format-override");
     // `.clj`, not `.edn`, so auto-detection would land on `baseline` for

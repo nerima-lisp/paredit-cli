@@ -12,7 +12,7 @@ use std::path::Path;
 
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
-    ByteOffset, ByteSpan, Delimiter, ExpressionKind, ExpressionView, ReaderPrefix, SyntaxTree,
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, ReaderPrefix, SyntaxTree,
 };
 use paredit_core_syntax::view_query::{atom_text, for_each_subview, is_paren_list, list_head};
 use serde_json::{Value, json};
@@ -36,9 +36,6 @@ pub enum DataFormat {
     /// EDN (extensible data notation): Clojure's reader minus the
     /// code-only reader macros EDN forbids.
     Edn,
-    /// A `.paredit/rules/*.lisp` or `.paredit/migrations/*.lisp` file this
-    /// tool itself reads as Common Lisp.
-    PareditConfig,
     /// Emacs's `.dir-locals.el`: an alist of `(mode-or-nil . variable-alist)`.
     DirLocals,
     /// A Racket data file: `.rktd` by extension. `#lang` alone cannot signal
@@ -66,9 +63,6 @@ pub enum DataIssueKind {
     /// A code-only Clojure reader macro (`#(`, `#'`, `#?`/`#?@`) appears in a
     /// file being checked as EDN, which forbids all three.
     EdnInvalidReaderMacro,
-    /// A `.paredit/rules`/`.paredit/migrations` file does not parse as
-    /// Common Lisp, the dialect this tool itself reads it with.
-    PareditConfigParseError,
     /// A `.dir-locals.el` entry is not shaped like `(mode-or-nil .
     /// variable-alist)`, or one of its variable-alist entries is not shaped
     /// like `(variable . value)`.
@@ -87,7 +81,6 @@ impl DataIssueKind {
             Self::NestingMismatch => "nesting-mismatch",
             Self::EmacsCustomizeMalformedEntry => "emacs-customize-malformed-entry",
             Self::EdnInvalidReaderMacro => "edn-invalid-reader-macro",
-            Self::PareditConfigParseError => "paredit-config-parse-error",
             Self::DirLocalsMalformedEntry => "dir-locals-malformed-entry",
             Self::DirLocalsEvalPresent => "dir-locals-eval-present",
         }
@@ -151,7 +144,6 @@ pub fn build_data_check_report(
         }
         DataFormat::EmacsCustomize => findings.extend(emacs_customize_issues(&root)),
         DataFormat::Edn => findings.extend(edn_issues(&root, tree.source())),
-        DataFormat::PareditConfig => findings.extend(paredit_config_issues(tree.source())),
         DataFormat::DirLocals => findings.extend(dir_locals_issues(&root)),
     }
 
@@ -174,19 +166,18 @@ pub fn build_data_check_report(
 /// Chooses the format `data-check` should apply to `path` when the caller did
 /// not pass `--format`.
 ///
-/// Checked most-specific first, so a `.dir-locals.el` inside a
-/// `.paredit/migrations/` tree (unlikely, but not impossible) still reads as
-/// `.dir-locals.el` rather than as a config file, and none of these can
-/// mutually misfire: each format's own condition is disjoint from the
-/// others' by construction (a distinct filename, a distinct path shape, or a
-/// distinct dialect).
+/// Checked most-specific first, so none of these can mutually misfire: each
+/// format's own condition is disjoint from the others' by construction (a
+/// distinct filename, a distinct path shape, or a distinct dialect).
+///
+/// `.paredit/rules`/`.paredit/migrations` files are deliberately not a format
+/// here: `inspect check --paredit-config` already validates them (syntax,
+/// `RulesetError`s, and cross-file collision/dangling-`deftest` checks a
+/// shape-only pass here could not add anything to).
 #[must_use]
 pub fn detect_data_format(path: &Path, dialect: Dialect, tree: &SyntaxTree) -> DataFormat {
     if is_dir_locals_path(path) {
         return DataFormat::DirLocals;
-    }
-    if is_paredit_config_path(path) {
-        return DataFormat::PareditConfig;
     }
     if is_racket_data(path, dialect, tree.source()) {
         return DataFormat::RacketData;
@@ -204,23 +195,6 @@ pub fn detect_data_format(path: &Path, dialect: Dialect, tree: &SyntaxTree) -> D
 /// recognizes for this file — there is no extension-only heuristic for it.
 fn is_dir_locals_path(path: &Path) -> bool {
     path.file_name().and_then(|name| name.to_str()) == Some(".dir-locals.el")
-}
-
-/// Whether `path` sits under a `.paredit/rules/` or `.paredit/migrations/`
-/// directory, wherever in the path that pair of components appears.
-///
-/// A component-pair scan rather than a suffix match on the whole path: a
-/// caller may pass a relative or an absolute path, and either way the
-/// directory pair `.paredit`, `rules` (or `migrations`) is what marks the
-/// file, not any particular number of segments before or after it.
-fn is_paredit_config_path(path: &Path) -> bool {
-    let components: Vec<&str> = path
-        .components()
-        .filter_map(|component| component.as_os_str().to_str())
-        .collect();
-    components
-        .windows(2)
-        .any(|pair| pair[0] == ".paredit" && matches!(pair[1], "rules" | "migrations"))
 }
 
 /// Whether `path` is a Racket data file: `.rktd` by extension.
@@ -553,32 +527,6 @@ fn edn_issues(root: &ExpressionView, source: &str) -> Vec<DataIssue> {
     issues
 }
 
-/// `paredit-config`: reports a parse failure under `Dialect::CommonLisp`, the
-/// dialect `lint-custom`'s `parse_ruleset` and `migrate`'s recipe reader both
-/// use for `.paredit/rules`/`.paredit/migrations` files.
-///
-/// Re-parses `source` from scratch rather than trusting the tree this report
-/// was already handed: that tree parsed successfully under whichever dialect
-/// `data-check` detected for the file, which is not necessarily
-/// `Dialect::CommonLisp` — an unrecognised extension falls back to the
-/// permissive legacy reader, which accepts source the strict Common Lisp
-/// reader these two features actually use would refuse. A finding, not a
-/// propagated error: a malformed rule file is a fact about that file, worth
-/// reporting alongside every other file in the run rather than aborting it.
-fn paredit_config_issues(source: &str) -> Vec<DataIssue> {
-    let Err(error) = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp) else {
-        return Vec::new();
-    };
-    let position = error.position();
-    let start = ByteOffset::new(position);
-    let end = ByteOffset::new((position + 1).min(source.len()).max(position));
-    vec![DataIssue {
-        kind: DataIssueKind::PareditConfigParseError,
-        detail: format!("does not parse as Common Lisp: {error}"),
-        span: ByteSpan::new(start, end),
-    }]
-}
-
 /// `dir-locals`: reports a malformed `(mode-or-nil . variable-alist)` entry
 /// or a malformed `(variable . value)` pair inside one, and separately flags
 /// every `eval` key found in a variable-alist.
@@ -879,35 +827,6 @@ mod tests {
         }
     }
 
-    mod paredit_config {
-        use super::*;
-
-        #[test]
-        fn a_well_formed_rule_file_reports_nothing() {
-            let report = report_with(
-                "(defrule :name \"x\" :pattern (foo))",
-                Dialect::CommonLisp,
-                DataFormat::PareditConfig,
-            );
-            assert!(report.findings.is_empty(), "{report:?}");
-        }
-
-        #[test]
-        fn a_file_that_does_not_parse_as_common_lisp_is_reported() {
-            // `#{` is accepted by the legacy permissive reader (as a
-            // `HashLiteral`-prefixed brace list) but has no meaning under
-            // strict Common Lisp, where `#` dispatch on `{` is an
-            // unsupported reader dispatch — exactly the gap this check
-            // exists to surface.
-            let report = report_with("#{1 2}", Dialect::Unknown, DataFormat::PareditConfig);
-            assert_eq!(report.findings.len(), 1, "{report:?}");
-            assert_eq!(
-                report.findings[0].kind,
-                DataIssueKind::PareditConfigParseError
-            );
-        }
-    }
-
     mod dir_locals {
         use super::*;
 
@@ -1006,26 +925,6 @@ mod tests {
         fn an_edn_file_is_edn() {
             let format = detect("data.edn", Dialect::Clojure, "{:a 1}");
             assert_eq!(format, DataFormat::Edn);
-        }
-
-        #[test]
-        fn a_path_under_paredit_rules_is_paredit_config() {
-            let format = detect(
-                "project/.paredit/rules/no-foo.lisp",
-                Dialect::CommonLisp,
-                "(defrule :name \"x\")",
-            );
-            assert_eq!(format, DataFormat::PareditConfig);
-        }
-
-        #[test]
-        fn a_path_under_paredit_migrations_is_paredit_config() {
-            let format = detect(
-                ".paredit/migrations/001-rename.lisp",
-                Dialect::CommonLisp,
-                "(defmigration :name \"x\")",
-            );
-            assert_eq!(format, DataFormat::PareditConfig);
         }
 
         #[test]

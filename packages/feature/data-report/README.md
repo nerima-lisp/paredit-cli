@@ -28,12 +28,14 @@ which format below also applies.
 On top of that, `--format` (auto-detected from a file's path and content
 when omitted) turns on a handful of convention-specific checks: Emacs
 `custom-set-variables` entry shape, EDN's ban on code-only Clojure reader
-macros, `.paredit/rules`/`.paredit/migrations` files parsing as the Common
-Lisp this tool itself reads them with, `.dir-locals.el`'s alist-of-alist
-shape (and its `eval` key, flagged for presence only — judging risk is a
-later phase's job), and routing `.rktd` Racket data files into this report at
-all — `#lang` alone cannot mark a Racket file as data, since every named
-language (`typed/racket` included) is still executable code. A per-format
+macros, `.dir-locals.el`'s alist-of-alist shape (and its `eval` key, flagged
+for presence only — judging risk is a later phase's job), and routing
+`.rktd` Racket data files into this report at all — `#lang` alone cannot mark
+a Racket file as data, since every named language (`typed/racket` included)
+is still executable code. `.paredit/rules`/`.paredit/migrations` are
+deliberately not a format here: `inspect check --paredit-config` already
+validates them (syntax, `RulesetError`s, and cross-file collision/dangling-
+`deftest` checks a shape-only pass here could not add to). A per-format
 *schema* (JSON-Lisp, EDN-style maps, a project's
 own `defschema`) is still out of scope here; see `inspect data-check`'s own
 help for what ships today.

@@ -40,7 +40,6 @@ pub enum DataFormatArg {
     Baseline,
     EmacsCustomize,
     Edn,
-    PareditConfig,
     DirLocals,
     RacketData,
 }
@@ -51,7 +50,6 @@ impl From<DataFormatArg> for DataFormat {
             DataFormatArg::Baseline => Self::Baseline,
             DataFormatArg::EmacsCustomize => Self::EmacsCustomize,
             DataFormatArg::Edn => Self::Edn,
-            DataFormatArg::PareditConfig => Self::PareditConfig,
             DataFormatArg::DirLocals => Self::DirLocals,
             DataFormatArg::RacketData => Self::RacketData,
         }
