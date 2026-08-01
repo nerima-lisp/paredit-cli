@@ -3191,6 +3191,22 @@
               "shortDescription": {
                 "text": "a define-condition whose direct supertype list names a type and one of that type's own same-file ancestors"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "A comment that is a whole disabled form carries no reason and no attribution, unlike a TODO/FIXME marker. It is code nobody runs, drifting silently out of sync with whatever replaced it. Version control already remembers deleted code, so the comment adds nothing a `git log` would not."
+              },
+              "id": "commented-out-code",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "A comment that is a whole disabled form carries no reason and no attribution, unlike a TODO/FIXME marker. It is code nobody runs, drifting silently out of sync with whatever replaced it. Version control already remembers deleted code, so the comment adds nothing a `git log` would not.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a comment whose entire body is a balanced s-expression rather than prose"
+              }
             }
           ]
         }

@@ -1141,6 +1141,12 @@
       "count": 0,
       "description": "a define-condition whose direct supertype list names a type and one of that type's own same-file ancestors",
       "rule": "redundant-condition-supertype"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a comment whose entire body is a balanced s-expression rather than prose",
+      "rule": "commented-out-code"
     }
   ],
   "policy": {

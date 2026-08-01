@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod commented_out_code;
 pub mod contradictory_optimize;
 pub mod defclass_slot_option;
 pub mod definition_naming;

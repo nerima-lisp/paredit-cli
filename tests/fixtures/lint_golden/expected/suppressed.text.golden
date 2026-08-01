@@ -167,4 +167,5 @@ rule	elisp-condition-case-without-handler	0
 rule	embedded-secret	0
 rule	giant-conditional-form	0
 rule	redundant-condition-supertype	0
+rule	commented-out-code	0
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
