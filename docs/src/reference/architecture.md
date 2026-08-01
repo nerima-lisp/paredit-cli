@@ -65,11 +65,11 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 179 rules, and every rule depends on the engine; putting the registry in
+all 183 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching six packages for their `META` and
-`RULE`. That is the criterion: **a module that enumerates or aggregates several
+the registry sits in the root reaching twelve feature packages for their `META`
+and `RULE`. That is the criterion: **a module that enumerates or aggregates several
 features** belongs in neither core nor any one feature.
 
 There is no `domain`, `application` or `infrastructure` module, and the names
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, six packages
+## Lint rules: one trait, one registry line, twelve packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,16 +141,20 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-165 of the 166 shipped rules live in eleven themed packages, split three ways.
+178 of the 183 shipped rules live in eleven themed packages, split three ways.
 A twelfth, `feature/lint-custom`, holds no rules at all: it is the pattern
 language and the second pass that run the rules a *project* writes for itself.
 
-The remaining rule, `macro-variable-capture`, lives in `feature/lisp-analysis`
-instead — not a themed lint package, but the one that already owned the
-detection as the standalone `inspect macro-hygiene` report. It follows the
-same `rule.rs`/`domain.rs`/`usecase.rs`/`cli/` split as the seven older
-packages below, for the same reason: the rule and the report share one
-detection rather than each keeping its own.
+The remaining five — `macro-variable-capture`, `macro-multiple-evaluation`,
+`macro-parameter-reordering`, `macro-deep-quasiquote-nesting` and
+`elisp-macro-missing-declare` — live in `feature/lisp-analysis` instead: not a
+themed lint package, but the one that already owned the detection as the
+standalone `inspect macro-hygiene` report. They follow the same
+`rule/`/`domain.rs`/`usecase.rs`/`cli/` split as the seven older packages
+below, for the same reason: the rules and the report share one detection
+rather than each keeping its own. `rule/` is a directory rather than a file
+there because one detection pass yields five distinct risks, and a project
+must be able to deny, fail on, suppress and baseline each of them separately.
 
 Six are split by the Lisp syntax they are about —
 `feature/lint-{conditional,sequence,numeric,control-flow,form-shape,string-char}`.
@@ -178,7 +182,7 @@ newer packages give each rule a single module: they ship as lint rules only,
 reachable through `inspect lint --rule <name>`, so there is one consumer and
 the three-file split would be indirection with nothing on the other end.
 
-**`REGISTRY` is in neither.** It names all 179 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 183 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.
@@ -191,15 +195,41 @@ merged into the report, and the merge is two functions in
 `src/presentation/cli/lint_report/workflow.rs`. The two passes share the
 finding type — so every output mode renders both — and nothing else.
 
-Adding a rule touches exactly three places:
+Adding a rule is three places of *design* and several more of bookkeeping. The
+design:
 
 1. Add `packages/feature/lint-<theme>/src/your_rule/` with `rule.rs` and
    `domain.rs`.
 2. Add one `RuleEntry::new(...)` line to `REGISTRY` in
-   `src/lint/registry/mod.rs`. `RULE_COUNT`'s const assertion means
-   forgetting this is a compile error, not a silently shorter report.
+   `src/lint/registry/mod.rs`, and bump `RULE_COUNT` with it.
 3. Add one integration test in `tests/cli/lint_report.rs`, or a fixture pair
    under `tests/fixtures/lint_golden` for the golden test.
+
+The bookkeeping is deliberate — the suite's shape is pinned so that a rule
+cannot appear or vanish unremarked — but it is not free, and it is what makes
+"three places" misleading. Adding the five `inspect macro-hygiene` rules
+touched sixteen files. Budget for all of these:
+
+- The const assertions beside `RULE_COUNT` in `src/lint/registry/catalog.rs`:
+  `fixable_count()`, `warning_count()`, `EXPERIMENTAL_RULES`, and
+  `PEDANTIC_RULES.len()`. These are compile errors, so they cannot be missed —
+  but each one has to be recomputed, not merely incremented.
+- The pinned counts in the integration tests: `rule_count` and the
+  warning-severity tally in `tests/cli/lint_report.rs`, and the rule count in
+  the docstring of `tests/cli/determinism_contract.rs`. These fail at test
+  time, and the prose beside them goes stale silently.
+- The goldens under `tests/fixtures/lint_golden/expected/`. Every rule appears
+  in each fixture's per-rule tally and in the SARIF `rules` array, so a new
+  rule rewrites all twelve golden files even when it finds nothing.
+  `UPDATE_LINT_GOLDEN=1` regenerates them; read the diff rather than accepting
+  it.
+- The rule counts written into prose: `docs/src/reference/api.md` and this
+  file. Nothing checks these, which is exactly why they drift.
+
+A rule id is public API from the moment it is released, so settle on the name
+before any of the above: renaming one afterwards means a breaking change to
+every `lint.deny`, `lint.fail-on`, baseline entry and `paredit:ignore` comment
+in every downstream project.
 
 ## Semantics: read-only tables beside the tree
 

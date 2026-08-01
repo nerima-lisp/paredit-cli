@@ -3025,6 +3025,54 @@
               }
             },
             {
+              "id": "macro-multiple-evaluation",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macro expansion runs one form more than once: an argument form unquoted twice, or a symbol-macrolet expansion referenced twice"
+              }
+            },
+            {
+              "id": "macro-parameter-reordering",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macro template unquotes its parameters in an order the lambda list does not"
+              }
+            },
+            {
+              "id": "macro-deep-quasiquote-nesting",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a macro template nests three or more quasiquote levels"
+              }
+            },
+            {
+              "id": "elisp-macro-missing-declare",
+              "properties": {
+                "category": "malformed",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an Emacs Lisp macro with no leading (declare (indent ...)) or (declare (debug ...))"
+              }
+            },
+            {
               "id": "elisp-missing-lexical-binding",
               "properties": {
                 "category": "suspicious",

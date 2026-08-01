@@ -1,4 +1,4 @@
-finding_count	10
+finding_count	11
 rule	self-assignment	0
 rule	duplicate-setf-places	0
 rule	setf-arity	0
@@ -156,6 +156,10 @@ rule	contradictory-optimize	0
 rule	defclass-slot-option	0
 rule	method-lambda-list-mismatch	0
 rule	macro-variable-capture	0
+rule	macro-multiple-evaluation	0
+rule	macro-parameter-reordering	0
+rule	macro-deep-quasiquote-nesting	0
+rule	elisp-macro-missing-declare	1
 rule	elisp-missing-lexical-binding	1
 rule	elisp-unreachable-lexical-binding	1
 rule	elisp-autoload-cookie-without-form	2
@@ -173,6 +177,7 @@ rule	execution-order-dependency	0
 rule	declarative-style-score	0
 rule	package-level-shadowing	0
 rule	self-recursive-tail-call	0
+finding	elisp-macro-missing-declare	warning	malformed	fixable=false	emacs-lisp.el	344	missing editor declaration: macro `fixture-macro` is defined without one; add a leading (declare (indent ...)) and/or (declare (debug ...)) form so Emacs indents and Edebug instruments calls to this macro correctly	elisp-macro-missing-declare/3f509c1d426873fb/0
 finding	elisp-missing-lexical-binding	warning	suspicious	fixable=false	emacs-lisp.el	0	no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`	elisp-missing-lexical-binding/48686428ba8a57d0/0
 finding	elisp-unreachable-lexical-binding	error	suspicious	fixable=false	emacs-lisp.el	911	`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding	elisp-unreachable-lexical-binding/7bec796cbb2809fb/0
 finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	748	this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload	elisp-autoload-cookie-without-form/1d02fc8f50fffe50/0

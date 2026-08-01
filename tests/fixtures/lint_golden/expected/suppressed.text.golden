@@ -156,6 +156,10 @@ rule	contradictory-optimize	0
 rule	defclass-slot-option	0
 rule	method-lambda-list-mismatch	0
 rule	macro-variable-capture	0
+rule	macro-multiple-evaluation	0
+rule	macro-parameter-reordering	0
+rule	macro-deep-quasiquote-nesting	0
+rule	elisp-macro-missing-declare	0
 rule	elisp-missing-lexical-binding	0
 rule	elisp-unreachable-lexical-binding	0
 rule	elisp-autoload-cookie-without-form	0

@@ -1,6 +1,6 @@
 # Configuration
 
-With 179 lint rules and 375 commands, passing every knob as a flag
+With 183 lint rules and 375 commands, passing every knob as a flag
 stopped scaling. `paredit.toml` is the answer: a small, strictly validated file
 that sets the defaults a repository wants, so a command line carries only what
 is unusual about *this* invocation.
@@ -213,7 +213,18 @@ version. The tables are:
 | `[cache]` | Where workspace discovery caches its results between runs |
 | `[format]` | Indent width, inline width, block-comment reindenting, trailing-comment alignment, blank-line normalization, per-symbol indent styles, per-style width profiles, reader-prefix printing, numeric-literal letter case, let-binding value alignment, and final-newline/trailing-whitespace toggles for `edit format` |
 | `[lint]` | Preset, rule selection, severity overrides, baseline, gate |
+| `[macro-hygiene]` | Whether any macro hygiene risk fails `inspect macro-hygiene` |
 | `[output]` | Default format, verbosity, token budget, message language |
+
+Despite its name, `[macro-hygiene]` settles one command rather than the subject.
+`macro-hygiene.fail-on-risk` arms `inspect macro-hygiene --fail-on-risk`, which
+is all-or-nothing: it exits 3 if *any* of the five risks is reported — variable
+capture, multiple evaluation, parameter reordering, deep quasiquote nesting, or
+a missing Emacs Lisp editor declaration — and there is no way to gate on a
+subset. Per-risk enforcement is `inspect lint`'s job instead: each of the five
+also ships as its own lint rule, so `lint.deny` and `lint.fail-on` can fail the
+build on `macro-variable-capture` alone while leaving the other four as
+warnings, and `lint.baseline` and inline `paredit:ignore` comments apply too.
 
 ## The dialect it is written in
 

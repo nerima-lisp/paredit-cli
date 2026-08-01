@@ -73,6 +73,8 @@ struct Binding {
 
 const LINT: &[&str] = &["inspect lint"];
 
+const MACRO_HYGIENE: &[&str] = &["inspect macro-hygiene"];
+
 /// Every command whose `--cache-dir` is `WorkspaceInputArgs`'s discovery
 /// cache — "reuse a previous scan's file list from this directory".
 ///
@@ -309,6 +311,18 @@ const BINDINGS: &[Binding] = &[
         shape: Shape::Value,
         scope: Scope::Only(LINT),
         omit_when: Some("never"),
+    },
+    Binding {
+        // No sentinel: the key's "off" is `false`, and a `Switch` set to
+        // `false` already contributes nothing, so absence is spelled the same
+        // way in the file and on the command line. That is why this needs
+        // nothing of what `lint.fail-on` needs, whose "off" is the *value*
+        // `"never"`.
+        key: "macro-hygiene.fail-on-risk",
+        flag: "fail-on-risk",
+        shape: Shape::Switch,
+        scope: Scope::Only(MACRO_HYGIENE),
+        omit_when: None,
     },
     Binding {
         key: "output.format",
@@ -820,6 +834,74 @@ mod tests {
             &[("lint.fail-on", Value::String("error".to_owned()))],
         );
         assert!(result.windows(2).any(|pair| pair == ["--fail-on", "error"]));
+    }
+
+    // --- FR-007: `macro-hygiene.fail-on-risk` ---
+
+    /// The point of the key: the gate arms itself with nothing on the command
+    /// line.
+    #[test]
+    fn a_configured_macro_hygiene_gate_becomes_the_bare_flag() {
+        let result = run(
+            &["inspect", "macro-hygiene", "a.lisp"],
+            &[("macro-hygiene.fail-on-risk", Value::Boolean(true))],
+        );
+        assert!(result.contains(&"--fail-on-risk".to_owned()), "{result:?}");
+        assert!(Cli::try_parse_from(&result).is_ok(), "{result:?}");
+    }
+
+    /// `false` is how the file spells what the command line spells by not
+    /// typing the flag, so it needs no `omit_when` sentinel — the switch
+    /// contributes nothing on its own.
+    #[test]
+    fn a_macro_hygiene_gate_set_to_false_contributes_nothing() {
+        let result = run(
+            &["inspect", "macro-hygiene", "a.lisp"],
+            &[("macro-hygiene.fail-on-risk", Value::Boolean(false))],
+        );
+        assert_eq!(result, argv(&["inspect", "macro-hygiene", "a.lisp"]));
+    }
+
+    /// The built-in default is `false`, and a default is never injected
+    /// anyway — so an unconfigured project's command line is untouched.
+    #[test]
+    fn the_macro_hygiene_gates_built_in_default_injects_nothing() {
+        let result = augment(
+            &argv(&["inspect", "macro-hygiene", "a.lisp"]),
+            &Settings::with_defaults(),
+            &root(),
+        );
+        assert!(result.injected.is_empty(), "{:?}", result.injected);
+        assert_eq!(result.argv, argv(&["inspect", "macro-hygiene", "a.lisp"]));
+    }
+
+    /// The same guarantee `--indent` gets: a flag already typed is never
+    /// injected over, so the configuration cannot double it.
+    #[test]
+    fn an_explicit_macro_hygiene_gate_flag_beats_the_configuration() {
+        let result = run(
+            &["inspect", "macro-hygiene", "a.lisp", "--fail-on-risk"],
+            &[("macro-hygiene.fail-on-risk", Value::Boolean(true))],
+        );
+        assert_eq!(
+            result
+                .iter()
+                .filter(|token| *token == "--fail-on-risk")
+                .count(),
+            1,
+            "{result:?}"
+        );
+    }
+
+    /// The binding is scoped to one command, so the key cannot arm anything
+    /// else — `inspect impact` has its own, differently-shaped risk gate.
+    #[test]
+    fn the_macro_hygiene_gate_does_not_reach_another_command() {
+        let result = run(
+            &["inspect", "lint", "a.lisp"],
+            &[("macro-hygiene.fail-on-risk", Value::Boolean(true))],
+        );
+        assert!(!result.contains(&"--fail-on-risk".to_owned()), "{result:?}");
     }
 
     /// Whatever the configuration says, the rewritten vector has to be
