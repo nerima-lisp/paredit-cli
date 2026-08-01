@@ -34,8 +34,13 @@ fn cli_lint_baseline_round_trip_suppresses_a_custom_rule_finding_like_a_shipped_
     let base = dir.join("base.json");
     // One custom finding (no-bare-print) and one shipped finding
     // (self-assignment), so the baseline round trip is checked for both at
-    // once.
-    fs::write(&file, "(print 1)\n(setq x x)\n").expect("write a.lisp");
+    // once. The shipped `leftover-print-debug` rule also matches `print`
+    // now; suppressed so the entry count stays exactly two.
+    fs::write(
+        &file,
+        ";; paredit:ignore leftover-print-debug\n(print 1)\n(setq x x)\n",
+    )
+    .expect("write a.lisp");
 
     let written = json_stdout(
         paredit()
@@ -94,7 +99,10 @@ fn cli_lint_baseline_reports_a_new_custom_rule_finding_alongside_a_new_shipped_o
     let dir = fresh_temp_dir("lint-custom-baseline-contract-new-src");
     let file = dir.join("a.lisp");
     let base = dir.join("base.json");
-    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+    // The shipped `leftover-print-debug` rule also matches `print`; both
+    // print lines below are suppressed for it so this test stays about the
+    // custom rule and the shipped `self-assignment` rule only.
+    fs::write(&file, ";; paredit:ignore leftover-print-debug\n(print 1)\n").expect("write a.lisp");
 
     paredit()
         .args(["inspect", "lint", "--custom-rules"])
@@ -107,7 +115,11 @@ fn cli_lint_baseline_reports_a_new_custom_rule_finding_alongside_a_new_shipped_o
 
     // Add a second custom finding and a shipped one alongside the baselined
     // custom finding.
-    fs::write(&file, "(print 1)\n(print 2)\n(setq x x)\n").expect("rewrite a.lisp");
+    fs::write(
+        &file,
+        ";; paredit:ignore leftover-print-debug\n(print 1)\n;; paredit:ignore leftover-print-debug\n(print 2)\n(setq x x)\n",
+    )
+    .expect("rewrite a.lisp");
 
     let rerun = json_stdout(
         paredit()
@@ -178,7 +190,13 @@ fn cli_lint_suppress_path_leaves_a_custom_rule_finding_outside_the_prefix_untouc
     fs::create_dir_all(&suppressed).expect("create suppressed dir");
     fs::write(suppressed.join("a.lisp"), "(print 1)\n").expect("write suppressed a.lisp");
     let kept = dir.join("kept.lisp");
-    fs::write(&kept, "(print 1)\n(setq x x)\n").expect("write kept.lisp");
+    // The shipped `leftover-print-debug` rule also matches `print`;
+    // suppressed so the kept file's finding count stays exactly two.
+    fs::write(
+        &kept,
+        ";; paredit:ignore leftover-print-debug\n(print 1)\n(setq x x)\n",
+    )
+    .expect("write kept.lisp");
 
     let value = json_stdout(
         paredit()

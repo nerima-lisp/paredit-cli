@@ -650,7 +650,13 @@ fn a_custom_rule_named_in_lint_deny_gates_the_run() {
         &root,
         r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
     );
-    write(&root, "a.lisp", "(print 1)\n");
+    // The shipped `leftover-print-debug` rule also matches; suppressed so
+    // `findings[0]` stays the custom rule's own finding.
+    write(
+        &root,
+        "a.lisp",
+        ";; paredit:ignore leftover-print-debug\n(print 1)\n",
+    );
     write(
         &root,
         "paredit.toml",
@@ -700,7 +706,13 @@ fn lint_disable_stops_a_custom_rule_from_being_reported() {
         &root,
         r#"(defrule my-custom-rule :pattern (print ?x) :message "m")"#,
     );
-    write(&root, "a.lisp", "(print 1)\n");
+    // The shipped `leftover-print-debug` rule also matches; suppressed so
+    // this stays a test of the custom rule's own disable behaviour.
+    write(
+        &root,
+        "a.lisp",
+        ";; paredit:ignore leftover-print-debug\n(print 1)\n",
+    );
 
     let before = json_of(in_repo(&root, &["inspect", "lint", "a.lisp"]));
     assert_eq!(before["finding_count"], 1);

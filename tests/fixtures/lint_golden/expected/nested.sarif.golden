@@ -3331,6 +3331,102 @@
               "shortDescription": {
                 "text": "a function's own name called in tail position of its body, annotated with the target dialect's tail-call guarantee"
               }
+            },
+            {
+              "id": "leftover-print-debug",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a bare debug-print call left in committed source"
+              }
+            },
+            {
+              "id": "leftover-trace-call",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "trace or untrace used as a statement, left in committed source"
+              }
+            },
+            {
+              "id": "leftover-break-call",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Common Lisp (break ...) left in committed source"
+              }
+            },
+            {
+              "id": "leftover-inspect-call",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Common Lisp (inspect x) or (describe x) left in committed source"
+              }
+            },
+            {
+              "id": "leftover-time-benchmark-call",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Common Lisp (time form) wrapper left in committed source"
+              }
+            },
+            {
+              "id": "leftover-step-call",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Common Lisp (step form) wrapper left in committed source"
+              }
+            },
+            {
+              "id": "commented-repl-transcript",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a comment block shaped like a pasted REPL session"
+              }
+            },
+            {
+              "id": "leftover-format-debug-marker",
+              "properties": {
+                "category": "suspicious",
+                "fixable": true,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a (format t ...) whose control string carries a DEBUG/DBG marker"
+              }
             }
           ]
         }

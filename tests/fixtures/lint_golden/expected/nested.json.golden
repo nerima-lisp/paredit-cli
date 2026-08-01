@@ -1318,6 +1318,54 @@
       "count": 0,
       "description": "a function's own name called in tail position of its body, annotated with the target dialect's tail-call guarantee",
       "rule": "self-recursive-tail-call"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a bare debug-print call left in committed source",
+      "rule": "leftover-print-debug"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "trace or untrace used as a statement, left in committed source",
+      "rule": "leftover-trace-call"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Common Lisp (break ...) left in committed source",
+      "rule": "leftover-break-call"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Common Lisp (inspect x) or (describe x) left in committed source",
+      "rule": "leftover-inspect-call"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Common Lisp (time form) wrapper left in committed source",
+      "rule": "leftover-time-benchmark-call"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a Common Lisp (step form) wrapper left in committed source",
+      "rule": "leftover-step-call"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a comment block shaped like a pasted REPL session",
+      "rule": "commented-repl-transcript"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a (format t ...) whose control string carries a DEBUG/DBG marker",
+      "rule": "leftover-format-debug-marker"
     }
   ],
   "policy": {

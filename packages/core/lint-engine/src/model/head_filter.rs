@@ -55,27 +55,35 @@ pub enum HeadFilter {
     Heads(&'static [NormalizedHead]),
     /// Every node, including atoms — for rules keyed on shape, not operator.
     AllNodes,
-    /// The whole document at once, for rules that correlate separate
-    /// definitions and cannot be expressed as a per-node predicate.
+    /// The whole document at once, for rules that need more than one node's
+    /// worth of context and cannot be expressed as a per-node predicate.
+    /// Eleven rules use this, for two unrelated reasons:
     ///
-    /// Three rules use this — `duplicate-parameters`,
-    /// `duplicate-lambda-list-keyword`, and `lambda-list-keyword-order` — and
-    /// all three want the same narrower thing: the *top-level* definitions
-    /// only. `Heads` would be wrong for them, because a `defun` inside an
-    /// `flet` or a `let` is not a top-level definition and picking it up would
-    /// change what they report.
+    /// - **Correlating separate top-level definitions.**
+    ///   `duplicate-parameters`, `duplicate-lambda-list-keyword`, and
+    ///   `lambda-list-keyword-order` all want the same narrower thing: the
+    ///   *top-level* definitions only. `Heads` would be wrong for them,
+    ///   because a `defun` inside an `flet` or a `let` is not a top-level
+    ///   definition and picking it up would change what they report.
     ///
-    /// A `TopLevelHeads` variant was considered and declined. It would have to
-    /// carry heads as well as the depth restriction, so it is a whole
-    /// additional dispatch mode; what it would replace is the five lines below
-    /// that hand each such rule the root view once per *file*, not once per
-    /// node. The three rules then walk `root_children` themselves, which is
-    /// explicit about the one thing that matters about them. Adding a mode to
-    /// remove a smaller one is not a simplification.
+    ///   A `TopLevelHeads` variant was considered and declined for this case.
+    ///   It would have to carry heads as well as the depth restriction, so it
+    ///   is a whole additional dispatch mode; what it would replace is the
+    ///   five lines below that hand each such rule the root view once per
+    ///   *file*, not once per node. The three rules then walk `root_children`
+    ///   themselves, which is explicit about the one thing that matters about
+    ///   them. Adding a mode to remove a smaller one is not a simplification.
     ///
-    /// Revisit if a fourth rule wants top-level definitions, or if one of
-    /// these needs the per-node context (`RuleContext` carries no depth) for
-    /// some other reason.
+    /// - **Needing ancestor context a per-node predicate cannot see.**
+    ///   `paredit-feature-lint-repl-debug`'s eight rules (`RuleContext`
+    ///   carries no depth or parent, so `Heads`/`AllNodes` cannot answer "is
+    ///   this call quoted data", "is it the last form of its enclosing body",
+    ///   or "is its head shadowed by a local `flet`/`labels`/`macrolet`") each
+    ///   run their own quote-aware, binding-aware walk from the root instead
+    ///   — see `paredit_feature_lint_repl_debug::support`.
+    ///
+    /// Revisit if a rule in the first group's set changes, or if a rule needs
+    /// per-node context this variant does not carry for some other reason.
     WholeTree,
 }
 
