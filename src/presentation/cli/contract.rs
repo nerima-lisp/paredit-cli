@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 239] = [
+const INTROSPECTION_COMMANDS: [&str; 242] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
