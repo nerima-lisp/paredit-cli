@@ -479,7 +479,7 @@ impl Formatter {
 
             while tree
                 .node(end_node_id)
-                .reader_prefixes
+                .reader_prefixes()
                 .iter()
                 .any(|prefix| matches!(prefix, crate::sexpr::tree::ReaderPrefix::Metadata))
                 && node_index + 1 < root_children.len()
@@ -848,7 +848,7 @@ impl Formatter {
                                 return None;
                             }
 
-                            for span in &node.reader_prefix_spans {
+                            for span in node.reader_prefix_spans() {
                                 output.push_str(span.slice(&tree.source), max_width)?;
                             }
                             let delimiter = self.list_delimiter(node);
@@ -887,7 +887,7 @@ impl Formatter {
         let node = tree.node(node_id);
         let first = *node.children.first()?;
         let first = tree.node(first);
-        (first.kind == NodeKind::Atom && first.reader_prefixes.is_empty())
+        (first.kind == NodeKind::Atom && first.reader_prefixes().is_empty())
             .then(|| first.span.slice(&tree.source))
     }
 
@@ -904,7 +904,7 @@ impl Formatter {
         node: &Node,
         output: &mut String,
     ) {
-        for span in &node.reader_prefix_spans {
+        for span in node.reader_prefix_spans() {
             output.push_str(span.slice(&tree.source));
         }
     }
@@ -912,7 +912,7 @@ impl Formatter {
     pub(super) fn is_opaque_reader_form(&self, node: &Node) -> bool {
         node.opaque_reader_form
             || node
-                .reader_prefixes
+                .reader_prefixes()
                 .iter()
                 .any(|prefix| prefix.is_opaque_reader_form())
     }

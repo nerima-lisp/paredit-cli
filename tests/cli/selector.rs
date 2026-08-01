@@ -209,6 +209,58 @@ fn all_applies_one_edit_to_every_match() {
         .success();
 }
 
+/// `--all` applies its edits right to left and re-parses between them, and it
+/// carries a parse from one application to the next rather than making the
+/// same one twice. Both of those are invisible when every match sits in its
+/// own top-level form and nothing nearby is opaque, which is the shape
+/// `all_applies_one_edit_to_every_match` covers.
+///
+/// This is the shape that would expose a stale carried parse. Two matches
+/// share the first `defun`, so the second application must see the document
+/// the first produced. A third sits inside `#+sbcl`, which folds the guard and
+/// the form it guards into a single opaque atom under Common Lisp: it is not
+/// a node, no selector reaches it, and every byte of it must survive the two
+/// edits happening on either side.
+#[test]
+fn all_leaves_a_neighbouring_reader_conditional_untouched() {
+    const NEIGHBOURS: &str = "\
+(defun alpha ()
+  (cleanup 1)
+  (cleanup 2))
+
+#+sbcl (defun guarded ()
+         (cleanup 3))
+
+(defun omega ()
+  (cleanup 4))
+";
+
+    let mut command = paredit();
+    command
+        .args([
+            "edit",
+            "kill",
+            "--dialect",
+            "common-lisp",
+            "--query",
+            "(cleanup ?x)",
+            "--all",
+        ])
+        .write_stdin(NEIGHBOURS)
+        .assert()
+        .success()
+        .stdout(
+            "\
+(defun alpha ())
+
+#+sbcl (defun guarded ()
+         (cleanup 3))
+
+(defun omega ())
+",
+        );
+}
+
 /// `--all` only means something where the command can fan out. On one that
 /// cannot, it must not quietly become "act on the first of three".
 #[test]

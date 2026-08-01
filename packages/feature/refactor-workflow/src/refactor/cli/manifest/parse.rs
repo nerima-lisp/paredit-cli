@@ -102,8 +102,15 @@ fn parse_refactor_apply_manifest_edit(
         &format!("files[{file_index}].edits[{edit_index}].replacement"),
     )?;
 
+    let offset = |value: usize, field: &str| {
+        ByteOffset::try_new(value).ok_or_else(|| {
+            crate::error::ManifestError::Malformed(format!(
+                "files[{file_index}].edits[{edit_index}].{field} exceeds the maximum byte offset"
+            ))
+        })
+    };
     let span =
-        ByteSpan::try_new(ByteOffset::new(start), ByteOffset::new(end)).ok_or_else(|| {
+        ByteSpan::try_new(offset(start, "start")?, offset(end, "end")?).ok_or_else(|| {
             crate::error::ManifestError::Malformed(format!(
                 "files[{file_index}].edits[{edit_index}] start must not exceed end"
             ))
@@ -201,4 +208,78 @@ fn required_usize(
     usize::try_from(raw).map_err(|_| {
         crate::error::ManifestError::Malformed(format!("manifest field {field} is too large"))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::parse_refactor_apply_manifest;
+
+    fn manifest(start: u64, end: u64) -> serde_json::Value {
+        json!({
+            "mode": "rename-symbol",
+            "from": "alpha",
+            "to": "beta",
+            "policy": { "passed": true },
+            "summary": { "all_outputs_parse": true },
+            "files": [{
+                "path": "example.lisp",
+                "dialect": "common-lisp",
+                "changed": true,
+                "output_parse_ok": true,
+                "input_hash": "in",
+                "output_hash": "out",
+                "edits": [{ "start": start, "end": end, "replacement": "beta" }],
+            }],
+        })
+    }
+
+    /// A manifest is input, and `refactor check` exists to judge one without
+    /// touching a file.
+    ///
+    /// An offset past `u32::MAX` used to reach `ByteOffset::new`, whose assert
+    /// aborted the process at exit code 101 — so the command whose whole job
+    /// is to reject a bad manifest crashed on one instead.
+    #[test]
+    fn an_edit_offset_beyond_the_bound_is_a_malformed_manifest() {
+        for (start, end) in [
+            (5_000_000_000_u64, 5_000_000_001_u64),
+            (0, 5_000_000_000),
+            (u64::from(u32::MAX) + 1, u64::from(u32::MAX) + 2),
+        ] {
+            let error = parse_refactor_apply_manifest(&manifest(start, end))
+                .expect_err("an out-of-range offset is not a usable edit");
+            let rendered = error.to_string();
+            assert!(
+                rendered.contains("exceeds the maximum byte offset"),
+                "expected a malformed-manifest error, got {rendered}"
+            );
+        }
+    }
+
+    /// The bound check must not disturb a manifest that is in range, including
+    /// one sitting exactly on the largest representable offset.
+    #[test]
+    fn edit_offsets_within_the_bound_still_parse() {
+        for (start, end) in [(0_u64, 0_u64), (1, 4), (0, u64::from(u32::MAX))] {
+            let parsed = parse_refactor_apply_manifest(&manifest(start, end))
+                .expect("an in-range manifest parses");
+            let span = parsed.files[0].edits[0].span;
+            assert_eq!(span.start().get() as u64, start);
+            assert_eq!(span.end().get() as u64, end);
+        }
+    }
+
+    /// The pre-existing ordering check still fires, and is not shadowed by the
+    /// new bound check on the way past.
+    #[test]
+    fn an_inverted_edit_span_is_still_rejected() {
+        let error = parse_refactor_apply_manifest(&manifest(9, 4))
+            .expect_err("start after end is not a usable edit");
+        assert!(
+            error.to_string().contains("start must not exceed end"),
+            "expected the ordering error, got {error}"
+        );
+    }
 }

@@ -123,8 +123,8 @@ fn to_shorthand(
     // `ReaderPrefix` is already dialect-overloaded (see [`quote_operators`]).
     // A form under a non-quote prefix is not a quote form, and is reported as
     // one.
-    if !node.reader_prefixes.is_empty() {
-        return if outermost_quote_prefix(dialect, node.reader_prefixes.as_slice()).is_some() {
+    if !node.reader_prefixes().is_empty() {
+        return if outermost_quote_prefix(dialect, node.reader_prefixes()).is_some() {
             Ok(input.to_owned())
         } else {
             Err(StructureError::NotAQuoteForm.into())
@@ -158,7 +158,7 @@ fn to_longhand(
     dialect: Dialect,
 ) -> SexprResult<String> {
     let node = selection.node();
-    let Some(operator) = outermost_quote_prefix(dialect, node.reader_prefixes.as_slice()) else {
+    let Some(operator) = outermost_quote_prefix(dialect, node.reader_prefixes()) else {
         // Not a quote prefix. Either it is already the list form this produces
         // (possibly under a quasiquote, which is left where it is), or it is
         // not a quote at all.
@@ -172,10 +172,10 @@ fn to_longhand(
     // Only the outermost prefix is expanded, matching `unwrap_prefix`'s own
     // rule: `'#'f` becomes `(quote #'f)`, not `(quote (function f))`. Peeling
     // one layer per call is what makes repeated calls predictable.
-    let prefix_end = if node.reader_prefixes.len() == 1 {
+    let prefix_end = if node.reader_prefixes().len() == 1 {
         content_start(node).get()
     } else {
-        node.reader_prefix_spans[1].start().get()
+        node.reader_prefix_spans()[1].start().get()
     };
     let quoted = &input[prefix_end..node.span.end().get()];
     Ok(replace_span(

@@ -471,3 +471,113 @@ fn unknown_dialect_keeps_generic_compatibility_and_rejects_malformed_changes() {
         .is_err()
     );
 }
+
+/// The whole value of lending the parse out is that a caller may use it
+/// instead of parsing, so a tree that does not match the text it came back
+/// with would be silent corruption rather than a slow path.
+#[track_caller]
+fn assert_lent_parse_matches_its_text(input: &str, rewritten: &str, dialect: Dialect) -> String {
+    let (normalized, lent) =
+        Edit::normalize_changed_line_trivia_reusing_parse(input, rewritten.to_owned(), dialect)
+            .expect("the rewrite parses");
+
+    assert_eq!(
+        normalized,
+        Edit::normalize_changed_line_trivia(input, rewritten.to_owned(), dialect)
+            .expect("the rewrite parses"),
+        "lending the parse out must not change the text produced"
+    );
+
+    if let Some(tree) = lent {
+        assert_eq!(
+            tree,
+            SyntaxTree::parse_with_dialect(&normalized, dialect)
+                .expect("the normalized document parses"),
+            "the lent tree must equal a parse of the text it came back with"
+        );
+    }
+    normalized
+}
+
+#[test]
+fn a_rewrite_needing_no_removal_lends_its_parse_out() {
+    let (normalized, lent) = Edit::normalize_changed_line_trivia_reusing_parse(
+        "(alpha beta)\n",
+        "(alpha gamma)\n".to_owned(),
+        Dialect::CommonLisp,
+    )
+    .expect("the rewrite parses");
+
+    assert_eq!(normalized, "(alpha gamma)\n");
+    assert_eq!(
+        lent.expect("nothing was removed, so the parse still describes the text")
+            .source(),
+        "(alpha gamma)\n"
+    );
+}
+
+/// A removal edits the text after it was parsed, so the parse no longer
+/// describes it and must not be handed back.
+#[test]
+fn a_rewrite_needing_a_removal_lends_nothing_out() {
+    let (normalized, lent) = Edit::normalize_changed_line_trivia_reusing_parse(
+        "(alpha beta) \n",
+        "(alpha gamma) \n".to_owned(),
+        Dialect::CommonLisp,
+    )
+    .expect("the rewrite parses");
+
+    assert_eq!(normalized, "(alpha gamma)\n");
+    assert!(lent.is_none());
+}
+
+#[test]
+fn an_unchanged_rewrite_lends_nothing_out_because_it_never_parses() {
+    let (normalized, lent) = Edit::normalize_changed_line_trivia_reusing_parse(
+        "(alpha beta)\n",
+        "(alpha beta)\n".to_owned(),
+        Dialect::CommonLisp,
+    )
+    .expect("an unchanged rewrite is trivially fine");
+
+    assert_eq!(normalized, "(alpha beta)\n");
+    assert!(lent.is_none());
+}
+
+#[test]
+fn a_lent_parse_matches_its_text_across_the_shapes_removal_must_not_touch() {
+    assert_lent_parse_matches_its_text("(alpha beta)\n", "(alpha gamma)\n", Dialect::CommonLisp);
+    assert_lent_parse_matches_its_text("(alpha beta) \n", "(alpha gamma) \n", Dialect::CommonLisp);
+    assert_lent_parse_matches_its_text(
+        "(print \"old  \nvalue\")\n",
+        "(print \"new  \nvalue\")\n",
+        Dialect::CommonLisp,
+    );
+    assert_lent_parse_matches_its_text(
+        "#| old  \ncomment |#\n",
+        "#| new  \ncomment |#\n",
+        Dialect::CommonLisp,
+    );
+    assert_lent_parse_matches_its_text(
+        "#+sbcl (alpha beta)\n(omega)\n",
+        "#+sbcl (alpha beta)\n(omega gamma)\n",
+        Dialect::CommonLisp,
+    );
+    assert_lent_parse_matches_its_text(
+        "#_(old  \n  \\)) kept\n",
+        "#_(new  \n  \\)) kept\n",
+        Dialect::Clojure,
+    );
+}
+
+#[test]
+fn a_rewrite_that_does_not_parse_still_fails_when_the_parse_is_lent_out() {
+    assert!(
+        Edit::normalize_changed_line_trivia_reusing_parse(
+            "(alpha beta)",
+            "(alpha gamma".to_owned(),
+            Dialect::CommonLisp,
+        )
+        .is_err()
+    );
+}

@@ -4,20 +4,64 @@ use std::ops::Range;
 use std::str::FromStr;
 
 /// A byte offset into the original source text.
+///
+/// Stored as a `u32`, and read and written as a `usize`. The narrowing is
+/// invisible to callers and is the reason a `Node` fits in 72 bytes rather
+/// than 152: a node carries three offsets and a parent index, so eight bytes
+/// saved on each is a third of the struct, multiplied by roughly one node per
+/// six source bytes.
+///
+/// Four gigabytes is a bound this crate can rely on rather than hope for.
+/// `paredit_core_safety::limits` caps a single document at
+/// `DEFAULT_MAX_INPUT_BYTES` (64 MiB) and its `check_ceiling` refuses any
+/// `--max-input-bytes` *above* that default — the limit can only ever be
+/// lowered — so no document reaching the parser through the CLI is within six
+/// orders of magnitude of overflowing. The assertion below covers the
+/// remaining case, a library caller handing the parser a string directly, and
+/// it panics rather than truncating: a silently wrapped offset would index
+/// into the middle of the wrong form and corrupt an edit at exit code zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ByteOffset(usize);
+pub struct ByteOffset(u32);
 
 impl ByteOffset {
     /// Creates an offset from a raw byte index.
+    ///
+    /// # Panics
+    ///
+    /// If `value` exceeds `u32::MAX`, i.e. the source document is at least
+    /// four gigabytes. See the type documentation for why that is
+    /// unreachable through any supported entry point.
     #[must_use]
     pub const fn new(value: usize) -> Self {
-        Self(value)
+        assert!(
+            value <= u32::MAX as usize,
+            "byte offset exceeds the four-gigabyte document bound"
+        );
+        #[allow(clippy::cast_possible_truncation)]
+        Self(value as u32)
+    }
+
+    /// Attempts to create an offset from a raw byte index.
+    ///
+    /// Returns `None` when `value` exceeds `u32::MAX`. Use this at any
+    /// boundary where the index is supplied by a caller rather than produced
+    /// by parsing a length-capped document: a `--at` argument, a manifest
+    /// field, a cache entry. Those callers owe the user a structured error,
+    /// not the panic [`Self::new`] raises.
+    #[must_use]
+    pub const fn try_new(value: usize) -> Option<Self> {
+        if value <= u32::MAX as usize {
+            #[allow(clippy::cast_possible_truncation)]
+            Some(Self(value as u32))
+        } else {
+            None
+        }
     }
 
     /// Returns the raw byte index.
     #[must_use]
     pub const fn get(self) -> usize {
-        self.0
+        self.0 as usize
     }
 }
 
@@ -352,18 +396,33 @@ impl fmt::Display for SymbolName {
     }
 }
 
+/// An index into a [`SyntaxTree`](crate::sexpr::SyntaxTree)'s node arena.
+///
+/// A `u32` for the same reason [`ByteOffset`] is one, and bounded by the same
+/// fact: a node is never shorter than one source byte, so a document small
+/// enough for `ByteOffset` cannot produce more nodes than `NodeId` can name.
+/// Halving it shrinks every `children` vector as well as the parent link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NodeId(usize);
+pub struct NodeId(u32);
 
 impl NodeId {
     pub(in crate::sexpr) const ROOT: Self = Self(0);
 
+    /// # Panics
+    ///
+    /// If `value` exceeds `u32::MAX`. Unreachable for a document that parsed:
+    /// see [`ByteOffset`].
     pub(in crate::sexpr) const fn new(value: usize) -> Self {
-        Self(value)
+        assert!(
+            value <= u32::MAX as usize,
+            "node count exceeds the four-gigabyte document bound"
+        );
+        #[allow(clippy::cast_possible_truncation)]
+        Self(value as u32)
     }
 
     pub(in crate::sexpr) const fn get(self) -> usize {
-        self.0
+        self.0 as usize
     }
 }
 

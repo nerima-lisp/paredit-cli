@@ -192,7 +192,7 @@ impl Formatter {
         // The `#?`/`#?@` prefix is already written, so continuation lines align
         // just inside the open delimiter that follows it.
         let prefix_width = node
-            .reader_prefix_spans
+            .reader_prefix_spans()
             .iter()
             .map(|span| span.slice(&tree.source).len())
             .sum::<usize>();
@@ -216,7 +216,7 @@ impl Formatter {
 
     /// Returns whether `node` is a `#?(...)` or `#?@(...)` reader conditional.
     pub(in crate::sexpr::formatter) fn is_clojure_reader_conditional(node: &Node) -> bool {
-        node.reader_prefixes.iter().any(|prefix| {
+        node.reader_prefixes().iter().any(|prefix| {
             matches!(
                 prefix,
                 ReaderPrefix::ReaderConditional | ReaderPrefix::ReaderConditionalSplicing
@@ -258,7 +258,7 @@ impl Formatter {
         for (position, child) in children.iter().enumerate() {
             let carries_metadata = tree
                 .node(*child)
-                .reader_prefixes
+                .reader_prefixes()
                 .iter()
                 .any(|prefix| matches!(prefix, ReaderPrefix::Metadata));
             if !carries_metadata {

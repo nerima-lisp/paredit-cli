@@ -28,6 +28,58 @@ fn selects_by_offset() {
     assert_eq!(selection.text(), "beta");
 }
 
+/// `--at` is a number the user types, so it is not bounded by the document.
+///
+/// The offset below is one past `u32::MAX`, which `ByteOffset::new` asserts
+/// against: reaching it aborted the process with a Rust panic message and exit
+/// code 101, where every other unreachable offset produces
+/// `selection.offset-not-found` and exit code 1.
+#[test]
+fn an_offset_beyond_the_document_is_refused_rather_than_panicking() {
+    let input = "(alpha (beta gamma))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+
+    for offset in [
+        input.len() + 1,
+        9_999,
+        usize::try_from(u32::MAX).expect("64-bit"),
+        usize::try_from(u32::MAX).expect("64-bit") + 1,
+        4_294_967_296,
+        usize::MAX,
+    ] {
+        let error = tree
+            .select_at(offset)
+            .expect_err("no expression contains an offset past the source");
+        assert!(
+            matches!(
+                error,
+                SexprError::Selection(SelectionError::NoExpressionAtOffset { offset: reported })
+                    if reported == offset
+            ),
+            "offset {offset} should be reported as not found, got {error:?}"
+        );
+    }
+}
+
+/// The guard added above must not reject an offset that does resolve.
+#[test]
+fn offsets_inside_the_document_still_select() {
+    let input = "(alpha (beta gamma))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+
+    assert_eq!(tree.select_at(1).expect("selection").text(), "alpha");
+    assert_eq!(tree.select_at(9).expect("selection").text(), "beta");
+    assert_eq!(tree.select_at(7).expect("selection").text(), "(beta gamma)");
+    // The last byte of the source, and one past it: `len()` is the exclusive
+    // end of every span, so it selects nothing, but it is on the allowed side
+    // of the bound and must reach the search rather than the guard.
+    assert_eq!(
+        tree.select_at(input.len() - 1).expect("selection").text(),
+        "(alpha (beta gamma))"
+    );
+    assert!(tree.select_at(input.len()).is_err());
+}
+
 #[test]
 fn outlines_top_level_forms() {
     let input = "(defun add (x y) (+ x y))\n(defvar *x* 1)";
