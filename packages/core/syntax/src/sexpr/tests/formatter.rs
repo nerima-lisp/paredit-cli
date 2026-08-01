@@ -1,5 +1,6 @@
 use super::*;
 use crate::dialect::Dialect;
+use crate::sexpr::ReaderPrefixStyle;
 
 #[test]
 fn formats_short_atom_lists_inline() {
@@ -1414,5 +1415,395 @@ fn with_max_width_moves_the_definition_header_threshold_in_both_directions() {
         Formatter::new(2).with_max_width(120).format(&tree),
         format!("{long}\n"),
         "fits on one line once widened"
+    );
+}
+
+// --- FR-008: `format.indent-table` (per-symbol style overrides) ---
+
+#[test]
+fn indent_override_wins_over_the_built_in_style_for_that_symbol() {
+    // `frob` is not special-cased anywhere, so it gets `ListStyle::General`
+    // by default and inlines like any other call, `format_prefix_body`'s
+    // 2-prefix layout only breaks onto a new line past its third child, so a
+    // fourth argument is what makes the retargeting visible.
+    let input = "(frob a b c)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(frob a b c)\n",
+        "an unmapped symbol is an ordinary call by default"
+    );
+
+    let overridden = Formatter::new(2)
+        .with_indent_overrides(&[("frob".to_owned(), "if-then-else".to_owned())])
+        .expect("if-then-else is a recognised style")
+        .format(&tree);
+    assert_eq!(
+        overridden, "(frob a b\n  c)\n",
+        "the override retargets `frob` onto `format_prefix_body`'s 2-prefix layout, \
+         the same one `if`/`named-lambda`/two-argument-body forms use"
+    );
+}
+
+#[test]
+fn indent_override_can_retarget_a_built_in_special_form_back_to_general() {
+    // `if` is `ListStyle::If` by default, which never inlines regardless of
+    // width (see `with_max_width_narrows_the_inline_fit_threshold` above).
+    // Overriding it to `general` makes it an ordinary compactable call.
+    let input = "(if a b c)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_ne!(
+        Formatter::new(2).format(&tree),
+        "(if a b c)\n",
+        "`if` never inlines by default"
+    );
+
+    let overridden = Formatter::new(2)
+        .with_indent_overrides(&[("if".to_owned(), "general".to_owned())])
+        .expect("general is a recognised style")
+        .format(&tree);
+    assert_eq!(overridden, "(if a b c)\n");
+}
+
+#[test]
+fn with_indent_overrides_rejects_an_unrecognised_style_name_cleanly() {
+    let error = Formatter::new(2)
+        .with_indent_overrides(&[("frob".to_owned(), "not-a-real-style".to_owned())])
+        .expect_err("not-a-real-style is not in STYLE_NAMES");
+    assert_eq!(error.style_name, "not-a-real-style");
+    assert!(error.to_string().contains("not-a-real-style"));
+}
+
+#[test]
+fn indent_override_with_a_duplicate_symbol_resolves_to_the_last_entry() {
+    // Two `--indent-table` entries for the same symbol are a realistic
+    // mistake (e.g. a shell alias plus an explicit override on the same
+    // invocation), and the field doc on `Formatter::indent_overrides`
+    // promises "later entries... win over earlier ones" — the same
+    // last-beats-earlier precedence `packages/core/config/src/load.rs` uses
+    // across its own configuration layers. `general` (first) would leave
+    // `frob` an ordinary compactable call; `if-then-else` (last) must win.
+    let input = "(frob a b c)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+
+    let resolved = Formatter::new(2)
+        .with_indent_overrides(&[
+            ("frob".to_owned(), "general".to_owned()),
+            ("frob".to_owned(), "if-then-else".to_owned()),
+        ])
+        .expect("both are recognised styles")
+        .format(&tree);
+    assert_eq!(
+        resolved, "(frob a b\n  c)\n",
+        "the later `if-then-else` entry must win over the earlier `general` one"
+    );
+}
+
+#[test]
+fn indent_overrides_are_a_no_op_when_unset() {
+    // The off-by-default case: building a formatter without
+    // `with_indent_overrides` must format byte-identically to before this
+    // phase existed.
+    let input = "(defun add (x y) (+ x y))\n(if a b c)\n(let ((x 1)) x)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        Formatter::new(2).format(&tree)
+    );
+}
+
+// --- FR-009: `format.width-profiles` (per-style `--max-width`) ---
+
+#[test]
+fn width_profile_narrows_the_inline_fit_threshold_for_its_own_style() {
+    let input = "(foo (bar 1 2) (baz 3 4))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let default = Formatter::new(2).format(&tree);
+    assert_eq!(
+        default, "(foo (bar 1 2) (baz 3 4))\n",
+        "fits inline by default"
+    );
+
+    let narrowed = Formatter::new(2)
+        .with_width_profiles(&[("general".to_owned(), 10)])
+        .expect("general is a recognised style")
+        .format(&tree);
+    assert_ne!(
+        narrowed, default,
+        "a `general` profile narrower than the global default must stop a plain call fitting inline"
+    );
+    assert!(narrowed.contains('\n'));
+}
+
+#[test]
+fn width_profile_widens_the_inline_fit_threshold_for_its_own_style() {
+    let input =
+        "(some-function-name argument-one argument-two argument-three argument-four argument-five)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    // Narrow the *global* width so the form would not fit by default, then
+    // confirm a wider `general` profile overrides that global width, the
+    // same relationship `with_max_width`'s own "narrows"/"widens" pair above
+    // proves for the compiled-in default.
+    let base = Formatter::new(2).with_max_width(10);
+    assert!(
+        base.format(&tree).contains('\n'),
+        "does not fit under a 10-column global width"
+    );
+
+    let widened = base
+        .with_width_profiles(&[("general".to_owned(), 200)])
+        .expect("general is a recognised style")
+        .format(&tree);
+    assert_eq!(
+        widened,
+        format!("{input}\n"),
+        "a `general` profile of 200 must let it fit even though the global width is 10"
+    );
+}
+
+#[test]
+fn width_profile_applies_to_a_form_retargeted_to_general_by_an_indent_override() {
+    // `ListStyle::If` (and every non-`General` style) never inlines at all,
+    // as a whole form or as a compacted child — see
+    // `with_max_width_narrows_the_inline_fit_threshold`'s own comment, and
+    // `compact_node`'s own-head check, which refuses *any* node whose head
+    // resolves to a non-`General` style before it ever reads a width. So a
+    // style's width profile is only observable for `general` (see the two
+    // tests above) — including a symbol `format.indent-table` retargeted
+    // onto `general`, which this test exercises: FR-009 keyed by the exact
+    // classification FR-008 introduces, as specified, means an override
+    // determines which profile applies, not that every style gets one.
+    let input = "(if a b c)";
+    let overridden_general = Formatter::new(2)
+        .with_indent_overrides(&[("if".to_owned(), "general".to_owned())])
+        .expect("general is a recognised style");
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        overridden_general.format(&tree),
+        "(if a b c)\n",
+        "retargeted to `general`, it inlines like any other short call"
+    );
+
+    let narrowed = overridden_general
+        .with_width_profiles(&[("general".to_owned(), 5)])
+        .expect("general is a recognised style")
+        .format(&tree);
+    assert_ne!(
+        narrowed, "(if a b c)\n",
+        "a 5-column `general` profile must stop the retargeted `if` fitting inline"
+    );
+    assert!(narrowed.contains('\n'));
+}
+
+#[test]
+fn width_profile_with_a_duplicate_style_resolves_to_the_last_entry() {
+    // Same duplicate-entry precedence check as
+    // `indent_override_with_a_duplicate_symbol_resolves_to_the_last_entry`,
+    // for `width_profiles`: the field doc promises "later entries... win
+    // over earlier ones". `5` (first) would keep this narrow; `200` (last)
+    // must win and let it fit inline.
+    let input = "(foo (bar 1 2) (baz 3 4))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+
+    let resolved = Formatter::new(2)
+        .with_width_profiles(&[("general".to_owned(), 5), ("general".to_owned(), 200)])
+        .expect("general is a recognised style")
+        .format(&tree);
+    assert_eq!(
+        resolved,
+        format!("{input}\n"),
+        "the later width-200 entry must win over the earlier width-5 one"
+    );
+}
+
+#[test]
+fn with_width_profiles_rejects_an_unrecognised_style_name_cleanly() {
+    let error = Formatter::new(2)
+        .with_width_profiles(&[("not-a-real-style".to_owned(), 40)])
+        .expect_err("not-a-real-style is not in STYLE_NAMES");
+    assert_eq!(error.style_name, "not-a-real-style");
+}
+
+#[test]
+fn width_profiles_are_a_no_op_when_unset() {
+    let input = "(foo (bar 1 2) (baz 3 4))\n(defun add (x y) (+ x y))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        Formatter::new(2).format(&tree)
+    );
+}
+
+// --- FR-010: `format.quote-style` (reader-prefix printing) ---
+
+#[test]
+fn reader_prefix_style_defaults_to_shorthand_byte_identical_to_before() {
+    let input = "'(alpha beta)\n`(list ,item ,@rest)\n#'(lambda (value) value)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    // Byte-identical to `preserves_common_lisp_reader_prefixes` above,
+    // proving the off-by-default case: a `Formatter` nobody called
+    // `with_reader_prefix_style` on behaves exactly as it did before this
+    // phase.
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "'(alpha beta)\n\n`(list ,item ,@rest)\n\n#'(lambda (value)\n  value)\n"
+    );
+}
+
+#[test]
+fn canonical_quote_style_expands_the_quote_prefix_in_every_dialect() {
+    for dialect in [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Racket,
+        Dialect::Clojure,
+    ] {
+        let tree = SyntaxTree::parse_with_dialect("'(alpha beta)", dialect).expect("valid");
+        let rendered = Formatter::with_dialect(2, dialect)
+            .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+            .format(&tree);
+        assert_eq!(rendered, "(quote (alpha beta))\n", "{}", dialect.label());
+    }
+}
+
+#[test]
+fn canonical_quote_style_expands_the_function_pair_only_in_the_common_lisp_family() {
+    let tree = SyntaxTree::parse_with_dialect("#'car", Dialect::CommonLisp).expect("valid");
+    let rendered = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .format(&tree);
+    assert_eq!(rendered, "(function car)\n");
+
+    // Clojure's `#'` is a different reader form entirely (`ReaderPrefix` is
+    // dialect-overloaded — see `quote_edit`'s own doc comment), so it must
+    // never become `(function ...)` there.
+    let tree = SyntaxTree::parse_with_dialect("#'car", Dialect::Clojure).expect("valid");
+    let rendered = Formatter::with_dialect(2, Dialect::Clojure)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .format(&tree);
+    assert_eq!(rendered, "#'car\n");
+}
+
+#[test]
+fn canonical_quote_style_never_expands_quasiquote_or_unquote() {
+    // Deliberate: `quote_edit`'s own module doc explains why `` ` ``, `,`,
+    // and `,@` have no portable list spelling (backquote is not part of
+    // ANSI Common Lisp, and implementations disagree on what it expands to).
+    // Canonical printing reuses that exact judgment rather than inventing
+    // one of its own, so these keep their shorthand even in canonical mode.
+    let input = "`(list ,item ,@rest)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let rendered = Formatter::new(2)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .format(&tree);
+    assert_eq!(rendered, format!("{input}\n"));
+}
+
+#[test]
+fn canonical_quote_style_leaves_a_stack_mixing_quasiquote_alone() {
+    // `` '`x ``: a quote (canonicalizable) stacked with a quasiquote (never
+    // canonicalizable, on the same atom node) — the whole stack is left
+    // exactly as written rather than rewriting only the outer layer.
+    let input = "'`x";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let rendered = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .format(&tree);
+    assert_eq!(
+        rendered,
+        format!("{input}\n"),
+        "a stack mixing a canonicalizable prefix with a non-canonicalizable one is left as written"
+    );
+}
+
+#[test]
+fn canonical_quote_style_expands_a_fully_canonicalizable_prefix_stack() {
+    // `'#'f`: quote stacked with function — both canonicalizable in Common
+    // Lisp, so (unlike the quasiquote case above) the whole stack expands,
+    // outermost first.
+    let input = "'#'f";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let rendered = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .format(&tree);
+    assert_eq!(rendered, "(quote (function f))\n");
+}
+
+#[test]
+fn canonical_quote_style_round_trips_every_recognised_reader_prefix() {
+    // Every reader-prefix form `reader_prefix_spans` recognises in Common
+    // Lisp source: `'x`, `` `x ``, `,x`, `,@x`, plus the CL-only `#'x` pair.
+    // `'x`/`#'x` canonicalize to their exact list expansion; `` `x ``, `,x`,
+    // `,@x` deliberately keep their shorthand (see
+    // `canonical_quote_style_never_expands_quasiquote_or_unquote`). Every
+    // case's canonical-mode output must still reparse — the literal meaning
+    // of "round-trips" for a prefix this mode does not touch.
+    let cases = [
+        ("'x", "(quote x)\n"),
+        ("`x", "`x\n"),
+        (",x", ",x\n"),
+        (",@x", ",@x\n"),
+        ("#'x", "(function x)\n"),
+    ];
+    for (input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+        let canonical = Formatter::with_dialect(2, Dialect::CommonLisp)
+            .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+            .format(&tree);
+        assert_eq!(canonical, expected, "{input}");
+        SyntaxTree::parse_with_dialect(&canonical, Dialect::CommonLisp)
+            .unwrap_or_else(|_| panic!("{input}: canonical output must reparse"));
+    }
+}
+
+#[test]
+fn canonical_quote_style_is_idempotent() {
+    // Canonical mode is a far more invasive text transformation than any
+    // prior phase's options — it changes the number of parens in the
+    // document, not merely spacing or width — so `format(format(x)) ==
+    // format(x)` gets its own dedicated case rather than trusting the
+    // shorthand-mode property to generalize.
+    let inputs = [
+        "'x",
+        "'(alpha beta)",
+        "#'car",
+        "`(list ,item ,@rest)",
+        "(defun f (x) 'x)",
+        "'`x",
+        "(list 'a '(b c) `(d ,e))",
+    ];
+    for input in inputs {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+        let formatter = Formatter::with_dialect(2, Dialect::CommonLisp)
+            .with_reader_prefix_style(ReaderPrefixStyle::Canonical);
+        let once = formatter.format(&tree);
+        let reparsed = SyntaxTree::parse_with_dialect(&once, Dialect::CommonLisp)
+            .unwrap_or_else(|_| panic!("{input}: canonical output must reparse"));
+        let twice = formatter.format(&reparsed);
+        assert_eq!(once, twice, "{input}: canonical mode must be idempotent");
+    }
+
+    // Shorthand mode's idempotency is unaffected by this phase, but the
+    // property is worth pinning explicitly for the same inputs rather than
+    // assumed from the pre-existing default-mode test coverage.
+    for input in inputs {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+        let formatter = Formatter::with_dialect(2, Dialect::CommonLisp);
+        let once = formatter.format(&tree);
+        let reparsed = SyntaxTree::parse_with_dialect(&once, Dialect::CommonLisp)
+            .unwrap_or_else(|_| panic!("{input}: shorthand output must reparse"));
+        let twice = formatter.format(&reparsed);
+        assert_eq!(once, twice, "{input}: shorthand mode must be idempotent");
+    }
+}
+
+#[test]
+fn quote_style_is_a_no_op_when_unset() {
+    let input = "'(alpha beta)\n`(list ,item ,@rest)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        Formatter::new(2).format(&tree)
     );
 }

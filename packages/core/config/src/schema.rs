@@ -35,6 +35,24 @@ pub enum ValueKind {
     RuleList,
     /// An array of strings that may each name a rule *or* a rule category.
     RuleOrCategoryList,
+    /// An array of `symbol=style` entries. The style half is checked against
+    /// [`paredit_core_syntax::sexpr::STYLE_NAMES`]; the symbol half is never
+    /// checked, because any string is a legitimate head to retarget.
+    ///
+    /// A table-shaped TOML value (`[format.indent-table] my-macro = "..."`)
+    /// would read more naturally, but no `ValueKind` here represents a map —
+    /// every other key is a scalar or a homogeneous array — and adding one
+    /// disproportionate to this key's own scope, so this reuses the
+    /// string-array shape every list key already has, the same way
+    /// `RuleList`'s "one string per entry" already carries a mapping in
+    /// disguise (a name to a rule struct). `check_list` gives each entry the
+    /// same "did you get the shape right" checking a table's key/value pair
+    /// would.
+    IndentStyleEntries,
+    /// An array of `style=width` entries. The style half is checked against
+    /// [`paredit_core_syntax::sexpr::STYLE_NAMES`]; the width half must parse
+    /// as an integer in the same range `format.max-inline-width` accepts.
+    WidthProfileEntries,
 }
 
 impl ValueKind {
@@ -49,6 +67,8 @@ impl ValueKind {
             Self::TextList => "string-array",
             Self::RuleList => "rule-array",
             Self::RuleOrCategoryList => "rule-or-category-array",
+            Self::IndentStyleEntries => "indent-style-array",
+            Self::WidthProfileEntries => "width-profile-array",
         }
     }
 
@@ -57,15 +77,38 @@ impl ValueKind {
     pub const fn is_list(self) -> bool {
         matches!(
             self,
-            Self::TextList | Self::RuleList | Self::RuleOrCategoryList
+            Self::TextList
+                | Self::RuleList
+                | Self::RuleOrCategoryList
+                | Self::IndentStyleEntries
+                | Self::WidthProfileEntries
         )
     }
 
     /// The closed set of accepted strings, when there is one.
+    ///
+    /// For [`Self::IndentStyleEntries`] and [`Self::WidthProfileEntries`] this
+    /// is not the set of accepted whole values — a whole value is a
+    /// `symbol=style`/`style=width` entry, which is never itself one of
+    /// [`paredit_core_syntax::sexpr::STYLE_NAMES`] — but the vocabulary valid
+    /// on the style half of each entry. `--indent-table`'s and
+    /// `--width-profile`'s own help text already tells a user to run
+    /// `paredit config schema` for that vocabulary (see
+    /// `packages/core/cli/src/args.rs`); before this, the command they were
+    /// told to run answered with `"choices": null`, so the only way to learn
+    /// the names was to get one wrong first and read the resulting
+    /// `UnknownStyleName` error. `entry.kind.label()` still distinguishes
+    /// these from a true [`Self::Choice`] (`"indent-style-array"` and
+    /// `"width-profile-array"`, not `"choice"`), so a consumer reading
+    /// `config schema`'s JSON is not told the whole value must equal one
+    /// of these strings — only that each entry's style half must.
     #[must_use]
     pub const fn choices(self) -> Option<&'static [&'static str]> {
         match self {
             Self::Choice(values) => Some(values),
+            Self::IndentStyleEntries | Self::WidthProfileEntries => {
+                Some(paredit_core_syntax::sexpr::STYLE_NAMES)
+            }
             _ => None,
         }
     }
@@ -147,11 +190,12 @@ const LANGUAGES: &[&str] = &["en", "ja"];
 const COLOR_MODES: &[&str] = &["auto", "always", "never"];
 const LINT_PRESETS: &[&str] = &["minimal", "recommended", "pedantic", "all"];
 const FAIL_SEVERITIES: &[&str] = &["never", "warning", "error"];
+const QUOTE_STYLES: &[&str] = &["shorthand", "canonical"];
 
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 33;
+pub const KEY_COUNT: usize = 36;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -253,6 +297,29 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         default: DefaultValue::Unset,
         summary: "Most consecutive blank lines to preserve between top-level forms. Unset \
                   always collapses every gap to exactly one.",
+    },
+    KeySchema {
+        key: "format.indent-table",
+        kind: ValueKind::IndentStyleEntries,
+        default: DefaultValue::EmptyList,
+        summary: "Per-symbol indent style overrides for `edit format`, each written as \
+                  `symbol=style`.",
+    },
+    KeySchema {
+        key: "format.width-profiles",
+        kind: ValueKind::WidthProfileEntries,
+        default: DefaultValue::EmptyList,
+        summary: "Per-indent-style `--max-width` overrides for `edit format`, each written as \
+                  `style=width`; only the `general` style ever renders on one line, so a \
+                  non-general entry has no effect unless format.indent-table retargets a form \
+                  onto general.",
+    },
+    KeySchema {
+        key: "format.quote-style",
+        kind: ValueKind::Choice(QUOTE_STYLES),
+        default: DefaultValue::Text("shorthand"),
+        summary: "How reader-macro prefixes like 'x print for `edit format`: shorthand or their \
+                  canonical list form.",
     },
     // --- [lint] ---
     KeySchema {

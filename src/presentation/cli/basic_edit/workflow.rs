@@ -8,7 +8,9 @@ use crate::presentation::cli::args::{
     WrapArgs, YankArgs, YankPlacement,
 };
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{Edit, Formatter, Placement, Selection, SyntaxTree};
+use paredit_core_syntax::sexpr::{
+    Edit, Formatter, Placement, ReaderPrefixStyle, Selection, SyntaxTree,
+};
 use std::path::Path;
 
 use crate::presentation::cli::shared::{
@@ -32,22 +34,18 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
 
     let check = args.check;
     let diff_stat_only = args.diff_stat;
-    let max_width = args.max_width;
-    let reindent_block_comments = args.reindent_block_comments;
-    let comment_column = args.comment_column;
-    let max_blank_lines = args.max_blank_lines;
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    let mut formatter = Formatter::with_dialect(args.indent, dialect)
-        .with_reindent_block_comments(reindent_block_comments);
-    if let Some(max_width) = max_width {
-        formatter = formatter.with_max_width(max_width);
-    }
-    if let Some(comment_column) = comment_column {
-        formatter = formatter.with_comment_column(comment_column);
-    }
-    if let Some(max_blank_lines) = max_blank_lines {
-        formatter = formatter.with_max_blank_lines(max_blank_lines);
-    }
+    let formatter = build_formatter(FormatOptions {
+        indent: args.indent,
+        dialect,
+        max_width: args.max_width,
+        reindent_block_comments: args.reindent_block_comments,
+        comment_column: args.comment_column,
+        max_blank_lines: args.max_blank_lines,
+        indent_table: &args.indent_table,
+        width_profiles: &args.width_profiles,
+        quote_style: args.quote_style.into(),
+    })?;
     let rendered = formatter.format(&tree);
 
     if check {
@@ -120,18 +118,21 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
     let reindent_block_comments = args.reindent_block_comments;
     let comment_column = args.comment_column;
     let max_blank_lines = args.max_blank_lines;
+    let indent_table = args.indent_table.clone();
+    let width_profiles = args.width_profiles.clone();
+    let quote_style: ReaderPrefixStyle = args.quote_style.into();
     let analysis = analyze_files(&files, args.dialect, move |file, dialect, tree, input| {
-        let mut formatter = Formatter::with_dialect(indent, dialect)
-            .with_reindent_block_comments(reindent_block_comments);
-        if let Some(width) = max_width {
-            formatter = formatter.with_max_width(width);
-        }
-        if let Some(comment_column) = comment_column {
-            formatter = formatter.with_comment_column(comment_column);
-        }
-        if let Some(max_blank_lines) = max_blank_lines {
-            formatter = formatter.with_max_blank_lines(max_blank_lines);
-        }
+        let formatter = build_formatter(FormatOptions {
+            indent,
+            dialect,
+            max_width,
+            reindent_block_comments,
+            comment_column,
+            max_blank_lines,
+            indent_table: &indent_table,
+            width_profiles: &width_profiles,
+            quote_style,
+        })?;
         let rendered = formatter.format(tree);
         let diff = unified_diff(file, &input.text, &rendered);
         let stat = diff_stat(&diff);
@@ -175,6 +176,116 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
         }))?
     );
     Ok(())
+}
+
+/// Every width/style knob `FormatArgs` and `format_diff_stat_many` share,
+/// bundled so [`build_formatter`] takes one argument instead of nine.
+struct FormatOptions<'a> {
+    indent: usize,
+    dialect: Dialect,
+    max_width: Option<usize>,
+    reindent_block_comments: bool,
+    comment_column: Option<usize>,
+    max_blank_lines: Option<usize>,
+    indent_table: &'a [String],
+    width_profiles: &'a [String],
+    quote_style: ReaderPrefixStyle,
+}
+
+/// Builds the [`Formatter`] `edit format` renders with, threading through
+/// every width/style knob `FormatArgs` and `format_diff_stat_many` share.
+///
+/// Fallible only because `--indent-table`/`--width-profile` are plain
+/// strings at the argument-parser boundary (`SYMBOL=STYLE`/`STYLE=WIDTH`,
+/// not something `clap` can shape-check on its own): a malformed entry or an
+/// unrecognised style name is refused here with a message naming the flag,
+/// rather than reaching [`Formatter`] itself. A value that came from
+/// `paredit.toml` already passed this same shape and vocabulary check in
+/// `packages/core/config`'s schema validation, so in practice this only ever
+/// rejects a flag typed directly on the command line.
+fn build_formatter(options: FormatOptions<'_>) -> CliResult<Formatter> {
+    let FormatOptions {
+        indent,
+        dialect,
+        max_width,
+        reindent_block_comments,
+        comment_column,
+        max_blank_lines,
+        indent_table,
+        width_profiles,
+        quote_style,
+    } = options;
+    let mut formatter = Formatter::with_dialect(indent, dialect)
+        .with_reindent_block_comments(reindent_block_comments);
+    if let Some(max_width) = max_width {
+        formatter = formatter.with_max_width(max_width);
+    }
+    if let Some(comment_column) = comment_column {
+        formatter = formatter.with_comment_column(comment_column);
+    }
+    if let Some(max_blank_lines) = max_blank_lines {
+        formatter = formatter.with_max_blank_lines(max_blank_lines);
+    }
+    if !indent_table.is_empty() {
+        let overrides = split_pairs(indent_table, "--indent-table", "SYMBOL=STYLE")?;
+        formatter = formatter
+            .with_indent_overrides(&overrides)
+            .map_err(|error| style_name_refusal("--indent-table", &error))?;
+    }
+    if !width_profiles.is_empty() {
+        let profiles = parse_width_profiles(width_profiles)?;
+        formatter = formatter
+            .with_width_profiles(&profiles)
+            .map_err(|error| style_name_refusal("--width-profile", &error))?;
+    }
+    Ok(formatter.with_reader_prefix_style(quote_style))
+}
+
+/// Splits each `KEY=VALUE` entry in `raw`, refusing cleanly — not panicking —
+/// when one is missing its `=`.
+fn split_pairs(raw: &[String], flag: &str, shape: &str) -> CliResult<Vec<(String, String)>> {
+    raw.iter()
+        .map(|entry| {
+            entry
+                .split_once('=')
+                .map(|(left, right)| (left.to_owned(), right.to_owned()))
+                .ok_or_else(|| {
+                    paredit_core_cli::error::FeatureRefusal::message(
+                        paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+                        format!("{flag} entry {entry:?} is not {shape}"),
+                    )
+                    .into()
+                })
+        })
+        .collect()
+}
+
+/// Splits and parses every `--width-profile` entry, refusing cleanly when the
+/// width half is not a plain integer.
+fn parse_width_profiles(raw: &[String]) -> CliResult<Vec<(String, usize)>> {
+    split_pairs(raw, "--width-profile", "STYLE=WIDTH")?
+        .into_iter()
+        .map(|(style, width_text)| {
+            width_text.parse::<usize>().map(|width| (style, width)).map_err(|_| {
+                paredit_core_cli::error::FeatureRefusal::message(
+                    paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+                    format!("--width-profile entry has a width that is not an integer: {width_text:?}"),
+                )
+                .into()
+            })
+        })
+        .collect()
+}
+
+fn style_name_refusal(
+    flag: &str,
+    error: &paredit_core_syntax::sexpr::UnknownStyleName,
+) -> paredit_core_cli::error::CliError {
+    paredit_core_cli::error::FeatureRefusal::message(
+        paredit_core_cli::diagnosis::ErrorCode::InputShapeRefused,
+        format!("{flag}: {error}"),
+    )
+    .into()
 }
 
 pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> CliResult<()> {

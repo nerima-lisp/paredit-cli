@@ -46,8 +46,87 @@ pub(super) enum ListStyle {
     General,
 }
 
+/// The vocabulary a project's `paredit.toml` may use in `format.indent-table`
+/// and `format.width-profiles` (see [`Formatter::with_indent_overrides`] and
+/// [`Formatter::with_width_profiles`]).
+///
+/// Deliberately narrower than [`ListStyle`]: every entry here has a single,
+/// generic, dialect-independent behavior a plain string can name without
+/// ambiguity. Left out, each for its own reason:
+///
+/// - Every `Clojure*` variant — dialect-specific, and three of them
+///   (`ClojureThreading`, `ClojurePrefixBody`, `ClojurePairClauses`) carry an
+///   internal `usize` a bare style name has nowhere to put.
+/// - [`ListStyle::SystemDefinition`] — the ASDF `defsystem` keyword/value
+///   plist header is narrow and Common-Lisp-specific enough that retargeting
+///   an unrelated symbol onto it would almost certainly be a mistake, not an
+///   intentional override.
+/// - [`ListStyle::Defmethod`] — CLOS method syntax has an optional qualifier
+///   before the lambda list that plain [`ListStyle::Definition`] does not;
+///   an arbitrary symbol given this style would have that slot misread.
+/// - [`ListStyle::NamedLambda`] — renders identically to
+///   [`ListStyle::TwoArgumentBody`]/[`ListStyle::If`] (all three call
+///   `format_prefix_body` with the same prefix length); a second name for
+///   the same behavior is a synonym, not a capability worth the surface area.
+/// - [`ListStyle::LocalFunctions`] — the `flet`/`labels` nested
+///   binding-list-of-lists shape is specific to that pair of operators.
+/// - [`ListStyle::ClauseForm`], [`ListStyle::Do`], [`ListStyle::Prog`] —
+///   `do`/`prog`'s bindings/end-test/body shape is a fixed positional
+///   structure, not a generic "body" a `defun`-like symbol would want.
+/// - [`ListStyle::Declaration`], [`ListStyle::PairAssignment`] —
+///   `declare`/`setq`'s pairing shape is specific to those forms.
+/// - [`ListStyle::Loop`] — has its own internal loop-keyword clause grammar,
+///   unrelated to every other style here.
+pub const STYLE_NAMES: &[&str] = &[
+    "general",
+    "definition",
+    "name-body",
+    "lambda",
+    "binding-list",
+    "one-argument-body",
+    "two-argument-body",
+    "if-then-else",
+    "cond-clauses",
+    "case-clauses",
+    "head-body",
+];
+
+/// Resolves one of [`STYLE_NAMES`] to the style it names. `None` when `name`
+/// is not in that list.
+pub(super) fn style_from_name(name: &str) -> Option<ListStyle> {
+    match name {
+        "general" => Some(ListStyle::General),
+        "definition" => Some(ListStyle::Definition),
+        "name-body" => Some(ListStyle::DefinitionNameBody),
+        "lambda" => Some(ListStyle::Lambda),
+        "binding-list" => Some(ListStyle::Binding),
+        "one-argument-body" => Some(ListStyle::OneArgumentBody),
+        "two-argument-body" => Some(ListStyle::TwoArgumentBody),
+        "if-then-else" => Some(ListStyle::If),
+        "cond-clauses" => Some(ListStyle::CondClauses),
+        "case-clauses" => Some(ListStyle::CaseClauses),
+        "head-body" => Some(ListStyle::HeadBody),
+        _ => None,
+    }
+}
+
 impl Formatter {
     pub(super) fn style_for_head(&self, head: &str) -> ListStyle {
+        // A project's `paredit.toml` entry always wins over the built-in
+        // per-dialect table for the same symbol — the configuration layer
+        // this codebase treats as highest-precedence everywhere else (see
+        // `packages/core/config/src/load.rs`). Searched in reverse so that,
+        // per this struct's `indent_overrides` field doc, a later entry for
+        // the same symbol wins over an earlier one — the same "later beats
+        // earlier" precedence `load.rs` uses across configuration layers.
+        if let Some((_, style)) = self
+            .indent_overrides
+            .iter()
+            .rev()
+            .find(|(symbol, _)| symbol == head)
+        {
+            return *style;
+        }
         match self.dialect {
             Dialect::Clojure => Self::clojure_style_for_head(head),
             _ => Self::common_lisp_style_for_head(head),

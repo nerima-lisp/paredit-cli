@@ -53,6 +53,24 @@ const UNIVERSAL_QUOTE_OPERATORS: [QuoteOperator; 1] = [QUOTE_OPERATOR];
 /// The Common Lisp family, which additionally has `#'f` / `(function f)`.
 const COMMON_LISP_QUOTE_OPERATORS: [QuoteOperator; 2] = [QUOTE_OPERATOR, FUNCTION_OPERATOR];
 
+/// The canonical list-form head [`ReaderPrefix`] `prefix` expands to in
+/// `dialect`, when it has one this module considers portable.
+///
+/// Shared with the formatter's opt-in canonical printing mode
+/// (`super::formatter::core::Formatter::canonical_prefix_heads`), so both
+/// consumers agree on exactly the same set — see this module's own doc
+/// comment for why quasiquote and unquote are never in it, in either
+/// direction.
+pub(in crate::sexpr) fn canonical_quote_head(
+    dialect: Dialect,
+    prefix: ReaderPrefix,
+) -> Option<&'static str> {
+    quote_operators(dialect)
+        .iter()
+        .find(|operator| operator.prefix == prefix)
+        .map(|operator| operator.head)
+}
+
 /// The quote operators `dialect` spells both ways.
 ///
 /// The `function` pair is confined to Common Lisp and Emacs Lisp because

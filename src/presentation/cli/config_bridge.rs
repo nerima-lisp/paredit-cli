@@ -143,6 +143,27 @@ const BINDINGS: &[Binding] = &[
         omit_when: None,
     },
     Binding {
+        key: "format.indent-table",
+        flag: "indent-table",
+        shape: Shape::Repeated,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "format.width-profiles",
+        flag: "width-profile",
+        shape: Shape::Repeated,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "format.quote-style",
+        flag: "quote-style",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
         key: "paths.include-hidden",
         flag: "include-hidden",
         shape: Shape::Switch,
