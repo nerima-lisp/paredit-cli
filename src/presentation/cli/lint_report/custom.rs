@@ -109,6 +109,18 @@ impl CustomRules {
             .collect()
     }
 
+    /// How many loaded custom rules a `:dialects` clause puts out of scope
+    /// for `dialect` (FR-E12) — the guard's skip count, so a caller can
+    /// report "N rule(s) skipped by dialect scope" rather than silently
+    /// running fewer rules than the ruleset defines.
+    #[must_use]
+    pub(super) fn dialect_skip_count(
+        &self,
+        dialect: paredit_core_syntax::dialect::Dialect,
+    ) -> usize {
+        paredit_feature_lint_custom::skipped_by_dialect(&self.ruleset, dialect)
+    }
+
     /// Runs the `deftest` clauses, returning the raw failures.
     ///
     /// `--test-rules --output json` renders one JSON object per failure from
@@ -197,7 +209,17 @@ pub(in crate::presentation::cli) fn load(explicit: Option<&Path>) -> CliResult<C
         }
     };
 
-    let ruleset = read_directory(&directory)?;
+    let mut ruleset = read_directory(&directory)?;
+    // Fragment resolution (FR-E14) must run before `validate`: a `:fix`
+    // naming a variable only a `defpattern` fragment binds cannot be checked
+    // until the fragment it references is substituted in, and a rule in one
+    // file may reference a fragment defined in another.
+    ruleset.resolve_fragments().map_err(|error| {
+        paredit_core_cli::error::FeatureRefusal::new(
+            paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,
+            &error,
+        )
+    })?;
     ruleset.validate(&RULES).map_err(|error| {
         paredit_core_cli::error::FeatureRefusal::new(
             paredit_core_cli::diagnosis::ErrorCode::InputUnparsable,

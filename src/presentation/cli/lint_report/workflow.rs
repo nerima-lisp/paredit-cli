@@ -533,12 +533,25 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
     // values rather than from the flags the caller typed.
     let discriminator = lint_cache_discriminator(&active, &custom, &settings);
     let statistics = std::sync::Mutex::new(paredit_core_safety::cache::CacheStatistics::default());
+    // FR-E12: how many loaded custom rules a file's dialect put out of scope,
+    // summed across the run. `:dialects` is a guard, not a hint — a rule it
+    // excludes never even attempts to match — so this is worth reporting
+    // rather than leaving a project to notice only that a rule never fires.
+    let dialect_skips = std::sync::Mutex::new(0usize);
 
     // The 170-rule pass over each file is the heaviest per-file work in this
     // tool and has no dependency between files, so it runs on every core.
     // `analyze_files` returns results in input order, which is what keeps the
     // report byte-identical however the workers were scheduled.
     let analysis = analyze_files(&files, args.dialect, |file, dialect, tree, input| {
+        if !custom.is_empty() {
+            let skipped = custom.dialect_skip_count(dialect);
+            if skipped > 0 {
+                if let Ok(mut total) = dialect_skips.lock() {
+                    *total += skipped;
+                }
+            }
+        }
         // The cached value is the *pre-baseline* finding set: a baseline is a
         // filter over the answer, not part of the question, so changing one
         // must not throw the analysis away.
@@ -626,6 +639,11 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
                     failures => format!(", {failures} unwritable"),
                 }
             );
+        }
+    }
+    if let Ok(skipped) = dialect_skips.lock() {
+        if *skipped > 0 {
+            eprintln!("custom rules: {skipped} rule application(s) skipped by :dialects scope");
         }
     }
 

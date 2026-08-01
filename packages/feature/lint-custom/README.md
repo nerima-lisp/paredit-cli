@@ -16,6 +16,7 @@ already writing:
   :category malformed
   :severity error
   :description "a defentity with no :table option"
+  :dialects (common-lisp)
   :pattern (defentity ?name ...)
   :message "defentity needs a :table")
 
@@ -24,7 +25,18 @@ already writing:
   (:matches  "(defentity user)"))
 
 (deprecate legacy-connect :use connect :reason "removed in 3.0")
+
+(defpattern bare-print (print ?x))
+(defrule no-print-in-handler
+  :pattern (handler-case (:fragment bare-print) ...)
+  :message "do not print from inside a handler")
 ```
+
+`:dialects` is optional and, like `defmigration`'s own clause, a guard rather
+than a hint: naming dialects skips every file outside them entirely, rather
+than matching them and finding nothing. `defpattern` registers a named
+pattern fragment a `:pattern` can reference with `(:fragment name)`,
+resolved (and cycle-checked) once, at load time.
 
 ## Why a separate pass
 

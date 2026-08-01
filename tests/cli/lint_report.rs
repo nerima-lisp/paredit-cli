@@ -3029,6 +3029,175 @@ fn cli_lint_rejects_a_custom_rule_whose_fix_names_an_unbound_variable() {
         .stderr(predicate::str::contains("does not bind"));
 }
 
+/// FR-E12: a `:dialects` clause scopes a `defrule` to the dialects it names,
+/// as a guard rather than a hint — a file outside them is skipped entirely,
+/// not matched and reported anyway.
+#[test]
+fn cli_lint_dialect_scoped_rule_only_fires_in_its_own_dialects() {
+    let rules = rule_dir(
+        "lint-custom-dialects",
+        r#"(defrule cl-only-incf
+             :dialects (common-lisp)
+             :pattern (incf ?x)
+             :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-dialects-run");
+
+    // `--rule` scopes the report to just this custom rule (FR-E16 widened
+    // rule selectors to recognise loaded custom rule names), so the
+    // assertion is not at the mercy of an unrelated shipped rule also firing
+    // on the fixture.
+    let cl_file = dir.join("a.lisp");
+    fs::write(&cl_file, "(incf x)\n").expect("write a.lisp");
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--output",
+                "json",
+                "--rule",
+                "cl-only-incf",
+                "--custom-rules",
+            ])
+            .arg(&rules)
+            .arg(&cl_file)
+            .assert()
+            .success(),
+    );
+    assert_eq!(value["finding_count"], 1, "{value}");
+
+    let el_file = dir.join("a.el");
+    fs::write(&el_file, "(incf x)\n").expect("write a.el");
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--output",
+                "json",
+                "--rule",
+                "cl-only-incf",
+                "--custom-rules",
+            ])
+            .arg(&rules)
+            .arg(&el_file)
+            .assert()
+            .success(),
+    );
+    assert_eq!(value["finding_count"], 0, "{value}");
+}
+
+#[test]
+fn cli_lint_a_rule_with_no_dialects_clause_still_runs_everywhere() {
+    let rules = rule_dir(
+        "lint-custom-dialects-default",
+        r#"(defrule no-print :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-dialects-default-run");
+    let el_file = dir.join("a.el");
+    fs::write(&el_file, "(print x)\n").expect("write a.el");
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--output",
+                "json",
+                "--rule",
+                "no-print",
+                "--custom-rules",
+            ])
+            .arg(&rules)
+            .arg(&el_file)
+            .assert()
+            .success(),
+    );
+    assert_eq!(value["finding_count"], 1, "{value}");
+}
+
+/// FR-E14: a `defpattern` fragment, referenced with `(:fragment name)`, is
+/// substituted into a rule's `:pattern` before matching.
+#[test]
+fn cli_lint_a_rule_can_reuse_a_named_pattern_fragment() {
+    let rules = rule_dir(
+        "lint-custom-fragment",
+        r#"(defpattern bare-print (print ?x))
+           (defrule no-bare-print-in-progn
+             :pattern (progn (:fragment bare-print))
+             :message "no bare print inside progn")"#,
+    );
+    let dir = fresh_temp_dir("lint-fragment-run");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(progn (print 1))\n(print 2)\n").expect("write a.lisp");
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--output",
+                "json",
+                "--rule",
+                "no-bare-print-in-progn",
+                "--custom-rules",
+            ])
+            .arg(&rules)
+            .arg(&file)
+            .assert()
+            .success(),
+    );
+    // Only the form matching the whole `(progn (print ?x))` shape, not the
+    // bare `(print 2)` outside a `progn`.
+    assert_eq!(value["finding_count"], 1, "{value}");
+}
+
+#[test]
+fn cli_lint_rejects_a_rule_referencing_an_undefined_fragment() {
+    let rules = rule_dir(
+        "lint-custom-fragment-undefined",
+        r#"(defrule r :pattern (:fragment ghost) :message "m")"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("undefined pattern fragment"));
+}
+
+#[test]
+fn cli_lint_rejects_a_self_referential_pattern_fragment() {
+    let rules = rule_dir(
+        "lint-custom-fragment-cycle",
+        r#"(defpattern loopy (progn (:fragment loopy)))
+           (defrule r :pattern (f) :message "m")"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cycle"));
+}
+
+/// FR-E17: two custom rules sharing a name are rejected at load time, rather
+/// than the pass loop, the metadata cache, and `deftest` resolution each
+/// silently picking a different one.
+#[test]
+fn cli_lint_rejects_two_custom_rules_sharing_a_name() {
+    let rules = rule_dir(
+        "lint-custom-self-collision",
+        r#"(defrule dup :pattern (f ?x) :message "m")
+           (defrule dup :pattern (g ?x) :message "m")"#,
+    );
+    paredit()
+        .args(["inspect", "lint", "--list-rules", "--custom-rules"])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("two custom rules are named"));
+}
+
 #[test]
 fn cli_lint_list_rules_shows_the_projects_own_rules() {
     let rules = rule_dir(

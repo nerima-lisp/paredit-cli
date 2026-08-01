@@ -63,9 +63,28 @@ pub fn run(ruleset: &Ruleset, tree: &SyntaxTree, dialect: Dialect) -> Vec<Custom
     let source = tree.source();
     let mut found = Vec::new();
     for rule in &ruleset.rules {
+        // FR-E12's `:dialects` guard: a rule scoped away from this file's
+        // dialect is skipped entirely, the same as
+        // `paredit_feature_migrate`'s recipe-level guard — never matched
+        // against, not matched and then discarded.
+        if !rule.covers(dialect) {
+            continue;
+        }
         collect_rule(rule, tree, source, dialect, &mut found);
     }
     found
+}
+
+/// How many of `ruleset`'s rules are out of `dialect`'s scope — the `:dialects`
+/// guard's skip count, for a caller (`--timings`, the main scan) that wants to
+/// report it rather than silently run fewer rules than the ruleset defines.
+#[must_use]
+pub fn skipped_by_dialect(ruleset: &Ruleset, dialect: Dialect) -> usize {
+    ruleset
+        .rules
+        .iter()
+        .filter(|rule| !rule.covers(dialect))
+        .count()
 }
 
 fn collect_rule(
@@ -342,5 +361,32 @@ mod tests {
         ));
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0].clause, ":matches");
+    }
+
+    // -----------------------------------------------------------------
+    // FR-E12: a rule's `:dialects` guard applies at match time.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn a_dialect_scoped_rule_does_not_run_outside_its_dialects() {
+        let rules =
+            ruleset(r#"(defrule cl-only :dialects (common-lisp) :pattern (incf ?x) :message "m")"#);
+        let tree =
+            SyntaxTree::parse_with_dialect("(incf counter)", Dialect::EmacsLisp).expect("parse");
+        assert!(run(&rules, &tree, Dialect::EmacsLisp).is_empty());
+
+        let tree =
+            SyntaxTree::parse_with_dialect("(incf counter)", Dialect::CommonLisp).expect("parse");
+        assert_eq!(run(&rules, &tree, Dialect::CommonLisp).len(), 1);
+    }
+
+    #[test]
+    fn skipped_by_dialect_counts_the_rules_a_dialect_puts_out_of_scope() {
+        let rules = ruleset(
+            r#"(defrule cl-only :dialects (common-lisp) :pattern (f) :message "m")
+               (defrule everywhere :pattern (g) :message "m")"#,
+        );
+        assert_eq!(skipped_by_dialect(&rules, Dialect::EmacsLisp), 1);
+        assert_eq!(skipped_by_dialect(&rules, Dialect::CommonLisp), 0);
     }
 }
