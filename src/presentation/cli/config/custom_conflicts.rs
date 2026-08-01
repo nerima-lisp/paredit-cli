@@ -30,6 +30,7 @@
 
 use std::path::{Path, PathBuf};
 
+use paredit_core_cli::shared::{MAX_SOURCE_INPUT_BYTES, read_text_file_with_limit};
 use paredit_core_config::error::{Diagnostic, DiagnosticCode};
 use paredit_core_config::load::Loaded;
 use paredit_core_config::settings::Origin;
@@ -59,15 +60,18 @@ pub(super) fn conflicts(loaded: &Loaded) -> Vec<Diagnostic> {
         return Vec::new();
     }
 
-    let deny = raw_list(loaded, "lint.deny");
-    let warn = raw_list(loaded, "lint.warn");
+    let (deny, warn) = raw_lists(loaded);
     if deny.is_none() && warn.is_none() {
         return Vec::new();
     }
 
     rule_files(directory)
         .iter()
-        .filter_map(|path| std::fs::read_to_string(path).ok().map(|text| (path, text)))
+        .filter_map(|path| {
+            read_text_file_with_limit(path, MAX_SOURCE_INPUT_BYTES)
+                .ok()
+                .map(|text| (path, text))
+        })
         .filter_map(|(path, text)| parse_ruleset(&path.display().to_string(), &text).ok())
         .flat_map(|ruleset| ruleset.rules)
         .filter_map(|rule| check_rule(&rule.name, rule.severity, deny.as_ref(), warn.as_ref()))
@@ -93,22 +97,30 @@ fn rule_files(directory: &Path) -> Vec<PathBuf> {
     paths
 }
 
-/// `key`'s value as the last source in application order literally wrote it,
-/// bypassing `Settings`' shipped-only vocabulary gate. `None` when no source
-/// sets `key` at all.
-fn raw_list(loaded: &Loaded, key: &str) -> Option<RawList> {
-    let mut found = None;
+/// `lint.deny`'s and `lint.warn`'s values as the last source in application
+/// order literally wrote each, bypassing `Settings`' shipped-only vocabulary
+/// gate. `None` in either slot when no source sets that key at all.
+///
+/// Reads and TOML-parses each `loaded.sources` entry exactly once, pulling
+/// both keys out of the same parsed document, rather than the two full
+/// read-and-parse passes over every source that calling a single-key lookup
+/// twice would cost.
+fn raw_lists(loaded: &Loaded) -> (Option<RawList>, Option<RawList>) {
+    let mut deny = None;
+    let mut warn = None;
     for source in &loaded.sources {
-        let Ok(text) = std::fs::read_to_string(&source.path) else {
+        let Ok(text) = read_text_file_with_limit(&source.path, MAX_SOURCE_INPUT_BYTES) else {
             continue;
         };
         let Ok(document) = toml::parse(&text) else {
             continue;
         };
         for entry in &document.entries {
-            if entry.key != key {
-                continue;
-            }
+            let slot = match entry.key.as_str() {
+                "lint.deny" => &mut deny,
+                "lint.warn" => &mut warn,
+                _ => continue,
+            };
             let items = match &entry.value {
                 Value::Array(items) => items
                     .iter()
@@ -119,13 +131,13 @@ fn raw_list(loaded: &Loaded, key: &str) -> Option<RawList> {
                     .collect(),
                 _ => Vec::new(),
             };
-            found = Some(RawList {
+            *slot = Some(RawList {
                 items,
                 origin: Origin::file(source.layer, source.path.clone(), entry.line),
             });
         }
     }
-    found
+    (deny, warn)
 }
 
 /// Which list names `name`, and what severity it implies, checking
