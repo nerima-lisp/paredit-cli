@@ -730,6 +730,75 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
                     args,
                 )?;
             }
+            command::InspectCommand::AroundMethodMissingCallNextMethod(args) => {
+                around_method_missing_call_next_method_report::workflow::around_method_missing_call_next_method_report(args)?;
+            }
+            command::InspectCommand::DefclassRequiredSlotNoInitformOrInitarg(args) => {
+                defclass_required_slot_no_initform_or_initarg_report::workflow::defclass_required_slot_no_initform_or_initarg_report(args)?;
+            }
+            command::InspectCommand::DefclassSlotShadowing(args) => {
+                defclass_slot_shadowing_report::workflow::defclass_slot_shadowing_report(args)?;
+            }
+            command::InspectCommand::DuplicateDefmethodSignature(args) => {
+                duplicate_defmethod_signature_report::workflow::duplicate_defmethod_signature_report(args)?;
+            }
+            command::InspectCommand::GenericFunctionNoMethods(args) => {
+                generic_function_no_methods_report::workflow::generic_function_no_methods_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::MethodQualifierTypo(args) => {
+                method_qualifier_typo_report::workflow::method_qualifier_typo_report(args)?;
+            }
+            command::InspectCommand::PrintObjectWithoutPrintUnreadableObject(args) => {
+                print_object_without_print_unreadable_object_report::workflow::print_object_without_print_unreadable_object_report(args)?;
+            }
+            command::InspectCommand::SlotValueBypassesAccessor(args) => {
+                slot_value_bypasses_accessor_report::workflow::slot_value_bypasses_accessor_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::CerrorMissingContinueFormat(args) => {
+                cerror_missing_continue_format_report::workflow::cerror_missing_continue_format_report(args)?;
+            }
+            command::InspectCommand::DefineConditionEmptySuperclassList(args) => {
+                define_condition_empty_superclass_list_report::workflow::define_condition_empty_superclass_list_report(args)?;
+            }
+            command::InspectCommand::DefineConditionMissingReportForErrorType(args) => {
+                define_condition_missing_report_for_error_type_report::workflow::define_condition_missing_report_for_error_type_report(args)?;
+            }
+            command::InspectCommand::HandlerBindHandlerReturnsBareValue(args) => {
+                handler_bind_handler_returns_bare_value_report::workflow::handler_bind_handler_returns_bare_value_report(args)?;
+            }
+            command::InspectCommand::IgnoreErrorsWrapsNonErrorSignal(args) => {
+                ignore_errors_wraps_non_error_signal_report::workflow::ignore_errors_wraps_non_error_signal_report(args)?;
+            }
+            command::InspectCommand::RestartCaseClauseWithoutReport(args) => {
+                restart_case_clause_without_report_report::workflow::restart_case_clause_without_report_report(args)?;
+            }
+            command::InspectCommand::SignalOnErrorConditionReturnsSilently(args) => {
+                signal_on_error_condition_returns_silently_report::workflow::signal_on_error_condition_returns_silently_report(args)?;
+            }
+            command::InspectCommand::DolistResultFormReferencesLoopVariable(args) => {
+                dolist_result_form_references_loop_variable_report::workflow::dolist_result_form_references_loop_variable_report(args)?;
+            }
+            command::InspectCommand::DotimesBoundMutationHasNoEffect(args) => {
+                dotimes_bound_mutation_has_no_effect_report::workflow::dotimes_bound_mutation_has_no_effect_report(args)?;
+            }
+            command::InspectCommand::LoopClauseOrderViolation(args) => {
+                loop_clause_order_violation_report::workflow::loop_clause_order_violation_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::LoopForAcrossStaticallyKnownList(args) => {
+                loop_for_across_statically_known_list_report::workflow::loop_for_across_statically_known_list_report(args)?;
+            }
+            command::InspectCommand::LoopIntoAccumulatorKindConflict(args) => {
+                loop_into_accumulator_kind_conflict_report::workflow::loop_into_accumulator_kind_conflict_report(args)?;
+            }
+            command::InspectCommand::LoopUnreachableFinallyClause(args) => {
+                loop_unreachable_finally_clause_report::workflow::loop_unreachable_finally_clause_report(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

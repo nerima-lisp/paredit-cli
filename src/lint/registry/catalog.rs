@@ -174,17 +174,20 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-// 179 (pre-rebase base) + 4 (PR #79: macro-hygiene's four new enforcement
-// rules, all `Warning`/`ReportOnly`) + 8 (this branch's `lint-repl-debug`
-// package) = 191.
-const _: () = assert!(RULE_COUNT == 191);
-// 92 (base) + 0 (PR #79: all four new rules are `Fixability::ReportOnly`) + 7
-// of this branch's 8 rules (all but `commented-repl-transcript`, which is
-// `Fixability::ReportOnly` — see its module doc for why removing a comment
-// cannot be proven safe here) = 99.
+// 191 (through PR #78's `lint-repl-debug`) + 8 (`lint-object-system`) + 7
+// (`lint-condition-system`) + 6 (`lint-iteration-flow`) = 212.
+const _: () = assert!(RULE_COUNT == 212);
+// Unchanged at 99: every one of this branch's 21 rules is
+// `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
+// on the author's behalf — inserting a `call-next-method`, choosing a
+// `:report` string, or reordering `loop` clauses all change what the code
+// means, not merely how it reads.
 const _: () = assert!(fixable_count() == 99);
-// 122 (base) + 4 (PR #79) + 8 (this branch) = 134.
-const _: () = assert!(warning_count() == 134);
+// 134 (through PR #78) + 16 of this branch's 21 rules. The other 5 are
+// `Severity::Error`: `duplicate-defmethod-signature`,
+// `loop-clause-order-violation`, `loop-for-across-statically-known-list`,
+// `loop-into-accumulator-kind-conflict` and `loop-unreachable-finally-clause`.
+const _: () = assert!(warning_count() == 150);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 const _: () = assert!(PEDANTIC_RULES.len() == 5);
 

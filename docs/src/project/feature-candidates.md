@@ -168,7 +168,7 @@ CL では unresolved call を保守的に「副作用あり」とみなしてい
 | C10 | ~~命名規則の一貫性検査~~ — **実装済み**: `inspect naming`（レポート）と lint ルール `definition-naming` の両方 |
 | C11 | 巨大 `let`/`cond`/`case` の分割提案（既存 `debt-score`/`hotspots` の一段掘り下げ） |
 | C12 | 副作用を持つトップレベルフォームの実行順序依存性検出（load 順が結果を変える箇所） |
-| C13 | condition/error クラス階層の整合性（`define-condition` の継承関係の妥当性） |
+| C13 | ~~condition/error クラス階層の整合性（`define-condition` の継承関係の妥当性）~~ — **実装済み**: lint ルール `define-condition-empty-superclass-list`、`define-condition-missing-report-for-error-type`、`signal-on-error-condition-returns-silently`、`ignore-errors-wraps-non-error-signal`（`packages/feature/lint-condition-system`） |
 | C14 | パッケージ間の「循環しないが過度に結合している」度合いの指標化（結合度メトリクス） |
 | C15 | 方言横断で統一算出する循環的複雑度と、既存 C11（巨大 `let`/`cond`/`case`）の相関レポート |
 | C16 | 同一パッケージ内でのシンボル衝突・シャドーイング（内側の束縛が外側の関数名を隠す等）の検出 |

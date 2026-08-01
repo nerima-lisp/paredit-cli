@@ -291,10 +291,11 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        // 174 (pre-rebase base's recommended-preset count) + 4 (PR #79's new
-        // rules, none pedantic) + 8 (this branch's `lint-repl-debug`, none
-        // pedantic either) = 186.
-        .stdout(predicate::str::contains("\"rule_count\": 186"))
+        // 186 (through PR #78) + 21 (this branch's `lint-object-system`,
+        // `lint-condition-system` and `lint-iteration-flow`, none of them
+        // pedantic) = 207 — the whole suite's 212 less the 5 `pedantic`
+        // rules the default `recommended` preset holds back.
+        .stdout(predicate::str::contains("\"rule_count\": 207"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -965,9 +966,10 @@ fn cli_lint_list_rules_marks_severity() {
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
     // The default preset is `recommended`, which holds back the five
     // `pedantic` rules; `--preset all` is what lists the whole suite.
-    // 117 (base) + 4 (PR #79, all four new rules are `Warning`) + 8 (this
-    // branch, all eight are `Warning`) = 129.
-    assert_eq!(warnings, 129);
+    // 129 (through PR #78) + 16 of this branch's 22 rules — the other 6 are
+    // `Severity::Error` — = 145, which is the suite's 150 warnings less the
+    // 5 `pedantic` rules, all of which are warnings.
+    assert_eq!(warnings, 145);
 }
 
 #[test]

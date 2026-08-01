@@ -13,9 +13,9 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-// 179 (pre-rebase base) + 4 (PR #79: macro-hygiene's four new enforcement
-// rules) + 8 (this branch's `lint-repl-debug` package) = 191.
-pub const RULE_COUNT: usize = 191;
+// 191 (through PR #78's `lint-repl-debug`) + 8 (`lint-object-system`) + 7
+// (`lint-condition-system`) + 7 (`lint-iteration-flow`) = 213.
+pub const RULE_COUNT: usize = 212;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -797,5 +797,89 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_repl_debug::leftover_format_debug_marker::rule::META,
         &paredit_feature_lint_repl_debug::leftover_format_debug_marker::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::around_method_missing_call_next_method::rule::META,
+        &paredit_feature_lint_object_system::around_method_missing_call_next_method::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::defclass_required_slot_no_initform_or_initarg::rule::META,
+        &paredit_feature_lint_object_system::defclass_required_slot_no_initform_or_initarg::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::defclass_slot_shadowing::rule::META,
+        &paredit_feature_lint_object_system::defclass_slot_shadowing::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::duplicate_defmethod_signature::rule::META,
+        &paredit_feature_lint_object_system::duplicate_defmethod_signature::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::generic_function_no_methods::rule::META,
+        &paredit_feature_lint_object_system::generic_function_no_methods::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::method_qualifier_typo::rule::META,
+        &paredit_feature_lint_object_system::method_qualifier_typo::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::print_object_without_print_unreadable_object::rule::META,
+        &paredit_feature_lint_object_system::print_object_without_print_unreadable_object::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_object_system::slot_value_bypasses_accessor::rule::META,
+        &paredit_feature_lint_object_system::slot_value_bypasses_accessor::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_condition_system::cerror_missing_continue_format::rule::META,
+        &paredit_feature_lint_condition_system::cerror_missing_continue_format::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_condition_system::define_condition_empty_superclass_list::rule::META,
+        &paredit_feature_lint_condition_system::define_condition_empty_superclass_list::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_condition_system::define_condition_missing_report_for_error_type::rule::META,
+        &paredit_feature_lint_condition_system::define_condition_missing_report_for_error_type::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_condition_system::handler_bind_handler_returns_bare_value::rule::META,
+        &paredit_feature_lint_condition_system::handler_bind_handler_returns_bare_value::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_condition_system::ignore_errors_wraps_non_error_signal::rule::META,
+        &paredit_feature_lint_condition_system::ignore_errors_wraps_non_error_signal::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_condition_system::restart_case_clause_without_report::rule::META,
+        &paredit_feature_lint_condition_system::restart_case_clause_without_report::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_condition_system::signal_on_error_condition_returns_silently::rule::META,
+        &paredit_feature_lint_condition_system::signal_on_error_condition_returns_silently::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_iteration_flow::dolist_result_form_references_loop_variable::rule::META,
+        &paredit_feature_lint_iteration_flow::dolist_result_form_references_loop_variable::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_iteration_flow::dotimes_bound_mutation_has_no_effect::rule::META,
+        &paredit_feature_lint_iteration_flow::dotimes_bound_mutation_has_no_effect::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_iteration_flow::loop_clause_order_violation::rule::META,
+        &paredit_feature_lint_iteration_flow::loop_clause_order_violation::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_iteration_flow::loop_for_across_statically_known_list::rule::META,
+        &paredit_feature_lint_iteration_flow::loop_for_across_statically_known_list::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_iteration_flow::loop_into_accumulator_kind_conflict::rule::META,
+        &paredit_feature_lint_iteration_flow::loop_into_accumulator_kind_conflict::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_iteration_flow::loop_unreachable_finally_clause::rule::META,
+        &paredit_feature_lint_iteration_flow::loop_unreachable_finally_clause::rule::RULE,
     ),
 ];

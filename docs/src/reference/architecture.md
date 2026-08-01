@@ -65,10 +65,10 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 191 rules, and every rule depends on the engine; putting the registry in
+all 212 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching thirteen feature packages for their `META`
+the registry sits in the root reaching sixteen feature packages for their `META`
 and `RULE`. That is the criterion: **a module that enumerates or aggregates several
 features** belongs in neither core nor any one feature.
 
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, thirteen packages
+## Lint rules: one trait, one registry line, sixteen packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,8 +141,8 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-186 of the 191 shipped rules live in twelve themed packages, split four ways.
-A thirteenth, `feature/lint-custom`, holds no rules at all: it is the pattern
+207 of the 212 shipped rules live in fifteen themed packages, split five ways.
+A sixteenth, `feature/lint-custom`, holds no rules at all: it is the pattern
 language and the second pass that run the rules a *project* writes for itself.
 
 The remaining five — `macro-variable-capture`, `macro-multiple-evaluation`,
@@ -174,8 +174,20 @@ The twelfth, `feature/lint-repl-debug`, is split by *provenance* rather than
 syntax or claim: its eight rules all flag the same thing — an interactive
 REPL session's leftovers (`print`/`trace`/`break`/`time`/`step`/... calls, a
 `DEBUG`-marked `format`, a pasted transcript in a comment) accidentally
-committed — which cuts across every one of the other three groupings and does
+committed — which cuts across every one of the other four groupings and does
 not belong in any of them.
+
+The last three —
+`feature/lint-{object-system,condition-system,iteration-flow}` — are split by
+the *language subsystem* whose contract the rule encodes: CLOS's class and
+method protocol (8 rules), the condition system's signalling, handling and
+restart protocol (7), and the iteration macros' clause grammar — `loop`,
+`dotimes`, `dolist` (6). Each of those is a self-contained CLHS chapter with
+its own vocabulary and its own failure modes, and a rule in one is unreadable
+without that chapter's rules around it. All 21 are Common Lisp only and
+`ReportOnly`: each reports a judgment the tool cannot make for the author —
+inserting a `call-next-method`, choosing a `:report` string, or reordering
+`loop` clauses all change what the code *means*, not merely how it reads.
 
 A rule declares its `dialect_scope`, and the dispatcher skips one whose scope
 excludes the file's dialect before walking anything.
@@ -187,9 +199,12 @@ each of those rules also has its own standalone `inspect <rule>` command, and
 the split is what lets the command and the rule share one detection. The four
 newer packages give each rule a single module: they ship as lint rules only,
 reachable through `inspect lint --rule <name>`, so there is one consumer and
-the three-file split would be indirection with nothing on the other end.
+the three-file split would be indirection with nothing on the other end. The
+four newest — `feature/lint-{repl-debug,object-system,condition-system,iteration-flow}`
+— return to the directory layout, for the original reason: every one of their
+rules also ships a standalone `inspect <rule>` command.
 
-**`REGISTRY` is in neither.** It names all 191 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 212 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.
