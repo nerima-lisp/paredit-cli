@@ -64,6 +64,15 @@ pub enum HygieneRisk {
     /// reason to notice evaluation order at all — the caller's own left-to-
     /// right expectation is silently violated.
     ParameterReordering,
+    /// The template nests three or more levels of quasiquote.
+    ///
+    /// Each backquote inside another backquote's template changes what an
+    /// unquote there needs — the innermost unquote cancels one level, an
+    /// unquote-unquote cancels two, and so on — which is already hard to
+    /// track correctly by the second level. A third makes it easy to get an
+    /// escape wrong in a way that only shows up when the macro that builds
+    /// the macro is itself expanded.
+    DeepQuasiquoteNesting,
 }
 
 impl HygieneRisk {
@@ -73,6 +82,7 @@ impl HygieneRisk {
             Self::VariableCapture => "variable-capture",
             Self::MultipleEvaluation => "multiple-evaluation",
             Self::ParameterReordering => "parameter-reordering",
+            Self::DeepQuasiquoteNesting => "deep-quasiquote-nesting",
         }
     }
 }
@@ -86,10 +96,13 @@ pub struct HygieneFinding {
     /// The captured binding name, the multiply-evaluated parameter, or —
     /// for [`HygieneRisk::ParameterReordering`] — every out-of-order
     /// parameter, comma-joined in the order the template unquotes them.
+    /// Empty for [`HygieneRisk::DeepQuasiquoteNesting`]: the whole template
+    /// is at fault there, not any one name in it.
     pub subject: String,
     /// How many times the parameter is unquoted, for
     /// [`HygieneRisk::MultipleEvaluation`]; how many parameters are
-    /// out-of-order, for [`HygieneRisk::ParameterReordering`]. `0` for a
+    /// out-of-order, for [`HygieneRisk::ParameterReordering`]; the nesting
+    /// depth itself, for [`HygieneRisk::DeepQuasiquoteNesting`]. `0` for a
     /// capture.
     pub occurrences: usize,
     /// The remedy, named rather than left to the reader.
@@ -190,7 +203,12 @@ pub fn build_macro_hygiene_report(
     )
 }
 
-fn analyze(dialect: Dialect, form: &ExpressionView, name: &str, findings: &mut Vec<HygieneFinding>) {
+fn analyze(
+    dialect: Dialect,
+    form: &ExpressionView,
+    name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
     let parameters = form
         .children
         .get(2)
@@ -207,6 +225,7 @@ fn analyze(dialect: Dialect, form: &ExpressionView, name: &str, findings: &mut V
         find_multiple_evaluation(body, name, &parameters, findings);
         find_parameter_reordering(body, name, &parameters, findings);
         find_symbol_macrolet_multiple_evaluation(body, name, findings);
+        find_deep_quasiquote_nesting(body, name, findings);
     }
 }
 
@@ -539,6 +558,70 @@ fn is_side_effect_free(view: &ExpressionView) -> bool {
     list_head(view).is_some_and(|head| common_lisp_operator_head_eq(head, "quote"))
 }
 
+/// Reports a template that nests three or more levels of quasiquote.
+///
+/// Unlike the other checks in this file, this one does not stop recursing
+/// once it finds the outermost quasiquote of a template: [`quasiquote_depth`]
+/// already measures the deepest nesting anywhere under a node in one pass, so
+/// there is nothing further inside that same template worth a second,
+/// separate report.
+fn find_deep_quasiquote_nesting(
+    view: &ExpressionView,
+    macro_name: &str,
+    findings: &mut Vec<HygieneFinding>,
+) {
+    if !is_quasiquoted(view) {
+        for child in &view.children {
+            find_deep_quasiquote_nesting(child, macro_name, findings);
+        }
+        return;
+    }
+
+    let depth = quasiquote_depth(view);
+    if depth < 3 {
+        return;
+    }
+
+    findings.push(HygieneFinding {
+        risk: HygieneRisk::DeepQuasiquoteNesting,
+        macro_name: macro_name.to_ascii_uppercase(),
+        subject: String::new(),
+        occurrences: depth,
+        remedy: "three or more nested backquote levels are hard to reason about and easy to get \
+                 an escape wrong in; consider splitting this into helper macros or functions to \
+                 reduce the nesting",
+        span: view.span,
+    });
+}
+
+/// The deepest quasiquote nesting reachable from `view`, counting `view`'s
+/// own backquote(s) (a node can carry more than one, when several backquotes
+/// appear contiguously with nothing between them) plus whatever is nested
+/// inside it.
+fn quasiquote_depth(view: &ExpressionView) -> usize {
+    let own = if view.reader_prefixes.contains(&ReaderPrefix::Quasiquote) {
+        view.reader_prefixes
+            .iter()
+            .filter(|prefix| **prefix == ReaderPrefix::Quasiquote)
+            .count()
+    } else if view
+        .text
+        .as_deref()
+        .is_some_and(|text| text.starts_with('`'))
+    {
+        1
+    } else {
+        0
+    };
+    let deepest_child = view
+        .children
+        .iter()
+        .map(quasiquote_depth)
+        .max()
+        .unwrap_or(0);
+    own + deepest_child
+}
+
 /// The node a binding binds: the binding itself when it is a bare name, or its
 /// first child when it is a `(name value)` pair.
 ///
@@ -725,8 +808,7 @@ mod tests {
 
     #[test]
     fn a_symbol_macrolet_expansion_with_a_side_effect_referenced_twice_is_reported() {
-        let report =
-            report("(defmacro m () (symbol-macrolet ((x (incf y))) (+ x x)))");
+        let report = report("(defmacro m () (symbol-macrolet ((x (incf y))) (+ x x)))");
         let finding = report
             .findings
             .iter()
@@ -766,9 +848,54 @@ mod tests {
 
     #[test]
     fn a_symbol_macrolet_expansion_that_is_quoted_is_not_reported() {
-        let report =
-            report("(defmacro m () (symbol-macrolet ((x '(1 2 3))) (+ (car x) (car x))))");
+        let report = report("(defmacro m () (symbol-macrolet ((x '(1 2 3))) (+ (car x) (car x))))");
         assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn three_nested_backquote_levels_is_reported() {
+        let report = report("(defmacro m () ```(a))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::DeepQuasiquoteNesting)
+            .expect("deep quasiquote nesting is reported");
+        assert_eq!(finding.occurrences, 3);
+    }
+
+    #[test]
+    fn separately_nested_backquotes_across_a_list_boundary_still_count() {
+        let report = report("(defmacro m () `(a `(b `(c))))");
+        let finding = report
+            .findings
+            .iter()
+            .find(|finding| finding.risk == HygieneRisk::DeepQuasiquoteNesting)
+            .expect("deep quasiquote nesting is reported");
+        assert_eq!(finding.occurrences, 3);
+    }
+
+    #[test]
+    fn two_nested_backquote_levels_is_not_reported() {
+        let report = report("(defmacro m () ``(a))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::DeepQuasiquoteNesting),
+            "{report:?}"
+        );
+    }
+
+    #[test]
+    fn a_single_quasiquote_is_not_reported() {
+        let report = report("(defmacro m (x) `(list ,x))");
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.risk != HygieneRisk::DeepQuasiquoteNesting),
+            "{report:?}"
+        );
     }
 
     #[test]
