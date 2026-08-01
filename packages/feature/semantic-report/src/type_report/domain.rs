@@ -369,6 +369,43 @@ mod tests {
         assert!(contradictory_value.contradictory);
     }
 
+    /// Scheme's `define-record-type` predicate is the one thing this layer
+    /// declares for Scheme: it always answers a boolean, by construction.
+    #[test]
+    fn a_scheme_file_is_modelled_and_reports_a_record_predicates_return_type() {
+        let report = report_of(
+            "(define-record-type point (make-point x y) point? (x point-x)) \
+             (define (f p) (point? p))",
+            Dialect::Scheme,
+        );
+        assert!(report.dialect_modelled);
+        let predicate_call = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "(point? p)")
+            .unwrap_or_else(|| panic!("no (point? p) expression in {report:?}"));
+        assert_eq!(predicate_call.ty, Ty::Boolean);
+        assert!(!predicate_call.contradictory);
+    }
+
+    /// Racket gets both Scheme's `define-record-type` predicate and its own
+    /// Typed Racket `(: name (-> …))` function annotation.
+    #[test]
+    fn a_racket_file_is_modelled_and_reports_a_typed_racket_annotations_return_type() {
+        let report = report_of(
+            "(: convert (-> Integer String)) (define (f x) (convert x))",
+            Dialect::Racket,
+        );
+        assert!(report.dialect_modelled);
+        let call = report
+            .expressions
+            .iter()
+            .find(|expression| expression.text == "(convert x)")
+            .unwrap_or_else(|| panic!("no (convert x) expression in {report:?}"));
+        assert_eq!(call.ty, Ty::String);
+        assert!(!call.contradictory);
+    }
+
     #[test]
     fn unknown_makes_no_claim_so_it_cannot_contradict_one() {
         assert!(!contradicts(Type::Unknown, Type::Known(Ty::String)));

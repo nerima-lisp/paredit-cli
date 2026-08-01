@@ -157,7 +157,10 @@ impl SemanticLayer {
     /// the other five stay Common-Lisp-only until their own step lands.
     const fn supports(self, dialect: Dialect) -> bool {
         match self {
-            Self::Typing => matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp),
+            Self::Typing => matches!(
+                dialect,
+                Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Racket
+            ),
             Self::Narrowing => matches!(dialect, Dialect::CommonLisp),
             Self::Constants => matches!(dialect, Dialect::CommonLisp),
             Self::ValuePropagation => matches!(dialect, Dialect::CommonLisp),
@@ -1231,7 +1234,12 @@ mod tests {
             // FR-002/FR-003: Common Lisp, Emacs Lisp, Scheme, Racket typing.
             (
                 SemanticLayer::Typing,
-                &[Dialect::CommonLisp, Dialect::EmacsLisp],
+                &[
+                    Dialect::CommonLisp,
+                    Dialect::EmacsLisp,
+                    Dialect::Scheme,
+                    Dialect::Racket,
+                ],
             ),
             (SemanticLayer::Narrowing, &[Dialect::CommonLisp]),
             (SemanticLayer::Constants, &[Dialect::CommonLisp]),

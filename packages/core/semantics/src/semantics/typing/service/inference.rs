@@ -26,7 +26,7 @@ use crate::semantics::value::{LiteralValue, ValueTable, evaluate_constant};
 use super::super::model::{Ty, Type, TypeTable, TypeTableBuilder, meet};
 use super::super::policy::supports_type_inference;
 use super::narrowing::{self, Narrowing};
-use super::{calls, declarations, emacs_lisp_declarations};
+use super::{calls, declarations, emacs_lisp_declarations, scheme_declarations};
 
 /// Everything a call into any source needs, bundled once rather than threaded
 /// argument by argument.
@@ -59,9 +59,14 @@ pub fn build_type_table(
     // and so order-independent, but a name-keyed lookup table like this one
     // is not — it has to exist before any call consults it. Each dialect
     // reads its own declaration syntax: Common Lisp's `declaim`/`proclaim`
-    // `ftype`, Emacs Lisp's `cl-defstruct` slots.
+    // `ftype`, Emacs Lisp's `cl-defstruct` slots, Scheme's/Racket's
+    // `define-record-type` predicates and Racket's own Typed Racket `:`
+    // function annotations.
     let declared_returns = match dialect {
         Dialect::EmacsLisp => emacs_lisp_declarations::collect_declared_returns(tree),
+        Dialect::Scheme | Dialect::Racket => {
+            scheme_declarations::collect_declared_returns(dialect, tree)
+        }
         _ => declarations::collect_declared_returns(dialect, tree),
     };
     let ctx = Ctx {
@@ -544,5 +549,24 @@ mod tests {
             type_of(&analysis, "(the integer x)"),
             Type::Known(Ty::Integer)
         );
+    }
+
+    #[test]
+    fn a_scheme_record_predicate_return_type_is_known_at_the_call_site() {
+        let analysis = analyze_as(
+            "(define-record-type point (make-point x y) point? (x point-x)) \
+             (define (f p) (point? p))",
+            Dialect::Scheme,
+        );
+        assert_eq!(type_of(&analysis, "(point? p)"), Type::Known(Ty::Boolean));
+    }
+
+    #[test]
+    fn a_typed_racket_annotation_return_type_is_known_at_the_call_site() {
+        let analysis = analyze_as(
+            "(: convert (-> Integer String)) (define (f x) (convert x))",
+            Dialect::Racket,
+        );
+        assert_eq!(type_of(&analysis, "(convert x)"), Type::Known(Ty::String));
     }
 }
