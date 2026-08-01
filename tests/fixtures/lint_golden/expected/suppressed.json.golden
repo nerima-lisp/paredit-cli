@@ -1,5 +1,5 @@
 {
-  "finding_count": 1,
+  "finding_count": 2,
   "findings": [
     {
       "category": "suspicious",
@@ -12,6 +12,19 @@
       "span": {
         "end": 340,
         "start": 338
+      }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "id": "declarative-style-score/2f534fdd67304360/0",
+      "message": "this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold",
+      "path": "suppressed.lisp",
+      "rule": "declarative-style-score",
+      "severity": "warning",
+      "span": {
+        "end": 500,
+        "start": 0
       }
     }
   ],
@@ -1036,6 +1049,12 @@
       "count": 0,
       "description": "a top-level form that runs at load time and references a name this file only defines later",
       "rule": "execution-order-dependency"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "a file whose fraction of purely-declarative top-level forms falls below a threshold",
+      "rule": "declarative-style-score"
     }
   ],
   "policy": {

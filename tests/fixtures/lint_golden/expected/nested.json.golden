@@ -1270,6 +1270,12 @@
       "count": 0,
       "description": "a top-level form that runs at load time and references a name this file only defines later",
       "rule": "execution-order-dependency"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a file whose fraction of purely-declarative top-level forms falls below a threshold",
+      "rule": "declarative-style-score"
     }
   ],
   "policy": {

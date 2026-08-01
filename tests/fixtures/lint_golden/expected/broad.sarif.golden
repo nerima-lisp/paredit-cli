@@ -5782,6 +5782,32 @@
             "primaryLocationLineHash": "fnv1a64:d28afb89e5c98c47:0"
           },
           "ruleId": "list-star-nil"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "broad.lisp"
+                },
+                "region": {
+                  "byteLength": 10167,
+                  "byteOffset": 0,
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this file's declarative-style score is 10% (134 top-level forms), below the 80% threshold"
+          },
+          "partialFingerprints": {
+            "pareditFindingId": "declarative-style-score/82af518277a40447/0",
+            "primaryLocationLineHash": "fnv1a64:eb2a94446f52be81:0"
+          },
+          "ruleId": "declarative-style-score"
         }
       ],
       "tool": {
@@ -8033,6 +8059,22 @@
               },
               "shortDescription": {
                 "text": "a top-level form that runs at load time and references a name this file only defines later"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A file built only from definitions and value bindings can be reordered, split, or reloaded piecemeal without changing behaviour. A file with many top-level forms that run for effect — bare calls, setf, let used for a side effect — is a sequence: each form only means what it means in the order it was written."
+              },
+              "id": "declarative-style-score",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A file built only from definitions and value bindings can be reordered, split, or reloaded piecemeal without changing behaviour. A file with many top-level forms that run for effect — bare calls, setf, let used for a side effect — is a sequence: each form only means what it means in the order it was written.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a file whose fraction of purely-declarative top-level forms falls below a threshold"
               }
             }
           ]

@@ -1,4 +1,4 @@
-finding_count	1
+finding_count	2
 rule	self-assignment	0
 rule	duplicate-setf-places	0
 rule	setf-arity	0
@@ -169,4 +169,6 @@ rule	giant-conditional-form	0
 rule	redundant-condition-supertype	0
 rule	commented-out-code	0
 rule	execution-order-dependency	0
+rule	declarative-style-score	1
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
+finding	declarative-style-score	warning	suspicious	fixable=false	suppressed.lisp	0	this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold	declarative-style-score/2f534fdd67304360/0
