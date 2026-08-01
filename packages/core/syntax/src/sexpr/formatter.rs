@@ -1,11 +1,13 @@
 mod core;
 mod lists;
+mod numeric_literal;
 mod styles;
 
 use std::fmt;
 
 use crate::dialect::Dialect;
 
+pub use numeric_literal::NumericLiteralCase;
 pub use styles::STYLE_NAMES;
 
 /// The compiled-in default for one inline (non-wrapped) line's width.
@@ -98,6 +100,31 @@ pub struct Formatter {
     /// How reader-macro prefixes print. `Shorthand` unless overridden with
     /// [`Formatter::with_reader_prefix_style`].
     quote_style: ReaderPrefixStyle,
+    /// How a numeric literal's radix-prefix and exponent-marker letters
+    /// print. [`NumericLiteralCase::Preserve`] unless overridden with
+    /// [`Formatter::with_numeric_literal_case`], which reproduces this
+    /// formatter's behavior before this option existed exactly: every atom's
+    /// text is copied from source untouched.
+    numeric_literal_case: NumericLiteralCase,
+    /// Align every `let`-style binding's value to one column past the
+    /// widest name in its run. `false` unless overridden with
+    /// [`Formatter::with_align_clause_values`] — a layout *policy*, so it
+    /// stays opt-in the same way [`Formatter::with_reindent_block_comments`]
+    /// does.
+    align_clause_values: bool,
+    /// Whether the rendered document ends in exactly one trailing newline.
+    /// `true` unless overridden with
+    /// [`Formatter::with_insert_final_newline`], which reproduces this
+    /// formatter's original, unconditional behavior.
+    insert_final_newline: bool,
+    /// Whether a standalone or trailing comment has its own trailing
+    /// whitespace trimmed. `true` unless overridden with
+    /// [`Formatter::with_trim_trailing_whitespace`], which reproduces this
+    /// formatter's original, unconditional behavior. Verbatim-rendered spans
+    /// (a form kept exactly as written because it carries an interior
+    /// comment, or an opaque reader form) are never affected either way —
+    /// see `Formatter::render_comment_text`.
+    trim_trailing_whitespace: bool,
 }
 
 impl Formatter {
@@ -155,6 +182,46 @@ impl Formatter {
     #[must_use]
     pub const fn with_reader_prefix_style(mut self, style: ReaderPrefixStyle) -> Self {
         self.quote_style = style;
+        self
+    }
+
+    /// Overrides how a numeric literal's radix-prefix and exponent-marker
+    /// letters print. [`NumericLiteralCase::Preserve`] by default, which is
+    /// byte-identical to this formatter's behavior before this option
+    /// existed.
+    #[must_use]
+    pub const fn with_numeric_literal_case(mut self, case: NumericLiteralCase) -> Self {
+        self.numeric_literal_case = case;
+        self
+    }
+
+    /// Aligns every `let`-style binding's value to one column past the
+    /// widest name in its run (see `formatter::lists::general`'s doc comment
+    /// on the alignment helpers for exactly what "run" means here). `false`
+    /// by default: this changes where a value starts, not merely how a line
+    /// breaks, so a caller opts in rather than finding their bindings
+    /// realigned by default.
+    #[must_use]
+    pub const fn with_align_clause_values(mut self, align: bool) -> Self {
+        self.align_clause_values = align;
+        self
+    }
+
+    /// Overrides whether the rendered document ends in exactly one trailing
+    /// newline. `true` by default, which is this formatter's original,
+    /// unconditional behavior.
+    #[must_use]
+    pub const fn with_insert_final_newline(mut self, insert: bool) -> Self {
+        self.insert_final_newline = insert;
+        self
+    }
+
+    /// Overrides whether a standalone or trailing comment has its own
+    /// trailing whitespace trimmed. `true` by default, which is this
+    /// formatter's original, unconditional behavior.
+    #[must_use]
+    pub const fn with_trim_trailing_whitespace(mut self, trim: bool) -> Self {
+        self.trim_trailing_whitespace = trim;
         self
     }
 }

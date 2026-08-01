@@ -191,11 +191,17 @@ impl Formatter {
                 (0, _) => self.format_node(tree, *child, depth + 1, output),
                 (1, _) => {
                     output.push(' ');
+                    // Never aligned, regardless of `format.align-clause-values`:
+                    // a `do`/`prog` var-clause may carry a third "step"
+                    // element a two-column name/value layout does not fit,
+                    // so this shape stays outside FR-013's scope (see
+                    // `Formatter::format_sequence_list`'s doc comment).
                     self.format_sequence_list(
                         tree,
                         *child,
                         depth + 1,
                         self.continuation_column(depth, head.len().saturating_add(3)),
+                        false,
                         output,
                     );
                 }

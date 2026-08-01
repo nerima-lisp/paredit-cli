@@ -1,3 +1,5 @@
+use std::io::IsTerminal;
+
 use paredit_core_cli::CliResult;
 use serde_json::json;
 
@@ -9,7 +11,7 @@ use crate::presentation::cli::args::{
 };
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::{
-    Edit, Formatter, Placement, ReaderPrefixStyle, Selection, SyntaxTree,
+    Edit, Formatter, NumericLiteralCase, Placement, ReaderPrefixStyle, Selection, SyntaxTree,
 };
 use std::path::Path;
 
@@ -34,17 +36,27 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
 
     let check = args.check;
     let diff_stat_only = args.diff_stat;
+    // Computed before `args.file`/`args.dialect` are consumed below: only
+    // borrows `args`, so the ordering here is about readability, not
+    // ownership.
+    let max_width = args
+        .max_width
+        .or_else(|| auto_detected_terminal_width(&args));
     let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let formatter = build_formatter(FormatOptions {
         indent: args.indent,
         dialect,
-        max_width: args.max_width,
+        max_width,
         reindent_block_comments: args.reindent_block_comments,
         comment_column: args.comment_column,
         max_blank_lines: args.max_blank_lines,
         indent_table: &args.indent_table,
         width_profiles: &args.width_profiles,
         quote_style: args.quote_style.into(),
+        numeric_literal_case: args.numeric_literal_case.into(),
+        align_clause_values: args.align_clause_values,
+        insert_final_newline: args.insert_final_newline,
+        trim_trailing_whitespace: args.trim_trailing_whitespace,
     })?;
     let rendered = formatter.format(&tree);
 
@@ -90,6 +102,44 @@ pub(in crate::presentation::cli) fn format(args: FormatArgs) -> CliResult<()> {
     emit_document(&input, dialect, args.write, args.diff, rendered)
 }
 
+/// The terminal's own column width, when nothing else already decided
+/// `--max-width` and using it is actually appropriate — `None` otherwise,
+/// which leaves [`build_formatter`] falling back to the compiled-in default
+/// exactly as before this option existed (FR-014).
+///
+/// Three conditions, all necessary:
+///
+/// - `--max-width` was not passed, *and* no `format.max-inline-width`
+///   resolved either. Both are the same check here (`args.max_width.is_some()`)
+///   because `config_bridge` already turns a configured
+///   `format.max-inline-width` into `--max-width` before `clap` ever parses
+///   `FormatArgs` — by the time this runs, "the flag is absent" and "neither
+///   source set it" are the same fact.
+/// - The command is not `--write` (nothing is printed to a terminal at all)
+///   nor `--check`/`--diff-stat` (their result is a machine-consumed exit
+///   code or JSON summary, not something rendered *for* a human at a
+///   terminal — and unlike the FR's explicit `--diff-stat` exclusion,
+///   `--check` is excluded on the same reasoning even though the FR does not
+///   name it: an exit code that depends on the width of whoever's terminal
+///   happened to run it would make the same file pass in one shell and fail
+///   in another, and disagree with the fixed-width answer CI (which has no
+///   tty) already gives for the identical file).
+/// - Stdout is actually an interactive terminal. Piped or redirected output
+///   keeps the fixed default, matching every CI run and every test in this
+///   suite — this is the one branch of this function a test harness (whose
+///   stdout is always captured, never a live tty) can exercise directly; the
+///   "really is a terminal" branch can only be verified by hand, by running
+///   `edit format` with no `--file`/`--write`/`--check`/`--diff-stat` at an
+///   actual terminal and a piped one side by side.
+fn auto_detected_terminal_width(args: &FormatArgs) -> Option<usize> {
+    if args.max_width.is_some() || args.write || args.check || args.diff_stat {
+        return None;
+    }
+    std::io::stdout()
+        .is_terminal()
+        .then(paredit_core_cli::terminal::width)
+}
+
 /// One file's `--diff-stat` result, computed while aggregating over more than
 /// one file.
 struct FileDiffStat {
@@ -121,6 +171,13 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
     let indent_table = args.indent_table.clone();
     let width_profiles = args.width_profiles.clone();
     let quote_style: ReaderPrefixStyle = args.quote_style.into();
+    let numeric_literal_case: NumericLiteralCase = args.numeric_literal_case.into();
+    let align_clause_values = args.align_clause_values;
+    let insert_final_newline = args.insert_final_newline;
+    let trim_trailing_whitespace = args.trim_trailing_whitespace;
+    // Never terminal-width-detected here, regardless of `max_width`: this
+    // path only runs under `--diff-stat`, one of FR-014's own exclusions
+    // (a machine-consumed JSON summary, not something rendered for a human).
     let analysis = analyze_files(&files, args.dialect, move |file, dialect, tree, input| {
         let formatter = build_formatter(FormatOptions {
             indent,
@@ -132,6 +189,10 @@ fn format_diff_stat_many(args: FormatArgs) -> CliResult<()> {
             indent_table: &indent_table,
             width_profiles: &width_profiles,
             quote_style,
+            numeric_literal_case,
+            align_clause_values,
+            insert_final_newline,
+            trim_trailing_whitespace,
         })?;
         let rendered = formatter.format(tree);
         let diff = unified_diff(file, &input.text, &rendered);
@@ -190,6 +251,10 @@ struct FormatOptions<'a> {
     indent_table: &'a [String],
     width_profiles: &'a [String],
     quote_style: ReaderPrefixStyle,
+    numeric_literal_case: NumericLiteralCase,
+    align_clause_values: bool,
+    insert_final_newline: bool,
+    trim_trailing_whitespace: bool,
 }
 
 /// Builds the [`Formatter`] `edit format` renders with, threading through
@@ -214,9 +279,17 @@ fn build_formatter(options: FormatOptions<'_>) -> CliResult<Formatter> {
         indent_table,
         width_profiles,
         quote_style,
+        numeric_literal_case,
+        align_clause_values,
+        insert_final_newline,
+        trim_trailing_whitespace,
     } = options;
     let mut formatter = Formatter::with_dialect(indent, dialect)
-        .with_reindent_block_comments(reindent_block_comments);
+        .with_reindent_block_comments(reindent_block_comments)
+        .with_numeric_literal_case(numeric_literal_case)
+        .with_align_clause_values(align_clause_values)
+        .with_insert_final_newline(insert_final_newline)
+        .with_trim_trailing_whitespace(trim_trailing_whitespace);
     if let Some(max_width) = max_width {
         formatter = formatter.with_max_width(max_width);
     }

@@ -15,6 +15,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use crate::editorconfig;
 use crate::error::{ConfigError, ConfigResult, Diagnostic, DiagnosticCode};
 use crate::schema;
 use crate::settings::{Layer, Origin, Settings, Vocabulary};
@@ -188,6 +189,24 @@ pub fn load(options: &LoadOptions, vocabulary: Option<Vocabulary<'_>>) -> Config
     } else {
         find_repository_root(&options.start)
     };
+
+    // Below every `paredit.toml` layer: `--config`/`PAREDIT_CONFIG` already
+    // replaces file discovery outright (see `LoadOptions::explicit`'s doc
+    // comment), and `--no-config` means no files at all, `.editorconfig`
+    // included. Applied here, before the loop below, so any `paredit.toml`
+    // layer that sets the same key overwrites it — `Settings::apply`'s
+    // unconditional "last write wins" is what actually enforces the
+    // precedence; see `editorconfig`'s module doc for why that is enough.
+    if options.explicit.is_none() && !options.skip_files {
+        for discovered in editorconfig::discover(repository_root.as_deref(), &options.start) {
+            diagnostics.extend(settings.apply(
+                discovered.key,
+                &discovered.value,
+                &Origin::file(Layer::EditorConfig, &discovered.path, discovered.line),
+                vocabulary,
+            ));
+        }
+    }
 
     for (layer, path) in discover(options, repository_root.as_deref())? {
         let mut visiting = Vec::new();
@@ -1013,6 +1032,114 @@ mod tests {
             excluded[0].ends_with("nested/vendor"),
             "expected a path under nested/, got {excluded:?}"
         );
+    }
+
+    // --- FR-015: `.editorconfig` discovery ---
+
+    #[test]
+    fn an_editorconfig_alone_sets_the_format_keys_it_maps() {
+        let scratch = Scratch::new("editorconfig-alone");
+        scratch.dir(".git");
+        scratch.write(
+            ".editorconfig",
+            "root = true\n[*]\nindent_size = 4\nmax_line_length = 100\n",
+        );
+
+        let loaded = load(&options(scratch.0.clone()), None).expect("loads");
+        assert_eq!(loaded.settings.integer("format.indent"), Some(4));
+        assert_eq!(
+            loaded.settings.integer("format.max-inline-width"),
+            Some(100)
+        );
+        assert_eq!(
+            loaded.settings.origin("format.indent").expect("set").layer,
+            Layer::EditorConfig
+        );
+    }
+
+    #[test]
+    fn paredit_toml_wins_over_an_editorconfig_on_the_same_key() {
+        let scratch = Scratch::new("editorconfig-precedence");
+        scratch.dir(".git");
+        scratch.write("paredit.toml", "[format]\nindent = 8\n");
+        scratch.write(".editorconfig", "root = true\n[*]\nindent_size = 4\n");
+
+        let loaded = load(&options(scratch.0.clone()), None).expect("loads");
+        assert_eq!(loaded.settings.integer("format.indent"), Some(8));
+        assert_eq!(
+            loaded.settings.origin("format.indent").expect("set").layer,
+            Layer::Repository
+        );
+    }
+
+    #[test]
+    fn an_editorconfig_still_fills_a_key_paredit_toml_leaves_unset() {
+        let scratch = Scratch::new("editorconfig-fills-gap");
+        scratch.dir(".git");
+        scratch.write("paredit.toml", "[format]\nindent = 8\n");
+        scratch.write(
+            ".editorconfig",
+            "root = true\n[*]\nindent_size = 4\nmax_line_length = 120\n",
+        );
+
+        let loaded = load(&options(scratch.0.clone()), None).expect("loads");
+        // `paredit.toml` set `format.indent`, so it wins there...
+        assert_eq!(loaded.settings.integer("format.indent"), Some(8));
+        // ...but never mentioned `format.max-inline-width`, so the
+        // `.editorconfig` value fills that gap.
+        assert_eq!(
+            loaded.settings.integer("format.max-inline-width"),
+            Some(120)
+        );
+    }
+
+    #[test]
+    fn no_editorconfig_behaves_exactly_as_before_this_feature() {
+        let scratch = Scratch::new("no-editorconfig");
+        scratch.dir(".git");
+        scratch.write("paredit.toml", "[format]\nindent = 4\n");
+
+        let loaded = load(&options(scratch.0.clone()), None).expect("loads");
+        assert_eq!(loaded.settings.integer("format.indent"), Some(4));
+        assert_eq!(loaded.settings.integer("format.max-inline-width"), None);
+        assert_eq!(loaded.sources.len(), 1, "only the paredit.toml layer read");
+    }
+
+    #[test]
+    fn skip_files_also_skips_editorconfig_discovery() {
+        let scratch = Scratch::new("editorconfig-skip-files");
+        scratch.dir(".git");
+        scratch.write(".editorconfig", "root = true\n[*]\nindent_size = 4\n");
+
+        let loaded = load(
+            &LoadOptions {
+                start: scratch.0.clone(),
+                skip_files: true,
+                ..LoadOptions::default()
+            },
+            None,
+        )
+        .expect("loads");
+        assert_eq!(loaded.settings.integer("format.indent"), Some(2));
+    }
+
+    #[test]
+    fn an_explicit_config_file_also_skips_editorconfig_discovery() {
+        let scratch = Scratch::new("editorconfig-skip-explicit");
+        scratch.dir(".git");
+        scratch.write(".editorconfig", "root = true\n[*]\nindent_size = 4\n");
+        let named = scratch.write("elsewhere.toml", "[lint]\npreset = \"all\"\n");
+
+        let loaded = load(
+            &LoadOptions {
+                start: scratch.0.clone(),
+                explicit: Some(named),
+                ..LoadOptions::default()
+            },
+            None,
+        )
+        .expect("loads");
+        assert_eq!(loaded.settings.integer("format.indent"), Some(2));
     }
 
     #[test]

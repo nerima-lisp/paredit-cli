@@ -191,11 +191,12 @@ const COLOR_MODES: &[&str] = &["auto", "always", "never"];
 const LINT_PRESETS: &[&str] = &["minimal", "recommended", "pedantic", "all"];
 const FAIL_SEVERITIES: &[&str] = &["never", "warning", "error"];
 const QUOTE_STYLES: &[&str] = &["shorthand", "canonical"];
+const NUMERIC_LITERAL_CASES: &[&str] = &["preserve", "lower", "upper"];
 
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 36;
+pub const KEY_COUNT: usize = 40;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -320,6 +321,32 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         default: DefaultValue::Text("shorthand"),
         summary: "How reader-macro prefixes like 'x print for `edit format`: shorthand or their \
                   canonical list form.",
+    },
+    KeySchema {
+        key: "format.numeric-literal-case",
+        kind: ValueKind::Choice(NUMERIC_LITERAL_CASES),
+        default: DefaultValue::Text("preserve"),
+        summary: "Letter case for a numeric literal's radix prefix (#x/#o/#b/#NNr) and float \
+                  exponent marker, for `edit format`.",
+    },
+    KeySchema {
+        key: "format.align-clause-values",
+        kind: ValueKind::Boolean,
+        default: DefaultValue::Boolean(false),
+        summary: "Pad every let-style binding's value to one column past the widest name in its \
+                  run, for `edit format`.",
+    },
+    KeySchema {
+        key: "format.insert-final-newline",
+        kind: ValueKind::Boolean,
+        default: DefaultValue::Boolean(true),
+        summary: "End the document `edit format` renders in exactly one trailing newline.",
+    },
+    KeySchema {
+        key: "format.trim-trailing-whitespace",
+        kind: ValueKind::Boolean,
+        default: DefaultValue::Boolean(true),
+        summary: "Trim a comment's own trailing whitespace in `edit format`'s output.",
     },
     // --- [lint] ---
     KeySchema {
