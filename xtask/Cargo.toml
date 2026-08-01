@@ -18,3 +18,11 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
+# `new-lint-rule --from-custom-rule` reuses this crate's `.paredit/rules/*.lisp`
+# reader (packages/feature/lint-custom/src/ruleset.rs) rather than parsing Lisp
+# a second time. This is a path dependency into the *main* workspace from
+# xtask's own separate one — a package can be a member of only one workspace,
+# but that is about `cargo build --workspace`/member lists, not about who may
+# depend on it by path, so this builds cleanly under both workspaces' own
+# `cargo build`.
+paredit-feature-lint-custom = { path = "../packages/feature/lint-custom" }

@@ -16,6 +16,7 @@
 //! there.
 
 use std::fs;
+use std::path::Path;
 
 use crate::error::Result;
 
@@ -24,10 +25,181 @@ use crate::checklist::{self, Namespace};
 use crate::fs_util::{insert_sorted_mod_line, write_new_file};
 use crate::repo::Repo;
 
+use paredit_feature_lint_custom::pattern;
+use paredit_feature_lint_custom::ruleset::{self, CustomRule, RuleTest};
+
 pub struct NewLintRuleOptions {
     pub theme: String,
     pub name: Name,
     pub description: String,
+    /// Set by `--from-custom-rule <path>#<name>`, to seed the scaffold's
+    /// category/severity/pattern/message/fix and its generated tests.
+    pub seed: Option<CustomRuleSeed>,
+}
+
+/// A `.paredit/rules/*.lisp` `defrule` (or `deprecate`) loaded to seed a new
+/// scaffold, plus whatever `deftest` cases named it.
+///
+/// This reuses `paredit-feature-lint-custom`'s own reader
+/// (`packages/feature/lint-custom/src/ruleset.rs`) rather than parsing Lisp a
+/// second time: that file's grammar is the one this project's custom rules
+/// actually get read with, so a second reader could silently disagree with it
+/// about what a rule file means.
+#[derive(Debug)]
+pub struct CustomRuleSeed {
+    /// The `<path>#<name>` this was loaded from, for the generated doc
+    /// comment to attribute the seed to.
+    pub spec: String,
+    pub rule: CustomRule,
+    pub tests: Vec<RuleTest>,
+}
+
+impl CustomRuleSeed {
+    /// Parses `<path>#<name>`, reads `path`, and locates the rule named
+    /// `name` inside it — failing with a clear, actionable message rather
+    /// than panicking, since a dev tool with a bad `--from-custom-rule` value
+    /// is a user error, not a defect.
+    pub fn load(spec: &str) -> Result<Self> {
+        let (path, name) = spec.split_once('#').ok_or_else(|| {
+            crate::error::XtaskError::refused(format!(
+                "--from-custom-rule wants `<path>#<name>`, e.g. \
+                 `.paredit/rules/entity.lisp#entity-needs-table` — got `{spec}` (no `#`)"
+            ))
+        })?;
+        if name.is_empty() {
+            return Err(crate::error::XtaskError::refused(format!(
+                "--from-custom-rule {spec} names no rule after `#`"
+            )));
+        }
+
+        let text = fs::read_to_string(path)
+            .map_err(crate::error::XtaskError::at("read", Path::new(path)))?;
+        let parsed = ruleset::parse_ruleset(path, &text).map_err(|error| {
+            crate::error::XtaskError::refused(format!(
+                "{path} does not parse as a `.paredit/rules` file: {error}"
+            ))
+        })?;
+
+        let rule = parsed
+            .rules
+            .into_iter()
+            .find(|rule| rule.name == name)
+            .ok_or_else(|| {
+                crate::error::XtaskError::refused(format!(
+                    "no `(defrule {name} ...)` (or `(deprecate {name} ...)`) found in {path}"
+                ))
+            })?;
+        let tests = parsed
+            .tests
+            .into_iter()
+            .filter(|test| test.rule == name)
+            .collect();
+        Ok(Self {
+            spec: spec.to_owned(),
+            rule,
+            tests,
+        })
+    }
+}
+
+/// A one-line doc comment, since the seeded description/message/pattern text
+/// came from a Lisp string that technically could carry an embedded newline.
+fn oneline(text: &str) -> String {
+    text.replace('\n', " ")
+}
+
+/// The doc-comment block placed just above the generated `examine()`, when a
+/// seed was given: the seeded pattern/message/fix, rendered back to Lisp text
+/// so the scaffold author has the custom rule's own words as a starting
+/// point rather than starting from nothing.
+fn seed_examine_notes(seed: &CustomRuleSeed) -> String {
+    let spec = &seed.spec;
+    let pattern_text = pattern::render(&seed.rule.pattern, &pattern::Bindings::new());
+    let mut notes = format!(
+        "/// Seeded from `{spec}`:\n\
+         /// - pattern: `{}`\n\
+         /// - message: {:?}\n",
+        oneline(&pattern_text),
+        oneline(&seed.rule.message),
+    );
+    if let Some(fix) = &seed.rule.fix {
+        let fix_text = pattern::render(fix, &pattern::Bindings::new());
+        notes.push_str(&format!(
+            "/// - fix: `{}` (not ported — this scaffold has no fix support yet;\n\
+             ///   see `Fixability` on `META` below if you add one)\n",
+            oneline(&fix_text),
+        ));
+    }
+    notes.push_str("///\n");
+    notes
+}
+
+/// Generated `#[test]` functions for each seeded `:matches`/`:no-match` input,
+/// appended inside the scaffold's `mod tests`.
+///
+/// Each one already compiles and passes: `examine` is still a stub that finds
+/// nothing, so every generated assertion says exactly that, with a TODO
+/// telling the scaffold author which way to flip it once `examine` is real.
+/// `:fix` cases are not turned into tests — this scaffold has no fix support
+/// to wire them against — and are listed instead as a trailing comment.
+fn seed_test_functions(seed: &CustomRuleSeed, snake: &str) -> String {
+    let mut out = String::new();
+    let mut index = 0usize;
+    for test in &seed.tests {
+        for source in &test.matches {
+            out.push_str(&format!(
+                "\n    #[test]\n\
+                 \x20   fn todo_seed_matches_{index}() {{\n\
+                 \x20       // Seeded from a `(:matches ...)` case. TODO: once `examine` is\n\
+                 \x20       // implemented, this input must be flagged — replace\n\
+                 \x20       // `assert!(violations.is_empty())` below with the opposite.\n\
+                 \x20       let source = {source:?};\n\
+                 \x20       let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)\n\
+                 \x20           .expect(\"parse\");\n\
+                 \x20       let (_, violations) =\n\
+                 \x20           collect_{snake}(&PathBuf::from(\"seed.lisp\"), Dialect::CommonLisp, &tree)\n\
+                 \x20               .expect(\"collect {snake}\");\n\
+                 \x20       assert!(violations.is_empty(), \"TODO: examine() is still a stub\");\n\
+                 \x20   }}\n"
+            ));
+            index += 1;
+        }
+    }
+    index = 0;
+    for test in &seed.tests {
+        for source in &test.no_match {
+            out.push_str(&format!(
+                "\n    #[test]\n\
+                 \x20   fn todo_seed_no_match_{index}() {{\n\
+                 \x20       // Seeded from a `(:no-match ...)` case: `examine` must keep not\n\
+                 \x20       // flagging this input once it is implemented.\n\
+                 \x20       let source = {source:?};\n\
+                 \x20       let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)\n\
+                 \x20           .expect(\"parse\");\n\
+                 \x20       let (_, violations) =\n\
+                 \x20           collect_{snake}(&PathBuf::from(\"seed.lisp\"), Dialect::CommonLisp, &tree)\n\
+                 \x20               .expect(\"collect {snake}\");\n\
+                 \x20       assert!(violations.is_empty(), \"TODO: examine() is still a stub\");\n\
+                 \x20   }}\n"
+            ));
+            index += 1;
+        }
+    }
+
+    let fixes: Vec<&(String, String)> = seed.tests.iter().flat_map(|test| &test.fixes).collect();
+    if !fixes.is_empty() {
+        out.push_str("\n    // TODO: this rule's `.paredit/rules` seed also declared fix cases,\n");
+        out.push_str("    // which this scaffold has no fix support to turn into tests yet:\n");
+        for (before, after) in fixes {
+            out.push_str(&format!(
+                "    // - {:?} -> {:?}\n",
+                oneline(before),
+                oneline(after),
+            ));
+        }
+    }
+
+    out
 }
 
 pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
@@ -46,6 +218,29 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
             rule_dir.display()
         )));
     }
+
+    // Absent a seed, this generates exactly what it always has:
+    // `Suspicious`/`Warning`, no extra doc notes, no extra tests.
+    let category_ident = options.seed.as_ref().map_or_else(
+        || "Suspicious".to_owned(),
+        |seed| format!("{:?}", seed.rule.category),
+    );
+    let severity_ident = options.seed.as_ref().map_or_else(
+        || "Warning".to_owned(),
+        |seed| format!("{:?}", seed.rule.severity),
+    );
+    // `catalog.rs` only tracks a `warning_count()` (see `bump_catalog_counts`
+    // below) — an `Error`-severity seed must not bump it, or the pinned
+    // assertion goes stale the moment this scaffold is generated.
+    let severity_is_warning = severity_ident == "Warning";
+    let seed_notes = options
+        .seed
+        .as_ref()
+        .map_or_else(String::new, seed_examine_notes);
+    let seed_tests = options
+        .seed
+        .as_ref()
+        .map_or_else(String::new, |seed| seed_test_functions(seed, &snake));
 
     write_new_file(
         &rule_dir.join("mod.rs"),
@@ -109,7 +304,7 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
              /// node through the single dispatch pass instead of walking the tree again.\n\
              ///\n\
              /// TODO: replace this stub with the real detection for {description}.\n\
-             pub fn examine(\n\
+             {seed_notes}pub fn examine(\n\
              \x20   _view: &ExpressionView,\n\
              \x20   _path: &Path,\n\
              \x20   _scanned_form_count: &mut usize,\n\
@@ -173,7 +368,7 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
              \x20       assert_eq!(count, 0);\n\
              \x20       assert!(violations.is_empty(), \"TODO: this stub never finds anything yet\");\n\
              \x20   }}\n\
-             }}\n"
+             {seed_tests}}}\n"
         ),
     )?;
 
@@ -204,8 +399,8 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
              use paredit_core_syntax::sexpr::ExpressionView;\n\n\
              pub const META: RuleMeta = RuleMeta::new(\n\
              \x20   \"{kebab}\",\n\
-             \x20   RuleCategory::Suspicious,\n\
-             \x20   Severity::Warning,\n\
+             \x20   RuleCategory::{category_ident},\n\
+             \x20   Severity::{severity_ident},\n\
              \x20   \"{description}\",\n\
              \x20   Fixability::ReportOnly,\n\
              );\n\n\
@@ -365,16 +560,43 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
     )?;
 
     let (old_count, new_count) = register_in_registry(repo, &crate_name, &snake)?;
-    bump_catalog_counts(repo, false, true)?;
+    bump_catalog_counts(repo, false, severity_is_warning)?;
 
     println!();
     println!(
         "Generated `{snake}` inside {}, and registered it: RULE_COUNT {old_count} -> {new_count} \
-         in src/lint/registry/mod.rs, warning_count() assertion bumped to match (this \
-         rule's META defaults to Severity::Warning / Fixability::ReportOnly — if you change \
+         in src/lint/registry/mod.rs, {} assertion bumped to match (this \
+         rule's META is Severity::{severity_ident} / Fixability::ReportOnly — if you change \
          either, fix the matching assertion in src/lint/registry/catalog.rs by hand).",
-        package_dir.display()
+        package_dir.display(),
+        if severity_is_warning {
+            "warning_count()"
+        } else {
+            "no warning_count() (Severity::Error doesn't have its own counter)"
+        }
     );
+    if let Some(seed) = &options.seed {
+        println!(
+            "Seeded from `{}`: category RuleCategory::{category_ident}, severity \
+             Severity::{severity_ident}, {} `:matches`/{} `:no-match` deftest case(s) \
+             turned into TODO-marked unit tests in `domain.rs`{}.",
+            seed.spec,
+            seed.tests
+                .iter()
+                .map(|test| test.matches.len())
+                .sum::<usize>(),
+            seed.tests
+                .iter()
+                .map(|test| test.no_match.len())
+                .sum::<usize>(),
+            if seed.tests.iter().any(|test| !test.fixes.is_empty()) {
+                "; its `:fix` case(s) are listed as a comment only — this scaffold has no fix \
+                 support yet"
+            } else {
+                ""
+            }
+        );
+    }
     println!("Fill in `domain.rs`'s `examine()` — everything else is plumbing.");
 
     let args_type = format!("{pascal}ReportArgs");
@@ -554,6 +776,7 @@ mod tests {
             theme: "demo".to_owned(),
             name: Name::parse("char-case-fold").expect("valid rule name"),
             description: "flags a suspicious case fold".to_owned(),
+            seed: None,
         };
 
         run(&repo, &options).expect("scaffolding must succeed against a well-formed fixture repo");
@@ -577,5 +800,124 @@ mod tests {
         assert!(catalog.contains("assert!(RULE_COUNT == 2)"));
         assert!(catalog.contains("assert!(warning_count() == 2)"));
         assert!(catalog.contains("assert!(fixable_count() == 0)"));
+    }
+
+    /// A real `.paredit/rules/*.lisp` fixture — the same shape as the example
+    /// in `packages/feature/lint-custom/src/ruleset.rs`'s own module doc —
+    /// written to a temp file so `CustomRuleSeed::load` reads it exactly the
+    /// way a project's own custom rule file would be read.
+    fn write_custom_rule_fixture() -> std::path::PathBuf {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "xtask-new-lint-rule-seed-fixture-{}-{unique}.lisp",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            r#"(defrule entity-needs-table
+  :category malformed
+  :severity error
+  :description "a defentity with no :table option"
+  :pattern (defentity ?name ...)
+  :message "defentity needs a :table"
+  :fix (defentity ?name :table "TODO"))
+
+(deftest entity-needs-table
+  (:matches "(defentity user)")
+  (:no-match "(defentity user :table \"users\")")
+  (:fix "(defentity user)" "(defentity user :table \"TODO\")"))
+"#,
+        )
+        .expect("write custom rule fixture");
+        path
+    }
+
+    #[test]
+    fn seeds_category_severity_pattern_and_deftest_cases_from_a_real_custom_rule_file() {
+        let fixture_path = write_custom_rule_fixture();
+        let spec = format!("{}#entity-needs-table", fixture_path.display());
+        let seed = CustomRuleSeed::load(&spec).expect("a well-formed seed spec must load");
+        assert_eq!(seed.tests.len(), 1);
+        let _ = fs::remove_file(&fixture_path);
+
+        let fixture = build_fixture_repo();
+        let repo = Repo::for_test(fixture.root.clone());
+        let options = NewLintRuleOptions {
+            theme: "demo".to_owned(),
+            name: Name::parse("entity-needs-table").expect("valid rule name"),
+            description: seed.rule.description.clone(),
+            seed: Some(seed),
+        };
+
+        run(&repo, &options).expect("scaffolding from a seed must succeed against a fixture repo");
+
+        let rule_dir = fixture
+            .root
+            .join("packages/feature/lint-demo/src/entity_needs_table");
+
+        let rule_rs = fs::read_to_string(rule_dir.join("rule.rs")).expect("read rule.rs");
+        assert!(rule_rs.contains("RuleCategory::Malformed"));
+        assert!(rule_rs.contains("Severity::Error"));
+        assert!(rule_rs.contains("a defentity with no :table option"));
+
+        let domain_rs = fs::read_to_string(rule_dir.join("domain.rs")).expect("read domain.rs");
+        assert!(domain_rs.contains("Seeded from `"));
+        assert!(domain_rs.contains("pattern: `(defentity ?name ...)`"));
+        assert!(domain_rs.contains("defentity needs a :table"));
+        assert!(domain_rs.contains("fix: `(defentity ?name :table \"TODO\")`"));
+        assert!(domain_rs.contains("fn todo_seed_matches_0()"));
+        assert!(domain_rs.contains(r#"let source = "(defentity user)";"#));
+        assert!(domain_rs.contains("fn todo_seed_no_match_0()"));
+        assert!(domain_rs.contains(r#"let source = "(defentity user :table \"users\")";"#));
+        assert!(domain_rs.contains(&format!(
+            "{:?} -> {:?}",
+            "(defentity user)", "(defentity user :table \"TODO\")"
+        )));
+
+        // `Severity::Error` must not bump `warning_count()` — only RULE_COUNT.
+        let catalog = fs::read_to_string(fixture.root.join("src/lint/registry/catalog.rs"))
+            .expect("read bumped registry catalog.rs");
+        assert!(catalog.contains("assert!(RULE_COUNT == 2)"));
+        assert!(catalog.contains("assert!(warning_count() == 1)"));
+    }
+
+    #[test]
+    fn a_seed_spec_without_a_hash_is_a_clear_refusal() {
+        let error =
+            CustomRuleSeed::load("rules.lisp").expect_err("a spec with no `#name` must be refused");
+        assert!(error.to_string().contains("<path>#<name>"));
+    }
+
+    #[test]
+    fn a_seed_spec_naming_no_rule_is_a_clear_refusal() {
+        let fixture_path = write_custom_rule_fixture();
+        let error = CustomRuleSeed::load(&format!("{}#does-not-exist", fixture_path.display()))
+            .expect_err("a name absent from the file must be refused");
+        let _ = fs::remove_file(&fixture_path);
+        assert!(error.to_string().contains("does-not-exist"));
+    }
+
+    #[test]
+    fn a_seed_file_that_does_not_parse_is_a_clear_refusal() {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "xtask-new-lint-rule-seed-unreadable-{}-{unique}.lisp",
+            std::process::id()
+        ));
+        fs::write(&path, "(defrule broken :pattern (f)").expect("write unreadable fixture");
+
+        let error = CustomRuleSeed::load(&format!("{}#broken", path.display()))
+            .expect_err("unbalanced parens must be refused, not panic");
+        let _ = fs::remove_file(&path);
+        assert!(error.to_string().contains("does not parse"));
+    }
+
+    #[test]
+    fn a_seed_path_that_does_not_exist_is_a_clear_refusal() {
+        let error = CustomRuleSeed::load("/no/such/directory/rules.lisp#some-rule")
+            .expect_err("a missing file must be refused, not panic");
+        assert!(!error.to_string().is_empty());
     }
 }

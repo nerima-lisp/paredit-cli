@@ -46,8 +46,18 @@ enum Command {
         theme: String,
         /// The new rule's name in kebab-case, e.g. `char-case-fold`.
         rule_name: String,
+        /// Required unless `--from-custom-rule` supplies one.
         #[arg(long)]
-        description: String,
+        description: Option<String>,
+        /// Seed the scaffold from an existing `.paredit/rules/*.lisp` custom
+        /// rule: `<path>#<name>`, e.g.
+        /// `.paredit/rules/entity.lisp#entity-needs-table`. Fills in the
+        /// description (when `--description` is not given), category,
+        /// severity, and drops the rule's pattern/message/fix and its
+        /// `deftest` cases into the scaffold as a starting point — this still
+        /// does not write the actual Rust matching logic.
+        #[arg(long, value_name = "PATH#NAME")]
+        from_custom_rule: Option<String>,
     },
     /// Scaffold a new command inside an existing feature package.
     NewCommand {
@@ -89,14 +99,31 @@ fn main() -> Result<()> {
             theme,
             rule_name,
             description,
-        } => new_lint_rule::run(
-            &repo,
-            &new_lint_rule::NewLintRuleOptions {
-                theme,
-                name: Name::parse(&rule_name)?,
-                description,
-            },
-        ),
+            from_custom_rule,
+        } => {
+            let seed = from_custom_rule
+                .as_deref()
+                .map(new_lint_rule::CustomRuleSeed::load)
+                .transpose()?;
+            let description = match (description, &seed) {
+                (Some(description), _) => description,
+                (None, Some(seed)) => seed.rule.description.clone(),
+                (None, None) => {
+                    return Err(crate::error::XtaskError::refused(
+                        "`--description` is required unless `--from-custom-rule` supplies one",
+                    ));
+                }
+            };
+            new_lint_rule::run(
+                &repo,
+                &new_lint_rule::NewLintRuleOptions {
+                    theme,
+                    name: Name::parse(&rule_name)?,
+                    description,
+                    seed,
+                },
+            )
+        }
         Command::NewCommand {
             namespace,
             package,
