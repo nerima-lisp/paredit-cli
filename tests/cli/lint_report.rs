@@ -2841,10 +2841,63 @@ fn cli_lint_test_rules_passes_a_correct_rule_set() {
         paredit()
             .args(["inspect", "lint", "--test-rules", "--custom-rules"])
             .arg(&rules)
+            .args(["--output", "text"])
             .assert()
             .success(),
     );
     assert!(value.contains("failure_count\t0"), "{value}");
+}
+
+/// `--test-rules` honors `--output json` the same way a scan does: one JSON
+/// object per [`paredit_feature_lint_custom::TestFailure`] rather than the
+/// text mode's flattened tab-separated line.
+#[test]
+fn cli_lint_test_rules_reports_structured_failures_as_json() {
+    let rules = rule_dir(
+        "lint-custom-harness-json",
+        r#"(defrule no-bare-print :pattern (?op ?x) :message "m")
+           (deftest no-bare-print (:no-match "(princ 1)"))"#,
+    );
+    let stdout = paredit()
+        .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+        .arg(&rules)
+        .args(["--output", "json"])
+        .assert()
+        .code(3)
+        .get_output()
+        .stdout
+        .clone();
+    let value: serde_json::Value = serde_json::from_slice(&stdout).expect("valid JSON");
+    assert_eq!(value["failure_count"], 1, "{value}");
+    let failure = &value["failures"][0];
+    assert_eq!(failure["rule"], "no-bare-print");
+    assert_eq!(failure["clause"], ":no-match");
+    assert_eq!(failure["input"], "(princ 1)");
+    assert_eq!(failure["expected"], "no finding");
+    assert_eq!(failure["actual"], "1 finding(s)");
+}
+
+/// `--test-rules` still defaults to JSON like every other mode, so a
+/// passing rule set with no `--output` flag reports `failure_count: 0` as a
+/// JSON number, not the text mode's tab-separated line.
+#[test]
+fn cli_lint_test_rules_defaults_to_json_output() {
+    let rules = rule_dir(
+        "lint-custom-harness-json-default",
+        r#"(defrule no-bare-print
+             :pattern (print ?x)
+             :message "m")
+           (deftest no-bare-print (:matches "(print 1)"))"#,
+    );
+    let value = json_stdout(
+        paredit()
+            .args(["inspect", "lint", "--test-rules", "--custom-rules"])
+            .arg(&rules)
+            .assert()
+            .success(),
+    );
+    assert_eq!(value["failure_count"], 0, "{value}");
+    assert_eq!(value["custom_rule_count"], 1, "{value}");
 }
 
 #[test]
@@ -2909,6 +2962,129 @@ fn cli_lint_list_rules_shows_the_projects_own_rules() {
     assert_eq!(custom.len(), 1);
     assert_eq!(custom[0]["rule"], "house-style");
     assert_eq!(custom[0]["category"], "naming");
+}
+
+/// `--docs` includes a project's own rules in their own section, with the
+/// `deftest` clauses rendered as worked examples straight from the rule file
+/// — not the shipped catalogue's `RULE_DOCS`, which knows nothing about them.
+#[test]
+fn cli_lint_docs_includes_the_projects_own_rules_with_worked_examples() {
+    let rules = rule_dir(
+        "lint-custom-docs",
+        r#"(defrule no-bare-print
+             :category suspicious
+             :severity error
+             :description "print writes to *standard-output* directly"
+             :pattern (print ?x)
+             :message "use (format t ...) rather than print")
+           (deftest no-bare-print
+             (:matches "(print 1)")
+             (:no-match "(princ 1)"))"#,
+    );
+    let docs = String::from_utf8(
+        paredit()
+            .args(["inspect", "lint", "--docs", "--custom-rules"])
+            .arg(&rules)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .expect("UTF-8 docs");
+
+    assert!(docs.contains("# Custom rules"), "{docs}");
+    assert!(docs.contains("### `no-bare-print`"), "{docs}");
+    assert!(
+        docs.contains("use (format t ...) rather than print"),
+        "{docs}"
+    );
+    // The worked examples come from the rule's own `deftest`, not hand-written
+    // prose.
+    assert!(docs.contains("(print 1)"), "{docs}");
+    assert!(docs.contains("(princ 1)"), "{docs}");
+}
+
+/// A project with no custom rules loaded gets no "Custom rules" section at
+/// all, rather than an empty heading.
+#[test]
+fn cli_lint_docs_omits_the_custom_section_with_no_custom_rules() {
+    let docs = String::from_utf8(
+        paredit()
+            .args(["inspect", "lint", "--docs"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .expect("UTF-8 docs");
+    assert!(!docs.contains("# Custom rules"), "{docs}");
+}
+
+/// `--explain` on a custom rule name no longer hard-errors "unknown lint
+/// rule" — it explains the rule using its own metadata, the same way it
+/// already shows up in `--list-rules`/`--docs`.
+#[test]
+fn cli_lint_explain_reports_a_custom_rules_own_metadata() {
+    let rules = rule_dir(
+        "lint-custom-explain",
+        r#"(defrule no-bare-print
+             :category suspicious
+             :severity error
+             :description "print writes to *standard-output* directly"
+             :pattern (print ?x)
+             :message "use (format t ...) rather than print")"#,
+    );
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--explain",
+                "no-bare-print",
+                "--custom-rules",
+            ])
+            .arg(&rules)
+            .args(["--output", "json"])
+            .assert()
+            .success(),
+    );
+    assert_eq!(value["rule"], "no-bare-print");
+    assert_eq!(value["source"], "custom");
+    assert_eq!(value["category"], "suspicious");
+    assert_eq!(value["severity"], "error");
+    assert_eq!(value["fixable"], false);
+    assert_eq!(
+        value["description"],
+        "print writes to *standard-output* directly"
+    );
+    assert_eq!(value["message"], "use (format t ...) rather than print");
+    // No `doc_url` — a custom rule has none, and it should be omitted rather
+    // than reported as an error or a made-up value.
+    assert!(value.get("doc_url").is_none(), "{value}");
+}
+
+/// `--explain` on a name that is neither a shipped rule nor a loaded custom
+/// one still refuses the same way it always did.
+#[test]
+fn cli_lint_explain_still_rejects_an_unknown_rule_with_custom_rules_loaded() {
+    let rules = rule_dir(
+        "lint-custom-explain-unknown",
+        r#"(defrule no-bare-print :pattern (print ?x) :message "m")"#,
+    );
+    paredit()
+        .args([
+            "inspect",
+            "lint",
+            "--explain",
+            "not-a-real-rule",
+            "--custom-rules",
+        ])
+        .arg(&rules)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown lint rule"));
 }
 
 /// stdout as a `String`, for the modes whose output is not JSON.

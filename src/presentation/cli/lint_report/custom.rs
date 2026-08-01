@@ -30,7 +30,9 @@ use paredit_core_cli::CliResult;
 use crate::lint::report::{
     RULES, Severity, SeverityOverrides, overridden_rule_severity, rule_category, rule_is_fixable,
 };
-use paredit_feature_lint_custom::{CustomFinding, Ruleset, parse_ruleset, run, run_tests};
+use paredit_feature_lint_custom::{
+    CustomFinding, CustomRule, Ruleset, TestFailure, parse_ruleset, run, run_tests,
+};
 
 /// Where a project keeps its own rules when it does not say otherwise.
 pub(super) const DEFAULT_RULE_DIRECTORY: &str = ".paredit/rules";
@@ -107,10 +109,20 @@ impl CustomRules {
             .collect()
     }
 
+    /// Runs the `deftest` clauses, returning the raw failures.
+    ///
+    /// `--test-rules --output json` renders one JSON object per failure from
+    /// this; [`Self::test`] formats the same failures as the text mode's
+    /// tab-separated line, so the two can never drift apart.
+    #[must_use]
+    pub(super) fn test_failures(&self) -> Vec<TestFailure> {
+        run_tests(&self.ruleset)
+    }
+
     /// Runs the `deftest` clauses, returning one line per failure.
     #[must_use]
     pub(super) fn test(&self) -> Vec<String> {
-        run_tests(&self.ruleset)
+        self.test_failures()
             .into_iter()
             .map(|failure| {
                 format!(
@@ -119,6 +131,14 @@ impl CustomRules {
                 )
             })
             .collect()
+    }
+
+    /// The full custom rule named `name`, for `--explain` and `--docs`, where
+    /// the shipped catalogue's metadata (message, description, note) is
+    /// needed and not just what [`Self::catalog`] projects.
+    #[must_use]
+    pub(super) fn rule(&self, name: &str) -> Option<&CustomRule> {
+        self.ruleset.rules.iter().find(|rule| rule.name == name)
     }
 }
 

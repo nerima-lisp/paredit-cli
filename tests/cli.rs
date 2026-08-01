@@ -255,6 +255,8 @@ mod last_default_count_report;
 mod let_refactor;
 #[path = "cli/lint_cache.rs"]
 mod lint_cache;
+#[path = "cli/lint_custom_baseline_contract.rs"]
+mod lint_custom_baseline_contract;
 #[path = "cli/lint_report.rs"]
 mod lint_report;
 #[path = "cli/lint_report_golden.rs"]
