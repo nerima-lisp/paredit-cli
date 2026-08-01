@@ -31,6 +31,7 @@ mod tests {
             input,
             dialect: Dialect::CommonLisp,
             path: "1".parse().expect("path"),
+            allow_partial: false,
         })
         .expect("plan");
 
@@ -51,6 +52,7 @@ mod tests {
                 input: ")",
                 dialect,
                 path: "0".parse().expect("path"),
+                allow_partial: false,
             })
             .expect_err("unsupported dialect");
 
@@ -59,5 +61,38 @@ mod tests {
                 "convert-let-star-to-let currently supports only Common Lisp"
             );
         }
+    }
+
+    #[test]
+    fn allow_partial_threads_through_the_facade() {
+        let plan = plan_convert_let_star_to_let(ConvertLetStarToLetRequest {
+            input: "(let* ((a 1) (b (+ a 1))) (+ a b))",
+            dialect: Dialect::CommonLisp,
+            path: "0".parse().expect("path"),
+            allow_partial: true,
+        })
+        .expect("plan");
+
+        assert!(plan.partial);
+        assert_eq!(plan.rewritten, "(let ((a 1)) (let* ((b (+ a 1))) (+ a b)))");
+    }
+
+    #[test]
+    fn reader_conditional_refusal_still_fires_with_allow_partial() {
+        // `reject_common_lisp_reader_conditionals` runs before the domain
+        // plan is even attempted, so this guard is identical whether or not
+        // `allow_partial` is set.
+        let error = plan_convert_let_star_to_let(ConvertLetStarToLetRequest {
+            input: "#+sbcl (let* ((x 1) (y (+ x 1))) (+ x y))",
+            dialect: Dialect::CommonLisp,
+            path: "0".parse().expect("path"),
+            allow_partial: true,
+        })
+        .expect_err("reader conditional must still be refused");
+
+        assert!(
+            error.to_string().contains("reader conditional"),
+            "{error:#}"
+        );
     }
 }

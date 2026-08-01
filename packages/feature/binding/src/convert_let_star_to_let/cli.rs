@@ -26,6 +26,11 @@ pub struct ConvertLetStarToLetArgs {
     write: bool,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     output: OutputFormat,
+    /// Instead of refusing when a binding's initializer depends on an
+    /// earlier binding, convert the longest independent prefix of bindings
+    /// into an outer `let` and keep the rest as a nested `let*`.
+    #[arg(long)]
+    allow_partial: bool,
 }
 
 pub fn convert_let_star_to_let(args: ConvertLetStarToLetArgs) -> CliResult<()> {
@@ -37,6 +42,7 @@ pub fn convert_let_star_to_let(args: ConvertLetStarToLetArgs) -> CliResult<()> {
         input: &input.text,
         dialect,
         path: args.path,
+        allow_partial: args.allow_partial,
     })?;
     let written = args.write && plan.changed;
     if written {
@@ -57,6 +63,7 @@ fn print_plan(
             println!("path\t{}", safe_text!(plan.path));
             println!("binding_count\t{}", plan.binding_names.len());
             println!("changed\t{}", plan.changed);
+            println!("partial\t{}", plan.partial);
             println!("written\t{written}");
         }
         OutputFormat::Json => println!(
@@ -70,6 +77,7 @@ fn print_plan(
                 },
                 "binding_names": plan.binding_names.iter().map(SymbolName::as_str).collect::<Vec<_>>(),
                 "changed": plan.changed,
+                "partial": plan.partial,
                 "written": written,
                 "rewritten": plan.rewritten,
             }))?
