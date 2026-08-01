@@ -129,7 +129,10 @@ fn looks_like_aws_key(value: &str) -> bool {
     else {
         return false;
     };
-    rest.len() == 16 && rest.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+    rest.len() == 16
+        && rest
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
 }
 
 const VENDOR_PREFIXES: [&str; 4] = ["sk-", "ghp_", "gho_", "github_pat_"];
@@ -162,7 +165,11 @@ fn string_literal<'a>(view: &ExpressionView, context: &RuleContext<'a>) -> Optio
 
 /// Judges one `(name value)` pair, from either a definition's own two leading
 /// arguments or one `let`/`let*` binding.
-fn judge(name: &str, value_view: &ExpressionView, context: &RuleContext<'_>) -> Option<EmbeddedSecretItem> {
+fn judge(
+    name: &str,
+    value_view: &ExpressionView,
+    context: &RuleContext<'_>,
+) -> Option<EmbeddedSecretItem> {
     let value = string_literal(value_view, context)?;
 
     if looks_like_secret_value(value) {
@@ -259,7 +266,10 @@ impl LintRule for Rule {
         for item in examine(view, context) {
             sink.report(
                 item.span,
-                format!("{} looks like an embedded secret: {}", item.name, item.reason),
+                format!(
+                    "{} looks like an embedded secret: {}",
+                    item.name, item.reason
+                ),
             );
         }
         Ok(())
@@ -295,7 +305,10 @@ mod tests {
     fn flags_an_aws_shaped_value_regardless_of_name() {
         let found = findings(r#"(defvar *setting* "AKIAABCDEFGHIJKLMNOP")"#); // gitleaks:allow
         assert_eq!(found.len(), 1, "{found:?}");
-        assert_eq!(found[0].reason, "value is shaped like a real vendor credential");
+        assert_eq!(
+            found[0].reason,
+            "value is shaped like a real vendor credential"
+        );
     }
 
     #[test]

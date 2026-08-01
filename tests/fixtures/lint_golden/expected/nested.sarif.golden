@@ -3125,6 +3125,38 @@
               "shortDescription": {
                 "text": "a condition-case with no handler clauses, which catches nothing"
               }
+            },
+            {
+              "fullDescription": {
+                "text": "A credential typed directly into source is leaked the moment it is committed, and stays leaked in history even after the line is deleted. This rule looks for two independent signals: a value shaped like a real vendor credential, and a suspiciously-named binding holding a non-placeholder string."
+              },
+              "id": "embedded-secret",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A credential typed directly into source is leaked the moment it is committed, and stays leaked in history even after the line is deleted. This rule looks for two independent signals: a value shaped like a real vendor credential, and a suspiciously-named binding holding a non-placeholder string.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a definition whose name or literal value is shaped like an embedded credential"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A form with many bindings or clauses is doing many things in one place. Splitting it — into smaller lets, a dispatch table, or separate functions per clause — usually makes each piece independently readable and testable, at the cost of naming the pieces."
+              },
+              "id": "giant-conditional-form",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A form with many bindings or clauses is doing many things in one place. Splitting it — into smaller lets, a dispatch table, or separate functions per clause — usually makes each piece independently readable and testable, at the cost of naming the pieces.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a let/let*/cond/case-family form carrying more bindings or clauses than a threshold"
+              }
             }
           ]
         }

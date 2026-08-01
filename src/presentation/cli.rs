@@ -632,6 +632,7 @@ use paredit_feature_lint_form_shape::empty_let::cli as empty_let_report;
 use paredit_feature_lint_form_shape::funcall_lambda::cli as funcall_lambda_report;
 use paredit_feature_lint_form_shape::getf_default_nil::cli as getf_default_nil_report;
 use paredit_feature_lint_form_shape::gethash_default::cli as gethash_default_report;
+use paredit_feature_lint_form_shape::giant_conditional_form::cli as giant_conditional_form_report;
 use paredit_feature_lint_form_shape::lambda_list_keyword_order::cli as lambda_list_keyword_order_report;
 use paredit_feature_lint_form_shape::make_array_default_keyword::cli as make_array_default_keyword_report;
 use paredit_feature_lint_form_shape::make_hash_table_test::cli as make_hash_table_test_report;

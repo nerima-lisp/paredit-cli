@@ -164,6 +164,8 @@ rule	elisp-obsolete-cl-alias	1
 rule	elisp-quoted-lambda	1
 rule	elisp-interactive-in-macro	1
 rule	elisp-condition-case-without-handler	1
+rule	embedded-secret	0
+rule	giant-conditional-form	0
 finding	elisp-missing-lexical-binding	warning	suspicious	fixable=false	emacs-lisp.el	0	no `lexical-binding` setting on the first line, so this file is evaluated with dynamic binding; add `-*- lexical-binding: t -*-`	elisp-missing-lexical-binding/48686428ba8a57d0/0
 finding	elisp-unreachable-lexical-binding	error	suspicious	fixable=false	emacs-lisp.el	911	`lexical-binding` is read from the first line only, so this setting has no effect and the file is evaluated with dynamic binding	elisp-unreachable-lexical-binding/7bec796cbb2809fb/0
 finding	elisp-autoload-cookie-without-form	error	suspicious	fixable=false	emacs-lisp.el	748	this autoload cookie is nested inside a top-level form; `loaddefs` extracts top-level definitions only, so it produces no autoload	elisp-autoload-cookie-without-form/1d02fc8f50fffe50/0

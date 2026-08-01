@@ -1123,6 +1123,18 @@
       "count": 1,
       "description": "a condition-case with no handler clauses, which catches nothing",
       "rule": "elisp-condition-case-without-handler"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a definition whose name or literal value is shaped like an embedded credential",
+      "rule": "embedded-secret"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a let/let*/cond/case-family form carrying more bindings or clauses than a threshold",
+      "rule": "giant-conditional-form"
     }
   ],
   "policy": {

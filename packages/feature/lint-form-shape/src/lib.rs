@@ -12,6 +12,7 @@ pub mod empty_let;
 pub mod funcall_lambda;
 pub mod getf_default_nil;
 pub mod gethash_default;
+pub mod giant_conditional_form;
 pub mod lambda_list_keyword_order;
 pub mod make_array_default_keyword;
 pub mod make_hash_table_test;

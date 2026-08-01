@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 236] = [
+const INTROSPECTION_COMMANDS: [&str; 237] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -442,6 +442,7 @@ const INTROSPECTION_COMMANDS: [&str; 236] = [
     "inspect redundant-count-nil",
     "inspect make-hash-table-test",
     "inspect gethash-default",
+    "inspect giant-conditional-form",
     "inspect typep-predicate",
     "inspect coerce-to-t",
     "inspect redundant-identity-key",
@@ -664,8 +665,9 @@ const SYNTAX_TIER_REPORTS: [&str; 19] = [
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 33] = [
+const SCOPE_TIER_REPORTS: [&str; 34] = [
     "inspect resolve",
+    "inspect giant-conditional-form",
     "inspect test-map",
     "inspect symbol-index",
     "inspect unreachable-expressions",

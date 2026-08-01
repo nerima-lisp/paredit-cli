@@ -421,6 +421,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::GethashDefault(args) => {
                 gethash_default_report::workflow::gethash_default_report(args)?;
             }
+            command::InspectCommand::GiantConditionalForm(args) => {
+                giant_conditional_form_report::workflow::giant_conditional_form_report(args)?;
+            }
             command::InspectCommand::TypepPredicate(args) => {
                 typep_predicate_report::workflow::typep_predicate_report(args)?;
             }
