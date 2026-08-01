@@ -73,6 +73,34 @@ struct Binding {
 
 const LINT: &[&str] = &["inspect lint"];
 
+/// Every command whose `--cache-dir` is `WorkspaceInputArgs`'s discovery
+/// cache — "reuse a previous scan's file list from this directory".
+///
+/// `inspect lint` also declares a `--cache-dir`, but its own: a per-file
+/// analysis cache keyed on file content, opened straight from
+/// `LintReportArgs::cache_dir` rather than flattened from
+/// `WorkspaceInputArgs`. One key reaching both would be the same trap
+/// `--exclude` already warns about above — two different flags that happen
+/// to share a spelling — so `inspect lint` is deliberately left off this
+/// list rather than folded into `Scope::Anywhere`.
+const WORKSPACE_CACHE: &[&str] = &[
+    "inspect workspace",
+    "inspect sources",
+    "inspect clone-classes",
+    "inspect clone-sequences",
+    "inspect clone-external",
+    "inspect clone-threshold",
+    "inspect clone-genealogy",
+    "inspect similarity",
+    "refactor workspace-plan",
+    "refactor workspace-preview",
+    "refactor workspace-execute",
+    "query find",
+    "query count",
+    "query replace",
+    "migrate run",
+];
+
 /// Every configured key that maps onto an existing flag.
 ///
 /// Keys absent from this table are not unconfigured: `[dialect]` and the rest
@@ -133,6 +161,13 @@ const BINDINGS: &[Binding] = &[
         flag: "max-depth",
         shape: Shape::Value,
         scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "cache.dir",
+        flag: "cache-dir",
+        shape: Shape::Value,
+        scope: Scope::Only(WORKSPACE_CACHE),
         omit_when: None,
     },
     Binding {
@@ -466,6 +501,55 @@ mod tests {
             result.windows(2).any(|pair| pair == ["--indent", "4"]),
             "{result:?}"
         );
+    }
+
+    /// FR-012: a configured `cache.dir` reaches a command that flattens
+    /// `WorkspaceInputArgs`, the same way `format.indent` reaches `--indent`.
+    #[test]
+    fn a_configured_cache_dir_becomes_the_flag_the_workspace_discovery_cache_declares() {
+        let result = run(
+            &["inspect", "workspace", "."],
+            &[("cache.dir", Value::String("/tmp/paredit-cache".to_owned()))],
+        );
+        assert!(
+            result
+                .windows(2)
+                .any(|pair| pair == ["--cache-dir", "/tmp/paredit-cache"]),
+            "{result:?}"
+        );
+    }
+
+    /// `inspect lint --cache-dir` is a different flag wearing the same name —
+    /// a per-file analysis cache, not `WorkspaceInputArgs`'s discovery cache —
+    /// so `cache.dir` must not reach it. The same shape as
+    /// `a_scoped_binding_does_not_reach_a_command_outside_its_scope` above,
+    /// for `--exclude`.
+    #[test]
+    fn cache_dir_does_not_reach_lints_unrelated_cache_dir_flag() {
+        let result = run(
+            &["inspect", "lint", "a.lisp"],
+            &[("cache.dir", Value::String("/tmp/paredit-cache".to_owned()))],
+        );
+        assert!(!result.contains(&"--cache-dir".to_owned()), "{result:?}");
+    }
+
+    /// The same guarantee `--indent` gets: a `--cache-dir` already on the
+    /// command line is never injected over.
+    #[test]
+    fn an_explicit_cache_dir_flag_beats_the_configuration() {
+        let result = run(
+            &["inspect", "workspace", ".", "--cache-dir", "/explicit"],
+            &[("cache.dir", Value::String("/configured".to_owned()))],
+        );
+        assert_eq!(
+            result
+                .iter()
+                .filter(|token| *token == "--cache-dir")
+                .count(),
+            1
+        );
+        assert!(result.contains(&"/explicit".to_owned()));
+        assert!(!result.contains(&"/configured".to_owned()));
     }
 
     /// The property the whole mechanism exists to guarantee.

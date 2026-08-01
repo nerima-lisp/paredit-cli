@@ -1059,3 +1059,195 @@ fn show_without_for_reports_no_injections_at_all() {
     let report = json_of(config(&root, &["show"]));
     assert!(report["injections"].is_null());
 }
+
+// --- FR-012: `--cache-dir` config layering (arg > env > paredit.toml > no cache). ---
+//
+// `inspect sources` is the target rather than `inspect lint`: it reports its
+// `WorkspaceInputArgs` discovery-cache outcome as a `cache` field in its own
+// JSON (`missing`/`hit`/`stale`/`unusable`, or absent when no cache was
+// resolved at all), which is a direct, unambiguous read of exactly the cache
+// FR-012 configures. `inspect lint --cache-dir` looks identical but is a
+// different flag — a per-file analysis cache — so it is deliberately not used
+// here; see `cache_dir_does_not_reach_lints_unrelated_cache_dir_flag` in
+// `config_bridge.rs` for that boundary.
+//
+// Cache directories are independent `fresh_temp_dir`s rather than paths under
+// `root`: a cache directory created *inside* the scanned root invalidates its
+// own first entry (creating it changes the root's mtime/entry count after the
+// walk recorded them), which would make "was the cache resolved at all" and
+// "did the first lookup already go stale" the same observation.
+
+fn source_cache_outcome(root: &Path, extra: &[&str]) -> Option<String> {
+    let mut command = in_repo(root, &["inspect", "sources", "."]);
+    command.args(extra);
+    let output = command.assert().success().get_output().stdout.clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+    report["cache"].as_str().map(str::to_owned)
+}
+
+#[test]
+fn with_nothing_set_no_cache_is_resolved_at_all() {
+    let root = repo("cache-dir-default");
+    write(&root, "a.lisp", "(defun f (x) (+ x 1))\n");
+
+    assert_eq!(
+        source_cache_outcome(&root, &[]),
+        None,
+        "no --cache-dir, PAREDIT_CACHE_DIR, or cache.dir means no cache at all"
+    );
+}
+
+#[test]
+fn the_environment_variable_activates_the_cache_with_no_flag() {
+    let root = repo("cache-dir-env");
+    write(&root, "a.lisp", "(defun f (x) (+ x 1))\n");
+    let cache = fresh_temp_dir("cache-dir-env-store");
+
+    let mut command = in_repo(&root, &["inspect", "sources", "."]);
+    command.env("PAREDIT_CACHE_DIR", cache.display().to_string());
+    let output = command.assert().success().get_output().stdout.clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+
+    assert_eq!(
+        report["cache"], "missing",
+        "PAREDIT_CACHE_DIR alone must turn the discovery cache on: {report}"
+    );
+    assert!(
+        fs::read_dir(&cache).is_ok_and(|mut entries| entries.next().is_some()),
+        "the environment-selected directory must receive a cache entry"
+    );
+}
+
+#[test]
+fn a_configured_cache_dir_activates_the_cache_with_no_flag_or_variable() {
+    let root = repo("cache-dir-config");
+    write(&root, "a.lisp", "(defun f (x) (+ x 1))\n");
+    let cache = fresh_temp_dir("cache-dir-config-store");
+    // Absolute, so it resolves the same way regardless of where `paredit.toml`
+    // sits; the relative case is covered separately below through `config show`.
+    write(
+        &root,
+        "paredit.toml",
+        &format!("[cache]\ndir = {:?}\n", cache.display().to_string()),
+    );
+
+    assert_eq!(
+        source_cache_outcome(&root, &[]),
+        Some("missing".to_owned()),
+        "a configured cache.dir alone must turn the discovery cache on"
+    );
+}
+
+/// The precedence FR-012 asks for, checked end to end against the running
+/// binary: an explicit `--cache-dir` outranks both a `paredit.toml` and
+/// `PAREDIT_CACHE_DIR`. Proven by pointing the flag at a directory that does
+/// not exist as a cache-shaped directory yet and confirming *that* one — and
+/// not the other two — receives the entry.
+#[test]
+fn an_explicit_flag_outranks_both_the_variable_and_the_configuration() {
+    let root = repo("cache-dir-precedence");
+    write(&root, "a.lisp", "(defun f (x) (+ x 1))\n");
+    let from_config = fresh_temp_dir("cache-dir-precedence-config");
+    let from_env = fresh_temp_dir("cache-dir-precedence-env");
+    let from_flag = fresh_temp_dir("cache-dir-precedence-flag");
+    write(
+        &root,
+        "paredit.toml",
+        &format!("[cache]\ndir = {:?}\n", from_config.display().to_string()),
+    );
+
+    let mut command = in_repo(&root, &["inspect", "sources", "."]);
+    command
+        .env("PAREDIT_CACHE_DIR", from_env.display().to_string())
+        .arg("--cache-dir")
+        .arg(&from_flag);
+    let output = command.assert().success().get_output().stdout.clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+
+    assert_eq!(
+        report["cache"], "missing",
+        "the explicit flag must win: {report}"
+    );
+    assert!(
+        fs::read_dir(&from_flag).is_ok_and(|mut entries| entries.next().is_some()),
+        "the explicit flag's directory must receive the cache entry"
+    );
+    for untouched in [&from_config, &from_env] {
+        assert!(
+            fs::read_dir(untouched).is_ok_and(|mut entries| entries.next().is_none()),
+            "{untouched:?} must not be touched once a flag is given"
+        );
+    }
+}
+
+/// The other half of the same precedence: with no flag, the environment beats
+/// the file, exactly as it does for every other key (see
+/// `an_environment_variable_beats_every_file` above, for `format.indent`).
+#[test]
+fn the_environment_variable_outranks_a_configured_cache_dir() {
+    let root = repo("cache-dir-env-beats-config");
+    write(&root, "a.lisp", "(defun f (x) (+ x 1))\n");
+    let from_config = fresh_temp_dir("cache-dir-env-beats-config-config");
+    let from_env = fresh_temp_dir("cache-dir-env-beats-config-env");
+    write(
+        &root,
+        "paredit.toml",
+        &format!("[cache]\ndir = {:?}\n", from_config.display().to_string()),
+    );
+
+    let mut command = in_repo(&root, &["inspect", "sources", "."]);
+    command.env("PAREDIT_CACHE_DIR", from_env.display().to_string());
+    let output = command.assert().success().get_output().stdout.clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("valid JSON");
+
+    assert_eq!(
+        report["cache"], "missing",
+        "the environment must win over the file: {report}"
+    );
+    assert!(
+        fs::read_dir(&from_env).is_ok_and(|mut entries| entries.next().is_some()),
+        "the environment directory must receive the cache entry"
+    );
+    assert!(
+        fs::read_dir(&from_config).is_ok_and(|mut entries| entries.next().is_none()),
+        "the outranked configuration directory must not be touched"
+    );
+}
+
+/// `config show` proves the layer, independent of any command's behaviour —
+/// the same shape as `an_environment_variable_beats_every_file` above.
+#[test]
+fn config_show_reports_the_environment_layer_for_cache_dir() {
+    let root = repo("cache-dir-show-env");
+    write(&root, "paredit.toml", "[cache]\ndir = \"from-config\"\n");
+
+    let mut command = config(&root, &["show", "--key", "cache.dir"]);
+    command.env("PAREDIT_CACHE_DIR", "/from/env");
+    let report = json_of(command);
+
+    assert_eq!(setting(&report, "cache.dir")["value"], "/from/env");
+    assert_eq!(
+        setting(&report, "cache.dir")["origin"]["layer"],
+        "environment"
+    );
+}
+
+/// `config show` proves the file layer resolves relative to the file that set
+/// it, just like `lint.baseline` and `paths.exclude` already do.
+#[test]
+fn config_show_resolves_a_configured_cache_dir_relative_to_its_file() {
+    let root = repo("cache-dir-show-config");
+    write(&root, "nested/paredit.toml", "[cache]\ndir = \"store\"\n");
+
+    let report = json_of(config(
+        &root.join("nested"),
+        &["show", "--key", "cache.dir"],
+    ));
+    let value = setting(&report, "cache.dir")["value"]
+        .as_str()
+        .expect("cache.dir value");
+    assert!(
+        value.ends_with("nested/store"),
+        "expected a path under nested/, got {value}"
+    );
+}
