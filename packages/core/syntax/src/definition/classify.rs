@@ -1,5 +1,7 @@
 use crate::clojure::ClojureOperator;
-use crate::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
+use crate::common_lisp::{
+    CommonLispOperator, common_lisp_operator_head_eq, normalize_common_lisp_operator_head,
+};
 use crate::dialect::Dialect;
 use crate::emacs_lisp::EmacsLispOperator;
 use crate::scheme::SchemeOperator;
@@ -161,17 +163,25 @@ pub(super) fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool
         ),
         Dialect::Clojure => ClojureOperator::from_head(head)
             .is_some_and(ClojureOperator::is_macro_expander_definition),
-        // Scheme stays out deliberately. A `defmacro` body is *evaluated* to
-        // produce code, which is what this predicate marks; a `syntax-rules`
-        // template is substituted, never run, and the reference query skips
-        // `define-syntax` bodies wholesale in
+        // Every one of these spells its macro-expander form `defmacro`
+        // (Janet, Hy, Carp) or has both a Lisp-2-style `defmacro` and its own
+        // `defsyntax` (LFE). None of them has an operator table of its own in
+        // this crate, so the head is compared directly rather than routed
+        // through one.
+        Dialect::Janet | Dialect::Hy | Dialect::Carp => {
+            common_lisp_operator_head_eq(head, "defmacro")
+        }
+        Dialect::Lfe => {
+            common_lisp_operator_head_eq(head, "defmacro")
+                || common_lisp_operator_head_eq(head, "defsyntax")
+        }
+        // Fennel's macro-expander form is `macro`, not `defmacro`.
+        Dialect::Fennel => common_lisp_operator_head_eq(head, "macro"),
+        // Scheme and Racket stay out deliberately. A `defmacro` body is
+        // *evaluated* to produce code, which is what this predicate marks; a
+        // `syntax-rules` template is substituted, never run, and the
+        // reference query skips `define-syntax` bodies wholesale in
         // `lexical_scope::traversal::binding_forms::scheme` instead.
-        Dialect::Lfe
-        | Dialect::Scheme
-        | Dialect::Racket
-        | Dialect::Hy
-        | Dialect::Carp
-        | Dialect::Janet
-        | Dialect::Fennel => false,
+        Dialect::Scheme | Dialect::Racket => false,
     }
 }

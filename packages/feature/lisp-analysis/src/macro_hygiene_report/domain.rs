@@ -23,6 +23,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use paredit_core_syntax::common_lisp::common_lisp_operator_head_eq;
+use paredit_core_syntax::definition::is_macro_expander_definition;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::reader::atom_symbol_text;
 use paredit_core_syntax::sexpr::{
@@ -100,13 +101,38 @@ impl Finding for HygieneFinding {
 /// Binding forms whose second child is a binding list.
 const BINDING_FORMS: [&str; 4] = ["let", "let*", "flet", "labels"];
 
+/// Whether `dialect`'s macro system is unhygienic by default and
+/// template/quasiquote-based — the precondition for variable-capture and
+/// multiple-evaluation analysis to mean anything.
+///
+/// Scheme and Racket are the deliberate exclusions. `is_macro_expander_definition`
+/// recognizes their `define-syntax` as a macro-expander form too (useful for
+/// rename and navigation), but `syntax-rules` hygiene is a language guarantee
+/// there, not a discipline the programmer must enforce by hand: counting
+/// unquotes or capture-prone bindings in a `syntax-rules` template would be
+/// analyzing a mechanism these checks were never written to model, and would
+/// misfire on hygienic-by-construction code.
+const fn dialect_is_hygiene_modelled(dialect: Dialect) -> bool {
+    matches!(
+        dialect,
+        Dialect::CommonLisp
+            | Dialect::EmacsLisp
+            | Dialect::Clojure
+            | Dialect::Janet
+            | Dialect::Hy
+            | Dialect::Carp
+            | Dialect::Fennel
+            | Dialect::Lfe
+    )
+}
+
 #[must_use]
 pub fn build_macro_hygiene_report(
     path: &Path,
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> FileFindings<HygieneFinding> {
-    let modelled = dialect == Dialect::CommonLisp;
+    let modelled = dialect_is_hygiene_modelled(dialect);
     let mut findings = Vec::new();
     let mut macro_count = 0;
 
@@ -115,14 +141,14 @@ pub fn build_macro_hygiene_report(
             let Some(head) = list_head(form) else {
                 continue;
             };
-            if !common_lisp_operator_head_eq(head, "defmacro") {
+            if !is_macro_expander_definition(dialect, head) {
                 continue;
             }
             let Some(name) = form.children.get(1).and_then(atom_symbol_text) else {
                 continue;
             };
             macro_count += 1;
-            analyze(form, name, &mut findings);
+            analyze(dialect, form, name, &mut findings);
         }
     }
 
@@ -136,7 +162,7 @@ pub fn build_macro_hygiene_report(
     )
 }
 
-fn analyze(form: &ExpressionView, name: &str, findings: &mut Vec<HygieneFinding>) {
+fn analyze(dialect: Dialect, form: &ExpressionView, name: &str, findings: &mut Vec<HygieneFinding>) {
     let parameters = form
         .children
         .get(2)
@@ -146,7 +172,7 @@ fn analyze(form: &ExpressionView, name: &str, findings: &mut Vec<HygieneFinding>
     // Names bound by the macro's own body outside the template — the usual
     // `(let ((var (gensym))) ...)` prelude — are safe by construction, because
     // whatever they hold at expansion time is a fresh symbol.
-    let gensym_bound = gensym_bindings(form);
+    let gensym_bound = gensym_bindings(dialect, form);
 
     for body in form.children.iter().skip(3) {
         find_captures(body, name, &gensym_bound, findings);
@@ -165,12 +191,20 @@ fn parameter_names(lambda_list: &ExpressionView) -> Vec<String> {
         .collect()
 }
 
+/// The Common Lisp gensym idioms, recognised in every modelled dialect.
+const GENSYM_GENERATORS: [&str; 4] = ["gensym", "gentemp", "make-symbol", "copy-symbol"];
+
+/// Emacs Lisp's own gensym idiom. `cl-gensym` is the `cl-lib` equivalent of
+/// Common Lisp's `gensym`; `make-symbol` is already in [`GENSYM_GENERATORS`]
+/// and is the idiom real Elisp macros reach for even without `cl-lib`.
+const EMACS_LISP_GENSYM_GENERATOR: &str = "cl-gensym";
+
 /// Names the macro body binds to a freshly generated symbol.
 ///
 /// Recognised by the initial form's head rather than by the name's spelling:
 /// `g!foo` is a convention and `(gensym)` is a proof, and only one of those is
 /// something to build a report on.
-fn gensym_bindings(form: &ExpressionView) -> BTreeMap<String, ()> {
+fn gensym_bindings(dialect: Dialect, form: &ExpressionView) -> BTreeMap<String, ()> {
     let mut bound = BTreeMap::new();
     walk(form, &mut |view| {
         let Some(head) = list_head(view) else { return };
@@ -194,9 +228,11 @@ fn gensym_bindings(form: &ExpressionView) -> BTreeMap<String, ()> {
                 .get(1)
                 .and_then(list_head)
                 .is_some_and(|head| {
-                    ["gensym", "gentemp", "make-symbol", "copy-symbol"]
+                    GENSYM_GENERATORS
                         .iter()
                         .any(|generator| common_lisp_operator_head_eq(head, generator))
+                        || (dialect == Dialect::EmacsLisp
+                            && common_lisp_operator_head_eq(head, EMACS_LISP_GENSYM_GENERATOR))
                 });
             if generated {
                 bound.insert(name.to_ascii_uppercase(), ());
@@ -362,8 +398,12 @@ mod tests {
     use super::*;
 
     fn report(source: &str) -> FileFindings<HygieneFinding> {
-        let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
-        build_macro_hygiene_report(Path::new("t.lisp"), Dialect::CommonLisp, &tree)
+        report_in(source, Dialect::CommonLisp)
+    }
+
+    fn report_in(source: &str, dialect: Dialect) -> FileFindings<HygieneFinding> {
+        let tree = SyntaxTree::parse_with_dialect(source, dialect).expect("parse");
+        build_macro_hygiene_report(Path::new("t.lisp"), dialect, &tree)
     }
 
     #[test]
@@ -449,11 +489,152 @@ mod tests {
     }
 
     #[test]
-    fn an_unmodelled_dialect_says_so_rather_than_reporting_nothing() {
-        let tree =
-            SyntaxTree::parse_with_dialect("(defmacro m [x] x)", Dialect::Clojure).expect("parse");
-        let report = build_macro_hygiene_report(Path::new("t.clj"), Dialect::Clojure, &tree);
-        assert!(!report.dialect_modelled);
-        assert!(report.findings.is_empty());
+    fn clojure_is_now_a_modelled_dialect() {
+        // Clojure's `defmacro` is unhygienic by default and template-based,
+        // just like Common Lisp's, so it is modelled rather than reported as
+        // unknown territory.
+        let report = report_in("(defmacro m [x] x)", Dialect::Clojure);
+        assert!(report.dialect_modelled);
+        assert_eq!(report.summary, vec![("macro_count", json!(1))]);
+    }
+
+    #[test]
+    fn scheme_and_racket_say_so_rather_than_reporting_nothing() {
+        // `define-syntax`/`syntax-rules` hygiene is a language guarantee in
+        // both dialects, so unquote-counting and capture-checking do not
+        // apply here even though `is_macro_expander_definition` recognizes
+        // the form for other purposes (rename, navigation).
+        for dialect in [Dialect::Scheme, Dialect::Racket] {
+            let source = "(define-syntax m (syntax-rules () ((_ x) (let ((result x)) result))))";
+            let tree = SyntaxTree::parse_with_dialect(source, dialect).expect("parse");
+            let report = build_macro_hygiene_report(Path::new("t.scm"), dialect, &tree);
+            assert!(!report.dialect_modelled, "{dialect:?}");
+            assert!(report.findings.is_empty(), "{dialect:?}");
+        }
+    }
+
+    /// Every dialect whose macro system is now modelled reports the same
+    /// literal-binding-in-a-template capture that Common Lisp always has.
+    /// The fixtures below deliberately use Common Lisp's paired `let`
+    /// binding shape in every dialect: none of these dialects has an
+    /// operator table of its own in this crate for their *native* binding
+    /// vector shape (Clojure/Janet/Fennel's `[name val]`), so a fixture using
+    /// that shape would exercise nothing this analyzer looks at.
+    #[test]
+    fn a_literal_binding_in_a_template_is_a_capture_risk_in_every_modelled_dialect() {
+        for (dialect, source) in [
+            (
+                Dialect::EmacsLisp,
+                "(defmacro m (form) `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Clojure,
+                "(defmacro m [form] `(let ((result ~form)) (list result)))",
+            ),
+            (
+                Dialect::Janet,
+                "(defmacro m [form] ~(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Hy,
+                "(defmacro m [form] `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Carp,
+                "(defmacro m [form] `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Fennel,
+                "(macro m [form] `(let ((result ,form)) (list result)))",
+            ),
+            (
+                Dialect::Lfe,
+                "(defmacro m (form) `(let ((result ,form)) (list result)))",
+            ),
+        ] {
+            let report = report_in(source, dialect);
+            assert_eq!(report.findings.len(), 1, "{dialect:?}: {report:?}");
+            assert_eq!(
+                report.findings[0].risk,
+                HygieneRisk::VariableCapture,
+                "{dialect:?}"
+            );
+            assert_eq!(report.findings[0].subject, "RESULT", "{dialect:?}");
+        }
+    }
+
+    /// The same fixtures, with the binding name unquoted (the gensym-at-the-
+    /// use-site idiom), report nothing in every modelled dialect.
+    #[test]
+    fn an_unquoted_binding_name_is_not_a_capture_risk_in_every_modelled_dialect() {
+        for (dialect, source) in [
+            (
+                Dialect::EmacsLisp,
+                "(defmacro m (var form) `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Clojure,
+                "(defmacro m [var form] `(let ((~var ~form)) ~var))",
+            ),
+            (
+                Dialect::Janet,
+                "(defmacro m [var form] ~(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Hy,
+                "(defmacro m [var form] `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Carp,
+                "(defmacro m [var form] `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Fennel,
+                "(macro m [var form] `(let ((,var ,form)) ,var))",
+            ),
+            (
+                Dialect::Lfe,
+                "(defmacro m (var form) `(let ((,var ,form)) ,var))",
+            ),
+        ] {
+            let report = report_in(source, dialect);
+            assert!(
+                report
+                    .findings
+                    .iter()
+                    .all(|finding| finding.risk != HygieneRisk::VariableCapture),
+                "{dialect:?}: {report:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn cl_gensym_bound_name_is_not_a_capture_risk_in_emacs_lisp() {
+        let report = report_in(
+            "(defmacro m (form) (let ((result (cl-gensym))) `(let ((,result ,form)) (list ,result))))",
+            Dialect::EmacsLisp,
+        );
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn make_symbol_bound_name_is_not_a_capture_risk_in_emacs_lisp() {
+        let report = report_in(
+            "(defmacro m (form) (let ((result (make-symbol \"result\"))) `(let ((,result ,form)) (list ,result))))",
+            Dialect::EmacsLisp,
+        );
+        assert!(report.findings.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn cl_gensym_is_not_recognised_outside_emacs_lisp() {
+        // `cl-gensym` is an Emacs Lisp `cl-lib` idiom. A binding to it in any
+        // other dialect is not a proof of freshness there, so it must still
+        // be reported as a capture risk.
+        let report = report(
+            "(defmacro m (form) (let ((result (cl-gensym))) `(let ((result ,form)) (list result))))",
+        );
+        assert_eq!(report.findings.len(), 1, "{report:?}");
+        assert_eq!(report.findings[0].risk, HygieneRisk::VariableCapture);
     }
 }

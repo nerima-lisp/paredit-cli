@@ -458,6 +458,18 @@ mod tests {
         ));
         assert!(is_macro_expander_definition(Dialect::Clojure, "defmacro"));
         assert!(!is_macro_expander_definition(Dialect::Clojure, "defn"));
+        assert!(is_macro_expander_definition(Dialect::Janet, "defmacro"));
+        assert!(!is_macro_expander_definition(Dialect::Janet, "defn"));
+        assert!(is_macro_expander_definition(Dialect::Hy, "defmacro"));
+        assert!(!is_macro_expander_definition(Dialect::Hy, "defn"));
+        assert!(is_macro_expander_definition(Dialect::Carp, "defmacro"));
+        assert!(!is_macro_expander_definition(Dialect::Carp, "defn"));
+        assert!(is_macro_expander_definition(Dialect::Fennel, "macro"));
+        assert!(!is_macro_expander_definition(Dialect::Fennel, "fn"));
+        assert!(is_macro_expander_definition(Dialect::Lfe, "defmacro"));
+        assert!(is_macro_expander_definition(Dialect::Lfe, "defsyntax"));
+        assert!(!is_macro_expander_definition(Dialect::Lfe, "defun"));
+        assert!(!is_macro_expander_definition(Dialect::Racket, "defmacro"));
     }
 
     #[test]

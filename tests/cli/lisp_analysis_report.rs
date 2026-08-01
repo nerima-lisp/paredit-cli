@@ -243,9 +243,16 @@ fn cli_restarts_reports_a_restart_nothing_invokes() {
 /// must be labelled rather than silently reported as clean.
 #[test]
 fn cli_every_lisp_analysis_report_labels_a_dialect_it_does_not_model() {
+    // Scheme rather than Clojure: `inspect macro-hygiene` now models Clojure's
+    // `defmacro` (it is unhygienic-by-default and template-based, just like
+    // Common Lisp's), so a Clojure fixture would no longer be unmodelled by
+    // every report in `COMMANDS`. Scheme's `define-syntax`/`syntax-rules` is
+    // hygienic by language guarantee and stays out of that report too, and
+    // every other report here is Common Lisp only, so Scheme is still
+    // unmodelled by all thirteen.
     let dir = fresh_temp_dir("inspect-lisp-analysis-unmodelled");
-    let file = dir.join("core.clj");
-    fs::write(&file, "(defn f [x] (loop [y x] (recur y)))\n").expect("write clojure fixture");
+    let file = dir.join("core.scm");
+    fs::write(&file, "(define (f x) (let loop ((y x)) (loop y)))\n").expect("write scheme fixture");
 
     for command in COMMANDS {
         paredit()
