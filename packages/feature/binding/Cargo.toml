@@ -15,6 +15,7 @@ paredit-core-semantics = { path = "../../core/semantics" }
 paredit-core-edit = { path = "../../core/edit" }
 paredit-core-cli = { path = "../../core/cli" }
 paredit-core-workspace = { path = "../../core/workspace" }
+paredit-core-safety = { path = "../../core/safety" }
 # `shadowed_binding_report` compares a `let` binding against the enclosing
 # definition's parameters, and the validated lambda-list parser that names
 # them belongs to the parameter slice. See ALLOWED_FEATURE_DEPENDENCIES.

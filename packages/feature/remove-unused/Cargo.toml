@@ -15,6 +15,7 @@ paredit-core-semantics = { path = "../../core/semantics" }
 paredit-core-edit = { path = "../../core/edit" }
 paredit-core-workspace = { path = "../../core/workspace" }
 paredit-core-cli = { path = "../../core/cli" }
+paredit-core-safety = { path = "../../core/safety" }
 # Feature-to-feature edges (section 2.2 measured 89 of them).
 paredit-feature-package = { path = "../package" }
 paredit-feature-form-transform = { path = "../form-transform" }

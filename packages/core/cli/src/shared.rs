@@ -832,13 +832,10 @@ fn worker_count(count: usize) -> usize {
     if count < PARALLEL_THRESHOLD {
         return 1;
     }
-    let requested = paredit_core_safety::limits::effective_jobs();
-    let available = if requested == 0 {
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
-    } else {
-        requested
-    };
-    available.min(count).max(1)
+    paredit_core_safety::limits::effective_jobs_or_available()
+        .get()
+        .min(count)
+        .max(1)
 }
 
 /// Restates this invocation's bounds in the traversal's own vocabulary.

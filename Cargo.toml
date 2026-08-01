@@ -141,6 +141,10 @@ harness = false
 name = "lint_report"
 harness = false
 
+[[bench]]
+name = "cache_dir"
+harness = false
+
 # Inherited from [workspace.lints] below, so the root package and every
 # packages/*/* member are governed by one definition. A member that omits
 # `[lints] workspace = true` silently loses `unsafe_code = "deny"` without any

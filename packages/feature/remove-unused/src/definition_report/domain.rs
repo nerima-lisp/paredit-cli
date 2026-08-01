@@ -206,9 +206,9 @@ pub fn collect_unused_definition_candidates(
         })
         .collect();
 
-    let worker_count = thread::available_parallelism()
-        .map(|parallelism| parallelism.get())
-        .unwrap_or(1)
+    // `--jobs` governs this fan-out.
+    let worker_count = paredit_core_safety::limits::effective_jobs_or_available()
+        .get()
         .clamp(1, files.len().max(1));
     let mut ordered: Vec<Option<UnusedDefinitionFile>> = (0..files.len()).map(|_| None).collect();
     thread::scope(|scope| -> RemoveUnusedResult<()> {

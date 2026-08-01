@@ -1,7 +1,7 @@
 use std::fs;
 
 use predicates::prelude::*;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use super::{fresh_temp_dir, paredit};
 
@@ -811,4 +811,399 @@ fn cli_rejects_non_finite_thresholds_and_zero_max_results() {
         .stderr(predicate::str::contains(
             "--max-candidates must be at least 1",
         ));
+}
+
+// --- FR-007: the result cache ---------------------------------------------
+//
+// The report is quadratic in the candidate count, so a repeated run over an
+// unchanged corpus is the expensive case worth avoiding. The property every
+// test below is really checking is the one that makes the cache safe rather
+// than fast: a reused answer must be one that a fresh run would have given.
+
+/// A corpus varied enough that changing one file changes the answer.
+///
+/// The forms differ in size on purpose, so the reported similarities are
+/// repeating fractions like `0.8545454545454545` rather than the round `1.0`
+/// that near-identical forms produce.
+///
+/// That widens what these tests cover but does not on its own catch a lossy
+/// float encoding: whether a given ratio survives an approximate JSON parser
+/// depends on the ratio, and no corpus reliably produces one that does not.
+/// The guard for that is a unit test over the encoding itself — see
+/// `a_similarity_survives_the_entry_bit_for_bit`.
+fn similarity_corpus(label: &str) -> std::path::PathBuf {
+    let dir = fresh_temp_dir(label);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("alpha.lisp"),
+        "(defun alpha (x) (+ x 1))\n\
+         (defun alpha-two (x y) (list (+ x 1) (- y 2) (* x y)))\n\
+         (defun alpha-three (a b c) (when (and a b) (list a b c (cons a b))))\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.join("beta.lisp"),
+        "(defun beta (y) (+ y 1))\n\
+         (defun beta-two (p q) (list (+ p 3) (- q 4) (* p q) q))\n\
+         (defun beta-three (a b) (when (or a b) (list a b (cons b a))))\n",
+    )
+    .unwrap();
+    dir
+}
+
+/// Runs the report over `dir`, with `cache` given as `--cache-dir` when set.
+fn similarity_run(dir: &std::path::Path, cache: Option<&std::path::Path>, extra: &[&str]) -> Value {
+    let mut command = paredit();
+    command.args(["inspect", "similarity", "--threshold", "0.6"]);
+    if let Some(cache) = cache {
+        command.arg("--cache-dir").arg(cache);
+    }
+    let output = command.args(extra).arg(dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "inspect similarity failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+/// The report without the field that says how it was obtained.
+///
+/// Comparing whole documents rather than a pair count is deliberate: a cache
+/// that dropped a form's text or rounded a similarity would still agree on
+/// every count in the summary.
+fn without_cache_field(mut report: Value) -> Value {
+    report.as_object_mut().unwrap().remove("cache");
+    report
+}
+
+#[test]
+fn cli_similarity_reuses_a_cached_report_for_an_unchanged_corpus() {
+    let dir = similarity_corpus("similarity-cache");
+    // Outside the corpus: a cache written inside it would change the tree it
+    // describes.
+    let cache = fresh_temp_dir("similarity-cache-store");
+
+    let first = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(first["cache"], "missing");
+
+    let second = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(
+        second["cache"], "hit",
+        "an unchanged corpus must not be recomputed"
+    );
+    assert_eq!(
+        without_cache_field(second),
+        without_cache_field(first),
+        "a reused report must be identical to the one it replaces"
+    );
+}
+
+/// The worst failure this cache could have: serving the previous answer after
+/// a file changed. Everything else here is a performance nit; this would be a
+/// wrong report at exit 0.
+#[test]
+fn cli_similarity_recomputes_after_one_file_changes() {
+    let dir = similarity_corpus("similarity-cache-stale");
+    let cache = fresh_temp_dir("similarity-cache-stale-store");
+
+    let cached = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(cached["cache"], "missing");
+    assert_eq!(similarity_run(&dir, Some(&cache), &[])["cache"], "hit");
+
+    // Rewritten to something structurally unlike alpha.lisp, so the answer
+    // genuinely differs rather than merely being recomputed.
+    fs::write(dir.join("beta.lisp"), "(list 1 2 3)\n").unwrap();
+
+    let recomputed = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(recomputed["cache"], "missing");
+    assert_ne!(
+        recomputed["pairs"], cached["pairs"],
+        "a changed file must not be reported through the old answer"
+    );
+
+    // And the recomputed answer is the *correct* one: identical to what a run
+    // with no cache at all gives over the same tree.
+    assert_eq!(
+        without_cache_field(recomputed),
+        similarity_run(&dir, None, &[]),
+        "the recomputed report must match an uncached run of the same tree"
+    );
+}
+
+/// Same file set, different question. The corpus hash cannot catch this, so
+/// each option has to be in the key on its own account.
+#[test]
+fn cli_similarity_does_not_share_an_entry_between_different_options() {
+    let dir = similarity_corpus("similarity-cache-options");
+    let cache = fresh_temp_dir("similarity-cache-options-store");
+
+    assert_eq!(similarity_run(&dir, Some(&cache), &[])["cache"], "missing");
+    assert_eq!(similarity_run(&dir, Some(&cache), &[])["cache"], "hit");
+
+    for flag in [
+        ["--overlap-policy", "all"],
+        ["--min-line-span", "2"],
+        ["--max-results", "3"],
+        ["--min-node-count", "3"],
+        ["--form-scope", "top-level"],
+        ["--comparison-scope", "cross-file"],
+    ] {
+        assert_eq!(
+            similarity_run(&dir, Some(&cache), &flag)["cache"],
+            "missing",
+            "changing {} must not reuse the previous entry",
+            flag[0]
+        );
+    }
+
+    // The original question is still answered from its own entry.
+    assert_eq!(similarity_run(&dir, Some(&cache), &[])["cache"], "hit");
+}
+
+/// Caching is opt-in: without the flag there is no cache field, nothing is
+/// stored, and the output is what it was before FR-007.
+#[test]
+fn cli_similarity_without_a_cache_dir_always_recomputes() {
+    let dir = similarity_corpus("similarity-cache-optout");
+
+    let first = similarity_run(&dir, None, &[]);
+    let second = similarity_run(&dir, None, &[]);
+
+    assert_eq!(first, second);
+    assert!(
+        first.get("cache").is_none(),
+        "a run that asked for no cache must not report one"
+    );
+}
+
+/// `--clear-cache` has to reach these entries too. They live in a
+/// subdirectory of `--cache-dir` that the discovery cache's own clear does not
+/// walk, so this is the regression guard for that split.
+#[test]
+fn cli_similarity_clear_cache_discards_the_stored_report() {
+    let dir = similarity_corpus("similarity-cache-clear");
+    let cache = fresh_temp_dir("similarity-cache-clear-store");
+
+    assert_eq!(similarity_run(&dir, Some(&cache), &[])["cache"], "missing");
+    assert_eq!(similarity_run(&dir, Some(&cache), &[])["cache"], "hit");
+    assert_eq!(
+        similarity_run(&dir, Some(&cache), &["--clear-cache"])["cache"],
+        "missing"
+    );
+}
+
+/// The text renderer reports the outcome too, and only when asked for.
+#[test]
+fn cli_similarity_text_output_reports_the_cache_outcome() {
+    let dir = similarity_corpus("similarity-cache-text");
+    let cache = fresh_temp_dir("similarity-cache-text-store");
+
+    let run = |cached: bool| -> String {
+        let mut command = paredit();
+        command.args(["inspect", "similarity", "--output", "text"]);
+        if cached {
+            command.arg("--cache-dir").arg(&cache);
+        }
+        let output = command.arg(&dir).output().unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap()
+    };
+
+    assert!(run(true).contains("cache\tmissing"));
+    assert!(run(true).contains("cache\thit"));
+    assert!(!run(false).contains("cache\t"));
+}
+
+/// A corrupt entry is a slow run, not a wrong one.
+#[test]
+fn cli_similarity_treats_an_unreadable_entry_as_a_miss() {
+    let dir = similarity_corpus("similarity-cache-corrupt");
+    let cache = fresh_temp_dir("similarity-cache-corrupt-store");
+
+    let fresh = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(fresh["cache"], "missing");
+
+    let mut corrupted = 0;
+    for shard in fs::read_dir(cache.join("similarity")).unwrap() {
+        let shard = shard.unwrap().path();
+        if shard.is_dir() {
+            for entry in fs::read_dir(&shard).unwrap() {
+                fs::write(entry.unwrap().path(), "{ not json").unwrap();
+                corrupted += 1;
+            }
+        }
+    }
+    assert_eq!(corrupted, 1, "the run must have stored exactly one entry");
+
+    let recomputed = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(recomputed["cache"], "missing");
+    assert_eq!(
+        without_cache_field(recomputed),
+        without_cache_field(fresh),
+        "a corrupt entry must produce the same report, not a broken one"
+    );
+}
+
+/// The one entry a run over the corpus stores.
+fn sole_entry(cache: &std::path::Path) -> std::path::PathBuf {
+    let mut found = Vec::new();
+    for shard in fs::read_dir(cache.join("similarity")).unwrap() {
+        let shard = shard.unwrap().path();
+        // The signing key is a file at this level, not a shard.
+        if shard.is_dir() {
+            for entry in fs::read_dir(&shard).unwrap() {
+                found.push(entry.unwrap().path());
+            }
+        }
+    }
+    assert_eq!(found.len(), 1, "the run must have stored exactly one entry");
+    found.pop().unwrap()
+}
+
+/// Rewrites a stored answer, leaving its authenticator exactly as written.
+///
+/// This is what an attacker with write access to the cache directory can
+/// actually do: they hold the entry but not the secret that signed it, and
+/// re-signing is what they cannot do.
+fn forge_entry(path: &std::path::Path, edit: impl FnOnce(&mut Value)) {
+    let stored = fs::read_to_string(path).unwrap();
+    let (tag, payload) = stored
+        .split_once('\n')
+        .expect("an entry is tag then answer");
+    let mut entry: Value = serde_json::from_str(payload).unwrap();
+    edit(&mut entry);
+    fs::write(
+        path,
+        format!("{tag}\n{}", serde_json::to_string(&entry).unwrap()),
+    )
+    .unwrap();
+}
+
+/// A corpus of two files that are one duplicate pair.
+fn duplicate_corpus(label: &str) -> std::path::PathBuf {
+    let dir = fresh_temp_dir(label);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("a.lisp"), "(foo a b)\n").unwrap();
+    fs::write(dir.join("b.lisp"), "(foo x y)\n").unwrap();
+    dir
+}
+
+/// The attack the authentication exists for.
+///
+/// A `--cache-dir` restored from a shared CI artifact is attacker-controlled
+/// input. Before entries carried a tag, zeroing the stored counts turned a
+/// failing `--fail-on-duplicates` into a passing one — a CI gate defeated by
+/// editing a JSON file. The forged entry no longer verifies, so it costs a
+/// recompute and the gate still fails.
+#[test]
+fn cli_similarity_a_forged_entry_cannot_pass_the_duplicate_gate() {
+    let dir = duplicate_corpus("similarity-cache-gate-forgery");
+    let cache = fresh_temp_dir("similarity-cache-gate-forgery-store");
+    let gate = || {
+        paredit()
+            .args([
+                "inspect",
+                "similarity",
+                "--threshold",
+                "0.8",
+                "--fail-on-duplicates",
+            ])
+            .arg("--cache-dir")
+            .arg(&cache)
+            .arg(&dir)
+            .output()
+            .unwrap()
+    };
+
+    assert!(!gate().status.success(), "the corpus is a duplicate pair");
+    let warm = gate();
+    assert!(!warm.status.success());
+    assert!(
+        String::from_utf8_lossy(&warm.stdout).contains("\"cache\": \"hit\""),
+        "the second run must be served from the cache, or the forgery below \
+         would be testing nothing"
+    );
+
+    forge_entry(&sole_entry(&cache), |entry| {
+        entry["summary"]["matched_pairs"] = json!(0);
+        entry["summary"]["suppressed_pairs"] = json!(0);
+        entry["summary"]["reported_pairs"] = json!(0);
+        entry["pairs"] = json!([]);
+    });
+
+    let forged = gate();
+    assert!(
+        !forged.status.success(),
+        "a forged entry must not turn a failing gate into a passing one"
+    );
+    let report: Value = serde_json::from_slice(&forged.stdout).unwrap();
+    assert_eq!(
+        report["cache"], "missing",
+        "the forgery must read as a miss"
+    );
+    assert_eq!(report["pair_count"], 1);
+}
+
+/// The other half of the same attack: a pair's `text` is printed verbatim and
+/// attributed to a real source path, so an accepted forgery puts
+/// attacker-chosen content into a report about code the attacker never touched.
+#[test]
+fn cli_similarity_a_forged_entry_cannot_inject_report_text() {
+    let dir = duplicate_corpus("similarity-cache-text-forgery");
+    let cache = fresh_temp_dir("similarity-cache-text-forgery-store");
+    let fabricated = "(defun TOTALLY-FABRICATED (evil) (delete-everything))";
+
+    let honest = similarity_run(&dir, Some(&cache), &["--output", "json"]);
+    assert_eq!(honest["cache"], "missing");
+    assert_eq!(
+        similarity_run(&dir, Some(&cache), &["--output", "json"])["cache"],
+        "hit"
+    );
+
+    forge_entry(&sole_entry(&cache), |entry| {
+        entry["pairs"][0]["left"]["text"] = json!(fabricated);
+    });
+
+    let recomputed = similarity_run(&dir, Some(&cache), &["--output", "json"]);
+    assert_eq!(recomputed["cache"], "missing");
+    assert!(
+        !recomputed.to_string().contains("TOTALLY-FABRICATED"),
+        "a forged entry must not put its own text into the report: {recomputed}"
+    );
+    assert_eq!(
+        without_cache_field(recomputed),
+        without_cache_field(honest),
+        "the recomputed report must be the honest one"
+    );
+}
+
+/// A cache directory written before entries were authenticated has no tags. It
+/// is stale rather than trusted: one extra recompute, then caching resumes.
+#[test]
+fn cli_similarity_an_unauthenticated_entry_is_stale() {
+    let dir = similarity_corpus("similarity-cache-legacy");
+    let cache = fresh_temp_dir("similarity-cache-legacy-store");
+
+    let fresh = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(fresh["cache"], "missing");
+
+    // Strip the tag line, leaving exactly what the previous format wrote.
+    let entry = sole_entry(&cache);
+    let stored = fs::read_to_string(&entry).unwrap();
+    let (_, payload) = stored.split_once('\n').unwrap();
+    fs::write(&entry, payload).unwrap();
+
+    let recomputed = similarity_run(&dir, Some(&cache), &[]);
+    assert_eq!(recomputed["cache"], "missing");
+    assert_eq!(
+        without_cache_field(recomputed),
+        without_cache_field(fresh),
+        "an unauthenticated entry must be recomputed, not served"
+    );
+    assert_eq!(
+        similarity_run(&dir, Some(&cache), &[])["cache"],
+        "hit",
+        "caching must resume after the one stale round"
+    );
 }
