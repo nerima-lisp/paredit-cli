@@ -13,11 +13,21 @@
 //! down, cannot shadow one of its rules (the name check in
 //! [`super::ruleset::Ruleset::validate`] sees to that), and cannot make it
 //! report differently.
+//!
+//! Matching and rewriting are the `--query`/`--rewrite` engine's own
+//! [`match_all`] and [`plan_rewrite`] — not a second implementation. That is
+//! what a custom rule's `:fix` gains the same rewrite-hazard detection a
+//! `--rewrite` gets: a match this pass reports is still reported (a `defrule`
+//! finding is one per occurrence, hazardous or not — a project should still
+//! learn its rule fired), but a hazardous one's `fix` comes back `None`
+//! rather than a replacement that would corrupt quoted data, drop a comment,
+//! or overlap another match already applied.
 
-use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
-use paredit_core_syntax::view_query::for_each_subview;
+use paredit_core_syntax::dialect::Dialect;
+use paredit_core_syntax::selector::match_all;
+use paredit_core_syntax::selector::rewrite::{RewriteAllowances, plan_rewrite};
+use paredit_core_syntax::sexpr::{ByteSpan, SyntaxTree};
 
-use crate::pattern::{match_view, render};
 use crate::ruleset::{CustomRule, Ruleset};
 
 /// One custom rule's complaint about one form.
@@ -32,39 +42,72 @@ pub struct CustomFinding {
     pub rule: String,
     pub span: ByteSpan,
     pub message: String,
-    /// The replacement source for `span`, when the rule declared a `:fix`.
+    /// The replacement source for `span`, when the rule declared a `:fix`
+    /// *and* rewriting this particular match is not one of the hazards
+    /// [`paredit_core_syntax::selector::rewrite`] refuses by default.
     pub fix: Option<String>,
 }
 
 /// Every custom finding in one parsed file, in the same order the shipped pass
 /// uses: rule order, then each rule's own pre-order over the document.
+///
+/// `dialect` is the *file being linted*'s dialect, not the rule file's (rule
+/// files are always read as Common Lisp; see
+/// [`crate::ruleset::parse_ruleset`]). Matching a custom pattern with the
+/// target's own dialect is what lets `(defun ?name ...)` fold case in a
+/// Common Lisp file and stay case-sensitive in an Emacs Lisp one, the same as
+/// `--query` already does — the old bespoke matcher folded case
+/// unconditionally, which was a latent wrong answer for every other dialect.
 #[must_use]
-pub fn run(ruleset: &Ruleset, tree: &SyntaxTree, source: &str) -> Vec<CustomFinding> {
-    let root = tree.root_view();
+pub fn run(ruleset: &Ruleset, tree: &SyntaxTree, dialect: Dialect) -> Vec<CustomFinding> {
+    let source = tree.source();
     let mut found = Vec::new();
     for rule in &ruleset.rules {
-        collect_rule(rule, &root, source, &mut found);
+        collect_rule(rule, tree, source, dialect, &mut found);
     }
     found
 }
 
 fn collect_rule(
     rule: &CustomRule,
-    root: &ExpressionView,
+    tree: &SyntaxTree,
     source: &str,
+    dialect: Dialect,
     found: &mut Vec<CustomFinding>,
 ) {
-    for_each_subview(root, |view| {
-        let Some(bindings) = match_view(&rule.pattern, view, source) else {
-            return;
-        };
+    let matches = match_all(tree, &rule.pattern, dialect);
+
+    // Computed once per rule rather than per match: `plan_rewrite` walks the
+    // whole document itself, so asking it once for the spans it declines to
+    // rewrite is the same cost as asking `match_all` for the matches, not the
+    // product of the two.
+    let skipped: Vec<ByteSpan> = match &rule.fix {
+        None => Vec::new(),
+        Some(template) => plan_rewrite(
+            tree,
+            &rule.pattern,
+            template,
+            dialect,
+            RewriteAllowances::default(),
+        )
+        .skipped
+        .into_iter()
+        .map(|skipped| skipped.span)
+        .collect(),
+    };
+
+    for found_match in matches {
+        let fix = rule.fix.as_ref().and_then(|template| {
+            (!skipped.contains(&found_match.span))
+                .then(|| template.render(source, &found_match.captures))
+        });
         found.push(CustomFinding {
             rule: rule.name.clone(),
-            span: view.span,
+            span: found_match.span,
             message: rule.message.clone(),
-            fix: rule.fix.as_ref().map(|fix| render(fix, &bindings)),
+            fix,
         });
-    });
+    }
 }
 
 /// What running one rule's declarative tests found.
@@ -139,14 +182,16 @@ pub fn run_tests(ruleset: &Ruleset) -> Vec<TestFailure> {
 }
 
 /// One rule's findings over a snippet, for the harness.
+///
+/// Always read as Common Lisp: a `deftest` clause tests a rule against a
+/// snippet written in the rule *file*'s own language, independent of whichever
+/// dialect the rule ends up applied to at lint time (see [`run`]).
 fn findings_for(rule: &CustomRule, source: &str) -> Vec<CustomFinding> {
-    let Ok(tree) =
-        SyntaxTree::parse_with_dialect(source, paredit_core_syntax::dialect::Dialect::CommonLisp)
-    else {
+    let Ok(tree) = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp) else {
         return Vec::new();
     };
     let mut found = Vec::new();
-    collect_rule(rule, &tree.root_view(), source, &mut found);
+    collect_rule(rule, &tree, source, Dialect::CommonLisp, &mut found);
     found
 }
 
@@ -154,7 +199,6 @@ fn findings_for(rule: &CustomRule, source: &str) -> Vec<CustomFinding> {
 mod tests {
     use super::*;
     use crate::ruleset::parse_ruleset;
-    use paredit_core_syntax::dialect::Dialect;
 
     fn ruleset(text: &str) -> Ruleset {
         parse_ruleset("rules.lisp", text).expect("a readable ruleset")
@@ -162,7 +206,7 @@ mod tests {
 
     fn findings(rules: &str, source: &str) -> Vec<CustomFinding> {
         let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp).expect("parse");
-        run(&ruleset(rules), &tree, source)
+        run(&ruleset(rules), &tree, Dialect::CommonLisp)
     }
 
     #[test]

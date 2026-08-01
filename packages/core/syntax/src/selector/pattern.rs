@@ -40,7 +40,12 @@ use super::error::PatternError;
 /// Matching walks a pattern recursively, so an adversarial `--query` of ten
 /// thousand open parens would otherwise be a stack overflow. Real patterns are
 /// a handful of levels deep; this is three orders of magnitude above them.
-const MAX_PATTERN_DEPTH: usize = 64;
+///
+/// `pub` so the `paredit-feature-lint-custom` crate's `defrule` front end —
+/// the other caller this module's own documentation promises a matcher to —
+/// enforces the same limit rather than inventing (and risking drifting from)
+/// its own.
+pub const MAX_PATTERN_DEPTH: usize = 64;
 
 /// A constraint on what a wildcard may bind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,7 +133,11 @@ impl CaptureKind {
 /// reader keeps the dispatch prefix on the atom, and a radix-prefixed literal
 /// is rare enough in a selector that treating it as a symbol is the safer
 /// default than a half-right radix parser).
-fn is_number_literal(text: &str) -> bool {
+///
+/// `pub(crate)` rather than private: [`super::matcher`] uses this same
+/// recognizer to decide whether a *literal* pattern atom is a number (and so
+/// must compare exactly) rather than a symbol (which Common Lisp folds).
+pub(crate) fn is_number_literal(text: &str) -> bool {
     let body = text.strip_prefix(['+', '-']).unwrap_or(text);
     if body.is_empty() {
         return false;
@@ -226,6 +235,19 @@ impl Pattern {
         convert(form, 0, &mut kinds)
     }
 
+    /// Converts an already-parsed form into a pattern, without reading text.
+    ///
+    /// `defrule`'s `:pattern` and `:fix` clauses are sub-forms of a rule file
+    /// the reader has already parsed once; reparsing their source slice would
+    /// cost a second read and, for a `:fix` template, would need the clause's
+    /// exact byte range recovered first. Converting the view directly is both
+    /// cheaper and simpler, and is exactly what [`Self::parse`] does after its
+    /// own call to the reader.
+    pub fn from_view(view: &ExpressionView) -> Result<Self, PatternError> {
+        let mut kinds = Vec::new();
+        convert(view, 0, &mut kinds)
+    }
+
     /// Every literal atom this pattern requires, in no particular order.
     ///
     /// A pattern matches only where *all* of these appear, so a document
@@ -301,7 +323,15 @@ fn push_unique(names: &mut Vec<String>, name: &str) {
 /// `?name:kind` and `?name...` with the tokenizer the `--query` pattern uses.
 /// Two copies of this grammar would drift, and the drift would be a template
 /// that silently writes a literal `?name` into the source.
-pub(super) enum AtomToken {
+///
+/// `pub`, not `pub(super)`, for the same reason: `paredit-feature-lint-custom`'s
+/// `defrule` reads the identical spellings (`?name`, `?name:kind`, `...`,
+/// `?name...`) and calling this function directly is what keeps its grammar
+/// from drifting from `--query`'s, the property this crate's `selector`
+/// module documentation names as the whole point of keeping the pattern
+/// language separate from the CLI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AtomToken {
     Wildcard {
         capture: Option<String>,
         kind: CaptureKind,
@@ -310,7 +340,7 @@ pub(super) enum AtomToken {
     Literal,
 }
 
-pub(super) fn classify_atom(text: &str) -> Result<AtomToken, PatternError> {
+pub fn classify_atom(text: &str) -> Result<AtomToken, PatternError> {
     if text == "_" {
         return Ok(AtomToken::Wildcard {
             capture: None,
@@ -457,7 +487,8 @@ fn convert(
     }
 }
 
-fn record_kind(
+/// `pub` alongside [`classify_atom`], for the same cross-crate reuse.
+pub fn record_kind(
     kinds: &mut Vec<(String, CaptureKind)>,
     name: &str,
     kind: CaptureKind,

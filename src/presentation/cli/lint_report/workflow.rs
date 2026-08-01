@@ -571,7 +571,7 @@ pub(in crate::presentation::cli) fn lint_report(args: LintReportArgs) -> Command
                     },
                 )?
                 .findings;
-                let computed = merge_custom(computed, &custom, file, tree, &input.text);
+                let computed = merge_custom(computed, &custom, file, dialect, tree);
                 let computed = retain_unsuppressed(computed, &input.text, tree);
                 if let (Some(cache), Some(key)) = (cache.as_ref(), key.as_deref()) {
                     let written = cache.put(key, &encode_cached_findings(&computed));
@@ -833,8 +833,8 @@ fn lint_report_sarif(
             },
         )?;
         let mut fixes = fix_map(pass.fixes);
-        let findings = merge_custom(pass.findings, custom, file, tree, &input.text);
-        custom_fixes(custom, file, tree, &input.text, active, &mut fixes);
+        let findings = merge_custom(pass.findings, custom, file, dialect, tree);
+        custom_fixes(custom, file, dialect, tree, active, &mut fixes);
         let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
         let findings: Vec<LintFinding> = findings
@@ -998,7 +998,7 @@ fn lint_report_fix(
 
         for _ in 0..MAX_FIX_PASSES {
             let mut fixes = collect_lint_fixes(file, dialect, &tree, &text, active, settings)?;
-            custom_fixes(custom, file, &tree, &text, active, &mut fixes);
+            custom_fixes(custom, file, dialect, &tree, active, &mut fixes);
             // Re-parse suppressions each pass: line numbers shift as edits land,
             // but the directive comment and its form move together.
             let suppressions = LintSuppressions::parse_in_tree(&text, &tree);
@@ -1155,8 +1155,8 @@ fn lint_report_write_baseline(
             collect_lint_findings(file, dialect, &tree)?,
             custom,
             file,
+            dialect,
             &tree,
-            &input.text,
         );
         let findings = retain_unsuppressed(findings, &input.text, &tree);
         for finding in findings {
@@ -1218,8 +1218,8 @@ fn lint_report_stats(
             collect_lint_findings(file, dialect, &tree)?,
             custom,
             file,
+            dialect,
             &tree,
-            &input.text,
         );
         let findings = retain_unsuppressed(findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
@@ -1364,8 +1364,8 @@ fn lint_report_suggest_severity(
             collect_lint_findings(file, dialect, &tree)?,
             custom,
             file,
+            dialect,
             &tree,
-            &input.text,
         );
         let findings = retain_unsuppressed(findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
@@ -1566,8 +1566,8 @@ fn lint_report_interop(
             collect_lint_findings(file, dialect, &tree)?,
             custom,
             file,
+            dialect,
             &tree,
-            &input.text,
         );
         let findings = retain_unsuppressed(findings, &input.text, &tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
@@ -1665,8 +1665,8 @@ fn lint_report_github(
             collect_lint_findings(file, dialect, tree)?,
             custom,
             file,
+            dialect,
             tree,
-            &input.text,
         );
         let findings = retain_unsuppressed(findings, &input.text, tree);
         let findings = retain_unbaselined(findings, &input.text, baseline.as_ref());
@@ -1844,13 +1844,13 @@ fn merge_custom(
     mut findings: Vec<LintFinding>,
     custom: &CustomRules,
     file: &std::path::Path,
+    dialect: paredit_core_syntax::dialect::Dialect,
     tree: &SyntaxTree,
-    text: &str,
 ) -> Vec<LintFinding> {
     if custom.is_empty() {
         return findings;
     }
-    for (rule, finding) in custom.findings(tree, text) {
+    for (rule, finding) in custom.findings(tree, dialect) {
         findings.push(LintFinding {
             rule,
             path: file.to_path_buf(),
@@ -1870,15 +1870,15 @@ fn merge_custom(
 fn custom_fixes(
     custom: &CustomRules,
     _file: &std::path::Path,
+    dialect: paredit_core_syntax::dialect::Dialect,
     tree: &SyntaxTree,
-    text: &str,
     active: &[&str],
     fixes: &mut FixMap,
 ) {
     if custom.is_empty() {
         return;
     }
-    for (rule, finding) in custom.findings(tree, text) {
+    for (rule, finding) in custom.findings(tree, dialect) {
         if !active.contains(&rule) {
             continue;
         }

@@ -90,7 +90,7 @@ use clap::Subcommand;
 )]
 pub(super) enum InspectCommand {
     /// Validate that input is a balanced S-expression document.
-    Check(AnalyzeArgs),
+    Check(analysis_report::args::CheckArgs),
     /// Detect Lisp dialect from --file extension or explicit --dialect.
     Dialect(AnalyzeArgs),
     /// Print parse, dialect, and structural metrics for agent planning.
