@@ -443,8 +443,8 @@ fn decode_form(
         return None;
     }
     let span = ByteSpan::try_new(
-        ByteOffset::new(usize::try_from(stored["start"].as_u64()?).ok()?),
-        ByteOffset::new(end),
+        ByteOffset::try_new(usize::try_from(stored["start"].as_u64()?).ok()?)?,
+        ByteOffset::try_new(end)?,
     )?;
     let head = match &stored["head"] {
         Value::Null => None,
@@ -656,6 +656,43 @@ mod tests {
         assert!(
             decode_form(&form(0, u64::MAX), &dialects, &corpus).is_none(),
             "an unbounded span must not decode"
+        );
+    }
+
+    /// `start` is bounds-checked too, not just `end`.
+    ///
+    /// Only `end` is compared against the file's length, so an entry pairing a
+    /// vast `start` with an in-range `end` walked straight into
+    /// `ByteOffset::new` and panicked the process. Every other shape of
+    /// unusable entry above is a miss, and a stale or corrupt cache is exactly
+    /// the situation this decoder exists to survive.
+    #[test]
+    fn a_start_beyond_the_offset_bound_is_a_miss() {
+        let corpus = fingerprint_corpus(&inventory(&["a.lisp"]), |_| Ok(b"(defun f ())".to_vec()))
+            .expect("the file loaded");
+        let path = PathBuf::from("a.lisp");
+        let dialects = HashMap::from([(path.as_path(), Dialect::CommonLisp)]);
+        let form = |start: u64| {
+            json!({
+                "path": "a.lisp",
+                "form_path": [0],
+                "start": start,
+                "end": 12,
+                "node_count": 3,
+                "head": "defun",
+                "text": "(defun f ())",
+            })
+        };
+
+        for start in [u64::from(u32::MAX) + 1, 5_000_000_000, u64::MAX] {
+            assert!(
+                decode_form(&form(start), &dialects, &corpus).is_none(),
+                "a start of {start} must decode to a miss, not a panic"
+            );
+        }
+        assert!(
+            decode_form(&form(0), &dialects, &corpus).is_some(),
+            "an in-range start must still decode"
         );
     }
 

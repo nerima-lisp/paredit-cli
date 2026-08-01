@@ -887,8 +887,11 @@ where
             match handle.join() {
                 Ok(mine) => claimed.push(mine),
                 // Rather than `expect`, which would render the payload as
-                // `Any { .. }`: a worker panic reaches the caller as the panic
-                // it was, the same as it did when the scope propagated it.
+                // `Any { .. }`: a worker panic reaches the caller carrying its
+                // original payload and message. `thread::scope` used to
+                // propagate it too, but replaced the payload with a generic
+                // "a scoped thread panicked", so this is strictly more
+                // informative than what it replaced.
                 Err(payload) => std::panic::resume_unwind(payload),
             }
         }

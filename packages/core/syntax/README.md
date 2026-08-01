@@ -120,3 +120,22 @@ unchanged by the move.
 | making this package depend on a `paredit-feature-*` crate | that inverts the dependency direction; a contract test rejects it |
 
 Adding a dependency to `Cargo.toml` means adding a row to the table above.
+
+### `Node` has a size budget
+
+The parse tree is a flat arena of `Node`, and that arena — not the retained
+source — is essentially all of a parse's memory. A `const` assertion in
+`sexpr/tree.rs` holds `Node` at **72 bytes** and fails the build if a field
+pushes it over. It is a budget rather than a fact about today's layout: at
+roughly one node per six source bytes, every eight bytes added to `Node` costs
+about 1.3x the document's own size in resident memory.
+
+So a field on `Node` is not a local change. Prefer widening an existing field,
+or an `Option<Box<_>>` for anything the overwhelming majority of nodes will not
+carry — which is what `reader` already is. If a new field genuinely belongs on
+every node, raise the number deliberately and say why in the assertion's
+comment. `tests/parse_memory.rs` measures what it costs, and
+`docs/src/reference/benchmarks.md` records the numbers behind the current
+bound. The same reasoning is why `ByteOffset` and `NodeId` are `u32`: see their
+documentation for why a four-gigabyte document bound is a fact this crate can
+rely on.

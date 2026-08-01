@@ -41,6 +41,23 @@ impl ByteOffset {
         Self(value as u32)
     }
 
+    /// Attempts to create an offset from a raw byte index.
+    ///
+    /// Returns `None` when `value` exceeds `u32::MAX`. Use this at any
+    /// boundary where the index is supplied by a caller rather than produced
+    /// by parsing a length-capped document: a `--at` argument, a manifest
+    /// field, a cache entry. Those callers owe the user a structured error,
+    /// not the panic [`Self::new`] raises.
+    #[must_use]
+    pub const fn try_new(value: usize) -> Option<Self> {
+        if value <= u32::MAX as usize {
+            #[allow(clippy::cast_possible_truncation)]
+            Some(Self(value as u32))
+        } else {
+            None
+        }
+    }
+
     /// Returns the raw byte index.
     #[must_use]
     pub const fn get(self) -> usize {

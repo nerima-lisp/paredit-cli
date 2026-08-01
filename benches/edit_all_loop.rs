@@ -21,6 +21,12 @@
 //! parses per match shows up as a constant factor between two revisions at
 //! every arm rather than as a slope change at one.
 //!
+//! Each match count is measured twice, as `parse-every-pass` and
+//! `carried-parse`: the loop before and after the parse `normalize` makes is
+//! carried into the next pass. Both arms are in one group so the speedup is a
+//! ratio inside a single run, rather than a comparison against a number
+//! written down in another session on another machine.
+//!
 //! Read the results as a ratio between arms and between sizes of one run,
 //! never as absolute numbers: see the header of `scripts/bench-compare.sh`.
 
@@ -116,6 +122,34 @@ fn edit_every_match(
     current
 }
 
+/// The same loop as it was before the parse was carried between passes.
+///
+/// The A in the A/B: it parses the document itself on every pass, and calls
+/// the `normalize` that discards the parse it makes internally, so the pair
+/// below differs in exactly one variable. Deliberately *not* the differential
+/// test's `edit_loop_parsing_every_pass`, which lives behind `#[cfg(test)]` in
+/// `paredit-core-syntax` and so does not exist in this crate's build at all;
+/// copying it would also have changed two more variables, since it kills
+/// rather than splices and clones the document into a trace on every pass.
+fn edit_every_match_parsing_every_pass(
+    source: &str,
+    spans: &[ByteSpan],
+    dialect: Dialect,
+) -> String {
+    let mut current = source.to_owned();
+    for span in spans.iter().rev() {
+        let tree = SyntaxTree::parse_with_dialect(&current, dialect)
+            .expect("the document under edit parses");
+        let selection = tree
+            .select_at(span.start().get())
+            .expect("the match is still where it was");
+        let rewritten = Edit::splice(&current, &tree, selection).expect("splicing a call succeeds");
+        current = Edit::normalize_changed_line_trivia(&current, rewritten, dialect)
+            .expect("the rewrite parses");
+    }
+    current
+}
+
 /// Fails the benchmark on a fixture that would measure nothing.
 ///
 /// A loop that refuses on its first match still benchmarks happily -- it just
@@ -132,6 +166,14 @@ fn assert_measurable(source: &str, spans: &[ByteSpan], dialect: Dialect) {
         "every match should have been spliced away"
     );
     SyntaxTree::parse_with_dialect(&edited, dialect).expect("the edited document still parses");
+    // A ratio between the two arms only means anything if they did the same
+    // work. This is what stops the old-loop arm drifting into a cheaper or
+    // costlier job than the new one and reporting the drift as a speedup.
+    assert_eq!(
+        edit_every_match_parsing_every_pass(source, spans, dialect),
+        edited,
+        "the two loop shapes must agree on the edited document"
+    );
 }
 
 fn benchmark_edit_all_loop(criterion: &mut Criterion) {
@@ -152,7 +194,24 @@ fn benchmark_edit_all_loop(criterion: &mut Criterion) {
         // document once per match, so this is what its throughput is per.
         group.throughput(Throughput::Bytes((source.len() * matches) as u64));
         group.bench_with_input(
-            BenchmarkId::from_parameter(matches),
+            BenchmarkId::new("parse-every-pass", matches),
+            &spans,
+            |bencher, spans| {
+                // No `iter_custom`: this arm builds no seed, so there is
+                // nothing to keep out of the measurement. Its first pass pays
+                // for the parse the other arm is handed, which is exactly the
+                // difference being measured.
+                bencher.iter(|| {
+                    black_box(edit_every_match_parsing_every_pass(
+                        &source,
+                        black_box(spans),
+                        dialect,
+                    ))
+                });
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("carried-parse", matches),
             &spans,
             |bencher, spans| {
                 // `iter_custom` to keep the seed parse each iteration needs out

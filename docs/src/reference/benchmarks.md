@@ -125,12 +125,19 @@ on Linux, `getrusage(RUSAGE_SELF)` on macOS — at sizes up to 128 MiB:
 $ cargo test --profile bench --test parse_memory -- --ignored --nocapture
 ```
 
-It is `#[ignore]`d because it allocates about 4 GiB at the largest size, and it
-reports rather than asserts: a threshold would only describe the machine it was
-last calibrated on. Each size runs in a *fresh child process*, which is not
-incidental — both platforms report a high-water mark that never falls, so
+It is `#[ignore]`d because it allocates about two gigabytes at the largest size,
+and it reports rather than asserts: a threshold would only describe the machine
+it was last calibrated on. Each size runs in a *fresh child process*, which is
+not incidental — both platforms report a high-water mark that never falls, so
 measuring several sizes in one process would report every one of them at the
 largest one's peak.
+
+The two largest sizes are deliberately past what the CLI will read. A document
+reaching the parser through a command is capped at `DEFAULT_MAX_INPUT_BYTES`
+(64 MiB), and `--max-input-bytes` can only lower that ceiling, never raise it —
+so the 32 and 128 MiB rows below measure the parser as a library, and exist to
+answer the linearity question rather than to describe a reachable run. The
+worst case a command can actually reach is the 64 MiB point on the same line.
 
 A single run on one developer machine (Apple M-series, `--profile bench`) —
 again **not** targets:
@@ -187,7 +194,7 @@ which is right for a routine measured in microseconds and would be a hundred
 seconds for the 8 MiB arm. Flat sampling bounds the target's cost by its
 `measurement_time` instead. It also times with `iter_custom`, to keep the
 tree's destructor — freeing 1.4 million nodes and their child vectors — out of
-a measurement of parsing, without Criterion retaining a quarter-gigabyte tree
+a measurement of parsing, without Criterion retaining a hundred-megabyte tree
 per iteration the way `iter_with_large_drop` would.
 
 !!! note "The fixture is uniform, and real source is not"
@@ -197,7 +204,7 @@ per iteration the way `iter_with_large_drop` would.
     reproducible, but it fixes the nodes-per-byte ratio at a value real source
     will not share: long docstrings, long string literals and wide `case` forms
     all push it down, deep macro nesting pushes it up. The *shape* of the curve
-    is what these targets measure reliably. The 30x constant is indicative.
+    is what these targets measure reliably. The 15x constant is indicative.
 
 ## `--all` edits, and what a match costs
 
@@ -224,6 +231,11 @@ were about 95% of the loop, and removing one of them roughly halved it at every
 arm. Nothing about *what* is parsed changed: there is no incremental parsing
 here, and a parse is only carried forward when it still describes the document
 byte for byte, which `edit_target_with` asserts on every pass in a debug build.
+
+Once per match is the ordinary case rather than a guarantee: a pass whose
+rewrite left trailing whitespace behind has its parse invalidated by the
+removal, and the next pass parses again. That is rare — most edits never
+produce trailing whitespace at all — so it moves the constant, not the shape.
 
 !!! warning "`parse_scaling` would not notice this loop regressing"
 

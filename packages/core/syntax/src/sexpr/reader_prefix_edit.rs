@@ -51,7 +51,7 @@ impl Edit {
     ) -> SexprResult<String> {
         super::edit::validate_edit_context(input, tree, selection)?;
         let node = selection.node();
-        let spans = &node.reader_prefix_spans();
+        let spans = node.reader_prefix_spans();
         let first = *spans
             .first()
             .ok_or(StructureError::NoReaderPrefixToUnwrap)?;

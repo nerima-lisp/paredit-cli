@@ -155,8 +155,8 @@ fn benchmark_parse_scaling(c: &mut Criterion) {
                     // 1.4 million nodes and their child vectors, which is
                     // real work and is not parsing; Criterion's `iter` times
                     // it, and its `iter_with_large_drop` excludes it only by
-                    // retaining every tree in the batch — a quarter of a
-                    // gigabyte each.
+                    // retaining every tree in the batch — over a hundred
+                    // megabytes each.
                     bencher.iter_custom(|iterations| {
                         let mut elapsed = Duration::ZERO;
                         for _ in 0..iterations {

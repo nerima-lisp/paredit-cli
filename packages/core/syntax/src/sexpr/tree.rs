@@ -851,6 +851,15 @@ impl SyntaxTree {
 
     /// Selects the smallest expression that contains the given byte offset.
     pub fn select_at(&self, offset: usize) -> SexprResult<Selection<'_>> {
+        let not_found = || SexprError::from(SelectionError::NoExpressionAtOffset { offset });
+        // The offset is a caller's argument, not a parser product, so it is
+        // not bounded by the document's length. Past the end of the source it
+        // is inside no node and the search below would fail anyway; rejecting
+        // it here also keeps it away from `ByteOffset::new`, which panics
+        // rather than truncate above four gigabytes.
+        if offset > self.source.len() {
+            return Err(not_found());
+        }
         let offset = ByteOffset::new(offset);
         let mut best = None;
         for id in 1..self.nodes.len() {
@@ -870,11 +879,7 @@ impl SyntaxTree {
             tree: self,
             node_id,
         })
-        .ok_or_else(|| {
-            SexprError::from(SelectionError::NoExpressionAtOffset {
-                offset: offset.get(),
-            })
-        })
+        .ok_or_else(not_found)
     }
 
     // A full `ExpressionPath` is only built when an atom is found. Enter/leave
