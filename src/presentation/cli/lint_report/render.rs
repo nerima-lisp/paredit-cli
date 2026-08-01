@@ -528,11 +528,31 @@ pub(super) struct LintTiming {
     pub share: f64,
 }
 
-/// Prints the per-rule cost breakdown, slowest first.
+/// One custom rule's measured cost, for `--timings`' "custom rules" section
+/// (FR-E5).
+///
+/// A separate type from [`LintTiming`] rather than a reuse of it: a custom
+/// rule's name is a `String` read from a file at startup, not the
+/// `&'static str` the compile-time registry hands the built-in rules — the
+/// same reason [`crate::lint::report::CustomFinding`] is not a
+/// `LintFinding`. Its `share` is of the *custom* rules' own total, not the
+/// built-in suite's, since the two are measured and reported as separate
+/// sections rather than one combined ranking.
+pub(super) struct CustomLintTiming {
+    pub rule: String,
+    pub micros: u128,
+    pub invocations: u64,
+    pub share: f64,
+}
+
+/// Prints the per-rule cost breakdown, slowest first, followed by the
+/// loaded custom rules' own breakdown when any ran.
 pub(super) fn print_lint_timings(
     timings: &[LintTiming],
     total_micros: u128,
     files_scanned: usize,
+    custom: &[CustomLintTiming],
+    custom_total_micros: u128,
     output: OutputFormat,
 ) -> CliResult<()> {
     match output {
@@ -547,6 +567,18 @@ pub(super) fn print_lint_timings(
                     timing.invocations,
                     timing.share,
                 );
+            }
+            if !custom.is_empty() {
+                println!("custom_total_micros\t{custom_total_micros}");
+                for timing in custom {
+                    println!(
+                        "custom_rule\t{}\t{}\t{}\t{:.2}",
+                        safe_text!(timing.rule),
+                        timing.micros,
+                        timing.invocations,
+                        timing.share,
+                    );
+                }
             }
         }
         OutputFormat::Json => {
@@ -565,6 +597,18 @@ pub(super) fn print_lint_timings(
                             "share_percent": timing.share,
                         }))
                         .collect::<Vec<_>>(),
+                    "custom_rules": {
+                        "total_micros": custom_total_micros,
+                        "rules": custom
+                            .iter()
+                            .map(|timing| json!({
+                                "rule": timing.rule,
+                                "micros": timing.micros,
+                                "invocations": timing.invocations,
+                                "share_percent": timing.share,
+                            }))
+                            .collect::<Vec<_>>(),
+                    },
                 }))?
             );
         }

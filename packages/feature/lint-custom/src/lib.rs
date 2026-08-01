@@ -4,5 +4,5 @@ pub mod pass;
 pub mod pattern;
 pub mod ruleset;
 
-pub use pass::{CustomFinding, TestFailure, run, run_tests, skipped_by_dialect};
+pub use pass::{CustomFinding, TestFailure, run, run_tests, skipped_by_dialect, timed_run};
 pub use ruleset::{CustomRule, RuleTest, Ruleset, RulesetError, parse_ruleset};

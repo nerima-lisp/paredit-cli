@@ -87,6 +87,36 @@ pub fn skipped_by_dialect(ruleset: &Ruleset, dialect: Dialect) -> usize {
         .count()
 }
 
+/// One custom rule's measured wall-clock cost over one file, for `--timings`.
+///
+/// Kept serial, like the built-in suite's own `RuleTimings` measurement (see
+/// its module documentation): a handful of workers contending for memory
+/// bandwidth measures the machine, not the rules, and a per-rule cost that
+/// changes with `--jobs` would not be a per-rule cost. A custom rule cannot
+/// join `RuleTimings` itself — that table is indexed by a rule's
+/// compile-time registration position, which a rule read from a file at
+/// startup does not have — so this is a second, independent measurement
+/// rather than an extension of it.
+#[must_use]
+pub fn timed_run(
+    ruleset: &Ruleset,
+    tree: &SyntaxTree,
+    dialect: Dialect,
+) -> Vec<(String, std::time::Duration)> {
+    let source = tree.source();
+    ruleset
+        .rules
+        .iter()
+        .filter(|rule| rule.covers(dialect))
+        .map(|rule| {
+            let mut found = Vec::new();
+            let start = std::time::Instant::now();
+            collect_rule(rule, tree, source, dialect, &mut found);
+            (rule.name.clone(), start.elapsed())
+        })
+        .collect()
+}
+
 fn collect_rule(
     rule: &CustomRule,
     tree: &SyntaxTree,
@@ -388,5 +418,28 @@ mod tests {
         );
         assert_eq!(skipped_by_dialect(&rules, Dialect::EmacsLisp), 1);
         assert_eq!(skipped_by_dialect(&rules, Dialect::CommonLisp), 0);
+    }
+
+    // -----------------------------------------------------------------
+    // FR-E5: per-rule timing for custom rules.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn timed_run_reports_every_covering_rule_once() {
+        let rules = ruleset(
+            r#"(defrule a :pattern (f ?x) :message "m")
+               (defrule b :dialects (emacs-lisp) :pattern (g ?x) :message "m")"#,
+        );
+        let tree =
+            SyntaxTree::parse_with_dialect("(f 1) (g 2)", Dialect::CommonLisp).expect("parse");
+        let timed = timed_run(&rules, &tree, Dialect::CommonLisp);
+        // `b` is out of scope for Common Lisp, so only `a` is timed.
+        assert_eq!(
+            timed
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a"]
+        );
     }
 }

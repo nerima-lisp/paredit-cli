@@ -121,6 +121,18 @@ impl CustomRules {
         paredit_feature_lint_custom::skipped_by_dialect(&self.ruleset, dialect)
     }
 
+    /// Every custom rule's per-rule wall-clock cost over one file (FR-E5),
+    /// kept serial for the same reason the built-in suite's own timing is —
+    /// see [`paredit_feature_lint_custom::timed_run`].
+    #[must_use]
+    pub(super) fn timed_findings(
+        &self,
+        tree: &paredit_core_syntax::sexpr::SyntaxTree,
+        dialect: paredit_core_syntax::dialect::Dialect,
+    ) -> Vec<(String, std::time::Duration)> {
+        paredit_feature_lint_custom::timed_run(&self.ruleset, tree, dialect)
+    }
+
     /// Runs the `deftest` clauses, returning the raw failures.
     ///
     /// `--test-rules --output json` renders one JSON object per failure from

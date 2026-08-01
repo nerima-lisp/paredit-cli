@@ -3198,6 +3198,46 @@ fn cli_lint_rejects_two_custom_rules_sharing_a_name() {
         .stderr(predicate::str::contains("two custom rules are named"));
 }
 
+/// FR-E5: `--timings` reports the loaded custom rules' own per-rule cost in
+/// a separate section, alongside the built-in suite's.
+#[test]
+fn cli_lint_timings_includes_a_custom_rules_section() {
+    let rules = rule_dir(
+        "lint-custom-timings",
+        r#"(defrule no-bare-print :pattern (print ?x) :message "m")"#,
+    );
+    let dir = fresh_temp_dir("lint-custom-timings-run");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+
+    let value = json_stdout(
+        paredit()
+            .args([
+                "inspect",
+                "lint",
+                "--timings",
+                "--output",
+                "json",
+                "--custom-rules",
+            ])
+            .arg(&rules)
+            .arg(&file)
+            .assert()
+            .success(),
+    );
+    let custom_rules = value["custom_rules"]["rules"]
+        .as_array()
+        .expect("custom_rules.rules array");
+    assert_eq!(custom_rules.len(), 1);
+    assert_eq!(custom_rules[0]["rule"], "no-bare-print");
+    assert!(
+        custom_rules[0]["invocations"]
+            .as_u64()
+            .expect("invocations")
+            > 0
+    );
+}
+
 #[test]
 fn cli_lint_list_rules_shows_the_projects_own_rules() {
     let rules = rule_dir(
