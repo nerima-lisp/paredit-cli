@@ -247,7 +247,7 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 239] = [
+const INTROSPECTION_COMMANDS: [&str; 242] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -386,6 +386,7 @@ const INTROSPECTION_COMMANDS: [&str; 239] = [
     "inspect explicit-nil-return",
     "inspect redundant-progn",
     "inspect redundant-prog1",
+    "inspect self-recursive-tail-call",
     "inspect negated-comparison",
     "inspect negated-if",
     "inspect negated-step-delta",
@@ -408,6 +409,7 @@ const INTROSPECTION_COMMANDS: [&str; 239] = [
     "inspect negated-when-unless",
     "inspect nested-boolean",
     "inspect nested-cxr",
+    "inspect package-level-shadowing",
     "inspect nthcdr-zero",
     "inspect subseq-zero",
     "inspect car-nthcdr",
@@ -445,6 +447,7 @@ const INTROSPECTION_COMMANDS: [&str; 239] = [
     "inspect redundant-count-nil",
     "inspect make-hash-table-test",
     "inspect gethash-default",
+    "inspect giant-conditional-form",
     "inspect typep-predicate",
     "inspect coerce-to-t",
     "inspect redundant-identity-key",
@@ -667,8 +670,10 @@ const SYNTAX_TIER_REPORTS: [&str; 19] = [
 
 /// Reports built on the dialect-neutral definition and scope shapes, which
 /// every dialect with a verified semantic policy provides.
-const SCOPE_TIER_REPORTS: [&str; 33] = [
+const SCOPE_TIER_REPORTS: [&str; 36] = [
     "inspect resolve",
+    "inspect giant-conditional-form",
+    "inspect self-recursive-tail-call",
     "inspect test-map",
     "inspect symbol-index",
     "inspect unreachable-expressions",
@@ -692,6 +697,7 @@ const SCOPE_TIER_REPORTS: [&str; 33] = [
     "inspect unused-definitions",
     "inspect unused-parameters",
     "inspect shadowed-bindings",
+    "inspect package-level-shadowing",
     "inspect lets",
     "inspect duplicates",
     "inspect similarity",

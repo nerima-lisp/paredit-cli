@@ -1,7 +1,10 @@
 #![doc = include_str!("../README.md")]
 
 pub mod check_then_act;
+pub mod declarative_style_score;
+pub mod embedded_secret;
 pub mod eval_of_non_constant;
+pub mod execution_order_dependency;
 pub mod global_mutation_in_function;
 pub mod handler_case_swallows_error;
 pub mod read_without_read_eval_guard;

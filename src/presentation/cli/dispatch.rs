@@ -296,6 +296,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::RedundantProg1(args) => {
                 redundant_prog1_report::workflow::redundant_prog1_report(args)?;
             }
+            command::InspectCommand::SelfRecursiveTailCall(args) => {
+                self_recursive_tail_call_report::workflow::self_recursive_tail_call_report(args)?;
+            }
             command::InspectCommand::NegatedWhenUnless(args) => {
                 negated_when_unless_report::workflow::negated_when_unless_report(args)?;
             }
@@ -364,6 +367,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::NestedCxr(args) => {
                 nested_cxr_report::workflow::nested_cxr_report(args)?;
             }
+            command::InspectCommand::PackageLevelShadowing(args) => {
+                package_level_shadowing_report::workflow::package_level_shadowing_report(args)?;
+            }
             command::InspectCommand::NthcdrZero(args) => {
                 nthcdr_zero_report::workflow::nthcdr_zero_report(args)?;
             }
@@ -420,6 +426,9 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             }
             command::InspectCommand::GethashDefault(args) => {
                 gethash_default_report::workflow::gethash_default_report(args)?;
+            }
+            command::InspectCommand::GiantConditionalForm(args) => {
+                giant_conditional_form_report::workflow::giant_conditional_form_report(args)?;
             }
             command::InspectCommand::TypepPredicate(args) => {
                 typep_predicate_report::workflow::typep_predicate_report(args)?;

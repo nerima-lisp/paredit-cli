@@ -53,6 +53,32 @@
             "primaryLocationLineHash": "fnv1a64:3a6afadbfea1e1ed:0"
           },
           "ruleId": "redundant-quote"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "suppressed.lisp"
+                },
+                "region": {
+                  "byteLength": 500,
+                  "byteOffset": 0,
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold"
+          },
+          "partialFingerprints": {
+            "pareditFindingId": "declarative-style-score/2f534fdd67304360/0",
+            "primaryLocationLineHash": "fnv1a64:8bb921ddf8134a74:0"
+          },
+          "ruleId": "declarative-style-score"
         }
       ],
       "tool": {
@@ -2206,6 +2232,152 @@
               },
               "shortDescription": {
                 "text": "a condition-case with no handler clauses, which catches nothing"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A credential typed directly into source is leaked the moment it is committed, and stays leaked in history even after the line is deleted. This rule looks for two independent signals: a value shaped like a real vendor credential, and a suspiciously-named binding holding a non-placeholder string."
+              },
+              "id": "embedded-secret",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A credential typed directly into source is leaked the moment it is committed, and stays leaked in history even after the line is deleted. This rule looks for two independent signals: a value shaped like a real vendor credential, and a suspiciously-named binding holding a non-placeholder string.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a definition whose name or literal value is shaped like an embedded credential"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A form with many bindings or clauses is doing many things in one place. Splitting it — into smaller lets, a dispatch table, or separate functions per clause — usually makes each piece independently readable and testable, at the cost of naming the pieces."
+              },
+              "id": "giant-conditional-form",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A form with many bindings or clauses is doing many things in one place. Splitting it — into smaller lets, a dispatch table, or separate functions per clause — usually makes each piece independently readable and testable, at the cost of naming the pieces.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a let/let*/cond/case-family form carrying more bindings or clauses than a threshold"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "defvar and defparameter both mean the value may change over the program's lifetime. When nothing in the defining file ever assigns to one again, that possibility is unused here, and defconstant says the same binding more precisely."
+              },
+              "id": "effectively-constant-variable",
+              "properties": {
+                "category": "naming",
+                "fixable": false,
+                "rationale": "defvar and defparameter both mean the value may change over the program's lifetime. When nothing in the defining file ever assigns to one again, that possibility is unused here, and defconstant says the same binding more precisely.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "a defparameter/defvar with an initial value that is never reassigned in the same file"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Listing a type and one of its own ancestors as direct supertypes of the same condition contributes nothing the more specific type did not already contribute; it usually means the author was not sure what the more specific type already inherits."
+              },
+              "id": "redundant-condition-supertype",
+              "properties": {
+                "category": "conditions",
+                "fixable": false,
+                "rationale": "Listing a type and one of its own ancestors as direct supertypes of the same condition contributes nothing the more specific type did not already contribute; it usually means the author was not sure what the more specific type already inherits.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a define-condition whose direct supertype list names a type and one of that type's own same-file ancestors"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A comment that is a whole disabled form carries no reason and no attribution, unlike a TODO/FIXME marker. It is code nobody runs, drifting silently out of sync with whatever replaced it. Version control already remembers deleted code, so the comment adds nothing a `git log` would not."
+              },
+              "id": "commented-out-code",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "rationale": "A comment that is a whole disabled form carries no reason and no attribution, unlike a TODO/FIXME marker. It is code nobody runs, drifting silently out of sync with whatever replaced it. Version control already remembers deleted code, so the comment adds nothing a `git log` would not.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a comment whose entire body is a balanced s-expression rather than prose"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A file loads by evaluating its top-level forms in order. defun/defmacro/defclass and friends only install a definition, so a forward reference inside one is ordinary — by the time it runs, the file has finished loading. defvar/defparameter and every other top-level form run immediately, and a forward reference inside one depends on the file's current order to work at all."
+              },
+              "id": "execution-order-dependency",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A file loads by evaluating its top-level forms in order. defun/defmacro/defclass and friends only install a definition, so a forward reference inside one is ordinary — by the time it runs, the file has finished loading. defvar/defparameter and every other top-level form run immediately, and a forward reference inside one depends on the file's current order to work at all.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a top-level form that runs at load time and references a name this file only defines later"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A file built only from definitions and value bindings can be reordered, split, or reloaded piecemeal without changing behaviour. A file with many top-level forms that run for effect — bare calls, setf, let used for a side effect — is a sequence: each form only means what it means in the order it was written."
+              },
+              "id": "declarative-style-score",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A file built only from definitions and value bindings can be reordered, split, or reloaded piecemeal without changing behaviour. A file with many top-level forms that run for effect — bare calls, setf, let used for a side effect — is a sequence: each form only means what it means in the order it was written.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a file whose fraction of purely-declarative top-level forms falls below a threshold"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A local named the same as a top-level function or special variable makes the outer one unreachable for the rest of that binding's scope. `inspect shadowed-bindings` already covers shadowing between nested lexical scopes; this is the wider case, an inner binding reaching all the way out to a top-level name."
+              },
+              "id": "package-level-shadowing",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A local named the same as a top-level function or special variable makes the outer one unreachable for the rest of that binding's scope. `inspect shadowed-bindings` already covers shadowing between nested lexical scopes; this is the wider case, an inner binding reaching all the way out to a top-level name.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an inner let binding or lambda-list parameter that reuses the name of a top-level definition in the same file"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A self-recursive call in tail position is a loop written as a function call, and whether that is safe is a fact about the dialect, not the code. Scheme, Racket, LFE, and Fennel guarantee a proper tail call here; Emacs Lisp, Hy, and Clojure do not; Common Lisp leaves it to the implementation."
+              },
+              "id": "self-recursive-tail-call",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A self-recursive call in tail position is a loop written as a function call, and whether that is safe is a fact about the dialect, not the code. Scheme, Racket, LFE, and Fennel guarantee a proper tail call here; Emacs Lisp, Hy, and Clojure do not; Common Lisp leaves it to the implementation.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a function's own name called in tail position of its body, annotated with the target dialect's tail-call guarantee"
               }
             }
           ]

@@ -622,6 +622,7 @@ use paredit_feature_lint_control_flow::prog2_to_progn::cli as prog2_to_progn_rep
 use paredit_feature_lint_control_flow::redundant_body_progn::cli as redundant_body_progn_report;
 use paredit_feature_lint_control_flow::redundant_prog1::cli as redundant_prog1_report;
 use paredit_feature_lint_control_flow::redundant_progn::cli as redundant_progn_report;
+use paredit_feature_lint_control_flow::self_recursive_tail_call::cli as self_recursive_tail_call_report;
 use paredit_feature_lint_control_flow::unwind_protect_no_cleanup::cli as unwind_protect_no_cleanup_report;
 use paredit_feature_lint_form_shape::butlast_default_count::cli as butlast_default_count_report;
 use paredit_feature_lint_form_shape::coerce_to_t::cli as coerce_to_t_report;
@@ -635,6 +636,7 @@ use paredit_feature_lint_form_shape::empty_let::cli as empty_let_report;
 use paredit_feature_lint_form_shape::funcall_lambda::cli as funcall_lambda_report;
 use paredit_feature_lint_form_shape::getf_default_nil::cli as getf_default_nil_report;
 use paredit_feature_lint_form_shape::gethash_default::cli as gethash_default_report;
+use paredit_feature_lint_form_shape::giant_conditional_form::cli as giant_conditional_form_report;
 use paredit_feature_lint_form_shape::lambda_list_keyword_order::cli as lambda_list_keyword_order_report;
 use paredit_feature_lint_form_shape::make_array_default_keyword::cli as make_array_default_keyword_report;
 use paredit_feature_lint_form_shape::make_hash_table_test::cli as make_hash_table_test_report;
@@ -646,6 +648,7 @@ use paredit_feature_lint_form_shape::manual_pushnew::cli as manual_pushnew_repor
 use paredit_feature_lint_form_shape::multiple_value_list_of_values::cli as multiple_value_list_of_values_report;
 use paredit_feature_lint_form_shape::nested_char_case::cli as nested_char_case_report;
 use paredit_feature_lint_form_shape::nested_cxr::cli as nested_cxr_report;
+use paredit_feature_lint_form_shape::package_level_shadowing::cli as package_level_shadowing_report;
 use paredit_feature_lint_form_shape::parse_integer_default_radix::cli as parse_integer_default_radix_report;
 use paredit_feature_lint_form_shape::redundant_apply::cli as redundant_apply_report;
 use paredit_feature_lint_form_shape::redundant_funcall::cli as redundant_funcall_report;

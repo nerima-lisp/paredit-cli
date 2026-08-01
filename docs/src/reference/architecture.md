@@ -65,7 +65,7 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 165 rules, and every rule depends on the engine; putting the registry in
+all 178 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
 the registry sits in the root reaching six packages for their `META` and
@@ -171,7 +171,7 @@ newer packages give each rule a single module: they ship as lint rules only,
 reachable through `inspect lint --rule <name>`, so there is one consumer and
 the three-file split would be indirection with nothing on the other end.
 
-**`REGISTRY` is in neither.** It names all 165 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 178 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.
