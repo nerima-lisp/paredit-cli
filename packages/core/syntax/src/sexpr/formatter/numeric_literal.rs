@@ -79,13 +79,33 @@ pub(super) fn numeric_literal_text(
     dialect: Dialect,
     case: NumericLiteralCase,
 ) -> Cow<'_, str> {
-    if case == NumericLiteralCase::Preserve {
+    if case == NumericLiteralCase::Preserve || !could_start_numeric_literal(text) {
         return Cow::Borrowed(text);
     }
     match radix_marker_index(text, dialect).or_else(|| exponent_marker_index(text, dialect)) {
         Some(index) => Cow::Owned(recase_byte_at(text, index, case)),
         None => Cow::Borrowed(text),
     }
+}
+
+/// Cheap first-byte guard skipping `exponent_marker_index`'s
+/// allocate-and-scan for an atom that can never be a numeric literal in any
+/// dialect this module recognises. Every shape this module recases — a
+/// radix prefix (`#x`/`#o`/`#b`/`#<n>r`) or a float, signed or not, with or
+/// without a leading decimal point (`.5e10` recases, confirmed by this
+/// module's own tests) — starts with `#`, a digit, `+`, `-`, or `.`.
+/// Anything else — an ordinary symbol like `defun` or `my-variable-name`, or
+/// a numeric-looking symbol this grammar deliberately rejects like `e10` or
+/// `x1e5` — is guaranteed to make both `radix_marker_index` and
+/// `exponent_marker_index` return `None` anyway (see their own docs), so
+/// bailing out here changes no observable output; it only skips the
+/// per-atom allocation for the common case of a non-numeric atom, which is
+/// most atoms in real source.
+const fn could_start_numeric_literal(text: &str) -> bool {
+    matches!(
+        text.as_bytes().first(),
+        Some(b'0'..=b'9' | b'+' | b'-' | b'.' | b'#')
+    )
 }
 
 /// The byte index of `text`'s radix marker letter (`x`/`o`/`b`/`r`), when
@@ -247,6 +267,22 @@ mod tests {
         assert_eq!(
             normalize("1e10", Dialect::CommonLisp, NumericLiteralCase::Upper),
             "1E10"
+        );
+    }
+
+    #[test]
+    fn a_leading_decimal_point_float_still_recases_its_exponent_marker() {
+        // No leading digit before the `.` — pinned as its own case because
+        // `could_start_numeric_literal`'s fast-path guard must treat `.` as
+        // a plausible numeric-literal start, not just a digit or sign, or
+        // this would silently stop recasing.
+        assert_eq!(
+            normalize(".5e10", Dialect::CommonLisp, NumericLiteralCase::Upper),
+            ".5E10"
+        );
+        assert_eq!(
+            normalize("-.5e10", Dialect::CommonLisp, NumericLiteralCase::Upper),
+            "-.5E10"
         );
     }
 

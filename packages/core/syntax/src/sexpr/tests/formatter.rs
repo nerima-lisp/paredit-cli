@@ -1908,6 +1908,49 @@ fn numeric_literal_case_is_idempotent() {
     assert_eq!(once, twice);
 }
 
+#[test]
+fn canonical_quote_style_and_numeric_literal_case_compose_in_format_node() {
+    use crate::sexpr::NumericLiteralCase;
+
+    // `format_node`'s Atom arm (multi-line/general rendering, exercised here
+    // via a `defun` body — a definition-style head always breaks onto
+    // multiple lines regardless of width, see
+    // `with_max_width_narrows_the_inline_fit_threshold`'s own comment, so
+    // this never routes through `compact_node`). `content` (the
+    // numeric-literal-recased text) is computed once and then either wrapped
+    // in canonical-prefix heads or emitted directly; this pins that both
+    // happen together rather than one silently winning over the other.
+    let input = "(defun f () '#x1a)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .with_numeric_literal_case(NumericLiteralCase::Upper)
+        .format(&tree);
+    assert_eq!(
+        output, "(defun f ()\n  (quote #X1a))\n",
+        "canonical quote wrapper and upper-cased radix marker (digit `a` untouched) must both apply"
+    );
+}
+
+#[test]
+fn canonical_quote_style_and_numeric_literal_case_compose_in_compact_node() {
+    use crate::sexpr::NumericLiteralCase;
+
+    // `compact_node`'s Atom arm (inline/compact rendering) — `list` is
+    // `ListStyle::General`, the one shape `compact_node` will inline at all,
+    // and the whole form comfortably fits the compiled-in 80-column default.
+    let input = "(list '#x1a)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+    let output = Formatter::with_dialect(2, Dialect::CommonLisp)
+        .with_reader_prefix_style(ReaderPrefixStyle::Canonical)
+        .with_numeric_literal_case(NumericLiteralCase::Upper)
+        .format(&tree);
+    assert_eq!(
+        output, "(list (quote #X1a))\n",
+        "canonical quote wrapper and upper-cased radix marker (digit `a` untouched) must both apply"
+    );
+}
+
 // --- FR-013: `format.align-clause-values` ---
 
 #[test]

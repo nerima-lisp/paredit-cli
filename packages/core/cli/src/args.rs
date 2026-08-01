@@ -41,7 +41,9 @@ pub struct FormatArgs {
     #[arg(long, default_value_t = 2)]
     pub indent: usize,
     /// Width, in columns, one inline (non-wrapped) line may reach before
-    /// falling back to a multi-line layout. Unset keeps the built-in 80.
+    /// falling back to a multi-line layout. Unset auto-detects the
+    /// terminal's width at an interactive stdout (plain output, no --write/
+    /// --check/--diff-stat), and falls back to the built-in 80 otherwise.
     #[arg(long, value_name = "COLUMNS")]
     pub max_width: Option<usize>,
     /// Realign the interior lines of #|...|# block comments to their new
