@@ -139,6 +139,27 @@ fn cli_marks_refactor_plan_manual_review_when_blocking_gates_do_not_fail_policy(
     assert!(output.stdout.contains("\"code\": \"ambiguous-definition\""));
     assert!(output.stdout.contains("\"code\": \"signature-mismatch\""));
     assert!(output.stdout.contains("\"command\": null"));
+
+    // FR-003: two blocking gates fired, so the aggregate is "blocking" —
+    // outranking the "warning" level either gate carries on its own.
+    assert_eq!(
+        output.json.pointer("/risk_summary/overall_risk"),
+        Some(&serde_json::Value::String("blocking".to_owned()))
+    );
+
+    // FR-004: automation cannot proceed, so the suggestion is the command
+    // that shows the blocking findings in context, not the apply command.
+    let next_commands = output
+        .json
+        .pointer("/next_commands")
+        .and_then(serde_json::Value::as_array)
+        .expect("next_commands is present for a blocked plan");
+    assert!(
+        next_commands.iter().any(|command| command["command"]
+            .as_str()
+            .is_some_and(|command| command.starts_with("paredit inspect impact"))),
+        "{next_commands:?}"
+    );
 }
 
 #[test]

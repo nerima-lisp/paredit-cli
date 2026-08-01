@@ -122,6 +122,35 @@ pub struct RefactorPlanGate {
     pub blocks_automation: bool,
 }
 
+/// The single number an agent checks first, before the level/count breakdown.
+///
+/// `RefactorRiskLevel` (info/warning/error) and "blocks automation" are two
+/// different axes: a `warning`-level gate can block (an ambiguous rename
+/// target) and an `error`-level one can be advisory in spirit while still
+/// being severe. An agent deciding whether it may proceed unattended cares
+/// about the blocking axis first and the severity label second, so this
+/// collapses both into the three states that decision actually has:
+/// nothing found, something found but non-blocking, or something blocking.
+/// Any blocking gate outranks every advisory one regardless of level, because
+/// one blocking gate is enough to stop automated editing on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RefactorPlanOverallRisk {
+    Clean,
+    Advisory,
+    Blocking,
+}
+
+impl RefactorPlanOverallRisk {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Clean => "clean",
+            Self::Advisory => "advisory",
+            Self::Blocking => "blocking",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RefactorPlanRiskSummary {
     pub highest_level: Option<RefactorRiskLevel>,
@@ -130,6 +159,7 @@ pub struct RefactorPlanRiskSummary {
     pub error_count: usize,
     pub blocking_count: usize,
     pub advisory_count: usize,
+    pub overall_risk: RefactorPlanOverallRisk,
 }
 
 impl RefactorPlanRiskSummary {
@@ -142,6 +172,7 @@ impl RefactorPlanRiskSummary {
             error_count: 0,
             blocking_count: 0,
             advisory_count: 0,
+            overall_risk: RefactorPlanOverallRisk::Clean,
         };
 
         for gate in gates {
@@ -160,6 +191,13 @@ impl RefactorPlanRiskSummary {
                 summary.advisory_count += gate.count;
             }
         }
+        summary.overall_risk = if summary.blocking_count > 0 {
+            RefactorPlanOverallRisk::Blocking
+        } else if summary.advisory_count > 0 {
+            RefactorPlanOverallRisk::Advisory
+        } else {
+            RefactorPlanOverallRisk::Clean
+        };
         summary
     }
 }
