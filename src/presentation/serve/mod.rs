@@ -26,12 +26,14 @@
 //! text says sends the token over the network in clear text.
 
 mod http;
+mod metrics;
 mod service;
 
 use std::io::BufReader;
 use std::net::{IpAddr, TcpListener, TcpStream};
 use std::process::ExitCode;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Instant;
 
 use clap::Args;
 use serde_json::{Value, json};
@@ -103,6 +105,7 @@ fn run(args: ServeArgs) -> Result<(), String> {
     eprintln!("token: {token}");
 
     let cache = Arc::new(Mutex::new(service::Cache::default()));
+    let metrics = Mutex::new(metrics::Metrics::default());
     let mut served = 0_u64;
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
@@ -111,7 +114,7 @@ fn run(args: ServeArgs) -> Result<(), String> {
         // would spend its life waiting on the same mutex — with the added
         // failure mode that a client holding a socket open blocks nothing today
         // and would block a worker then.
-        handle(&stream, &cache, &token);
+        handle(&stream, &cache, &metrics, &token);
         served += 1;
         if args.max_requests.is_some_and(|limit| served >= limit) {
             return Ok(());
@@ -162,17 +165,55 @@ fn mint_token(address: &str) -> String {
     hasher.finalize().to_hex()[..32].to_owned()
 }
 
-fn handle(stream: &TcpStream, cache: &Arc<Mutex<service::Cache>>, token: &str) {
+fn handle(
+    stream: &TcpStream,
+    cache: &Arc<Mutex<service::Cache>>,
+    metrics: &Mutex<metrics::Metrics>,
+    token: &str,
+) {
+    let started = Instant::now();
     let mut reader = BufReader::new(stream);
     let request = match http::Request::read(&mut reader) {
         Ok(request) => request,
+        // Not a request, so not a request to count: a health checker that opens
+        // and closes a socket would otherwise drag the latency total down.
         Err(http::RequestError::Closed) => return,
         Err(error) => {
             let _ = write(stream, 400, "Bad Request", &format!("{error}\n"));
+            lock_metrics(metrics).record(started.elapsed());
             return;
         }
     };
 
+    route(stream, &request, cache, metrics, token);
+    lock_metrics(metrics).record(started.elapsed());
+}
+
+/// A poisoned mutex means a previous request panicked mid-analysis. The cache
+/// is a pure derivation of files on disk, so the worst it can hold is a stale
+/// entry; discarding the poison and continuing is better than taking the server
+/// down for the rest of the session.
+fn lock_cache(cache: &Mutex<service::Cache>) -> MutexGuard<'_, service::Cache> {
+    cache.lock().unwrap_or_else(|poison| {
+        let mut cache = poison.into_inner();
+        *cache = service::Cache::default();
+        cache
+    })
+}
+
+/// Counters are not correctness state, so a poisoned tally keeps counting
+/// rather than costing the server its remaining requests.
+fn lock_metrics(metrics: &Mutex<metrics::Metrics>) -> MutexGuard<'_, metrics::Metrics> {
+    metrics.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn route(
+    stream: &TcpStream,
+    request: &http::Request,
+    cache: &Arc<Mutex<service::Cache>>,
+    metrics: &Mutex<metrics::Metrics>,
+    token: &str,
+) {
     // Unauthenticated, and deliberately before the route table: a health probe
     // that answered without a token would be a way to confirm the port is a
     // paredit server, which is the first step of an attack on it.
@@ -187,6 +228,22 @@ fn handle(stream: &TcpStream, cache: &Arc<Mutex<service::Cache>>, token: &str) {
             401,
             "Unauthorized",
             &json!({ "error": "an Authorization: Bearer <token> header is required" }),
+        );
+        return;
+    }
+
+    // Behind the token like everything below it. A scrape reveals how much of
+    // the repository this process has read and how busy the developer is, which
+    // is not something to hand to any process that can reach the port.
+    if request.method == "GET" && request.target == "/metrics" {
+        let counters = lock_cache(cache).counters();
+        let body = lock_metrics(metrics).render(counters);
+        let _ = write_with(
+            stream,
+            200,
+            "OK",
+            "text/plain; version=0.0.4; charset=utf-8",
+            &body,
         );
         return;
     }
@@ -234,15 +291,7 @@ fn handle(stream: &TcpStream, cache: &Arc<Mutex<service::Cache>>, token: &str) {
     };
 
     let outcome = {
-        // A poisoned mutex means a previous request panicked mid-analysis. The
-        // cache is a pure derivation of files on disk, so the worst it can hold
-        // is a stale entry; discarding the poison and continuing is better than
-        // taking the server down for the rest of the session.
-        let mut cache = cache.lock().unwrap_or_else(|poison| {
-            let mut cache = poison.into_inner();
-            *cache = service::Cache::default();
-            cache
-        });
+        let mut cache = lock_cache(cache);
         service::dispatch(&mut cache, &call.method, &call.params)
     };
 
@@ -282,6 +331,117 @@ fn write_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::io::{Read as _, Write as _};
+    use std::net::SocketAddr;
+
+    /// One raw request over a fresh connection, returning the status, the
+    /// header block, and the body. Twenty lines rather than an HTTP client, for
+    /// the same reason the server is: the exchange is a request line, three
+    /// headers, and a body.
+    fn request(
+        address: SocketAddr,
+        line: &str,
+        token: Option<&str>,
+        body: &str,
+    ) -> (u16, String, String) {
+        let mut text = format!("{line}\r\nHost: {address}\r\n");
+        if let Some(token) = token {
+            text.push_str(&format!("Authorization: Bearer {token}\r\n"));
+        }
+        text.push_str(&format!("Content-Length: {}\r\n\r\n", body.len()));
+        text.push_str(body);
+
+        let mut stream = TcpStream::connect(address).expect("connect");
+        stream
+            .write_all(text.as_bytes())
+            .expect("write the request");
+        stream.flush().expect("flush");
+
+        let mut response = String::new();
+        stream
+            .read_to_string(&mut response)
+            .expect("read the response");
+        let status = response
+            .split_whitespace()
+            .nth(1)
+            .expect("a status code")
+            .parse()
+            .expect("a numeric status");
+        let (head, body) = response
+            .split_once("\r\n\r\n")
+            .expect("a header block and a body");
+        (status, head.to_owned(), body.to_owned())
+    }
+
+    /// The scrape has to parse as Prometheus text, and it has to be as closed
+    /// as every other route: a `/metrics` that answered without the token would
+    /// confirm the port is a paredit server and say how much it has read, which
+    /// is the first step of an attack on it.
+    #[test]
+    fn metrics_are_prometheus_text_behind_the_same_token_as_every_other_route() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind a loopback port");
+        let address = listener.local_addr().expect("the bound address");
+        let token = "metrics-test-token";
+
+        let server = std::thread::spawn(move || {
+            let cache = Arc::new(Mutex::new(service::Cache::default()));
+            let metrics = Mutex::new(metrics::Metrics::default());
+            for _ in 0..4 {
+                let Ok((stream, _)) = listener.accept() else {
+                    return;
+                };
+                handle(&stream, &cache, &metrics, token);
+            }
+        });
+
+        let (status, _, body) = request(
+            address,
+            "POST / HTTP/1.1",
+            Some(token),
+            r#"{"jsonrpc":"2.0","id":1,"method":"paredit/version"}"#,
+        );
+        assert_eq!(status, 200, "{body}");
+
+        let (status, head, body) = request(address, "GET /metrics HTTP/1.1", Some(token), "");
+        assert_eq!(status, 200, "{body}");
+        assert!(
+            head.contains("Content-Type: text/plain; version=0.0.4"),
+            "{head}"
+        );
+        assert!(
+            body.contains("# TYPE paredit_serve_requests_total counter"),
+            "{body}"
+        );
+        // The POST above, and not the scrape itself: the tally is recorded once
+        // the response is written.
+        assert!(
+            body.lines()
+                .any(|line| line == "paredit_serve_requests_total 1"),
+            "{body}"
+        );
+        assert!(
+            body.lines()
+                .any(|line| line == "paredit_serve_cache_hits_total 0"),
+            "{body}"
+        );
+        assert!(
+            body.lines()
+                .any(|line| line.starts_with("paredit_serve_request_duration_seconds_total ")),
+            "{body}"
+        );
+
+        let refused = request(address, "GET /metrics HTTP/1.1", None, "");
+        let baseline = request(address, "POST / HTTP/1.1", None, "{}");
+        assert_eq!(refused.0, 401, "{}", refused.2);
+        assert_eq!(
+            (refused.0, refused.2),
+            (baseline.0, baseline.2),
+            "an unauthorized scrape must be indistinguishable from any other"
+        );
+
+        server.join().expect("the server thread");
+    }
 
     /// A token that repeats is one an attacker can predict from a token they
     /// have already seen — or hardcode outright.

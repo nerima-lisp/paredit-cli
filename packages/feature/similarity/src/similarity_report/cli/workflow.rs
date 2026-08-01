@@ -3,7 +3,8 @@ use paredit_core_cli::CommandResult;
 use crate::similarity_report::usecase::{
     DiscoveredSimilarityFile, SimilarityDuplicatePolicy, SimilarityGateDecision,
     SimilarityIndeterminateReason, SimilarityInventory, SimilarityReportOptions,
-    SimilarityReportRequest, SimilarityReportSourcePort, build_similarity_report,
+    SimilarityReportPlan, SimilarityReportRequest, SimilarityReportSourcePort,
+    build_similarity_report,
 };
 use paredit_core_cli::workspace_args::scan_workspace;
 use paredit_core_syntax::dialect::Dialect;
@@ -12,6 +13,7 @@ use paredit_core_workspace::workspace::{
 };
 
 use super::args::SimilarityReportArgs;
+use super::cache::{ResultCacheOutcome, SimilarityResultCache, fingerprint_corpus};
 use super::render::print_similarity_report;
 
 pub fn similarity_report(args: SimilarityReportArgs) -> CommandResult {
@@ -49,9 +51,17 @@ pub fn similarity_report(args: SimilarityReportArgs) -> CommandResult {
         options: resolved.options,
         from_list: resolved.from_list,
         discovery: None,
+        inventory: None,
     };
-    let plan = build_similarity_report(&mut source, request)?;
-    print_similarity_report(&plan, &args)?;
+
+    let (plan, cache_outcome) = match args.input.cache_dir.as_deref() {
+        None => (build_similarity_report(&mut source, request)?, None),
+        Some(directory) => {
+            let cache = SimilarityResultCache::open(directory, args.input.clear_cache)?;
+            reuse_or_build(&mut source, request, &cache)?
+        }
+    };
+    print_similarity_report(&plan, &args, cache_outcome)?;
 
     match plan.gate() {
         SimilarityGateDecision::NotRequested | SimilarityGateDecision::Passed => Ok(()),
@@ -78,6 +88,32 @@ pub fn similarity_report(args: SimilarityReportArgs) -> CommandResult {
     }
 }
 
+/// Answers from the stored report when the corpus and the options match.
+///
+/// Discovery has to run before that can be decided, because the corpus is part
+/// of the key — see [`super::cache`]. The source memoises it, so the analysis
+/// on a miss does not walk the tree a second time.
+fn reuse_or_build(
+    source: &mut CliSimilarityReportSource,
+    request: SimilarityReportRequest,
+    cache: &SimilarityResultCache,
+) -> paredit_core_cli::CliResult<(SimilarityReportPlan, Option<ResultCacheOutcome>)> {
+    let inventory = source.discover(&request)?;
+    let Some(fingerprint) = fingerprint_corpus(&inventory, |file| source.load(file)) else {
+        // A file the corpus cannot read at all. Reported by the analysis under
+        // the error policy, but not cached: see `fingerprint_corpus`.
+        return Ok((build_similarity_report(source, request)?, None));
+    };
+
+    let key = cache.key(&request, &fingerprint);
+    if let Some(plan) = cache.get(&key, &inventory, request.duplicate_policy) {
+        return Ok((plan, Some(ResultCacheOutcome::Hit)));
+    }
+    let plan = build_similarity_report(source, request)?;
+    cache.put(&key, &plan);
+    Ok((plan, Some(ResultCacheOutcome::Missing)))
+}
+
 struct CliSimilarityReportSource {
     /// Held rather than taken from the args: `--dialect` widens the options
     /// below, and a cache key computed from the un-widened set would serve a
@@ -86,6 +122,13 @@ struct CliSimilarityReportSource {
     options: WorkspaceDiscoveryOptions,
     from_list: bool,
     discovery: Option<WorkspaceDiscovery>,
+    /// The inventory the first `discover` produced.
+    ///
+    /// `reuse_or_build` needs it before it can decide whether to run the
+    /// analysis, and the analysis asks for it again. Recomputing would mean
+    /// walking the tree twice per run, and — worse — deciding the cache key
+    /// against one walk while analysing the results of another.
+    inventory: Option<SimilarityInventory>,
 }
 
 impl SimilarityReportSourcePort for CliSimilarityReportSource {
@@ -95,6 +138,9 @@ impl SimilarityReportSourcePort for CliSimilarityReportSource {
         &mut self,
         request: &SimilarityReportRequest,
     ) -> Result<SimilarityInventory, Self::Error> {
+        if let Some(inventory) = self.inventory.clone() {
+            return Ok(inventory);
+        }
         // `--dialect` forces every file to be parsed with one dialect, so an
         // unknown extension is no longer a reason to skip a file.
         let options = WorkspaceDiscoveryOptions {
@@ -118,6 +164,7 @@ impl SimilarityReportSourcePort for CliSimilarityReportSource {
             skipped_excluded_count: discovery.skipped_excluded_count(),
         };
         self.discovery = Some(discovery);
+        self.inventory = Some(inventory.clone());
         Ok(inventory)
     }
 

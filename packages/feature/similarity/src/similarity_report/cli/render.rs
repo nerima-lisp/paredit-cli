@@ -8,28 +8,45 @@ use crate::similarity_report::usecase::{
 use paredit_core_syntax::dialect::Dialect;
 
 use super::args::SimilarityReportArgs;
+use super::cache::ResultCacheOutcome;
 use paredit_core_cli::args::OutputFormat;
 
+/// Prints the report, and — only when `--cache-dir` was given — whether it was
+/// recomputed.
+///
+/// Reported rather than inferred: a reused report is byte-identical to a fresh
+/// one, so without this field there is no way to tell a working cache from a
+/// misconfigured one, and a cache that silently never hits looks exactly like
+/// a cache that always does. Absent without the flag, so a run that asked for
+/// no cache keeps the output it had before there was one.
 pub fn print_similarity_report(
     plan: &SimilarityReportPlan,
     args: &SimilarityReportArgs,
+    cache: Option<ResultCacheOutcome>,
 ) -> CliResult<()> {
     match args.output {
-        OutputFormat::Text => print_text(plan, args),
+        OutputFormat::Text => print_text(plan, args, cache),
         OutputFormat::Json => println!(
             "{}",
-            serde_json::to_string_pretty(&json_report(plan, args))?
+            serde_json::to_string_pretty(&json_report(plan, args, cache))?
         ),
     }
     Ok(())
 }
 
-fn print_text(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) {
+fn print_text(
+    plan: &SimilarityReportPlan,
+    args: &SimilarityReportArgs,
+    cache: Option<ResultCacheOutcome>,
+) {
     let report = plan.report();
     let inventory = plan.inventory();
     let errors = plan.errors();
     let summary = &report.summary;
     println!("schema_version\t1");
+    if let Some(outcome) = cache {
+        println!("cache\t{}", outcome.as_str());
+    }
     println!("threshold\t{:.6}", args.threshold);
     println!("min_node_count\t{}", args.min_node_count);
     println!("min_line_span\t{}", args.min_line_span);
@@ -97,11 +114,15 @@ fn print_text(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) {
     }
 }
 
-fn json_report(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) -> serde_json::Value {
+fn json_report(
+    plan: &SimilarityReportPlan,
+    args: &SimilarityReportArgs,
+    cache: Option<ResultCacheOutcome>,
+) -> serde_json::Value {
     let report = plan.report();
     let inventory = plan.inventory();
     let errors = plan.errors();
-    json!({
+    let mut document = json!({
         "schema_version": 1,
         "pair_count": report.summary.reported_pairs(),
         "options": {
@@ -167,7 +188,13 @@ fn json_report(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) -> serd
                 "right": form_json(pair.right()),
             })
         }).collect::<Vec<_>>(),
-    })
+    });
+    if let Some(object) = document.as_object_mut() {
+        if let Some(outcome) = cache {
+            object.insert("cache".to_owned(), outcome.as_str().into());
+        }
+    }
+    document
 }
 
 fn optional_usize(value: Option<usize>) -> String {

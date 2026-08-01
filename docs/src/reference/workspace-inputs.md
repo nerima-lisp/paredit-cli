@@ -239,6 +239,27 @@ of the tree, and it re-checks that each root is still the directory it was.
 The cache never widens a result: a file the cached scan did not select stays
 unreadable even if it now sits inside a scanned root.
 
+### `inspect similarity` also caches the report
+
+For most commands the entry is a file list and the analysis still runs. For
+`inspect similarity` the same `--cache-dir` additionally stores the finished
+report, in a `similarity/` subdirectory of it. Similarity compares every pair
+of candidate forms, so it is quadratic in the candidate count where the walk is
+linear in the file count — reusing the file list saves the smaller half.
+
+That entry is content-addressed rather than validated: the key covers the tool
+version, every matching option, and each selected file's path, dialect and full
+content hash. A hit therefore means the identical question was already
+answered, so there is nothing to invalidate — change a byte in any file, or any
+option, and the previous entry describes a question nobody is asking. Reading
+the whole corpus to hash it costs a linear pass and buys a quadratic one.
+
+`--output` and `--fail-on-duplicates` are deliberately not part of the key: the
+stored value is the report, not its rendering, and the duplicate gate is
+recomputed from the current run's flag. `inspect similarity --output json`
+reports `hit` or `missing` in a `cache` field, present only when `--cache-dir`
+was given. `--clear-cache` discards these entries too.
+
 ## Several repositories at once
 
 Discovery detects repository boundaries and groups the result:

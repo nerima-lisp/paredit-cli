@@ -49,10 +49,15 @@ pub fn let_report(args: LetReportArgs) -> CommandResult {
         // Per-file read+parse+analysis is independent, so it fans out across
         // workers; results are reassembled by index so both the per-file
         // output order and first-error selection match the sequential loop.
-        let worker_count = std::thread::available_parallelism()
-            .map(|parallelism| parallelism.get())
-            .unwrap_or(1)
-            .clamp(1, args.files.len());
+        // `--jobs` governs this fan-out; `0` is that flag's own "as many as
+        // the machine reports", and the only case that still asks the machine.
+        let requested = paredit_core_safety::limits::effective_jobs();
+        let worker_count = if requested == 0 {
+            std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+        } else {
+            requested
+        }
+        .clamp(1, args.files.len());
         let mut ordered: Vec<Option<CliResult<FileLetReport>>> =
             (0..args.files.len()).map(|_| None).collect();
         std::thread::scope(|scope| -> CommandResult {

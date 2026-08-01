@@ -102,6 +102,67 @@ problem the split exists to fix: one feature's change spread across three
 trees. A slice grows a subdirectory per layer only when that layer has more
 than one file, as `similarity_report` does and `duplicate_report` does not.
 
+## Complexity
+
+Everything in this package is built on comparing forms to other forms, so its
+cost is quadratic in the candidate count before any pruning. The mitigations
+below are load-bearing, not optimisations: removing one does not make a report
+slower, it makes it stop returning on inputs that are perfectly ordinary.
+
+| Stage | Cost | What holds it down |
+| --- | --- | --- |
+| Pair enumeration | `O(n²)` in candidate forms | Size-based pruning rejects pairs whose node or leaf counts cannot reach the threshold, before any tree-edit distance is computed. `--max-candidates` and `--max-comparisons` are hard budgets on top. |
+| Overlap suppression (`--overlap-policy maximal`) | `O(m log m)` in *matched* pairs | A span forest per file pair, not a pairwise containment test. |
+| Sub-form runs (`inspect clone-sequences`) | `O(w)` run lengths per list of width `w` | `MAX_SUPPORTED_RUN_LENGTH`. |
+
+### `--overlap-policy maximal` is the default, and the degenerate case
+
+`maximal` suppresses a match that is wholly contained by a higher-ranked one,
+which is what makes the report readable: without it, a duplicated function also
+reports its body, and its body's body. The trap is that the suppression runs
+over the *matched* pair set, and on a repetitive or generated corpus — one
+where nearly every form matches nearly every other — that set is itself
+quadratic in the candidate count. A pairwise containment check over it is
+therefore quartic in the input, which does not look slow on a test fixture and
+does not return at all on a real vendored directory.
+
+So containment is not decided pair by pair. `suppress_contained_pairs` in
+`similarity_report/domain/reports.rs` groups pairs by their (ordered) file pair,
+builds a `SpanForest` over each side — form spans within one tree are nested or
+disjoint, so containment is a forest rather than an arbitrary partial order —
+and walks it with Euler ranges against a Fenwick tree. **Do not replace this
+with the obvious nested loop.** It is the obvious nested loop that this exists
+to avoid, and the input that exposes the difference is a corpus, not a unit
+test.
+
+### `MAX_SUPPORTED_RUN_LENGTH`
+
+`clone_report/domain/sequence.rs` caps a reported run of adjacent sibling forms
+at 64. The cap is cheap to justify twice over: a run longer than 64 is almost
+certainly a whole body, which the form-shaped reports already cover, and
+enumerating every run length up to a file's widest list is exactly what makes
+naive run detection quadratic in that width. Raising it trades a class of
+finding nobody asked for against a cost that grows with the worst file in the
+tree.
+
+### Measuring a change
+
+`benches/similarity_report.rs` is where performance-sensitive changes to this
+package are measured. Its scenarios exist specifically to pin the pruning
+behaviour that is quadratic in the candidate count — `repeated-shape` is the
+degenerate corpus, `node-count-pruned` and `leaf-count-pruned` are the two size
+filters — so a change that defeats a filter shows up as a shape change across
+input sizes rather than a flat slowdown.
+
+Run it against a baseline revision rather than reading absolute numbers:
+
+```console
+$ ./scripts/bench-compare.sh
+```
+
+See `docs/src/reference/benchmarks.md` for what that reports and why the
+confidence interval, not the point estimate, is the number to act on.
+
 ## When you change this package
 
 | You are… | and it belongs here because… |

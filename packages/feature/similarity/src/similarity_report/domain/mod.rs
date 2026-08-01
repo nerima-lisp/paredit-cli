@@ -12,9 +12,23 @@ pub use options::{
 };
 pub use reports::{build_similarity_pairs, build_similarity_pairs_with_omissions};
 pub use types::{
-    InvalidSimilarityRatio, InvalidSimilarityReport, InvalidSimilarityScore, PairProcessingCounts,
-    PairResultCounts, ReportLimit, SharedFormText, SimilarityCandidate, SimilarityFormReport,
-    SimilarityPairReport, SimilarityRatio, SimilarityReport, SimilarityReportSummary,
+    // `FormHead` is in `SimilarityFormReport::new`'s signature, so the
+    // constructor was not actually callable from outside this module without
+    // it.
+    FormHead,
+    InvalidSimilarityRatio,
+    InvalidSimilarityReport,
+    InvalidSimilarityScore,
+    PairProcessingCounts,
+    PairResultCounts,
+    ReportLimit,
+    SharedFormText,
+    SimilarityCandidate,
+    SimilarityFormReport,
+    SimilarityPairReport,
+    SimilarityRatio,
+    SimilarityReport,
+    SimilarityReportSummary,
     SimilarityScore,
 };
 

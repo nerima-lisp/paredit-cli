@@ -57,8 +57,12 @@ pub trait SimilarityReportSourcePort: Sync {
 
     fn load(&self, file: &DiscoveredSimilarityFile) -> Result<Vec<u8>, String>;
 
+    /// `--jobs` is what a caller sets to bound this run's worker count, and it
+    /// only reaches here if this default reads it. `0` is the flag's "as many
+    /// as the machine reports", which is the only case that asks the machine.
     fn available_parallelism(&self) -> NonZeroUsize {
-        std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN)
+        NonZeroUsize::new(paredit_core_safety::limits::effective_jobs())
+            .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN))
     }
 }
 
