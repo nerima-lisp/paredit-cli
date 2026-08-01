@@ -54,9 +54,14 @@ impl Request {
             return Err(RequestError::Closed);
         }
         let mut parts = line.split_whitespace();
-        let (Some(method), Some(target)) = (parts.next(), parts.next()) else {
+        let (Some(method), Some(target), Some(version)) =
+            (parts.next(), parts.next(), parts.next())
+        else {
             return Err(RequestError::Malformed("malformed request line".to_owned()));
         };
+        if version != "HTTP/1.1" || parts.next().is_some() {
+            return Err(RequestError::Malformed("malformed request line".to_owned()));
+        }
         let (method, target) = (method.to_owned(), target.to_owned());
 
         let mut length = 0_usize;

@@ -40,10 +40,50 @@ fn generated_thread_last_pipeline(depth: usize) -> String {
     format!("({})", forms.join(" "))
 }
 
+fn expected_thread_first_pipeline(depth: usize) -> String {
+    let mut forms = vec!["->".to_owned(), "seed".to_owned()];
+    for index in 0..depth {
+        forms.push(format!("f{index}"));
+    }
+    format!("({})", forms.join(" "))
+}
+
+fn expected_thread_last_pipeline(depth: usize) -> String {
+    let mut forms = vec!["->>".to_owned(), "seed".to_owned()];
+    for index in 0..depth {
+        forms.push(format!("(g{index} arg{index})"));
+    }
+    format!("({})", forms.join(" "))
+}
+
+fn expected_unthread_first_expression(depth: usize) -> String {
+    let mut expression = "seed".to_owned();
+    for index in 0..depth {
+        expression = if index % 2 == 0 {
+            format!("(f{index} {expression})")
+        } else {
+            format!("(f{index} {expression} arg{index})")
+        };
+    }
+    expression
+}
+
+fn expected_unthread_last_expression(depth: usize) -> String {
+    let mut expression = "seed".to_owned();
+    for index in 0..depth {
+        expression = if index % 2 == 0 {
+            format!("(g{index} {expression})")
+        } else {
+            format!("(g{index} arg{index} {expression})")
+        };
+    }
+    expression
+}
+
 fn assert_thread_expression_property(
     input: String,
     style: &str,
-    expected_operator: &str,
+    expected_replacement: String,
 ) -> Result<(), TestCaseError> {
     let output = paredit()
         .args([
@@ -71,10 +111,10 @@ fn assert_thread_expression_property(
         .map_err(|err| TestCaseError::fail(format!("parse json: {err}")))?;
     prop_assert_eq!(report["changed"].as_bool(), Some(true));
     let replacement = report["replacement"].as_str().unwrap_or_default();
-    let expected_prefix = format!("({expected_operator} seed");
-    prop_assert!(replacement.starts_with(&expected_prefix));
+    prop_assert_eq!(replacement, expected_replacement.as_str());
 
     let rewritten = report["rewritten"].as_str().unwrap_or_default();
+    prop_assert_eq!(rewritten, expected_replacement.as_str());
     let check_output = paredit()
         .arg("inspect")
         .arg("check")
@@ -89,7 +129,10 @@ fn assert_thread_expression_property(
     Ok(())
 }
 
-fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseError> {
+fn assert_unthread_expression_property(
+    input: String,
+    expected_replacement: String,
+) -> Result<(), TestCaseError> {
     let output = paredit()
         .args([
             "refactor",
@@ -114,12 +157,14 @@ fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseErro
         .map_err(|err| TestCaseError::fail(format!("parse json: {err}")))?;
     prop_assert_eq!(report["changed"].as_bool(), Some(true));
     let replacement = report["replacement"].as_str().unwrap_or_default();
-    prop_assert!(replacement.starts_with('('));
+    prop_assert_eq!(replacement, expected_replacement.as_str());
+    let rewritten = report["rewritten"].as_str().unwrap_or_default();
+    prop_assert_eq!(rewritten, expected_replacement.as_str());
 
     let check_output = paredit()
         .arg("inspect")
         .arg("check")
-        .write_stdin(replacement.to_owned())
+        .write_stdin(rewritten.to_owned())
         .output()
         .map_err(|err| TestCaseError::fail(format!("run check: {err}")))?;
     prop_assert!(
@@ -131,17 +176,34 @@ fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseErro
 }
 
 proptest! {
-    #![proptest_config(cli_proptest_config_replaying_recorded_failures(12))]
+    #![proptest_config(cli_proptest_config_replaying_recorded_failures(
+        12,
+        concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cli/thread_expression/pbt.proptest-regressions"),
+    ))]
 
     #[test]
     fn cli_thread_expression_preserves_parseability_for_generated_chains(depth in 1usize..8) {
-        assert_thread_expression_property(generated_thread_first_chain(depth), "first", "->")?;
-        assert_thread_expression_property(generated_thread_last_chain(depth), "last", "->>")?;
+        assert_thread_expression_property(
+            generated_thread_first_chain(depth),
+            "first",
+            expected_thread_first_pipeline(depth),
+        )?;
+        assert_thread_expression_property(
+            generated_thread_last_chain(depth),
+            "last",
+            expected_thread_last_pipeline(depth),
+        )?;
     }
 
     #[test]
     fn cli_unthread_expression_preserves_parseability_for_generated_pipelines(depth in 1usize..8) {
-        assert_unthread_expression_property(generated_thread_first_pipeline(depth))?;
-        assert_unthread_expression_property(generated_thread_last_pipeline(depth))?;
+        assert_unthread_expression_property(
+            generated_thread_first_pipeline(depth),
+            expected_unthread_first_expression(depth),
+        )?;
+        assert_unthread_expression_property(
+            generated_thread_last_pipeline(depth),
+            expected_unthread_last_expression(depth),
+        )?;
     }
 }

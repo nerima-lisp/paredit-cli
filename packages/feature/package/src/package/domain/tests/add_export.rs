@@ -17,7 +17,10 @@ fn adds_export_to_existing_option() {
     assert!(plan.changed);
     assert!(!plan.already_exported);
     assert_eq!(plan.package, "#:demo");
-    assert!(plan.rewritten.contains("(:export #:old #:new)"));
+    assert_eq!(
+        plan.rewritten,
+        "(defpackage #:demo\n  (:use #:cl)\n  (:export #:old #:new))\n"
+    );
     SyntaxTree::parse(&plan.rewritten).unwrap();
 }
 
@@ -33,7 +36,10 @@ fn adds_export_with_hash_colon_prefix_even_when_symbol_argument_is_bare() {
     .unwrap();
 
     assert!(plan.changed);
-    assert!(plan.rewritten.contains("(:export #:old #:new)"));
+    assert_eq!(
+        plan.rewritten,
+        "(defpackage #:demo\n  (:use #:cl)\n  (:export #:old #:new))\n"
+    );
     SyntaxTree::parse(&plan.rewritten).unwrap();
 }
 
@@ -49,7 +55,10 @@ fn adds_export_option_with_hash_colon_prefix_when_symbol_argument_is_bare() {
     .unwrap();
 
     assert!(plan.changed);
-    assert!(plan.rewritten.contains("(:export #:new)"));
+    assert_eq!(
+        plan.rewritten,
+        "(defpackage #:demo\n  (:use #:cl)\n  (:export #:new))\n"
+    );
     SyntaxTree::parse(&plan.rewritten).unwrap();
 }
 
@@ -84,10 +93,10 @@ proptest! {
             package: Some(&package_name),
             symbol: &export_symbol,
         }).unwrap();
-        let expected_export = format!("(:export {export})");
+        let expected = format!("(defpackage #:{package} (:use #:cl)\n  (:export {export}))\n");
 
         SyntaxTree::parse(&plan.rewritten).unwrap();
         prop_assert!(plan.changed);
-        prop_assert!(plan.rewritten.contains(&expected_export));
+        prop_assert_eq!(&plan.rewritten, &expected);
     }
 }

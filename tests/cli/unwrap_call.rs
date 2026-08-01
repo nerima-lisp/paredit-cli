@@ -146,7 +146,18 @@ fn generated_unwrap_call_input(depth: usize) -> String {
     format!("(with-wrapper {expression} :trace)")
 }
 
-fn assert_unwrap_call_property(input: String) -> Result<(), TestCaseError> {
+fn expected_unwrapped_call(depth: usize) -> String {
+    let mut expression = "seed".to_owned();
+    for index in 0..depth {
+        expression = format!("(step-{index} {expression})");
+    }
+    expression
+}
+
+fn assert_unwrap_call_property(
+    input: String,
+    expected_replacement: String,
+) -> Result<(), TestCaseError> {
     let output = paredit()
         .args([
             "refactor",
@@ -178,7 +189,10 @@ fn assert_unwrap_call_property(input: String) -> Result<(), TestCaseError> {
     prop_assert_eq!(report["callArgumentCount"].as_u64(), Some(2));
     prop_assert_eq!(report["changed"].as_bool(), Some(true));
 
+    let replacement = report["replacement"].as_str().unwrap_or_default();
+    prop_assert_eq!(replacement, expected_replacement.as_str());
     let rewritten = report["rewritten"].as_str().unwrap_or_default();
+    prop_assert_eq!(rewritten, expected_replacement.as_str());
     let check_output = paredit()
         .arg("inspect")
         .arg("check")
@@ -198,6 +212,9 @@ proptest! {
 
     #[test]
     fn cli_unwrap_call_preserves_parseability_for_generated_wrappers(depth in 1usize..8) {
-        assert_unwrap_call_property(generated_unwrap_call_input(depth))?;
+        assert_unwrap_call_property(
+            generated_unwrap_call_input(depth),
+            expected_unwrapped_call(depth),
+        )?;
     }
 }

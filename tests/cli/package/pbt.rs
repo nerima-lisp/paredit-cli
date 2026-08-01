@@ -31,7 +31,8 @@ proptest! {
         let rewritten = fs::read_to_string(&package_file).expect("read rewritten package");
         let expected = symbols.iter().map(|symbol| format!("#:{symbol}")).collect::<Vec<_>>();
         let expected_export = format!("(:export {})", expected.join(" "));
-        prop_assert!(rewritten.contains(&expected_export));
+        let expected_output = format!("(defpackage #:demo {expected_export})\n");
+        prop_assert_eq!(rewritten, expected_output);
 
         let mut check = paredit();
         check.arg("inspect").arg("check")
@@ -68,7 +69,8 @@ proptest! {
 
         let rewritten = fs::read_to_string(&package_file).expect("read rewritten package");
         let expected_options = option_indexes.iter().map(|index| cli_option_fixture(*index)).collect::<Vec<_>>();
-        assert_substrings_in_order(&rewritten, &expected_options);
+        let expected_output = format!("(defpackage #:demo {})\n", expected_options.join(" "));
+        prop_assert_eq!(rewritten, expected_output);
 
         let mut check = paredit();
         check.arg("inspect").arg("check")
@@ -110,7 +112,8 @@ proptest! {
 
         let rewritten = fs::read_to_string(&package_file).expect("read rewritten package");
         let expected_export = format!("(:export {})", left.join(" "));
-        prop_assert!(rewritten.contains(&expected_export));
+        let expected_output = format!("(defpackage #:demo {expected_export})\n");
+        prop_assert_eq!(rewritten, expected_output);
 
         let mut check = paredit();
         check.arg("inspect").arg("check")

@@ -67,7 +67,7 @@ fn dry_run_still_produces_the_result_on_stdout() {
         .clone();
     let output = String::from_utf8(output).expect("UTF-8");
 
-    assert!(output.starts_with("((defun f (x)"), "{output}");
+    assert_eq!(output, "((defun f (x)\n  (list x)))\n(defun g (y) y)\n");
     assert_eq!(contents(&file), SOURCE);
 }
 

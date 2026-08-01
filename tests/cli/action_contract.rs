@@ -91,6 +91,34 @@ fn flake_exposes_the_documented_integration_surfaces() {
     }
 }
 
+/// Property tests use explicit small local budgets, which means Proptest's
+/// built-in environment handling alone cannot widen CI coverage. The nextest
+/// derivation must provide the fixed budget inside its Nix sandbox, and the
+/// helpers in `tests/cli.rs` and `tests/parser_robustness.rs` apply it as an
+/// upper-bound-only override.
+#[test]
+fn nextest_widens_explicit_property_budgets_in_ci() {
+    let flake = fs::read_to_string("flake.nix").expect("read flake.nix");
+    let nextest_start = flake
+        .find("nextest = craneLib.cargoNextest")
+        .expect("flake defines the nextest check");
+    let nextest_block = &flake[nextest_start..];
+
+    assert!(
+        nextest_block.contains("PROPTEST_CASES = \"256\""),
+        "the Nix-sandboxed nextest check must set a deterministic PROPTEST_CASES budget"
+    );
+
+    for path in ["tests/cli.rs", "tests/parser_robustness.rs"] {
+        let source = fs::read_to_string(path).expect("read property-test configuration");
+        assert!(
+            source.contains("PROPTEST_CASES")
+                && source.contains("local_cases.max(configured_cases)"),
+            "{path} must apply CI's property budget without reducing its local baseline"
+        );
+    }
+}
+
 /// `lispIncludes` decides which files `paredit-lint`, `paredit-format`, and the
 /// treefmt formatter ever look at. If it drifts from `Dialect::from_extension`,
 /// a supported dialect is silently skipped by every Nix gate — the failure is

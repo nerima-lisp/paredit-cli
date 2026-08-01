@@ -16,13 +16,22 @@ use super::*;
 use paredit_core_syntax::dialect::Dialect;
 use paredit_core_syntax::sexpr::SyntaxTree;
 
-/// `tests/cli/function_parameter/add/property.proptest-regressions`, both
+/// `tests/cli/function_parameter/add/property.proptest-regressions`, all three
 /// recorded shrinks.
 #[test]
 fn recorded_add_parameter_shrinks_still_rewrite_correctly() {
     for (name, a, b, c, first, second, third) in [
         ("d1r", "y", "cs19612", "fn6", "2765", "-13", "72"),
         ("s6z1bx", "yyu5r3l", "wj3p547su", "nwty", "6259", "-2", "3"),
+        (
+            "exsgx6781",
+            "gkeju1",
+            "zzm9ngst",
+            "vr1x",
+            "-000",
+            "-2491",
+            "48",
+        ),
     ] {
         let input = format!(
             "(defun {name} ({a} {b}) (list {a} {b} {c}))\n(print ({name} {first} {second}))\n"

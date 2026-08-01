@@ -774,6 +774,22 @@ fn formatting_never_drops_comments_and_is_idempotent() {
     );
 }
 
+#[test]
+fn common_lisp_escaped_newline_before_comment_is_idempotent() {
+    let input = format!(
+        "\u{000f}\0 A co\"\\co\"\\\n {} A-hi ;t #| nd e",
+        "\0".repeat(56)
+    );
+    let formatter = Formatter::new(2);
+    let tree = SyntaxTree::parse_with_dialect(&input, Dialect::CommonLisp)
+        .expect("input must parse as Common Lisp");
+    let once = formatter.format(&tree);
+    let reparsed = SyntaxTree::parse_with_dialect(&once, Dialect::CommonLisp)
+        .expect("formatted output must parse as Common Lisp");
+
+    assert_eq!(formatter.format(&reparsed), once);
+}
+
 // --- FR-005: comment-column alignment ---
 
 #[test]

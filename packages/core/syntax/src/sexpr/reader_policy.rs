@@ -181,7 +181,7 @@ impl DialectReaderPolicy {
                 self.classify_legacy(byte, next, third)
             }
             Dialect::CommonLisp => self.classify_common_lisp(bytes, pos),
-            Dialect::EmacsLisp => self.classify_emacs_lisp(byte, next),
+            Dialect::EmacsLisp => self.classify_emacs_lisp(bytes, pos),
             Dialect::Scheme | Dialect::Racket => self.classify_scheme(bytes, pos),
             Dialect::Clojure => self.classify_clojure(bytes, pos),
             Dialect::Janet => self.classify_janet(byte, next),
@@ -276,17 +276,18 @@ impl DialectReaderPolicy {
         }
     }
 
-    const fn classify_emacs_lisp(self, byte: u8, next: Option<u8>) -> Option<ReaderMacro> {
+    fn classify_emacs_lisp(self, bytes: &[u8], pos: usize) -> Option<ReaderMacro> {
+        let byte = *bytes.get(pos)?;
+        let next = bytes.get(pos + 1).copied();
+
         if let Some(prefix) = classify_quote_prefix(byte, next) {
             return Some(prefix);
         }
-        // `?` at end of input is a truncated character literal — the Emacs Lisp
-        // member of the family that also covers Common Lisp's and Scheme's
-        // `#\` and Clojure's `\`. Reading it as an ordinary atom made the
-        // formatter non-idempotent: it appends a trailing newline, the
-        // truncated literal claims it as its character, and the next pass
-        // appends another.
-        if byte == b'?' && next.is_none() {
+        // `?` and `?\` at end of input are truncated character literals.
+        // Rejecting them prevents formatting from turning a missing payload
+        // into whitespace that changes meaning on the next parse.
+        if byte == b'?' && (next.is_none() || (next == Some(b'\\') && bytes.get(pos + 2).is_none()))
+        {
             return Some(ReaderMacro::UnsupportedDispatch { width: 1 });
         }
         if byte != b'#' {

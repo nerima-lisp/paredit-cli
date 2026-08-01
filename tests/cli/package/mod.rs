@@ -11,16 +11,6 @@ const fn cli_option_fixture(index: usize) -> &'static str {
     }
 }
 
-fn assert_substrings_in_order(input: &str, needles: &[&str]) {
-    let mut offset = 0usize;
-    for needle in needles {
-        let position = input[offset..]
-            .find(needle)
-            .unwrap_or_else(|| panic!("missing {needle} in {input}"));
-        offset += position + needle.len();
-    }
-}
-
 mod add_export;
 mod merge_options;
 mod pbt;

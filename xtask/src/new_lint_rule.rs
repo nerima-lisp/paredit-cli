@@ -34,7 +34,7 @@ pub struct NewLintRuleOptions {
     pub name: Name,
     pub description: String,
     /// Set by `--from-custom-rule <path>#<name>`, to seed the scaffold's
-    /// category/severity/pattern/message/fix and its generated tests.
+    /// category/severity/pattern/message and its generated tests.
     pub seed: Option<CustomRuleSeed>,
 }
 
@@ -61,7 +61,7 @@ impl CustomRuleSeed {
     /// than panicking, since a dev tool with a bad `--from-custom-rule` value
     /// is a user error, not a defect.
     pub fn load(spec: &str) -> Result<Self> {
-        let (path, name) = spec.split_once('#').ok_or_else(|| {
+        let (path, name) = spec.rsplit_once('#').ok_or_else(|| {
             crate::error::XtaskError::refused(format!(
                 "--from-custom-rule wants `<path>#<name>`, e.g. \
                  `.paredit/rules/entity.lisp#entity-needs-table` — got `{spec}` (no `#`)"
@@ -204,9 +204,9 @@ fn oneline(text: &str) -> String {
 }
 
 /// The doc-comment block placed just above the generated `examine()`, when a
-/// seed was given: the seeded pattern/message/fix, rendered back to Lisp text
-/// so the scaffold author has the custom rule's own words as a starting
-/// point rather than starting from nothing.
+/// seed was given: the seeded pattern/message, preserving enough context for
+/// the scaffold author to implement the rule rather than starting from
+/// nothing.
 fn seed_examine_notes(seed: &CustomRuleSeed) -> String {
     let spec = &seed.spec;
     let pattern_text = render_pattern(&seed.rule.pattern);
@@ -234,11 +234,9 @@ fn seed_examine_notes(seed: &CustomRuleSeed) -> String {
 /// Generated `#[test]` functions for each seeded `:matches`/`:no-match` input,
 /// appended inside the scaffold's `mod tests`.
 ///
-/// Each one already compiles and passes: `examine` is still a stub that finds
-/// nothing, so every generated assertion says exactly that, with a TODO
-/// telling the scaffold author which way to flip it once `examine` is real.
-/// `:fix` cases are not turned into tests — this scaffold has no fix support
-/// to wire them against — and are listed instead as a trailing comment.
+/// The `:matches` cases preserve their real positive expectation, but start
+/// ignored because a newly generated `examine` is intentionally empty. This
+/// avoids presenting an empty-result assertion as a passing positive test.
 fn seed_test_functions(seed: &CustomRuleSeed, snake: &str) -> String {
     let mut out = String::new();
     let mut index = 0usize;
@@ -246,17 +244,16 @@ fn seed_test_functions(seed: &CustomRuleSeed, snake: &str) -> String {
         for source in &test.matches {
             out.push_str(&format!(
                 "\n    #[test]\n\
-                 \x20   fn todo_seed_matches_{index}() {{\n\
-                 \x20       // Seeded from a `(:matches ...)` case. TODO: once `examine` is\n\
-                 \x20       // implemented, this input must be flagged — replace\n\
-                 \x20       // `assert!(violations.is_empty())` below with the opposite.\n\
+                 \x20   #[ignore = \"Implement `examine` before enabling this seeded positive case\"]\n\
+                 \x20   fn seed_matches_{index}() {{\n\
+                 \x20       // Seeded from a `(:matches ...)` case: this input must be flagged.\n\
                  \x20       let source = {source:?};\n\
                  \x20       let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)\n\
                  \x20           .expect(\"parse\");\n\
                  \x20       let (_, violations) =\n\
                  \x20           collect_{snake}(&PathBuf::from(\"seed.lisp\"), Dialect::CommonLisp, &tree)\n\
                  \x20               .expect(\"collect {snake}\");\n\
-                 \x20       assert!(violations.is_empty(), \"TODO: examine() is still a stub\");\n\
+                 \x20       assert!(!violations.is_empty(), \"the seeded `:matches` input must be flagged\");\n\
                  \x20   }}\n"
             ));
             index += 1;
@@ -267,32 +264,18 @@ fn seed_test_functions(seed: &CustomRuleSeed, snake: &str) -> String {
         for source in &test.no_match {
             out.push_str(&format!(
                 "\n    #[test]\n\
-                 \x20   fn todo_seed_no_match_{index}() {{\n\
-                 \x20       // Seeded from a `(:no-match ...)` case: `examine` must keep not\n\
-                 \x20       // flagging this input once it is implemented.\n\
+                 \x20   fn seed_no_match_{index}() {{\n\
+                 \x20       // Seeded from a `(:no-match ...)` case: this input must not be flagged.\n\
                  \x20       let source = {source:?};\n\
                  \x20       let tree = SyntaxTree::parse_with_dialect(source, Dialect::CommonLisp)\n\
                  \x20           .expect(\"parse\");\n\
                  \x20       let (_, violations) =\n\
                  \x20           collect_{snake}(&PathBuf::from(\"seed.lisp\"), Dialect::CommonLisp, &tree)\n\
                  \x20               .expect(\"collect {snake}\");\n\
-                 \x20       assert!(violations.is_empty(), \"TODO: examine() is still a stub\");\n\
+                 \x20       assert!(violations.is_empty(), \"the seeded `:no-match` input must not be flagged\");\n\
                  \x20   }}\n"
             ));
             index += 1;
-        }
-    }
-
-    let fixes: Vec<&(String, String)> = seed.tests.iter().flat_map(|test| &test.fixes).collect();
-    if !fixes.is_empty() {
-        out.push_str("\n    // TODO: this rule's `.paredit/rules` seed also declared fix cases,\n");
-        out.push_str("    // which this scaffold has no fix support to turn into tests yet:\n");
-        for (before, after) in fixes {
-            out.push_str(&format!(
-                "    // - {:?} -> {:?}\n",
-                oneline(before),
-                oneline(after),
-            ));
         }
     }
 
@@ -314,6 +297,16 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
             "{} already exists",
             rule_dir.display()
         )));
+    }
+
+    if let Some(seed) = &options.seed {
+        if seed.rule.fix.is_some() || seed.tests.iter().any(|test| !test.fixes.is_empty()) {
+            return Err(crate::error::XtaskError::refused(format!(
+                "{spec} contains `:fix` data, but generated lint rules are report-only; \\
+                 implement a fix-capable scaffold before seeding rewrite cases",
+                spec = seed.spec
+            )));
+        }
     }
 
     // Absent a seed, this generates exactly what it always has:
@@ -457,13 +450,13 @@ pub fn run(repo: &Repo, options: &NewLintRuleOptions) -> Result<()> {
              mod tests {{\n\
              \x20   use super::*;\n\n\
              \x20   #[test]\n\
-             \x20   fn todo_replace_with_real_fixtures_once_examine_is_implemented() {{\n\
-             \x20       let tree = SyntaxTree::parse_with_dialect(\"()\", Dialect::CommonLisp).expect(\"parse\");\n\
-             \x20       let (count, violations) =\n\
-             \x20           collect_{snake}(&PathBuf::from(\"test.lisp\"), Dialect::CommonLisp, &tree)\n\
-             \x20               .expect(\"collect {snake}\");\n\
-             \x20       assert_eq!(count, 0);\n\
-             \x20       assert!(violations.is_empty(), \"TODO: this stub never finds anything yet\");\n\
+             \x20   fn a_clean_summary_passes_policy() {{\n\
+             \x20       let summary = summarize_{snake}(0, Vec::new());\n\
+             \x20       let policy = evaluate_{snake}_policy({pascal}PolicyOptions::new(true), &summary);\n\
+             \x20       assert_eq!(policy.scanned_form_count, 0);\n\
+             \x20       assert_eq!(policy.violation_count, 0);\n\
+             \x20       assert!(policy.passed);\n\
+             \x20       assert!(policy.violations.is_empty());\n\
              \x20   }}\n\
              {seed_tests}}}\n"
         ),
@@ -917,13 +910,11 @@ mod tests {
   :severity error
   :description "a defentity with no :table option"
   :pattern (defentity ?name ...)
-  :message "defentity needs a :table"
-  :fix (defentity ?name :table "TODO"))
+  :message "defentity needs a :table")
 
 (deftest entity-needs-table
   (:matches "(defentity user)")
-  (:no-match "(defentity user :table \"users\")")
-  (:fix "(defentity user)" "(defentity user :table \"TODO\")"))
+  (:no-match "(defentity user :table \"users\")"))
 "#,
         )
         .expect("write custom rule fixture");
@@ -936,6 +927,12 @@ mod tests {
         let spec = format!("{}#entity-needs-table", fixture_path.display());
         let seed = CustomRuleSeed::load(&spec).expect("a well-formed seed spec must load");
         assert_eq!(seed.tests.len(), 1);
+        assert_eq!(seed.tests[0].matches, vec!["(defentity user)".to_owned()]);
+        assert_eq!(
+            seed.tests[0].no_match,
+            vec!["(defentity user :table \"users\")".to_owned()]
+        );
+        assert!(seed.tests[0].fixes.is_empty());
         let _ = fs::remove_file(&fixture_path);
 
         let fixture = build_fixture_repo();
@@ -962,15 +959,20 @@ mod tests {
         assert!(domain_rs.contains("Seeded from `"));
         assert!(domain_rs.contains("pattern: `(defentity ?name ...)`"));
         assert!(domain_rs.contains("defentity needs a :table"));
-        assert!(domain_rs.contains("fix: `(defentity ?name :table \"TODO\")`"));
-        assert!(domain_rs.contains("fn todo_seed_matches_0()"));
+        assert!(domain_rs.contains("fn a_clean_summary_passes_policy()"));
+        assert!(domain_rs.contains("fn seed_matches_0()"));
+        assert!(domain_rs.contains(
+            "#[ignore = \"Implement `examine` before enabling this seeded positive case\"]"
+        ));
         assert!(domain_rs.contains(r#"let source = "(defentity user)";"#));
-        assert!(domain_rs.contains("fn todo_seed_no_match_0()"));
+        assert!(domain_rs.contains(
+            "assert!(!violations.is_empty(), \"the seeded `:matches` input must be flagged\");"
+        ));
+        assert!(domain_rs.contains("fn seed_no_match_0()"));
         assert!(domain_rs.contains(r#"let source = "(defentity user :table \"users\")";"#));
-        assert!(domain_rs.contains(&format!(
-            "{:?} -> {:?}",
-            "(defentity user)", "(defentity user :table \"TODO\")"
-        )));
+        assert!(domain_rs.contains(
+            "assert!(violations.is_empty(), \"the seeded `:no-match` input must not be flagged\");"
+        ));
 
         // `Severity::Error` must not bump `warning_count()` — only RULE_COUNT.
         let catalog = fs::read_to_string(fixture.root.join("src/lint/registry/catalog.rs"))
@@ -996,6 +998,26 @@ mod tests {
     }
 
     #[test]
+    fn a_seed_path_containing_a_hash_is_parsed_at_its_final_separator() {
+        let fixture_path = write_custom_rule_fixture();
+        let file_name = fixture_path
+            .file_name()
+            .expect("temporary fixture has a file name")
+            .to_string_lossy();
+        let hash_path = fixture_path.with_file_name(format!("seed#path-{file_name}"));
+        fs::rename(&fixture_path, &hash_path)
+            .expect("rename fixture to a valid path containing `#`");
+
+        let spec = format!("{}#entity-needs-table", hash_path.display());
+        let seed =
+            CustomRuleSeed::load(&spec).expect("the final `#` separates path from rule name");
+        let _ = fs::remove_file(&hash_path);
+
+        assert_eq!(seed.rule.name, "entity-needs-table");
+        assert_eq!(seed.tests.len(), 1);
+    }
+
+    #[test]
     fn a_seed_file_that_does_not_parse_is_a_clear_refusal() {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -1012,9 +1034,58 @@ mod tests {
     }
 
     #[test]
+    fn a_seed_with_fix_cases_is_refused_until_the_scaffold_can_apply_them() {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "xtask-new-lint-rule-fix-seed-{}-{unique}.lisp",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            r#"(defrule entity-needs-table
+  :category malformed
+  :severity error
+  :description "a defentity with no :table option"
+  :pattern (defentity ?name ...)
+  :message "defentity needs a :table"
+  :fix (defentity ?name :table "TODO"))
+
+(deftest entity-needs-table
+  (:fix "(defentity user)" "(defentity user :table \"TODO\")"))
+"#,
+        )
+        .expect("write fixable custom rule fixture");
+        let spec = format!("{}#entity-needs-table", path.display());
+        let seed = CustomRuleSeed::load(&spec).expect("load fixable seed");
+        let _ = fs::remove_file(&path);
+
+        let fixture = build_fixture_repo();
+        let repo = Repo::for_test(fixture.root.clone());
+        let options = NewLintRuleOptions {
+            theme: "demo".to_owned(),
+            name: Name::parse("entity-needs-table").expect("valid rule name"),
+            description: seed.rule.description.clone(),
+            seed: Some(seed),
+        };
+
+        let error = run(&repo, &options).expect_err("report-only scaffolds cannot seed fixes");
+        assert!(error.to_string().contains(":fix"));
+        assert!(error.to_string().contains("report-only"));
+    }
+
+    #[test]
     fn a_seed_path_that_does_not_exist_is_a_clear_refusal() {
-        let error = CustomRuleSeed::load("/no/such/directory/rules.lisp#some-rule")
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "xtask-new-lint-rule-missing-seed-{}-{unique}.lisp",
+            std::process::id()
+        ));
+        assert!(!path.exists(), "fixture path must not exist");
+        let error = CustomRuleSeed::load(&format!("{}#some-rule", path.display()))
             .expect_err("a missing file must be refused, not panic");
-        assert!(!error.to_string().is_empty());
+        assert!(error.to_string().contains("read"));
+        assert!(error.to_string().contains(&path.display().to_string()));
     }
 }

@@ -35,10 +35,21 @@ use proptest::test_runner::{
 /// `PAREDIT_ROBUSTNESS_SEED=<n>` re-runs this file with a different seed, and
 /// the fuzz targets in `fuzz/` explore continuously.
 fn robustness_config(cases: u32) -> ProptestConfig {
-    let mut config = ProptestConfig::with_cases(cases);
+    let mut config = ProptestConfig::with_cases(robustness_cases(cases));
     config.failure_persistence = Some(Box::new(FileFailurePersistence::Off));
     config.rng_algorithm = RngAlgorithm::ChaCha;
     config
+}
+
+/// CI can widen the fixed-seed search without changing a developer's local
+/// budget. Never let an environment value reduce a property's baseline.
+fn robustness_cases(local_cases: u32) -> u32 {
+    std::env::var("PROPTEST_CASES")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .map_or(local_cases, |configured_cases| {
+            local_cases.max(configured_cases)
+        })
 }
 
 /// The seed every run uses unless one is supplied.
@@ -136,11 +147,16 @@ fn check_invariants(source: &str, dialect: Dialect) -> Result<(), String> {
     // 4. Formatting returns, reparses, and converges.
     let formatter = Formatter::with_dialect(2, dialect);
     let once = formatter.format(&tree);
-    if let Ok(reparsed) = SyntaxTree::parse_with_dialect(&once, dialect) {
-        let twice = formatter.format(&reparsed);
-        if once != twice {
-            return Err(format!("formatting did not converge for {source:?}"));
-        }
+    let reparsed = SyntaxTree::parse_with_dialect(&once, dialect).map_err(|error| {
+        format!(
+            "formatting produced output that does not reparse for {source:?} in {dialect:?}: {error}"
+        )
+    })?;
+    let twice = formatter.format(&reparsed);
+    if once != twice {
+        return Err(format!(
+            "formatting did not converge for {source:?} in {dialect:?}"
+        ));
     }
 
     Ok(())

@@ -801,6 +801,11 @@ fn parses_dialect_character_literals_with_closing_delimiters() {
 }
 
 #[test]
+fn rejects_truncated_escaped_emacs_lisp_character_literal() {
+    assert!(SyntaxTree::parse_with_dialect("?\\", Dialect::EmacsLisp).is_err());
+}
+
+#[test]
 fn discarded_forms_use_the_same_dialect_character_literal_scanner() {
     let cases = [
         (Dialect::Scheme, "#;(#\\)) kept"),

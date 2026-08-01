@@ -1,7 +1,10 @@
 use super::*;
 
 proptest! {
-    #![proptest_config(cli_proptest_config_replaying_recorded_failures(24))]
+    #![proptest_config(cli_proptest_config_replaying_recorded_failures(
+        24,
+        concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cli/function_parameter/add/property.proptest-regressions"),
+    ))]
 
     #[test]
     fn pbt_cli_add_function_parameter_output_remains_parseable(
