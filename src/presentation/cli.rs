@@ -143,6 +143,13 @@ struct Cli {
     /// existing stderr rendering is byte-for-byte unchanged.
     #[arg(long, global = true)]
     plain_language: bool,
+    /// On a failure, print the full explanation from this error code's own
+    /// `docs/src/reference/errors.md` section — the same text `doc_url`
+    /// links to — inline, with no network access. Named `--explain-error`
+    /// rather than `--explain` because `inspect lint --explain <RULE>` and
+    /// `migrate explain` already claim that spelling for unrelated things.
+    #[arg(long, global = true)]
+    explain_error: bool,
     /// Permission bits a brand-new file is created with, octal without a
     /// leading 0 (for example 644). Unix only; the built-in default is 600.
     #[arg(long, global = true, value_name = "MODE")]
@@ -212,6 +219,7 @@ pub fn run() -> ExitCode {
     }
 
     let plain_language = cli.plain_language;
+    let explain_error = cli.explain_error;
 
     // The protocol servers own their own exit status, and are therefore taken
     // before dispatch. A session normally ends with the client closing the
@@ -229,7 +237,7 @@ pub fn run() -> ExitCode {
     let pager = paredit_core_cli::pager::maybe_start();
     let exit_code = match dispatch::dispatch(command) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => report_failure(&error, &invocation, plain_language),
+        Err(error) => report_failure(&error, &invocation, plain_language, explain_error),
     };
     #[cfg(unix)]
     if let Some(pager) = pager {
@@ -309,6 +317,7 @@ fn report_failure(
     failure: &CommandFailure,
     invocation: &[String],
     plain_language: bool,
+    explain_error: bool,
 ) -> ExitCode {
     use clap::CommandFactory;
 
@@ -318,16 +327,27 @@ fn report_failure(
         command_path: argv::resolve_leaf(invocation, &root).map(|(_, path)| path),
     };
     let diagnosis = diagnosis::diagnose(failure, &context);
+    // `None` when `--explain-error` was not passed, so the flag stays a pure
+    // opt-in: the byte-for-byte-unchanged guarantee `plain_language` already
+    // makes for text mode extends to the JSON envelope's new key too.
+    let explanation = explain_error
+        .then(|| diagnosis.code.explanation())
+        .flatten();
 
     // JSON on stderr when the report itself would have been JSON. An agent
     // that asked for a machine-readable answer should not have to parse
     // English to find out why it did not get one.
     if argv::effective_output_format(invocation, &root).as_deref() == Some("json") {
+        let mut error_json = diagnosis.to_json();
+        // The doc-embedded prose is trusted, compiled-in content — not a
+        // value the caller chose — so it is not run through `terminal_safe`
+        // the way `message` and `candidates[].preview` are.
+        error_json["explanation"] = json!(explanation);
         let envelope = json!({
             "schema_version": 1,
             "status": "error",
             "command": context.command_path.as_deref(),
-            "error": diagnosis.to_json(),
+            "error": error_json,
         });
         // Not wrapped in `terminal_safe`: the values inside were escaped when
         // the envelope was built, and escaping the serialized document would
@@ -360,6 +380,24 @@ fn report_failure(
         if let Some(caret) = caret_for_failure(&diagnosis, context.file.as_deref()) {
             eprintln!("{caret}");
         }
+        // Only `selection.ambiguous` ever populates this — see FR-002 — so
+        // the "already listed alongside this error" repair below is true in
+        // text mode too, not only in the JSON envelope's `candidates`.
+        if !diagnosis.candidates.is_empty() {
+            eprintln!(
+                "{}:",
+                painter.cyan(messages::say(messages::Message::CandidatesPrefix))
+            );
+            for candidate in &diagnosis.candidates {
+                eprintln!(
+                    "  {}\t{}-{}\t{}",
+                    terminal_safe(&candidate.path),
+                    candidate.start,
+                    candidate.end,
+                    terminal_safe(&candidate.preview)
+                );
+            }
+        }
         for repair in &diagnosis.repairs {
             match &repair.command {
                 Some(command) => {
@@ -376,6 +414,14 @@ fn report_failure(
                     repair.detail()
                 ),
             }
+        }
+        if let Some(explanation) = explanation {
+            eprintln!();
+            eprintln!(
+                "{}:",
+                painter.cyan(messages::say(messages::Message::ExplainPrefix))
+            );
+            eprintln!("{explanation}");
         }
     }
 
@@ -747,6 +793,7 @@ use paredit_feature_project_analysis::undefined_package_report::cli as undefined
 use paredit_feature_project_analysis::unused_local_callable_report::cli as unused_local_callable_report;
 use paredit_feature_project_analysis::workspace_report::cli as workspace_report;
 use paredit_feature_refactor_workflow::refactor::cli as refactor;
+use paredit_feature_refactor_workflow::refactor_checkpoint::cli as refactor_checkpoint;
 use paredit_feature_refactor_workflow::refactor_step::cli as refactor_step;
 use paredit_feature_remove_unused::definition_movement::cli as definition_movement;
 use paredit_feature_remove_unused::definition_removal::cli as definition_removal;

@@ -55,6 +55,19 @@ shape refusal like "cannot raise a top-level expression" does not, because
 it is not about one place in the source). The human-readable rendering shows
 the same offset as a caret under the source line, the way `rustc` does.
 
+`candidates` is `selection.ambiguous`'s own matches — path, line/column
+extent, and a short preview each — so a selector that matched more than one
+form does not need a follow-up `inspect resolve` just to see what it found.
+Every other code reports it as an empty array; it is capped, with `count`
+still carrying the true total when there were more.
+
+Passing `--explain-error` prints this page's own section for the code —
+everything below this paragraph, one heading at a time — inline with the
+failure, in both `--output json` (as an `explanation` field alongside
+`doc_url`) and the default text rendering. It reads the same markdown
+`doc_url` links to, embedded in the binary at compile time, so it needs
+neither a second process nor network access.
+
 ## Argument
 
 The command line does not describe a runnable request. Retrying the same

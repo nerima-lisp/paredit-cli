@@ -13,7 +13,7 @@ use crate::dialect::Dialect;
 use crate::sexpr::{ByteSpan, ExpressionKind, ExpressionPath, ExpressionView, SyntaxTree};
 use crate::view_query::list_head;
 
-use super::error::{SelectorError, SelectorResult};
+use super::error::{AmbiguousCandidate, SelectorError, SelectorResult};
 use super::line_index::{LineIndex, LinePosition};
 use super::matcher::{Capture, match_all};
 use super::pattern::Pattern;
@@ -265,6 +265,7 @@ pub fn resolve(
         return Err(SelectorError::Ambiguous {
             selector: request.describe(),
             count: targets.len(),
+            candidates: ambiguous_candidates(tree, &targets),
         });
     }
     Ok(targets)
@@ -318,6 +319,7 @@ fn exactly_one(
         count => Err(SelectorError::Ambiguous {
             selector: term.describe(),
             count,
+            candidates: ambiguous_candidates(tree, &targets),
         }),
     }
 }
@@ -619,6 +621,60 @@ pub fn target_text<'a>(tree: &'a SyntaxTree, target: &SelectorTarget) -> &'a str
         .unwrap_or_default()
 }
 
+/// How many of an ambiguous selector's matches [`ambiguous_candidates`]
+/// describes.
+///
+/// A selector can match arbitrarily many forms — `--query t` in a large file
+/// might match thousands — and `SelectorError::Ambiguous` is a single error
+/// value that every JSON envelope carries whole. Bounding it keeps that
+/// payload bounded too; `count` on the error still reports the true total,
+/// and `--all` (or `inspect resolve`) is still how a caller sees the rest.
+pub const MAX_AMBIGUOUS_CANDIDATES: usize = 20;
+
+/// Builds the candidate list [`SelectorError::Ambiguous`] carries: each
+/// match's path, line/column extent, and a short preview, so a caller does
+/// not need a separate `inspect resolve` call just to see what an ambiguous
+/// selector found.
+#[must_use]
+pub fn ambiguous_candidates(
+    tree: &SyntaxTree,
+    targets: &[SelectorTarget],
+) -> Vec<AmbiguousCandidate> {
+    let source = tree.source();
+    let index = LineIndex::new(source);
+    targets
+        .iter()
+        .take(MAX_AMBIGUOUS_CANDIDATES)
+        .map(|target| AmbiguousCandidate {
+            path: target.path.to_string(),
+            start: index.position_of(source, target.span.start().get()),
+            end: index.position_of(source, target.span.end().get()),
+            preview: candidate_preview(source, target.span),
+        })
+        .collect()
+}
+
+/// A single-line, length-bounded rendering of the matched source.
+///
+/// Newlines and runs of whitespace collapse so one candidate stays one line.
+/// Independent of `resolve_report`'s own preview builder (that crate sits
+/// above this one and cannot be depended on from here), but the same shape:
+/// short enough that twenty candidates still fit an agent's context.
+fn candidate_preview(source: &str, span: ByteSpan) -> String {
+    const MAX_PREVIEW_BYTES: usize = 80;
+
+    let text = source.get(span.as_range()).unwrap_or_default();
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.len() <= MAX_PREVIEW_BYTES {
+        return collapsed;
+    }
+    let mut end = MAX_PREVIEW_BYTES.min(collapsed.len());
+    while !collapsed.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...", &collapsed[..end])
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -695,6 +751,52 @@ mod tests {
         let mut all = request(query("(defun ?n ...)"));
         all.all = true;
         assert_eq!(paths(&parsed, &all), vec!["0".to_owned(), "1".to_owned()]);
+    }
+
+    #[test]
+    fn an_ambiguous_error_carries_the_matches_it_found() {
+        let parsed = tree("(defun a ()) (defun b ())");
+        let error = resolve(
+            &parsed,
+            Dialect::CommonLisp,
+            &request(query("(defun ?n ...)")),
+        )
+        .unwrap_err();
+        let SelectorError::Ambiguous {
+            count, candidates, ..
+        } = error
+        else {
+            panic!("expected Ambiguous, got {error:?}");
+        };
+        assert_eq!(count, 2);
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].path, "0");
+        assert_eq!(candidates[0].preview, "(defun a ())");
+        assert_eq!(candidates[1].path, "1");
+        assert_eq!(candidates[1].preview, "(defun b ())");
+    }
+
+    #[test]
+    fn ambiguous_candidates_are_capped_but_the_count_is_not() {
+        let source = (0..30)
+            .map(|index| format!("(defun f{index} ())"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let parsed = tree(&source);
+        let error = resolve(
+            &parsed,
+            Dialect::CommonLisp,
+            &request(query("(defun ?n ...)")),
+        )
+        .unwrap_err();
+        let SelectorError::Ambiguous {
+            count, candidates, ..
+        } = error
+        else {
+            panic!("expected Ambiguous, got {error:?}");
+        };
+        assert_eq!(count, 30);
+        assert_eq!(candidates.len(), MAX_AMBIGUOUS_CANDIDATES);
     }
 
     #[test]

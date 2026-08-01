@@ -18,6 +18,23 @@ pub struct RefactorApplyResult {
     pub write_scope: WriteScope,
     pub files: Vec<RefactorApplyFileResult>,
     pub summary: RefactorApplySummary,
+    /// One line: "3 added, 1 renamed, 2 modified definitions.", across every
+    /// changed file. Populated for a dry run as well as a write, since it
+    /// describes what the apply *would* change either way.
+    pub headline: String,
+    /// One entry per group `--group-by-impact-area` wrote or tried to write,
+    /// in the order it processed them. Empty on every run that did not use
+    /// that flag: it never partitioned anything, so it has no groups to
+    /// report, not one group covering the whole manifest.
+    pub impact_area_groups: Vec<RefactorApplyGroupResult>,
+}
+
+#[derive(Debug)]
+pub struct RefactorApplyGroupResult {
+    pub group: String,
+    pub file_count: usize,
+    pub written: bool,
+    pub failure: Option<String>,
 }
 
 #[derive(Debug)]

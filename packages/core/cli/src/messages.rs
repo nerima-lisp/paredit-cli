@@ -84,6 +84,10 @@ pub enum Message {
     RepairNeedRepository,
     RepairNoInputsProduced,
     RepairArchiveDestination,
+    RepairCandidatesInline,
+    // --- the error rendering, continued ---
+    ExplainPrefix,
+    CandidatesPrefix,
 }
 
 impl Message {
@@ -236,6 +240,12 @@ impl Message {
             Self::RepairArchiveDestination => {
                 "--from-archive needs somewhere to extract to; add --extract-to <DIR>"
             }
+            Self::RepairCandidatesInline => {
+                "the matched forms are already listed alongside this error; `inspect resolve` \
+                 only helps for more matches than fit there, or for a bulk --all pass"
+            }
+            Self::ExplainPrefix => "explanation",
+            Self::CandidatesPrefix => "matches",
         }
     }
 
@@ -381,11 +391,16 @@ impl Message {
             Self::RepairArchiveDestination => {
                 "--from-archive には展開先が必要です。--extract-to <DIR> を指定してください"
             }
+            Self::RepairCandidatesInline => {
+                "一致したフォームはこのエラーに併記されています。`inspect resolve` が必要なのは、そこに収まらないほど一致数が多い場合や --all で一括処理する場合だけです"
+            }
+            Self::ExplainPrefix => "説明",
+            Self::CandidatesPrefix => "一致",
         }
     }
 
     /// Every message, so a contract test can check both sides are complete.
-    pub const ALL: [Self; 58] = [
+    pub const ALL: [Self; 61] = [
         Self::ErrorPrefix,
         Self::RepairPrefix,
         Self::DryRunSuppressedWrite,
@@ -444,6 +459,9 @@ impl Message {
         Self::RepairNoInputsProduced,
         Self::RepairArchiveDestination,
         Self::RepairKillRingIndex,
+        Self::RepairCandidatesInline,
+        Self::ExplainPrefix,
+        Self::CandidatesPrefix,
     ];
 }
 

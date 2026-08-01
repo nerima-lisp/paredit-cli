@@ -1,6 +1,8 @@
 use super::super::types::plan::RefactorPlan;
+use super::next_commands::plan_next_commands;
 use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::report::next_command;
 use paredit_core_cli::safe_text;
 use paredit_feature_project_analysis::impact_report::usecase::summarize_impact_reports;
 use serde_json::json;
@@ -8,6 +10,7 @@ use serde_json::json;
 pub fn print_refactor_plan(plan: &RefactorPlan, output: OutputFormat) -> CliResult<()> {
     let mut summary = summarize_impact_reports(&plan.files);
     summary.safe_to_automate = !plan.gates.iter().any(|gate| gate.blocks_automation);
+    let next_commands_json = next_command::to_json(&plan_next_commands(plan));
 
     match output {
         OutputFormat::Text => {
@@ -95,6 +98,7 @@ pub fn print_refactor_plan(plan: &RefactorPlan, output: OutputFormat) -> CliResu
             println!("risk_error_count\t{}", plan.risk_summary.error_count);
             println!("risk_blocking_count\t{}", plan.risk_summary.blocking_count);
             println!("risk_advisory_count\t{}", plan.risk_summary.advisory_count);
+            println!("risk_overall\t{}", plan.risk_summary.overall_risk.label());
             println!("files\t{}", summary.file_count);
             println!("definition_count\t{}", summary.definition_count);
             println!("reference_count\t{}", summary.reference_count);
@@ -129,9 +133,8 @@ pub fn print_refactor_plan(plan: &RefactorPlan, output: OutputFormat) -> CliResu
                 );
             }
         }
-        OutputFormat::Json => println!(
-            "{}",
-            serde_json::to_string_pretty(&json!({
+        OutputFormat::Json => {
+            let mut payload = json!({
                 "schema_version": 1,
                 "operation": plan.operation.label(),
                 "symbol": plan.symbol.as_str(),
@@ -185,6 +188,7 @@ pub fn print_refactor_plan(plan: &RefactorPlan, output: OutputFormat) -> CliResu
                     "error_count": plan.risk_summary.error_count,
                     "blocking_count": plan.risk_summary.blocking_count,
                     "advisory_count": plan.risk_summary.advisory_count,
+                    "overall_risk": plan.risk_summary.overall_risk.label(),
                 },
                 "policy": {
                     "fail_on_blocking_gate": plan.policy.fail_on_blocking_gate,
@@ -232,8 +236,12 @@ pub fn print_refactor_plan(plan: &RefactorPlan, output: OutputFormat) -> CliResu
                         "non_call_reference_count": report.non_call_reference_count,
                     }))
                     .collect::<Vec<_>>(),
-            }))?
-        ),
+            });
+            if let Some(commands) = next_commands_json {
+                payload["next_commands"] = commands;
+            }
+            println!("{}", serde_json::to_string_pretty(&payload)?);
+        }
     }
 
     Ok(())

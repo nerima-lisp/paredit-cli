@@ -36,6 +36,13 @@ whose entries carry runnable `command` strings. An agent can execute the plan
 literally: run each step in order and stop when a gate blocks automation or a
 step exits non-zero.
 
+`risk_summary.overall_risk` collapses every gate's level and blocking flag
+into the one axis a decision actually needs: `"clean"` (nothing found),
+`"advisory"` (something found, but nothing blocks automation), or
+`"blocking"` (at least one gate that does). Any blocking gate outranks every
+advisory one regardless of severity level, since one blocking gate is enough
+to stop unattended editing on its own.
+
 Policy flags such as `--require-definitions`, `--require-references`, and
 `--fail-on-blocking-gate` turn advisory checks into hard failures, which makes
 `plan` usable as a CI gate on its own.

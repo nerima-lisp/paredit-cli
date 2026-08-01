@@ -237,6 +237,50 @@ fn cli_capabilities_schema_admits_the_silent_status_only_from_version_three() {
     );
 }
 
+/// `writes`/`possible_error_codes` are populated on every command regardless
+/// of `schema_version` — a deliberate exception to the module's own
+/// version-gating discipline (see `schema.rs`'s doc comment), not the
+/// version 1 vs. version 3 drift that discipline exists to catch. This pins
+/// that exception as a tested contract: a version-1-validated catalog must
+/// actually carry both fields, and the version 1 schema's
+/// `additionalProperties: false` on `command` must not reject them.
+#[test]
+fn cli_capabilities_schema_pins_writes_and_error_codes_as_intentionally_unversioned() {
+    let document = catalog("1");
+    let schema = schema("1");
+
+    let leaf = document["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .find(|command| command["name"] == "inspect")
+        .and_then(|inspect| inspect["commands"].as_array())
+        .and_then(|commands| {
+            commands
+                .iter()
+                .find(|command| command["name"] == "capabilities")
+        })
+        .expect("inspect capabilities command");
+    assert_eq!(leaf["writes"], false, "{leaf}");
+    assert!(leaf["possible_error_codes"].is_array(), "{leaf}");
+    assert!(
+        !leaf["possible_error_codes"]
+            .as_array()
+            .expect("possible_error_codes")
+            .is_empty(),
+        "{leaf}"
+    );
+
+    let mut errors = Vec::new();
+    validate(&document, &schema, &schema, "$", &mut errors);
+    assert!(
+        errors.is_empty(),
+        "the version 1 schema must validate `writes`/`possible_error_codes` on the version 1 \
+         catalog it already carries them on:\n{}",
+        errors.join("\n")
+    );
+}
+
 #[test]
 fn cli_capabilities_defaults_to_the_catalog() {
     let default = emit(&["inspect", "capabilities", "--output", "json"]);

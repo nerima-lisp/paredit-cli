@@ -1,5 +1,6 @@
 use super::super::super::manifest::status::refactor_apply_decision;
 use super::super::super::types::apply::RefactorApplyResult;
+use super::super::next_commands::apply_next_commands_for_result;
 use super::{
     blocked_reason_labels, blocked_reason_text, decision_steps_json, decision_summary_json,
     print_decision_summary,
@@ -10,13 +11,20 @@ use crate::refactor::cli::manifest::status::{
 };
 use paredit_core_cli::CliResult;
 use paredit_core_cli::args::OutputFormat;
+use paredit_core_cli::report::next_command;
 use paredit_core_cli::safe_text;
 use serde_json::json;
 
 pub fn print_refactor_apply_result(
     result: &RefactorApplyResult,
+    compact: bool,
     output: OutputFormat,
 ) -> CliResult<()> {
+    if compact && output == OutputFormat::Text {
+        println!("{}", safe_text!(result.headline));
+        return Ok(());
+    }
+
     let decision = refactor_apply_decision(
         RefactorManifestChecks {
             policy: ManifestPolicy::from_passed(result.manifest_policy_passed),
@@ -30,6 +38,11 @@ pub fn print_refactor_apply_result(
         },
         RefactorApplyOutcome::from_applied(result.summary.applied),
     );
+    let next_commands_json = next_command::to_json(&apply_next_commands_for_result(
+        result,
+        decision.status,
+        &decision.blocked_reasons,
+    ));
 
     match output {
         OutputFormat::Text => {
@@ -46,6 +59,7 @@ pub fn print_refactor_apply_result(
                 println!("root\t{}", safe_text!(path.display()));
             }
             println!("write_requested\t{}", result.write_requested);
+            println!("headline\t{}", safe_text!(result.headline));
             println!("status\t{}", decision.status.label());
             println!("next_action\t{}", safe_text!(decision.next_action.label()));
             println!("manifest_policy_passed\t{}", result.manifest_policy_passed);
@@ -98,10 +112,18 @@ pub fn print_refactor_apply_result(
                     file.manifest_flags_match()
                 );
             }
+            for group in &result.impact_area_groups {
+                println!(
+                    "impact_area_group\t{}\tfile_count={}\twritten={}\t{}",
+                    safe_text!(&group.group),
+                    group.file_count,
+                    group.written,
+                    safe_text!(group.failure.as_deref().unwrap_or(""))
+                );
+            }
         }
-        OutputFormat::Json => println!(
-            "{}",
-            serde_json::to_string_pretty(&json!({
+        OutputFormat::Json => {
+            let mut payload = json!({
                 "schema_version": 1,
                 "manifest": {
                     "path": result.manifest.path.display().to_string(),
@@ -120,6 +142,7 @@ pub fn print_refactor_apply_result(
                 "manifest_policy_passed": result.manifest_policy_passed,
                 "manifest_outputs_parse": result.manifest_outputs_parse,
                 "write_scope": result.write_scope.to_json(),
+                "headline": result.headline.as_str(),
                 "blocked_reasons": blocked_reason_labels(&decision.blocked_reasons),
                 "steps": decision_steps_json(decision.steps()),
                 "decision_summary": decision_summary_json(decision.summary()),
@@ -154,8 +177,21 @@ pub fn print_refactor_apply_result(
                         "manifest_flags_match": file.manifest_flags_match(),
                     }))
                     .collect::<Vec<_>>(),
-            }))?
-        ),
+                "impact_area_groups": result.impact_area_groups
+                    .iter()
+                    .map(|group| json!({
+                        "group": group.group.as_str(),
+                        "file_count": group.file_count,
+                        "written": group.written,
+                        "failure": group.failure.as_deref(),
+                    }))
+                    .collect::<Vec<_>>(),
+            });
+            if let Some(commands) = next_commands_json {
+                payload["next_commands"] = commands;
+            }
+            println!("{}", serde_json::to_string_pretty(&payload)?);
+        }
     }
 
     Ok(())

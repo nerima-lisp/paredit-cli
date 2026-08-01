@@ -1,5 +1,6 @@
 pub mod execute;
 pub mod manifest;
+pub mod next_commands;
 pub mod plan;
 pub mod preview;
 pub mod verification;

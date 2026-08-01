@@ -206,6 +206,207 @@ fn cli_mcp_read_only_refuses_a_command_that_writes_without_a_writing_flag() {
     );
 }
 
+/// Two more commands that spell the write in the command *name*: the
+/// checkpoint file lifecycle. Without these two entries in `WRITING_COMMANDS`
+/// an MCP server started with `--read-only` would run `refactor
+/// create-checkpoint`/`refactor delete-checkpoint` anyway, breaking the same
+/// promise `fix apply`'s regression test above guards.
+#[test]
+fn cli_mcp_read_only_refuses_create_checkpoint() {
+    let source = "(defun greet (name) (format t \"hi ~a\" name))\n";
+    let file = fixture("mcp-read-only-create-checkpoint", source);
+    let checkpoints_dir = file.parent().expect("parent").join("checkpoints");
+    let responses = session(
+        &["--read-only"],
+        &[
+            initialize(),
+            call(
+                2,
+                "paredit_run",
+                serde_json::json!({
+                    "args": [
+                        "refactor", "create-checkpoint",
+                        "--name", "cp1",
+                        "--checkpoints-dir", checkpoints_dir.display().to_string(),
+                        file.display().to_string(),
+                    ],
+                }),
+            ),
+        ],
+    );
+
+    assert_eq!(reply(&responses, 2)["isError"], true);
+    assert!(
+        !checkpoints_dir.join("cp1.json").exists(),
+        "--read-only must refuse `refactor create-checkpoint`, which writes with no writing flag"
+    );
+}
+
+#[test]
+fn cli_mcp_read_only_refuses_delete_checkpoint() {
+    let source = "(defun greet (name) (format t \"hi ~a\" name))\n";
+    let file = fixture("mcp-read-only-delete-checkpoint", source);
+    let checkpoints_dir = file.parent().expect("parent").join("checkpoints");
+    paredit()
+        .args([
+            "refactor",
+            "create-checkpoint",
+            "--name",
+            "cp2",
+            "--checkpoints-dir",
+            &checkpoints_dir.display().to_string(),
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+    let checkpoint_file = checkpoints_dir.join("cp2.json");
+    assert!(
+        checkpoint_file.exists(),
+        "checkpoint must exist before the read-only delete attempt"
+    );
+
+    let responses = session(
+        &["--read-only"],
+        &[
+            initialize(),
+            call(
+                2,
+                "paredit_run",
+                serde_json::json!({
+                    "args": [
+                        "refactor", "delete-checkpoint",
+                        "--name", "cp2",
+                        "--checkpoints-dir", checkpoints_dir.display().to_string(),
+                    ],
+                }),
+            ),
+        ],
+    );
+
+    assert_eq!(reply(&responses, 2)["isError"], true);
+    assert!(
+        checkpoint_file.exists(),
+        "--read-only must refuse `refactor delete-checkpoint`, which writes with no writing flag"
+    );
+}
+
+/// The flag vocabulary a write is spelled with, mirrored from
+/// `src/presentation/mcp/tools.rs::WRITING_FLAGS` (bare, without the leading
+/// `--`, to match the capabilities catalog's own `long` spelling) rather than
+/// imported: this test is deliberately black-box, driven off the same JSON a
+/// real MCP client would read, not off the module's private tables.
+const WRITE_FLAG_LONGS: [&str; 4] = ["write", "fix", "apply", "in-place"];
+
+fn capabilities_catalog() -> serde_json::Value {
+    let output = paredit()
+        .args([
+            "inspect",
+            "capabilities",
+            "--output",
+            "json",
+            "--schema-version",
+            "1",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    serde_json::from_slice(&output).expect("capabilities catalog is valid json")
+}
+
+/// Depth-first walk collecting every leaf command's full path where the
+/// catalog reports `writes: true` but none of its own flags is spelled from
+/// [`WRITE_FLAG_LONGS`] — a write baked into the command's *name*, the same
+/// shape that let `fix apply` and the two `refactor *-checkpoint` commands
+/// slip past `--read-only` before their `WRITING_COMMANDS` entries existed.
+fn collect_name_based_writers(
+    commands: &serde_json::Value,
+    prefix: &mut Vec<String>,
+    out: &mut Vec<Vec<String>>,
+) {
+    let Some(commands) = commands.as_array() else {
+        return;
+    };
+    for command in commands {
+        let name = command["name"].as_str().expect("command name").to_owned();
+        prefix.push(name);
+        match command.get("commands") {
+            Some(children) if children.is_array() => {
+                collect_name_based_writers(children, prefix, out);
+            }
+            _ => {
+                if command["writes"] == serde_json::json!(true) {
+                    let flagged = command["args"].as_array().into_iter().flatten().any(|arg| {
+                        arg["long"]
+                            .as_str()
+                            .is_some_and(|long| WRITE_FLAG_LONGS.contains(&long))
+                    });
+                    if !flagged {
+                        out.push(prefix.clone());
+                    }
+                }
+            }
+        }
+        prefix.pop();
+    }
+}
+
+/// The general form of the two regression tests above: every command the
+/// catalog itself says writes without a writing flag must actually be
+/// refused under `--read-only`, discovered dynamically from the catalog
+/// rather than off a hand-kept list — so `mcp::tools::WRITING_COMMANDS` and
+/// `capabilities::classify::WRITE_VERB_COMMANDS` (the two hand-kept lists
+/// this mirrors) can drift from each other, or from the real command tree,
+/// without a test ever catching it again.
+///
+/// The read-only refusal happens before the subprocess even starts (see
+/// `server.rs`'s `tools::writes(&argv)` check), so this only needs each
+/// command's leading path words, not a full, valid argument vector.
+#[test]
+fn cli_mcp_read_only_refuses_every_name_based_write_the_catalog_reports() {
+    let catalog = capabilities_catalog();
+    let mut name_based = Vec::new();
+    collect_name_based_writers(&catalog["commands"], &mut Vec::new(), &mut name_based);
+
+    assert!(
+        !name_based.is_empty(),
+        "the discovery walk found nothing; that means the walk is broken, not that the \
+         catalog has no name-based writers"
+    );
+    // Sanity check on the walk itself: the four commands known to write this
+    // way when this test was written must all be found, or the rest of this
+    // test is vacuous.
+    for expected in [
+        vec!["fix".to_owned(), "apply".to_owned()],
+        vec!["refactor".to_owned(), "create-checkpoint".to_owned()],
+        vec!["refactor".to_owned(), "delete-checkpoint".to_owned()],
+        vec!["config".to_owned(), "init".to_owned()],
+    ] {
+        assert!(
+            name_based.contains(&expected),
+            "expected {expected:?} among the catalog's name-based writers, found {name_based:?}"
+        );
+    }
+
+    for path in &name_based {
+        let responses = session(
+            &["--read-only"],
+            &[
+                initialize(),
+                call(2, "paredit_run", serde_json::json!({ "args": path })),
+            ],
+        );
+        assert_eq!(
+            reply(&responses, 2)["isError"],
+            true,
+            "--read-only must refuse `paredit {}`, which the catalog marks writes: true with \
+             no writing flag",
+            path.join(" ")
+        );
+    }
+}
+
 /// The gate matches a leading subcommand *sequence*, not any occurrence of the
 /// word, or it would refuse reads that merely mention it.
 #[test]
@@ -277,4 +478,35 @@ fn cli_mcp_reports_a_failed_gate_as_a_result_rather_than_a_tool_error() {
     assert_eq!(result["isError"], false);
     assert_eq!(result["structuredContent"]["gate_failed"], true);
     assert_eq!(result["structuredContent"]["exit_code"], 3);
+}
+
+/// `writes` in `structuredContent` is what lets a client learn, after the
+/// fact, whether the specific command a `paredit_run` call spelled out
+/// actually wrote a file — the fixed tools each have a static answer, but
+/// `paredit_run` carries any argument vector, so its answer varies call to
+/// call and has to be reported per call rather than assumed from the tool.
+#[test]
+fn cli_mcp_reports_whether_the_call_actually_wrote() {
+    let file = fixture("mcp-writes-flag", "(defun f (x) (if x 1 2))\n");
+    let responses = session(
+        &[],
+        &[
+            initialize(),
+            call(
+                2,
+                "paredit_check",
+                serde_json::json!({ "path": file.display().to_string() }),
+            ),
+            call(
+                3,
+                "paredit_run",
+                serde_json::json!({
+                    "args": ["edit", "format", "--file", file.display().to_string(), "--write"],
+                }),
+            ),
+        ],
+    );
+
+    assert_eq!(reply(&responses, 2)["structuredContent"]["writes"], false);
+    assert_eq!(reply(&responses, 3)["structuredContent"]["writes"], true);
 }

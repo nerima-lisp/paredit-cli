@@ -147,4 +147,53 @@ fn risk_summary_counts_gate_occurrences_by_level_and_blocking_status() {
     assert_eq!(summary.error_count, 1);
     assert_eq!(summary.blocking_count, 4);
     assert_eq!(summary.advisory_count, 2);
+    assert_eq!(summary.overall_risk, RefactorPlanOverallRisk::Blocking);
+}
+
+#[test]
+fn overall_risk_is_clean_when_no_gates_were_found() {
+    let summary = RefactorPlanRiskSummary::from_gates(&[]);
+    assert_eq!(summary.overall_risk, RefactorPlanOverallRisk::Clean);
+}
+
+#[test]
+fn overall_risk_is_advisory_when_gates_exist_but_none_block() {
+    let gates = vec![RefactorPlanGate {
+        level: RefactorRiskLevel::Warning,
+        code: "context",
+        message: "context only".to_owned(),
+        count: 1,
+        blocks_automation: false,
+    }];
+
+    let summary = RefactorPlanRiskSummary::from_gates(&gates);
+
+    assert_eq!(summary.overall_risk, RefactorPlanOverallRisk::Advisory);
+}
+
+/// A blocking gate outranks the aggregate even when its own level is the
+/// least severe one present: the axis that decides `overall_risk` is whether
+/// automation may proceed, not how loud any single gate's label is.
+#[test]
+fn a_blocking_gate_outranks_a_higher_level_advisory_gate() {
+    let gates = vec![
+        RefactorPlanGate {
+            level: RefactorRiskLevel::Error,
+            code: "advisory-error",
+            message: "severe but non-blocking".to_owned(),
+            count: 1,
+            blocks_automation: false,
+        },
+        RefactorPlanGate {
+            level: RefactorRiskLevel::Info,
+            code: "blocking-info",
+            message: "mild but blocking".to_owned(),
+            count: 1,
+            blocks_automation: true,
+        },
+    ];
+
+    let summary = RefactorPlanRiskSummary::from_gates(&gates);
+
+    assert_eq!(summary.overall_risk, RefactorPlanOverallRisk::Blocking);
 }

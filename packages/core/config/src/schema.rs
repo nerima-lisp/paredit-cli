@@ -151,7 +151,7 @@ const FAIL_SEVERITIES: &[&str] = &["never", "warning", "error"];
 /// How many keys the schema declares. Pinned for the same reason
 /// `RULE_COUNT` is: gaining or losing a configuration key should be a
 /// reviewed change, not a diff nobody looked at.
-pub const KEY_COUNT: usize = 32;
+pub const KEY_COUNT: usize = 33;
 
 /// Every recognised key, in the order `config schema` and `config show`
 /// present them. Grouped by table, tables in the order a file would write them.
@@ -212,6 +212,14 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
         kind: ValueKind::Boolean,
         default: DefaultValue::Boolean(true),
         summary: "Skip files that a .pareditignore excludes.",
+    },
+    // --- [cache] ---
+    KeySchema {
+        key: "cache.dir",
+        kind: ValueKind::Text,
+        default: DefaultValue::Unset,
+        summary: "Directory that stores workspace discovery results between runs, relative to \
+                  the file that sets it.",
     },
     // --- [format] ---
     KeySchema {
@@ -371,6 +379,7 @@ pub const SCHEMA: [KeySchema; KEY_COUNT] = [
 pub const PATH_KEYS: &[&str] = &[
     "extends",
     "paths.exclude",
+    "cache.dir",
     "lint.baseline",
     "lint.custom-rules",
     "lint.suppress-paths",
@@ -451,6 +460,18 @@ mod tests {
     fn an_environment_variable_is_the_key_shouted() {
         let entry = lookup("lint.fail-on").expect("declared");
         assert_eq!(entry.env_var(), "PAREDIT_LINT_FAIL_ON");
+    }
+
+    /// FR-012: `cache.dir` resolves to `PAREDIT_CACHE_DIR`, is a path key
+    /// resolved relative to the file that sets it, and carries no default —
+    /// unset means "no cache", exactly as an absent `--cache-dir` always has.
+    #[test]
+    fn cache_dir_is_a_path_key_with_no_default_and_the_expected_variable() {
+        let entry = lookup("cache.dir").expect("declared");
+        assert_eq!(entry.env_var(), "PAREDIT_CACHE_DIR");
+        assert_eq!(entry.kind, ValueKind::Text);
+        assert_eq!(entry.default, DefaultValue::Unset);
+        assert!(PATH_KEYS.contains(&"cache.dir"));
     }
 
     /// A default has to be a value the key's own type would accept, or the

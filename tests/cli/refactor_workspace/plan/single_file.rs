@@ -88,6 +88,46 @@ fn cli_builds_gated_refactor_plan_for_agents() {
 }
 
 #[test]
+fn cli_reports_overall_risk_and_apply_next_command_for_a_clean_plan() {
+    let dir = fresh_temp_dir("refactor plan-overall-risk-clean");
+    let file = dir.join("core.lisp");
+    write_fixture(
+        &file,
+        r#"(defpackage #:demo.core (:use #:cl))
+(in-package #:demo.core)
+(defun render-pane (pane) (draw-pane pane))
+(defun caller () (render-pane window) render-pane)
+"#,
+    );
+
+    let output = run_refactor_plan_json(&file, "render-pane", "rename");
+
+    // FR-003: no blocking gate exists (see `cli_builds_gated_refactor_plan_for_agents`
+    // for the full risk breakdown this same fixture produces), so the
+    // aggregate is "advisory" rather than "clean" — the two info/warning
+    // gates it does carry are non-blocking, not absent.
+    assert_eq!(
+        output.json.pointer("/risk_summary/overall_risk"),
+        Some(&Value::String("advisory".to_owned()))
+    );
+
+    // FR-004: nothing blocks automation, so the suggestion is the command
+    // that applies the plan, not a "look at the finding" command.
+    let next_commands = output
+        .json
+        .pointer("/next_commands")
+        .and_then(Value::as_array)
+        .expect("next_commands is present for a plan with an apply step");
+    assert!(
+        next_commands.iter().any(|command| command["command"]
+            .as_str()
+            .is_some_and(|command| command
+                .starts_with("paredit refactor rename-symbols --from 'render-pane'"))),
+        "{next_commands:?}"
+    );
+}
+
+#[test]
 fn cli_builds_refactor_plan_for_macro_targets() {
     assert_refactor_plan_target(
         "refactor plan-macro",

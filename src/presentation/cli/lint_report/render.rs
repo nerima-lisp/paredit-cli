@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use paredit_core_cli::CliResult;
 use paredit_core_cli::color::Painter;
+use paredit_core_cli::report::next_command::{self, NextCommand};
 use serde_json::json;
 
 use crate::lint::report::{
@@ -1173,19 +1174,50 @@ pub(super) struct LintFileFix {
     pub per_rule: Vec<(&'static str, usize)>,
 }
 
+/// One group `--group-by-impact-area` wrote or tried to write, in the order
+/// it processed them. Empty on every run that did not use that flag: it never
+/// partitioned anything, so it has no groups to report, not one group
+/// covering the whole run. Exact shape of `refactor apply`'s
+/// `RefactorApplyGroupResult`, for the same field-by-field reason: the two
+/// commands group files by the same key (each file's declared package) and an
+/// agent reading both reports should not have to learn two shapes for one
+/// idea.
+pub(super) struct LintFixGroupResult {
+    pub group: String,
+    pub file_count: usize,
+    pub written: bool,
+    pub failure: Option<String>,
+}
+
 /// Reports the outcome of applying auto-fixes in place: the grand total of
 /// fixes applied, how many files changed, and the per-file/per-rule breakdown.
+///
+/// `compact` short-circuits every other argument except `headline` in text
+/// mode: the point of the flag is a single line, not a smaller version of the
+/// full report. It has no effect on JSON, which already lets a caller select
+/// just the one field it wants.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn print_lint_fix_report(
     files: &[LintFileFix],
     fixes_applied: usize,
     deferred: usize,
+    headline: &str,
+    impact_area_groups: &[LintFixGroupResult],
+    next_commands: &[NextCommand],
+    compact: bool,
     output: OutputFormat,
 ) -> CliResult<()> {
+    if compact && output == OutputFormat::Text {
+        println!("{}", safe_text!(headline));
+        return Ok(());
+    }
+
     match output {
         OutputFormat::Text => {
             println!("fixes_applied\t{fixes_applied}");
             println!("files_changed\t{}", files.len());
             println!("fixes_deferred\t{deferred}");
+            println!("headline\t{}", safe_text!(headline));
             for file in files {
                 for (rule, count) in &file.per_rule {
                     println!(
@@ -1196,32 +1228,52 @@ pub(super) fn print_lint_fix_report(
                     );
                 }
             }
+            for group in impact_area_groups {
+                println!(
+                    "impact_area_group\t{}\tfile_count={}\twritten={}\t{}",
+                    safe_text!(&group.group),
+                    group.file_count,
+                    group.written,
+                    safe_text!(group.failure.as_deref().unwrap_or(""))
+                );
+            }
         }
         OutputFormat::Json => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&json!({
-                    "schema_version": 1,
-                    "fixes_applied": fixes_applied,
-                    "files_changed": files.len(),
-                    // Fixes an overlapping one shadowed on the final pass. A
-                    // non-zero count means re-running would apply more; it is
-                    // not an error, and the fixpoint loop already re-ran until
-                    // it stopped shrinking.
-                    "fixes_deferred": deferred,
-                    "files": files
-                        .iter()
-                        .map(|file| json!({
-                            "path": file.path,
-                            "applied": file.applied,
-                            "per_rule": file.per_rule
-                                .iter()
-                                .map(|(rule, count)| json!({ "rule": rule, "count": count }))
-                                .collect::<Vec<_>>(),
-                        }))
-                        .collect::<Vec<_>>(),
-                }))?
-            );
+            let mut payload = json!({
+                "schema_version": 1,
+                "fixes_applied": fixes_applied,
+                "files_changed": files.len(),
+                // Fixes an overlapping one shadowed on the final pass. A
+                // non-zero count means re-running would apply more; it is
+                // not an error, and the fixpoint loop already re-ran until
+                // it stopped shrinking.
+                "fixes_deferred": deferred,
+                "headline": headline,
+                "files": files
+                    .iter()
+                    .map(|file| json!({
+                        "path": file.path,
+                        "applied": file.applied,
+                        "per_rule": file.per_rule
+                            .iter()
+                            .map(|(rule, count)| json!({ "rule": rule, "count": count }))
+                            .collect::<Vec<_>>(),
+                    }))
+                    .collect::<Vec<_>>(),
+                "impact_area_groups": impact_area_groups
+                    .iter()
+                    .map(|group| json!({
+                        "group": group.group.as_str(),
+                        "file_count": group.file_count,
+                        "written": group.written,
+                        "failure": group.failure.as_deref(),
+                    }))
+                    .collect::<Vec<_>>(),
+            });
+            if let Some(commands) = next_command::to_json(next_commands) {
+                payload["next_commands"] = commands;
+            }
+            println!("{}", serde_json::to_string_pretty(&payload)?);
         }
     }
 
@@ -1367,6 +1419,7 @@ pub(super) struct LintFixPlanEntry {
 /// in-place `--fix` run. Mirrors the SARIF `fixes` payload in the plain schema.
 pub(super) fn print_lint_fix_plan(
     entries: &[LintFixPlanEntry],
+    next_commands: &[NextCommand],
     output: OutputFormat,
 ) -> CliResult<()> {
     match output {
@@ -1386,34 +1439,35 @@ pub(super) fn print_lint_fix_plan(
             }
         }
         OutputFormat::Json => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&json!({
-                    "schema_version": 1,
-                    "fix_count": entries.len(),
-                    "fixes": entries
-                        .iter()
-                        .map(|entry| json!({
-                            "id": entry.finding_id,
-                            "rule": entry.rule,
-                            "path": entry.path,
-                            "description": entry.fix.description,
-                            "span": {
-                                "start": entry.byte_offset,
-                                "end": entry.byte_offset + entry.byte_length,
-                            },
-                            "replacements": entry.fix.replacements
-                                .iter()
-                                .map(|replacement| json!({
-                                    "byte_offset": replacement.byte_offset,
-                                    "byte_length": replacement.byte_length,
-                                    "text": replacement.text,
-                                }))
-                                .collect::<Vec<_>>(),
-                        }))
-                        .collect::<Vec<_>>(),
-                }))?
-            );
+            let mut payload = json!({
+                "schema_version": 1,
+                "fix_count": entries.len(),
+                "fixes": entries
+                    .iter()
+                    .map(|entry| json!({
+                        "id": entry.finding_id,
+                        "rule": entry.rule,
+                        "path": entry.path,
+                        "description": entry.fix.description,
+                        "span": {
+                            "start": entry.byte_offset,
+                            "end": entry.byte_offset + entry.byte_length,
+                        },
+                        "replacements": entry.fix.replacements
+                            .iter()
+                            .map(|replacement| json!({
+                                "byte_offset": replacement.byte_offset,
+                                "byte_length": replacement.byte_length,
+                                "text": replacement.text,
+                            }))
+                            .collect::<Vec<_>>(),
+                    }))
+                    .collect::<Vec<_>>(),
+            });
+            if let Some(commands) = next_command::to_json(next_commands) {
+                payload["next_commands"] = commands;
+            }
+            println!("{}", serde_json::to_string_pretty(&payload)?);
         }
     }
 

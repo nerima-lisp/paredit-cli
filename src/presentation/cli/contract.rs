@@ -19,8 +19,8 @@ pub(super) const DIALECTS: [&str; 10] = [
     "fennel",
 ];
 
-#[derive(Clone, Copy, Debug)]
-enum CommandCategory {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum CommandCategory {
     Introspection,
     Format,
     Structural,
@@ -554,8 +554,12 @@ const STRUCTURAL_COMMANDS: [&str; 33] = [
     "migrate run",
 ];
 
-const SEMANTIC_COMMANDS: [&str; 83] = [
+const SEMANTIC_COMMANDS: [&str; 87] = [
     "refactor step",
+    "refactor create-checkpoint",
+    "refactor list-checkpoints",
+    "refactor restore-checkpoint",
+    "refactor delete-checkpoint",
     "refactor patch",
     "refactor plan",
     "refactor verify",
@@ -719,8 +723,12 @@ const SCOPE_TIER_REPORTS: [&str; 36] = [
 
 /// Refactor plumbing that moves whole forms or drives the manifest workflow.
 /// None of it reads an operator name, so it is complete for every dialect.
-const SYNTAX_TIER_REFACTORS: [&str; 17] = [
+const SYNTAX_TIER_REFACTORS: [&str; 21] = [
     "refactor step",
+    "refactor create-checkpoint",
+    "refactor list-checkpoints",
+    "refactor restore-checkpoint",
+    "refactor delete-checkpoint",
     "refactor patch",
     "refactor plan",
     "refactor verify",
@@ -995,7 +1003,11 @@ fn dialect_depth_report() -> Value {
     Value::Array(entries)
 }
 
-fn command_category(command_path: &str) -> Option<CommandCategory> {
+/// The category [`crate::presentation::cli::capabilities::classify`] keys its
+/// own write and error-code classification on, so that classification cannot
+/// drift from the dialect contract's own per-command inventory — this *is*
+/// the 358-command list the dialect contract publishes, read a second way.
+pub(super) fn command_category(command_path: &str) -> Option<CommandCategory> {
     COMMAND_GROUPS
         .iter()
         .find(|(paths, _)| paths.contains(&command_path))

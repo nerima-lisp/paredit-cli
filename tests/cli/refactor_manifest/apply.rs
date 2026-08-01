@@ -132,6 +132,191 @@ fn cli_applies_refactor_preview_manifest_with_hash_guards() {
 }
 
 #[test]
+fn cli_refactor_apply_reports_headline_and_compact_text_output() {
+    let dir = fresh_temp_dir("refactor apply-headline");
+    let lisp_file = dir.join("core.lisp");
+    let original = "(defun old-name (x) x)\n";
+    fs::write(&lisp_file, original).expect("write lisp fixture");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .args(["refactor", "preview"])
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let manifest_text = String::from_utf8(preview_output).expect("preview output is utf8");
+    let manifest_file = dir.join("rename.preview.json");
+    fs::write(&manifest_file, &manifest_text).expect("write refactor manifest");
+
+    // FR-006: JSON always carries the headline, dry run or not.
+    let mut dry_run = paredit();
+    dry_run
+        .args(["refactor", "apply"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"headline\": \"1 renamed definition.\"",
+        ));
+
+    // FR-006: `--compact` text output is the headline and nothing else.
+    let mut compact = paredit();
+    compact
+        .args(["refactor", "apply"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--compact")
+        .arg("--output")
+        .arg("text")
+        .assert()
+        .success()
+        .stdout("1 renamed definition.\n");
+
+    // Without --compact, text mode still prints the full field-by-field
+    // report, with a headline row alongside everything else.
+    let mut verbose_text = paredit();
+    verbose_text
+        .args(["refactor", "apply"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--output")
+        .arg("text")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "headline\t1 renamed definition.\n",
+        ))
+        .stdout(predicate::str::contains("manifest_path\t"));
+
+    assert_eq!(
+        fs::read_to_string(&lisp_file).expect("read unwritten dry-run fixture"),
+        original
+    );
+}
+
+#[test]
+fn cli_refactor_apply_next_commands_suggest_write_when_dry_run_ready() {
+    let dir = fresh_temp_dir("refactor apply-next-commands-dry-run");
+    let lisp_file = dir.join("core.lisp");
+    fs::write(&lisp_file, "(defun old-name (x) x)\n").expect("write lisp fixture");
+    let manifest_file = dir.join("rename.preview.json");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .args(["refactor", "preview"])
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    fs::write(&manifest_file, preview_output).expect("write refactor manifest");
+
+    let mut apply = paredit();
+    let assert = apply
+        .args(["refactor", "apply"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .success();
+    let json: serde_json::Value =
+        serde_json::from_slice(&assert.get_output().stdout).expect("apply output is valid json");
+    let next_commands = json
+        .pointer("/next_commands")
+        .and_then(serde_json::Value::as_array)
+        .expect("next_commands is present for a dry-run-ready manifest");
+    assert!(
+        next_commands.iter().any(|command| {
+            command["command"].as_str().is_some_and(|command| {
+                command.contains("refactor apply")
+                    && command.contains("--write")
+                    && command.contains(&manifest_file.display().to_string())
+            })
+        }),
+        "{next_commands:?}"
+    );
+}
+
+#[test]
+fn cli_refactor_apply_next_commands_suggest_recheck_when_blocked() {
+    let dir = fresh_temp_dir("refactor apply-next-commands-blocked");
+    let lisp_file = dir.join("core.lisp");
+    fs::write(&lisp_file, "(defun old-name (x) x)\n").expect("write lisp fixture");
+    let manifest_file = dir.join("rename.preview.json");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .args(["refactor", "preview"])
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let manifest_text = String::from_utf8(preview_output)
+        .expect("preview output is utf8")
+        .replace("\"passed\": true", "\"passed\": false");
+    fs::write(&manifest_file, manifest_text).expect("write failed refactor manifest");
+
+    let mut apply = paredit();
+    let assert = apply
+        .args(["refactor", "apply"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .failure();
+    let json: serde_json::Value =
+        serde_json::from_slice(&assert.get_output().stdout).expect("apply output is valid json");
+    let next_commands = json
+        .pointer("/next_commands")
+        .and_then(serde_json::Value::as_array)
+        .expect("next_commands is present for a blocked manifest");
+    assert!(
+        next_commands.iter().any(|command| {
+            command["command"].as_str().is_some_and(|command| {
+                command.contains("refactor check")
+                    && command.contains(&manifest_file.display().to_string())
+            })
+        }),
+        "{next_commands:?}"
+    );
+}
+
+#[test]
 fn cli_refactor_apply_rejects_manifest_paths_outside_root_without_writing() {
     let dir = fresh_temp_dir("refactor apply-root-guard");
     let root = dir.join("workspace");
@@ -578,6 +763,107 @@ fn cli_rolls_back_refactor_apply_when_later_file_write_fails() {
     );
     assert_eq!(
         fs::read_to_string(&blocked_file).expect("read blocked fixture"),
+        blocked_original
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_refactor_apply_group_by_impact_area_continues_after_one_group_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = fresh_temp_dir("refactor apply-group-by-impact-area");
+    let writable_file = dir.join("app.lisp");
+    let readonly_dir = dir.join("readonly");
+    let blocked_file = readonly_dir.join("util.lisp");
+    let manifest_file = dir.join("rename.preview.json");
+    let writable_original = "(in-package :app)\n(defun old-name (x) x)\n";
+    let blocked_original = "(in-package :util)\n(defun old-name (y) y)\n";
+    fs::write(&writable_file, writable_original).expect("write writable fixture");
+    fs::create_dir_all(&readonly_dir).expect("create readonly dir");
+    fs::write(&blocked_file, blocked_original).expect("write blocked fixture");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .args(["refactor", "preview"])
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--output")
+        .arg("json")
+        .arg(&writable_file)
+        .arg(&blocked_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    fs::write(&manifest_file, preview_output).expect("write refactor manifest");
+
+    fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o555))
+        .expect("chmod readonly dir");
+
+    let mut apply = paredit();
+    let assert = apply
+        .args(["refactor", "apply"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--write")
+        .arg("--group-by-impact-area")
+        .arg("--output")
+        .arg("json")
+        .assert();
+
+    fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o755))
+        .expect("restore readonly dir permissions");
+
+    // One group's write failed and one succeeded: not everything failed, so
+    // this is a warning on stderr and a zero exit rather than the
+    // whole-manifest refusal `cli_rolls_back_refactor_apply_when_later_file_write_fails`
+    // exercises without this flag.
+    let assert = assert
+        .success()
+        .stderr(predicate::str::contains("Permission denied"));
+    let json: serde_json::Value =
+        serde_json::from_slice(&assert.get_output().stdout).expect("apply output is valid json");
+
+    let groups = json
+        .pointer("/impact_area_groups")
+        .and_then(serde_json::Value::as_array)
+        .expect("impact_area_groups is present");
+    assert_eq!(groups.len(), 2, "{groups:?}");
+    assert_eq!(
+        groups
+            .iter()
+            .filter(|group| group["written"] == serde_json::Value::Bool(true))
+            .count(),
+        1,
+        "{groups:?}"
+    );
+    assert_eq!(
+        groups
+            .iter()
+            .filter(|group| group["written"] == serde_json::Value::Bool(false))
+            .count(),
+        1,
+        "{groups:?}"
+    );
+    assert!(
+        groups.iter().any(|group| group["failure"]
+            .as_str()
+            .is_some_and(|message| message.contains("Permission denied"))),
+        "{groups:?}"
+    );
+
+    assert_eq!(
+        fs::read_to_string(&writable_file).expect("read written app fixture"),
+        "(in-package :app)\n(defun new-name (x) x)\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&blocked_file).expect("read unwritten util fixture"),
         blocked_original
     );
 }

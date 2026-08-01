@@ -1179,6 +1179,7 @@ dependencies = [
  "paredit-core-semantics",
  "paredit-core-syntax",
  "paredit-core-workspace",
+ "paredit-feature-change-summary",
  "paredit-feature-project-analysis",
  "paredit-feature-rename",
  "proptest",

@@ -17,6 +17,23 @@
 //! permissive schema covering all three would validate a version 1 document
 //! carrying a version 3 field, which is exactly the drift the catalog's
 //! version number exists to catch.
+//!
+//! `command.writes` and `command.possible_error_codes` are the one
+//! deliberate exception to that discipline: both are populated on every
+//! command regardless of `schema_version`, and their `$defs` entry (in
+//! [`definitions`]) is not gated behind a `version >= N` check the way
+//! `dialectContract` is. That is safe rather than an oversight, because the
+//! two things a version number has to protect against don't apply to them:
+//! they are additive-only leaf properties on a node that already exists in
+//! every version (unlike `dialect_contract`, which changes the *shape* of
+//! the document by adding a whole new top-level collection), and no version
+//! ever populated the catalog without them, so there is no older document
+//! shape a schema revision could be asked to keep validating. Widening a
+//! schema in place is exactly the drift this module otherwise refuses to
+//! allow — the fields are exempted here, not the discipline.
+//! `cli_capabilities_schema_pins_writes_and_error_codes_as_intentionally_unversioned`
+//! in `tests/cli/capabilities_schema.rs` pins this as a tested contract
+//! rather than a comment that can go stale.
 
 use serde_json::{Value, json};
 
@@ -91,6 +108,30 @@ fn definitions(version: u8) -> Value {
                          command that has none, so \"cannot fail on a policy\" and \"we \
                          did not look\" stay distinguishable.",
                     "items": { "$ref": "#/$defs/gate" },
+                },
+                "writes": {
+                    "type": "boolean",
+                    "description":
+                        "Whether this command is capable of modifying a file under some \
+                         argument combination — a `--write`/`--fix`/`--apply`/`--in-place` \
+                         flag, or a command whose name is itself the write (`fix apply`). \
+                         Present only on an invocable command, absent on a namespace node \
+                         that only groups other commands. `false` on a command that can \
+                         still touch disk outside this promise — the kill ring \
+                         (`--to-ring`) and archive extraction (`--extract-to`) are not \
+                         counted, matching the `--read-only` MCP gate this mirrors.",
+                },
+                "possible_error_codes": {
+                    "type": "array",
+                    "description":
+                        "The `ErrorCode` labels (see `docs/src/reference/errors.md`) this \
+                         command can realistically exit with, such as \
+                         `input.dialect-unsupported` or `selection.no-match`. A superset \
+                         gathered from the command's own argument shape rather than a \
+                         proof of completeness: absence of a code here means no known \
+                         signal predicts it, not that it is provably unreachable. Present \
+                         only on an invocable command, same as `writes`.",
+                    "items": { "type": "string" },
                 },
             },
         },

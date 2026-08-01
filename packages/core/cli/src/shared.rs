@@ -6,7 +6,9 @@ use std::path::PathBuf;
 use crate::args::{CompactSelectorArgs, DialectArg, EditTargetArgs, SelectorArgs, SourceInput};
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_eq;
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::selector::{SelectorError, SelectorTarget, resolve as resolve_selector};
+use paredit_core_syntax::selector::{
+    SelectorError, SelectorTarget, ambiguous_candidates, resolve as resolve_selector,
+};
 use paredit_core_syntax::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SexprResult, SymbolName, SyntaxTree,
@@ -252,7 +254,7 @@ pub fn resolve_one_target(
 ) -> CliResult<SelectorTarget> {
     let request = selector.to_request(dialect)?;
     let targets = resolve_selector(tree, dialect, &request)?;
-    exactly_one_target(targets, &request.describe(), command)
+    exactly_one_target(tree, targets, &request.describe(), command)
 }
 
 /// Resolves a [`CompactSelectorArgs`] into the one form it names.
@@ -267,15 +269,24 @@ pub fn resolve_compact_target(
 ) -> CliResult<SelectorTarget> {
     let request = selector.to_request(dialect)?;
     let targets = resolve_selector(tree, dialect, &request)?;
-    exactly_one_target(targets, &request.describe(), command)
+    exactly_one_target(tree, targets, &request.describe(), command)
 }
 
 fn exactly_one_target(
+    tree: &SyntaxTree,
     targets: Vec<SelectorTarget>,
     selector: &str,
     command: &str,
 ) -> CliResult<SelectorTarget> {
     let count = targets.len();
+    if count > 1 {
+        return Err(SelectorError::Ambiguous {
+            selector: selector.to_owned(),
+            count,
+            candidates: ambiguous_candidates(tree, &targets),
+        }
+        .into());
+    }
     let target = targets
         .into_iter()
         .next()
@@ -285,13 +296,6 @@ fn exactly_one_target(
         .ok_or_else(|| SelectorError::NoMatch {
             selector: selector.to_owned(),
         })?;
-    if count > 1 {
-        return Err(SelectorError::Ambiguous {
-            selector: selector.to_owned(),
-            count,
-        }
-        .into());
-    }
     require_single_form(&target, command)?;
     Ok(target)
 }

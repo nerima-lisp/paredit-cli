@@ -21,10 +21,14 @@ mod summary;
 mod syntax;
 mod types;
 
-use definitions::{collect_impact_definitions, impact_definition_matches_signature};
+use definitions::impact_definition_matches_signature;
 use identity::SymbolIdentity;
 use references::{count_non_call_references, matching_symbol_occurrences};
 
+// Exposed beyond this crate as the one place a file's declared package is
+// derived from its own source, rather than a `--group-by-impact-area`-style
+// caller reimplementing the `in-package` scan.
+pub use definitions::collect_impact_definitions;
 pub use summary::{
     impact_risks, impact_status_counts, raw_refactor_risks, summarize_impact_reports,
 };

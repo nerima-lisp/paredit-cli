@@ -31,11 +31,16 @@ pub(super) use args::FixCommand;
 
 /// Dispatches the namespace's four leaves onto the one lint workflow.
 pub(super) fn fix(command: FixCommand) -> CommandResult {
-    let (selection, mode) = match command {
-        FixCommand::Apply(selection) => (selection, FixMode::Apply),
-        FixCommand::Check(selection) => (selection, FixMode::Check),
-        FixCommand::Plan(selection) => (selection, FixMode::Plan),
-        FixCommand::List(selection) => (selection, FixMode::List),
+    let (selection, mode, compact, group_by_impact_area) = match command {
+        FixCommand::Apply(apply_args) => (
+            apply_args.selection,
+            FixMode::Apply,
+            apply_args.compact,
+            apply_args.group_by_impact_area,
+        ),
+        FixCommand::Check(selection) => (selection, FixMode::Check, false, false),
+        FixCommand::Plan(selection) => (selection, FixMode::Plan, false, false),
+        FixCommand::List(selection) => (selection, FixMode::List, false, false),
     };
 
     // `inspect lint` gets this from clap's `required_unless_present_any`, which
@@ -52,5 +57,10 @@ pub(super) fn fix(command: FixCommand) -> CommandResult {
         .into());
     }
 
-    lint_report(LintReportArgs::for_fix(selection, mode))
+    lint_report(LintReportArgs::for_fix(
+        selection,
+        mode,
+        compact,
+        group_by_impact_area,
+    ))
 }

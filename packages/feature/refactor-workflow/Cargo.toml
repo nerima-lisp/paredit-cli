@@ -22,6 +22,11 @@ paredit-core-safety = { path = "../../core/safety" }
 # One feature edge: impact_report, for the risk level a plan reports.
 paredit-feature-project-analysis = { path = "../project-analysis" }
 paredit-feature-rename = { path = "../rename" }
+# The compact one-line summary on `refactor apply`: this package's own
+# `summarise`/`headline` are what `inspect change` uses, and reusing them here
+# means the same reader-syntax-aware, reparse-validated comparison rather than
+# a second diffing implementation.
+paredit-feature-change-summary = { path = "../change-summary" }
 blake3.workspace = true
 libc.workspace = true
 cap-std.workspace = true

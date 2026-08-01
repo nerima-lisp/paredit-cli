@@ -4,8 +4,8 @@ pub mod tests;
 pub mod types;
 
 pub use paredit_core_edit::refactor_plan::{
-    RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
-    RefactorPlanPolicyOptions, RefactorPlanRiskSummary, RefactorPlanSummary,
+    RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanOverallRisk,
+    RefactorPlanPolicy, RefactorPlanPolicyOptions, RefactorPlanRiskSummary, RefactorPlanSummary,
     RefactorPlanTargetKind, RefactorRiskLevel, RefactorVerificationCheck,
     RefactorVerificationRequest, VerificationPhase, evaluate_refactor_plan_policy,
     refactor_plan_gates, refactor_verification_checks,

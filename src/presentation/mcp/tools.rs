@@ -68,44 +68,43 @@ fn files_schema() -> Value {
 pub(super) const TOOLS: &[Tool] = &[
     Tool {
         name: "paredit_check",
-        description: "Validate that a Lisp source file is a balanced S-expression document. \
-                      Run this before and after any edit made by other means; it is the \
-                      cheapest way to catch a delimiter mistake.",
+        description: "Check that a Lisp file is a balanced S-expression document. Run before \
+                      and after edits made by other means, to catch delimiter mistakes early.",
         argv: &["inspect", "check", "--output", "json", "--file"],
         schema: || one_file("The Lisp source file to validate."),
         writes: false,
     },
     Tool {
         name: "paredit_outline",
-        description: "List a file's top-level forms with their child-index paths, byte spans, \
-                      and whether each is a definition. The paths are what every `edit` and \
-                      `refactor` command selects with, so this is the usual first call.",
+        description: "List a file's top-level forms with child-index paths, byte spans, and \
+                      definition status. These paths are what `edit`/`refactor` commands \
+                      select with — call this first.",
         argv: &["inspect", "outline", "--output", "json", "--file"],
         schema: || one_file("The Lisp source file to outline."),
         writes: false,
     },
     Tool {
         name: "paredit_lint",
-        description: "Run every within-file logic-bug lint rule and report the findings with \
-                      rule, severity, category, and whether an automatic fix exists. Prefer \
-                      this to the individual rule commands.",
+        description: "Run every within-file logic-bug lint rule; findings include rule, \
+                      severity, category, and fixability. Prefer this over individual rule \
+                      commands.",
         argv: &["inspect", "lint", "--output", "json"],
         schema: files_schema,
         writes: false,
     },
     Tool {
         name: "paredit_format",
-        description: "Print a file in canonical S-expression layout without writing it. \
-                      Compare against the file to decide whether a rewrite is needed.",
+        description: "Print a file in canonical S-expression layout without writing it, to \
+                      check whether a rewrite is needed.",
         argv: &["edit", "format", "--file"],
         schema: || one_file("The Lisp source file to format."),
         writes: false,
     },
     Tool {
         name: "paredit_diff",
-        description: "Compare two Lisp documents by their parse rather than their lines: which \
-                      forms were inserted, deleted, or replaced. Whitespace and comments are \
-                      not compared, so a reformatting reports no changes.",
+        description: "Compare two Lisp documents by parse, not lines: inserted, deleted, or \
+                      replaced forms. Whitespace and comments are ignored, so reformatting \
+                      alone reports no changes.",
         argv: &["inspect", "diff", "--output", "json"],
         schema: || {
             json!({
@@ -122,9 +121,9 @@ pub(super) const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "paredit_capabilities",
-        description: "The machine-readable catalog of every paredit command, flag, default, \
-                      and enum value, plus the per-dialect support matrix. Read this before \
-                      using `paredit_run` for a command not in this tool list.",
+        description: "Machine-readable catalog of every command, flag, default, and enum \
+                      value, plus per-dialect support. Read before using `paredit_run` for a \
+                      command not listed here.",
         argv: &[
             "inspect",
             "capabilities",
@@ -144,11 +143,10 @@ pub(super) const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "paredit_run",
-        description: "Run any paredit command by its argument vector, for example \
-                      [\"refactor\", \"rename-at\", \"--file\", \"a.lisp\", \"--at\", \"42\", \
-                      \"--to\", \"new-name\"]. Use `paredit_capabilities` to discover the \
-                      commands and their flags. Commands that write a file are refused when \
-                      the server was started with --read-only.",
+        description: "Run any paredit command by its argument vector, e.g. [\"refactor\", \
+                      \"rename-at\", \"--file\", \"a.lisp\", \"--at\", \"42\", \"--to\", \
+                      \"new-name\"]. See `paredit_capabilities` for commands and flags. \
+                      Writing commands are refused under --read-only.",
         argv: &[],
         schema: || {
             json!({
@@ -185,10 +183,25 @@ pub(super) const WRITING_FLAGS: &[&str] = &["--write", "--fix", "--apply", "--in
 /// carries none of the four flags above. Under `--read-only` it therefore ran,
 /// and wrote.
 ///
+/// `refactor create-checkpoint` and `refactor delete-checkpoint` write and
+/// delete a checkpoint file the same way, and `config init` writes
+/// `paredit.toml` unconditionally unless `--dry-run` is given — none of the
+/// three carry a flag from [`WRITING_FLAGS`] either. This list is the
+/// command-path-sequence counterpart of
+/// [`crate::presentation::cli::capabilities::classify`]'s
+/// `WRITE_VERB_COMMANDS`, which independently names all four; the two lists
+/// are checked against each other by a contract test so they cannot diverge
+/// silently again.
+///
 /// Matched as a subcommand *sequence* at the front of the argument vector
 /// rather than by asking "is this word anywhere in argv": `--rule apply` must
 /// not be mistaken for `fix apply`, and neither must a file named `fix`.
-const WRITING_COMMANDS: &[&[&str]] = &[&["fix", "apply"]];
+const WRITING_COMMANDS: &[&[&str]] = &[
+    &["fix", "apply"],
+    &["refactor", "create-checkpoint"],
+    &["refactor", "delete-checkpoint"],
+    &["config", "init"],
+];
 
 pub(super) fn find(name: &str) -> Option<&'static Tool> {
     TOOLS.iter().find(|tool| tool.name == name)
@@ -300,7 +313,14 @@ pub(super) fn run(argv: &[String]) -> Result<Output, String> {
 /// `isError` is set from the exit status, and the exit status is meaningful
 /// here: 3 is a policy gate failing, which is a *result* and not a malfunction.
 /// Reporting it as an error would have a model retry a command that worked.
-pub(super) fn call_result(output: &Output) -> Value {
+///
+/// `writes` is the caller's already-computed answer to "did this argument
+/// vector ask for a write" (see `writes()` below). It is threaded through
+/// rather than recomputed here because `paredit_run` is the one tool whose
+/// argument vector is not known until the call arrives — for every other tool
+/// it is `tool.writes` — and the client cares which one actually happened,
+/// not just which one this fixed catalogue entry usually means.
+pub(super) fn call_result(output: &Output, writes: bool) -> Value {
     let gate_failure = output.code == paredit_core_cli::gate::GATE_FAILURE_EXIT_CODE;
     let mut text = output.stdout.clone();
     if !output.stderr.is_empty() {
@@ -315,6 +335,7 @@ pub(super) fn call_result(output: &Output) -> Value {
         "structuredContent": {
             "exit_code": output.code,
             "gate_failed": gate_failure,
+            "writes": writes,
         },
     })
 }
@@ -347,6 +368,29 @@ mod tests {
                 tool.name
             );
         }
+    }
+
+    /// This module's own doc comment argues for minimizing what a model has
+    /// to read before it has seen a line of the user's code — that is why
+    /// there are 7 tools and a `run` escape hatch rather than 358. The same
+    /// argument applies to the 7 descriptions themselves.
+    ///
+    /// 1,200 is a ceiling with headroom over the 1,114-character total these
+    /// 7 descriptions summed to right after trimming them for FR-010
+    /// (2026-08-01), not an exact-match snapshot: a future minor wording fix
+    /// that stays under it should not have to touch this number, but growth
+    /// back toward the untrimmed total (1,377) must fail loudly.
+    const TOOL_DESCRIPTION_CHARACTER_CEILING: usize = 1_200;
+
+    #[test]
+    fn tool_descriptions_stay_under_their_character_budget() {
+        let total: usize = TOOLS.iter().map(|tool| tool.description.len()).sum();
+        assert!(
+            total <= TOOL_DESCRIPTION_CHARACTER_CEILING,
+            "the 7 tool descriptions total {total} characters, over the \
+             {TOOL_DESCRIPTION_CHARACTER_CEILING}-character budget; this module's whole \
+             design argues for minimizing what a model reads before it sees the user's code"
+        );
     }
 
     #[test]
@@ -400,31 +444,61 @@ mod tests {
     /// was an error retries a command that worked.
     #[test]
     fn a_failed_gate_is_a_result_and_not_a_tool_error() {
-        let gated = call_result(&Output {
-            stdout: "finding_count\t2".to_owned(),
-            stderr: "lint-report policy failed".to_owned(),
-            code: 3,
-        });
+        let gated = call_result(
+            &Output {
+                stdout: "finding_count\t2".to_owned(),
+                stderr: "lint-report policy failed".to_owned(),
+                code: 3,
+            },
+            false,
+        );
         assert_eq!(gated["isError"], false);
         assert_eq!(gated["structuredContent"]["gate_failed"], true);
 
-        let broken = call_result(&Output {
-            stdout: String::new(),
-            stderr: "Error: no such file".to_owned(),
-            code: 1,
-        });
+        let broken = call_result(
+            &Output {
+                stdout: String::new(),
+                stderr: "Error: no such file".to_owned(),
+                code: 1,
+            },
+            false,
+        );
         assert_eq!(broken["isError"], true);
+    }
+
+    /// `writes` is threaded straight through from the caller into
+    /// `structuredContent`, independent of exit status: what matters is
+    /// whether the argument vector asked for a write, not whether the write
+    /// succeeded.
+    #[test]
+    fn call_result_surfaces_whether_the_call_asked_for_a_write() {
+        let output = Output {
+            stdout: String::new(),
+            stderr: String::new(),
+            code: 0,
+        };
+        assert_eq!(
+            call_result(&output, false)["structuredContent"]["writes"],
+            false
+        );
+        assert_eq!(
+            call_result(&output, true)["structuredContent"]["writes"],
+            true
+        );
     }
 
     /// stderr carries the reason a command refused. Dropping it leaves a model
     /// with an empty result and no way to correct itself.
     #[test]
     fn a_failures_message_reaches_the_content() {
-        let result = call_result(&Output {
-            stdout: String::new(),
-            stderr: "Error: unsupported dialect".to_owned(),
-            code: 1,
-        });
+        let result = call_result(
+            &Output {
+                stdout: String::new(),
+                stderr: "Error: unsupported dialect".to_owned(),
+                code: 1,
+            },
+            false,
+        );
         assert!(
             result["content"][0]["text"]
                 .as_str()

@@ -30,6 +30,15 @@ pub struct RefactorApplyArgs {
     /// Wall-clock budget for --verify-command, in milliseconds.
     #[arg(long, value_name = "MILLIS", requires = "verify_command")]
     pub verify_timeout_ms: Option<u64>,
+    /// In text mode, print only the one-line change headline instead of the
+    /// full field-by-field report.
+    #[arg(long)]
+    pub compact: bool,
+    /// Write changed files one impact-area (declared package) group at a
+    /// time instead of all at once, continuing to the next group when one
+    /// group's write fails.
+    #[arg(long, requires = "write")]
+    pub group_by_impact_area: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub output: OutputFormat,

@@ -62,7 +62,7 @@ the `--config`/`--no-config`/`--no-config-env` trio are covered in
 `--max-*` budgets in [Bounding a run](../guide/safety.md#bounding-a-run); and
 `--new-file-mode`/`--refuse-symlinked-ancestors` in
 [Write permissions and symlinked ancestors](../guide/safety.md#write-permissions-and-symlinked-ancestors).
-The remaining three are terminal presentation, not safety, and apply nowhere
+The remaining four are terminal presentation, not safety, and apply nowhere
 else:
 
 | Flag | What it does |
@@ -70,6 +70,7 @@ else:
 | `--color <auto\|always\|never>` | Whether text output may use ANSI color. `auto`, the default, colors if and only if the destination stream is a terminal, `NO_COLOR` and `TERM=dumb` are both unset, and `CLICOLOR_FORCE`/`FORCE_COLOR` have not already decided the question in the other direction (the off signals win over the on signals). The hues it may use, and the rule that none of them ever carries a signal alone, are in [Terminal Color](color-palette.md). |
 | `--paginate` | Delegates stdout to `$PAGER` (falling back to `less`) when it is a terminal. Off by default — unlike `--color`, paging changes the interaction itself, so it has to be asked for. |
 | `--plain-language` | Adds one line to a text-mode failure paraphrasing its error category — the same `category_description` the `--output json` envelope has always carried. Off by default, so the existing stderr rendering is byte-for-byte unchanged. |
+| `--explain-error` | On a failure, prints the full [Error Codes](errors.md) section for that code inline — the same text `doc_url` links to, extracted from the same markdown embedded in the binary at compile time. No network access. Named `--explain-error` rather than `--explain` because `inspect lint --explain <RULE>` and `migrate explain` already claim that spelling for unrelated things. |
 
 ## Inspect
 
@@ -572,10 +573,14 @@ plan/preview/verify/apply lifecycle.
 | `preview` | Preview exact refactoring rewrites without modifying files. |
 | `check` | Validate a refactor preview manifest without writing files. |
 | `status` | Summarize a preview manifest into agent-safe next actions. |
-| `apply` | Apply a previously generated preview manifest with hash guards. `--undo-out` records a reverse-edit journal; `--verify-command` runs a check afterwards and restores every written file when it fails. |
+| `apply` | Apply a previously generated preview manifest with hash guards. `--undo-out` records a reverse-edit journal; `--verify-command` runs a check afterwards and restores every written file when it fails. `--compact` prints only the one-line change headline instead of the full field-by-field report. `--group-by-impact-area` (requires `--write`) writes changed files one impact-area (declared package) group at a time instead of all at once, continuing to the next group when one group's write fails. |
 | `undo` | Restore the pre-refactor content recorded by `apply --undo-out`. Refuses unless every file is still byte-for-byte what the write produced, so a journal cannot be applied twice or over an intervening edit. |
 | `diff` | Render a verified diff from a preview manifest without writing files. |
 | `step` | Walk a preview manifest one edit at a time, taking only the steps you accept. `refactor apply` is all-or-nothing, which is right for applying and wrong for reviewing: a reader who disagrees with one of forty edits would otherwise have to discard the manifest. Steps are numbered in source order and each carries its line, the text it replaces, and the source line it sits on. `--accept`/`--skip` take a selector (`all`, `3`, `1,4`, `2-5`); `--interactive` reads one `y`/`n`/`a`/`q` decision per step from stdin. `--diff` previews, `--write` applies, `--fail-on-partial` gates a script that took a subset by accident. Both hash guards still apply, and a subset that would not parse is refused before anything is written. |
+| `create-checkpoint` | Record the current content of `--name`'s files as a named checkpoint under `.paredit/checkpoints/` (`$PAREDIT_CHECKPOINTS_DIR` overrides the directory, the same convention `.paredit/kill-ring.json` uses), so a later invocation — a separate agent turn — can name the point it wants to get back to instead of keeping an `--undo-out` path around. Refuses a name already in use unless `--force` is given. |
+| `list-checkpoints` | List every registered checkpoint: name, creation time, and the files it covers. |
+| `restore-checkpoint` | Report whether `--name`'s checkpoint can be restored, and with `--write`, confirm it. A file is restorable only when it is still byte-for-byte what the checkpoint recorded; anything else — a later `refactor apply --write`, or a person editing the file directly — refuses, since the two are indistinguishable from a content hash alone and silently overwriting either would be the wrong default. |
+| `delete-checkpoint` | Remove `--name`'s checkpoint from the registry. Does not garbage-collect checkpoints that no longer resolve to any file. |
 | `patch` | Carry the difference between two versions of one file (`--from`/`--to`, neither written) onto a third (`--apply-to`), matching each change by structure rather than by position — so it lands whatever the target's formatting and wherever in the file the form sits. Each change is reported as `applied`, `not-found` (the target never had the form), `ambiguous` (several sites match; `--all` applies to all of them), or `unportable` (a top-level insertion, which names no existing form to anchor on). Plans by default; `--diff` previews, `--write` applies, `--fail-on-unapplied` gates on a partial port. A patch that would produce source this tool cannot parse is refused before anything is written. |
 | `workspace-plan` | Discover Lisp sources under roots and build a gated refactor plan. |
 | `workspace-preview` | Discover sources and preview exact refactoring rewrites. |
@@ -746,6 +751,25 @@ Unlike every other writing command here, `fix apply` writes in place with **no
 exactly is what makes the two spellings the same bytes. Use `--diff` to
 preview, `fix check` to gate, and the global `--dry-run` to refuse the write.
 
+`fix apply` also takes two flags only it makes sense for, mirroring
+`refactor apply`'s own `--compact`/`--group-by-impact-area`: `--compact`
+prints only the one-line change headline instead of the full field-by-field
+report, and `--group-by-impact-area` writes changed files one impact-area
+(declared package) group at a time instead of all at once, continuing to the
+next group when one group's write fails. Neither is available on `check`,
+`plan`, or `list`, which never write. `--compact` conflicts with `--diff`,
+since `--diff` writes nothing for `--compact` to summarize.
+
+In JSON, `fix apply` (and `refactor apply`) always carry a `headline` field
+— the same one-line summary `--compact` prints on its own — and an
+`impact_area_groups` array, populated only under `--group-by-impact-area`,
+with one entry per group naming the group (`group`), how many files it
+covers (`file_count`), whether its write succeeded (`written`), and the
+failure reason when it did not. `fix plan` and `fix apply` also carry
+`next_commands` (see
+[What to run next](../guide/agents.md#what-to-run-next)) when their contents
+justify one — a plan with fixes available points at `fix apply`.
+
 All four take the rule-selection flags (`--rule`, `--category`, `--exclude`,
 `--tag`, `--preset`, `--experimental`, `--custom-rules`) and
 `--no-destructive-fixes`. The flags that shape a *report* rather than a fix
@@ -755,6 +779,8 @@ run — `--emit`, `--baseline`, `--stats`, `--timings`, `--fail-on` — stay on
 ```sh
 paredit fix list
 paredit fix apply --diff src/
+paredit fix apply --compact src/
+paredit fix apply --group-by-impact-area src/
 paredit fix apply --rule redundant-progn --no-destructive-fixes src/
 paredit fix check src/          # exit 3 when fixable lint is outstanding
 ```

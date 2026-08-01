@@ -335,6 +335,56 @@ fn a_selector_that_matches_too_much_has_its_own_code() {
     assert!(details.iter().any(|d| d.contains("--all")), "{details:?}");
 }
 
+/// FR-002: an ambiguous selector's own matches ride along in the JSON
+/// envelope, so a caller does not need a second `inspect resolve` round trip
+/// just to see what it found.
+#[test]
+fn an_ambiguous_selector_lists_its_matches_inline() {
+    let dir = fresh_temp_dir("diagnosis-selector-candidates");
+    let file = dir.join("a.lisp");
+    fs::write(&file, "(defun alpha (x) x)\n(defun beta (y) y)\n").expect("write");
+
+    let mut command = paredit();
+    command
+        .args(["inspect", "form", "--query", "(defun ?n ...)", "--file"])
+        .arg(&file);
+
+    let report = error_json(command);
+    assert_eq!(code_of(&report), "selection.ambiguous");
+
+    let candidates = report["error"]["candidates"]
+        .as_array()
+        .expect("candidates");
+    assert_eq!(candidates.len(), 2);
+    assert_eq!(candidates[0]["path"], "0");
+    assert_eq!(candidates[0]["preview"], "(defun alpha (x) x)");
+    assert_eq!(candidates[0]["start"]["line"], 1);
+    assert_eq!(candidates[1]["path"], "1");
+    assert_eq!(candidates[1]["preview"], "(defun beta (y) y)");
+    assert_eq!(candidates[1]["start"]["line"], 2);
+}
+
+/// A code that never carries candidates reports an empty array rather than
+/// omitting the key, so a consumer can always index into it without a
+/// presence check.
+#[test]
+fn a_non_ambiguous_selector_failure_has_an_empty_candidates_array() {
+    let file = lisp("diagnosis-no-candidates");
+    let mut command = paredit();
+    command
+        .args(["inspect", "form", "--name", "no-such-name", "--file"])
+        .arg(&file);
+
+    let report = error_json(command);
+    assert_eq!(code_of(&report), "selection.no-match");
+    assert!(
+        report["error"]["candidates"]
+            .as_array()
+            .expect("candidates")
+            .is_empty()
+    );
+}
+
 /// No selector at all is the problem `--path`/`--at` already had, so it gets
 /// the code that already means it rather than a second spelling of the same
 /// thing.
