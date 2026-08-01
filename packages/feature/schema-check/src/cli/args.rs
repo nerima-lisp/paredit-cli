@@ -17,7 +17,8 @@ pub enum SchemaCommand {
     after_help = "The `defschema` DSL is Lisp forms that are never evaluated: a schema file \
 holds only field declarations, and a :type or refinement keyword this build does not recognize is a \
 parse error rather than code it tries to run. `:matches` is a small glob (`*` = any run of \
-characters, `?` = one character), not a regular expression.\n\n\
+characters, `?` = one character), not a regular expression. A field is required unless it \
+carries `:optional t`.\n\n\
 Examples:\n  \
 paredit schema check instance.lisp --schema .paredit/schemas/config.lisp\n  \
 paredit schema check instance.lisp --schema schemas.lisp --schema-name config\n  \

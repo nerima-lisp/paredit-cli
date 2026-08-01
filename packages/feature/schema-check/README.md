@@ -36,4 +36,6 @@ An instance may be alist-shaped (`((key . value) ...)` or `((key value)
 file that is neither is refused with a clear "not a recognizable instance
 shape" error rather than a confusing cascade of per-field mismatches.
 
+A field declared by the schema is required unless it carries `:optional t`.
+
 Depends on `paredit-core-syntax` and `paredit-core-cli` only.

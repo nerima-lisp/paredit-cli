@@ -817,7 +817,8 @@ run of characters, `?` = one character), **not a regular expression**.
 An instance may be alist-shaped (`((key . value) ...)`) or plist-shaped
 (`(:key value ...)`); both validate identically. A field present in the
 instance but not declared by the schema is reported too, as `unknown-field`,
-at a lower severity than a genuine type or refinement violation.
+at a lower severity than a genuine type or refinement violation. A field is
+required unless it carries `:optional t`.
 
 ```sh
 paredit schema check instance.lisp --schema .paredit/schemas/config.lisp
@@ -834,7 +835,7 @@ order, and `extends`.
 
 | Command | Purpose |
 | --- | --- |
-| `check` | Validate every discovered file and exit 3 if any key is unusable. |
+| `check` | Validate every discovered file and exit 3 if any key is unusable. Also flags when a custom rule under `lint.custom-rules` declares its own `:severity` that disagrees with what `lint.warn`/`lint.deny` implies for that rule's name. |
 | `show` | Print the effective configuration with the file and line that set each key. |
 | `schema` | Print every recognised key with its type, default, and environment variable. |
 | `init` | Write a documented starter `paredit.toml` generated from the schema. |

@@ -90,6 +90,13 @@ pub enum DslError {
         refinement: String,
     },
 
+    #[error("schema {schema:?} field {key:?} declares :{keyword} more than once")]
+    DuplicateSpecKeyword {
+        schema: String,
+        key: String,
+        keyword: &'static str,
+    },
+
     #[error(
         "schema {schema:?} field {key:?} declares :{refinement} on a {field_type} field; :{refinement} only applies to a {expected} field"
     )]
@@ -314,6 +321,13 @@ fn read_field(schema: &str, entry: &ExpressionView) -> Result<FieldSpec, DslErro
         let value = &pair[1];
         match keyword {
             ":type" => {
+                if field_type.is_some() {
+                    return Err(DslError::DuplicateSpecKeyword {
+                        schema: schema.to_owned(),
+                        key: key.clone(),
+                        keyword: "type",
+                    });
+                }
                 let type_name = atom_text(value).ok_or_else(|| DslError::FieldSpecMalformed {
                     schema: schema.to_owned(),
                     key: key.clone(),
@@ -327,9 +341,37 @@ fn read_field(schema: &str, entry: &ExpressionView) -> Result<FieldSpec, DslErro
                         })?,
                     );
             }
+            ":min" if min.is_some() => {
+                return Err(DslError::DuplicateSpecKeyword {
+                    schema: schema.to_owned(),
+                    key: key.clone(),
+                    keyword: "min",
+                });
+            }
             ":min" => min = Some(read_integer(schema, &key, "min", value)?),
+            ":max" if max.is_some() => {
+                return Err(DslError::DuplicateSpecKeyword {
+                    schema: schema.to_owned(),
+                    key: key.clone(),
+                    keyword: "max",
+                });
+            }
             ":max" => max = Some(read_integer(schema, &key, "max", value)?),
+            ":one-of" if one_of.is_some() => {
+                return Err(DslError::DuplicateSpecKeyword {
+                    schema: schema.to_owned(),
+                    key: key.clone(),
+                    keyword: "one-of",
+                });
+            }
             ":one-of" => one_of = Some(read_string_list(schema, &key, "one-of", value)?),
+            ":matches" if matches.is_some() => {
+                return Err(DslError::DuplicateSpecKeyword {
+                    schema: schema.to_owned(),
+                    key: key.clone(),
+                    keyword: "matches",
+                });
+            }
             ":matches" => matches = Some(read_string(schema, &key, "matches", value)?),
             OPTIONAL_KEYWORD => optional = read_bool(schema, &key, "optional", value)?,
             other if !other.starts_with(':') => {
@@ -570,6 +612,29 @@ mod tests {
         assert!(matches!(
             error,
             DslError::UnknownRefinement { refinement, .. } if refinement == "frobnicate"
+        ));
+    }
+
+    #[test]
+    fn a_duplicate_type_keyword_is_rejected() {
+        let text = "(defschema s (fields (:f (:type string :type integer))))";
+        let error = parse_schemas(text, "sample").expect_err("must refuse");
+        assert!(matches!(
+            error,
+            DslError::DuplicateSpecKeyword {
+                keyword: "type",
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn a_duplicate_refinement_keyword_is_rejected() {
+        let text = "(defschema s (fields (:f (:type integer :min 1 :min 2))))";
+        let error = parse_schemas(text, "sample").expect_err("must refuse");
+        assert!(matches!(
+            error,
+            DslError::DuplicateSpecKeyword { keyword: "min", .. }
         ));
     }
 
