@@ -1009,7 +1009,8 @@ mod tests {
             .expect("rename fixture to a valid path containing `#`");
 
         let spec = format!("{}#entity-needs-table", hash_path.display());
-        let seed = CustomRuleSeed::load(&spec).expect("the final `#` separates path from rule name");
+        let seed =
+            CustomRuleSeed::load(&spec).expect("the final `#` separates path from rule name");
         let _ = fs::remove_file(&hash_path);
 
         assert_eq!(seed.rule.name, "entity-needs-table");
