@@ -211,7 +211,7 @@ impl SyntaxTree {
         };
         let node = self.node(node_id);
         if node
-            .reader_prefix_spans
+            .reader_prefix_spans()
             .iter()
             .any(|span| span.contains(ByteOffset::new(offset)))
         {
@@ -310,7 +310,7 @@ pub(in crate::sexpr) fn is_string_atom(node: &Node, source: &str) -> bool {
         && node
             .span
             .slice(source)
-            .get(node.symbol_offset..)
+            .get(node.symbol_offset as usize..)
             .is_some_and(|text| text.starts_with('"'))
 }
 

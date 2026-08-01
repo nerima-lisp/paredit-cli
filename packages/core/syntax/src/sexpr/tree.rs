@@ -79,14 +79,57 @@ impl<'a> SourceComment<'a> {
     }
 }
 
+/// The reader sugar on one node, and the exact source ranges it occupied.
+///
+/// Two parallel vectors, always the same length: the normalized semantics and
+/// the spellings they were written with, kept apart so dialect-specific
+/// spellings round-trip.
+///
+/// Boxed as a unit inside [`Node`] rather than stored inline, because the
+/// overwhelming majority of nodes have no reader sugar at all and two empty
+/// `Vec`s still cost 48 bytes of headers each time. Behind an `Option<Box<_>>`
+/// the common case pays eight, and the rare prefixed node pays one extra
+/// allocation — which is the right trade at roughly one node per six source
+/// bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::sexpr) struct ReaderPrefixes {
+    pub(in crate::sexpr) kinds: Vec<ReaderPrefix>,
+    pub(in crate::sexpr) spans: Vec<ByteSpan>,
+}
+
+impl ReaderPrefixes {
+    /// The value a [`Node`]'s `reader` field takes for the given sugar.
+    ///
+    /// Returns `None` for the empty case rather than an allocated pair of
+    /// empty vectors. Funnelling construction through here is what keeps the
+    /// `Some(empty)` state — which reads identically through the accessors on
+    /// [`Node`] but costs the allocation this indirection exists to avoid —
+    /// from ever being built.
+    pub(in crate::sexpr) fn boxed(
+        kinds: Vec<ReaderPrefix>,
+        spans: Vec<ByteSpan>,
+    ) -> Option<Box<Self>> {
+        debug_assert_eq!(
+            kinds.len(),
+            spans.len(),
+            "reader prefix kinds and spans are parallel"
+        );
+        if kinds.is_empty() {
+            return None;
+        }
+        Some(Box::new(Self { kinds, spans }))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::sexpr) struct Node {
     pub(in crate::sexpr) kind: NodeKind,
     pub(in crate::sexpr) delimiter: Option<Delimiter>,
-    pub(in crate::sexpr) reader_prefixes: Vec<ReaderPrefix>,
-    /// Exact source ranges for `reader_prefixes`, kept separately from their
-    /// normalized semantics so dialect-specific spellings round-trip.
-    pub(in crate::sexpr) reader_prefix_spans: Vec<ByteSpan>,
+    /// `None` for a node with no reader sugar, which is nearly all of them.
+    /// Read through [`Node::reader_prefixes`] and
+    /// [`Node::reader_prefix_spans`], which flatten the absent case to an
+    /// empty slice.
+    pub(in crate::sexpr) reader: Option<Box<ReaderPrefixes>>,
     pub(in crate::sexpr) parent: Option<NodeId>,
     pub(in crate::sexpr) children: Vec<NodeId>,
     pub(in crate::sexpr) span: ByteSpan,
@@ -99,11 +142,45 @@ pub(in crate::sexpr) struct Node {
     /// unusual, syntax), so this cannot be recovered later by summing each
     /// prefix's fixed source length — it must be recorded while parsing.
     /// Meaningless (`0`) for non-atom nodes.
-    pub(in crate::sexpr) symbol_offset: usize,
+    ///
+    /// A `u32` for the same reason [`ByteOffset`] is: it is an offset into the
+    /// same bounded document, and as the only remaining eight-byte scalar it
+    /// was costing a further four bytes of tail padding.
+    pub(in crate::sexpr) symbol_offset: u32,
     /// Reader forms that consume multiple datums are represented by one
     /// verbatim atom node so their payload cannot become editable siblings.
     pub(in crate::sexpr) opaque_reader_form: bool,
 }
+
+impl Node {
+    /// The node's reader sugar, or an empty slice when it has none.
+    pub(in crate::sexpr) fn reader_prefixes(&self) -> &[ReaderPrefix] {
+        self.reader.as_ref().map_or(&[], |reader| &reader.kinds)
+    }
+
+    /// The source ranges of [`Self::reader_prefixes`], one per entry.
+    pub(in crate::sexpr) fn reader_prefix_spans(&self) -> &[ByteSpan] {
+        self.reader.as_ref().map_or(&[], |reader| &reader.spans)
+    }
+}
+
+/// The node arena dominates a parse's memory, so `Node`'s layout is a
+/// documented property rather than an accident.
+///
+/// It was 152 bytes before this bound existed. Nearly all of the difference is
+/// three changes worth keeping: `ByteOffset` and `NodeId` narrowed to `u32`
+/// (see their documentation for why four gigabytes is a fact here, not a
+/// hope), and the two reader-prefix vectors moved behind one `Option<Box<_>>`.
+///
+/// At roughly one node per six source bytes, every eight bytes added here
+/// costs about 1.3x the document's own size in resident memory — so a field
+/// added without thought is not a small regression. If a new field genuinely
+/// belongs on every node, raise this number deliberately and say why;
+/// `tests/parse_memory.rs` measures what it costs.
+const _: () = assert!(
+    std::mem::size_of::<Node>() <= 72,
+    "Node grew past its documented 72-byte budget"
+);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::sexpr) enum NodeKind {
@@ -579,20 +656,20 @@ impl SyntaxTree {
             let node = self.node(node_id);
             if node.opaque_reader_form
                 || node
-                    .reader_prefixes
+                    .reader_prefixes()
                     .iter()
                     .any(|prefix| prefix.is_opaque_reader_form())
             {
                 continue;
             }
             if node.kind == NodeKind::Atom {
-                let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
+                let is_quoted_literal = node.reader_prefixes().contains(&ReaderPrefix::Quote);
                 count = count.saturating_add(usize::from(
                     !is_quoted_literal
                         && node
                             .span
                             .slice(&self.source)
-                            .get(node.symbol_offset..)
+                            .get(node.symbol_offset as usize..)
                             .is_some(),
                 ));
                 continue;
@@ -622,23 +699,27 @@ impl SyntaxTree {
             let node = self.node(node_id);
             if node.opaque_reader_form
                 || node
-                    .reader_prefixes
+                    .reader_prefixes()
                     .iter()
                     .any(|prefix| prefix.is_opaque_reader_form())
             {
                 continue;
             }
             if node.kind == NodeKind::Atom {
-                if let Some(text) = node.span.slice(&self.source).get(node.symbol_offset..) {
+                if let Some(text) = node
+                    .span
+                    .slice(&self.source)
+                    .get(node.symbol_offset as usize..)
+                {
                     let occurrence = BorrowedAtomOccurrence {
                         node_id,
                         span: ByteSpan::new(
-                            ByteOffset::new(node.span.start().get() + node.symbol_offset),
+                            ByteOffset::new(node.span.start().get() + node.symbol_offset as usize),
                             node.span.end(),
                         ),
                         text,
                     };
-                    if node.reader_prefixes.contains(&ReaderPrefix::Quote) {
+                    if node.reader_prefixes().contains(&ReaderPrefix::Quote) {
                         quoted_designators.push(occurrence);
                     } else {
                         occurrences.push(occurrence);
@@ -827,20 +908,22 @@ impl SyntaxTree {
             let node = self.node(node_id);
             if node.opaque_reader_form
                 || node
-                    .reader_prefixes
+                    .reader_prefixes()
                     .iter()
                     .any(|prefix| prefix.is_opaque_reader_form())
             {
                 continue;
             }
             if node.kind == NodeKind::Atom {
-                let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
+                let is_quoted_literal = node.reader_prefixes().contains(&ReaderPrefix::Quote);
                 if is_quoted_literal == quoted_designators {
-                    if let Some(symbol_text) =
-                        node.span.slice(&self.source).get(node.symbol_offset..)
+                    if let Some(symbol_text) = node
+                        .span
+                        .slice(&self.source)
+                        .get(node.symbol_offset as usize..)
                     {
                         let symbol_span = ByteSpan::new(
-                            ByteOffset::new(node.span.start().get() + node.symbol_offset),
+                            ByteOffset::new(node.span.start().get() + node.symbol_offset as usize),
                             node.span.end(),
                         );
                         output.push(AtomOccurrence {
@@ -868,7 +951,7 @@ impl SyntaxTree {
         let node = self.node(node_id);
         if node.kind != NodeKind::Atom
             || node.opaque_reader_form
-            || !node.reader_prefixes.is_empty()
+            || !node.reader_prefixes().is_empty()
         {
             return None;
         }
@@ -899,13 +982,13 @@ impl SyntaxTree {
                     NodeKind::Atom => ExpressionKind::Atom,
                 },
                 delimiter: node.delimiter,
-                reader_prefixes: node.reader_prefixes.clone(),
+                reader_prefixes: node.reader_prefixes().to_vec(),
                 span: node.span,
                 content_span: ByteSpan::new(
                     match node.kind {
                         NodeKind::List => node.open.unwrap_or(node.span.start()),
                         NodeKind::Atom => {
-                            ByteOffset::new(node.span.start().get() + node.symbol_offset)
+                            ByteOffset::new(node.span.start().get() + node.symbol_offset as usize)
                         }
                         NodeKind::Root => node.span.start(),
                     },
@@ -913,7 +996,7 @@ impl SyntaxTree {
                 ),
                 text: (node.kind == NodeKind::Atom)
                     .then(|| node.span.slice(&self.source).to_string()),
-                symbol_offset: node.symbol_offset,
+                symbol_offset: node.symbol_offset as usize,
                 children,
             });
         }

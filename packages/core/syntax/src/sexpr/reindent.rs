@@ -182,7 +182,7 @@ impl SyntaxTree {
             self.node(child)
                 .span
                 .slice(self.source())
-                .get(self.node(child).symbol_offset..)
+                .get(self.node(child).symbol_offset as usize..)
         });
 
         if let Some(distinguished) = head_text.and_then(body_form_distinguished) {

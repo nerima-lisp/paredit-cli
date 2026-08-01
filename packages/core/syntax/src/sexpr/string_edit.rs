@@ -115,7 +115,7 @@ fn string_contents<'a>(
 ) -> SexprResult<(ByteSpan, &'a str)> {
     validate_edit_context(input, tree, selection)?;
     let node = selection.node();
-    if !node.reader_prefix_spans.is_empty() {
+    if !node.reader_prefix_spans().is_empty() {
         return Err(StructureError::StringReaderPrefix.into());
     }
     let span = content_span(node);

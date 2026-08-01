@@ -296,3 +296,310 @@ fn node_span_kind_pairs_are_unique_for_a_read_eval_form() {
 fn node_span_kind_pairs_are_unique_for_a_feature_conditional_form() {
     assert_node_span_kind_pairs_are_unique("#+sbcl (a)");
 }
+
+// --- The `--all` edit loop's carried parse ------------------------------
+//
+// `edit_target_with` in `paredit-core-cli` applies one edit per match, right
+// to left, re-parsing between each. It used to parse the whole document twice
+// per match: once itself, and once inside
+// `Edit::normalize_changed_line_trivia`, which parses the rewrite it is handed
+// and then drops it. It now carries both parses forward instead.
+//
+// That is a claim about *when* the loop parses, never about what a parse
+// returns -- there is no incremental parsing here, and deliberately so. What
+// could still go wrong is carrying a parse that no longer describes the
+// document, which would hand an edit a tree whose spans point into text that
+// has moved. The loop asserts against exactly that on every pass in a debug
+// build; these tests are the randomized half, comparing the two loops step by
+// step over documents the generator varies in form count, form size, and
+// whether a form is hidden behind a reader conditional.
+//
+// The loops below mirror `edit_target_with`; that function cannot be called
+// from here, because it lives a package away and reads its document from a
+// file or stdin.
+
+/// One top-level form: whether a `#+sbcl` guard hides it from editing, how
+/// many markers it offers as targets, and whether its marker line ends in
+/// trailing whitespace.
+#[derive(Debug, Clone, Copy)]
+struct GeneratedForm {
+    guarded: bool,
+    markers: usize,
+    trailing_space: bool,
+}
+
+/// A document of `(marker i-j)` forms to aim edits at, some of them inside a
+/// reader conditional.
+///
+/// Three things vary, each because it reaches a branch the others do not:
+///
+/// * A `#+sbcl` guard. Under `Dialect::CommonLisp` the guard and the form it
+///   guards fold into one opaque atom, so a guarded form's markers are not
+///   nodes and no edit can land in them. Generating both kinds is what puts a
+///   form whose parse must survive untouched next to the ones being rewritten.
+/// * The marker count, so that several edits land in one top-level form and
+///   each pass has to see the document the pass before it produced.
+/// * Trailing whitespace on the marker line. Without it every rewrite here
+///   normalizes to itself, and `normalize_changed_line_trivia_reusing_parse`
+///   returns its parse every time -- leaving the branch that must *not*
+///   return one, because a removal has since edited the text, unreached.
+///   `both_edit_loops_agree_when_normalizing_removes_trailing_space` pins that
+///   the generator still reaches it.
+fn generated_document(forms: &[GeneratedForm]) -> String {
+    let mut source = String::new();
+    for (index, form) in forms.iter().enumerate() {
+        if form.guarded {
+            source.push_str("#+sbcl ");
+        }
+        source.push_str(&format!("(defun form-{index} (x)\n  (list x"));
+        for marker in 0..form.markers {
+            source.push_str(&format!(" (marker {index}-{marker})"));
+        }
+        // `done` closes the line after the markers on purpose. `Edit::kill`
+        // absorbs the whitespace around what it removes, so a marker that ends
+        // its line takes the trailing spaces (and the newline) with it, and
+        // the removal branch below would never run.
+        source.push_str(" done");
+        if form.trailing_space {
+            source.push_str("  ");
+        }
+        source.push_str("\n        more))\n\n");
+    }
+    source
+}
+
+/// Every `(marker ...)` that is a node in its own right, in source order.
+///
+/// A marker inside a guarded form is skipped here the same way the CLI's
+/// selector skips it: `select_at` lands on the enclosing opaque atom, whose
+/// span starts before the marker's own text does.
+fn editable_marker_spans(source: &str, tree: &SyntaxTree) -> Vec<ByteSpan> {
+    let mut spans = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(found) = source[cursor..].find("(marker ") {
+        let start = cursor + found;
+        if let Ok(selection) = tree.select_at(start) {
+            if selection.span().start().get() == start {
+                spans.push(selection.span());
+            }
+        }
+        cursor = start + 1;
+    }
+    spans
+}
+
+/// The document after each pass of the loop, or the pass that refused.
+type LoopTrace = Result<Vec<String>, usize>;
+
+/// The loop as it was: one parse of its own plus one inside `normalize`.
+fn edit_loop_parsing_every_pass(source: &str, spans: &[ByteSpan], dialect: Dialect) -> LoopTrace {
+    let mut trace = Vec::new();
+    let mut current = source.to_owned();
+    for (pass, span) in spans.iter().rev().enumerate() {
+        let Ok(tree) = SyntaxTree::parse_with_dialect(&current, dialect) else {
+            return Err(pass);
+        };
+        let Ok(selection) = tree.select_at(span.start().get()) else {
+            return Err(pass);
+        };
+        if selection.span() != *span {
+            return Err(pass);
+        }
+        let Ok(rewritten) = Edit::kill(&current, &tree, selection) else {
+            return Err(pass);
+        };
+        let Ok(normalized) = Edit::normalize_changed_line_trivia(&current, rewritten, dialect)
+        else {
+            return Err(pass);
+        };
+        current = normalized;
+        trace.push(current.clone());
+    }
+    Ok(trace)
+}
+
+/// The loop as it is: the parse `normalize` makes is carried into the next
+/// pass, and the document's first parse is carried into the first.
+///
+/// Checks the carried tree against a parse made from scratch on every pass,
+/// which is the invariant the change rests on.
+fn edit_loop_carrying_the_parse(
+    source: &str,
+    spans: &[ByteSpan],
+    dialect: Dialect,
+    seed: SyntaxTree,
+    removals: &mut usize,
+) -> LoopTrace {
+    let mut trace = Vec::new();
+    let mut current = source.to_owned();
+    let mut parsed = Some(seed);
+    for (pass, span) in spans.iter().rev().enumerate() {
+        let tree = match parsed.take() {
+            Some(tree) => tree,
+            None => match SyntaxTree::parse_with_dialect(&current, dialect) {
+                Ok(tree) => tree,
+                Err(_) => return Err(pass),
+            },
+        };
+        assert_eq!(
+            tree,
+            SyntaxTree::parse_with_dialect(&current, dialect)
+                .expect("the document under edit parses"),
+            "the carried parse diverged from a parse of the same text on pass {pass}"
+        );
+        let Ok(selection) = tree.select_at(span.start().get()) else {
+            return Err(pass);
+        };
+        if selection.span() != *span {
+            return Err(pass);
+        }
+        let Ok(rewritten) = Edit::kill(&current, &tree, selection) else {
+            return Err(pass);
+        };
+        let Ok((normalized, reusable)) =
+            Edit::normalize_changed_line_trivia_reusing_parse(&current, rewritten, dialect)
+        else {
+            return Err(pass);
+        };
+        // Nothing came back and the text moved: normalization removed
+        // something, so the parse it made no longer describes the document.
+        if reusable.is_none() && normalized != current {
+            *removals += 1;
+        }
+        parsed = if normalized == current {
+            Some(tree)
+        } else {
+            reusable
+        };
+        current = normalized;
+        trace.push(current.clone());
+    }
+    Ok(trace)
+}
+
+/// Runs both loops over the same targets and returns how many passes
+/// normalization removed trailing whitespace on.
+#[track_caller]
+fn assert_both_edit_loops_agree(forms: &[GeneratedForm], keep: &[bool]) -> usize {
+    let dialect = Dialect::CommonLisp;
+    let source = generated_document(forms);
+    let tree = SyntaxTree::parse_with_dialect(&source, dialect).expect("generated input parses");
+
+    let spans = editable_marker_spans(&source, &tree)
+        .into_iter()
+        .enumerate()
+        .filter(|(index, _)| keep.get(*index).copied().unwrap_or(true))
+        .map(|(_, span)| span)
+        .collect::<Vec<_>>();
+    if spans.is_empty() {
+        return 0;
+    }
+
+    let mut removals = 0;
+    let expected = edit_loop_parsing_every_pass(&source, &spans, dialect);
+    let actual = edit_loop_carrying_the_parse(&source, &spans, dialect, tree, &mut removals);
+    assert_eq!(
+        expected,
+        actual,
+        "the two loops diverged on {source:?} with {} targets",
+        spans.len()
+    );
+
+    // A guarded form is opaque, so no edit may have reached inside one.
+    if let Ok(trace) = &actual {
+        let last = trace.last().expect("at least one pass ran");
+        for (index, form) in forms.iter().enumerate() {
+            if form.guarded && form.markers > 0 {
+                assert!(
+                    last.contains(&format!("(marker {index}-0)")),
+                    "an edit reached inside the reader conditional on form {index}"
+                );
+            }
+        }
+    }
+    removals
+}
+
+fn generated_form_strategy() -> impl Strategy<Value = GeneratedForm> {
+    (any::<bool>(), 0usize..4, any::<bool>()).prop_map(|(guarded, markers, trailing_space)| {
+        GeneratedForm {
+            guarded,
+            markers,
+            trailing_space,
+        }
+    })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(96))]
+
+    /// Carrying a parse from one pass of the `--all` edit loop to the next
+    /// must produce the same document, byte for byte, after every single pass
+    /// -- not merely at the end.
+    #[test]
+    fn pbt_carrying_the_parse_matches_parsing_every_pass(
+        forms in prop::collection::vec(generated_form_strategy(), 1..7),
+        keep in prop::collection::vec(any::<bool>(), 0..16),
+    ) {
+        assert_both_edit_loops_agree(&forms, &keep);
+    }
+}
+
+/// Two targets in one top-level form: the pass that edits the second must see
+/// a parse of the document the first pass produced, not of the one before it.
+#[test]
+fn both_edit_loops_agree_on_two_targets_in_one_form() {
+    assert_both_edit_loops_agree(
+        &[GeneratedForm {
+            guarded: false,
+            markers: 2,
+            trailing_space: false,
+        }],
+        &[true, true],
+    );
+}
+
+/// An edit in a form neighbouring a reader conditional must leave the
+/// conditional's folding alone.
+#[test]
+fn both_edit_loops_agree_next_to_a_reader_conditional() {
+    assert_both_edit_loops_agree(
+        &[
+            GeneratedForm {
+                guarded: false,
+                markers: 2,
+                trailing_space: false,
+            },
+            GeneratedForm {
+                guarded: true,
+                markers: 2,
+                trailing_space: false,
+            },
+            GeneratedForm {
+                guarded: false,
+                markers: 1,
+                trailing_space: false,
+            },
+        ],
+        &[true, true, true],
+    );
+}
+
+/// Pins the one branch the generator would otherwise be free to stop
+/// reaching: the pass where normalization removes trailing whitespace, and so
+/// must *not* hand its now-stale parse to the next pass.
+#[test]
+fn both_edit_loops_agree_when_normalizing_removes_trailing_space() {
+    let removals = assert_both_edit_loops_agree(
+        &[GeneratedForm {
+            guarded: false,
+            markers: 3,
+            trailing_space: true,
+        }],
+        &[true, true, true],
+    );
+    assert!(
+        removals > 0,
+        "this shape exists to exercise normalization's removal path"
+    );
+}

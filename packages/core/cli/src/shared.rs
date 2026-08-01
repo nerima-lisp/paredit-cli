@@ -380,9 +380,26 @@ pub fn edit_target_with(
     spans.sort_by_key(ByteSpan::start);
 
     let mut current = input.text.clone();
+    // The loop needs a tree of `current` on every pass, and used to parse one
+    // even when a parse of exactly those bytes had just been made and dropped:
+    // once above, to resolve the selector, and once per pass inside
+    // `normalize_changed_line_trivia`, which parses the rewrite it is handed.
+    // Carrying those forward halves the parses a many-match `--all` run does,
+    // which is most of its cost. Each is a full parse of the whole document,
+    // not an incremental one, so what changes here is how often the loop
+    // parses -- never what it parses, or what it gets back.
+    let mut parsed = Some(tree);
     for span in spans.into_iter().rev() {
-        let tree = SyntaxTree::parse_with_dialect(&current, dialect)
-            .map_err(|_| IoRefusal::RewriteDoesNotReparse)?;
+        let tree = match parsed.take() {
+            Some(tree) => tree,
+            None => SyntaxTree::parse_with_dialect(&current, dialect)
+                .map_err(|_| IoRefusal::RewriteDoesNotReparse)?,
+        };
+        debug_assert_eq!(
+            tree.source(),
+            current,
+            "a carried-forward parse must belong to the document being edited"
+        );
         let selection = tree.select_at(span.start().get())?;
         if selection.span() != span {
             return Err(ArgumentError::AllMatchShifted {
@@ -392,7 +409,17 @@ pub fn edit_target_with(
         }
         observe(selection)?;
         let rewritten = f(&current, &tree, selection)?;
-        current = Edit::normalize_changed_line_trivia(&current, rewritten, dialect)?;
+        let (normalized, reusable) =
+            Edit::normalize_changed_line_trivia_reusing_parse(&current, rewritten, dialect)?;
+        // An edit that rewrote the document to itself leaves the parse in hand
+        // valid, and is the one case `normalize` reports nothing back from: it
+        // returns before parsing at all when the rewrite matches its input.
+        parsed = if normalized == current {
+            Some(tree)
+        } else {
+            reusable
+        };
+        current = normalized;
     }
 
     emit_document(&input, dialect, args.write, args.diff, current)
@@ -728,16 +755,20 @@ pub fn note_partial_file_failures(failures: &[FileFailure]) {
 ///
 /// - **Order is preserved.** Results come back in input order regardless of
 ///   which thread finished first, so the report's bytes do not depend on
-///   scheduling. That is the same-input-same-output contract, and it is the
-///   reason the results are collected into pre-indexed slots rather than
-///   pushed as they arrive. [`FileAnalysis::succeeded`] and
+///   scheduling. Since [`claim_order_by_descending_size`] means the workers do
+///   not even *start* the files in input order, that is now an explicit
+///   reassembly rather than a happy accident of the partitioning: each result
+///   travels back paired with the index of the file it came from and is placed
+///   in that slot, and nothing is ever appended as it arrives. That is the
+///   same-input-same-output contract. [`FileAnalysis::succeeded`] and
 ///   [`FileAnalysis::failed`] each keep that ordering independently.
 /// - **Every failure is kept, not only the first.** A run over ten files
 ///   where files 2 and 7 both fail reports both, every time — not whichever
 ///   thread lost the race, and not only the earliest by input order.
 /// - **One worker is the serial path.** With `--jobs 1`, or a list short
-///   enough not to be worth a thread, no thread is spawned at all. A caller
-///   debugging a panic gets the original stack.
+///   enough not to be worth a thread, no thread is spawned at all — and no
+///   file is stat'd to schedule it either. A caller debugging a panic gets the
+///   original stack.
 ///
 /// `std::thread::scope` rather than a work-stealing pool: the work is a flat
 /// map over a known list, and a scoped spawn needs no dependency, no runtime,
@@ -765,39 +796,7 @@ where
             .map(|file| analyze_one(file, dialect, &analyze))
             .collect()
     } else {
-        // Static partition into contiguous chunks. A work-stealing queue would
-        // balance an uneven file-size distribution better; it would also need a
-        // dependency, a mutex on the hot path, and a reason to believe the
-        // imbalance costs more than the contention. Contiguous chunks of a
-        // sorted file list are close to even in practice, and each worker
-        // writes only its own slice — which is what makes the whole thing
-        // sound without a lock.
-        let mut results = files
-            .iter()
-            .map(|_| None::<Result<T, E>>)
-            .collect::<Vec<_>>();
-        let per_worker = files.len().div_ceil(workers);
-        let analyze = &analyze;
-
-        std::thread::scope(|scope| {
-            for (chunk_index, slots) in results.chunks_mut(per_worker).enumerate() {
-                let start = chunk_index * per_worker;
-                scope.spawn(move || {
-                    for (offset, slot) in slots.iter_mut().enumerate() {
-                        // `files` is borrowed immutably by every worker; the
-                        // mutable half is the disjoint slice each one owns.
-                        if let Some(file) = files.get(start + offset) {
-                            *slot = Some(analyze_one(file, dialect, analyze));
-                        }
-                    }
-                });
-            }
-        });
-
-        results
-            .into_iter()
-            .map(|slot| slot.expect("every slot is filled before the scope ends"))
-            .collect()
+        analyze_in_parallel(files, dialect, &analyze, workers)
     };
 
     let mut analysis = FileAnalysis {
@@ -814,6 +813,121 @@ where
         }
     }
     analysis
+}
+
+/// Runs `analyze` over every file on `workers` threads, largest file first.
+///
+/// Files are claimed one at a time from a shared cursor rather than handed out
+/// in contiguous chunks before any work starts. Static chunking divides the
+/// work by file *count*, which is only a proxy for the work when the files are
+/// a similar size, and the distribution a real tree has is not that: one
+/// generated 4 MB file among a thousand 2 KB ones handed a single worker
+/// essentially the whole run while the rest returned instantly and stayed
+/// idle. A cursor cannot leave a worker idle while a file remains unclaimed,
+/// whatever the distribution — and it needs no estimate of how long any
+/// individual file will take, only that some file is left.
+///
+/// The cursor walks [`claim_order_by_descending_size`] rather than the input
+/// order, because claim order still decides the tail: a queue that reaches the
+/// largest file last spends the end of the run with one worker on it and every
+/// other worker finished. Largest-first is the greedy
+/// longest-processing-time-first rule, and it bounds the tail at the cost of
+/// one `stat` per file — against a read and a parse of that same file
+/// moments later.
+///
+/// The only shared mutable state is the cursor, touched once per file with a
+/// relaxed `fetch_add`; `Relaxed` suffices because the counter guards nothing
+/// but itself, and every result crosses to this thread through the join rather
+/// than through memory the workers share. Each worker accumulates its own
+/// `(index, result)` pairs, so no lock is held across an analysis and no two
+/// workers ever address the same slot.
+///
+/// **Ordering.** A worker's pairs come back in the order it happened to claim
+/// them, which is neither input order nor the same twice. Input order is
+/// restored by the indexed placement below — `slots[index] = Some(result)` —
+/// and by nothing else. Appending here instead would make the report depend on
+/// which worker won a race.
+fn analyze_in_parallel<T, E, F>(
+    files: &[PathBuf],
+    dialect: Option<DialectArg>,
+    analyze: &F,
+    workers: usize,
+) -> Vec<Result<T, E>>
+where
+    T: Send,
+    E: From<CliError> + Send,
+    F: Fn(&PathBuf, Dialect, &SyntaxTree, &SourceInput) -> Result<T, E> + Sync,
+{
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let claim_order = claim_order_by_descending_size(files);
+    let cursor = AtomicUsize::new(0);
+    let claim_order = &claim_order;
+    let cursor = &cursor;
+
+    let claimed: Vec<Vec<(usize, Result<T, E>)>> = std::thread::scope(|scope| {
+        let handles = (0..workers)
+            .map(|_| {
+                scope.spawn(move || {
+                    let mut mine = Vec::new();
+                    loop {
+                        let position = cursor.fetch_add(1, Ordering::Relaxed);
+                        let Some(&index) = claim_order.get(position) else {
+                            break;
+                        };
+                        mine.push((index, analyze_one(&files[index], dialect, analyze)));
+                    }
+                    mine
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let mut claimed = Vec::with_capacity(workers);
+        for handle in handles {
+            match handle.join() {
+                Ok(mine) => claimed.push(mine),
+                // Rather than `expect`, which would render the payload as
+                // `Any { .. }`: a worker panic reaches the caller as the panic
+                // it was, the same as it did when the scope propagated it.
+                Err(payload) => std::panic::resume_unwind(payload),
+            }
+        }
+        claimed
+    });
+
+    let mut slots: Vec<Option<Result<T, E>>> = files.iter().map(|_| None).collect();
+    for mine in claimed {
+        for (index, result) in mine {
+            slots[index] = Some(result);
+        }
+    }
+    slots
+        .into_iter()
+        .map(|slot| slot.expect("every index is claimed exactly once"))
+        .collect()
+}
+
+/// The order the workers claim `files` in: largest first.
+///
+/// A permutation of the indices into `files`, not a reordering of the list
+/// itself. The index is what puts each result back where it belongs, so it has
+/// to survive the scheduling decision rather than be consumed by it.
+///
+/// A file whose size cannot be read sorts as empty. Guessing high would put a
+/// path that may not even exist at the head of the queue; sorting it last
+/// costs nothing, because whatever is wrong with it surfaces as that file's own
+/// read failure a moment later either way.
+fn claim_order_by_descending_size(files: &[PathBuf]) -> Vec<usize> {
+    let sizes = files
+        .iter()
+        .map(|file| std::fs::metadata(file).map_or(0, |metadata| metadata.len()))
+        .collect::<Vec<_>>();
+    let mut order = (0..files.len()).collect::<Vec<_>>();
+    // Stable, so equal-sized files are claimed in input order. The report does
+    // not depend on the schedule, but a schedule that moves between runs of the
+    // same tree makes a wall-clock measurement of it unreadable.
+    order.sort_by_key(|&index| std::cmp::Reverse(sizes[index]));
+    order
 }
 
 fn analyze_one<T, E, F>(file: &PathBuf, dialect: Option<DialectArg>, analyze: &F) -> Result<T, E>
@@ -870,10 +984,12 @@ fn push_unique_path(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, p
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Condvar, Mutex};
 
     use super::{
-        CliError, CliResult, Dialect, PathBuf, analyze_files, prefers_crlf, require_output_file,
-        restore_line_ending, terminal_safe, terminal_safe_error_chain,
+        CliError, CliResult, Dialect, PathBuf, analyze_files, claim_order_by_descending_size,
+        prefers_crlf, require_output_file, restore_line_ending, terminal_safe,
+        terminal_safe_error_chain, worker_count,
     };
 
     fn restore(original: &str, rewritten: &str) -> String {
@@ -983,6 +1099,206 @@ mod tests {
         assert_eq!(analysis.succeeded.len(), 9);
         assert_eq!(analysis.failed.len(), 1);
         assert_eq!(analysis.failed[0].file, files[4]);
+    }
+
+    /// A file list in which the file at `heavy` is a hundred times the size of
+    /// every other, the distribution static count-based chunking handles worst.
+    fn size_skewed_files(label: &str, count: usize, heavy: usize) -> Vec<PathBuf> {
+        (0..count)
+            .map(|index| {
+                let forms = if index == heavy { 100 } else { 1 };
+                let source = (0..forms)
+                    .map(|form| format!("(defun f{index}-{form} (x)\n  (g x))\n"))
+                    .collect::<String>();
+                test_file(&format!("{label}-{index:02}"), &source)
+            })
+            .collect()
+    }
+
+    /// A rendezvous the analyses use to pin down which file finishes last.
+    ///
+    /// Completion order is otherwise a race, and a race that usually comes out
+    /// in input order is exactly the race that lets an append-on-arrival
+    /// collector pass. Forcing the order makes the assertion mean something on
+    /// every run rather than on an unlucky one.
+    struct Gate {
+        arrived: Mutex<usize>,
+        changed: Condvar,
+    }
+
+    impl Gate {
+        fn new() -> Self {
+            Self {
+                arrived: Mutex::new(0),
+                changed: Condvar::new(),
+            }
+        }
+
+        fn arrive(&self) {
+            *self.arrived.lock().expect("gate") += 1;
+            self.changed.notify_all();
+        }
+
+        /// Blocks until `count` analyses have arrived, or thirty seconds pass.
+        ///
+        /// The timeout is a hang guard, not a deadline: a test that never
+        /// returns reports nothing at all, where one that gives up still gets
+        /// to make its assertion.
+        fn wait_for(&self, count: usize) {
+            let mut arrived = self.arrived.lock().expect("gate");
+            while *arrived < count {
+                let (guard, timeout) = self
+                    .changed
+                    .wait_timeout(arrived, std::time::Duration::from_secs(30))
+                    .expect("gate");
+                arrived = guard;
+                if timeout.timed_out() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// The scheduler claims the biggest file first, so the run does not end
+    /// with every worker but one waiting on it.
+    #[test]
+    fn the_claim_order_is_the_largest_file_first() {
+        let files = size_skewed_files("claim-order", 4, 2);
+
+        assert_eq!(claim_order_by_descending_size(&files), vec![2, 0, 1, 3]);
+    }
+
+    /// A path that cannot be stat'd sorts last rather than first: it may not be
+    /// a file at all, and its read failure is a moment away regardless.
+    #[test]
+    fn an_unstattable_path_is_claimed_last() {
+        let mut files = size_skewed_files("claim-order-missing", 2, 0);
+        files.push(PathBuf::from(
+            "/nonexistent/paredit/claim-order/missing.lisp",
+        ));
+
+        assert_eq!(claim_order_by_descending_size(&files), vec![0, 1, 2]);
+    }
+
+    /// The report is in input order even when the file that belongs *first* in
+    /// it is provably the last one analysed.
+    ///
+    /// The first file is the huge one, so largest-first claims it before
+    /// anything else and its worker is the one still running at the end — and
+    /// the gate makes that certain rather than likely. A collector that pushed
+    /// each result as its thread returned would move file 00 to the end of the
+    /// report; the indexed reassembly in `analyze_in_parallel` cannot.
+    #[test]
+    fn the_largest_file_finishing_last_does_not_move_it_down_the_report() {
+        const COUNT: usize = 24;
+        let files = size_skewed_files("skew-heavy-first", COUNT, 0);
+        // With one worker nothing else runs to open the gate, so the serial
+        // path waits on itself.
+        let parallel = worker_count(files.len()) > 1;
+        let gate = Gate::new();
+        let completion = Mutex::new(Vec::new());
+
+        let analysis = analyze_files(&files, None, |file, _dialect, _tree, _input| {
+            let index = files.iter().position(|f| f == file).expect("known file");
+            if parallel && index == 0 {
+                gate.wait_for(COUNT - 1);
+            }
+            completion.lock().expect("completion").push(index);
+            // Arrives only after recording, so the count reaching COUNT - 1
+            // means every other completion is already in the list rather than
+            // merely about to be.
+            if parallel && index != 0 {
+                gate.arrive();
+            }
+            CliResult::Ok(index)
+        });
+
+        assert!(analysis.failed.is_empty(), "{:?}", analysis.failed);
+        assert_eq!(analysis.succeeded, (0..COUNT).collect::<Vec<_>>());
+        if parallel {
+            assert_eq!(
+                completion.lock().expect("completion").last(),
+                Some(&0),
+                "the gate did not make the first file finish last, so the \
+                 assertion above proved nothing"
+            );
+        }
+    }
+
+    /// The mirror: the report is in input order even when the file that belongs
+    /// *last* in it is the first one analysed.
+    ///
+    /// The huge file is at the end of the input, and largest-first claims it
+    /// before any of the small ones — so here the fast workers are the ones
+    /// that finish late, and an append-on-arrival collector would hoist file 23
+    /// to the top of the report instead of dropping it to the bottom.
+    #[test]
+    fn the_largest_file_finishing_first_does_not_move_it_up_the_report() {
+        const COUNT: usize = 24;
+        let files = size_skewed_files("skew-heavy-last", COUNT, COUNT - 1);
+        let parallel = worker_count(files.len()) > 1;
+        let gate = Gate::new();
+        let completion = Mutex::new(Vec::new());
+
+        let analysis = analyze_files(&files, None, |file, _dialect, _tree, _input| {
+            let index = files.iter().position(|f| f == file).expect("known file");
+            // Safe from deadlock however many workers there are: the huge file
+            // is at claim position 0, so it is always in flight in the first
+            // round and never queued behind a waiter.
+            if parallel && index != COUNT - 1 {
+                gate.wait_for(1);
+            }
+            completion.lock().expect("completion").push(index);
+            if parallel && index == COUNT - 1 {
+                gate.arrive();
+            }
+            CliResult::Ok(index)
+        });
+
+        assert!(analysis.failed.is_empty(), "{:?}", analysis.failed);
+        assert_eq!(analysis.succeeded, (0..COUNT).collect::<Vec<_>>());
+        if parallel {
+            assert_eq!(
+                completion.lock().expect("completion").first(),
+                Some(&(COUNT - 1)),
+                "the gate did not make the last file finish first, so the \
+                 assertion above proved nothing"
+            );
+        }
+    }
+
+    /// Failures keep input order under a skewed schedule too. They are
+    /// collected in a second pass over the reassembled results rather than as
+    /// they occur, so a broken file claimed early cannot outrun a broken file
+    /// that precedes it in the input.
+    #[test]
+    fn failures_stay_in_input_order_when_the_schedule_is_size_ordered() {
+        const COUNT: usize = 24;
+        let files = size_skewed_files("skew-failures", COUNT, 3);
+        // The tiny broken file precedes the big one in the input and follows it
+        // in the claim order, so the order they must be reported in is neither
+        // the order they are started in nor the order they finish in.
+        std::fs::write(&files[1], "(defun broken (\n").expect("write test file");
+        std::fs::write(
+            &files[20],
+            format!(
+                "{}(defun also-broken (\n",
+                "(defun pad (x)\n  (g x))\n".repeat(200)
+            ),
+        )
+        .expect("write test file");
+
+        let analysis = analyze_files(&files, None, |_file, _dialect, _tree, _input| {
+            CliResult::Ok(())
+        });
+
+        assert_eq!(analysis.succeeded.len(), COUNT - 2);
+        let failed = analysis
+            .failed
+            .iter()
+            .map(|failure| failure.file.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(failed, vec![files[1].clone(), files[20].clone()]);
     }
 
     #[test]

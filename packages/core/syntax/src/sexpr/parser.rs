@@ -3,7 +3,7 @@ use thiserror::Error;
 use crate::dialect::Dialect;
 
 use super::reader_policy::{DialectReaderPolicy, ReaderMacro};
-use super::tree::{Comment, Node, NodeKind, ReaderPrefix, SyntaxTree};
+use super::tree::{Comment, Node, NodeKind, ReaderPrefix, ReaderPrefixes, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -149,8 +149,7 @@ impl<'a> Parser<'a> {
         let root = Node {
             kind: NodeKind::Root,
             delimiter: None,
-            reader_prefixes: Vec::new(),
-            reader_prefix_spans: Vec::new(),
+            reader: None,
             parent: None,
             children: Vec::new(),
             span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(input.len())),
@@ -318,13 +317,14 @@ impl<'a> Parser<'a> {
             .first()
             .map(|prefix| prefix.span.start())
             .unwrap_or(self.pos);
-        let reader_prefixes = prefixes.iter().map(|prefix| prefix.kind).collect();
-        let reader_prefix_spans = prefixes.iter().map(|prefix| prefix.span).collect();
+        let reader = ReaderPrefixes::boxed(
+            prefixes.iter().map(|prefix| prefix.kind).collect(),
+            prefixes.iter().map(|prefix| prefix.span).collect(),
+        );
         self.nodes.push(Node {
             kind: NodeKind::List,
             delimiter: Some(delimiter),
-            reader_prefixes,
-            reader_prefix_spans,
+            reader,
             parent: Some(parent),
             children: Vec::new(),
             span: ByteSpan::new(start, ByteOffset::new(self.pos.get() + 1)),
@@ -518,14 +518,16 @@ impl<'a> Parser<'a> {
         // content even when whitespace or a comment separates a reader
         // prefix from what it prefixes (`#' foo` is valid, if unusual, CL
         // syntax).
-        let symbol_offset = start.get() - span_start.get();
-        let reader_prefixes = prefixes.iter().map(|prefix| prefix.kind).collect();
-        let reader_prefix_spans = prefixes.iter().map(|prefix| prefix.span).collect();
+        let symbol_offset = u32::try_from(start.get() - span_start.get())
+            .expect("an offset within a document a ByteOffset can address fits a u32");
+        let reader = ReaderPrefixes::boxed(
+            prefixes.iter().map(|prefix| prefix.kind).collect(),
+            prefixes.iter().map(|prefix| prefix.span).collect(),
+        );
         self.nodes.push(Node {
             kind: NodeKind::Atom,
             delimiter: None,
-            reader_prefixes,
-            reader_prefix_spans,
+            reader,
             parent: Some(parent),
             children: Vec::new(),
             span: ByteSpan::new(span_start, end),
@@ -549,8 +551,7 @@ impl<'a> Parser<'a> {
         self.nodes.push(Node {
             kind: NodeKind::Atom,
             delimiter: None,
-            reader_prefixes: Vec::new(),
-            reader_prefix_spans: Vec::new(),
+            reader: None,
             parent: Some(parent),
             children: Vec::new(),
             span: ByteSpan::new(start, end),

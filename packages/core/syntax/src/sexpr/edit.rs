@@ -11,8 +11,30 @@ impl Edit {
         rewritten: String,
         dialect: crate::dialect::Dialect,
     ) -> SexprResult<String> {
+        Self::normalize_changed_line_trivia_reusing_parse(input, rewritten, dialect)
+            .map(|(normalized, _)| normalized)
+    }
+
+    /// [`Self::normalize_changed_line_trivia`], lending out the parse it made.
+    ///
+    /// Normalizing needs a tree only to tell trailing whitespace apart from
+    /// the inside of a string or block comment, so it parses the rewrite it
+    /// was handed and then throws that parse away. A caller that immediately
+    /// parses the normalized document itself therefore pays for the same bytes
+    /// twice — which the `--all` edit loop in the CLI did, once per match, and
+    /// those two parses were about 95% of that loop.
+    ///
+    /// The tree comes back as `Some` only when nothing was removed, because
+    /// only then is it still a parse of the text returned alongside it. That is
+    /// the ordinary case: a rewrite leaves trailing whitespace behind rarely,
+    /// and never at all for most edits.
+    pub fn normalize_changed_line_trivia_reusing_parse(
+        input: &str,
+        rewritten: String,
+        dialect: crate::dialect::Dialect,
+    ) -> SexprResult<(String, Option<SyntaxTree>)> {
         if input == rewritten {
-            return Ok(rewritten);
+            return Ok((rewritten, None));
         }
 
         let tree = SyntaxTree::parse_with_dialect(&rewritten, dialect)?;
@@ -50,11 +72,15 @@ impl Edit {
             cursor = newline.saturating_add(1);
         }
 
+        if removals.is_empty() {
+            return Ok((rewritten, Some(tree)));
+        }
+
         let mut normalized = rewritten;
         for removal in removals.into_iter().rev() {
             normalized.replace_range(removal, "");
         }
-        Ok(normalized)
+        Ok((normalized, None))
     }
 
     pub fn replace(
@@ -248,7 +274,7 @@ impl Edit {
         if parent.kind != NodeKind::List {
             return Err(StructureError::SplitNotDirectlyInList.into());
         }
-        if !parent.reader_prefixes.is_empty() {
+        if !parent.reader_prefixes().is_empty() {
             return Err(StructureError::SplitReaderPrefix.into());
         }
         let delimiter = parent
@@ -287,13 +313,13 @@ impl Edit {
         }
 
         ensure_list(node)?;
-        if !node.reader_prefixes.is_empty() {
+        if !node.reader_prefixes().is_empty() {
             return Err(StructureError::JoinReaderPrefix.into());
         }
         if sibling.kind != NodeKind::List {
             return Err(StructureError::JoinSiblingNotList.into());
         }
-        if !sibling.reader_prefixes.is_empty() {
+        if !sibling.reader_prefixes().is_empty() {
             return Err(StructureError::JoinIntoReaderPrefix.into());
         }
         if node.delimiter != sibling.delimiter {
@@ -393,7 +419,7 @@ impl Edit {
         if outer.kind != NodeKind::List {
             return Err(StructureError::ConvoluteNotTwoDeep.into());
         }
-        if !middle.reader_prefixes.is_empty() || !outer.reader_prefixes.is_empty() {
+        if !middle.reader_prefixes().is_empty() || !outer.reader_prefixes().is_empty() {
             return Err(StructureError::ConvoluteReaderPrefix.into());
         }
         let middle_delimiter = middle
@@ -467,7 +493,7 @@ impl Edit {
 /// their contents and dropping the interior delimiters and the gap between
 /// them. Refuses non-string atoms so symbols are never silently fused.
 fn join_strings(input: &str, node: &Node, sibling: &Node) -> SexprResult<String> {
-    if !node.reader_prefixes.is_empty() || !sibling.reader_prefixes.is_empty() {
+    if !node.reader_prefixes().is_empty() || !sibling.reader_prefixes().is_empty() {
         return Err(StructureError::JoinStringReaderPrefix.into());
     }
     let first = node.span.slice(input);

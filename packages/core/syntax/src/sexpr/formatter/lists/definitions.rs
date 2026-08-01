@@ -74,7 +74,7 @@ impl Formatter {
         }
         let delimiter = self.list_delimiter(node);
         let reader_prefix_width = node
-            .reader_prefix_spans
+            .reader_prefix_spans()
             .iter()
             .map(|span| UnicodeWidthStr::width(span.slice(&tree.source)))
             .sum::<usize>();

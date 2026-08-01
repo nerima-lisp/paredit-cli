@@ -51,7 +51,7 @@ impl Edit {
     ) -> SexprResult<String> {
         super::edit::validate_edit_context(input, tree, selection)?;
         let node = selection.node();
-        let spans = &node.reader_prefix_spans;
+        let spans = &node.reader_prefix_spans();
         let first = *spans
             .first()
             .ok_or(StructureError::NoReaderPrefixToUnwrap)?;
@@ -75,7 +75,7 @@ impl Edit {
 /// parser allowed between them.
 pub(in crate::sexpr) fn content_start(node: &Node) -> ByteOffset {
     match node.kind {
-        NodeKind::Atom => ByteOffset::new(node.span.start().get() + node.symbol_offset),
+        NodeKind::Atom => ByteOffset::new(node.span.start().get() + node.symbol_offset as usize),
         NodeKind::List => node.open.unwrap_or_else(|| node.span.start()),
         NodeKind::Root => node.span.start(),
     }
