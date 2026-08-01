@@ -65,10 +65,10 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 183 rules, and every rule depends on the engine; putting the registry in
+all 191 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching twelve feature packages for their `META`
+the registry sits in the root reaching thirteen feature packages for their `META`
 and `RULE`. That is the criterion: **a module that enumerates or aggregates several
 features** belongs in neither core nor any one feature.
 
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, twelve packages
+## Lint rules: one trait, one registry line, thirteen packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,8 +141,8 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-178 of the 183 shipped rules live in eleven themed packages, split three ways.
-A twelfth, `feature/lint-custom`, holds no rules at all: it is the pattern
+186 of the 191 shipped rules live in twelve themed packages, split four ways.
+A thirteenth, `feature/lint-custom`, holds no rules at all: it is the pattern
 language and the second pass that run the rules a *project* writes for itself.
 
 The remaining five — `macro-variable-capture`, `macro-multiple-evaluation`,
@@ -163,12 +163,19 @@ Lisp's own file conventions (`lexical-binding`, `;;;###autoload`, `defcustom`
 options, the `cl.el` names Emacs 27 removed) rather than about S-expression
 shape, so none of them has a Common Lisp counterpart to share a theme with.
 
-The remaining four —
+Four —
 `feature/lint-{performance,portability,safety,convention}` — are split by the
 *kind of claim* the rule makes rather than by the syntax it reads: cost,
 environment assumptions, what the form does to the world outside it, and what a
 definition says about itself. Grouping those by operator would scatter each
 argument across six packages.
+
+The twelfth, `feature/lint-repl-debug`, is split by *provenance* rather than
+syntax or claim: its eight rules all flag the same thing — an interactive
+REPL session's leftovers (`print`/`trace`/`break`/`time`/`step`/... calls, a
+`DEBUG`-marked `format`, a pasted transcript in a comment) accidentally
+committed — which cuts across every one of the other three groupings and does
+not belong in any of them.
 
 A rule declares its `dialect_scope`, and the dispatcher skips one whose scope
 excludes the file's dialect before walking anything.
@@ -182,7 +189,7 @@ newer packages give each rule a single module: they ship as lint rules only,
 reachable through `inspect lint --rule <name>`, so there is one consumer and
 the three-file split would be indirection with nothing on the other end.
 
-**`REGISTRY` is in neither.** It names all 183 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 191 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.

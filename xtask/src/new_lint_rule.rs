@@ -25,6 +25,8 @@ use crate::checklist::{self, Namespace};
 use crate::fs_util::{insert_sorted_mod_line, write_new_file};
 use crate::repo::Repo;
 
+use paredit_core_syntax::selector::pattern::{CaptureKind, Pattern, Rest};
+use paredit_core_syntax::sexpr::{Delimiter, ReaderPrefix};
 use paredit_feature_lint_custom::ruleset::{self, CustomRule, RuleTest};
 
 pub struct NewLintRuleOptions {
@@ -101,6 +103,100 @@ impl CustomRuleSeed {
     }
 }
 
+/// Renders one reader prefix back to the punctuation it parsed from.
+///
+/// `HashLiteral`/`ReaderConditional`/`Metadata` etc. do not round-trip to
+/// exactly the original spelling in every dialect (e.g. `#{` vs `#(`), but
+/// this only feeds a generated doc comment showing a scaffold author roughly
+/// what the seed pattern looked like — not a re-parsed value — so an
+/// approximate but recognizable rendering is enough.
+fn render_reader_prefix(prefix: ReaderPrefix) -> &'static str {
+    match prefix {
+        ReaderPrefix::Quote => "'",
+        ReaderPrefix::Quasiquote => "`",
+        ReaderPrefix::Unquote => ",",
+        ReaderPrefix::UnquoteSplicing => ",@",
+        ReaderPrefix::Function => "#'",
+        ReaderPrefix::ReadEval => "#.",
+        ReaderPrefix::HashLiteral => "#",
+        ReaderPrefix::Metadata => "^",
+        ReaderPrefix::ReaderConditional => "#?",
+        ReaderPrefix::ReaderConditionalSplicing => "#?@",
+    }
+}
+
+fn render_reader_prefixes(prefixes: &[ReaderPrefix]) -> String {
+    prefixes.iter().copied().map(render_reader_prefix).collect()
+}
+
+/// The `:kind` suffix a `?name`/`_` wildcard carries, e.g. `?x:string`.
+fn render_capture_kind_suffix(kind: CaptureKind) -> &'static str {
+    match kind {
+        CaptureKind::Any => "",
+        CaptureKind::Atom => ":atom",
+        CaptureKind::List => ":list",
+        CaptureKind::Symbol => ":symbol",
+        CaptureKind::Keyword => ":keyword",
+        CaptureKind::String => ":string",
+        CaptureKind::Number => ":number",
+    }
+}
+
+fn render_rest(rest: &Rest) -> String {
+    rest.capture
+        .as_ref()
+        .map_or_else(|| "...".to_owned(), |name| format!("?{name}..."))
+}
+
+/// Renders a parsed [`Pattern`] back to (approximately) the Lisp text it was
+/// parsed from, for the generated scaffold's seed doc comment only.
+///
+/// `Pattern` discards exact source text on parse (whitespace, comments), so
+/// this is a re-serialization rather than the original bytes — good enough
+/// for a comment a human is going to read and then replace.
+fn render_pattern(pattern: &Pattern) -> String {
+    match pattern {
+        Pattern::Wildcard {
+            capture,
+            kind,
+            prefixes,
+        } => {
+            let base = capture
+                .as_ref()
+                .map_or_else(|| "_".to_owned(), |name| format!("?{name}"));
+            format!(
+                "{}{base}{}",
+                render_reader_prefixes(prefixes),
+                render_capture_kind_suffix(*kind)
+            )
+        }
+        Pattern::Atom { text, prefixes } => {
+            format!("{}{text}", render_reader_prefixes(prefixes))
+        }
+        Pattern::List {
+            delimiter,
+            prefixes,
+            before,
+            rest,
+            after,
+        } => {
+            let (open, close) = match delimiter {
+                Delimiter::Paren => ('(', ')'),
+                Delimiter::Bracket => ('[', ']'),
+                Delimiter::Brace => ('{', '}'),
+            };
+            let mut parts: Vec<String> = before.iter().map(render_pattern).collect();
+            parts.extend(rest.as_ref().map(render_rest));
+            parts.extend(after.iter().map(render_pattern));
+            format!(
+                "{}{open}{}{close}",
+                render_reader_prefixes(prefixes),
+                parts.join(" ")
+            )
+        }
+    }
+}
+
 /// A one-line doc comment, since the seeded description/message/pattern text
 /// came from a Lisp string that technically could carry an embedded newline.
 fn oneline(text: &str) -> String {
@@ -113,7 +209,7 @@ fn oneline(text: &str) -> String {
 /// nothing.
 fn seed_examine_notes(seed: &CustomRuleSeed) -> String {
     let spec = &seed.spec;
-    let pattern_text = format!("{:?}", seed.rule.pattern);
+    let pattern_text = render_pattern(&seed.rule.pattern);
     let mut notes = format!(
         "/// Seeded from `{spec}`:\n\
          /// - pattern: `{}`\n\
@@ -121,6 +217,16 @@ fn seed_examine_notes(seed: &CustomRuleSeed) -> String {
         oneline(&pattern_text),
         oneline(&seed.rule.message),
     );
+    if let Some(fix) = &seed.rule.fix {
+        // `Template` retains its own source text (unlike `Pattern`, which
+        // discards it while parsing), so the `:fix` half needs no renderer.
+        let fix_text = fix.text().to_owned();
+        notes.push_str(&format!(
+            "/// - fix: `{}` (not ported — this scaffold has no fix support yet;\n\
+             ///   see `Fixability` on `META` below if you add one)\n",
+            oneline(&fix_text),
+        ));
+    }
     notes.push_str("///\n");
     notes
 }
@@ -851,7 +957,7 @@ mod tests {
 
         let domain_rs = fs::read_to_string(rule_dir.join("domain.rs")).expect("read domain.rs");
         assert!(domain_rs.contains("Seeded from `"));
-        assert!(domain_rs.contains("pattern: `List"));
+        assert!(domain_rs.contains("pattern: `(defentity ?name ...)`"));
         assert!(domain_rs.contains("defentity needs a :table"));
         assert!(domain_rs.contains("fn a_clean_summary_passes_policy()"));
         assert!(domain_rs.contains("fn seed_matches_0()"));

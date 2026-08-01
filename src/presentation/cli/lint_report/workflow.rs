@@ -2424,6 +2424,13 @@ mod tests {
             "(length (copy-list ucx))\n", // unnecessary-copy
             "(nreverse (copy-list cbd))\n", // copy-before-destructive
             "(code-char 65)\n",        // ascii-code-char
+            "(princ lpd)\n",           // leftover-print-debug
+            "(trace ltc)\n",           // leftover-trace-call
+            "(break)\n",               // leftover-break-call
+            "(inspect lic)\n",         // leftover-inspect-call
+            "(time (ltbc))\n",         // leftover-time-benchmark-call
+            "(step (lsc))\n",          // leftover-step-call
+            "(format t \"DEBUG lfdm\")\n", // leftover-format-debug-marker
             "(if a b c d)\n",          // if-arity — NOT fixable
         );
         // The Emacs Lisp half. Its rules declare `Dialect::EmacsLisp` only, so

@@ -174,9 +174,17 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-const _: () = assert!(RULE_COUNT == 183);
-const _: () = assert!(fixable_count() == 92);
-const _: () = assert!(warning_count() == 126);
+// 179 (pre-rebase base) + 4 (PR #79: macro-hygiene's four new enforcement
+// rules, all `Warning`/`ReportOnly`) + 8 (this branch's `lint-repl-debug`
+// package) = 191.
+const _: () = assert!(RULE_COUNT == 191);
+// 92 (base) + 0 (PR #79: all four new rules are `Fixability::ReportOnly`) + 7
+// of this branch's 8 rules (all but `commented-repl-transcript`, which is
+// `Fixability::ReportOnly` — see its module doc for why removing a comment
+// cannot be proven safe here) = 99.
+const _: () = assert!(fixable_count() == 99);
+// 122 (base) + 4 (PR #79) + 8 (this branch) = 134.
+const _: () = assert!(warning_count() == 134);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
 const _: () = assert!(PEDANTIC_RULES.len() == 5);
 

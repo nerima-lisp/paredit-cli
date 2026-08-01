@@ -291,7 +291,10 @@ fn cli_lint_list_rules_prints_the_catalog_without_files() {
         .arg("json")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"rule_count\": 178"))
+        // 174 (pre-rebase base's recommended-preset count) + 4 (PR #79's new
+        // rules, none pedantic) + 8 (this branch's `lint-repl-debug`, none
+        // pedantic either) = 186.
+        .stdout(predicate::str::contains("\"rule_count\": 186"))
         .stdout(predicate::str::contains("\"self-assignment\""))
         .stdout(predicate::str::contains(
             "a setq/setf/psetq/psetf that assigns a place to itself",
@@ -962,7 +965,9 @@ fn cli_lint_list_rules_marks_severity() {
     let warnings = rules.iter().filter(|r| r["severity"] == "warning").count();
     // The default preset is `recommended`, which holds back the five
     // `pedantic` rules; `--preset all` is what lists the whole suite.
-    assert_eq!(warnings, 121);
+    // 117 (base) + 4 (PR #79, all four new rules are `Warning`) + 8 (this
+    // branch, all eight are `Warning`) = 129.
+    assert_eq!(warnings, 129);
 }
 
 #[test]
@@ -981,7 +986,7 @@ fn cli_lint_list_rules_marks_fixability() {
 
     let fixable_count = rules.iter().filter(|r| r["fixable"] == true).count();
     assert_eq!(
-        fixable_count, 92,
+        fixable_count, 99,
         "the fixable rules the default preset admits"
     );
 
@@ -2703,7 +2708,14 @@ fn cli_lint_custom_rule_reports_like_a_shipped_one() {
     );
     let dir = fresh_temp_dir("lint-custom-report-src");
     let file = dir.join("a.lisp");
-    fs::write(&file, "(defun run () (print (compute 1)))\n").expect("write a.lisp");
+    // The shipped `leftover-print-debug` rule also matches a bare `print`
+    // call now; suppressed here so this stays a test of one custom finding's
+    // shape, not of two rules' interaction.
+    fs::write(
+        &file,
+        ";; paredit:ignore leftover-print-debug\n(defun run () (print (compute 1)))\n",
+    )
+    .expect("write a.lisp");
 
     let value = json_stdout(
         paredit()
@@ -2740,7 +2752,15 @@ fn cli_lint_custom_rule_fix_applies_like_a_shipped_one() {
     );
     let dir = fresh_temp_dir("lint-custom-fix-src");
     let file = dir.join("a.lisp");
-    fs::write(&file, "(print (compute 1))\n").expect("write a.lisp");
+    // The shipped `leftover-print-debug` rule also matches and would remove
+    // this call outright, racing the custom rule's own rewrite fix for the
+    // same span; suppressed here so this stays a test of one custom rule's
+    // fix, not of two competing fixes.
+    fs::write(
+        &file,
+        ";; paredit:ignore leftover-print-debug\n(print (compute 1))\n",
+    )
+    .expect("write a.lisp");
 
     paredit()
         .args(["inspect", "lint", "--custom-rules"])
@@ -2752,7 +2772,7 @@ fn cli_lint_custom_rule_fix_applies_like_a_shipped_one() {
 
     assert_eq!(
         fs::read_to_string(&file).expect("read a.lisp"),
-        "(format t \"~a~%\" (compute 1))\n"
+        ";; paredit:ignore leftover-print-debug\n(format t \"~a~%\" (compute 1))\n"
     );
 }
 
@@ -2764,7 +2784,14 @@ fn cli_lint_a_custom_finding_obeys_a_suppression_comment() {
     );
     let dir = fresh_temp_dir("lint-custom-suppress-src");
     let file = dir.join("a.lisp");
-    fs::write(&file, ";; paredit:ignore no-bare-print\n(print 1)\n").expect("write a.lisp");
+    // Also names the shipped `leftover-print-debug` rule, which matches the
+    // same `print` call now — a suppression comment names every rule it
+    // silences, and this one silences two.
+    fs::write(
+        &file,
+        ";; paredit:ignore no-bare-print leftover-print-debug\n(print 1)\n",
+    )
+    .expect("write a.lisp");
 
     let value = json_stdout(
         paredit()
@@ -2809,7 +2836,9 @@ fn cli_lint_deny_promotes_a_loaded_custom_rule_to_error() {
     );
     let dir = fresh_temp_dir("lint-custom-deny-promote-src");
     let file = dir.join("a.lisp");
-    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+    // The shipped `leftover-print-debug` rule also matches; suppressed so
+    // `findings[0]` stays the custom rule's own finding.
+    fs::write(&file, ";; paredit:ignore leftover-print-debug\n(print 1)\n").expect("write a.lisp");
 
     // The custom rule ships at warning severity by default.
     let plain = json_stdout(
@@ -2851,7 +2880,10 @@ fn cli_lint_exclude_stops_a_loaded_custom_rule_from_being_reported() {
     );
     let dir = fresh_temp_dir("lint-custom-exclude-src");
     let file = dir.join("a.lisp");
-    fs::write(&file, "(print 1)\n").expect("write a.lisp");
+    // The shipped `leftover-print-debug` rule also matches `--exclude` does
+    // not touch it; suppressed so the excluded custom rule's absence is what
+    // this test is actually observing.
+    fs::write(&file, ";; paredit:ignore leftover-print-debug\n(print 1)\n").expect("write a.lisp");
 
     let value = json_stdout(
         paredit()

@@ -26,3 +26,11 @@ clap = { version = "4.6", features = ["derive"] }
 # depend on it by path, so this builds cleanly under both workspaces' own
 # `cargo build`.
 paredit-feature-lint-custom = { path = "../packages/feature/lint-custom" }
+# `seed_examine_notes` renders a seeded `:pattern`/`:fix` back to Lisp text for
+# the generated doc comment. `Template::text()` covers the `:fix` half, but
+# `Pattern` (unlike `Template`) does not retain its source text — parsing it
+# discards reader-prefix and whitespace detail on purpose, since matching
+# never needs it back — so rendering a `Pattern` needs this crate's own
+# `Pattern`/`CaptureKind`/`Rest` types directly, not just the `pattern::`
+# facade `paredit-feature-lint-custom` re-exports.
+paredit-core-syntax = { path = "../packages/core/syntax" }

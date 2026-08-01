@@ -702,6 +702,34 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::KillRing(args) => {
                 kill_ring_report::workflow::kill_ring(args)?;
             }
+            command::InspectCommand::LeftoverPrintDebug(args) => {
+                leftover_print_debug_report::workflow::leftover_print_debug_report(args)?;
+            }
+            command::InspectCommand::LeftoverTraceCall(args) => {
+                leftover_trace_call_report::workflow::leftover_trace_call_report(args)?;
+            }
+            command::InspectCommand::LeftoverBreakCall(args) => {
+                leftover_break_call_report::workflow::leftover_break_call_report(args)?;
+            }
+            command::InspectCommand::LeftoverInspectCall(args) => {
+                leftover_inspect_call_report::workflow::leftover_inspect_call_report(args)?;
+            }
+            command::InspectCommand::LeftoverTimeBenchmarkCall(args) => {
+                leftover_time_benchmark_call_report::workflow::leftover_time_benchmark_call_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::LeftoverStepCall(args) => {
+                leftover_step_call_report::workflow::leftover_step_call_report(args)?;
+            }
+            command::InspectCommand::CommentedReplTranscript(args) => {
+                commented_repl_transcript_report::workflow::commented_repl_transcript_report(args)?;
+            }
+            command::InspectCommand::LeftoverFormatDebugMarker(args) => {
+                leftover_format_debug_marker_report::workflow::leftover_format_debug_marker_report(
+                    args,
+                )?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,
