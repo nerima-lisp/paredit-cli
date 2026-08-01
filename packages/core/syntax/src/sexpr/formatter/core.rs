@@ -722,15 +722,27 @@ impl Formatter {
             // verbatim, this single code path handles the string-literal
             // contract for free rather than needing its own case.
             NodeKind::Atom => {
-                let text = node.span.slice(&tree.source);
-                let content = self.numeric_literal_text(&text[node.symbol_offset as usize..]);
                 if let Some(heads) = self.canonical_prefix_heads(node) {
                     self.write_canonical_opens(&heads, output);
+                    let text = node.span.slice(&tree.source);
+                    let content = self.numeric_literal_text(&text[node.symbol_offset as usize..]);
                     output.push_str(&content);
                     Self::write_canonical_closes(&heads, output);
+                } else if self.numeric_literal_case == NumericLiteralCase::Preserve {
+                    // No reader prefix to canonicalize and no case recasing to
+                    // apply: copy the atom's whole span verbatim in one push,
+                    // same as before numeric-literal-case existed. Splitting
+                    // this into a symbol_offset-relative slice plus a
+                    // numeric_literal_text call on every atom regardless of
+                    // whether the feature is in use was a real, benchmarked
+                    // regression (~13% on `clean/forms/*`) — Preserve is the
+                    // default, so this fast path is the common case.
+                    output.push_str(node.span.slice(&tree.source));
                 } else {
+                    let text = node.span.slice(&tree.source);
                     output.push_str(&text[..node.symbol_offset as usize]);
-                    output.push_str(&content);
+                    output
+                        .push_str(&self.numeric_literal_text(&text[node.symbol_offset as usize..]));
                 }
             }
             NodeKind::List if node.children.is_empty() => {
@@ -939,10 +951,10 @@ impl Formatter {
                     match node.kind {
                         NodeKind::Root => return None,
                         NodeKind::Atom => {
-                            let text = node.span.slice(&tree.source);
-                            let content =
-                                self.numeric_literal_text(&text[node.symbol_offset as usize..]);
                             if let Some(heads) = self.canonical_prefix_heads(node) {
+                                let text = node.span.slice(&tree.source);
+                                let content =
+                                    self.numeric_literal_text(&text[node.symbol_offset as usize..]);
                                 for head in &heads {
                                     output.push_char('(', max_width)?;
                                     output.push_str(head, max_width)?;
@@ -952,9 +964,20 @@ impl Formatter {
                                 for _ in &heads {
                                     output.push_char(')', max_width)?;
                                 }
+                            } else if self.numeric_literal_case == NumericLiteralCase::Preserve {
+                                // See the matching fast path in `format_node`:
+                                // skip the symbol_offset split and
+                                // numeric_literal_text call entirely when
+                                // there's nothing for either to do.
+                                output.push_str(node.span.slice(&tree.source), max_width)?;
                             } else {
+                                let text = node.span.slice(&tree.source);
                                 output.push_str(&text[..node.symbol_offset as usize], max_width)?;
-                                output.push_str(&content, max_width)?;
+                                output.push_str(
+                                    &self
+                                        .numeric_literal_text(&text[node.symbol_offset as usize..]),
+                                    max_width,
+                                )?;
                             }
                         }
                         NodeKind::List if self.is_opaque_reader_form(node) => {
