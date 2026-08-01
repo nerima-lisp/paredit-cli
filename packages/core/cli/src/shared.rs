@@ -28,9 +28,10 @@ pub use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored}
 pub use io::{
     ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, WritabilityCheck, check_deadline_for_read,
     check_writable, parse_document, read_file_or_empty, read_input_and_dialect,
-    read_input_dialect_and_tree, read_text_file_with_expected_target, read_text_file_with_limit,
-    read_text_with_limit, write_artifact_with_rollback, write_file_with_rollback,
-    write_files_with_rollback, write_files_with_rollback_expected,
+    read_input_dialect_and_tree, read_input_dialect_tree_and_expected_target,
+    read_text_file_with_expected_target, read_text_file_with_limit, read_text_with_limit,
+    write_artifact_with_rollback, write_file_with_rollback, write_files_with_rollback,
+    write_files_with_rollback_expected,
 };
 
 pub const fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {

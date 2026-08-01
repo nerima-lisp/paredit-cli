@@ -486,6 +486,31 @@ pub fn read_input_dialect_and_tree(
     Ok((input, dialect, tree))
 }
 
+/// [`read_input_dialect_and_tree`], but also captures the [`ExpectedWriteTarget`]
+/// needed to write this file back transactionally via
+/// [`write_files_with_rollback_expected`]/[`write_files_with_rollback_expected_anchored`].
+///
+/// Requires a real file (not stdin): a transactional multi-file write is
+/// meaningless for a stream with no path to write back to.
+pub fn read_input_dialect_tree_and_expected_target(
+    file: PathBuf,
+    explicit: Option<DialectArg>,
+) -> CliResult<(SourceInput, Dialect, SyntaxTree, ExpectedWriteTarget)> {
+    check_deadline_for_read(Some(file.as_path()))?;
+    // Every multi-file command reaches its files through here, so one
+    // event at this point gives per-file progress across the tool
+    // without any command's loop knowing progress exists.
+    crate::progress::file_read(&file);
+    let (text, expected) = read_text_file_with_expected_target(&file, max_source_input_bytes())?;
+    let input = SourceInput {
+        text,
+        file: Some(file),
+    };
+    let dialect = crate::shared::detect_dialect(&input, explicit);
+    let tree = parse_document(&input, dialect)?;
+    Ok((input, dialect, tree, expected))
+}
+
 /// How many inputs this process has parsed, reported by a timeout so "timed
 /// out" can be read as "timed out after 412 files".
 static READS_COMPLETED: AtomicU64 = AtomicU64::new(0);
@@ -587,6 +612,12 @@ impl ExpectedWriteTarget {
     }
 }
 
+/// The general cross-file transaction primitive: any multi-file `refactor`/`edit`
+/// command that reads several files, decides what to rewrite, and needs to
+/// publish only the changed ones atomically can call this directly. It is not
+/// specific to the `refactor-workflow` package, which is today's only caller.
+/// [`read_input_dialect_tree_and_expected_target`] is its read-side counterpart,
+/// capturing the `ExpectedWriteTarget` each triple here needs.
 pub fn write_files_with_rollback_expected<I>(files: I) -> CliResult<()>
 where
     I: IntoIterator<Item = (PathBuf, String, ExpectedWriteTarget)>,
@@ -4908,6 +4939,152 @@ mod tests {
             fs::read_to_string(&preserved).expect("read parsed target"),
             "(old)"
         );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn read_input_dialect_tree_and_expected_target_detects_dialect_from_extension() {
+        let directory = test_directory("read-dialect-tree-expected-target-detect");
+        let target = directory.join("target.lisp");
+        fs::write(&target, "(defun foo () 1)\n").expect("write target");
+
+        let (input, dialect, tree, _expected) =
+            read_input_dialect_tree_and_expected_target(target.clone(), None)
+                .expect("read dialect tree and expected target");
+
+        assert_eq!(input.text, "(defun foo () 1)\n");
+        assert_eq!(input.file, Some(target.clone()));
+        assert_eq!(dialect, Dialect::CommonLisp);
+        let expected_tree = parse_document(&input, dialect).expect("parse expected tree");
+        assert_eq!(tree, expected_tree);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn read_input_dialect_tree_and_expected_target_honors_explicit_dialect_override() {
+        let directory = test_directory("read-dialect-tree-expected-target-explicit");
+        // Named with a Common Lisp extension so a passing test proves the
+        // explicit override actually won, rather than agreeing by accident
+        // with what extension-based detection would have picked anyway.
+        let target = directory.join("target.lisp");
+        fs::write(&target, "(defun foo () 1)\n").expect("write target");
+
+        let (_input, dialect, _tree, _expected) = read_input_dialect_tree_and_expected_target(
+            target.clone(),
+            Some(DialectArg::EmacsLisp),
+        )
+        .expect("read dialect tree and expected target");
+
+        assert_eq!(dialect, Dialect::EmacsLisp);
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn read_input_dialect_tree_and_expected_target_round_trips_through_transactional_write() {
+        let directory = test_directory("read-dialect-tree-expected-target-round-trip");
+        let first = directory.join("first.lisp");
+        let second = directory.join("second.lisp");
+        fs::write(&first, "(a)\n").expect("write first target");
+        fs::write(&second, "(b)\n").expect("write second target");
+
+        let (_, _, _, first_expected) =
+            read_input_dialect_tree_and_expected_target(first.clone(), None)
+                .expect("read first target");
+        let (_, _, _, second_expected) =
+            read_input_dialect_tree_and_expected_target(second.clone(), None)
+                .expect("read second target");
+
+        write_files_with_rollback_expected([
+            (first.clone(), "(a2)\n".to_owned(), first_expected),
+            (second.clone(), "(b2)\n".to_owned(), second_expected),
+        ])
+        .expect("transactional write of both captured targets");
+
+        assert_eq!(fs::read_to_string(&first).expect("read first"), "(a2)\n");
+        assert_eq!(fs::read_to_string(&second).expect("read second"), "(b2)\n");
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn read_input_dialect_tree_and_expected_target_write_refuses_whole_batch_when_one_target_changed()
+     {
+        let directory = test_directory("read-dialect-tree-expected-target-rollback");
+        let first = directory.join("first.lisp");
+        let second = directory.join("second.lisp");
+        fs::write(&first, "(a)\n").expect("write first target");
+        fs::write(&second, "(b)\n").expect("write second target");
+
+        let (_, _, _, first_expected) =
+            read_input_dialect_tree_and_expected_target(first.clone(), None)
+                .expect("read first target");
+        let (_, _, _, second_expected) =
+            read_input_dialect_tree_and_expected_target(second.clone(), None)
+                .expect("read second target");
+
+        // Simulates a concurrent modification landing between the read and
+        // the write: the second target's on-disk content no longer matches
+        // the digest captured above.
+        fs::write(&second, "(edited elsewhere)\n").expect("edit second target after reading");
+
+        let error = write_files_with_rollback_expected([
+            (first.clone(), "(a2)\n".to_owned(), first_expected),
+            (second.clone(), "(b2)\n".to_owned(), second_expected),
+        ])
+        .expect_err("a target changed since it was read must refuse the whole batch");
+
+        assert!(
+            error.chain().contains("changed since parsing"),
+            "unexpected error: {}",
+            error.chain()
+        );
+        assert_eq!(
+            fs::read_to_string(&first).expect("read first"),
+            "(a)\n",
+            "the untouched target must not have been published"
+        );
+        assert_eq!(
+            fs::read_to_string(&second).expect("read second"),
+            "(edited elsewhere)\n",
+            "the concurrently written content must be preserved"
+        );
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn read_input_dialect_tree_and_expected_target_on_a_missing_file_reports_the_underlying_error()
+    {
+        let directory = test_directory("read-dialect-tree-expected-target-missing");
+        let missing = directory.join("missing.lisp");
+
+        let direct_error = read_text_file_with_expected_target(&missing, MAX_SOURCE_INPUT_BYTES)
+            .expect_err("reading a missing file directly must fail");
+        let composed_error = read_input_dialect_tree_and_expected_target(missing.clone(), None)
+            .expect_err("reading a missing file through the composed helper must fail");
+
+        assert_eq!(composed_error.to_string(), direct_error.to_string());
+        fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn read_input_dialect_tree_and_expected_target_propagates_a_parse_error_unmodified() {
+        let directory = test_directory("read-dialect-tree-expected-target-parse-error");
+        let target = directory.join("target.lisp");
+        fs::write(&target, "(unbalanced\n").expect("write target");
+
+        let composed_error = read_input_dialect_tree_and_expected_target(target.clone(), None)
+            .expect_err(
+                "reading a file with unbalanced parens through the composed helper must fail",
+            );
+
+        let input = SourceInput {
+            text: "(unbalanced\n".to_owned(),
+            file: Some(target.clone()),
+        };
+        let dialect = crate::shared::detect_dialect(&input, None);
+        let direct_error = parse_document(&input, dialect)
+            .expect_err("parsing unbalanced parens directly must fail");
+
+        assert_eq!(composed_error.to_string(), direct_error.to_string());
         fs::remove_dir_all(directory).expect("remove test directory");
     }
 
