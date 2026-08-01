@@ -47,6 +47,30 @@ pub struct FormatArgs {
     /// Only dialects that read #|...|# as a block comment are affected.
     #[arg(long)]
     pub reindent_block_comments: bool,
+    /// Column same-line trailing comments align to. 0 auto-aligns each run
+    /// of adjacent, trailing-commented forms to one column past its own
+    /// widest form; any other value is a fixed column every trailing
+    /// comment aligns to. Unset keeps the default single space, unaligned.
+    ///
+    /// Bounded to the same 0..=512 range as the `format.comment-column`
+    /// config key (see `packages/core/config/src/schema.rs`): the formatter
+    /// pads out to this column with a literal `" ".repeat(column)`, so an
+    /// unvalidated huge value panics with a capacity overflow, and a merely
+    /// large one blows up the output size. `paredit-core-cli` does not
+    /// depend on `paredit-core-config` (or vice versa), so the bound is
+    /// duplicated rather than shared by a common item — keep the two in
+    /// sync by hand if either changes.
+    #[arg(
+        long,
+        value_name = "COLUMN",
+        value_parser = clap::builder::RangedU64ValueParser::<usize>::new().range(0..=512)
+    )]
+    pub comment_column: Option<usize>,
+    /// Most consecutive blank lines to preserve from the source between
+    /// top-level forms. 0 never inserts a blank line. Unset keeps the
+    /// default of collapsing every gap to exactly one blank line.
+    #[arg(long, value_name = "COUNT")]
+    pub max_blank_lines: Option<usize>,
     /// Write the rewritten document back to --file instead of stdout.
     #[arg(long)]
     pub write: bool,

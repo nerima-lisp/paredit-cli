@@ -27,4 +27,13 @@ pub struct Formatter {
     /// unless overridden with [`Formatter::with_reindent_block_comments`]: a
     /// formatting *policy* rather than a bug fix, so it stays opt-in.
     reindent_block_comments: bool,
+    /// Column same-line trailing comments align to. `None` unless overridden
+    /// with [`Formatter::with_comment_column`], which reproduces the
+    /// original single-space, no-alignment behavior exactly.
+    comment_column: Option<usize>,
+    /// Most consecutive blank lines preserved from the source between
+    /// top-level forms. `None` unless overridden with
+    /// [`Formatter::with_max_blank_lines`], which reproduces the original
+    /// behavior of always collapsing every gap to exactly one blank line.
+    max_blank_lines: Option<usize>,
 }

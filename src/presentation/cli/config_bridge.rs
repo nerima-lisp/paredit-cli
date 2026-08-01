@@ -101,6 +101,20 @@ const BINDINGS: &[Binding] = &[
         omit_when: None,
     },
     Binding {
+        key: "format.comment-column",
+        flag: "comment-column",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "format.blank-lines-max-consecutive",
+        flag: "max-blank-lines",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
         key: "paths.include-hidden",
         flag: "include-hidden",
         shape: Shape::Switch,
