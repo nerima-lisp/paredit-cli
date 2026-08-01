@@ -51,9 +51,33 @@ impl Walk<'_> {
 
         let depth = self.stack.depth();
         let inner = self.builder.open_scope(scope, target.span);
+        self.declare_lambda_list_from(parameter_form, inner, target, head, 0);
+        self.body(body_forms, inner);
+        self.stack.rewind(depth);
+        true
+    }
 
+    /// Declares every parameter of `parameter_form` from `start_index`
+    /// onward, into `scope`.
+    ///
+    /// Used both for a whole ordinary lambda list (`start_index == 0`, from
+    /// [`Self::lambda_scope`]) and for the `&optional`/`&rest`/`&key`/`&aux`
+    /// tail of a `defmethod` lambda list, whose required section a caller
+    /// binds separately because its parameters may carry a specializer an
+    /// ordinary lambda list does not expect. `start_index` landing exactly on
+    /// a `&optional`/`&rest`/`&key` marker (as it does for that caller) makes
+    /// the mode switch on the very first iteration, so the tail is read
+    /// exactly as it would be as a standalone lambda list.
+    pub(super) fn declare_lambda_list_from(
+        &mut self,
+        parameter_form: &ExpressionView,
+        scope: ScopeId,
+        target: &ExpressionView,
+        head: &str,
+        start_index: usize,
+    ) {
         let mut mode = LambdaListMode::Required;
-        let mut index = 0usize;
+        let mut index = start_index;
         while index < parameter_form.children.len() {
             let child = &parameter_form.children[index];
 
@@ -79,7 +103,7 @@ impl Walk<'_> {
                             for bound in binding_pattern_bound_names(next) {
                                 self.declare(
                                     target,
-                                    inner,
+                                    scope,
                                     head,
                                     &bound,
                                     BindingKind::Variable,
@@ -108,13 +132,13 @@ impl Walk<'_> {
                 .then(|| child.children.get(1))
                 .flatten();
             if let Some(default_form) = default_form {
-                self.form(default_form, inner, 0);
+                self.form(default_form, scope, 0);
             }
 
             for bound in spec_bound_names(child, mode) {
                 self.declare(
                     target,
-                    inner,
+                    scope,
                     head,
                     &bound,
                     BindingKind::Variable,
@@ -124,10 +148,6 @@ impl Walk<'_> {
 
             index += 1;
         }
-
-        self.body(body_forms, inner);
-        self.stack.rewind(depth);
-        true
     }
 }
 

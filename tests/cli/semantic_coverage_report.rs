@@ -20,6 +20,44 @@ fn cli_reports_json_totals_and_by_dialect() {
 }
 
 #[test]
+fn cli_reports_the_same_variable_bindings_for_a_defmethod_as_the_equivalent_defun() {
+    // FR-009 golden fixture: a `defmethod`'s specialized required parameter
+    // list must bind exactly the same names as a `defun`'s plain one —
+    // `obj` and `arg`, not the specializer `my-type`.
+    let dir = fresh_temp_dir("semantic-coverage-report-defmethod");
+    let method = dir.join("method.lisp");
+    let function = dir.join("function.lisp");
+    fs::write(
+        &method,
+        "(defmethod handle ((obj my-type) arg) (list obj arg))\n",
+    )
+    .expect("write method.lisp");
+    fs::write(&function, "(defun handle (obj arg) (list obj arg))\n").expect("write function.lisp");
+
+    let mut method_cmd = paredit();
+    method_cmd
+        .arg("inspect")
+        .arg("semantic-coverage")
+        .arg("--output")
+        .arg("json")
+        .arg(&method)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"variable_bindings\": 2"));
+
+    let mut function_cmd = paredit();
+    function_cmd
+        .arg("inspect")
+        .arg("semantic-coverage")
+        .arg("--output")
+        .arg("json")
+        .arg(&function)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"variable_bindings\": 2"));
+}
+
+#[test]
 fn cli_reports_text_totals() {
     let dir = fresh_temp_dir("semantic-coverage-report-text");
     let file = dir.join("a.lisp");
