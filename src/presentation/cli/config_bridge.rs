@@ -87,6 +87,20 @@ const BINDINGS: &[Binding] = &[
         omit_when: None,
     },
     Binding {
+        key: "format.max-inline-width",
+        flag: "max-width",
+        shape: Shape::Value,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
+        key: "format.block-comment-reindent",
+        flag: "reindent-block-comments",
+        shape: Shape::Switch,
+        scope: Scope::Anywhere,
+        omit_when: None,
+    },
+    Binding {
         key: "paths.include-hidden",
         flag: "include-hidden",
         shape: Shape::Switch,

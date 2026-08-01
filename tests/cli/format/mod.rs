@@ -3,6 +3,7 @@ use std::path::Path;
 
 mod binding_forms;
 mod body_forms;
+mod config_and_multi_file;
 mod declaration_forms;
 mod definition_forms;
 
