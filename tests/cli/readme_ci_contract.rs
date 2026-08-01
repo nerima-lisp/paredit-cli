@@ -6,7 +6,7 @@ fn readme_verification_model_matches_ci_trigger_surface() {
     let workflow = fs::read_to_string(".github/workflows/ci.yml").expect("read CI workflow");
 
     assert!(
-        readme.contains("Pull requests run every `nix flake check` output"),
+        readme.contains("Pull requests run a fast-path subset of `nix flake check`'s outputs"),
         "README verification model should describe the current PR CI gate"
     );
 

@@ -87,6 +87,8 @@ It builds and runs every check the project defines:
 | `package` | The release binary builds |
 | `documentation` | The MkDocs (Material) site builds to a valid `index.html` |
 | `lint-format-integration` | The `paredit-lint` / `paredit-format` gates behave end to end |
+| `treefmt-pr-check` | Same as `treefmt`, against a thin-LTO paredit binary — see "How CI runs it" |
+| `lint-format-integration-pr-check` | Same as `lint-format-integration`, against a thin-LTO paredit binary |
 
 Each check is defined exactly once, and each one is the only place its work
 happens. `package` does not run the test suite — that is `nextest`'s job — and
@@ -109,21 +111,43 @@ its checks; fanned out, it costs the *maximum*. The matrix comes from the flake
 rather than from `ci.yml` so that adding a check to `mkCoreChecks` is enough to
 get it verified.
 
+That matrix is not identical on every event. `package`, `treefmt`, and
+`lint-format-integration` all build the same fat-LTO (`lto = "fat"`,
+`codegen-units = 1`) release binary, and a pull request cannot share a Cachix
+build across its checks (a `pull_request` run is always Cachix pull-only, so
+each check would cold-compile that binary independently on its own runner).
+On `pull_request` events the `plan` job therefore drops `package` entirely —
+deferred to `main`/release — and `treefmt`/`lint-format-integration` build
+against a thin-LTO sibling instead (`treefmt-pr-check` /
+`lint-format-integration-pr-check`, `[profile.pr-check]` in `Cargo.toml`),
+which cuts a pull request's slowest path from several minutes of whole-program
+LTO to a low-hundreds-of-seconds compile. A fat-LTO-only compile break is
+therefore caught on `main` after a merge, not on the pull request itself.
+Every other event (pushes to `main`, tag releases) builds the full,
+unfiltered set — including the `-pr-check` checks — so `packagePrCheck` gets
+built and pushed to Cachix somewhere a pull request can actually pull it from;
+without that, the `-pr-check` cache key would never be seeded and every pull
+request would cold-compile it regardless.
+
 ### Where the build artifacts come from
 
 The Rust checks are [crane](https://github.com/ipetkov/crane) derivations
 sharing pre-built `cargoArtifacts`:
 
 ```text
-depsRelease ─▶ package                dev/release profiles are separate
-depsDev     ─▶ clippy, nextest        artifacts, shared within a profile
-depsMsrv    ─▶ msrv                   pinned MSRV toolchain
+depsRelease ─▶ package
+depsDev     ─▶ clippy, nextest
+depsMsrv    ─▶ msrv                                    (pinned MSRV toolchain)
+depsPrCheck ─▶ treefmt-pr-check, lint-format-integration-pr-check
 ```
+
+Each `deps*` derivation is a separate cargo profile's artifacts, shared only
+within that profile.
 
 A `deps` derivation compiles the 181 locked dependencies from dummified
 sources, so its hash depends on `Cargo.lock` and the member manifests and not
 on any `.rs` file. A pull request that only edits Rust sources therefore
-substitutes all three from the binary cache instead of recompiling the
+substitutes all four from the binary cache instead of recompiling the
 dependency graph once per check.
 
 ### Which host CI verifies
@@ -152,6 +176,44 @@ is the Darwin check, and the release checklist calls for it.
 Restoring the matrix is a small change to `.github/workflows/ci.yml`: the
 contract test beside it asserts the *gates* rather than the hosts, precisely so
 that stays a free choice.
+
+### Cheap checks before the full gate
+
+`nix flake check` costs 35-40 minutes on a developer or agent machine, because
+it builds roughly ten derivations, several of them on a different Rust
+toolchain or profile than `nix develop` gives you: msrv's pinned 1.85
+toolchain, clippy's and nextest's dev profile, package/treefmt/lint-format-integration's
+release profile, plus the docs site build and actionlint. That cost is not
+changing — it is what CI enforces and what the release checklist calls for —
+but most iterations fail on something a plain `cargo` invocation catches in a
+couple of minutes, long before it is worth paying for the rest. Run these, in
+order, before invoking the full gate:
+
+| Step | Command | Catches |
+| --- | --- | --- |
+| 1 | `cargo clippy --all-targets --all-features -- -D warnings` | The bulk of `clippy` failures, at local-toolchain speed |
+| 2 | `cargo fmt --all` | Rust formatting — note this is `cargo fmt`, not `cargo clippy --fix`, which does not reformat anything |
+| 3 | `cargo nextest run --locked` | The test suite, ~80-125s locally |
+| 4 | `cargo test --doc -p <pkg>` | Doc tests for a package that moved — `cargo-nextest` does not run these, and a moved package's doc examples can break silently |
+| 5 | `nix build .#checks.x86_64-linux.{clippy,formatting} --no-link` | The two cheapest full Nix checks, closest to what `nix flake check` actually runs |
+
+Only then reach for `nix flake check`, and treat it as a background gate —
+start it and keep working, rather than waiting on it synchronously:
+
+```sh
+nix flake check >flake-check.log 2>&1 &
+```
+
+Step 2 is deliberately `cargo fmt --all` rather than `nix fmt` in this inner
+loop: `nix fmt` also reformats Lisp fixtures via `paredit edit format` and can
+take minutes when it rebuilds the formatter derivation, which is wasted work
+on every iteration where only Rust changed. Step 5 exists because the Nix
+`clippy` derivation resolves a newer clippy than a locally installed one, so a
+clean step 1 does not guarantee step 5 agrees — that gap is real and this
+workflow does not try to close it, only to catch it before the full 35-40
+minute run does. `scripts/precheck.sh` runs steps 1, 2, 3, and 5 in order,
+optionally step 4 for a named package, and stops at the first failure; it does
+not invoke `nix flake check` itself, matching the split above.
 
 ## Robustness: corpora and fuzzing
 

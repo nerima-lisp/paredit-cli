@@ -53,9 +53,30 @@ jobs:
         run: nix flake check --no-build
       - name: Enumerate the checks to fan out over
         id: enumerate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           names="$(nix eval --json '.#lib.x86_64-linux.ciCheckNames')"
+          # A pull request skips the fat-LTO `package` build (it moves to
+          # main/release) and uses the thin-LTO `-pr-check` siblings of
+          # treefmt/lint-format-integration instead, so a PR's wall clock is
+          # not bound by a whole-program-LTO compile of the release binary. A
+          # fat-LTO-only compile break is therefore caught on main, not on the
+          # PR — see docs/src/project/development.md.
+          #
+          # main/release do NOT drop the `-pr-check` names the way a pull
+          # request drops `package`/`treefmt`/`lint-format-integration`: a
+          # pull_request event is always Cachix pull-only
+          # (.github/actions/nix-setup/action.yml), so if nothing ever built
+          # `packagePrCheck` on a push-enabled event either, that cache key
+          # would never be pushed and every single PR would cold-compile the
+          # thin-LTO binary from scratch, forever, instead of substituting
+          # it. Building the `-pr-check` checks here too - where Cachix push
+          # is enabled - seeds that substitute for the next PR to pull.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            names="$(jq -c '[.[] | select(. != "package" and . != "treefmt" and . != "lint-format-integration")]' <<<"$names")"
+          fi
           echo "fanning out over: $names"
           printf 'names=%s\n' "$names" >> "$GITHUB_OUTPUT"
 
