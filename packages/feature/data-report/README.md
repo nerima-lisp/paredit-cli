@@ -22,9 +22,19 @@ handful of shape-only checks that need no format description:
   match its siblings'.
 
 None of this needs to know what the data *means* — only what its own
-repeated shape already implies. A per-format schema (JSON-Lisp, EDN-style
-maps, a project's own `defschema`) is deliberately out of scope here; see
-`inspect data-check`'s own help for what ships today.
+repeated shape already implies, and it runs for every file regardless of
+which format below also applies.
+
+On top of that, `--format` (auto-detected from a file's path and content
+when omitted) turns on a handful of convention-specific checks: Emacs
+`custom-set-variables` entry shape, EDN's ban on code-only Clojure reader
+macros, `.paredit/rules`/`.paredit/migrations` files parsing as the Common
+Lisp this tool itself reads them with, `.dir-locals.el`'s alist-of-alist
+shape (and its `eval` key, flagged for presence only — judging risk is a
+later phase's job), and routing `.rktd`/data-lang Racket files into this
+report at all. A per-format *schema* (JSON-Lisp, EDN-style maps, a project's
+own `defschema`) is still out of scope here; see `inspect data-check`'s own
+help for what ships today.
 
 ## Non-goals
 

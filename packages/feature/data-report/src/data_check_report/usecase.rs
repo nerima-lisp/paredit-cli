@@ -1,6 +1,8 @@
 //! `inspect data-check` reporting across a set of files.
 
-pub use crate::data_check_report::domain::{DataFormat, DataIssue, build_data_check_report};
+pub use crate::data_check_report::domain::{
+    DataFormat, DataIssue, build_data_check_report, detect_data_format,
+};
 
 use paredit_core_cli::report::{FileFindings, ReportPolicy};
 
