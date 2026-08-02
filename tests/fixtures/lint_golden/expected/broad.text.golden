@@ -1,4 +1,4 @@
-finding_count	139
+finding_count	140
 rule	self-assignment	1
 rule	duplicate-setf-places	1
 rule	setf-arity	1
@@ -206,6 +206,22 @@ rule	loop-clause-order-violation	0
 rule	loop-for-across-statically-known-list	0
 rule	loop-into-accumulator-kind-conflict	0
 rule	loop-unreachable-finally-clause	0
+rule	disabled-test-left-in	0
+rule	duplicate-test-name	0
+rule	empty-test-body	0
+rule	sleep-in-test	0
+rule	test-asserts-constant	0
+rule	test-without-assertion	0
+rule	atom-swap-with-side-effect	0
+rule	dynamic-var-bound-across-thread-boundary	0
+rule	future-promise-never-realized	0
+rule	lock-acquired-not-released	0
+rule	recursive-lock-reentry-risk	0
+rule	thread-spawned-without-error-handler	0
+rule	unsynchronized-shared-mutation	0
+rule	asdf-perform-without-call-next-method	0
+rule	asdf-self-referential-depends-on	0
+rule	defpackage-without-in-package	1
 finding	self-assignment	error	suspicious	fixable=false	broad.lisp	6875	setq assigns place x to itself	self-assignment/5f1a5b802aa99b47/0
 finding	duplicate-setf-places	error	duplicate	fixable=false	broad.lisp	6961	setf assigns variable total more than once; the earlier assignment is dead	duplicate-setf-places/8104810ed815b9fd/0
 finding	setf-arity	error	arity	fixable=false	broad.lisp	7021	setf has 3 arguments; place/value pairs require an even count	setf-arity/b0a5b422aad6d4d2/0
@@ -345,3 +361,4 @@ finding	nested-char-case	warning	suspicious	fixable=true	broad.lisp	5313	the out
 finding	list-star-nil	warning	suspicious	fixable=true	broad.lisp	5384	list* with a nil tail is a spelled-out list; (list* a b nil) is (list a b)	list-star-nil/3d15900073a4c4e4/0
 finding	declarative-style-score	warning	suspicious	fixable=false	broad.lisp	0	this file's declarative-style score is 10% (134 top-level forms), below the 80% threshold	declarative-style-score/82af518277a40447/0
 finding	leftover-print-debug	warning	suspicious	fixable=true	broad.lisp	8864	print is a leftover debug-print call	leftover-print-debug/8410f5d691961e8d/0
+finding	defpackage-without-in-package	warning	suspicious	fixable=false	broad.lisp	10031	package :app is declared but the file never enters it; its 13 definition(s) are interned into whatever package is current, not into :app	defpackage-without-in-package/c37b38bb92c1afca/0

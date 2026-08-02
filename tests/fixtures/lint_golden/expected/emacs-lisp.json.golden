@@ -1388,6 +1388,102 @@
       "count": 0,
       "description": "a loop epilogue form after a finally clause that already returns",
       "rule": "loop-unreachable-finally-clause"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a test disabled in place rather than removed",
+      "rule": "disabled-test-left-in"
+    },
+    {
+      "category": "duplicate",
+      "count": 0,
+      "description": "two test definitions in one file sharing a name",
+      "rule": "duplicate-test-name"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a test definition with an empty body",
+      "rule": "empty-test-body"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a sleep-family call inside a test body",
+      "rule": "sleep-in-test"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a test assertion on a constant that can never fail",
+      "rule": "test-asserts-constant"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a test definition whose body contains no assertion form",
+      "rule": "test-without-assertion"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a swap!/alter update function with a side effect, which its retries repeat",
+      "rule": "atom-swap-with-side-effect"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a thread body reading a special its enclosing let rebinds, which does not carry over",
+      "rule": "dynamic-var-bound-across-thread-boundary"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a future or promise bound by let and never mentioned, discarding its value and errors",
+      "rule": "future-promise-never-realized"
+    },
+    {
+      "category": "resource",
+      "count": 0,
+      "description": "a manually acquired lock with no unwind-protect to release it on a non-local exit",
+      "rule": "lock-acquired-not-released"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "the same non-recursive lock taken again inside its own scope, a deadlock risk",
+      "rule": "recursive-lock-reentry-risk"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a thread body that inlines work with no handler, so an error in it is lost",
+      "rule": "thread-spawned-without-error-handler"
+    },
+    {
+      "category": "concurrency",
+      "count": 0,
+      "description": "a global written inside a thread body with no lock held, which races",
+      "rule": "unsynchronized-shared-mutation"
+    },
+    {
+      "category": "object-system",
+      "count": 0,
+      "description": "a primary asdf perform method on load-op or compile-op that never calls call-next-method",
+      "rule": "asdf-perform-without-call-next-method"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a defsystem whose :depends-on names the system itself",
+      "rule": "asdf-self-referential-depends-on"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a file that declares a package and defines symbols but never enters it",
+      "rule": "defpackage-without-in-package"
     }
   ],
   "policy": {

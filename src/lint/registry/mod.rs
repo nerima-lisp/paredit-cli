@@ -13,9 +13,10 @@ use super::rule::RuleEntry;
 
 /// How many rules the suite ships. Pinned so that adding or losing a rule is a
 /// deliberate, reviewed change rather than a silent drift in the catalogue.
-// 191 (through PR #78's `lint-repl-debug`) + 8 (`lint-object-system`) + 7
-// (`lint-condition-system`) + 7 (`lint-iteration-flow`) = 213.
-pub const RULE_COUNT: usize = 212;
+// 212 (through PR #81's `lint-object-system`, `lint-condition-system` and
+// `lint-iteration-flow`) + 6 (`lint-testing`) + 7 (`lint-concurrency`) + 4
+// (`lint-build-system`) = 229.
+pub const RULE_COUNT: usize = 229;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -881,5 +882,73 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_iteration_flow::loop_unreachable_finally_clause::rule::META,
         &paredit_feature_lint_iteration_flow::loop_unreachable_finally_clause::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_testing::disabled_test_left_in::rule::META,
+        &paredit_feature_lint_testing::disabled_test_left_in::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_testing::duplicate_test_name::rule::META,
+        &paredit_feature_lint_testing::duplicate_test_name::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_testing::empty_test_body::rule::META,
+        &paredit_feature_lint_testing::empty_test_body::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_testing::sleep_in_test::rule::META,
+        &paredit_feature_lint_testing::sleep_in_test::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_testing::test_asserts_constant::rule::META,
+        &paredit_feature_lint_testing::test_asserts_constant::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_testing::test_without_assertion::rule::META,
+        &paredit_feature_lint_testing::test_without_assertion::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_concurrency::atom_swap_with_side_effect::rule::META,
+        &paredit_feature_lint_concurrency::atom_swap_with_side_effect::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_concurrency::dynamic_var_bound_across_thread_boundary::rule::META,
+        &paredit_feature_lint_concurrency::dynamic_var_bound_across_thread_boundary::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_concurrency::future_promise_never_realized::rule::META,
+        &paredit_feature_lint_concurrency::future_promise_never_realized::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_concurrency::lock_acquired_not_released::rule::META,
+        &paredit_feature_lint_concurrency::lock_acquired_not_released::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_concurrency::recursive_lock_reentry_risk::rule::META,
+        &paredit_feature_lint_concurrency::recursive_lock_reentry_risk::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_concurrency::thread_spawned_without_error_handler::rule::META,
+        &paredit_feature_lint_concurrency::thread_spawned_without_error_handler::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_concurrency::unsynchronized_shared_mutation::rule::META,
+        &paredit_feature_lint_concurrency::unsynchronized_shared_mutation::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_build_system::asdf_perform_without_call_next_method::rule::META,
+        &paredit_feature_lint_build_system::asdf_perform_without_call_next_method::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_build_system::asdf_self_referential_depends_on::rule::META,
+        &paredit_feature_lint_build_system::asdf_self_referential_depends_on::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_build_system::asdf_system_missing_version::rule::META,
+        &paredit_feature_lint_build_system::asdf_system_missing_version::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_build_system::defpackage_without_in_package::rule::META,
+        &paredit_feature_lint_build_system::defpackage_without_in_package::rule::RULE,
     ),
 ];

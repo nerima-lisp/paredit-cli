@@ -1,5 +1,7 @@
 use serde_json::{Map, Value, json};
 
+use paredit_core_lint_engine::policy::RuleDialectScope;
+use paredit_core_lint_engine::rule::LintRule;
 use paredit_core_syntax::dialect::{Dialect, SemanticOperation};
 use paredit_feature_emacs_lisp::file_report::usecase::supports_emacs_lisp_file_report_dialect;
 use paredit_feature_inline::inline_function::domain::supports_inline_function_dialect;
@@ -248,7 +250,24 @@ impl SupportStatus {
     }
 }
 
-const INTROSPECTION_COMMANDS: [&str; 273] = [
+/// Every `inspect` subcommand, by wire name.
+///
+/// # Stack budget — read this before growing the array
+///
+/// `InspectCommand::augment_subcommands` builds all of these in **one** stack
+/// frame that an unoptimized build does not shrink: 1,613,280 bytes in the
+/// debug binary today, about 5.5 KiB per subcommand. Rust gives a spawned
+/// thread 2 MiB, which this exceeded at 290 commands, so `.cargo/config.toml`
+/// raises `RUST_MIN_STACK` to 8 MiB — room for roughly 1,400 subcommands at
+/// the current per-command cost.
+///
+/// Overflowing it does not abort with "thread has overflowed its stack". The
+/// test thread simply stops, and `cargo test` hangs indefinitely at 0% CPU
+/// with no failure reported. If that ever happens after a command is added
+/// here, the stack floor is the first thing to check — and note that an
+/// inherited `RUST_MIN_STACK` from the environment silently overrides
+/// `.cargo/config.toml`, because cargo's `[env]` is unforced.
+const INTROSPECTION_COMMANDS: [&str; 290] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -536,6 +555,26 @@ const INTROSPECTION_COMMANDS: [&str; 273] = [
     "inspect loop-for-across-statically-known-list",
     "inspect loop-into-accumulator-kind-conflict",
     "inspect loop-unreachable-finally-clause",
+    // Test definitions and what belongs inside them (`lint-testing`).
+    "inspect disabled-test-left-in",
+    "inspect duplicate-test-name",
+    "inspect empty-test-body",
+    "inspect sleep-in-test",
+    "inspect test-asserts-constant",
+    "inspect test-without-assertion",
+    // Thread safety, locks and shared state (`lint-concurrency`).
+    "inspect atom-swap-with-side-effect",
+    "inspect dynamic-var-bound-across-thread-boundary",
+    "inspect future-promise-never-realized",
+    "inspect lock-acquired-not-released",
+    "inspect recursive-lock-reentry-risk",
+    "inspect thread-spawned-without-error-handler",
+    "inspect unsynchronized-shared-mutation",
+    // ASDF system definitions and package declarations (`lint-build-system`).
+    "inspect asdf-perform-without-call-next-method",
+    "inspect asdf-self-referential-depends-on",
+    "inspect asdf-system-missing-version",
+    "inspect defpackage-without-in-package",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [
@@ -877,6 +916,48 @@ const SEMANTIC_OPERATIONS: [SemanticOperation; 3] = [
     SemanticOperation::ExtractFunction,
 ];
 
+/// The declared dialect scope of the lint commands whose rule is not
+/// Common-Lisp-only, or `None` for every other command path.
+///
+/// `lint-testing`'s six rules recognize the test-definition vocabulary of
+/// three dialects (`def-test`/`deftest`/`define-test`, `ert-deftest`, and
+/// `clojure.test`'s `deftest`), while two of `lint-concurrency`'s seven encode
+/// Clojure's `atom` and `future`/`promise` semantics, which have no Common
+/// Lisp counterpart at all. Each answer is read from the rule's own
+/// [`LintRule::dialect_scope`] — the very declaration the engine's dispatcher
+/// consults before it walks anything — so this matrix cannot claim a dialect
+/// the rule would decline, or stay silent about one it handles.
+fn lint_rule_dialect_scope(command_path: &str) -> Option<RuleDialectScope> {
+    Some(match command_path {
+        "inspect disabled-test-left-in" => {
+            paredit_feature_lint_testing::disabled_test_left_in::rule::RULE.dialect_scope()
+        }
+        "inspect duplicate-test-name" => {
+            paredit_feature_lint_testing::duplicate_test_name::rule::RULE.dialect_scope()
+        }
+        "inspect empty-test-body" => {
+            paredit_feature_lint_testing::empty_test_body::rule::RULE.dialect_scope()
+        }
+        "inspect sleep-in-test" => {
+            paredit_feature_lint_testing::sleep_in_test::rule::RULE.dialect_scope()
+        }
+        "inspect test-asserts-constant" => {
+            paredit_feature_lint_testing::test_asserts_constant::rule::RULE.dialect_scope()
+        }
+        "inspect test-without-assertion" => {
+            paredit_feature_lint_testing::test_without_assertion::rule::RULE.dialect_scope()
+        }
+        "inspect atom-swap-with-side-effect" => {
+            paredit_feature_lint_concurrency::atom_swap_with_side_effect::rule::RULE.dialect_scope()
+        }
+        "inspect future-promise-never-realized" => {
+            paredit_feature_lint_concurrency::future_promise_never_realized::rule::RULE
+                .dialect_scope()
+        }
+        _ => return None,
+    })
+}
+
 pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus {
     if !DIALECTS.contains(&dialect) {
         return SupportStatus::Unknown;
@@ -905,7 +986,9 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "inspect leftover-trace-call" => {
             Some(matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp))
         }
-        _ => None,
+        // The eight commands whose rule declares a dialect scope other than
+        // Common Lisp alone answer from that declaration directly.
+        other => lint_rule_dialect_scope(other).map(|scope| scope.includes(dialect)),
     };
     match gated {
         Some(true) => SupportStatus::Supported,
@@ -1118,7 +1201,20 @@ mod tests {
 
     /// Commands whose subject is one dialect, so they say nothing about the
     /// rest — Common Lisp included.
-    const DIALECT_SPECIFIC_REPORTS: [&str; 1] = ["inspect elisp-file"];
+    ///
+    /// `inspect elisp-file` reads an Emacs Lisp file's own conventions. The
+    /// other two are the first built-in lint rules scoped *away* from Common
+    /// Lisp: `swap!`/`alter` on an atom and `future`/`promise` are Clojure
+    /// constructs with no Common Lisp spelling, so both rules declare
+    /// `RuleDialectScope::CLOJURE_ONLY` and are correctly silent on a `.lisp`
+    /// file. `a_dialect_specific_report_is_supported_for_exactly_one_dialect`
+    /// below is what keeps this list from becoming a place to hide a rule that
+    /// is merely under-supported.
+    const DIALECT_SPECIFIC_REPORTS: [&str; 3] = [
+        "inspect elisp-file",
+        "inspect atom-swap-with-side-effect",
+        "inspect future-promise-never-realized",
+    ];
 
     #[test]
     fn only_reports_go_silent_and_only_outside_the_dialect_they_are_written_for() {

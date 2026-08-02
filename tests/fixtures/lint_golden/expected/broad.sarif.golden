@@ -5834,6 +5834,32 @@
             "primaryLocationLineHash": "fnv1a64:29e9a5a3d9f5c899:0"
           },
           "ruleId": "leftover-print-debug"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "broad.lisp"
+                },
+                "region": {
+                  "byteLength": 32,
+                  "byteOffset": 10031,
+                  "startColumn": 1,
+                  "startLine": 142
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "package :app is declared but the file never enters it; its 13 definition(s) are interned into whatever package is current, not into :app"
+          },
+          "partialFingerprints": {
+            "pareditFindingId": "defpackage-without-in-package/c37b38bb92c1afca/0",
+            "primaryLocationLineHash": "fnv1a64:e0002aef755c8604:0"
+          },
+          "ruleId": "defpackage-without-in-package"
         }
       ],
       "tool": {
@@ -8541,6 +8567,212 @@
               },
               "shortDescription": {
                 "text": "a loop epilogue form after a finally clause that already returns"
+              }
+            },
+            {
+              "id": "disabled-test-left-in",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a test disabled in place rather than removed"
+              }
+            },
+            {
+              "id": "duplicate-test-name",
+              "properties": {
+                "category": "duplicate",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "two test definitions in one file sharing a name"
+              }
+            },
+            {
+              "id": "empty-test-body",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a test definition with an empty body"
+              }
+            },
+            {
+              "id": "sleep-in-test",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a sleep-family call inside a test body"
+              }
+            },
+            {
+              "id": "test-asserts-constant",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a test assertion on a constant that can never fail"
+              }
+            },
+            {
+              "id": "test-without-assertion",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a test definition whose body contains no assertion form"
+              }
+            },
+            {
+              "id": "atom-swap-with-side-effect",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a swap!/alter update function with a side effect, which its retries repeat"
+              }
+            },
+            {
+              "id": "dynamic-var-bound-across-thread-boundary",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a thread body reading a special its enclosing let rebinds, which does not carry over"
+              }
+            },
+            {
+              "id": "future-promise-never-realized",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a future or promise bound by let and never mentioned, discarding its value and errors"
+              }
+            },
+            {
+              "id": "lock-acquired-not-released",
+              "properties": {
+                "category": "resource",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a manually acquired lock with no unwind-protect to release it on a non-local exit"
+              }
+            },
+            {
+              "id": "recursive-lock-reentry-risk",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "the same non-recursive lock taken again inside its own scope, a deadlock risk"
+              }
+            },
+            {
+              "id": "thread-spawned-without-error-handler",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a thread body that inlines work with no handler, so an error in it is lost"
+              }
+            },
+            {
+              "id": "unsynchronized-shared-mutation",
+              "properties": {
+                "category": "concurrency",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a global written inside a thread body with no lock held, which races"
+              }
+            },
+            {
+              "id": "asdf-perform-without-call-next-method",
+              "properties": {
+                "category": "object-system",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a primary asdf perform method on load-op or compile-op that never calls call-next-method"
+              }
+            },
+            {
+              "id": "asdf-self-referential-depends-on",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defsystem whose :depends-on names the system itself"
+              }
+            },
+            {
+              "id": "asdf-system-missing-version",
+              "properties": {
+                "category": "documentation",
+                "fixable": false,
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "a released defsystem with no :version option"
+              }
+            },
+            {
+              "id": "defpackage-without-in-package",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a file that declares a package and defines symbols but never enters it"
               }
             }
           ]

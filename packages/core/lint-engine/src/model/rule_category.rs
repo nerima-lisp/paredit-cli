@@ -16,7 +16,22 @@ pub enum RuleCategory {
     Allocation,
     /// A call with an argument count the operator cannot accept.
     Arity,
-    /// Shared mutable state and check-then-act races.
+    /// Shared mutable state, and defects that exist only because more than
+    /// one thread is involved.
+    ///
+    /// Wider than shared state alone: unsynchronized mutation and
+    /// check-then-act races, a non-reentrant lock taken again inside its own
+    /// scope, a special binding or an error handler that does not cross the
+    /// thread boundary it looks like it crosses, an update whose retries
+    /// repeat its side effects, and a deferred value nothing ever realizes.
+    ///
+    /// The first clause is not redundant: `global-mutation-in-function`
+    /// anchors on `defun`/`defmethod`/`defgeneric`/`lambda` and reports a
+    /// function whose result depends on every previous call, which is a
+    /// complaint a single-threaded program earns too.
+    ///
+    /// A lock that leaks on a non-local exit is [`Self::Resource`], not this:
+    /// what that rule is about is the unreleased resource, not the sharing.
     Concurrency,
     /// The condition system used in a way that loses or hides an error.
     Conditions,
@@ -25,7 +40,9 @@ pub enum RuleCategory {
     /// `declare` / `declaim` that contradicts itself, the lambda list, or the
     /// body.
     Declaration,
-    /// A missing or inconsistent docstring.
+    /// Descriptive metadata a definition should carry and does not: a missing
+    /// or inconsistent docstring, or a system declared without the `:version`
+    /// its dependents pin against.
     Documentation,
     /// The same key, place, test, or name given twice.
     Duplicate,

@@ -65,10 +65,10 @@ src/
 A contract test walks `src/` and refuses anything else.
 
 The lint `REGISTRY` is the canonical example of what *must* live here. It names
-all 212 rules, and every rule depends on the engine; putting the registry in
+all 229 rules, and every rule depends on the engine; putting the registry in
 either would be a cycle. So the engine takes a `RuleCatalog` as an argument and
 never learns which rules exist, the rules never learn the registry does, and
-the registry sits in the root reaching sixteen feature packages for their `META`
+the registry sits in the root reaching nineteen feature packages for their `META`
 and `RULE`. That is the criterion: **a module that enumerates or aggregates several
 features** belongs in neither core nor any one feature.
 
@@ -127,7 +127,7 @@ semantic enum (`ReportLimit::{Complete, Limited(NonZeroUsize)}`,
 Derive redundant presentation values (booleans, counts) at the serialization
 boundary instead of storing them.
 
-## Lint rules: one trait, one registry line, sixteen packages
+## Lint rules: one trait, one registry line, nineteen packages
 
 The lint suite is the clearest example of the split's shape, and the most
 frequently extended part of the tree.
@@ -141,8 +141,8 @@ frequently extended part of the tree.
 | `policy` | Dialect scope, rule selection and gate decisions: logic that needs no tree. |
 | `engine` | The single pass, which walks the document once and dispatches each node to every rule whose `head_filter` matches. |
 
-207 of the 212 shipped rules live in fifteen themed packages, split five ways.
-A sixteenth, `feature/lint-custom`, holds no rules at all: it is the pattern
+224 of the 229 shipped rules live in eighteen themed packages, split six ways.
+A nineteenth, `feature/lint-custom`, holds no rules at all: it is the pattern
 language and the second pass that run the rules a *project* writes for itself.
 
 The remaining five — `macro-variable-capture`, `macro-multiple-evaluation`,
@@ -177,10 +177,9 @@ REPL session's leftovers (`print`/`trace`/`break`/`time`/`step`/... calls, a
 committed — which cuts across every one of the other four groupings and does
 not belong in any of them.
 
-The last three —
-`feature/lint-{object-system,condition-system,iteration-flow}` — are split by
-the *language subsystem* whose contract the rule encodes: CLOS's class and
-method protocol (8 rules), the condition system's signalling, handling and
+Three — `feature/lint-{object-system,condition-system,iteration-flow}` — are
+split by the *language subsystem* whose contract the rule encodes: CLOS's class
+and method protocol (8 rules), the condition system's signalling, handling and
 restart protocol (7), and the iteration macros' clause grammar — `loop`,
 `dotimes`, `dolist` (6). Each of those is a self-contained CLHS chapter with
 its own vocabulary and its own failure modes, and a rule in one is unreadable
@@ -189,8 +188,32 @@ without that chapter's rules around it. All 21 are Common Lisp only and
 inserting a `call-next-method`, choosing a `:report` string, or reordering
 `loop` clauses all change what the code *means*, not merely how it reads.
 
+The last three — `feature/lint-{testing,concurrency,build-system}` — are split
+by the *program-level concern* the code serves, which cuts across syntax and
+across the CLHS: what a test has to do to be worth running (6 rules), what
+state shared between threads requires (7), and what a system definition and
+package declaration must say for a project to build and namespace itself (4).
+A rule in any of the three reads ordinary forms — `let`, `defmethod`, a
+function call — and is about the role those forms play, not their shape.
+
+These three are not uniformly Common Lisp — though they are not the first group
+that isn't, and it is worth being precise about what is actually new. Multi-
+dialect rules already exist: `feature/emacs-lisp` is not Common Lisp at all,
+and `lint-repl-debug`'s `leftover-print-debug` declares eight dialects.
+`lint-testing`'s six rules span Common Lisp, Emacs Lisp and Clojure, because a
+test framework's vocabulary is per-dialect and the same `deftest` spelling
+means different things in two of them. Two of `lint-concurrency`'s seven —
+`atom-swap-with-side-effect` and `future-promise-never-realized` — are
+**Clojure only**. Rules scoped *away* from Common Lisp are not new either: ten
+are already `EMACS_LISP_ONLY`. What these two are the first of is narrower —
+rules scoped to a dialect for a construct Common Lisp has no counterpart for at
+all, so there is nothing to generalize `atom`s, `future`s and `promise`s
+*to*. All 17 are `ReportOnly`.
+
 A rule declares its `dialect_scope`, and the dispatcher skips one whose scope
-excludes the file's dialect before walking anything.
+excludes the file's dialect before walking anything. `inspect capabilities`'
+dialect matrix reads that same declaration, so a rule's standalone command
+reports support for exactly the dialects the rule runs on.
 
 Layout inside a package follows what a rule is *shared with*. The seven older
 packages give each rule a directory holding `rule.rs` (what the registry
@@ -200,11 +223,12 @@ the split is what lets the command and the rule share one detection. The four
 newer packages give each rule a single module: they ship as lint rules only,
 reachable through `inspect lint --rule <name>`, so there is one consumer and
 the three-file split would be indirection with nothing on the other end. The
-four newest — `feature/lint-{repl-debug,object-system,condition-system,iteration-flow}`
+seven newest —
+`feature/lint-{repl-debug,object-system,condition-system,iteration-flow,testing,concurrency,build-system}`
 — return to the directory layout, for the original reason: every one of their
 rules also ships a standalone `inspect <rule>` command.
 
-**`REGISTRY` is in neither.** It names all 212 rules, and every rule depends on
+**`REGISTRY` is in neither.** It names all 229 rules, and every rule depends on
 the engine, so putting it in the engine or in a rule package would be a cycle.
 It sits in the root crate, and the engine receives a `RuleCatalog` as an
 argument — which is why the engine can be a package at all.
