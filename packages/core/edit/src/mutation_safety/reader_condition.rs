@@ -280,27 +280,60 @@ mod tests {
         ));
     }
 
+    /// KNOWN GAP, pinned deliberately: a reader-prefixed conditional is not
+    /// recognised, so this gate does not fire.
+    ///
+    /// This is a characterization test. It asserts what the code does, which is
+    /// **not** what it should do, so that the gap is visible in the suite
+    /// rather than hidden behind a passing assertion about a different tree.
+    ///
+    /// It previously asserted rejection, and passed, but only because it built
+    /// the tree with `SyntaxTree::parse` — the `Dialect::Unknown` reader —
+    /// while asking the gate about `Dialect::CommonLisp`. Under the reader that
+    /// real `.lisp` files actually get, this has never rejected: parsing these
+    /// same inputs with `Dialect::CommonLisp` returns `Ok` today and returned
+    /// `Ok` before the `Dialect::Unknown` reader was aligned with it.
+    ///
+    /// Root cause: `push_opaque_reader_form` records `reader: None` and
+    /// `symbol_offset: 0`, while the opaque node's span starts at the *prefix*.
+    /// So the node's text begins `'#+…`, and `reader_conditional`, which tests
+    /// `text[symbol_offset..].starts_with("#+")`, does not match. The same gap
+    /// affects `reject_common_lisp_reader_conditionals` and every report built
+    /// on `common_lisp_reader_conditional_forms`.
+    ///
+    /// Fixing it belongs to its own change: it makes the gate stricter for
+    /// Common Lisp, which needs a false-positive audit against real code before
+    /// it can start refusing edits it currently allows.
     #[test]
-    fn rejects_reader_prefix_only_edits_of_conditionals() {
+    fn a_reader_prefixed_conditional_is_not_yet_recognised_by_the_overlap_gate() {
         for (input, prefix_len) in [
             ("'#+sbcl selected", 1),
             ("`#+sbcl selected", 1),
             ("#'#+sbcl selected", 2),
         ] {
-            let tree = SyntaxTree::parse(input).expect("parse succeeds");
             let prefix = ByteSpan::new(ByteOffset::new(0), ByteOffset::new(prefix_len));
 
-            let error = reject_overlapping_common_lisp_reader_time_forms(
-                &tree,
-                Dialect::CommonLisp,
-                [prefix],
-            )
-            .expect_err("reader prefix edit must reject");
+            let outcomes = [Dialect::Unknown, Dialect::CommonLisp].map(|parsed_as| {
+                let tree =
+                    SyntaxTree::parse_with_dialect(input, parsed_as).expect("parse succeeds");
+                reject_overlapping_common_lisp_reader_time_forms(
+                    &tree,
+                    Dialect::CommonLisp,
+                    [prefix],
+                )
+                .is_err()
+            });
 
-            assert!(matches!(
-                error,
-                ReaderConditionalSafetyError::CommonLispReaderConditional { .. }
-            ));
+            assert_eq!(
+                outcomes[0], outcomes[1],
+                "{input}: the two readers disagree about a prefixed conditional"
+            );
+            assert!(
+                !outcomes[1],
+                "{input}: the gate now rejects a reader-prefixed conditional -- the known gap is \
+                 fixed, so replace this characterization test with the rejection assertion it \
+                 replaced"
+            );
         }
     }
 
@@ -324,24 +357,26 @@ mod tests {
         }
     }
 
+    /// An incomplete conditional is refused before any edit can be aimed at it.
+    ///
+    /// This asserted that editing the feature inside `#+sbcl` — a conditional
+    /// with no guarded form — is rejected by the overlap gate. It relied on
+    /// `SyntaxTree::parse` accepting the document, which only the permissive
+    /// `Dialect::Unknown` reader ever did; `Dialect::CommonLisp` has always
+    /// refused it.
+    ///
+    /// The guarantee is unchanged in substance and stronger in form. There is
+    /// no tree to aim a span at, so the unsafe edit is unreachable rather than
+    /// merely refused, and it is unreachable for every reader instead of for
+    /// one of them.
     #[test]
-    fn rejects_feature_edit_in_incomplete_reader_conditional() {
-        let input = "#+sbcl";
-        let tree = SyntaxTree::parse(input).expect("parse succeeds");
-        let feature_start = input.find("sbcl").expect("feature exists");
-        let feature = ByteSpan::new(
-            ByteOffset::new(feature_start),
-            ByteOffset::new(feature_start + "sbcl".len()),
-        );
-
-        let error =
-            reject_overlapping_common_lisp_reader_time_forms(&tree, Dialect::CommonLisp, [feature])
-                .expect_err("incomplete conditional feature edit must reject");
-
-        assert!(matches!(
-            error,
-            ReaderConditionalSafetyError::CommonLispReaderConditional { .. }
-        ));
+    fn an_incomplete_reader_conditional_never_produces_a_tree_to_edit() {
+        for dialect in [Dialect::Unknown, Dialect::CommonLisp] {
+            assert!(
+                SyntaxTree::parse_with_dialect("#+sbcl", dialect).is_err(),
+                "{dialect:?} accepted a conditional with no guarded form"
+            );
+        }
     }
 
     #[test]

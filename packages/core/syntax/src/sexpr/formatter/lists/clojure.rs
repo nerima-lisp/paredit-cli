@@ -68,14 +68,16 @@ impl Formatter {
         output: &mut String,
     ) {
         let children = Self::logical_children(tree, node_id);
+        let base_column = Self::last_line_width(output);
         if let Some(inline) =
-            self.compact_single_body_form(tree, node_id, children.len(), prefix_len)
+            self.compact_single_body_form(tree, node_id, children.len(), prefix_len, base_column)
         {
             output.push_str(&inline);
             return;
         }
 
         let delimiter = self.list_delimiter(tree.node(node_id));
+        let body_column = self.add_indent(base_column);
         output.push(delimiter.open());
 
         for (position, child) in children.iter().enumerate() {
@@ -84,8 +86,7 @@ impl Formatter {
                     output.push(' ');
                 }
             } else {
-                output.push('\n');
-                output.push_str(&self.indent(depth + 1));
+                Self::break_to_column(body_column, output);
             }
             self.format_logical_child(tree, child, depth + 1, output);
         }
@@ -103,32 +104,36 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         prefix_len: usize,
         output: &mut String,
     ) {
         let children = Self::logical_children(tree, node_id);
+        let base_column = Self::last_line_width(output);
         if let Some(inline) =
-            self.compact_single_body_form(tree, node_id, children.len(), prefix_len)
+            self.compact_single_body_form(tree, node_id, children.len(), prefix_len, base_column)
         {
             output.push_str(&inline);
             return;
         }
 
         let delimiter = self.list_delimiter(tree.node(node_id));
-        let continuation_column = self.continuation_column(depth, head.len().saturating_add(2));
         output.push(delimiter.open());
 
+        // Steps line up under the threaded value, i.e. one column past the
+        // head as actually written rather than past its byte length.
+        let mut continuation_column = base_column.saturating_add(1);
         for (position, child) in children.iter().enumerate() {
             if position <= prefix_len {
                 if position > 0 {
                     output.push(' ');
                 }
             } else {
-                output.push('\n');
-                output.push_str(&" ".repeat(continuation_column));
+                Self::break_to_column(continuation_column, output);
             }
             self.format_logical_child(tree, child, depth + 1, output);
+            if position == 0 {
+                continuation_column = Self::last_line_width(output).saturating_add(1);
+            }
         }
 
         output.push(delimiter.close());
@@ -151,6 +156,7 @@ impl Formatter {
         let children = Self::logical_children(tree, node_id);
         let delimiter = self.list_delimiter(tree.node(node_id));
         let head_line_end = prefix_len.saturating_add(1).min(children.len());
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in children[..head_line_end].iter().enumerate() {
@@ -161,8 +167,7 @@ impl Formatter {
         }
 
         for pair in children[head_line_end..].chunks(2) {
-            output.push('\n');
-            output.push_str(&self.indent(depth + 1));
+            Self::break_to_column(body_column, output);
             self.format_logical_child(tree, pair[0], depth + 1, output);
             if let Some(result) = pair.get(1) {
                 output.push(' ');
@@ -189,20 +194,16 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        // The `#?`/`#?@` prefix is already written, so continuation lines align
-        // just inside the open delimiter that follows it.
-        let prefix_width = node
-            .reader_prefix_spans()
-            .iter()
-            .map(|span| span.slice(&tree.source).len())
-            .sum::<usize>();
-        let continuation_column = self.continuation_column(depth, prefix_width.saturating_add(1));
+        // The `#?`/`#?@` prefix is already written, so the cursor is on the
+        // open delimiter and continuation lines align just inside it. Reading
+        // the cursor rather than summing the prefix spans' byte lengths keeps
+        // this a column count.
+        let continuation_column = Self::last_line_width(output).saturating_add(1);
         output.push(delimiter.open());
 
         for (position, pair) in node.children.chunks(2).enumerate() {
             if position > 0 {
-                output.push('\n');
-                output.push_str(&" ".repeat(continuation_column));
+                Self::break_to_column(continuation_column, output);
             }
             self.format_inline_or_node(tree, pair[0], depth + 1, output);
             if let Some(form) = pair.get(1) {
@@ -237,9 +238,10 @@ impl Formatter {
         node_id: NodeId,
         logical_child_count: usize,
         prefix_len: usize,
+        start_column: usize,
     ) -> Option<String> {
         (prefix_len > 0 && logical_child_count <= prefix_len.saturating_add(2))
-            .then(|| self.compact_form(tree, node_id))
+            .then(|| self.compact_form(tree, node_id, start_column))
             .flatten()
     }
 

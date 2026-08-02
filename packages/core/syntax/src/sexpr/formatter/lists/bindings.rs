@@ -12,10 +12,11 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let Some(head) = self.head_text(tree, node_id) else {
+        if self.head_text(tree, node_id).is_none() {
             self.format_general_list(tree, node_id, depth, output);
             return;
-        };
+        }
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -27,14 +28,12 @@ impl Formatter {
                         tree,
                         *child,
                         depth + 1,
-                        self.continuation_column(depth, head.len().saturating_add(3)),
                         self.align_clause_values,
                         output,
                     );
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -48,11 +47,11 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -60,17 +59,10 @@ impl Formatter {
                 0 => self.format_node(tree, *child, depth + 1, output),
                 1 => {
                     output.push(' ');
-                    self.format_local_callable_bindings(
-                        tree,
-                        *child,
-                        depth + 1,
-                        self.continuation_column(depth, head.len().saturating_add(3)),
-                        output,
-                    );
+                    self.format_local_callable_bindings(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -84,7 +76,6 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        continuation_column: usize,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
@@ -94,19 +85,13 @@ impl Formatter {
         }
 
         let delimiter = self.list_delimiter(node);
+        let entry_column = Self::last_line_width(output).saturating_add(1);
         output.push(delimiter.open());
         for (position, child) in node.children.iter().enumerate() {
             if position > 0 {
-                output.push('\n');
-                output.push_str(&" ".repeat(continuation_column));
+                Self::break_to_column(entry_column, output);
             }
-            self.format_local_callable_binding(
-                tree,
-                *child,
-                depth + 1,
-                self.add_indent(continuation_column),
-                output,
-            );
+            self.format_local_callable_binding(tree, *child, depth + 1, output);
         }
         output.push(delimiter.close());
     }
@@ -116,7 +101,6 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        body_column: usize,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
@@ -126,6 +110,7 @@ impl Formatter {
         }
 
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
         for (position, child) in node.children.iter().enumerate() {
             match position {
@@ -135,8 +120,7 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&" ".repeat(body_column));
+                    Self::break_to_column(body_column, output);
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -149,24 +133,27 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let continuation_column = self.continuation_column(depth, head.len().saturating_add(2));
         output.push(delimiter.open());
 
+        // Measured from the head as written rather than from its byte
+        // length, which is not a column count for a non-ASCII head.
+        let mut continuation_column = 0;
         for (position, child) in node.children.iter().enumerate() {
             match position {
-                0 => self.format_node(tree, *child, depth + 1, output),
+                0 => {
+                    self.format_node(tree, *child, depth + 1, output);
+                    continuation_column = Self::last_line_width(output).saturating_add(1);
+                }
                 1 => {
                     output.push(' ');
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&" ".repeat(continuation_column));
+                    Self::break_to_column(continuation_column, output);
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
             }
@@ -180,21 +167,21 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let continuation_column = self.continuation_column(depth, head.len().saturating_add(2));
         output.push(delimiter.open());
         self.format_node(tree, node.children[0], depth + 1, output);
+        // One column past the head, i.e. under the first pair on the head
+        // line — measured, not derived from the head's byte length.
+        let continuation_column = Self::last_line_width(output).saturating_add(1);
 
         for (position, pair) in node.children[1..].chunks(2).enumerate() {
             if position == 0 {
                 output.push(' ');
             } else {
-                output.push('\n');
-                output.push_str(&" ".repeat(continuation_column));
+                Self::break_to_column(continuation_column, output);
             }
 
             self.format_inline_or_node(tree, pair[0], depth + 1, output);

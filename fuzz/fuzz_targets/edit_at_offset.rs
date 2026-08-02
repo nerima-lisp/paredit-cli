@@ -16,18 +16,12 @@ use paredit_core_syntax::{
     sexpr::{Edit, SyntaxTree},
 };
 
-const DIALECTS: [Dialect; 10] = [
-    Dialect::CommonLisp,
-    Dialect::EmacsLisp,
-    Dialect::Lfe,
-    Dialect::Scheme,
-    Dialect::Racket,
-    Dialect::Clojure,
-    Dialect::Hy,
-    Dialect::Carp,
-    Dialect::Janet,
-    Dialect::Fennel,
-];
+/// Every dialect, including [`Dialect::Unknown`].
+///
+/// The offset arithmetic an edit performs is only as sound as the tree it
+/// indexes into, so the permissive reader needs the same coverage the named
+/// ones get.
+const DIALECTS: [Dialect; Dialect::ALL.len()] = Dialect::ALL;
 
 fuzz_target!(|data: &[u8]| {
     let Some((&dialect_seed, data)) = data.split_first() else {

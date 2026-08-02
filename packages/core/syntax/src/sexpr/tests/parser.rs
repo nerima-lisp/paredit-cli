@@ -85,6 +85,14 @@ fn multi_datum_reader_forms_are_single_siblings() {
             "(#+feature (guarded value) tail)",
             &["#+feature (guarded value)", "tail"] as &[&str],
         ),
+        // The permissive reader reaches the same shape. It used to produce
+        // `#+`, `feature`, `(guarded value)`, `tail` -- four siblings where
+        // Common Lisp sees two.
+        (
+            Dialect::Unknown,
+            "(#+feature (guarded value) tail)",
+            &["#+feature (guarded value)", "tail"] as &[&str],
+        ),
         (
             Dialect::Clojure,
             "(^:private target tail)",
@@ -870,46 +878,214 @@ fn rejects_dangling_single_escapes() {
     }
 }
 
+/// A feature conditional is one node, in both spellings and in every dialect
+/// that reads one.
+///
+/// This test used to assert the opposite for `SyntaxTree::parse` — that is,
+/// for `Dialect::Unknown` — and demanded `#+`, `sbcl` and the guarded datum as
+/// *three siblings*. That expectation was not arbitrary: it predates
+/// `ReaderMacro::MultiDatum`, and the goal it was written to serve was that
+/// `#+sbcl` and `#+(and sbcl x86-64)` produce the same shape rather than one
+/// gluing into an atom and the other splitting at the list delimiter.
+///
+/// Consuming the whole conditional as one opaque form serves that goal too,
+/// and serves it better: the two spellings agree here, *and* they agree with
+/// the ten named dialects, instead of `Dialect::Unknown` being the one reader
+/// that disagrees with the other ten. The three-sibling shape was not merely
+/// coarser — it claimed a file had more top-level forms than it has, and
+/// `edit format` acted on that claim by putting blank lines between the
+/// dispatch, the feature expression and the guarded form.
+///
+/// The cost is real and accepted: a feature symbol inside `#+sbcl` is no
+/// longer separately findable or renameable under `Dialect::Unknown`. It
+/// already was not under `Dialect::CommonLisp`, which is the dialect that
+/// defines the syntax.
 #[test]
-fn feature_dispatch_scans_separately_from_feature_expression() {
-    // `#+`/`#-` must scan as their own token so `#+sbcl` and
-    // `#+(and sbcl x86-64)` produce the same tree shape: dispatch, feature
-    // expression, guarded datum as three siblings. Otherwise a bare feature
-    // symbol glues onto `#+` into one opaque atom while a compound feature
-    // expression stays a separate list, hiding the feature symbol from
-    // find/rename in the bare spelling only.
-    let simple_input = "(defun f () #+sbcl (declare (optimize speed)) 1)";
-    let simple = SyntaxTree::parse(simple_input).expect("valid");
-    let form = simple.select_path(&parse_path("0")).expect("form").view();
-    assert_eq!(form.children[3].text.as_deref(), Some("#+"));
-    assert_eq!(form.children[4].text.as_deref(), Some("sbcl"));
-    assert_eq!(
-        form.children[5].span.slice(simple_input),
-        "(declare (optimize speed))"
-    );
+fn feature_conditionals_are_one_node_in_every_dialect_that_reads_them() {
+    let inputs = [
+        (
+            "(defun f () #+sbcl (declare (optimize speed)) 1)",
+            "#+sbcl (declare (optimize speed))",
+        ),
+        (
+            "(defun f () #+(and sbcl x86-64) (declare (optimize speed)) 1)",
+            "#+(and sbcl x86-64) (declare (optimize speed))",
+        ),
+        (
+            "(defun f () #-sbcl (declare (optimize speed)) 1)",
+            "#-sbcl (declare (optimize speed))",
+        ),
+    ];
 
-    let compound_input = "(defun f () #+(and sbcl x86-64) (declare (optimize speed)) 1)";
-    let compound = SyntaxTree::parse(compound_input).expect("valid");
-    let form = compound.select_path(&parse_path("0")).expect("form").view();
-    assert_eq!(form.children[3].text.as_deref(), Some("#+"));
-    assert_eq!(
-        form.children[4].span.slice(compound_input),
-        "(and sbcl x86-64)"
-    );
-    assert_eq!(
-        form.children[5].span.slice(compound_input),
-        "(declare (optimize speed))"
-    );
+    for (input, conditional) in inputs {
+        for dialect in [Dialect::Unknown, Dialect::CommonLisp] {
+            let tree = SyntaxTree::parse_with_dialect(input, dialect)
+                .unwrap_or_else(|error| panic!("{}: {input}: {error}", dialect.label()));
+            let form = tree.select_path(&parse_path("0")).expect("form").view();
+
+            // `defun`, `f`, `()`, the whole conditional, `1`.
+            let children = form
+                .children
+                .iter()
+                .map(|child| child.span.slice(input))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                children,
+                vec!["defun", "f", "()", conditional, "1"],
+                "{}: {input}",
+                dialect.label()
+            );
+        }
+    }
 }
 
+/// `Dialect::Unknown` and `Dialect::CommonLisp` agree, node for node.
+///
+/// The parity is the actual requirement; the shape assertions above are how it
+/// is spelled. Comparing the two readers directly means a future change that
+/// moves *both* still has to move them together.
 #[test]
-fn feature_dispatch_negative_variant_scans_separately_too() {
-    let input = "(declare #-sbcl (optimize speed))";
-    let tree = SyntaxTree::parse(input).expect("valid");
-    let form = tree.select_path(&parse_path("0")).expect("form").view();
-    assert_eq!(form.children[1].text.as_deref(), Some("#-"));
-    assert_eq!(form.children[2].text.as_deref(), Some("sbcl"));
-    assert_eq!(form.children[3].span.slice(input), "(optimize speed)");
+fn the_unknown_dialect_reads_feature_conditionals_exactly_as_common_lisp_does() {
+    for input in [
+        "#+sbcl (require :sb-posix)\n(defun f () 1)\n",
+        "#-sbcl (require :posix)\n(defun f () 1)\n",
+        "#+(and sbcl (not win32)) (defun posix-only () t)\n",
+        "(a #+sbcl b c)",
+        "(a #-sbcl b c)",
+    ] {
+        let unknown = SyntaxTree::parse_with_dialect(input, Dialect::Unknown)
+            .unwrap_or_else(|error| panic!("Unknown: {input}: {error}"));
+        let common_lisp = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)
+            .unwrap_or_else(|error| panic!("CommonLisp: {input}: {error}"));
+
+        assert_eq!(
+            unknown.root_view().children.len(),
+            common_lisp.root_view().children.len(),
+            "top-level form count diverged for {input:?}"
+        );
+        assert_eq!(
+            shape(&unknown.root_view(), input),
+            shape(&common_lisp.root_view(), input),
+            "tree shape diverged for {input:?}"
+        );
+    }
+}
+
+/// A comparable rendering of a subtree: every node's kind, delimiter, reader
+/// prefixes and source text, nested.
+fn shape(view: &ExpressionView, source: &str) -> String {
+    let children = view
+        .children
+        .iter()
+        .map(|child| shape(child, source))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "({:?} {:?} {:?} {:?} [{children}])",
+        view.kind,
+        view.delimiter,
+        view.reader_prefixes,
+        view.span.slice(source),
+    )
+}
+
+/// An incomplete feature conditional is refused, by the permissive reader as
+/// well as by `Dialect::CommonLisp`. **The refusal is intended.**
+///
+/// This is an acceptance *narrowing*, and the narrowing is the point. Reading
+/// `#+` as a token of its own let `Dialect::Unknown` accept every input below:
+/// `printf '#+sbcl\n' | paredit inspect check` answered `"ok"` and exited `0`.
+/// It could only do that by calling `#+` one top-level form and `sbcl` an
+/// unrelated second one, which is not what the text means — CLHS 2.4.8.17
+/// requires a feature expression *and* a datum after `#+`, and none of these
+/// five supply the datum. `Dialect::CommonLisp` has always refused all five.
+///
+/// The alternative to refusing was not "accept harmlessly". Every command
+/// shares this gate, so an accepted document is a document `edit format
+/// --write` will rewrite on that reading — moving the dispatch, the feature
+/// expression and the guarded form apart with blank lines between them, and
+/// changing what the file compiles to. Silent corruption at exit `0` is worse
+/// than a parse failure at exit `1`, which is loud, addressed at a byte
+/// offset, and cannot be missed.
+///
+/// The narrowing applies only to input that was already invalid. A *complete*
+/// conditional parses in both readers — see
+/// `the_unknown_dialect_reads_feature_conditionals_exactly_as_common_lisp_does`
+/// above — so no valid document lost acceptance here.
+#[test]
+fn incomplete_feature_conditionals_are_refused_by_both_readers() {
+    // Every one of these parsed under `Dialect::Unknown` before the reader
+    // stopped scanning `#+` as a standalone token.
+    let newly_refused = [
+        ("#+sbcl", ParseError::MissingReaderForm(0)),
+        ("#-sbcl", ParseError::MissingReaderForm(0)),
+        // Two dispatches, neither of which ever gets a feature expression:
+        // the first claims `#-` as its feature expression, and then there is
+        // nothing left to guard.
+        ("#+ #-", ParseError::MissingReaderForm(3)),
+        // A compound feature expression is no different: the list is the
+        // feature expression, and the datum it would guard is absent.
+        ("#+(and sbcl x86-64)", ParseError::MissingReaderForm(0)),
+    ];
+
+    for (input, expected) in newly_refused {
+        for dialect in [Dialect::Unknown, Dialect::CommonLisp] {
+            let error = SyntaxTree::parse_with_dialect(input, dialect).expect_err(&format!(
+                "{}: {input:?} was accepted, so `inspect check` calls an incomplete \
+                 conditional valid and `edit format --write` will rewrite it",
+                dialect.label()
+            ));
+            assert_eq!(error, expected, "{}: {input:?}", dialect.label());
+        }
+    }
+}
+
+/// The in-list case, and a known limitation in how it is reported.
+///
+/// `(a #+sbcl)` is refused for the same reason as the cases above — `#+`
+/// needs two data after it and only `sbcl` is available — but the diagnostic
+/// blames the wrong token. The conditional takes `sbcl` as its feature
+/// expression and then reads the `)` as its guarded datum, so the failure
+/// surfaces as `unexpected closing delimiter ')' at byte 9` rather than as an
+/// incomplete conditional at byte 3. Byte 9 really is the `)`; what is wrong
+/// is the *cause* it names.
+///
+/// This is recorded, not fixed. It is pre-existing behaviour of
+/// `Dialect::CommonLisp`, which has always refused this input with exactly
+/// this message; the permissive reader joining it made the wart reachable
+/// from one more dialect without making it any newer. Fixing it means
+/// distinguishing "the payload scan hit a closing delimiter" from "the
+/// document had a stray one", which is a change to `skip_form`'s error
+/// reporting and not to what is accepted.
+///
+/// Pinned so that a future fix to the message is a deliberate edit here rather
+/// than a silent change to what users are told.
+#[test]
+fn a_conditional_with_no_guarded_datum_inside_a_list_blames_the_closing_delimiter() {
+    let input = "(a #+sbcl)";
+
+    for dialect in [Dialect::Unknown, Dialect::CommonLisp] {
+        let error = SyntaxTree::parse_with_dialect(input, dialect)
+            .expect_err(&format!("{}: {input:?} was accepted", dialect.label()));
+
+        assert_eq!(
+            error,
+            ParseError::UnexpectedClose {
+                delimiter: ')',
+                position: 9,
+            },
+            "{}",
+            dialect.label()
+        );
+        // Known limitation: byte 3, where the `#+` starts, is the honest
+        // answer and is not what the user sees.
+        assert_eq!(
+            error.to_string(),
+            "unexpected closing delimiter ')' at byte 9",
+            "{}",
+            dialect.label()
+        );
+    }
 }
 
 #[test]

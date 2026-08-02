@@ -1,5 +1,3 @@
-use unicode_width::UnicodeWidthStr;
-
 use crate::sexpr::formatter::Formatter;
 use crate::sexpr::formatter::core::Bounded;
 use crate::sexpr::tree::{NodeKind, SyntaxTree};
@@ -22,13 +20,15 @@ impl Formatter {
         depth: usize,
         output: &mut String,
     ) {
-        if let Some(inline) = self.compact_form(tree, node_id) {
+        let base_column = Self::last_line_width(output);
+        if let Some(inline) = self.compact_form(tree, node_id, base_column) {
             output.push_str(&inline);
             return;
         }
 
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(base_column);
         output.push(delimiter.open());
 
         self.format_node(tree, node.children[0], depth + 1, output);
@@ -38,8 +38,7 @@ impl Formatter {
         }
 
         for pair in node.children.get(2..).unwrap_or_default().chunks(2) {
-            output.push('\n');
-            output.push_str(&self.indent(depth + 1));
+            Self::break_to_column(body_column, output);
             self.format_inline_or_node(tree, pair[0], depth + 1, output);
             if let Some(value) = pair.get(1) {
                 output.push(' ');
@@ -54,9 +53,11 @@ impl Formatter {
     /// returning `None` when the result would exceed the width budget or any
     /// child cannot be compacted.
     ///
-    /// Reader prefixes count against the budget but are not written here,
-    /// because [`Formatter::format_node`] has already emitted them by the time
-    /// it dispatches on the head's style.
+    /// `start_column` is the display column this rendering would be written
+    /// at, so that `max_width` stays a line width rather than a per-form
+    /// allowance. It already accounts for any reader prefix: those are
+    /// written by [`Formatter::format_node`] before it dispatches on the
+    /// head's style, so they are behind the cursor the caller measured.
     ///
     /// Builds against a running [`Bounded`] width instead of accumulating a
     /// plain `String` and re-scanning it for its display width at the end —
@@ -67,17 +68,13 @@ impl Formatter {
         &self,
         tree: &SyntaxTree,
         node_id: NodeId,
+        start_column: usize,
     ) -> Option<String> {
         let node = tree.node(node_id);
         if self.is_opaque_reader_form(node) {
             return Some(node.span.slice(&tree.source).to_owned());
         }
         let delimiter = self.list_delimiter(node);
-        let reader_prefix_width = node
-            .reader_prefix_spans()
-            .iter()
-            .map(|span| UnicodeWidthStr::width(span.slice(&tree.source)))
-            .sum::<usize>();
         // `self.max_width`, not the compiled-in constant: this was the last
         // width decision `--max-width` did not reach, which left a `defsystem`
         // header inlined up to 80 columns under `--max-width 40` and broken at
@@ -85,13 +82,13 @@ impl Formatter {
         // bytes for the same reason `compact_node` is: a CJK-heavy option
         // value is narrower in bytes than it is on screen.
         let max_width = self.max_width;
-        let mut output = Bounded::with_initial_width(reader_prefix_width);
+        let mut output = Bounded::with_initial_width(start_column);
         output.push_char(delimiter.open(), max_width)?;
         for (position, child) in node.children.iter().enumerate() {
             if position > 0 {
                 output.push_char(' ', max_width)?;
             }
-            output.push_str(&self.compact_node(tree, *child)?, max_width)?;
+            output.push_str(&self.compact_node(tree, *child, 0)?, max_width)?;
         }
         output.push_char(delimiter.close(), max_width)?;
         Some(output.into_text())
@@ -149,6 +146,7 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -161,8 +159,7 @@ impl Formatter {
                 output.push(' ');
                 self.format_inline_or_node(tree, *child, depth + 1, output);
             } else {
-                output.push('\n');
-                output.push_str(&self.indent(depth + 1));
+                Self::break_to_column(body_column, output);
                 self.format_node(tree, *child, depth + 1, output);
             }
         }
@@ -180,6 +177,7 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -189,8 +187,7 @@ impl Formatter {
                 }
                 self.format_inline_or_node(tree, *child, depth + 1, output);
             } else {
-                output.push('\n');
-                output.push_str(&self.indent(depth + 1));
+                Self::break_to_column(body_column, output);
                 self.format_node(tree, *child, depth + 1, output);
             }
         }
@@ -207,14 +204,14 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
             if position == 0 {
                 self.format_node(tree, *child, depth + 1, output);
             } else {
-                output.push('\n');
-                output.push_str(&self.indent(depth + 1));
+                Self::break_to_column(body_column, output);
                 self.format_node(tree, *child, depth + 1, output);
             }
         }

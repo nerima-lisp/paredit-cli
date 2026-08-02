@@ -71,7 +71,7 @@ fn plans_unused_binding_ignoring_shadowed_lambda_parameter() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(let ((used 2))\n  (list\n    used\n    (lambda (x)\n      x)))"
+        "(let ((used 2))\n  (list\n   used\n   (lambda (x)\n     x)))"
     );
 }
 
@@ -105,7 +105,7 @@ fn plans_unused_binding_ignoring_shadowed_dolist_variable() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(let ((used 2))\n  (list\n    used\n    (dolist (value items value)\n      value)))"
+        "(let ((used 2))\n  (list\n   used\n   (dolist (value items value)\n     value)))"
     );
 }
 
@@ -118,7 +118,7 @@ fn plans_unused_binding_ignoring_shadowed_with_slots_variable() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(let ((used 2))\n  (list\n    used\n    (with-slots (value)\n      object\n      value)))"
+        "(let ((used 2))\n  (list\n   used\n   (with-slots (value)\n     object\n     value)))"
     );
 }
 

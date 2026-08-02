@@ -221,10 +221,27 @@ Three layers, from "runs on every commit" to "runs when a maintainer asks".
 
 ### The corpus test
 
-`cargo test --test corpus` asserts four invariants over every file it reads:
+`cargo test --test corpus` asserts five invariants over every file it reads:
 parsing terminates without panicking, parsing is lossless, formatting is
-idempotent, and every path the tree reports resolves. It runs against the
-vendored fixtures in `tests/fixtures/corpus` with no network access.
+idempotent, every path the tree reports resolves, and no line of formatted
+output starts at or left of the column of its enclosing form's opening
+delimiter.
+
+The fifth is the only one that is not a round-trip through the tool's own
+tree, which is what makes it worth having: a layout that is merely *wrong*
+satisfies the first four as long as it is wrong consistently. Columns are
+measured as display width, so a full-width character counts as two. Lines the
+formatter reproduced verbatim — inside a multi-line token, or in a top-level
+form carrying a comment — are exempt, because their indentation was chosen by
+whoever wrote the file rather than by the formatter; the run reports how many
+lines it actually compared so that an exemption swallowing the whole corpus is
+visible rather than silent.
+
+A sixth test in the same file asserts that the vendored corpus has a fixture
+for every dialect except `Dialect::Unknown`, which no filename can reach.
+
+It runs against the vendored fixtures in `tests/fixtures/corpus` with no
+network access.
 
 Point it at real code to make it mean something:
 

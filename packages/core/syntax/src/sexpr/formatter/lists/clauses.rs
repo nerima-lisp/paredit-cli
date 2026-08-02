@@ -18,6 +18,7 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -28,8 +29,7 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_clause(tree, *child, depth + 1, output);
                 }
             }
@@ -52,6 +52,7 @@ impl Formatter {
         }
 
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
         for (position, child) in node.children.iter().enumerate() {
             match position {
@@ -61,8 +62,7 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -79,14 +79,14 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
             if position == 0 {
                 self.format_node(tree, *child, depth + 1, output);
             } else {
-                output.push('\n');
-                output.push_str(&self.indent(depth + 1));
+                Self::break_to_column(body_column, output);
                 self.format_body_clause(tree, *child, depth + 1, output);
             }
         }
@@ -103,6 +103,7 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -113,8 +114,7 @@ impl Formatter {
                     self.format_inline_or_node(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_body_clause(tree, *child, depth + 1, output);
                 }
             }
@@ -137,13 +137,13 @@ impl Formatter {
         }
 
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
         for (position, child) in node.children.iter().enumerate() {
             match position {
                 0 => self.format_inline_or_node(tree, *child, depth + 1, output),
                 _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }
@@ -156,10 +156,9 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         output: &mut String,
     ) {
-        self.format_clause_sequence_form(tree, node_id, depth, head, ClauseFormKind::Do, output);
+        self.format_clause_sequence_form(tree, node_id, depth, ClauseFormKind::Do, output);
     }
 
     pub(in crate::sexpr::formatter) fn format_prog_form(
@@ -167,10 +166,9 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         output: &mut String,
     ) {
-        self.format_clause_sequence_form(tree, node_id, depth, head, ClauseFormKind::Prog, output);
+        self.format_clause_sequence_form(tree, node_id, depth, ClauseFormKind::Prog, output);
     }
 
     fn format_clause_sequence_form(
@@ -178,12 +176,12 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        head: &str,
         form_kind: ClauseFormKind,
         output: &mut String,
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        let body_column = self.add_indent(Self::last_line_width(output));
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -196,23 +194,14 @@ impl Formatter {
                     // element a two-column name/value layout does not fit,
                     // so this shape stays outside FR-013's scope (see
                     // `Formatter::format_sequence_list`'s doc comment).
-                    self.format_sequence_list(
-                        tree,
-                        *child,
-                        depth + 1,
-                        self.continuation_column(depth, head.len().saturating_add(3)),
-                        false,
-                        output,
-                    );
+                    self.format_sequence_list(tree, *child, depth + 1, false, output);
                 }
                 (2, ClauseFormKind::Do) => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_body_clause(tree, *child, depth + 1, output);
                 }
                 _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
+                    Self::break_to_column(body_column, output);
                     self.format_node(tree, *child, depth + 1, output);
                 }
             }

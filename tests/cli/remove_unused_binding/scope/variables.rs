@@ -20,8 +20,10 @@ fn cli_plans_remove_unused_binding_ignoring_shadowed_lambda_parameter() {
     .success()
     .stdout(predicate::str::contains("\"binding_name\": \"x\""))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
+    // `used` and `(lambda ...)` are `list`'s siblings, so they share the
+    // column `list` itself starts at, one past the opening delimiter.
     .stdout(predicate::str::contains(
-        "(let ((used 2))\\n  (list\\n    used\\n    (lambda (x)\\n      x)))",
+        "(let ((used 2))\\n  (list\\n   used\\n   (lambda (x)\\n     x)))",
     ));
 }
 

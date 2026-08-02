@@ -1,3 +1,5 @@
+use unicode_width::UnicodeWidthStr;
+
 use super::*;
 use crate::dialect::Dialect;
 use crate::sexpr::ReaderPrefixStyle;
@@ -57,9 +59,11 @@ fn formats_handler_bind_like_a_binding_form() {
 fn preserves_common_lisp_reader_prefixes() {
     let input = "'(alpha beta)\n`(list ,item ,@rest)\n#'(lambda (value) value)";
     let tree = SyntaxTree::parse(input).expect("valid");
+    // `#'` is two columns wide, so the `(lambda` it prefixes opens at column
+    // 2 and the lambda body belongs at column 4.
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "'(alpha beta)\n\n`(list ,item ,@rest)\n\n#'(lambda (value)\n  value)\n"
+        "'(alpha beta)\n\n`(list ,item ,@rest)\n\n#'(lambda (value)\n    value)\n"
     );
 }
 
@@ -1337,12 +1341,15 @@ fn clojure_layouts_do_not_leak_into_other_dialects() {
         "(defn greet [first-name last-name] (log first-name) (str first-name \" \" last-name))";
     let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid Clojure");
 
+    // Outside Clojure `defn` has no layout of its own, so this is the plain
+    // list layout: every element lines up under `defn`, one column past the
+    // opening delimiter.
     let common_lisp_layout = concat!(
         "(defn\n",
-        "  greet\n",
-        "  [first-name last-name]\n",
-        "  (log first-name)\n",
-        "  (str first-name \" \" last-name))\n"
+        " greet\n",
+        " [first-name last-name]\n",
+        " (log first-name)\n",
+        " (str first-name \" \" last-name))\n"
     );
     assert_eq!(Formatter::new(2).format(&tree), common_lisp_layout);
     assert_eq!(
@@ -1662,7 +1669,7 @@ fn reader_prefix_style_defaults_to_shorthand_byte_identical_to_before() {
     // phase.
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "'(alpha beta)\n\n`(list ,item ,@rest)\n\n#'(lambda (value)\n  value)\n"
+        "'(alpha beta)\n\n`(list ,item ,@rest)\n\n#'(lambda (value)\n    value)\n"
     );
 }
 
@@ -2093,4 +2100,290 @@ fn trim_trailing_whitespace_false_keeps_a_comments_trailing_spaces() {
         .format(&tree);
     assert!(!trimmed.contains("space   \n"));
     assert!(untrimmed.contains("space   \n"));
+}
+
+/// A form hugged onto its operator's line, then forced to break internally,
+/// indents its body from the column its own opening delimiter landed on.
+///
+/// Nothing in the existing suite exercised this: every other hugged form is
+/// short enough to stay inline, so the body indentation derived from nesting
+/// depth was never compared against a form that did not start its own line.
+/// Derived from depth, `(unless p ...)` landed at column 6 — three columns
+/// *left* of the `(multiple-value-bind` that contains it.
+#[test]
+fn indents_a_hugged_form_that_breaks_from_the_column_it_landed_on() {
+    let input = "(if (consp value) (multiple-value-bind (copy p) (gethash value copies) (unless p (setf copy value))) value)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        concat!(
+            "(if (consp value) (multiple-value-bind (copy p) (gethash value copies)\n",
+            //                 ^ column 18: the `multiple-value-bind` list opens here,
+            //                   so its body belongs at column 20.
+            "                    (unless p\n",
+            "                      (setf copy value)))\n",
+            "  value)\n",
+        )
+    );
+}
+
+/// Every slot of a `defclass` slot list shares one column: the slot list is a
+/// plain list whose elements are peers, so the second one lines up under the
+/// first rather than one indentation step further right.
+#[test]
+fn aligns_defclass_slots_in_one_column() {
+    let input = "(defclass connection (resource) ((mock :initarg :mock :reader connection-mock) (symbol :initarg :symbol :reader connection-symbol)) (:documentation \"A connection.\"))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        concat!(
+            "(defclass connection (resource)\n",
+            "  ((mock :initarg :mock :reader connection-mock)\n",
+            "   (symbol :initarg :symbol :reader connection-symbol))\n",
+            "  (:documentation \"A connection.\"))\n",
+        )
+    );
+}
+
+/// The same alignment for `define-condition`, whose slot list has the same
+/// shape.
+#[test]
+fn aligns_define_condition_slots_in_one_column() {
+    let input = "(define-condition parse-failure (error) ((offset :initarg :offset :reader parse-failure-offset) (message :initarg :message :reader parse-failure-message)) (:report report-parse-failure))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        concat!(
+            "(define-condition parse-failure (error)\n",
+            "  ((offset :initarg :offset :reader parse-failure-offset)\n",
+            "   (message :initarg :message :reader parse-failure-message))\n",
+            "  (:report report-parse-failure))\n",
+        )
+    );
+}
+
+/// Sibling elements are a column apart from their list's opening delimiter
+/// whatever the indentation width is — the gap is "one delimiter", not "one
+/// indentation step". Indenting them by `indent` instead is off by
+/// `indent - 1`, which an indent of 2 hides as a plausible-looking one-column
+/// slip and an indent of 4 does not.
+#[test]
+fn sibling_alignment_does_not_widen_with_the_indent_width() {
+    let input = "(defclass connection (resource) ((mock :initarg :mock :reader connection-mock) (symbol :initarg :symbol :reader connection-symbol)))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(4).format(&tree),
+        concat!(
+            "(defclass connection (resource)\n",
+            "    ((mock :initarg :mock :reader connection-mock)\n",
+            "     (symbol :initarg :symbol :reader connection-symbol)))\n",
+        )
+    );
+}
+
+/// A reader prefix shifts the form behind it one column right per prefix
+/// character, and its body has to follow. `` `(defun ...) `` at column 2 opens
+/// its list at column 3, so the body belongs at column 5 — not at the column 4
+/// that ignoring the backquote's own width produced.
+#[test]
+fn indents_a_backquoted_definition_past_its_reader_prefix() {
+    let input = "(defmacro define-checker (name) `(defun ,name (expected) (unless (equal expected (current-value)) (error \"mismatch\"))))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        concat!(
+            "(defmacro define-checker (name)\n",
+            "  `(defun ,name (expected)\n",
+            "     (unless (equal expected (current-value))\n",
+            "       (error \"mismatch\"))))\n",
+        )
+    );
+}
+
+/// A binding list's continuation column is measured in display columns, not
+/// in UTF-8 bytes: `束縛` is 6 bytes wide and 4 columns wide, so a byte count
+/// pushed the second binding two columns right of the first.
+#[test]
+fn binding_continuation_columns_count_display_width_not_bytes() {
+    let formatter = Formatter::new(2)
+        .with_indent_overrides(&[("束縛".to_owned(), "binding-list".to_owned())])
+        .expect("binding-list is a known style");
+    let tree = SyntaxTree::parse("(束縛 ((変数 1) (別変数 2)) (list 変数 別変数))").expect("valid");
+    assert_eq!(
+        formatter.format(&tree),
+        concat!(
+            "(束縛 ((変数 1)\n",
+            "       (別変数 2))\n",
+            "  (list 変数 別変数))\n",
+        )
+    );
+}
+
+/// The same for a form hugged onto a line that already carries wide
+/// characters: `(setf` opens at display column 14, so its second pair lines
+/// up under the first at column 20. Counting the preceding `(適合 値)` in
+/// bytes would have overshot by four columns.
+#[test]
+fn a_hugged_form_starts_at_its_display_column_not_its_byte_offset() {
+    let input = "(if (適合 値) (setf 変数 (compute-first alpha) 別変数 (compute-second beta)) nil)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        concat!(
+            "(if (適合 値) (setf 変数 (compute-first alpha)\n",
+            "                    別変数 (compute-second beta))\n",
+            "  nil)\n",
+        )
+    );
+}
+
+/// A byte range in formatted text, half open.
+type Region = (usize, usize);
+
+/// The delimiter extents and the opaque token extents of one parse.
+///
+/// Both are read off the parse tree rather than scanned out of the text,
+/// which is the only way this check can be trusted. A hand-written delimiter
+/// scanner has to re-implement the reader to know that the `(` in `#\(`,
+/// `?\(`, `\(`, `"("` and `|a (b|` is not a delimiter, and getting any one of
+/// those wrong invents violations that are not there — see
+/// `delimiters_inside_tokens_are_not_delimiters` in `tests/corpus.rs`, whose
+/// sibling scan this mirrors. The reader already made every one of those
+/// decisions; asking the tree inherits all of them and cannot drift from the
+/// parse the formatter itself ran on.
+///
+/// Lists contribute `content_span`, which starts at the opening delimiter with
+/// reader prefixes excluded, so the recorded column is the delimiter's and not
+/// the quote's in front of it. Atoms and comments contribute their whole span:
+/// a line beginning inside one is a continuation line of a multi-line string,
+/// a `|bar symbol|` or a `#| block comment |#`, whose indentation is the
+/// author's content rather than the formatter's layout.
+fn list_and_opaque_regions(tree: &SyntaxTree) -> (Vec<Region>, Vec<Region>) {
+    let mut lists = Vec::new();
+    let mut opaque = Vec::new();
+
+    let root = tree.root_view();
+    let mut stack = vec![&root];
+    while let Some(view) = stack.pop() {
+        match view.kind {
+            ExpressionKind::List => lists.push((
+                view.content_span.start().get(),
+                view.content_span.end().get(),
+            )),
+            ExpressionKind::Atom => opaque.push((view.span.start().get(), view.span.end().get())),
+            ExpressionKind::Root => (),
+        }
+        stack.extend(view.children.iter());
+    }
+    opaque.extend(
+        tree.comments()
+            .map(|comment| (comment.span().start().get(), comment.span().end().get())),
+    );
+
+    (lists, opaque)
+}
+
+/// The display column `offset` sits at, counting from zero.
+///
+/// Display width rather than bytes: the formatter lines a continuation up
+/// under a column it measured with [`UnicodeWidthStr::width`], and `適合 値`
+/// is 9 bytes wide and 6 columns wide. Measuring in bytes here reports the
+/// enclosing delimiter three columns right of where it is, which is enough to
+/// turn a correctly indented body into a violation.
+fn display_column_of(text: &str, offset: usize) -> usize {
+    let line_start = text[..offset].rfind('\n').map_or(0, |index| index + 1);
+    UnicodeWidthStr::width(&text[line_start..offset])
+}
+
+/// Asserts that no line of `formatted` begins at or left of the display column
+/// of the opening delimiter that encloses it.
+///
+/// Two kinds of line are exempt, each because the formatter did not choose its
+/// indentation: a line whose first character closes a list (`))` belongs to
+/// the form it closes, and every convention in the family puts it at the
+/// column of that form's *parent*), and a line that begins inside an atom or a
+/// comment (the second and later lines of a multi-line string or block
+/// comment, whose indentation is content).
+fn assert_no_line_outdents_past_its_delimiter(formatted: &str, dialect: Dialect) {
+    let tree = SyntaxTree::parse_with_dialect(formatted, dialect)
+        .expect("the formatter's own output reparses");
+    let (lists, opaque) = list_and_opaque_regions(&tree);
+
+    let mut line_start = 0usize;
+    for raw in formatted.split_inclusive('\n') {
+        let line = raw.trim_end_matches(['\n', '\r']);
+        let offset = line_start;
+        line_start += raw.len();
+
+        let Some(indent_bytes) = line.find(|character: char| !character.is_whitespace()) else {
+            continue;
+        };
+        let first = offset + indent_bytes;
+
+        if opaque
+            .iter()
+            .any(|(start, end)| *start < first && first < *end)
+        {
+            continue;
+        }
+        if line[indent_bytes..].starts_with([')', ']', '}']) {
+            continue;
+        }
+        // Lists are properly nested, so the containing one that starts latest
+        // is the innermost.
+        let Some(enclosing) = lists
+            .iter()
+            .filter(|(start, end)| *start < first && first < *end)
+            .map(|(start, _)| *start)
+            .max()
+        else {
+            continue;
+        };
+
+        let indentation = UnicodeWidthStr::width(&line[..indent_bytes]);
+        let enclosing_column = display_column_of(formatted, enclosing);
+        assert!(
+            indentation > enclosing_column,
+            "line {line:?} starts at column {indentation}, \
+             at or left of its enclosing delimiter at {enclosing_column}\n{formatted}"
+        );
+    }
+}
+
+/// No line may start at or left of the column its enclosing form's opening
+/// delimiter sits at, across the shapes above plus the ones the rest of this
+/// file covers. Checked structurally rather than against a golden, so a
+/// layout change that reintroduces an outdented child fails here even where
+/// no golden pins that exact form.
+///
+/// The last three inputs exist to keep the *check* honest rather than the
+/// formatter. Measuring the enclosing delimiter's column in bytes puts
+/// `(progn` in the CJK input at 17 instead of 14, below its own body's 16;
+/// counting raw parentheses in the text leaves the string input's `(format`
+/// list open across the line after it and reads `#\(` as opening a list the
+/// following `#\)` line then sits left of. All three pass the tree-driven
+/// display-width scan and fail a byte-and-text-scanning one, so a regression
+/// to either shortcut is loud instead of latent.
+#[test]
+fn no_line_is_indented_at_or_left_of_its_enclosing_delimiter() {
+    let inputs = [
+        "(if (consp value) (multiple-value-bind (copy p) (gethash value copies) (unless p (setf copy value))) value)",
+        "(defmacro define-checker (name) `(defun ,name (expected) (unless (equal expected (current-value)) (error \"mismatch\"))))",
+        "(defclass connection (resource) ((mock :initarg :mock :reader connection-mock) (symbol :initarg :symbol :reader connection-symbol)))",
+        "(labels ((copy-reference (value) (if (consp value) (multiple-value-bind (copy p) (gethash value copies) (unless p (setf copy value))) value))) (copy-reference root))",
+        "(cond ((first-predicate value) (first-branch value)) ((second-predicate value) (second-branch value)))",
+        "(loop for item in items do (process item) (record item) finally (report))",
+        "(let ((alpha (compute-first-value)) (beta (compute-second-value))) (combine alpha beta))",
+        "(if (適合 値) (progn (実行 値) (記録 値)) nil)",
+        "(defun f (a) (format nil \"left ( paren\" a) (list a \"))\" a))",
+        "(list #\\( #\\) (defun g (x) (progn (h x) (i x))))",
+    ];
+
+    for indent in [2usize, 4] {
+        for input in inputs {
+            let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp).expect("valid");
+            let formatted = Formatter::with_dialect(indent, Dialect::CommonLisp).format(&tree);
+            assert_no_line_outdents_past_its_delimiter(&formatted, Dialect::CommonLisp);
+        }
+    }
 }

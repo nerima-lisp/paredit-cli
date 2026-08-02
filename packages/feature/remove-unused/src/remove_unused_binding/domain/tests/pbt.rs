@@ -76,7 +76,7 @@ proptest! {
 
         prop_assert_eq!(plan.reference_count, Some(0));
         prop_assert!(plan.changed);
-        let expected_lambda = format!("(lambda ({name})\n      {name})");
+        let expected_lambda = format!("(lambda ({name})\n     {name})");
         prop_assert!(plan.rewritten.contains(&expected_lambda));
         SyntaxTree::parse(&plan.rewritten)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;

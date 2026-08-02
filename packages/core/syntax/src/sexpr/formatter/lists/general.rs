@@ -14,21 +14,23 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
+        // Every element lines up under the first one, which lands one column
+        // past the opening delimiter. Indenting the rest by `indent` instead
+        // put them `indent - 1` columns right of their own first sibling.
+        let element_column = Self::last_line_width(output).saturating_add(1);
         output.push(delimiter.open());
         for (position, child) in node.children.iter().enumerate() {
-            if position == 0 {
-                self.format_node(tree, *child, depth + 1, output);
-            } else {
-                output.push('\n');
-                output.push_str(&self.indent(depth + 1));
-                self.format_node(tree, *child, depth + 1, output);
+            if position > 0 {
+                Self::break_to_column(element_column, output);
             }
+            self.format_node(tree, *child, depth + 1, output);
         }
         output.push(delimiter.close());
     }
 
     /// Lays out a `let`-style bindings list or a `do`/`prog` var-list: one
-    /// entry per line past the first, each continuing at `continuation_column`.
+    /// entry per line past the first, every entry sharing the column the
+    /// first one lands on.
     ///
     /// `align_values` is `format.align-clause-values` (FR-013), always
     /// passed explicitly by the caller rather than read from `self` here:
@@ -44,7 +46,6 @@ impl Formatter {
         tree: &SyntaxTree,
         node_id: NodeId,
         depth: usize,
-        continuation_column: usize,
         align_values: bool,
         output: &mut String,
     ) {
@@ -55,14 +56,14 @@ impl Formatter {
         }
 
         let delimiter = self.list_delimiter(node);
+        let entry_column = Self::last_line_width(output).saturating_add(1);
         output.push(delimiter.open());
         if delimiter == Delimiter::Bracket && node.children.len() % 2 == 0 {
             let columns =
                 align_values.then(|| self.align_target_columns_for_pairs(tree, &node.children));
             for (position, pair) in node.children.chunks_exact(2).enumerate() {
                 if position > 0 {
-                    output.push('\n');
-                    output.push_str(&" ".repeat(continuation_column));
+                    Self::break_to_column(entry_column, output);
                 }
                 if let Some(Some((name, column))) =
                     columns.as_ref().map(|columns| &columns[position])
@@ -83,8 +84,7 @@ impl Formatter {
             align_values.then(|| self.align_target_columns_for_bindings(tree, &node.children));
         for (position, child) in node.children.iter().enumerate() {
             if position > 0 {
-                output.push('\n');
-                output.push_str(&" ".repeat(continuation_column));
+                Self::break_to_column(entry_column, output);
             }
             if let Some(Some((name, column))) = columns.as_ref().map(|columns| &columns[position]) {
                 let binding = tree.node(*child);
@@ -145,9 +145,12 @@ impl Formatter {
         tree: &SyntaxTree,
         children: &[NodeId],
     ) -> Vec<Option<(String, usize)>> {
+        // Start column `0`: this measures a name's own text to derive an
+        // alignment column, and is not a decision about whether some line
+        // fits.
         let names: Vec<Option<String>> = children
             .chunks_exact(2)
-            .map(|pair| self.compact_node(tree, pair[0]))
+            .map(|pair| self.compact_node(tree, pair[0], 0))
             .collect();
         Self::pair_names_with_columns(names)
     }
@@ -159,7 +162,9 @@ impl Formatter {
         if node.kind != NodeKind::List || node.children.len() != 2 {
             return None;
         }
-        self.compact_node(tree, node.children[0])
+        // Start column `0`, for the same reason as
+        // `align_target_columns_for_pairs`.
+        self.compact_node(tree, node.children[0], 0)
     }
 
     /// Zips `names` (one entry per binding, `None` where alignment cannot

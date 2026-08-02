@@ -10,6 +10,22 @@ use crate::sexpr::types::NodeId;
 
 const MAX_RECURSIVE_FORMAT_DEPTH: usize = 256;
 
+/// A run of spaces long enough to fill a typical indent in one `push_str`,
+/// used by [`Formatter::break_to_column`].
+///
+/// Filling by slices of this beats both obvious alternatives at every width,
+/// because each `push_str` is a `memcpy` and nothing is allocated:
+/// `" ".repeat(n)` allocates a fresh `String` per line break, and
+/// `extend(repeat_n(' ', n))` goes through `String`'s `Extend<char>`, which is
+/// a per-character UTF-8 encode branch. Measured at 2M line breaks (min of 5
+/// interleaved rounds), the three cost, at columns 8 / 40 / 200:
+/// `repeat` 37 / 56 / 61 ms, `extend` 10 / 39 / 188 ms, this 5 / 8 / 10 ms.
+/// The column model makes wide indents common enough that `extend`'s blowup
+/// past ~60 columns is reachable in ordinary formatting.
+const SPACES: &str = "                                                                ";
+// A zero-length run would make `break_to_column`'s fill loop spin forever.
+const _: () = assert!(!SPACES.is_empty());
+
 /// The text accumulated so far, plus its running East-Asian-Width–aware
 /// display width — tracked separately from `text.len()`, which is a byte
 /// count and not a column count for anything outside ASCII.
@@ -24,16 +40,19 @@ pub(super) struct Bounded {
 }
 
 impl Bounded {
-    pub(super) const fn new() -> Self {
-        Self {
-            text: String::new(),
-            width: 0,
-        }
-    }
-
     /// Starts already charged `width` columns against the budget — for a
-    /// caller that writes some text (e.g. reader-prefix spans) outside this
-    /// accumulator but still wants it counted toward `max_width`.
+    /// caller whose rendering begins partway across a line, so the *fits on
+    /// one line* decision is measured from the real column instead of giving
+    /// a hugged form a fresh full-width allowance.
+    ///
+    /// This does not make `max_width` a line width the formatter honors. It
+    /// bounds only the text this accumulator itself builds; once the decision
+    /// comes back "does not fit", the multi-line renderers take over, and
+    /// they enforce no width budget at all (deliberately — a later phase).
+    /// So a line can still exceed `max_width`, and does: over 400 realistic
+    /// forms, lines past the configured width went 96/400 before charging
+    /// `start_column` to 92/400 after, and the widest line got *wider*
+    /// (135 to 150 columns). Do not read this as a width guarantee.
     pub(super) const fn with_initial_width(width: usize) -> Self {
         Self {
             text: String::new(),
@@ -154,6 +173,20 @@ impl RenderedItem {
                     output.push_str(line);
                     output.push('\n');
                 }
+                // `body` was rendered into its own empty buffer, so every
+                // column inside it was measured from 0 — see
+                // `Formatter::render_item`. Splicing it at a nonzero column
+                // would leave every line after its first indented relative to
+                // the wrong origin, silently and without any error. Every
+                // path into here does arrive at column 0 (an empty `output`,
+                // a `blank_line_separator` that always ends in a newline, or
+                // the leading-comment loop just above, which does too); this
+                // fails loudly if a future change stops doing so.
+                debug_assert_eq!(
+                    Formatter::last_line_width(output),
+                    0,
+                    "top-level form body spliced at a nonzero column, but it was rendered against column 0"
+                );
                 output.push_str(body);
                 if let Some(comment) = trailing {
                     // At least one space always separates the form from its
@@ -550,6 +583,18 @@ impl Formatter {
     /// before the next item — both need every item's rendering measured
     /// first, which [`Self::format`] does across the whole document before
     /// assembling anything.
+    ///
+    /// # Precondition
+    ///
+    /// The rendered body must end up spliced into the document **at column
+    /// 0**. Rendering here goes into a fresh, empty `String`, so every
+    /// [`Self::last_line_width`] call underneath it measures that temporary
+    /// buffer rather than the real document — the column model is correct
+    /// only because the two agree, which they do only at column 0. Nothing in
+    /// the type system holds this; [`RenderedItem::render`] carries the
+    /// matching `debug_assert!`. A future caller that wants to splice a body
+    /// partway across a line has to thread a start column through
+    /// [`Self::format_node`] instead of relying on this.
     fn render_item(&self, tree: &SyntaxTree, item: &TopLevelItem) -> RenderedItem {
         let comments = &tree.comments;
         match item {
@@ -594,11 +639,33 @@ impl Formatter {
         }
     }
 
-    /// Display width (via [`UnicodeWidthStr::width`]) of `text`'s last line —
-    /// the column at which a same-line trailing comment would start.
-    fn last_line_width(text: &str) -> usize {
+    /// Display width (via [`UnicodeWidthStr::width`]) of `text`'s last line.
+    ///
+    /// Called on the output buffer, this is the column the next character
+    /// appended to it will land on — the formatter's whole column model. A
+    /// form's opening delimiter goes wherever the line has already reached,
+    /// which `depth * indent` only agrees with when nothing preceded the form
+    /// on its line; a form hugged onto its operator's line, or one behind a
+    /// reader prefix, starts further right and every line it emits has to be
+    /// measured from there. Called on a rendered form, it is also the column
+    /// at which a same-line trailing comment would start.
+    pub(super) fn last_line_width(text: &str) -> usize {
         let last_line = text.rsplit('\n').next().unwrap_or("");
         UnicodeWidthStr::width(last_line)
+    }
+
+    /// Ends the current line and indents the next one out to `column`.
+    ///
+    /// The indent is copied in `SPACES`-sized slices rather than built a
+    /// character at a time; see that constant for why, and for the numbers.
+    pub(super) fn break_to_column(column: usize, output: &mut String) {
+        output.push('\n');
+        let mut remaining = column;
+        while remaining > SPACES.len() {
+            output.push_str(SPACES);
+            remaining -= SPACES.len();
+        }
+        output.push_str(&SPACES[..remaining]);
     }
 
     /// Trims a comment's trailing whitespace and, when enabled, realigns a
@@ -766,7 +833,11 @@ impl Formatter {
                 }
             }
             NodeKind::List => {
-                if let Some(inline) = self.inline_list(tree, node_id) {
+                // Measured before any reader prefix is written, because
+                // `compact_node` writes the prefix spans itself and so must
+                // charge them against the same budget exactly once.
+                if let Some(inline) = self.inline_list(tree, node_id, Self::last_line_width(output))
+                {
                     output.push_str(&inline);
                     return;
                 }
@@ -812,7 +883,7 @@ impl Formatter {
                             self.format_binding_form(tree, node_id, depth, output);
                         }
                         ListStyle::LocalFunctions => {
-                            self.format_local_callable_form(tree, node_id, depth, head, output);
+                            self.format_local_callable_form(tree, node_id, depth, output);
                         }
                         ListStyle::OneArgumentBody => {
                             self.format_prefix_body(tree, node_id, depth, 1, output);
@@ -830,19 +901,19 @@ impl Formatter {
                             self.format_case_clauses(tree, node_id, depth, output);
                         }
                         ListStyle::Do => {
-                            self.format_do_form(tree, node_id, depth, head, output);
+                            self.format_do_form(tree, node_id, depth, output);
                         }
                         ListStyle::Prog => {
-                            self.format_prog_form(tree, node_id, depth, head, output);
+                            self.format_prog_form(tree, node_id, depth, output);
                         }
                         ListStyle::Declaration => {
-                            self.format_declaration_form(tree, node_id, depth, head, output);
+                            self.format_declaration_form(tree, node_id, depth, output);
                         }
                         ListStyle::PairAssignment => {
-                            self.format_pair_assignment_form(tree, node_id, depth, head, output);
+                            self.format_pair_assignment_form(tree, node_id, depth, output);
                         }
                         ListStyle::Loop => {
-                            self.format_loop_form(tree, node_id, depth, head, output);
+                            self.format_loop_form(tree, node_id, depth, output);
                         }
                         ListStyle::HeadBody => {
                             self.format_head_body(tree, node_id, depth, output);
@@ -862,9 +933,7 @@ impl Formatter {
                             );
                         }
                         ListStyle::ClojureThreading(prefix_len) => {
-                            self.format_clojure_threading(
-                                tree, node_id, depth, head, prefix_len, output,
-                            );
+                            self.format_clojure_threading(tree, node_id, depth, prefix_len, output);
                         }
                         ListStyle::ClojurePairClauses(prefix_len) => {
                             self.format_clojure_pair_clauses(
@@ -922,15 +991,41 @@ impl Formatter {
             .collect()
     }
 
-    pub(super) fn inline_list(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
+    pub(super) fn inline_list(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        start_column: usize,
+    ) -> Option<String> {
         let head = self.head_text(tree, node_id);
         if head.is_some_and(|head| self.style_for_head(head) != ListStyle::General) {
             return None;
         }
-        self.compact_node(tree, node_id)
+        self.compact_node(tree, node_id, start_column)
     }
 
-    pub(super) fn compact_node(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
+    /// Flattens `node_id` onto one line, or `None` when it does not fit.
+    ///
+    /// `start_column` is the display column the returned text would be
+    /// written at. It is charged against the budget up front because this
+    /// builds into a separate accumulator that starts empty and so cannot
+    /// observe the cursor itself: without it a form hugged onto an operator's
+    /// line gets a fresh full-width allowance for the fit decision, and this
+    /// returns `Some` for text that cannot actually fit where it will land.
+    /// Callers that only want a subtree's text measured, rather than a
+    /// decision about a line, pass `0`.
+    ///
+    /// What `start_column` fixes is that decision, and only it. Returning
+    /// `None` hands the node to a multi-line renderer, and those enforce no
+    /// width budget whatsoever, so the emitted line may still pass
+    /// `max_width` — see [`Bounded::with_initial_width`] for the measured
+    /// residual overrun. This is a *decision* input, not a width bound.
+    pub(super) fn compact_node(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        start_column: usize,
+    ) -> Option<String> {
         enum Action {
             Node(NodeId),
             Separator,
@@ -941,7 +1036,7 @@ impl Formatter {
         // descendant, since the whole subtree this call flattens shares one
         // running [`Bounded`] budget. See `Formatter::effective_max_width`.
         let max_width = self.effective_max_width(tree, node_id);
-        let mut output = Bounded::new();
+        let mut output = Bounded::with_initial_width(start_column);
         let mut actions = vec![Action::Node(node_id)];
 
         while let Some(action) = actions.pop() {
@@ -1068,7 +1163,7 @@ impl Formatter {
         depth: usize,
         output: &mut String,
     ) {
-        if let Some(inline) = self.compact_node(tree, node_id) {
+        if let Some(inline) = self.compact_node(tree, node_id, Self::last_line_width(output)) {
             output.push_str(&inline);
         } else {
             self.format_node(tree, node_id, depth, output);
@@ -1118,18 +1213,29 @@ impl Formatter {
         super::numeric_literal::numeric_literal_text(text, self.dialect, self.numeric_literal_case)
     }
 
+    /// `depth * indent` spaces — the formatter's last remaining depth-based
+    /// indentation, kept for one caller only:
+    /// [`Self::reindent_block_comment`] realigning a `#|...|#` comment's
+    /// interior lines.
+    ///
+    /// Code layout does **not** go through here. It is column-based: a form
+    /// indents from where its opening delimiter actually landed, via
+    /// [`Self::last_line_width`] and [`Self::add_indent`]. `depth` survives in
+    /// the layout code purely as the `MAX_RECURSIVE_FORMAT_DEPTH` recursion
+    /// guard, and as the argument to this. New layout code that reaches for
+    /// `depth * indent` is reintroducing the model the column model replaced.
     pub(super) fn indent(&self, depth: usize) -> String {
         " ".repeat(self.indentation_width(depth))
     }
 
-    pub(super) const fn continuation_column(&self, depth: usize, offset: usize) -> usize {
-        self.indentation_width(depth).saturating_add(offset)
-    }
-
+    /// One indentation step in from `column` — a form's body column, given
+    /// the column its opening delimiter landed on.
     pub(super) const fn add_indent(&self, column: usize) -> usize {
         column.saturating_add(self.indent)
     }
 
+    /// Width of [`Self::indent`], and subject to the same restriction: this
+    /// is block-comment realignment's measure, not code layout's.
     const fn indentation_width(&self, depth: usize) -> usize {
         depth.saturating_mul(self.indent)
     }

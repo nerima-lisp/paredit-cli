@@ -89,18 +89,18 @@ fn check_property<S: Strategy>(
 }
 
 /// Every dialect, so a reader rule added for one cannot crash another.
-const DIALECTS: [Dialect; 10] = [
-    Dialect::CommonLisp,
-    Dialect::EmacsLisp,
-    Dialect::Lfe,
-    Dialect::Scheme,
-    Dialect::Racket,
-    Dialect::Clojure,
-    Dialect::Hy,
-    Dialect::Carp,
-    Dialect::Janet,
-    Dialect::Fennel,
-];
+///
+/// `Dialect::Unknown` belongs here and was missing. It is not a "no dialect"
+/// placeholder that falls back to one of the ten above — it is an eleventh
+/// reader with its own rules, and it is the one every extensionless file and
+/// every `--dialect`-less stdin pipe gets. Leaving it out meant the reader
+/// that runs on the least predictable input was the only one no property
+/// covered, which is how `#+sbcl (form)` came to parse as three siblings
+/// there and one node everywhere else.
+///
+/// Deferring to `Dialect::ALL` keeps a dialect added later from silently
+/// missing the same coverage.
+const DIALECTS: [Dialect; Dialect::ALL.len()] = Dialect::ALL;
 
 /// The invariants one input must satisfy, for one dialect.
 ///
@@ -157,6 +157,36 @@ fn check_invariants(source: &str, dialect: Dialect) -> Result<(), String> {
         return Err(format!(
             "formatting did not converge for {source:?} in {dialect:?}"
         ));
+    }
+
+    // 5. No node is a bare `#+`/`#-` dispatch.
+    //
+    // Properties 1-4 are all round-trips through the same tree, so a *wrong*
+    // parse satisfies every one of them as long as it is wrong consistently:
+    // the formatter renders the tree it is given, that output reparses to the
+    // same wrong tree, and it converges. `Dialect::Unknown` split
+    // `#+sbcl (require :sb-posix)` into three siblings and the blank-lined
+    // result was a fixed point, so no amount of fuzzing properties 1-4 -- with
+    // or without `Dialect::Unknown` in `DIALECTS` -- could have found it.
+    //
+    // Catching a wrong parse needs an oracle outside the round-trip. This is
+    // the cheapest sound one: `#+` and `#-` are a dispatch that consumes a
+    // feature expression and a guarded form, so a complete document never
+    // contains one standing alone as its own datum, in any dialect. The text
+    // is taken past `symbol_offset` so that a dialect where `#` is a genuine
+    // one-byte prefix -- Fennel's function shorthand, where `#+` is the prefix
+    // `#` applied to the symbol `+` -- is not mistaken for one.
+    let root = tree.root_view();
+    let mut stack = vec![&root];
+    while let Some(view) = stack.pop() {
+        if let Some(text) = view.text.as_deref() {
+            if matches!(text.get(view.symbol_offset..), Some("#+" | "#-")) {
+                return Err(format!(
+                    "a bare feature dispatch became its own datum for {source:?} in {dialect:?}"
+                ));
+            }
+        }
+        stack.extend(view.children.iter());
     }
 
     Ok(())
@@ -434,6 +464,67 @@ fn every_recorded_fuzz_input_still_upholds_the_invariants() {
         "recorded fuzz inputs regressed:\n{}",
         failures.join("\n")
     );
+}
+
+/// A feature conditional survives a format pass intact in every dialect that
+/// reads one.
+///
+/// The bug this pins was not a formatter bug. `Dialect::Unknown` tore
+/// `#+sbcl (require :sb-posix)` into the three siblings `#+`, `sbcl` and
+/// `(require :sb-posix)`; the formatter then did the correct thing with an
+/// incorrect tree and separated three top-level forms with blank lines. The
+/// output no longer meant what the input meant, at exit code 0.
+///
+/// The assertion is deliberately about *adjacency* rather than an exact
+/// rendering: it must keep holding as indentation and line-breaking rules
+/// change, and what makes the tree wrong is that the three pieces stop being
+/// one form, not how they are laid out.
+#[test]
+fn a_feature_conditional_is_never_broken_apart_by_formatting() {
+    // Only the readers for which `#+` is a CLHS 2.4.8 feature conditional --
+    // dispatch, feature expression, *and* guarded form. The others are
+    // excluded because they are right, not because they are exempt: in
+    // Clojure `#+(and sbcl x86-64)` is the tagged literal `+` applied to one
+    // datum, so the `(declare ...)` after it genuinely is a separate top-level
+    // form and separating them is correct. Asserting otherwise would pin a
+    // Common Lisp reading onto a dialect that does not share it.
+    const FEATURE_CONDITIONAL_DIALECTS: [Dialect; 5] = [
+        Dialect::Unknown,
+        Dialect::CommonLisp,
+        Dialect::Lfe,
+        Dialect::Hy,
+        Dialect::Carp,
+    ];
+
+    for dialect in FEATURE_CONDITIONAL_DIALECTS {
+        for source in [
+            "#+sbcl (require :sb-posix)\n(defun f () 1)\n",
+            "#-sbcl (require :posix)\n(defun f () 1)\n",
+            "#+(and sbcl x86-64) (declare (optimize speed))\n(defun f () 1)\n",
+        ] {
+            // Not every dialect reads `#+`; the ones that refuse it are making
+            // a different, also-correct choice and have nothing to check here.
+            let Ok(tree) = SyntaxTree::parse_with_dialect(source, dialect) else {
+                continue;
+            };
+            let formatted = Formatter::with_dialect(2, dialect).format(&tree);
+
+            let conditional = source
+                .lines()
+                .next()
+                .expect("the fixtures all start with the conditional");
+            assert!(
+                formatted.contains(conditional),
+                "{dialect:?}: formatting split the feature conditional apart.\n\
+                 expected to still contain: {conditional:?}\n\
+                 got:\n{formatted}"
+            );
+            assert!(
+                !formatted.contains("#+\n") && !formatted.contains("#-\n"),
+                "{dialect:?}: the dispatch was stranded on its own line.\ngot:\n{formatted}"
+            );
+        }
+    }
 }
 
 fn files_under(root: &Path) -> Vec<PathBuf> {

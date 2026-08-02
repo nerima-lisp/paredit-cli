@@ -33,6 +33,10 @@ Not stable — may change in any release, including a patch:
 - **Human-readable text output.** Wording, ordering, column layout, and
   spacing of `--output text` and of default (non-JSON) reports. Parse
   `--output json` instead.
+- **`edit format` output.** Line breaks, indentation, and alignment may change
+  in any release as the layout rules are refined — including under `--write`,
+  which rewrites your source file. Pin the version if you gate on a formatted
+  file being byte-identical across upgrades.
 - **Diagnostic and error message text** on stderr. Branch on the exit code.
 - **The Rust library API**, including the items re-exported from the
   `paredit_cli` crate root. The crate sets `publish = false` and is not
