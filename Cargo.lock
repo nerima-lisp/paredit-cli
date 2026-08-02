@@ -673,6 +673,8 @@ dependencies = [
  "paredit-feature-function-parameter",
  "paredit-feature-generate",
  "paredit-feature-inline",
+ "paredit-feature-lint-build-system",
+ "paredit-feature-lint-concurrency",
  "paredit-feature-lint-condition-system",
  "paredit-feature-lint-conditional",
  "paredit-feature-lint-control-flow",
@@ -688,6 +690,7 @@ dependencies = [
  "paredit-feature-lint-safety",
  "paredit-feature-lint-sequence",
  "paredit-feature-lint-string-char",
+ "paredit-feature-lint-testing",
  "paredit-feature-lisp-analysis",
  "paredit-feature-migrate",
  "paredit-feature-package",
@@ -964,6 +967,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "paredit-feature-lint-build-system"
+version = "1.3.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-concurrency"
+version = "1.3.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
 name = "paredit-feature-lint-condition-system"
 version = "1.4.0"
 dependencies = [
@@ -1140,6 +1165,17 @@ dependencies = [
  "proptest",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "paredit-feature-lint-testing"
+version = "1.3.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
 ]
 
 [[package]]

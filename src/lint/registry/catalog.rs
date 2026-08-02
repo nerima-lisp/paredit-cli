@@ -174,22 +174,23 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-// 191 (through PR #78's `lint-repl-debug`) + 8 (`lint-object-system`) + 7
-// (`lint-condition-system`) + 6 (`lint-iteration-flow`) = 212.
-const _: () = assert!(RULE_COUNT == 212);
-// Unchanged at 99: every one of this branch's 21 rules is
+// 212 (through PR #81) + 6 (`lint-testing`) + 7 (`lint-concurrency`) + 4
+// (`lint-build-system`) = 229.
+const _: () = assert!(RULE_COUNT == 229);
+// Unchanged at 99: every one of this branch's 17 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
-// on the author's behalf — inserting a `call-next-method`, choosing a
-// `:report` string, or reordering `loop` clauses all change what the code
-// means, not merely how it reads.
+// on the author's behalf — what a test should assert, where a lock's release
+// belongs, or which version string a system ships under are all decisions the
+// author has to make, not spellings of one they already made.
 const _: () = assert!(fixable_count() == 99);
-// 134 (through PR #78) + 16 of this branch's 21 rules. The other 5 are
-// `Severity::Error`: `duplicate-defmethod-signature`,
-// `loop-clause-order-violation`, `loop-for-across-statically-known-list`,
-// `loop-into-accumulator-kind-conflict` and `loop-unreachable-finally-clause`.
-const _: () = assert!(warning_count() == 150);
+// 150 (through PR #81) + 14 of this branch's 17 rules. The other 3 are
+// `Severity::Error`: `duplicate-test-name`, `lock-acquired-not-released` and
+// `asdf-self-referential-depends-on`.
+const _: () = assert!(warning_count() == 164);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
-const _: () = assert!(PEDANTIC_RULES.len() == 5);
+// 5 (through PR #81) + `asdf-system-missing-version`, whose `:version`
+// convention roughly 10% of correct Quicklisp systems decline to follow.
+const _: () = assert!(PEDANTIC_RULES.len() == 6);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
     REGISTRY

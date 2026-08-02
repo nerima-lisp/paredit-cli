@@ -799,6 +799,65 @@ pub(super) fn dispatch(command: Command) -> CommandResult {
             command::InspectCommand::LoopUnreachableFinallyClause(args) => {
                 loop_unreachable_finally_clause_report::workflow::loop_unreachable_finally_clause_report(args)?;
             }
+            command::InspectCommand::DisabledTestLeftIn(args) => {
+                disabled_test_left_in_report::workflow::disabled_test_left_in_report(args)?;
+            }
+            command::InspectCommand::DuplicateTestName(args) => {
+                duplicate_test_name_report::workflow::duplicate_test_name_report(args)?;
+            }
+            command::InspectCommand::EmptyTestBody(args) => {
+                empty_test_body_report::workflow::empty_test_body_report(args)?;
+            }
+            command::InspectCommand::SleepInTest(args) => {
+                sleep_in_test_report::workflow::sleep_in_test_report(args)?;
+            }
+            command::InspectCommand::TestAssertsConstant(args) => {
+                test_asserts_constant_report::workflow::test_asserts_constant_report(args)?;
+            }
+            command::InspectCommand::TestWithoutAssertion(args) => {
+                test_without_assertion_report::workflow::test_without_assertion_report(args)?;
+            }
+            command::InspectCommand::AtomSwapWithSideEffect(args) => {
+                atom_swap_with_side_effect_report::workflow::atom_swap_with_side_effect_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::DynamicVarBoundAcrossThreadBoundary(args) => {
+                dynamic_var_bound_across_thread_boundary_report::workflow::dynamic_var_bound_across_thread_boundary_report(args)?;
+            }
+            command::InspectCommand::FuturePromiseNeverRealized(args) => {
+                future_promise_never_realized_report::workflow::future_promise_never_realized_report(args)?;
+            }
+            command::InspectCommand::LockAcquiredNotReleased(args) => {
+                lock_acquired_not_released_report::workflow::lock_acquired_not_released_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::RecursiveLockReentryRisk(args) => {
+                recursive_lock_reentry_risk_report::workflow::recursive_lock_reentry_risk_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::ThreadSpawnedWithoutErrorHandler(args) => {
+                thread_spawned_without_error_handler_report::workflow::thread_spawned_without_error_handler_report(args)?;
+            }
+            command::InspectCommand::UnsynchronizedSharedMutation(args) => {
+                unsynchronized_shared_mutation_report::workflow::unsynchronized_shared_mutation_report(args)?;
+            }
+            command::InspectCommand::AsdfPerformWithoutCallNextMethod(args) => {
+                asdf_perform_without_call_next_method_report::workflow::asdf_perform_without_call_next_method_report(args)?;
+            }
+            command::InspectCommand::AsdfSelfReferentialDependsOn(args) => {
+                asdf_self_referential_depends_on_report::workflow::asdf_self_referential_depends_on_report(args)?;
+            }
+            command::InspectCommand::AsdfSystemMissingVersion(args) => {
+                asdf_system_missing_version_report::workflow::asdf_system_missing_version_report(
+                    args,
+                )?;
+            }
+            command::InspectCommand::DefpackageWithoutInPackage(args) => {
+                defpackage_without_in_package_report::workflow::defpackage_without_in_package_report(args)?;
+            }
         },
         Command::Edit { command } => match command {
             command::EditCommand::Format(args) => basic_edit::workflow::format(args)?,

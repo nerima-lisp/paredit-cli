@@ -3,3 +3,62 @@
 # repository root, same as scripts/*.sh already assume.
 [alias]
 xtask = "run --manifest-path xtask/Cargo.toml --quiet --"
+
+# `Cli::command()` builds all 413 subcommands in one clap-derive-generated
+# call, and `InspectCommand::augment_subcommands` — 290 of them — is a single
+# stack frame that an unoptimized build does not shrink. At 273 `inspect`
+# leaves it fit inside the 2 MiB stack Rust gives a spawned thread; at 290 it
+# does not, and the library unit tests that build the tree
+# (`presentation::cli::{config_bridge,argv,dispatch}::tests`) run on exactly
+# such a thread. Overflowing it there does not abort with the usual "thread has
+# overflowed its stack" — the test thread simply stops, so `cargo test
+# --workspace` hangs indefinitely with the run at 0% CPU rather than failing.
+#
+# ## The measured threshold
+#
+# A sweep of RUST_MIN_STACK against `cargo test -p paredit-cli --lib` on this
+# tree is monotone and fails at exactly 2048 KiB, passes at exactly 2176 KiB.
+# The real threshold is therefore between 2.000 and 2.125 MiB — 3 MiB was never
+# tested, and an earlier version of this comment claiming "2 MiB hangs, 4 MiB
+# passes" understated how little headroom the old default had.
+#
+# The disassembly says why. In the debug binary
+# `InspectCommand::augment_subcommands` opens with `sub sp, sp, #0x189000`
+# followed by `sub sp, sp, #0xde0` — 1,613,280 bytes, about 1.54 MiB, in one
+# frame. `Cli::augment_args` (80 KiB) and `Command::augment_subcommands`
+# (116 KiB) bring the call chain to roughly 1.73 MiB before libtest's own
+# frames are counted, which is why 2.000 MiB is not enough and 2.125 MiB is.
+# Headroom at Rust's 2 MiB spawned-thread default was effectively zero.
+#
+# 8 MiB is about 3.8x the measured threshold, i.e. room for the next several
+# batches of commands rather than for one. At ~5.5 KiB of stack per `inspect`
+# subcommand (1,613,280 / 288), 8 MiB covers roughly 1,400 of them; the same
+# figure is noted at `INTROSPECTION_COMMANDS` in
+# `src/presentation/cli/contract.rs`, which is the array a new command has to
+# be added to anyway.
+#
+# ## `force` is deliberately off — and that is a real hazard
+#
+# Cargo's `[env]` defaults to `force = false`, so this sets RUST_MIN_STACK only
+# when the parent environment has not already set it. That is wanted: what this
+# entry provides is a *floor*, and `force = true` would also clobber a value
+# someone deliberately raised.
+#
+# The cost is that an inherited RUST_MIN_STACK **below** the threshold silently
+# defeats this file. With `RUST_MIN_STACK=2097152` exported in the environment,
+# `cargo test -p paredit-cli --lib` was measured hanging past 300s despite the
+# line below. It does not warn, it does not fail, it hangs — so if the library
+# tests ever stall at 0% CPU, check `env | grep RUST_MIN_STACK` before anything
+# else.
+#
+# ## Scope
+#
+# The shipped binary is unaffected: cargo `[env]` applies only to processes
+# cargo itself launches, and `Cli::command()` runs on the main thread, which
+# gets 8 MiB from the OS. This raises the floor only for threads a cargo-run
+# process spawns. The nix build *does* honour it — crane writes its own cargo
+# configuration to `$CARGO_HOME/config.toml` precisely so that a project's
+# `.cargo/config.toml` still applies, and `cargo nextest` was confirmed to read
+# it.
+[env]
+RUST_MIN_STACK = "8388608"

@@ -206,5 +206,21 @@ rule	loop-clause-order-violation	0
 rule	loop-for-across-statically-known-list	0
 rule	loop-into-accumulator-kind-conflict	0
 rule	loop-unreachable-finally-clause	0
+rule	disabled-test-left-in	0
+rule	duplicate-test-name	0
+rule	empty-test-body	0
+rule	sleep-in-test	0
+rule	test-asserts-constant	0
+rule	test-without-assertion	0
+rule	atom-swap-with-side-effect	0
+rule	dynamic-var-bound-across-thread-boundary	0
+rule	future-promise-never-realized	0
+rule	lock-acquired-not-released	0
+rule	recursive-lock-reentry-risk	0
+rule	thread-spawned-without-error-handler	0
+rule	unsynchronized-shared-mutation	0
+rule	asdf-perform-without-call-next-method	0
+rule	asdf-self-referential-depends-on	0
+rule	defpackage-without-in-package	0
 finding	redundant-quote	warning	suspicious	fixable=true	suppressed.lisp	338	quoting number 6 is redundant	redundant-quote/07bb8007b4863bf0/0
 finding	declarative-style-score	warning	suspicious	fixable=false	suppressed.lisp	0	this file's declarative-style score is 0% (5 top-level forms), below the 80% threshold	declarative-style-score/2f534fdd67304360/0
