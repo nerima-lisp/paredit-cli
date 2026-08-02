@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ExpressionView, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::sexpr::{ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::list_head;
 
 use super::context::RuleContext;
@@ -207,15 +207,19 @@ pub fn collect_lint_pass(
     // nothing measurable.
     let budget = WalkBudget::new(path);
 
+    // The root view above already holds every top-level form, deeply
+    // materialized. Re-selecting each one from the tree would rebuild an
+    // `ExpressionView` — a `Vec` per node and a `String` per atom — for the
+    // whole document a second time, per pass, for nothing: these are the same
+    // subtrees, in the same order.
     let mut visit = VisitIndex::ROOT;
-    for child in 0..tree.root_children().len() {
-        let view = tree.select_path(&SexprPath::root_child(child))?.view();
+    for view in &root.children {
         walk(
             catalog,
             index,
             &context,
             &active,
-            &view,
+            view,
             &mut visit,
             &mut sink,
             timings.as_mut(),
