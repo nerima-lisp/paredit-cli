@@ -97,7 +97,7 @@ fn every_sampled_report_is_byte_identical_across_processes() {
 }
 
 /// Ten runs rather than two for the report most likely to wobble: `lint` runs
-/// 266 rules and groups their findings, which is the most collection-order
+/// 286 rules and groups their findings, which is the most collection-order
 /// surface in the tool.
 #[test]
 fn lint_is_stable_over_repeated_runs() {

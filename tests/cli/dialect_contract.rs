@@ -88,7 +88,7 @@ fn schema_v2_registry_is_an_exact_bijection_with_clap_leaves() {
     let unique_registry_paths = registry_paths.iter().copied().collect::<BTreeSet<_>>();
 
     assert_eq!(registry_paths.len(), unique_registry_paths.len());
-    assert_eq!(registry_paths.len(), 432);
+    assert_eq!(registry_paths.len(), 452);
     assert_eq!(
         clap_contract_leaf_paths(&v1),
         unique_registry_paths
@@ -142,9 +142,9 @@ fn schema_v2_keeps_its_three_value_vocabulary() {
     assert_eq!(report["schema_version"], 2);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["command_count"], 432);
+    assert_eq!(contract["command_count"], 452);
     assert_eq!(contract["dialect_count"], 10);
-    assert_eq!(contract["cell_count"], 4320);
+    assert_eq!(contract["cell_count"], 4520);
     assert_eq!(contract["dialects"], serde_json::json!(DIALECTS));
     assert_eq!(
         contract["statuses"],
@@ -165,14 +165,14 @@ fn schema_v2_keeps_its_three_value_vocabulary() {
         category_counts,
         BTreeMap::from([
             ("format", 3),
-            ("introspection", 309),
+            ("introspection", 329),
             ("semantic", 87),
             ("structural", 33),
         ])
     );
 
     let cells = support_cells(contract);
-    assert_eq!(cells.len(), 4320);
+    assert_eq!(cells.len(), 4520);
     let vocabulary = cells.values().map(String::as_str).collect::<BTreeSet<_>>();
     assert!(
         vocabulary.is_subset(&BTreeSet::from(["supported", "unsupported"])),
@@ -186,7 +186,7 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
     assert_eq!(report["schema_version"], 3);
 
     let contract = &report["dialect_contract"];
-    assert_eq!(contract["cell_count"], 4320);
+    assert_eq!(contract["cell_count"], 4520);
     assert_eq!(
         contract["statuses"],
         serde_json::json!(["supported", "silent", "unsupported", "unknown"])
@@ -215,7 +215,7 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
 
     // The whole point of the matrix: no cell may answer "unknown".
     let cells = support_cells(contract);
-    assert_eq!(cells.len(), 4320);
+    assert_eq!(cells.len(), 4520);
     let unanswered = cells
         .iter()
         .filter(|(_, status)| *status == "unknown")
@@ -236,10 +236,22 @@ fn schema_v3_answers_every_cell_and_names_the_tier_it_used() {
     // declare `RuleDialectScope::CLOJURE_ONLY` and are correctly silent on a
     // `.lisp` file. They are the first built-in rules to be scoped away from
     // Common Lisp rather than towards it.
-    const DIALECT_SPECIFIC: [&str; 3] = [
+    //
+    // Three more followed. `inspect nested-get-chain` and `inspect
+    // redundant-into-empty-collection` are the same Clojure case — `get-in` and
+    // `into` — and `inspect division-result-precision-loss` is the sharpest
+    // version of it: integer `/` truncates towards zero in Emacs Lisp, while the
+    // *identical* Common Lisp form is an exact ratio that loses nothing, so the
+    // rule declares `RuleDialectScope::EMACS_LISP_ONLY` and firing here would be
+    // a false positive rather than a missing feature. This list must stay in
+    // step with `contract.rs`'s own `DIALECT_SPECIFIC_REPORTS`.
+    const DIALECT_SPECIFIC: [&str; 6] = [
         "inspect elisp-file",
         "inspect atom-swap-with-side-effect",
         "inspect future-promise-never-realized",
+        "inspect nested-get-chain",
+        "inspect redundant-into-empty-collection",
+        "inspect division-result-precision-loss",
     ];
 
     for (cell, status) in &cells {
@@ -276,7 +288,7 @@ fn schema_v3_summarises_how_deep_each_dialect_goes() {
             .values()
             .map(|count| count.as_u64().expect("count"))
             .sum();
-        assert_eq!(total, 432, "{dialect} counts do not cover every command");
+        assert_eq!(total, 452, "{dialect} counts do not cover every command");
 
         // The summary has to agree with the matrix it summarises.
         for (status, count) in by_status {

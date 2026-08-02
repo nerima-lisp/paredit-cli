@@ -267,7 +267,7 @@ impl SupportStatus {
 /// here, the stack floor is the first thing to check — and note that an
 /// inherited `RUST_MIN_STACK` from the environment silently overrides
 /// `.cargo/config.toml`, because cargo's `[env]` is unforced.
-const INTROSPECTION_COMMANDS: [&str; 309] = [
+const INTROSPECTION_COMMANDS: [&str; 329] = [
     "inspect diff",
     "inspect check",
     "inspect dialect",
@@ -594,6 +594,26 @@ const INTROSPECTION_COMMANDS: [&str; 309] = [
     "inspect intern-dynamic-package-target",
     "inspect introspection-probe-unchecked",
     "inspect symbol-function-fset-dynamic-name",
+    "inspect destructuring-bind-unused-whole",
+    "inspect loop-collect-into-immediately-returned",
+    "inspect flet-single-use-inlinable",
+    "inspect multiple-value-setq-arity-mismatch",
+    "inspect with-open-file-redundant-direction-default",
+    "inspect ftype-values-arity-mismatch",
+    "inspect with-accessors-empty-binding-list",
+    "inspect quoted-form-contains-stray-unquote",
+    "inspect hash-table-iteration-order-assumed",
+    "inspect set-membership-via-linear-scan",
+    "inspect nested-get-chain",
+    "inspect redundant-into-empty-collection",
+    "inspect mixed-float-precision-arithmetic",
+    "inspect division-result-precision-loss",
+    "inspect epsilon-less-float-loop-bound",
+    "inspect redundant-precision-coercion",
+    "inspect format-unknown-directive",
+    "inspect format-percent-ampersand-adjacent-redundancy",
+    "inspect format-nested-directive-unbalanced",
+    "inspect package-circular-in-package-chain",
 ];
 
 const FORMAT_COMMANDS: [&str; 3] = [
@@ -945,8 +965,12 @@ const SEMANTIC_OPERATIONS: [SemanticOperation; 3] = [
 /// Lisp counterpart at all. Four more arrived with the `lint-call-shape` and
 /// `lint-introspection` batch: `lambda` nesting and `string=` dispatch read the
 /// same in Emacs Lisp, `symbol-function`/`fset` name both dialects' function
-/// cells, and `boundp`/`fboundp`-style probes are spelled in Clojure too. Each
-/// answer is read from the rule's own
+/// cells, and `boundp`/`fboundp`-style probes are spelled in Clojure too. Three
+/// more arrived with the `lint-sequence`/`lint-numeric` batch, and all three are
+/// scoped *away* from Common Lisp: `get-in` and `into` are Clojure's, and
+/// integer `/` truncating towards zero is Emacs Lisp's — in Common Lisp the same
+/// form is an exact ratio and nothing is lost. Each answer is read from the
+/// rule's own
 /// [`LintRule::dialect_scope`] — the very declaration the engine's dispatcher
 /// consults before it walks anything — so this matrix cannot claim a dialect
 /// the rule would decline, or stay silent about one it handles.
@@ -992,6 +1016,16 @@ fn lint_rule_dialect_scope(command_path: &str) -> Option<RuleDialectScope> {
             paredit_feature_lint_introspection::symbol_function_fset_dynamic_name::rule::RULE
                 .dialect_scope()
         }
+        "inspect nested-get-chain" => {
+            paredit_feature_lint_sequence::nested_get_chain::rule::RULE.dialect_scope()
+        }
+        "inspect redundant-into-empty-collection" => {
+            paredit_feature_lint_sequence::redundant_into_empty_collection::rule::RULE
+                .dialect_scope()
+        }
+        "inspect division-result-precision-loss" => {
+            paredit_feature_lint_numeric::division_result_precision_loss::rule::RULE.dialect_scope()
+        }
         _ => return None,
     })
 }
@@ -1024,7 +1058,7 @@ pub(super) fn support_status(command_path: &str, dialect: &str) -> SupportStatus
         "inspect leftover-trace-call" => {
             Some(matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp))
         }
-        // The twelve commands whose rule declares a dialect scope other than
+        // The fifteen commands whose rule declares a dialect scope other than
         // Common Lisp alone answer from that declaration directly.
         other => lint_rule_dialect_scope(other).map(|scope| scope.includes(dialect)),
     };
@@ -1241,17 +1275,26 @@ mod tests {
     /// rest — Common Lisp included.
     ///
     /// `inspect elisp-file` reads an Emacs Lisp file's own conventions. The
-    /// other two are the first built-in lint rules scoped *away* from Common
+    /// next two are the first built-in lint rules scoped *away* from Common
     /// Lisp: `swap!`/`alter` on an atom and `future`/`promise` are Clojure
     /// constructs with no Common Lisp spelling, so both rules declare
     /// `RuleDialectScope::CLOJURE_ONLY` and are correctly silent on a `.lisp`
-    /// file. `a_dialect_specific_report_is_supported_for_exactly_one_dialect`
+    /// file. `inspect nested-get-chain` and `inspect
+    /// redundant-into-empty-collection` are the same case — `get-in` and `into`
+    /// are Clojure's — and `inspect division-result-precision-loss` is the
+    /// mirror image: integer `/` truncates towards zero in Emacs Lisp, while in
+    /// Common Lisp the identical form is an exact ratio, so the rule declares
+    /// `RuleDialectScope::EMACS_LISP_ONLY` and would be *wrong* to fire on a
+    /// `.lisp` file. `a_dialect_specific_report_is_supported_for_exactly_one_dialect`
     /// below is what keeps this list from becoming a place to hide a rule that
     /// is merely under-supported.
-    const DIALECT_SPECIFIC_REPORTS: [&str; 3] = [
+    const DIALECT_SPECIFIC_REPORTS: [&str; 6] = [
         "inspect elisp-file",
         "inspect atom-swap-with-side-effect",
         "inspect future-promise-never-realized",
+        "inspect nested-get-chain",
+        "inspect redundant-into-empty-collection",
+        "inspect division-result-precision-loss",
     ];
 
     #[test]

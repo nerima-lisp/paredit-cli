@@ -24,7 +24,13 @@ use super::rule::RuleEntry;
 // `clojure-pre-referencing-percent` were dropped before merge as false-positive
 // generators on correct code; `packages/feature/lint-contract-annotation/README.md`
 // records the primary sources that refuted each premise.
-pub const RULE_COUNT: usize = 266;
+//
+// 266 + the next batch's 20, spread over five packages: 8 (`lint-form-shape`),
+// 4 each (`lint-sequence`, `lint-numeric`), 3 (`lint-string-char`) and 1
+// (`lint-package-hygiene`, new) = 286. Four of the five packages already
+// existed; `lint-package-hygiene` is the twenty-fourth package the registry
+// reaches into.
+pub const RULE_COUNT: usize = 286;
 
 /// Every rule, in report order: findings are grouped by this order, and the
 /// public `RULES`/`RULE_DOCS` arrays preserve it.
@@ -1106,5 +1112,85 @@ pub const REGISTRY: [RuleEntry; RULE_COUNT] = [
     RuleEntry::new(
         &paredit_feature_lint_introspection::symbol_function_fset_dynamic_name::rule::META,
         &paredit_feature_lint_introspection::symbol_function_fset_dynamic_name::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::destructuring_bind_unused_whole::rule::META,
+        &paredit_feature_lint_form_shape::destructuring_bind_unused_whole::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::loop_collect_into_immediately_returned::rule::META,
+        &paredit_feature_lint_form_shape::loop_collect_into_immediately_returned::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::flet_single_use_inlinable::rule::META,
+        &paredit_feature_lint_form_shape::flet_single_use_inlinable::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::multiple_value_setq_arity_mismatch::rule::META,
+        &paredit_feature_lint_form_shape::multiple_value_setq_arity_mismatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::with_open_file_redundant_direction_default::rule::META,
+        &paredit_feature_lint_form_shape::with_open_file_redundant_direction_default::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::ftype_values_arity_mismatch::rule::META,
+        &paredit_feature_lint_form_shape::ftype_values_arity_mismatch::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::with_accessors_empty_binding_list::rule::META,
+        &paredit_feature_lint_form_shape::with_accessors_empty_binding_list::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_form_shape::quoted_form_contains_stray_unquote::rule::META,
+        &paredit_feature_lint_form_shape::quoted_form_contains_stray_unquote::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::hash_table_iteration_order_assumed::rule::META,
+        &paredit_feature_lint_sequence::hash_table_iteration_order_assumed::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::set_membership_via_linear_scan::rule::META,
+        &paredit_feature_lint_sequence::set_membership_via_linear_scan::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::nested_get_chain::rule::META,
+        &paredit_feature_lint_sequence::nested_get_chain::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_sequence::redundant_into_empty_collection::rule::META,
+        &paredit_feature_lint_sequence::redundant_into_empty_collection::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::mixed_float_precision_arithmetic::rule::META,
+        &paredit_feature_lint_numeric::mixed_float_precision_arithmetic::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::division_result_precision_loss::rule::META,
+        &paredit_feature_lint_numeric::division_result_precision_loss::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::epsilon_less_float_loop_bound::rule::META,
+        &paredit_feature_lint_numeric::epsilon_less_float_loop_bound::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_numeric::redundant_precision_coercion::rule::META,
+        &paredit_feature_lint_numeric::redundant_precision_coercion::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_string_char::format_unknown_directive::rule::META,
+        &paredit_feature_lint_string_char::format_unknown_directive::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_string_char::format_percent_ampersand_adjacent_redundancy::rule::META,
+        &paredit_feature_lint_string_char::format_percent_ampersand_adjacent_redundancy::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_string_char::format_nested_directive_unbalanced::rule::META,
+        &paredit_feature_lint_string_char::format_nested_directive_unbalanced::rule::RULE,
+    ),
+    RuleEntry::new(
+        &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::META,
+        &paredit_feature_lint_package_hygiene::package_circular_in_package_chain::rule::RULE,
     ),
 ];

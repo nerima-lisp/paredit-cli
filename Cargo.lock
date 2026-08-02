@@ -688,6 +688,7 @@ dependencies = [
  "paredit-feature-lint-iteration-flow",
  "paredit-feature-lint-numeric",
  "paredit-feature-lint-object-system",
+ "paredit-feature-lint-package-hygiene",
  "paredit-feature-lint-performance",
  "paredit-feature-lint-portability",
  "paredit-feature-lint-repl-debug",
@@ -1135,6 +1136,17 @@ dependencies = [
 
 [[package]]
 name = "paredit-feature-lint-object-system"
+version = "1.4.0"
+dependencies = [
+ "clap",
+ "paredit-core-cli",
+ "paredit-core-lint-engine",
+ "paredit-core-syntax",
+ "serde_json",
+]
+
+[[package]]
+name = "paredit-feature-lint-package-hygiene"
 version = "1.4.0"
 dependencies = [
  "clap",
