@@ -25,7 +25,7 @@ use paredit_core_cli::report::{FileFindings, Finding};
 use paredit_core_syntax::common_lisp::common_lisp_symbol_reference_needle;
 use paredit_core_syntax::definition::definition_shape;
 use paredit_core_syntax::dialect::Dialect;
-use paredit_core_syntax::sexpr::{ByteSpan, Path as SexprPath, SyntaxTree};
+use paredit_core_syntax::sexpr::{ByteSpan, ExpressionView, SyntaxTree};
 use paredit_core_syntax::view_query::list_head;
 use paredit_feature_function_parameter::function_parameter::domain::list_lambda_list_parameter_names;
 use serde_json::{Value, json};
@@ -91,32 +91,48 @@ pub fn build_duplicate_parameter_report(
     dialect: Dialect,
     tree: &SyntaxTree,
 ) -> LintResult<FileFindings<DuplicateParameterItem>> {
-    if dialect != Dialect::CommonLisp {
-        return Ok(FileFindings::new(
-            path.to_path_buf(),
-            dialect,
-            false,
-            tree.source(),
-            Vec::new(),
-            vec![("definition_count", json!(0))],
-        ));
-    }
+    let root = tree.root_view();
+    let (duplicates, definition_count) = collect_duplicate_parameters(dialect, &root);
+    Ok(FileFindings::new(
+        path.to_path_buf(),
+        dialect,
+        dialect == Dialect::CommonLisp,
+        tree.source(),
+        duplicates,
+        vec![("definition_count", json!(definition_count))],
+    ))
+}
 
+/// Every duplicated parameter in the top-level definitions of `root`, with the
+/// number of definitions scanned.
+///
+/// Split out of [`build_duplicate_parameter_report`] so the lint rule can reuse
+/// the root view the dispatcher already materialized. Rebuilding it from the
+/// `SyntaxTree` costs a full extra materialization of the document — a `Vec`
+/// per node and a `String` per atom — and the `FileFindings` wrapper the rule
+/// would then discard costs a line index over the whole source besides.
+#[must_use]
+pub fn collect_duplicate_parameters(
+    dialect: Dialect,
+    root: &ExpressionView,
+) -> (Vec<DuplicateParameterItem>, usize) {
     let mut definition_count = 0;
     let mut duplicates = Vec::new();
+    if dialect != Dialect::CommonLisp {
+        return (duplicates, definition_count);
+    }
 
-    for index in 0..tree.root_children().len() {
-        let view = tree.select_path(&SexprPath::root_child(index))?.view();
-        let Some(head) = list_head(&view) else {
+    for view in &root.children {
+        let Some(head) = list_head(view) else {
             continue;
         };
-        let Some(shape) = definition_shape(dialect, &view, head) else {
+        let Some(shape) = definition_shape(dialect, view, head) else {
             continue;
         };
         if !shape.category.is_callable() {
             continue;
         }
-        let Some(lambda_list) = shape.lambda_list(&view) else {
+        let Some(lambda_list) = shape.lambda_list(view) else {
             continue;
         };
         // A lambda list this parser cannot classify is skipped rather than
@@ -126,7 +142,7 @@ pub fn build_duplicate_parameter_report(
         };
         definition_count += 1;
 
-        let definition = shape.name(&view).unwrap_or("?").to_owned();
+        let definition = shape.name(view).unwrap_or("?").to_owned();
 
         // Preserve first-seen spelling and declaration order while counting.
         let mut order: Vec<String> = Vec::new();
@@ -154,14 +170,7 @@ pub fn build_duplicate_parameter_report(
         }
     }
 
-    Ok(FileFindings::new(
-        path.to_path_buf(),
-        dialect,
-        true,
-        tree.source(),
-        duplicates,
-        vec![("definition_count", json!(definition_count))],
-    ))
+    (duplicates, definition_count)
 }
 
 #[cfg(test)]

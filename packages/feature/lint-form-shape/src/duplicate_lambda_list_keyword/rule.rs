@@ -6,7 +6,7 @@
 
 use paredit_core_lint_engine::LintResult;
 
-use crate::duplicate_lambda_list_keyword::domain::build_duplicate_lambda_list_keyword_report;
+use crate::duplicate_lambda_list_keyword::domain::collect_duplicate_lambda_list_keywords;
 use paredit_core_lint_engine::engine::{RuleContext, RuleSink};
 use paredit_core_lint_engine::model::{Fixability, HeadFilter, RuleCategory, RuleMeta, Severity};
 use paredit_core_lint_engine::rule::LintRule;
@@ -33,15 +33,12 @@ impl LintRule for Rule {
     fn check(
         &self,
         context: &RuleContext<'_>,
-        _view: &ExpressionView,
+        view: &ExpressionView,
         sink: &mut RuleSink<'_, '_>,
     ) -> LintResult<()> {
-        let report = build_duplicate_lambda_list_keyword_report(
-            context.path(),
-            context.dialect(),
-            context.tree(),
-        )?;
-        for item in report.findings {
+        let (duplicates, _definition_count) =
+            collect_duplicate_lambda_list_keywords(context.dialect(), view);
+        for item in duplicates {
             let span = item.span;
 
             sink.report(
