@@ -2993,6 +2993,569 @@
               "shortDescription": {
                 "text": "a file that declares a package and defines symbols but never enters it"
               }
+            },
+            {
+              "id": "block-name-shadows-outer-block",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a nested block reusing an outer block's name"
+              }
+            },
+            {
+              "id": "dotimes-dolist-index-var-mutated",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a dotimes or dolist iteration variable assigned inside the body"
+              }
+            },
+            {
+              "id": "go-to-undefined-tag",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a go targeting a tag no enclosing tagbody establishes"
+              }
+            },
+            {
+              "id": "multiple-value-bind-all-ignored",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a multiple-value-bind none of whose variables the body references"
+              }
+            },
+            {
+              "id": "return-from-unmatched-block",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a return-from naming a block that does not lexically enclose it"
+              }
+            },
+            {
+              "id": "return-outside-implicit-nil-block",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a return with no enclosing form establishing the implicit nil block"
+              }
+            },
+            {
+              "id": "tagbody-unreachable-tag",
+              "properties": {
+                "category": "dead-code",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a tagbody label no go in the form ever targets"
+              }
+            },
+            {
+              "id": "case-key-eql-pitfall",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a case/ecase/ccase clause keyed on a string or float literal, which eql does not match dependably"
+              }
+            },
+            {
+              "id": "cond-to-case-candidate",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a cond whose every test compares one variable against a literal (case says it directly)"
+              }
+            },
+            {
+              "id": "nested-cond-flattenable",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a cond whose final t clause holds only another cond, which splices into the outer clause list"
+              }
+            },
+            {
+              "id": "when-unless-implicit-nil-misused",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a when/unless value used as an argument to an operator that requires a number"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "The `~/package:function/` directive names the function `format` calls, and the name is read out of the control string. A control string the program did not write in full therefore chooses which function runs, not just how a value is printed."
+              },
+              "id": "format-tilde-slash-unvalidated-function-designator",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "The `~/package:function/` directive names the function `format` calls, and the name is read out of the control string. A control string the program did not write in full therefore chooses which function runs, not just how a value is printed.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a format control string built or supplied at runtime, so a ~/pkg:fn/ directive in it calls an arbitrary function"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A name the source spells, in a directory every user can write, can be created first by anyone — as a symlink to a file the program's own user owns. The program then writes through that link. Randomizing the name and creating it with O_EXCL semantics closes it."
+              },
+              "id": "insecure-temp-file-fixed-name-shared-directory",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "A name the source spells, in a directory every user can write, can be created first by anyone — as a symlink to a file the program's own user owns. The program then writes through that link. Randomizing the name and creating it with O_EXCL semantics closes it.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a fixed, predictable filename opened for writing under a world-writable temporary directory"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "String concatenation has no notion of a path boundary, so a base directory pasted in front of a value confines nothing: a value containing `..` walks straight out of it. Resolving the result with `truename` and checking it is still under the base, or taking only `pathname-name` of the value, is what actually confines it."
+              },
+              "id": "path-traversal-via-concatenated-filename",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "String concatenation has no notion of a path boundary, so a base directory pasted in front of a value confines nothing: a value containing `..` walks straight out of it. Resolving the result with `truename` and checking it is still under the base, or taking only `pathname-name` of the value, is what actually confines it.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a filename concatenated from a literal base directory and an unchecked value, opened without resolving it"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`*read-eval*` is true by default, so writing `t` to it cannot enable anything that was not already on — it can only undo a `nil` binding placed there deliberately. After it, `#.(…)` in whatever is read next executes as part of reading."
+              },
+              "id": "read-eval-star-rebound-to-t",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "`*read-eval*` is true by default, so writing `t` to it cannot enable anything that was not already on — it can only undo a `nil` binding placed there deliberately. After it, `#.(…)` in whatever is read next executes as part of reading.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "*read-eval* explicitly set or bound to t, re-arming #. evaluation inside read"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A statement built by string interpolation is parsed as SQL after the value is already in it, so a value containing a quote or a comment marker becomes syntax. Passing the value as a bound parameter means the SQL is parsed first and the value never can be."
+              },
+              "id": "sql-query-string-built-via-format",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "A statement built by string interpolation is parsed as SQL after the value is already in it, so a value containing a quote or a comment marker becomes syntax. Passing the value as a bound parameter means the SQL is parsed first and the value never can be.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a SQL statement assembled from a value, so the value becomes statement syntax rather than data"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A world-writable file can be replaced by any user on the host, so anything the program later reads back from it is attacker-controlled. Granting write to the owner, or to the owner's group, expresses the same intent without that."
+              },
+              "id": "world-writable-file-mode-in-open-call",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "A world-writable file can be replaced by any user on the host, so anything the program later reads back from it is attacker-controlled. Granting write to the owner, or to the owner's group, expresses the same intent without that.",
+                "severity": "error",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an explicit octal permission argument that grants write access to every user on the host"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Each `mapcar` walks its sequence once and allocates a fresh one. Chaining two of them builds an intermediate sequence that nothing else can reach, walks it, and discards it. Composing the two functions makes one pass and one allocation."
+              },
+              "id": "redundant-full-sequence-traversal-fusable-maps",
+              "properties": {
+                "category": "performance",
+                "fixable": false,
+                "rationale": "Each `mapcar` walks its sequence once and allocates a fresh one. Chaining two of them builds an intermediate sequence that nothing else can reach, walks it, and discards it. Composing the two functions makes one pass and one allocation.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a map over the result of another map, which walks and allocates a whole intermediate sequence"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A second `gethash` for a key already looked up hashes the key again and probes the table again to return what the first call returned. Binding the result once replaces n probes with one, and `multiple-value-bind` keeps the presence flag if the code needs it."
+              },
+              "id": "repeated-hash-table-lookup-same-key",
+              "properties": {
+                "category": "performance",
+                "fixable": false,
+                "rationale": "A second `gethash` for a key already looked up hashes the key again and probes the table again to return what the first call returned. Binding the result once replaces n probes with one, and `multiple-value-bind` keeps the presence flag if the code needs it.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "two or more gethash reads of one literal key on one table in a body that never writes it"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Sorting orders every element — O(n log n) comparisons — to answer a question about one of them. Finding a minimum or a maximum is a single linear pass with no ordering, and `reduce`, `loop … minimize`, and `loop … maximize` all spell it directly."
+              },
+              "id": "unnecessary-sort-before-extremum-extraction",
+              "properties": {
+                "category": "performance",
+                "fixable": false,
+                "rationale": "Sorting orders every element — O(n log n) comparisons — to answer a question about one of them. Finding a minimum or a maximum is a single linear pass with no ordering, and `reduce`, `loop … minimize`, and `loop … maximize` all spell it directly.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a full sort whose result is only read at one end, where a single linear pass would do"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`char-code-limit` is implementation-dependent — 1114112 on SBCL and CLISP — so a loop bounded by a literal 256 that calls `code-char` on its index enumerates the entire character repertoire on some implementations and a small prefix of it on others. Bounding the loop by `char-code-limit` says what was meant."
+              },
+              "id": "char-code-limit-loop-assumption",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "rationale": "`char-code-limit` is implementation-dependent — 1114112 on SBCL and CLISP — so a loop bounded by a literal 256 that calls `code-char` on its index enumerates the entire character repertoire on some implementations and a small prefix of it on others. Bounding the loop by `char-code-limit` says what was meant.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a loop over character codes 0-255, which is the whole character set only where char-code-limit is 256"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "`namestring` returns the pathname in an implementation-dependent canonical form, and the standard nowhere guarantees that parsing that form yields the same pathname. Since every filesystem operator already accepts a pathname designator, the conversion buys nothing and risks the components the host's syntax cannot spell."
+              },
+              "id": "namestring-round-trip-assumption",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "rationale": "`namestring` returns the pathname in an implementation-dependent canonical form, and the standard nowhere guarantees that parsing that form yields the same pathname. Since every filesystem operator already accepts a pathname designator, the conversion buys nothing and risks the components the host's syntax cannot spell.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a pathname rendered to a string and handed straight to a filesystem call, which assumes the rendering parses back unchanged"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "The standard says `sort` is not guaranteed stable and that `stable-sort` is, so whether equal elements keep their relative order is a property of the implementation. Sorting an already-sorted sequence by a second ordering is the one shape that depends on that order being kept: the outer pass must be stable or the first key is discarded."
+              },
+              "id": "sort-not-guaranteed-stable",
+              "properties": {
+                "category": "portability",
+                "fixable": false,
+                "rationale": "The standard says `sort` is not guaranteed stable and that `stable-sort` is, so whether equal elements keep their relative order is a property of the implementation. Sorting an already-sorted sequence by a second ordering is the one shape that depends on that order being kept: the outer pass must be stable or the first key is discarded.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a sequence sorted twice by different orderings, where the outer pass is the unstable `sort`"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Every step of a nested lambda chain is spelled only by its position, so following the data flow means re-reading the whole expression. Naming the intermediate steps — a `let`, an `flet`, a top-level helper — costs one line and gives a reader something to hold on to."
+              },
+              "id": "deeply-nested-anonymous-lambda",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Every step of a nested lambda chain is spelled only by its position, so following the data flow means re-reading the whole expression. Naming the intermediate steps — a `let`, an `flet`, a top-level helper — costs one line and gives a reader something to hold on to.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "three or more anonymous lambdas nested with no intervening named binding"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Inside the nested function the name no longer means what a reader of the enclosing one expects, and nothing at the point of use says so. Renaming the inner parameter costs nothing and removes the question."
+              },
+              "id": "nested-function-parameter-shadows-enclosing-parameter",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Inside the nested function the name no longer means what a reader of the enclosing one expects, and nothing at the point of use says so. Renaming the inner parameter costs nothing and removes the question.",
+                "severity": "warning",
+                "tags": [
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "an flet/labels or nested-defun parameter reusing an enclosing function's parameter name"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A long positional parameter list is unreadable at the call site: nothing there says which argument is which, so every reader has to go and find the lambda list. `&key` parameters name them in place; a structure groups the ones that always travel together."
+              },
+              "id": "overly-long-parameter-list",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A long positional parameter list is unreadable at the call site: nothing there says which argument is which, so every reader has to go and find the lambda list. `&key` parameters name them in place; a structure groups the ones that always travel together.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "a definition declaring more required parameters than a threshold"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Nothing at a call site of unlabelled constants says which is which, so every reader has to go and find the callee's lambda list. Keyword arguments put the names where they are read, and cost nothing at the definition."
+              },
+              "id": "positional-argument-count-exceeds-readability",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "Nothing at a call site of unlabelled constants says which is which, so every reader has to go and find the callee's lambda list. Keyword arguments put the names where they are read, and cost nothing at the definition.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "a call passing a long run of unlabelled literal arguments of mixed kinds"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A set of short string literals compared for equality is an enumeration written as text. Nothing checks it: a misspelt literal compiles, reads fine, and silently falls through. Interning the value once at the boundary turns the same dispatch into a `case`, where a typo becomes a clause that is visibly never taken."
+              },
+              "id": "stringly-typed-dispatch",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "A set of short string literals compared for equality is an enumeration written as text. Nothing checks it: a misspelt literal compiles, reads fine, and silently falls through. Interning the value once at the boundary turns the same dispatch into a `case`, where a typo becomes a clause that is visibly never taken.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "a cond/if chain dispatching on string equality against an enumeration of literals"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A worked example is the part of a docstring a reader trusts most, and the part nothing checks. String contents are never rewritten by a rename or a signature change, so an example goes stale silently and stays that way. Its arity, unlike the rest of a docstring, is decidable: the lambda list is right there."
+              },
+              "id": "docstring-example-stale-arity",
+              "properties": {
+                "category": "documentation",
+                "fixable": false,
+                "rationale": "A worked example is the part of a docstring a reader trusts most, and the part nothing checks. String contents are never rewritten by a rename or a signature change, so an example goes stale silently and stays that way. Its arity, unlike the rest of a docstring, is decidable: the lambda list is right there.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a docstring example calling its own definition with an argument count the lambda list rejects"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "Everything that lists documentation lists the docstring's *first line*: `apropos`, an editor's echo-area hint, a generated API index. A first line long enough to be truncated in all of them is the whole explanation with its line breaks missing, not a summary."
+              },
+              "id": "docstring-summary-line-too-long",
+              "properties": {
+                "category": "documentation",
+                "fixable": false,
+                "rationale": "Everything that lists documentation lists the docstring's *first line*: `apropos`, an editor's echo-area hint, a generated API index. A first line long enough to be truncated in all of them is the whole explanation with its line breaks missing, not a summary.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "a docstring whose first line is wider than the configured summary limit"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A package is the unit a reader meets first — what `:use` names, what `apropos` groups by, what an API index is organised around — and the one definition nothing else in this suite asks about: `missing-docstring` does not list `defpackage`, and `inspect docstrings` excludes it. A file can document all forty of its functions and still never say what the package they live in is for."
+              },
+              "id": "missing-package-docstring",
+              "properties": {
+                "category": "documentation",
+                "fixable": false,
+                "rationale": "A package is the unit a reader meets first — what `:use` names, what `apropos` groups by, what an API index is organised around — and the one definition nothing else in this suite asks about: `missing-docstring` does not list `defpackage`, and `inspect docstrings` excludes it. A file can document all forty of its functions and still never say what the package they live in is for.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "a defpackage with no (:documentation \"…\") option and no comment describing the package"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "An unattributed marker is a note to nobody: no owner to ask, no ticket to schedule, and no date to judge its age by. Finding out costs a `git blame`. One more token answers all three questions."
+              },
+              "id": "todo-fixme-no-attribution",
+              "properties": {
+                "category": "documentation",
+                "fixable": false,
+                "rationale": "An unattributed marker is a note to nobody: no owner to ask, no ticket to schedule, and no date to judge its age by. Finding out costs a `git blame`. One more token answers all three questions.",
+                "severity": "warning",
+                "tags": [
+                  "pedantic"
+                ]
+              },
+              "shortDescription": {
+                "text": "a TODO/FIXME marker with no owner, ticket reference, or date"
+              }
+            },
+            {
+              "id": "clojure-pre-post-vacuous",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a defn :pre/:post vector that is empty or all literal true, so it asserts nothing"
+              }
+            },
+            {
+              "id": "typed-racket-arity-mismatch",
+              "properties": {
+                "category": "arity",
+                "fixable": false,
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a Typed Racket (: name (-> ...)) annotation whose arrow arity disagrees with the define"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A symbol interned into a package chosen at run time is not where any cross-reference, grep, or `apropos` will look for it, and a computed package name that names no package makes `find-package` return nil, which `intern` then signals on."
+              },
+              "id": "intern-dynamic-package-target",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "A symbol interned into a package chosen at run time is not where any cross-reference, grep, or `apropos` will look for it, and a computed package name that names no package makes `find-package` return nil, which `intern` then signals on.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "an intern whose package argument is a computed expression, so the target package is not statically knowable"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "These lookups return nil rather than signalling when the name resolves to nothing. Applying the result in the same expression leaves no point at which the nil could be noticed, so a mistyped name or an unloaded package surfaces as a call to nil."
+              },
+              "id": "introspection-probe-unchecked",
+              "properties": {
+                "category": "suspicious",
+                "fixable": false,
+                "rationale": "These lookups return nil rather than signalling when the name resolves to nothing. Applying the result in the same expression leaves no point at which the nil could be noticed, so a mistyped name or an unloaded package surfaces as a call to nil.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a lookup that answers nil when not found, applied by funcall/apply with no opportunity to check it"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "A function whose name exists only at run time is invisible to grep, to a cross-reference index, and to `who-calls`. Whatever computes the name also decides which function cell is overwritten, so a name derived from outside the program can replace an existing definition."
+              },
+              "id": "symbol-function-fset-dynamic-name",
+              "properties": {
+                "category": "security",
+                "fixable": false,
+                "rationale": "A function whose name exists only at run time is invisible to grep, to a cross-reference index, and to `who-calls`. Whatever computes the name also decides which function cell is overwritten, so a name derived from outside the program can replace an existing definition.",
+                "severity": "warning",
+                "tags": []
+              },
+              "shortDescription": {
+                "text": "a function definition installed under a name built by intern, which no search can connect to its callers"
+              }
             }
           ]
         }

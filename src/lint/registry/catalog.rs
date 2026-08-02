@@ -174,23 +174,44 @@ pub const PEDANTIC_RULES: [&str; tagged_count(RuleTag::Pedantic)] = {
 
 // The suite's shape, pinned. A rule added or removed without updating these is
 // a compile error rather than a silently different report.
-// 212 (through PR #81) + 6 (`lint-testing`) + 7 (`lint-concurrency`) + 4
-// (`lint-build-system`) = 229.
-const _: () = assert!(RULE_COUNT == 229);
-// Unchanged at 99: every one of this branch's 17 rules is
+// 229 (through PR #82) + this branch's 37, spread over nine packages: 7
+// (`lint-control-flow`), 6 (`lint-safety`), 5 (`lint-call-shape`), 4 each
+// (`lint-conditional`, `lint-documentation`), 2 (`lint-contract-annotation`)
+// and 3 each (`lint-performance`, `lint-portability`, `lint-introspection`) =
+// 266.
+//
+// 37, not the 39 this branch first proposed. `check-type-redundant-with-declare`
+// and `clojure-pre-referencing-percent` were dropped before merge once their
+// premises were checked against the primary sources and refuted; both were
+// false-positive generators on correct code. See
+// `packages/feature/lint-contract-annotation/README.md`.
+const _: () = assert!(RULE_COUNT == 266);
+// Unchanged at 99: every one of this branch's 37 rules is
 // `Fixability::ReportOnly`. Each one reports a judgment the tool cannot make
-// on the author's behalf — what a test should assert, where a lock's release
-// belongs, or which version string a system ships under are all decisions the
-// author has to make, not spellings of one they already made.
+// on the author's behalf — whether an annotation or the parameter list under it
+// is the wrong half, which of two nested `cond`s the author meant to keep, or
+// how a temp file should be named are all decisions the author has to make,
+// not spellings of one they already made. The two dropped rules were
+// `ReportOnly` too, which is why this number does not move with them.
 const _: () = assert!(fixable_count() == 99);
-// 150 (through PR #81) + 14 of this branch's 17 rules. The other 3 are
-// `Severity::Error`: `duplicate-test-name`, `lock-acquired-not-released` and
-// `asdf-self-referential-depends-on`.
-const _: () = assert!(warning_count() == 164);
+// 164 (through PR #82) + 31 of this branch's 37 rules. The other 6 are
+// `Severity::Error`: `when-unless-implicit-nil-misused` and the five
+// `lint-safety` rules that report an exploitable defect rather than a risk —
+// `format-tilde-slash-unvalidated-function-designator`,
+// `path-traversal-via-concatenated-filename`, `read-eval-star-rebound-to-t`,
+// `sql-query-string-built-via-format` and
+// `world-writable-file-mode-in-open-call`. Both dropped rules were `Warning`,
+// so this fell by 2 where `fixable_count` did not.
+const _: () = assert!(warning_count() == 195);
 const _: () = assert!(EXPERIMENTAL_RULES.is_empty());
-// 5 (through PR #81) + `asdf-system-missing-version`, whose `:version`
-// convention roughly 10% of correct Quicklisp systems decline to follow.
-const _: () = assert!(PEDANTIC_RULES.len() == 6);
+// 6 (through PR #82) + 8 of this branch's rules: `lint-call-shape`'s four
+// threshold rules, whose limits are conventions a codebase either adopted or
+// did not; `lint-documentation`'s `docstring-summary-line-too-long`,
+// `missing-package-docstring` and `todo-fixme-no-attribution`; and
+// `repeated-hash-table-lookup-same-key`, which is a real cost only on a hot
+// path the rule cannot identify. Neither dropped rule was tagged `pedantic`,
+// so this does not move either.
+const _: () = assert!(PEDANTIC_RULES.len() == 14);
 
 fn meta_of(name: &str) -> Option<&'static crate::lint::model::RuleMeta> {
     REGISTRY

@@ -579,6 +579,26 @@ impl SyntaxTree {
         &self.node(NodeId::ROOT).children
     }
 
+    /// Returns the span of the top-level form at `index`, or `None` past the
+    /// end of the document.
+    ///
+    /// The allocation-free counterpart of
+    /// `select_path(&Path::root_child(index))?.span()`. That spelling reads
+    /// like a node-id lookup and a span read, and several callers document
+    /// themselves as costing exactly that — but [`ExpressionPath`] owns a
+    /// `Vec<ChildIndex>`, so `Path::root_child` heap-allocates, once per call.
+    /// Callers that binary-search the top level pay `log2(forms)` allocations
+    /// to answer one question about one node, which is what this exists to
+    /// avoid; here it is an index into a slice and a field read.
+    ///
+    /// [`ExpressionPath`]: crate::sexpr::Path
+    #[must_use]
+    pub fn root_child_span(&self, index: usize) -> Option<ByteSpan> {
+        self.root_children()
+            .get(index)
+            .map(|node_id| self.node(*node_id).span)
+    }
+
     /// Returns an immutable tree view rooted at the virtual document node.
     #[must_use]
     pub fn root_view(&self) -> ExpressionView {

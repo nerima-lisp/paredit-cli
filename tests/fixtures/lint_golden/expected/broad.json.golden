@@ -1,5 +1,5 @@
 {
-  "finding_count": 140,
+  "finding_count": 141,
   "findings": [
     {
       "category": "suspicious",
@@ -1820,6 +1820,19 @@
         "end": 10063,
         "start": 10031
       }
+    },
+    {
+      "category": "suspicious",
+      "fixable": false,
+      "id": "return-from-unmatched-block/83c6c0866319952f/0",
+      "message": "return-from names the block `blk`, which no enclosing form establishes; a block name is lexical",
+      "path": "broad.lisp",
+      "rule": "return-from-unmatched-block",
+      "severity": "warning",
+      "span": {
+        "end": 2941,
+        "start": 2920
+      }
     }
   ],
   "partial_failures": [],
@@ -3161,6 +3174,180 @@
       "count": 1,
       "description": "a file that declares a package and defines symbols but never enters it",
       "rule": "defpackage-without-in-package"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a nested block reusing an outer block's name",
+      "rule": "block-name-shadows-outer-block"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a dotimes or dolist iteration variable assigned inside the body",
+      "rule": "dotimes-dolist-index-var-mutated"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a go targeting a tag no enclosing tagbody establishes",
+      "rule": "go-to-undefined-tag"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a multiple-value-bind none of whose variables the body references",
+      "rule": "multiple-value-bind-all-ignored"
+    },
+    {
+      "category": "suspicious",
+      "count": 1,
+      "description": "a return-from naming a block that does not lexically enclose it",
+      "rule": "return-from-unmatched-block"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a return with no enclosing form establishing the implicit nil block",
+      "rule": "return-outside-implicit-nil-block"
+    },
+    {
+      "category": "dead-code",
+      "count": 0,
+      "description": "a tagbody label no go in the form ever targets",
+      "rule": "tagbody-unreachable-tag"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a case/ecase/ccase clause keyed on a string or float literal, which eql does not match dependably",
+      "rule": "case-key-eql-pitfall"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a cond whose every test compares one variable against a literal (case says it directly)",
+      "rule": "cond-to-case-candidate"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a cond whose final t clause holds only another cond, which splices into the outer clause list",
+      "rule": "nested-cond-flattenable"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a when/unless value used as an argument to an operator that requires a number",
+      "rule": "when-unless-implicit-nil-misused"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a format control string built or supplied at runtime, so a ~/pkg:fn/ directive in it calls an arbitrary function",
+      "rule": "format-tilde-slash-unvalidated-function-designator"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a fixed, predictable filename opened for writing under a world-writable temporary directory",
+      "rule": "insecure-temp-file-fixed-name-shared-directory"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a filename concatenated from a literal base directory and an unchecked value, opened without resolving it",
+      "rule": "path-traversal-via-concatenated-filename"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "*read-eval* explicitly set or bound to t, re-arming #. evaluation inside read",
+      "rule": "read-eval-star-rebound-to-t"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a SQL statement assembled from a value, so the value becomes statement syntax rather than data",
+      "rule": "sql-query-string-built-via-format"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "an explicit octal permission argument that grants write access to every user on the host",
+      "rule": "world-writable-file-mode-in-open-call"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a map over the result of another map, which walks and allocates a whole intermediate sequence",
+      "rule": "redundant-full-sequence-traversal-fusable-maps"
+    },
+    {
+      "category": "performance",
+      "count": 0,
+      "description": "a full sort whose result is only read at one end, where a single linear pass would do",
+      "rule": "unnecessary-sort-before-extremum-extraction"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a loop over character codes 0-255, which is the whole character set only where char-code-limit is 256",
+      "rule": "char-code-limit-loop-assumption"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a pathname rendered to a string and handed straight to a filesystem call, which assumes the rendering parses back unchanged",
+      "rule": "namestring-round-trip-assumption"
+    },
+    {
+      "category": "portability",
+      "count": 0,
+      "description": "a sequence sorted twice by different orderings, where the outer pass is the unstable `sort`",
+      "rule": "sort-not-guaranteed-stable"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "an flet/labels or nested-defun parameter reusing an enclosing function's parameter name",
+      "rule": "nested-function-parameter-shadows-enclosing-parameter"
+    },
+    {
+      "category": "documentation",
+      "count": 0,
+      "description": "a docstring example calling its own definition with an argument count the lambda list rejects",
+      "rule": "docstring-example-stale-arity"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a defn :pre/:post vector that is empty or all literal true, so it asserts nothing",
+      "rule": "clojure-pre-post-vacuous"
+    },
+    {
+      "category": "arity",
+      "count": 0,
+      "description": "a Typed Racket (: name (-> ...)) annotation whose arrow arity disagrees with the define",
+      "rule": "typed-racket-arity-mismatch"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "an intern whose package argument is a computed expression, so the target package is not statically knowable",
+      "rule": "intern-dynamic-package-target"
+    },
+    {
+      "category": "suspicious",
+      "count": 0,
+      "description": "a lookup that answers nil when not found, applied by funcall/apply with no opportunity to check it",
+      "rule": "introspection-probe-unchecked"
+    },
+    {
+      "category": "security",
+      "count": 0,
+      "description": "a function definition installed under a name built by intern, which no search can connect to its callers",
+      "rule": "symbol-function-fset-dynamic-name"
     }
   ],
   "policy": {
